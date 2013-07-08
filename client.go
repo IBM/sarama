@@ -4,11 +4,10 @@ import (
 	"encoding/binary"
 	"math"
 	"net"
-	"strings"
 )
 
-type ApiKey uint16
-type ApiVersion uint16
+type ApiKey int16
+type ApiVersion int16
 
 type API struct {
 	key     ApiKey
@@ -77,19 +76,38 @@ func (client *Client) read() (buf []byte, err error) {
 }
 
 func encodeString(in string) (buf []byte) {
-	r := strings.NewReader(in)
-	size := r.Len()
+	size := len(in)
 	if size > math.MaxInt16 {
 		panic("string too long to encode") /* Or just return nil? */
 	}
 	buf = make([]byte, 2+size)
 	binary.BigEndian.PutUint16(buf, uint16(size))
 	if size > 0 {
-		_, err := r.Read(buf[2:])
-		if err != nil {
-			/* this should never happen */
-			panic("couldn't read from string")
-		}
+		copy(buf[2:], in)
 	}
 	return buf
+}
+
+func encodeBytes(in []byte) (buf []byte) {
+	size := len(in)
+	if size > math.MaxInt32 {
+		panic("bytes too long to encode") /* Or just return nil? */
+	}
+	buf = make([]byte, 4+size)
+	binary.BigEndian.PutUint32(buf, uint32(size))
+	if size > 0 {
+		copy(buf[4:], in)
+	}
+	return buf
+}
+
+func (client *Client) sendRequest(api *API, body []byte) (err error) {
+	id := encodeString(client.id)
+	buf := make([]byte, 4+len(id)+len(body))
+	binary.BigEndian.PutUint16(buf[0:2], uint16(api.key))
+	binary.BigEndian.PutUint16(buf[2:4], uint16(api.version))
+	binary.BigEndian.PutUint32(buf[4:8], uint32(client.correlation_id))
+	copy(buf[8:], id)
+	copy(buf[8+len(id):], body)
+	return client.write(buf)
 }
