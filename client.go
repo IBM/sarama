@@ -107,6 +107,7 @@ func (client *Client) sendRequest(api *API, body []byte) (err error) {
 	binary.BigEndian.PutUint16(buf[0:2], uint16(api.key))
 	binary.BigEndian.PutUint16(buf[2:4], uint16(api.version))
 	binary.BigEndian.PutUint32(buf[4:8], uint32(client.correlation_id))
+	client.correlation_id++
 	copy(buf[8:], id)
 	copy(buf[8+len(id):], body)
 	return client.write(buf)
