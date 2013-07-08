@@ -63,13 +63,13 @@ func (client *Client) read() (buf []byte, err error) {
 	if n != 4 {
 		return nil, nil
 	}
-	s := binary.BigEndian.Uint32(size)
+	s := int32(binary.BigEndian.Uint32(size))
 	buf = make([]byte, s)
 	n, err = client.conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
-	if uint32(n) != s {
+	if n != int(s) {
 		return nil, nil
 	}
 	return buf, nil
