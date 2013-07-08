@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"encoding/binary"
-	"math"
 	"net"
 )
 
@@ -26,7 +25,8 @@ var (
 )
 
 type Client struct {
-	addr, id       string
+	addr           string
+	id             *string
 	correlation_id int32
 	conn           net.Conn
 }
@@ -36,7 +36,7 @@ func NewClient(addr string) (client *Client, err error) {
 	if err != nil {
 		return nil, err
 	}
-	client = &Client{addr, "", 0, conn}
+	client = &Client{addr, nil, 0, conn}
 	return client, err
 }
 
@@ -75,40 +75,20 @@ func (client *Client) read() (buf []byte, err error) {
 	return buf, nil
 }
 
-func encodeString(in string) (buf []byte) {
-	size := len(in)
-	if size > math.MaxInt16 {
-		panic("string too long to encode") /* Or just return nil? */
-	}
-	buf = make([]byte, 2+size)
-	binary.BigEndian.PutUint16(buf, uint16(size))
-	if size > 0 {
-		copy(buf[2:], in)
-	}
-	return buf
-}
-
-func encodeBytes(in []byte) (buf []byte) {
-	size := len(in)
-	if size > math.MaxInt32 {
-		panic("bytes too long to encode") /* Or just return nil? */
-	}
-	buf = make([]byte, 4+size)
-	binary.BigEndian.PutUint32(buf, uint32(size))
-	if size > 0 {
-		copy(buf[4:], in)
-	}
-	return buf
-}
-
 func (client *Client) sendRequest(api *API, body []byte) (err error) {
-	id := encodeString(client.id)
-	buf := make([]byte, 4+len(id)+len(body))
+	idLen, err := stringLen(client.id)
+	if err != nil {
+		return err
+	}
+	buf := make([]byte, 4+idLen+len(body))
 	binary.BigEndian.PutUint16(buf[0:2], uint16(api.key))
 	binary.BigEndian.PutUint16(buf[2:4], uint16(api.version))
 	binary.BigEndian.PutUint32(buf[4:8], uint32(client.correlation_id))
 	client.correlation_id++
-	copy(buf[8:], id)
-	copy(buf[8+len(id):], body)
+	err = encodeString(client.id, buf[8:])
+	if err != nil {
+		return err
+	}
+	copy(buf[8+idLen:], body)
 	return client.write(buf)
 }
