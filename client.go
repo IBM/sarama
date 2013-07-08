@@ -75,20 +75,42 @@ func (client *Client) read() (buf []byte, err error) {
 	return buf, nil
 }
 
-func (client *Client) sendRequest(api *API, body []byte) (err error) {
+func (client *Client) sendRequest(api API, body []byte) (err error) {
 	idLen, err := stringLen(client.id)
 	if err != nil {
 		return err
 	}
 	buf := make([]byte, 4+idLen+len(body))
-	binary.BigEndian.PutUint16(buf[0:2], uint16(api.key))
-	binary.BigEndian.PutUint16(buf[2:4], uint16(api.version))
-	binary.BigEndian.PutUint32(buf[4:8], uint32(client.correlation_id))
+	off := 0
+	binary.BigEndian.PutUint16(buf[off:], uint16(api.key))
+	off += 2
+	binary.BigEndian.PutUint16(buf[off:], uint16(api.version))
+	off += 2
+	binary.BigEndian.PutUint32(buf[off:], uint32(client.correlation_id))
+	off += 4
 	client.correlation_id++
-	err = encodeString(client.id, buf[8:])
+	off, err = encodeString(buf, off, client.id)
 	if err != nil {
 		return err
 	}
-	copy(buf[8+idLen:], body)
+	copy(buf[off:], body)
 	return client.write(buf)
+}
+
+func (client *Client) sendMetadataRequest(topics []string) (err error) {
+	bufLen := 4
+	for i := range topics {
+		bufLen += len(topics[i])
+	}
+	buf := make([]byte, bufLen)
+	off := 0
+	binary.BigEndian.PutUint32(buf[off:], uint32(len(topics)))
+	off += 4
+	for i := range topics {
+		off, err = encodeString(buf, off, &topics[i])
+		if err != nil {
+			return err
+		}
+	}
+	return client.sendRequest(REQUEST_METADATA, buf)
 }

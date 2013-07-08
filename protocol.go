@@ -17,25 +17,28 @@ func stringLen(in *string) (n int, err error) {
 	return 2 + n, nil
 }
 
-func encodeString(in *string, buf []byte) (err error) {
-	if len(buf) < 2 {
-		return errors.New("kafka: buffer too short to encode any string")
+func encodeString(buf []byte, off int, in *string) (int, error) {
+	available := len(buf) - off
+	if available < 2 {
+		return -1, errors.New("kafka: buffer too short to encode any string")
 	}
 	n := -1
 	if in != nil {
 		n = len(*in)
 	}
 	if n > math.MaxInt16 {
-		return errors.New("kafka: string too long to encode")
+		return -1, errors.New("kafka: string too long to encode")
 	}
-	if n > len(buf) {
-		return errors.New("kafka: buffer too short to encode string")
+	if n > available-2 {
+		return -1, errors.New("kafka: buffer too short to encode string")
 	}
-	binary.BigEndian.PutUint16(buf, uint16(n))
+	binary.BigEndian.PutUint16(buf[off:], uint16(n))
+	off += 2
 	if n > 0 {
-		copy(buf[2:], *in)
+		copy(buf[off:], *in)
 	}
-	return nil
+	off += n
+	return off, nil
 }
 
 func decodeString(buf []byte) (out *string, err error) {
@@ -70,25 +73,28 @@ func bytesLen(in *[]byte) (n int, err error) {
 	return 4 + n, nil
 }
 
-func encodeBytes(in *[]byte, buf []byte) (err error) {
-	if len(buf) < 4 {
-		return errors.New("kafka: buffer too short to encode any bytes")
+func encodeBytes(buf []byte, off int, in *[]byte) (int, error) {
+	available := len(buf) - off
+	if available < 4 {
+		return -1, errors.New("kafka: buffer too short to encode any bytes")
 	}
 	n := -1
 	if in != nil {
 		n = len(*in)
 	}
 	if n > math.MaxInt32 {
-		return errors.New("kafka: bytes too long to encode")
+		return -1, errors.New("kafka: bytes too long to encode")
 	}
-	if n > len(buf) {
-		return errors.New("kafka: buffer too short to encode bytes")
+	if n > available-4 {
+		return -1, errors.New("kafka: buffer too short to encode bytes")
 	}
-	binary.BigEndian.PutUint32(buf, uint32(n))
+	binary.BigEndian.PutUint32(buf[off:], uint32(n))
+	off += 4
 	if n > 0 {
-		copy(buf[4:], *in)
+		copy(buf[off:], *in)
 	}
-	return nil
+	off += n
+	return off, nil
 }
 
 func decodebyte(buf []byte) (out *[]byte, err error) {
