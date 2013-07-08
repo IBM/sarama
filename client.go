@@ -5,8 +5,10 @@ import (
 	"net"
 )
 
-type ApiKey int16
-type ApiVersion int16
+type (
+	ApiKey     int16
+	ApiVersion int16
+)
 
 type API struct {
 	key     ApiKey
