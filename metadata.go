@@ -18,21 +18,29 @@ func (m *metadata) encode(pe packetEncoder) {
 
 func (m *metadata) decode(pd *packetDecoder) (err error) {
 	n, err := pd.getArrayCount()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	m.brokers = make([]broker, n)
-	for i := 0; i<n; i++ {
+	for i := 0; i < n; i++ {
 		err = (&m.brokers[i]).decode(pd)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 
 	n, err = pd.getArrayCount()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 
 	m.topics = make([]topicMetadata, n)
-	for i := 0; i<n; i++ {
+	for i := 0; i < n; i++ {
 		err = (&m.topics[i]).decode(pd)
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -70,7 +70,7 @@ func (pd *packetDecoder) getString() (*string, error) {
 		return nil, errors.New("kafka getString: not enough data")
 	default:
 		tmp := new(string)
-		*tmp = string(pd.raw[pd.off:pd.off+n])
+		*tmp = string(pd.raw[pd.off : pd.off+n])
 		return tmp, nil
 	}
 }

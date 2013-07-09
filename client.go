@@ -1,8 +1,8 @@
 package kafka
 
 import (
-	"errors"
 	"encoding/binary"
+	"errors"
 	"math"
 	"net"
 )
