@@ -6,6 +6,16 @@ import (
 	"math"
 )
 
+func encodeInt16(buf []byte, off int, in int16) int {
+	binary.BigEndian.PutUint16(buf[off:], uint16(in))
+	return off + 2
+}
+
+func encodeInt32(buf []byte, off int, in int32) int {
+	binary.BigEndian.PutUint32(buf[off:], uint32(in))
+	return off + 4
+}
+
 func stringLen(in *string) (n int, err error) {
 	if in == nil {
 		return 2, nil
@@ -17,20 +27,10 @@ func stringLen(in *string) (n int, err error) {
 	return 2 + n, nil
 }
 
-func encodeString(buf []byte, off int, in *string) (int, error) {
-	available := len(buf) - off
-	if available < 2 {
-		return -1, errors.New("kafka: buffer too short to encode any string")
-	}
+func encodeString(buf []byte, off int, in *string) int {
 	n := -1
 	if in != nil {
 		n = len(*in)
-	}
-	if n > math.MaxInt16 {
-		return -1, errors.New("kafka: string too long to encode")
-	}
-	if n > available-2 {
-		return -1, errors.New("kafka: buffer too short to encode string")
 	}
 	binary.BigEndian.PutUint16(buf[off:], uint16(n))
 	off += 2
@@ -38,7 +38,7 @@ func encodeString(buf []byte, off int, in *string) (int, error) {
 		copy(buf[off:], *in)
 	}
 	off += n
-	return off, nil
+	return off
 }
 
 func decodeString(buf []byte) (out *string, err error) {
@@ -73,20 +73,10 @@ func bytesLen(in *[]byte) (n int, err error) {
 	return 4 + n, nil
 }
 
-func encodeBytes(buf []byte, off int, in *[]byte) (int, error) {
-	available := len(buf) - off
-	if available < 4 {
-		return -1, errors.New("kafka: buffer too short to encode any bytes")
-	}
+func encodeBytes(buf []byte, off int, in *[]byte) int {
 	n := -1
 	if in != nil {
 		n = len(*in)
-	}
-	if n > math.MaxInt32 {
-		return -1, errors.New("kafka: bytes too long to encode")
-	}
-	if n > available-4 {
-		return -1, errors.New("kafka: buffer too short to encode bytes")
 	}
 	binary.BigEndian.PutUint32(buf[off:], uint32(n))
 	off += 4
@@ -94,10 +84,10 @@ func encodeBytes(buf []byte, off int, in *[]byte) (int, error) {
 		copy(buf[off:], *in)
 	}
 	off += n
-	return off, nil
+	return off
 }
 
-func decodebyte(buf []byte) (out *[]byte, err error) {
+func decodeBytes(buf []byte) (out *[]byte, err error) {
 	if len(buf) < 4 {
 		return nil, errors.New("kafka: buffer too short to contain bytes")
 	}
