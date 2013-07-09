@@ -5,37 +5,35 @@ type metadata struct {
 	topics  []topicMetadata
 }
 
-func (m *metadata) length() (int, error) {
-	length := 4
+func (m *metadata) encode(pe packetEncoder) {
+	pe.putInt32(int32(len(m.brokers)))
 	for i := range m.brokers {
-		tmp, err := (&m.brokers[i]).length()
-		if err != nil {
-			return -1, err
-		}
-		length += tmp
+		(&m.brokers[i]).encode(pe)
 	}
-	length += 4
+	pe.putInt32(int32(len(m.topics)))
 	for i := range m.topics {
-		tmp, err := (&m.topics[i]).length()
-		if err != nil {
-			return -1, err
-		}
-		length += tmp
+		(&m.topics[i]).encode(pe)
 	}
-	return length, nil
 }
 
-func (m *metadata) encode(buf []byte, off int) int {
-	off = encodeInt32(buf, off, int32(len(m.brokers)))
-	for i := range m.brokers {
-		off = (&m.brokers[i]).encode(buf, off)
-	}
-	off = encodeInt32(buf, off, int32(len(m.topics)))
-	for i := range m.topics {
-		off = (&m.topics[i]).encode(buf, off)
-	}
-	return off
-}
+func (m *metadata) decode(pd *packetDecoder) (err error) {
+	n, err := pd.getArrayCount()
+	if err != nil { return err }
 
-func (m *metadata) decode(buf []byte, off int) (int, error) {
+	m.brokers = make([]broker, n)
+	for i := 0; i<n; i++ {
+		err = (&m.brokers[i]).decode(pd)
+		if err != nil { return err }
+	}
+
+	n, err = pd.getArrayCount()
+	if err != nil { return err }
+
+	m.topics = make([]topicMetadata, n)
+	for i := 0; i<n; i++ {
+		err = (&m.topics[i]).decode(pd)
+		if err != nil { return err }
+	}
+
+	return nil
 }

@@ -6,10 +6,10 @@ type broker struct {
 	port   int32
 }
 
-func (b *broker) build(pb packetBuilder) {
-	pb.putInt32(b.nodeId)
-	pb.putString(b.host)
-	pb.putInt32(b.port)
+func (b *broker) encode(pe packetEncoder) {
+	pe.putInt32(b.nodeId)
+	pe.putString(b.host)
+	pe.putInt32(b.port)
 }
 
 func (b *broker) decode(pd *packetDecoder) (err error) {

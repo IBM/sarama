@@ -1,6 +1,10 @@
 package kafka
 
-import "errors"
+import (
+	"encoding/binary"
+	"errors"
+	"math"
+)
 
 type packetDecoder struct {
 	raw []byte
@@ -16,8 +20,8 @@ func (pd *packetDecoder) getInt16() (int16, error) {
 		return -1, errors.New("kafka getInt16: not enough data")
 	}
 	tmp := int16(binary.BigEndian.Uint16(pd.raw[pd.off:]))
-	off += 2
-	return tmp
+	pd.off += 2
+	return tmp, nil
 }
 
 func (pd *packetDecoder) getInt32() (int32, error) {
@@ -25,8 +29,20 @@ func (pd *packetDecoder) getInt32() (int32, error) {
 		return -1, errors.New("kafka getInt32: not enough data")
 	}
 	tmp := int32(binary.BigEndian.Uint32(pd.raw[pd.off:]))
-	off += 4
-	return tmp
+	pd.off += 4
+	return tmp, nil
+}
+
+func (pd *packetDecoder) getArrayCount() (int, error) {
+	if pd.avail() < 4 {
+		return -1, errors.New("kafka getArrayCount: not enough data")
+	}
+	tmp := int(binary.BigEndian.Uint32(pd.raw[pd.off:]))
+	pd.off += 4
+	if tmp > pd.avail() || tmp > 2*math.MaxUint16 {
+		return -1, errors.New("kafka getArrayCount: unreasonably long array")
+	}
+	return tmp, nil
 }
 
 func (pd *packetDecoder) getError() (kafkaError, error) {
@@ -53,6 +69,8 @@ func (pd *packetDecoder) getString() (*string, error) {
 	case n > pd.avail():
 		return nil, errors.New("kafka getString: not enough data")
 	default:
-		return string(pd.raw[pd.off:pd.off+n]), nil
+		tmp := new(string)
+		*tmp = string(pd.raw[pd.off:pd.off+n])
+		return tmp, nil
 	}
 }

@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"errors"
 	"encoding/binary"
 	"math"
 	"net"
@@ -106,23 +107,32 @@ func (client *Client) rcvResponseLoop() {
 	}
 }
 
+func (client *Client) encode(api API, body []byte, pe packetEncoder) {
+	pe.putInt32(int32(len(body)))
+	pe.putInt16(api.key)
+	pe.putInt16(api.version)
+	pe.putInt32(client.correlation_id)
+	pe.putString(client.id)
+	pe.putRaw(body)
+}
+
 func (client *Client) sendRequest(api API, body []byte) (chan []byte, error) {
-	idLen, err := stringLength(client.id)
-	if err != nil {
-		return nil, err
+	var prepEnc prepEncoder
+	var realEnc realEncoder
+
+	client.encode(api, body, &prepEnc)
+	if prepEnc.err {
+		return nil, errors.New("kafka encoding error")
 	}
+
+	realEnc.raw = make([]byte, prepEnc.length)
+	client.encode(api, body, &realEnc)
+
 	// we buffer one packet so that we can send our packet to the request queue without
 	// blocking, and so that the responses can be sent to us async if we want them
 	request := reqResPair{client.correlation_id, make(chan []byte, 1)}
-	buf := make([]byte, 8+idLen+len(body))
-	off := 0
-	off = encodeInt32(buf, off, int32(len(buf)))
-	off = encodeInt16(buf, off, api.key)
-	off = encodeInt16(buf, off, api.version)
-	off = encodeInt32(buf, off, client.correlation_id)
-	off = encodeString(buf, off, client.id)
-	copy(buf[off:], body)
-	request.packets <- buf
+
+	request.packets <- realEnc.raw
 	client.requests <- request
 	client.correlation_id++
 	return request.packets, nil
@@ -144,9 +154,4 @@ func (client *Client) sendMetadataRequest(topics []string) (chan []byte, error) 
 		off = encodeString(buf, off, &topics[i])
 	}
 	return client.sendRequest(REQUEST_METADATA, buf)
-}
-
-func (client *Client) parseMetadataResponse(buf []byte) (m *metadata, err error) {
-	_, err = m.decode(buf, 0)
-	return
 }
