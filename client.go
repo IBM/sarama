@@ -107,7 +107,7 @@ func (client *Client) rcvResponseLoop() {
 }
 
 func (client *Client) sendRequest(api API, body []byte) (chan []byte, error) {
-	idLen, err := stringLen(client.id)
+	idLen, err := stringLength(client.id)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +131,7 @@ func (client *Client) sendRequest(api API, body []byte) (chan []byte, error) {
 func (client *Client) sendMetadataRequest(topics []string) (chan []byte, error) {
 	bufLen := 4
 	for i := range topics {
-		tmp, err := stringLen(&topics[i])
+		tmp, err := stringLength(&topics[i])
 		if err != nil {
 			return nil, err
 		}
@@ -144,4 +144,9 @@ func (client *Client) sendMetadataRequest(topics []string) (chan []byte, error) 
 		off = encodeString(buf, off, &topics[i])
 	}
 	return client.sendRequest(REQUEST_METADATA, buf)
+}
+
+func (client *Client) parseMetadataResponse(buf []byte) (m *metadata, err error) {
+	_, err = m.decode(buf, 0)
+	return
 }
