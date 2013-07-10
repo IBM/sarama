@@ -56,10 +56,10 @@ func (err KError) Error() string {
 	}
 }
 
-type outOfBrokers struct {
+type OutOfBrokers struct {
 }
 
-func (err outOfBrokers) Error() string {
+func (err OutOfBrokers) Error() string {
 	return "kafka: Client has run out of available brokers to talk to. Is your cluster reachable?"
 }
 
