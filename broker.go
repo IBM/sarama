@@ -12,11 +12,13 @@ type broker struct {
 	host   *string
 	port   int32
 
-	client         *Client
 	correlation_id int32
-	conn           net.Conn
-	requests       chan reqResPair
-	responses      chan reqResPair
+
+	conn net.Conn
+	addr net.TCPAddr
+
+	requests  chan reqResPair
+	responses chan reqResPair
 }
 
 type reqResPair struct {
@@ -37,7 +39,23 @@ func newBroker(host string, port int32) (b *broker, err error) {
 }
 
 func (b *broker) connect() (err error) {
-	// TODO
+	addr, err := net.ResolveIPAddr("ip", *b.host)
+	if err != nil {
+		return err
+	}
+
+	b.addr.IP = addr.IP
+	b.addr.Zone = addr.Zone
+	b.addr.Port = int(b.port)
+
+	b.conn, err = net.DialTCP("tcp", nil, &b.addr)
+	if err != nil {
+		return err
+	}
+
+	go b.sendRequestLoop()
+	go b.rcvResponseLoop()
+
 	return nil
 }
 
@@ -59,6 +77,11 @@ func (b *broker) decode(pd packetDecoder) (err error) {
 	}
 
 	b.port, err = pd.getInt32()
+	if err != nil {
+		return err
+	}
+
+	err = b.connect()
 	if err != nil {
 		return err
 	}
@@ -129,7 +152,7 @@ func (b *broker) sendRequest(api API, body encoder) (chan []byte, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 
-	req := request{api, b.correlation_id, b.client.id, body}
+	req := request{api, b.correlation_id, nil, body}
 
 	req.encode(&prepEnc)
 	if prepEnc.err {
