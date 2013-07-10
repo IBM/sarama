@@ -1,9 +1,9 @@
 package kafka
 
-type kError int16
+type KError int16
 
 const (
-	NO_ERROR                    kError = 0
+	NO_ERROR                    KError = 0
 	UNKNOWN                            = -1
 	OFFSET_OUT_OF_RANGE                = 1
 	INVALID_MESSAGE                    = 2
@@ -19,7 +19,7 @@ const (
 	OFFSET_METADATA_TOO_LARGE          = 12
 )
 
-func (err kError) Error() string {
+func (err KError) Error() string {
 	// Error messages stolen/adapted from
 	// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
 	switch err {
@@ -63,16 +63,16 @@ func (err outOfBrokers) Error() string {
 	return "kafka: Client has run out of available brokers to talk to. Is your cluster reachable?"
 }
 
-type encodingError struct {
+type EncodingError struct {
 }
 
-func (err encodingError) Error() string {
+func (err EncodingError) Error() string {
 	return "kafka: Could not encode packet."
 }
 
-type decodingError struct {
+type DecodingError struct {
 }
 
-func (err decodingError) Error() string {
+func (err DecodingError) Error() string {
 	return "kafka: Could not decode packet. Is the server really speaking kafka?"
 }

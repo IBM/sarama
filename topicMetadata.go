@@ -1,7 +1,7 @@
 package kafka
 
 type topicMetadata struct {
-	err        kError
+	err        KError
 	name       *string
 	partitions []partitionMetadata
 }

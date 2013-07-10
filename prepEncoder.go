@@ -15,7 +15,7 @@ func (pe *prepEncoder) putInt32(in int32) {
 	pe.length += 4
 }
 
-func (pe *prepEncoder) putError(in kError) {
+func (pe *prepEncoder) putError(in KError) {
 	pe.length += 2
 }
 

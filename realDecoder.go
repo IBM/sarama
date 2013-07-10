@@ -16,7 +16,7 @@ func (rd *realDecoder) avail() int {
 
 func (rd *realDecoder) getInt16() (int16, error) {
 	if rd.avail() < 2 {
-		return -1, decodingError{}
+		return -1, DecodingError{}
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
 	rd.off += 2
@@ -25,16 +25,16 @@ func (rd *realDecoder) getInt16() (int16, error) {
 
 func (rd *realDecoder) getInt32() (int32, error) {
 	if rd.avail() < 4 {
-		return -1, decodingError{}
+		return -1, DecodingError{}
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 	return tmp, nil
 }
 
-func (rd *realDecoder) getError() (kError, error) {
+func (rd *realDecoder) getError() (KError, error) {
 	val, err := rd.getInt16()
-	return kError(val), err
+	return KError(val), err
 }
 
 func (rd *realDecoder) getString() (*string, error) {
@@ -48,13 +48,13 @@ func (rd *realDecoder) getString() (*string, error) {
 
 	switch {
 	case n < -1:
-		return nil, decodingError{}
+		return nil, DecodingError{}
 	case n == -1:
 		return nil, nil
 	case n == 0:
 		return new(string), nil
 	case n > rd.avail():
-		return nil, decodingError{}
+		return nil, DecodingError{}
 	default:
 		tmp := new(string)
 		*tmp = string(rd.raw[rd.off : rd.off+n])
@@ -73,14 +73,14 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 
 	switch {
 	case n < -1:
-		return nil, decodingError{}
+		return nil, DecodingError{}
 	case n == -1:
 		return nil, nil
 	case n == 0:
 		tmp := make([]byte, 0)
 		return &tmp, nil
 	case n > rd.avail():
-		return nil, decodingError{}
+		return nil, DecodingError{}
 	default:
 		tmp := rd.raw[rd.off : rd.off+n]
 		return &tmp, nil
@@ -89,12 +89,12 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 
 func (rd *realDecoder) getArrayCount() (int, error) {
 	if rd.avail() < 4 {
-		return -1, decodingError{}
+		return -1, DecodingError{}
 	}
 	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 	if tmp > rd.avail() || tmp > 2*math.MaxUint16 {
-		return -1, decodingError{}
+		return -1, DecodingError{}
 	}
 	return tmp, nil
 }

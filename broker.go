@@ -155,7 +155,7 @@ func (b *broker) sendRequest(clientID *string, api API, body encoder) (chan []by
 
 	req.encode(&prepEnc)
 	if prepEnc.err {
-		return nil, encodingError{}
+		return nil, EncodingError{}
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length+4)
