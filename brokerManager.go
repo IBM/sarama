@@ -40,10 +40,30 @@ func newBrokerManager(client *Client, host string, port int32) (bm *brokerManage
 	return bm, nil
 }
 
-func (bm *brokerManager) lookupLeader(topic string, partition int32) *broker {
+func (bm *brokerManager) lookupLeader(topic string, partition int32) (*broker, error) {
+	var broker *broker = nil
 	bm.brokersLock.RLock()
-	defer bm.brokersLock.RUnlock()
-	return bm.brokers[bm.leaders[topicPartition{topic, partition}]]
+	id, ok := bm.leaders[topicPartition{topic, partition}]
+	if ok {
+		broker = bm.brokers[id]
+	}
+	bm.brokersLock.RUnlock()
+
+	if broker == nil {
+		err := bm.refreshTopic(topic)
+		if err != nil {
+			return nil, err
+		}
+		bm.brokersLock.RLock()
+		broker = bm.brokers[bm.leaders[topicPartition{topic, partition}]]
+		bm.brokersLock.RUnlock()
+	}
+
+	if broker == nil {
+		return nil, UNKNOWN_TOPIC_OR_PARTITION
+	}
+
+	return broker, nil
 }
 
 func (bm *brokerManager) getDefault() *broker {
