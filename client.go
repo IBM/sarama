@@ -107,15 +107,6 @@ func (client *Client) rcvResponseLoop() {
 	}
 }
 
-func (client *Client) encode(api API, body []byte, pe packetEncoder) {
-	pe.putInt32(int32(len(body)))
-	pe.putInt16(api.key)
-	pe.putInt16(api.version)
-	pe.putInt32(client.correlation_id)
-	pe.putString(client.id)
-	//pe.putRaw(body)
-}
-
 func (client *Client) sendRequest(api API, body encoder) (chan []byte, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
