@@ -12,7 +12,7 @@ func (b *broker) encode(pe packetEncoder) {
 	pe.putInt32(b.port)
 }
 
-func (b *broker) decode(pd *packetDecoder) (err error) {
+func (b *broker) decode(pd packetDecoder) (err error) {
 	b.nodeId, err = pd.getInt32()
 	if err != nil {
 		return err

@@ -9,36 +9,34 @@ type topicMetadata struct {
 func (tm *topicMetadata) encode(pe packetEncoder) {
 	pe.putError(tm.err)
 	pe.putString(tm.name)
-	pe.putInt32(int32(len(m.partitions)))
-	for i := range m.partitions {
-		(&m.partitions[i]).encode(pe)
+	pe.putArrayCount(len(tm.partitions))
+	for i := range tm.partitions {
+		(&tm.partitions[i]).encode(pe)
 	}
 }
 
-func (tm *topicMetadata) decode(pd *packetDecoder) (err error) {
+func (tm *topicMetadata) decode(pd packetDecoder) (err error) {
+	tm.err, err = pd.getError()
+	if err != nil {
+		return err
+	}
+
+	tm.name, err = pd.getString()
+	if err != nil {
+		return err
+	}
+
 	n, err := pd.getArrayCount()
 	if err != nil {
 		return err
 	}
-
-	m.brokers = make([]broker, n)
+	tm.partitions = make([]partitionMetadata, n)
 	for i := 0; i < n; i++ {
-		err = (&m.brokers[i]).decode(pd)
+		err = (&tm.partitions[i]).decode(pd)
 		if err != nil {
 			return err
 		}
 	}
 
-	n, err = pd.getArrayCount()
-	if err != nil {
-		return err
-	}
-
-	m.topics = make([]topic, n)
-	for i := 0; i < n; i++ {
-		err = (&m.topics[i]).decode(pd)
-		if err != nil {
-			return err
-		}
-	}
+	return nil
 }

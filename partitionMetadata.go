@@ -1,7 +1,5 @@
 package kafka
 
-import "errors"
-
 type partitionMetadata struct {
 	err      kafkaError
 	id       int32
@@ -10,64 +8,61 @@ type partitionMetadata struct {
 	isr      []int32
 }
 
-func (pm *partitionMetadata) length() (int, error) {
-	length := 6
+func (pm *partitionMetadata) encode(pe packetEncoder) {
+	pe.putError(pm.err)
+	pe.putInt32(pm.id)
+	pe.putInt32(pm.leader)
 
-	length += 4
-	length += len(pm.replicas) * 4
-
-	length += 4
-	length += len(pm.isr) * 4
-
-	return length, nil
-}
-
-func (pm *partitionMetadata) encode(buf []byte, off int) int {
-	off = encodeError(buf, off, pm.err)
-	off = encodeInt32(buf, off, pm.id)
-	off = encodeInt32(buf, off, pm.leader)
-
-	off = encodeInt32(buf, off, int32(len(pm.replicas)))
+	pe.putArrayCount(len(pm.replicas))
 	for _, val := range pm.replicas {
-		off = encodeInt32(buf, off, val)
+		pe.putInt32(val)
 	}
 
-	off = encodeInt32(buf, off, int32(len(pm.isr)))
+	pe.putArrayCount(len(pm.isr))
 	for _, val := range pm.isr {
-		off = encodeInt32(buf, off, val)
+		pe.putInt32(val)
 	}
-
-	return off
 }
 
-func (pm *partitionMetadata) decode(buf []byte, off int) (int, error) {
-	if len(buf)-off < 14 {
-		return -1, errors.New("kafka decode: not enough data")
+func (pm *partitionMetadata) decode(pd packetDecoder) (err error) {
+	pm.err, err = pd.getError()
+	if err != nil {
+		return err
 	}
 
-	pm.err, off = decodeError(buf, off)
-	pm.id, off = decodeInt32(buf, off)
-	pm.leader, off = decodeInt32(buf, off)
-
-	tmp, off := decodeInt32(buf, off)
-	length := int(tmp)
-	if length > (len(buf)-off)/4 {
-		return -1, errors.New("kafka decode: not enough data")
-	}
-	pm.replicas = make([]int32, length)
-	for i := 0; i < length; i++ {
-		pm.replicas[i], off = decodeInt32(buf, off)
+	pm.id, err = pd.getInt32()
+	if err != nil {
+		return err
 	}
 
-	tmp, off = decodeInt32(buf, off)
-	length = int(tmp)
-	if length > (len(buf)-off)/4 {
-		return -1, errors.New("kafka decode: not enough data")
-	}
-	pm.isr = make([]int32, length)
-	for i := 0; i < length; i++ {
-		pm.isr[i], off = decodeInt32(buf, off)
+	pm.leader, err = pd.getInt32()
+	if err != nil {
+		return err
 	}
 
-	return off, nil
+	n, err := pd.getArrayCount()
+	if err != nil {
+		return err
+	}
+	pm.replicas = make([]int32, n)
+	for i := 0; i < n; i++ {
+		pm.replicas[i], err = pd.getInt32()
+		if err != nil {
+			return err
+		}
+	}
+
+	n, err = pd.getArrayCount()
+	if err != nil {
+		return err
+	}
+	pm.isr = make([]int32, n)
+	for i := 0; i < n; i++ {
+		pm.isr[i], err = pd.getInt32()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

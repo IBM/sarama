@@ -6,6 +6,5 @@ type packetEncoder interface {
 	putError(in kafkaError)
 	putString(in *string)
 	putBytes(in *[]byte)
-	putRaw(in []byte)
 	putArrayCount(in int)
 }

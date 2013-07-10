@@ -113,7 +113,7 @@ func (client *Client) encode(api API, body []byte, pe packetEncoder) {
 	pe.putInt16(api.version)
 	pe.putInt32(client.correlation_id)
 	pe.putString(client.id)
-	pe.putRaw(body)
+	//pe.putRaw(body)
 }
 
 func (client *Client) sendRequest(api API, body []byte) (chan []byte, error) {
@@ -136,22 +136,4 @@ func (client *Client) sendRequest(api API, body []byte) (chan []byte, error) {
 	client.requests <- request
 	client.correlation_id++
 	return request.packets, nil
-}
-
-func (client *Client) sendMetadataRequest(topics []string) (chan []byte, error) {
-	bufLen := 4
-	for i := range topics {
-		tmp, err := stringLength(&topics[i])
-		if err != nil {
-			return nil, err
-		}
-		bufLen += tmp
-	}
-	buf := make([]byte, bufLen)
-	off := 0
-	off = encodeInt32(buf, off, int32(len(topics)))
-	for i := range topics {
-		off = encodeString(buf, off, &topics[i])
-	}
-	return client.sendRequest(REQUEST_METADATA, buf)
 }

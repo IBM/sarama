@@ -16,7 +16,7 @@ func (m *metadata) encode(pe packetEncoder) {
 	}
 }
 
-func (m *metadata) decode(pd *packetDecoder) (err error) {
+func (m *metadata) decode(pd packetDecoder) (err error) {
 	n, err := pd.getArrayCount()
 	if err != nil {
 		return err

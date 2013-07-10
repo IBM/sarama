@@ -43,10 +43,6 @@ func (pe *prepEncoder) putBytes(in *[]byte) {
 	}
 }
 
-func (pe *prepEncoder) putRaw(in []byte) {
-	pe.length += len(in)
-}
-
 func (pe *prepEncoder) putArrayCount(in int) {
 	pe.length += 4
 }
