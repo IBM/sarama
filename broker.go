@@ -143,9 +143,17 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) sendRequest(clientID *string, api API, body encoder) (chan []byte, error) {
+func (b *broker) sendRequest(clientID *string, body encoder) (chan []byte, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
+	var api API
+
+	switch body.(type) {
+	case *metadataRequest:
+		api = REQUEST_METADATA
+	default:
+		return nil, EncodingError{}
+	}
 
 	req := request{api, b.correlation_id, clientID, body}
 

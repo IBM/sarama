@@ -62,7 +62,7 @@ func (bm *brokerManager) refreshTopics(topics []*string) error {
 		return OutOfBrokers{}
 	}
 
-	responseChan, err := b.sendRequest(bm.client.id, REQUEST_METADATA, &metadataRequest{topics})
+	responseChan, err := b.sendRequest(bm.client.id, &metadataRequest{topics})
 	if err != nil {
 		return err
 	}
