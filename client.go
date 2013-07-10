@@ -116,17 +116,20 @@ func (client *Client) encode(api API, body []byte, pe packetEncoder) {
 	//pe.putRaw(body)
 }
 
-func (client *Client) sendRequest(api API, body []byte) (chan []byte, error) {
+func (client *Client) sendRequest(api API, body encoder) (chan []byte, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 
-	client.encode(api, body, &prepEnc)
+	req := request{api, client.correlation_id, client.id, body}
+
+	req.encode(&prepEnc)
 	if prepEnc.err {
 		return nil, errors.New("kafka encoding error")
 	}
 
-	realEnc.raw = make([]byte, prepEnc.length)
-	client.encode(api, body, &realEnc)
+	realEnc.raw = make([]byte, prepEnc.length+4)
+	realEnc.putInt32(int32(prepEnc.length))
+	req.encode(&realEnc)
 
 	// we buffer one packet so that we can send our packet to the request queue without
 	// blocking, and so that the responses can be sent to us async if we want them
