@@ -89,12 +89,10 @@ func (b *broker) decode(pd packetDecoder) (err error) {
 }
 
 func (b *broker) sendRequestLoop() {
-	var request reqResPair
 	var n int
 	var err error
 	var buf []byte
-	for {
-		request = <-b.requests
+	for request := range b.requests {
 		buf = <-request.packets
 		n, err = b.conn.Write(buf)
 		if err != nil || n != len(buf) {
@@ -106,14 +104,12 @@ func (b *broker) sendRequestLoop() {
 }
 
 func (b *broker) rcvResponseLoop() {
-	var response reqResPair
 	var n int
 	var length int32
 	var err error
 	var buf []byte
 	header := make([]byte, 4)
-	for {
-		response = <-b.responses
+	for response := range b.responses {
 		n, err = b.conn.Read(header)
 		if err != nil || n != 4 {
 			close(b.responses)
