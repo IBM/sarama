@@ -5,7 +5,7 @@ type encoder interface {
 }
 
 type decoder interface {
-	decoder(pd packetDecoder)
+	decode(pd packetDecoder) error
 }
 
 type encoderDecoder interface {

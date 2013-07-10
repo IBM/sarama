@@ -2,7 +2,7 @@ package kafka
 
 import "sync"
 
-type brokerKey struct {
+type topicPartition struct {
 	topic     string
 	partition int32
 }
@@ -10,8 +10,10 @@ type brokerKey struct {
 type brokerManager struct {
 	client        *Client
 	defaultBroker *broker
-	leaders       map[brokerKey]*broker
-	leadersLock   sync.RWMutex
+
+	brokers     map[int32]*broker
+	leaders     map[topicPartition]int32
+	brokersLock sync.RWMutex
 }
 
 func newBrokerManager(client *Client, host string, port int32) (bm *brokerManager, err error) {
@@ -26,7 +28,8 @@ func newBrokerManager(client *Client, host string, port int32) (bm *brokerManage
 		return nil, err
 	}
 
-	bm.leaders = make(map[brokerKey]*broker)
+	bm.brokers = make(map[int32]*broker)
+	bm.leaders = make(map[topicPartition]int32)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err = bm.refreshTopics(make([]*string, 0))
@@ -38,17 +41,18 @@ func newBrokerManager(client *Client, host string, port int32) (bm *brokerManage
 }
 
 func (bm *brokerManager) lookupLeader(topic string, partition int32) *broker {
-	bm.leadersLock.RLock()
-	defer bm.leadersLock.RUnlock()
-	return bm.leaders[brokerKey{topic, partition}]
+	bm.brokersLock.RLock()
+	defer bm.brokersLock.RUnlock()
+	return bm.brokers[bm.leaders[topicPartition{topic, partition}]]
 }
 
 func (bm *brokerManager) getDefault() *broker {
 
 	if bm.defaultBroker == nil {
-		bm.leadersLock.RLock()
-		defer bm.leadersLock.RUnlock()
-		for _, bm.defaultBroker = range bm.leaders {
+		bm.brokersLock.RLock()
+		defer bm.brokersLock.RUnlock()
+		for _, id := range bm.leaders {
+			bm.defaultBroker = bm.brokers[id]
 			break
 		}
 	}
@@ -56,26 +60,42 @@ func (bm *brokerManager) getDefault() *broker {
 	return bm.defaultBroker
 }
 
+func (bm *brokerManager) tryDefaultBrokers(req encoder, res decoder) error {
+	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
+		responseChan, err := b.sendRequest(bm.client.id, req)
+		if err != nil {
+			return err
+		}
+
+		select {
+		case buf := <-responseChan.packets:
+			decoder := realDecoder{raw: buf}
+			err = res.decode(&decoder)
+			return err
+		case <-responseChan.errors:
+			bm.defaultBroker = nil
+			bm.brokersLock.Lock()
+			delete(bm.brokers, b.id)
+			bm.brokersLock.Unlock()
+		}
+	}
+	return OutOfBrokers{}
+}
+
 func (bm *brokerManager) refreshTopics(topics []*string) error {
-	b := bm.getDefault()
-	if b == nil {
-		return OutOfBrokers{}
-	}
-
-	responseChan, err := b.sendRequest(bm.client.id, &metadataRequest{topics})
-	if err != nil {
-		return err
-	}
-
-	decoder := realDecoder{raw: <-responseChan}
 	response := new(metadata)
-	err = response.decode(&decoder)
+	err := bm.tryDefaultBrokers(&metadataRequest{topics}, response)
 	if err != nil {
 		return err
 	}
 
-	bm.leadersLock.Lock()
-	defer bm.leadersLock.Unlock()
+	bm.brokersLock.Lock()
+	defer bm.brokersLock.Unlock()
+
+	for i := range response.brokers {
+		broker := &response.brokers[i]
+		bm.brokers[broker.id] = broker
+	}
 
 	for i := range response.topics {
 		topic := &response.topics[i]
@@ -87,7 +107,7 @@ func (bm *brokerManager) refreshTopics(topics []*string) error {
 			if partition.err != NO_ERROR {
 				return partition.err
 			}
-			bm.leaders[brokerKey{*topic.name, partition.id}] = response.brokerById(partition.leader)
+			bm.leaders[topicPartition{*topic.name, partition.id}] = partition.leader
 		}
 	}
 
