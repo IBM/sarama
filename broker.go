@@ -2,7 +2,6 @@ package kafka
 
 import (
 	"encoding/binary"
-	"errors"
 	"math"
 	"net"
 )
@@ -156,7 +155,7 @@ func (b *broker) sendRequest(clientID *string, api API, body encoder) (chan []by
 
 	req.encode(&prepEnc)
 	if prepEnc.err {
-		return nil, errors.New("kafka encoding error")
+		return nil, encodingError{}
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length+4)

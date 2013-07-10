@@ -1,9 +1,6 @@
 package kafka
 
-import (
-	"errors"
-	"sync"
-)
+import "sync"
 
 type brokerKey struct {
 	topic     string
@@ -22,6 +19,8 @@ func newBrokerManager(client *Client, host string, port int32) (bm *brokerManage
 
 	bm.client = client
 
+	// we create a new broker object as the default 'master' broker
+	// if this broker is also a leader then we will end up with two broker objects for it, but that's not a big deal
 	bm.defaultBroker, err = newBroker(host, port)
 	if err != nil {
 		return nil, err
@@ -58,7 +57,7 @@ func (bm *brokerManager) getDefault() *broker {
 func (bm *brokerManager) refreshTopics(topics []*string) error {
 	b := bm.getDefault()
 	if b == nil {
-		return errors.New("kafka: lost all broker connections")
+		return outOfBrokers{}
 	}
 
 	responseChan, err := b.sendRequest(bm.client.id, REQUEST_METADATA, &metadataRequest{topics})

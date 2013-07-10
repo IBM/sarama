@@ -55,3 +55,24 @@ func (err kError) Error() string {
 		return "Unknown error, how did this happen?"
 	}
 }
+
+type outOfBrokers struct {
+}
+
+func (err outOfBrokers) Error() string {
+	return "kafka: Client has run out of available brokers to talk to. Is your cluster reachable?"
+}
+
+type encodingError struct {
+}
+
+func (err encodingError) Error() string {
+	return "kafka: Could not encode packet."
+}
+
+type decodingError struct {
+}
+
+func (err decodingError) Error() string {
+	return "kafka: Could not decode packet. Is the server really speaking kafka?"
+}
