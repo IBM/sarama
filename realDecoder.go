@@ -33,9 +33,9 @@ func (rd *realDecoder) getInt32() (int32, error) {
 	return tmp, nil
 }
 
-func (rd *realDecoder) getError() (kafkaError, error) {
+func (rd *realDecoder) getError() (kError, error) {
 	val, err := rd.getInt16()
-	return kafkaError(val), err
+	return kError(val), err
 }
 
 func (rd *realDecoder) getString() (*string, error) {

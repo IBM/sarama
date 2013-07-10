@@ -15,7 +15,7 @@ func (pe *prepEncoder) putInt32(in int32) {
 	pe.length += 4
 }
 
-func (pe *prepEncoder) putError(in kafkaError) {
+func (pe *prepEncoder) putError(in kError) {
 	pe.length += 2
 }
 

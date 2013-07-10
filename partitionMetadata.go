@@ -1,7 +1,7 @@
 package kafka
 
 type partitionMetadata struct {
-	err      kafkaError
+	err      kError
 	id       int32
 	leader   int32
 	replicas []int32

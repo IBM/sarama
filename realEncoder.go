@@ -17,7 +17,7 @@ func (re *realEncoder) putInt32(in int32) {
 	re.off += 4
 }
 
-func (re *realEncoder) putError(in kafkaError) {
+func (re *realEncoder) putError(in kError) {
 	re.putInt16(int16(in))
 }
 
