@@ -8,7 +8,7 @@ type Client struct {
 func NewClient(id *string, host string, port int32) (client *Client, err error) {
 	client = new(Client)
 	client.id = id
-	client.brokers, err = newBrokerManager(host, port)
+	client.brokers, err = newBrokerManager(client, host, port)
 	if err != nil {
 		return nil, err
 	}

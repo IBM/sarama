@@ -148,11 +148,11 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) sendRequest(api API, body encoder) (chan []byte, error) {
+func (b *broker) sendRequest(clientID *string, api API, body encoder) (chan []byte, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 
-	req := request{api, b.correlation_id, nil, body}
+	req := request{api, b.correlation_id, clientID, body}
 
 	req.encode(&prepEnc)
 	if prepEnc.err {
