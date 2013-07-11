@@ -16,7 +16,6 @@ func (p *Producer) SendSimpleMessage(in string) error {
 	}
 
 	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(newMessageFromString(in)))
-	response := new(produceResponse)
 
-	return p.client.brokers.sendToPartition(p.topic, partition, request, response)
+	return p.client.brokers.sendToPartition(p.topic, partition, request, nil)
 }

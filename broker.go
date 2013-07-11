@@ -16,7 +16,7 @@ type broker struct {
 	conn net.Conn
 	addr net.TCPAddr
 
-	requests  chan responsePromise
+	requests  chan requestToSend
 	responses chan responsePromise
 }
 
@@ -24,6 +24,12 @@ type responsePromise struct {
 	correlation_id int32
 	packets        chan []byte
 	errors         chan error
+}
+
+type requestToSend struct {
+	// we cheat and use the responsePromise channels to avoid creating more than necessary
+	response       responsePromise
+	expectResponse bool
 }
 
 func newBroker(host string, port int32) (b *broker, err error) {
@@ -53,7 +59,7 @@ func (b *broker) connect() (err error) {
 		return err
 	}
 
-	b.requests = make(chan responsePromise)
+	b.requests = make(chan requestToSend)
 	b.responses = make(chan responsePromise)
 
 	go b.sendRequestLoop()
@@ -108,13 +114,18 @@ func (b *broker) decode(pd packetDecoder) (err error) {
 
 func (b *broker) sendRequestLoop() {
 	for request := range b.requests {
-		buf := <-request.packets
+		buf := <-request.response.packets
 		_, err := b.conn.Write(buf)
 		if err != nil {
-			b.forceDisconnect(&request, err)
+			b.forceDisconnect(&request.response, err)
 			return
 		}
-		b.responses <- request
+		if request.expectResponse {
+			b.responses <- request.response
+		} else {
+			close(request.response.packets)
+			close(request.response.errors)
+		}
 	}
 }
 
@@ -153,7 +164,7 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) sendRequest(clientID *string, body encoder) (*responsePromise, error) {
+func (b *broker) sendRequest(clientID *string, body encoder, expectResponse bool) (*responsePromise, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 	var api API
@@ -178,10 +189,10 @@ func (b *broker) sendRequest(clientID *string, body encoder) (*responsePromise, 
 	realEnc.putInt32(int32(prepEnc.length))
 	req.encode(&realEnc)
 
-	request := responsePromise{b.correlation_id, make(chan []byte), make(chan error)}
+	request := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, expectResponse}
 
 	b.requests <- request
-	request.packets <- realEnc.raw
+	request.response.packets <- realEnc.raw // we cheat to avoid poofing up more channels than necessary
 	b.correlation_id++
-	return &request, nil
+	return &request.response, nil
 }

@@ -110,7 +110,7 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req enco
 		return err
 	}
 
-	responseChan, err := b.sendRequest(bm.client.id, req)
+	responseChan, err := b.sendRequest(bm.client.id, req, res != nil)
 	if err != nil {
 		// errors that would make us refresh the broker metadata don't get returned here,
 		// they'd come through responseChan.errors, so it's safe to just return here
@@ -119,8 +119,10 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req enco
 
 	select {
 	case buf := <-responseChan.packets:
-		decoder := realDecoder{raw: buf}
-		err = res.decode(&decoder)
+		if res != nil {
+			decoder := realDecoder{raw: buf}
+			err = res.decode(&decoder)
+		}
 	case err = <-responseChan.errors:
 	}
 
@@ -142,15 +144,17 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req enco
 		return err
 	}
 
-	responseChan, err = b.sendRequest(bm.client.id, req)
+	responseChan, err = b.sendRequest(bm.client.id, req, res != nil)
 	if err != nil {
 		return err
 	}
 
 	select {
 	case buf := <-responseChan.packets:
-		decoder := realDecoder{raw: buf}
-		err = res.decode(&decoder)
+		if res != nil {
+			decoder := realDecoder{raw: buf}
+			err = res.decode(&decoder)
+		}
 	case err = <-responseChan.errors:
 	}
 
@@ -174,15 +178,17 @@ func (bm *brokerManager) getDefault() *broker {
 
 func (bm *brokerManager) tryDefaultBrokers(req encoder, res decoder) error {
 	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
-		responseChan, err := b.sendRequest(bm.client.id, req)
+		responseChan, err := b.sendRequest(bm.client.id, req, res != nil)
 		if err != nil {
 			return err
 		}
 
 		select {
 		case buf := <-responseChan.packets:
-			decoder := realDecoder{raw: buf}
-			err = res.decode(&decoder)
+			if res != nil {
+				decoder := realDecoder{raw: buf}
+				err = res.decode(&decoder)
+			}
 			return err
 		case <-responseChan.errors:
 			bm.defaultBroker = nil
