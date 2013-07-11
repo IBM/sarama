@@ -161,15 +161,17 @@ func (b *broker) sendRequest(clientID *string, body encoder) (*responsePromise, 
 	switch body.(type) {
 	case *metadataRequest:
 		api = REQUEST_METADATA
+	case *produceRequest:
+		api = REQUEST_PRODUCE
 	default:
-		return nil, EncodingError{}
+		return nil, EncodingError{"Unknown API."}
 	}
 
 	req := request{api, b.correlation_id, clientID, body}
 
 	req.encode(&prepEnc)
-	if prepEnc.err {
-		return nil, EncodingError{}
+	if prepEnc.err != nil {
+		return nil, prepEnc.err
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length+4)
