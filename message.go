@@ -70,3 +70,8 @@ func (m *message) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func newMessageFromString(in string) message {
+	buf := make([]byte, len(in))
+	return message{COMPRESSION_NONE, nil, &buf}
+}
