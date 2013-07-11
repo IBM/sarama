@@ -6,16 +6,17 @@ import (
 )
 
 type realDecoder struct {
-	raw []byte
-	off int
+	raw   []byte
+	off   int
+	stack []pushDecoder
 }
 
-func (rd *realDecoder) avail() int {
+func (rd *realDecoder) remaining() int {
 	return len(rd.raw) - rd.off
 }
 
 func (rd *realDecoder) getInt16() (int16, error) {
-	if rd.avail() < 2 {
+	if rd.remaining() < 2 {
 		return -1, DecodingError{}
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
@@ -24,11 +25,20 @@ func (rd *realDecoder) getInt16() (int16, error) {
 }
 
 func (rd *realDecoder) getInt32() (int32, error) {
-	if rd.avail() < 4 {
+	if rd.remaining() < 4 {
 		return -1, DecodingError{}
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
+	return tmp, nil
+}
+
+func (rd *realDecoder) getInt64() (int64, error) {
+	if rd.remaining() < 8 {
+		return -1, DecodingError{}
+	}
+	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
+	rd.off += 8
 	return tmp, nil
 }
 
@@ -53,7 +63,7 @@ func (rd *realDecoder) getString() (*string, error) {
 		return nil, nil
 	case n == 0:
 		return new(string), nil
-	case n > rd.avail():
+	case n > rd.remaining():
 		return nil, DecodingError{}
 	default:
 		tmp := new(string)
@@ -79,7 +89,7 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 	case n == 0:
 		tmp := make([]byte, 0)
 		return &tmp, nil
-	case n > rd.avail():
+	case n > rd.remaining():
 		return nil, DecodingError{}
 	default:
 		tmp := rd.raw[rd.off : rd.off+n]
@@ -88,13 +98,41 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 }
 
 func (rd *realDecoder) getArrayCount() (int, error) {
-	if rd.avail() < 4 {
+	if rd.remaining() < 4 {
 		return -1, DecodingError{}
 	}
 	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
-	if tmp > rd.avail() || tmp > 2*math.MaxUint16 {
+	if tmp > rd.remaining() || tmp > 2*math.MaxUint16 {
 		return -1, DecodingError{}
 	}
 	return tmp, nil
+}
+
+func (rd *realDecoder) push(in pushDecoder) error {
+	in.saveOffset(rd.off)
+
+	if rd.remaining() < in.reserveLength() {
+		return DecodingError{}
+	}
+
+	rd.stack = append(rd.stack, in)
+
+	return nil
+}
+
+func (rd *realDecoder) pushLength32() error {
+	return rd.push(&length32Decoder{})
+}
+
+func (rd *realDecoder) pushCRC32() error {
+	return rd.push(&crc32Decoder{})
+}
+
+func (rd *realDecoder) pop() error {
+	// this is go's ugly pop pattern (the inverse of append)
+	in := rd.stack[len(rd.stack)-1]
+	rd.stack = rd.stack[:len(rd.stack)-1]
+
+	return in.check(rd.off, rd.raw)
 }

@@ -15,6 +15,10 @@ func (pe *prepEncoder) putInt32(in int32) {
 	pe.length += 4
 }
 
+func (pe *prepEncoder) putInt64(in int64) {
+	pe.length += 8
+}
+
 func (pe *prepEncoder) putError(in KError) {
 	pe.length += 2
 }
@@ -45,4 +49,19 @@ func (pe *prepEncoder) putBytes(in *[]byte) {
 
 func (pe *prepEncoder) putArrayCount(in int) {
 	pe.length += 4
+}
+
+func (pe *prepEncoder) push(in pushEncoder) {
+	pe.length += in.reserveLength()
+}
+
+func (pe *prepEncoder) pushLength32() {
+	pe.length += 4
+}
+
+func (pe *prepEncoder) pushCRC32() {
+	pe.length += 4
+}
+
+func (pe *prepEncoder) pop() {
 }
