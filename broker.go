@@ -53,8 +53,11 @@ func (b *broker) connect() (err error) {
 		return err
 	}
 
+	b.requests = make(chan responsePromise)
+	b.responses = make(chan responsePromise)
+
 	go b.sendRequestLoop()
-	go b.rcvresponsePromiseLoop()
+	go b.rcvResponseLoop()
 
 	return nil
 }
@@ -112,7 +115,7 @@ func (b *broker) sendRequestLoop() {
 	}
 }
 
-func (b *broker) rcvresponsePromiseLoop() {
+func (b *broker) rcvResponseLoop() {
 	header := make([]byte, 8)
 	for response := range b.responses {
 		_, err := io.ReadFull(b.conn, header)
