@@ -64,15 +64,17 @@ func (err OutOfBrokers) Error() string {
 }
 
 type EncodingError struct {
+	msg string
 }
 
 func (err EncodingError) Error() string {
-	return "kafka: Could not encode packet."
+	return "kafka: Could not encode packet. " + err.msg
 }
 
 type DecodingError struct {
+	msg string
 }
 
 func (err DecodingError) Error() string {
-	return "kafka: Could not decode packet. Is the server really speaking kafka?"
+	return "kafka: Could not decode packet. " + err.msg
 }
