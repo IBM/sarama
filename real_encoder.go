@@ -38,7 +38,6 @@ func (re *realEncoder) putString(in *string) {
 		return
 	}
 	re.putInt16(int16(len(*in)))
-	re.off += 2
 	copy(re.raw[re.off:], *in)
 	re.off += len(*in)
 }
@@ -49,7 +48,6 @@ func (re *realEncoder) putBytes(in *[]byte) {
 		return
 	}
 	re.putInt32(int32(len(*in)))
-	re.off += 4
 	copy(re.raw[re.off:], *in)
 	re.off += len(*in)
 }

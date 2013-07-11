@@ -77,6 +77,7 @@ func (rd *realDecoder) getString() (*string, error) {
 	default:
 		tmp := new(string)
 		*tmp = string(rd.raw[rd.off : rd.off+n])
+		rd.off += n
 		return tmp, nil
 	}
 }
@@ -102,6 +103,7 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 		return nil, DecodingError{}
 	default:
 		tmp := rd.raw[rd.off : rd.off+n]
+		rd.off += n
 		return &tmp, nil
 	}
 }
