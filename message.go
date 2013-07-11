@@ -1,9 +1,10 @@
 package kafka
 
 type compressionCodec int
+
 const (
-	COMPRESSION_NONE compressionCodec = 0
-	COMPRESSION_GZIP compressionCodec = 1
+	COMPRESSION_NONE   compressionCodec = 0
+	COMPRESSION_GZIP   compressionCodec = 1
 	COMPRESSION_SNAPPY compressionCodec = 2
 )
 
@@ -13,7 +14,7 @@ const MESSAGE_FORMAT int8 = 0
 
 type message struct {
 	codec compressionCodec
-	key *[]byte
+	key   *[]byte
 	value *[]byte
 }
 
