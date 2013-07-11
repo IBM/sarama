@@ -7,6 +7,10 @@ type prepEncoder struct {
 	err    bool
 }
 
+func (pe *prepEncoder) putInt8(in int8) {
+	pe.length += 1
+}
+
 func (pe *prepEncoder) putInt16(in int16) {
 	pe.length += 2
 }

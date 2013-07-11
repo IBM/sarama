@@ -8,6 +8,11 @@ type realEncoder struct {
 	stack []pushEncoder
 }
 
+func (re *realEncoder) putInt8(in int8) {
+	re.raw[re.off] = byte(in)
+	re.off += 1
+}
+
 func (re *realEncoder) putInt16(in int16) {
 	binary.BigEndian.PutUint16(re.raw[re.off:], uint16(in))
 	re.off += 2

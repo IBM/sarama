@@ -15,6 +15,15 @@ func (rd *realDecoder) remaining() int {
 	return len(rd.raw) - rd.off
 }
 
+func (rd *realDecoder) getInt8() (int8, error) {
+	if rd.remaining() < 1 {
+		return -1, DecodingError{}
+	}
+	tmp := int8(rd.raw[rd.off])
+	rd.off += 1
+	return tmp, nil
+}
+
 func (rd *realDecoder) getInt16() (int16, error) {
 	if rd.remaining() < 2 {
 		return -1, DecodingError{}

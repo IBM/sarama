@@ -3,6 +3,7 @@ package kafka
 type packetDecoder interface {
 	remaining() int
 
+	getInt8() (int8, error)
 	getInt16() (int16, error)
 	getInt32() (int32, error)
 	getInt64() (int64, error)

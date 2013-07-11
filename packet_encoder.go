@@ -1,6 +1,7 @@
 package kafka
 
 type packetEncoder interface {
+	putInt8(in int8)
 	putInt16(in int16)
 	putInt32(in int32)
 	putInt64(in int64)
