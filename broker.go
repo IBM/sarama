@@ -94,6 +94,9 @@ func (b *broker) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
+	if b.port > math.MaxUint16 {
+		return DecodingError{"Broker port > 65536"}
+	}
 
 	err = b.connect()
 	if err != nil {

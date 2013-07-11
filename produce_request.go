@@ -39,3 +39,12 @@ func (p *produceRequest) encode(pe packetEncoder) {
 		(&p.topics[i]).encode(pe)
 	}
 }
+
+func newSingletonProduceRequest(topic string, partition int32, set *messageSet) *produceRequest {
+	req := &produceRequest{topics: make([]produceRequestTopicBlock, 1)}
+	req.topics[0].topic = &topic
+	req.topics[0].partitions = make([]produceRequestPartitionBlock, 1)
+	req.topics[0].partitions[0].partition = partition
+	req.topics[0].partitions[0].msgSet = set
+	return req
+}

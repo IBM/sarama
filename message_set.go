@@ -60,3 +60,9 @@ func (ms *messageSet) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func newSingletonMessageSet(msg *message) *messageSet {
+	tmp := make([]*messageSetBlock, 1)
+	tmp[0] = &messageSetBlock{msg: *msg}
+	return &messageSet{tmp}
+}
