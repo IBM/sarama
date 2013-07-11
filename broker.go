@@ -173,13 +173,10 @@ func (b *broker) sendRequest(clientID *string, body encoder) (*responsePromise, 
 	realEnc.putInt32(int32(prepEnc.length))
 	req.encode(&realEnc)
 
-	// we buffer one packet and one error so that all this can work async if the
-	// caller so desires. we also cheat and use the same responsePromise object for both the
-	// request and the response, as things are much simpler that way
-	request := responsePromise{b.correlation_id, make(chan []byte, 1), make(chan error, 1)}
+	request := responsePromise{b.correlation_id, make(chan []byte), make(chan error)}
 
-	request.packets <- realEnc.raw
 	b.requests <- request
+	request.packets <- realEnc.raw
 	b.correlation_id++
 	return &request, nil
 }
