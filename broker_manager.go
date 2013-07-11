@@ -110,30 +110,20 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req enco
 		return err
 	}
 
-	responseChan, err := b.sendRequest(bm.client.id, req, res != nil)
-	if err != nil {
-		// errors that would make us refresh the broker metadata don't get returned here,
-		// they'd come through responseChan.errors, so it's safe to just return here
-		return err
-	}
-
-	select {
-	case buf := <-responseChan.packets:
-		if res != nil {
-			decoder := realDecoder{raw: buf}
-			err = res.decode(&decoder)
-		}
-	case err = <-responseChan.errors:
-	}
-
-	if err == nil {
+	err = b.sendAndReceive(bm.client.id, req, res)
+	switch err.(type) {
+	case nil:
 		// successfully received and decoded the packet, we're done
-		// (the actual decoded data is stored in `res decoder`)
+		// (the actual decoded data is stored in the res parameter)
 		return nil
+	case EncodingError:
+		// encoding errors are our problem, not the broker's, so just return them
+		// rather than refreshing the broker metadata
+		return err
+	default:
+		// broker error, so discard that broker
+		bm.terminateBroker(b.id)
 	}
-
-	// we got an error, so discard that broker
-	bm.terminateBroker(b.id)
 
 	// then do the whole thing again
 	// (the metadata for the broker gets refreshed automatically in getValidLeader)
@@ -144,22 +134,7 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req enco
 		return err
 	}
 
-	responseChan, err = b.sendRequest(bm.client.id, req, res != nil)
-	if err != nil {
-		return err
-	}
-
-	select {
-	case buf := <-responseChan.packets:
-		if res != nil {
-			decoder := realDecoder{raw: buf}
-			err = res.decode(&decoder)
-		}
-	case err = <-responseChan.errors:
-	}
-
-	return err // will be nil if this broker worked
-
+	return b.sendAndReceive(bm.client.id, req, res)
 }
 
 func (bm *brokerManager) getDefault() *broker {
@@ -176,21 +151,20 @@ func (bm *brokerManager) getDefault() *broker {
 	return bm.defaultBroker
 }
 
-func (bm *brokerManager) tryDefaultBrokers(req encoder, res decoder) error {
+func (bm *brokerManager) sendToAny(req encoder, res decoder) error {
 	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
-		responseChan, err := b.sendRequest(bm.client.id, req, res != nil)
-		if err != nil {
+		err := b.sendAndReceive(bm.client.id, req, res)
+		switch err.(type) {
+		case nil:
+			// successfully received and decoded the packet, we're done
+			// (the actual decoded data is stored in the res parameter)
+			return nil
+		case EncodingError:
+			// encoding errors are our problem, not the broker's, so just return them
+			// rather than trying another broker
 			return err
-		}
-
-		select {
-		case buf := <-responseChan.packets:
-			if res != nil {
-				decoder := realDecoder{raw: buf}
-				err = res.decode(&decoder)
-			}
-			return err
-		case <-responseChan.errors:
+		default:
+			// broker error, so discard that broker
 			bm.defaultBroker = nil
 			bm.terminateBroker(b.id)
 		}
@@ -200,7 +174,7 @@ func (bm *brokerManager) tryDefaultBrokers(req encoder, res decoder) error {
 
 func (bm *brokerManager) refreshTopics(topics []*string) error {
 	response := new(metadata)
-	err := bm.tryDefaultBrokers(&metadataRequest{topics}, response)
+	err := bm.sendToAny(&metadataRequest{topics}, response)
 	if err != nil {
 		return err
 	}

@@ -196,3 +196,22 @@ func (b *broker) sendRequest(clientID *string, body encoder, expectResponse bool
 	b.correlation_id++
 	return &request.response, nil
 }
+
+func (b *broker) sendAndReceive(clientID *string, req encoder, res decoder) error {
+	responseChan, err := b.sendRequest(clientID, req, res != nil)
+	if err != nil {
+		return err
+	}
+
+	select {
+	case buf := <-responseChan.packets:
+		// Only try to decode if we got a response.
+		if buf != nil {
+			decoder := realDecoder{raw: buf}
+			err = res.decode(&decoder)
+		}
+	case err = <-responseChan.errors:
+	}
+
+	return err
+}
