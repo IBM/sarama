@@ -1,14 +1,10 @@
 package kafka
 
-type requestAPI interface {
+type requestEncoder interface {
+	encoder
 	key() int16
 	version() int16
 	expectResponse() bool
-}
-
-type requestEncoder interface {
-	encoder
-	requestAPI
 }
 
 type request struct {
