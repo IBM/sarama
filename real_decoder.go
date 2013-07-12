@@ -15,6 +15,8 @@ func (rd *realDecoder) remaining() int {
 	return len(rd.raw) - rd.off
 }
 
+// primitives
+
 func (rd *realDecoder) getInt8() (int8, error) {
 	if rd.remaining() < 1 {
 		return -1, DecodingError{}
@@ -50,6 +52,42 @@ func (rd *realDecoder) getInt64() (int64, error) {
 	rd.off += 8
 	return tmp, nil
 }
+
+// arrays
+
+func (rd *realDecoder) getInt32Array() ([]int32, error) {
+	if rd.remaining() < 4 {
+		return nil, DecodingError{}
+	}
+	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+	rd.off += 4
+
+	var ret []int32 = nil
+	if rd.remaining() < 4*n {
+		return nil, DecodingError{}
+	} else if n > 0 {
+		ret = make([]int32, n)
+		for i := range ret {
+			ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+			rd.off += 4
+		}
+	}
+	return ret, nil
+}
+
+func (rd *realDecoder) getArrayCount() (int, error) {
+	if rd.remaining() < 4 {
+		return -1, DecodingError{}
+	}
+	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+	rd.off += 4
+	if tmp > rd.remaining() || tmp > 2*math.MaxUint16 {
+		return -1, DecodingError{}
+	}
+	return tmp, nil
+}
+
+// misc
 
 func (rd *realDecoder) getError() (KError, error) {
 	val, err := rd.getInt16()
@@ -108,17 +146,7 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 	}
 }
 
-func (rd *realDecoder) getArrayCount() (int, error) {
-	if rd.remaining() < 4 {
-		return -1, DecodingError{}
-	}
-	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
-	rd.off += 4
-	if tmp > rd.remaining() || tmp > 2*math.MaxUint16 {
-		return -1, DecodingError{}
-	}
-	return tmp, nil
-}
+// stackable
 
 func (rd *realDecoder) push(in pushDecoder) error {
 	in.saveOffset(rd.off)

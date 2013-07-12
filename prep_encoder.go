@@ -7,6 +7,8 @@ type prepEncoder struct {
 	err    error
 }
 
+// primitives
+
 func (pe *prepEncoder) putInt8(in int8) {
 	pe.length += 1
 }
@@ -22,6 +24,19 @@ func (pe *prepEncoder) putInt32(in int32) {
 func (pe *prepEncoder) putInt64(in int64) {
 	pe.length += 8
 }
+
+// arrays
+
+func (pe *prepEncoder) putInt32Array(in []int32) {
+	pe.length += 4
+	pe.length += 4 * len(in)
+}
+
+func (pe *prepEncoder) putArrayCount(in int) {
+	pe.length += 4
+}
+
+// misc
 
 func (pe *prepEncoder) putError(in KError) {
 	pe.length += 2
@@ -51,9 +66,7 @@ func (pe *prepEncoder) putBytes(in *[]byte) {
 	}
 }
 
-func (pe *prepEncoder) putArrayCount(in int) {
-	pe.length += 4
-}
+// stackable
 
 func (pe *prepEncoder) push(in pushEncoder) {
 	pe.length += in.reserveLength()

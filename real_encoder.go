@@ -8,6 +8,8 @@ type realEncoder struct {
 	stack []pushEncoder
 }
 
+// primitives
+
 func (re *realEncoder) putInt8(in int8) {
 	re.raw[re.off] = byte(in)
 	re.off += 1
@@ -27,6 +29,21 @@ func (re *realEncoder) putInt64(in int64) {
 	binary.BigEndian.PutUint64(re.raw[re.off:], uint64(in))
 	re.off += 8
 }
+
+// arrays
+
+func (re *realEncoder) putInt32Array(in []int32) {
+	re.putArrayCount(len(in))
+	for _, val := range in {
+		re.putInt32(val)
+	}
+}
+
+func (re *realEncoder) putArrayCount(in int) {
+	re.putInt32(int32(in))
+}
+
+// misc
 
 func (re *realEncoder) putError(in KError) {
 	re.putInt16(int16(in))
@@ -52,9 +69,7 @@ func (re *realEncoder) putBytes(in *[]byte) {
 	re.off += len(*in)
 }
 
-func (re *realEncoder) putArrayCount(in int) {
-	re.putInt32(int32(in))
-}
+// stackable
 
 func (re *realEncoder) push(in pushEncoder) {
 	in.saveOffset(re.off)
