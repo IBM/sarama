@@ -66,6 +66,10 @@ func (pe *prepEncoder) putBytes(in *[]byte) {
 	}
 }
 
+func (pe *prepEncoder) putRaw(in []byte) {
+	pe.length += len(in)
+}
+
 // stackable
 
 func (pe *prepEncoder) push(in pushEncoder) {

@@ -165,26 +165,18 @@ func (b *broker) rcvResponseLoop() {
 }
 
 func (b *broker) sendRequest(clientID *string, body requestEncoder) (*responsePromise, error) {
-	var prepEnc prepEncoder
-	var realEnc realEncoder
-
 	req := request{b.correlation_id, clientID, body}
-
-	req.encode(&prepEnc)
-	if prepEnc.err != nil {
-		return nil, prepEnc.err
+	packet, err := buildBytes(&req)
+	if err != nil {
+		return nil, err
 	}
 
-	realEnc.raw = make([]byte, prepEnc.length+4)
-	realEnc.putInt32(int32(prepEnc.length))
-	req.encode(&realEnc)
+	sendRequest := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, body.expectResponse()}
 
-	request := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, body.expectResponse()}
-
-	b.requests <- request
-	request.response.packets <- realEnc.raw // we cheat to avoid poofing up more channels than necessary
+	b.requests <- sendRequest
+	sendRequest.response.packets <- *packet // we cheat to avoid poofing up more channels than necessary
 	b.correlation_id++
-	return &request.response, nil
+	return &sendRequest.response, nil
 }
 
 // returns true if there was a response, even if there was an error decoding it (in

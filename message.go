@@ -116,7 +116,18 @@ func (m *message) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func newMessageFromString(in string) *message {
-	buf := make([]byte, len(in))
-	return &message{value: &buf}
+func newMessage(key, value encoder) (msg *message, err error) {
+	msg = new(message)
+
+	msg.key, err = buildBytes(key)
+	if err != nil {
+		return nil, err
+	}
+
+	msg.value, err = buildBytes(value)
+	if err != nil {
+		return nil, err
+	}
+
+	return msg, nil
 }

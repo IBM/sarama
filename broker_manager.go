@@ -78,20 +78,20 @@ func (bm *brokerManager) getValidLeader(topic string, partition_id int32) (*brok
 	return leader, nil
 }
 
-func (bm *brokerManager) choosePartition(topic string, p partitionChooser) (int32, error) {
+func (bm *brokerManager) partitionsForTopic(topic string) ([]int32, error) {
 	bm.lock.RLock()
 	id_map := bm.partitions[topic]
 	if id_map == nil {
 		bm.lock.RUnlock()
 		err := bm.refreshTopic(topic)
 		if err != nil {
-			return -1, err
+			return nil, err
 		}
 		bm.lock.RLock()
 		id_map = bm.partitions[topic]
 		if id_map == nil {
 			bm.lock.RUnlock()
-			return -1, UNKNOWN_TOPIC_OR_PARTITION
+			return nil, UNKNOWN_TOPIC_OR_PARTITION
 		}
 	}
 	partitions := make([]int32, len(id_map))
@@ -101,7 +101,7 @@ func (bm *brokerManager) choosePartition(topic string, p partitionChooser) (int3
 		i++
 	}
 	bm.lock.RUnlock()
-	return p.choosePartition(partitions), nil
+	return partitions, nil
 }
 
 func (bm *brokerManager) sendToPartition(topic string, partition int32, req requestEncoder, res responseDecoder) (bool, error) {

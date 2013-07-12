@@ -65,8 +65,12 @@ func (re *realEncoder) putBytes(in *[]byte) {
 		return
 	}
 	re.putInt32(int32(len(*in)))
-	copy(re.raw[re.off:], *in)
-	re.off += len(*in)
+	re.putRaw(*in)
+}
+
+func (re *realEncoder) putRaw(in []byte) {
+	copy(re.raw[re.off:], in)
+	re.off += len(in)
 }
 
 // stackable

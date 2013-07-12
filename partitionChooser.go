@@ -3,12 +3,12 @@ package kafka
 import "math/rand"
 
 type partitionChooser interface {
-	choosePartition(options []int32) int32
+	choosePartition(key encoder, partitions []int32) int32
 }
 
-type randomPartitioner struct {
+type RandomPartitioner struct {
 }
 
-func (p randomPartitioner) choosePartition(options []int32) int32 {
-	return options[rand.Intn(len(options))]
+func (p RandomPartitioner) choosePartition(key encoder, partitions []int32) int32 {
+	return partitions[rand.Intn(len(partitions))]
 }
