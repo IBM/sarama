@@ -181,10 +181,10 @@ func (b *broker) sendRequest(clientID *string, body requestEncoder) (*responsePr
 
 // returns true if there was a response, even if there was an error decoding it (in
 // which case it will also return an error of some sort)
-func (b *broker) sendAndReceive(clientID *string, req requestEncoder, res decoder) (bool, error) {
+func (b *broker) sendAndReceive(clientID *string, req requestEncoder, res decoder) error {
 	responseChan, err := b.sendRequest(clientID, req)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	select {
@@ -193,10 +193,10 @@ func (b *broker) sendAndReceive(clientID *string, req requestEncoder, res decode
 		if buf != nil {
 			decoder := realDecoder{raw: buf}
 			err = res.decode(&decoder)
-			return true, err
+			return err
 		}
 	case err = <-responseChan.errors:
 	}
 
-	return false, err
+	return err
 }

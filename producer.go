@@ -39,7 +39,7 @@ func (p *Producer) SendMessage(key, value encoder) error {
 	request.requiredAcks = p.responseCondition
 	request.timeout = p.responseTimeout
 
-	_, err = p.client.brokers.sendToPartition(p.topic, partition, request, &produceResponse{})
+	err = p.client.brokers.sendToPartition(p.topic, partition, request, &produceResponse{})
 
 	return err
 }
