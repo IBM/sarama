@@ -27,3 +27,11 @@ func (mr *metadataRequest) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func (mr *metadataRequest) key() int16 {
+	return 3
+}
+
+func (mr *metadataRequest) version() int16 {
+	return 0
+}

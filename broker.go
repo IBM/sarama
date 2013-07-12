@@ -164,21 +164,11 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) sendRequest(clientID *string, body encoder, expectResponse bool) (*responsePromise, error) {
+func (b *broker) sendRequest(clientID *string, body apiEncoder, expectResponse bool) (*responsePromise, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
-	var api API
 
-	switch body.(type) {
-	case *metadataRequest:
-		api = REQUEST_METADATA
-	case *produceRequest:
-		api = REQUEST_PRODUCE
-	default:
-		return nil, EncodingError{"Unknown API."}
-	}
-
-	req := request{api, b.correlation_id, clientID, body}
+	req := request{b.correlation_id, clientID, body}
 
 	req.encode(&prepEnc)
 	if prepEnc.err != nil {
@@ -197,7 +187,7 @@ func (b *broker) sendRequest(clientID *string, body encoder, expectResponse bool
 	return &request.response, nil
 }
 
-func (b *broker) sendAndReceive(clientID *string, req encoder, res decoder) error {
+func (b *broker) sendAndReceive(clientID *string, req apiEncoder, res decoder) error {
 	responseChan, err := b.sendRequest(clientID, req, res != nil)
 	if err != nil {
 		return err

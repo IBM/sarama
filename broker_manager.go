@@ -104,7 +104,7 @@ func (bm *brokerManager) choosePartition(topic string, p partitionChooser) (int3
 	return p.choosePartition(partitions), nil
 }
 
-func (bm *brokerManager) sendToPartition(topic string, partition int32, req encoder, res decoder) error {
+func (bm *brokerManager) sendToPartition(topic string, partition int32, req apiEncoder, res decoder) error {
 	b, err := bm.getValidLeader(topic, partition)
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func (bm *brokerManager) getDefault() *broker {
 	return bm.defaultBroker
 }
 
-func (bm *brokerManager) sendToAny(req encoder, res decoder) error {
+func (bm *brokerManager) sendToAny(req apiEncoder, res decoder) error {
 	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
 		err := b.sendAndReceive(bm.client.id, req, res)
 		switch err.(type) {

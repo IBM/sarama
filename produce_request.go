@@ -48,3 +48,11 @@ func newSingletonProduceRequest(topic string, partition int32, set *messageSet) 
 	req.topics[0].partitions[0].msgSet = set
 	return req
 }
+
+func (p *produceRequest) key() int16 {
+	return 0
+}
+
+func (p *produceRequest) version() int16 {
+	return 0
+}
