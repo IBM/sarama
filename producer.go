@@ -16,6 +16,13 @@ func (p *Producer) SendSimpleMessage(in string) error {
 	}
 
 	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(newMessageFromString(in)))
+	request.requiredAcks = WAIT_FOR_LOCAL
 
-	return p.client.brokers.sendToPartition(p.topic, partition, request, nil)
+	response := produceResponse{}
+
+	_, err = p.client.brokers.sendToPartition(p.topic, partition, request, &response)
+	if err != nil {
+		return err
+	}
+	return nil
 }

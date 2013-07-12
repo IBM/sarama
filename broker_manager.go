@@ -104,22 +104,34 @@ func (bm *brokerManager) choosePartition(topic string, p partitionChooser) (int3
 	return p.choosePartition(partitions), nil
 }
 
-func (bm *brokerManager) sendToPartition(topic string, partition int32, req apiEncoder, res decoder) error {
+func (bm *brokerManager) sendToPartition(topic string, partition int32, req requestEncoder, res responseDecoder) (bool, error) {
 	b, err := bm.getValidLeader(topic, partition)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	err = b.sendAndReceive(bm.client.id, req, res)
+	gotResponse, err := b.sendAndReceive(bm.client.id, req, res)
 	switch err.(type) {
-	case nil:
-		// successfully received and decoded the packet, we're done
-		// (the actual decoded data is stored in the res parameter)
-		return nil
 	case EncodingError:
 		// encoding errors are our problem, not the broker's, so just return them
 		// rather than refreshing the broker metadata
-		return err
+		return false, err
+	case nil:
+		// no error, did we get a response?
+		if gotResponse {
+			// yes, so check for stale topics that may require a resend
+			stale := res.staleTopics()
+			if len(stale) == 0 {
+				return true, nil
+			}
+			err = bm.refreshTopics(stale)
+			if err != nil {
+				return true, err
+			}
+		} else {
+			// no, so we have to assume it worked
+			return false, nil
+		}
 	default:
 		// broker error, so discard that broker
 		bm.terminateBroker(b.id)
@@ -131,7 +143,7 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req apiE
 	// we pass that error back to the user (as opposed to retrying indefinitely)
 	b, err = bm.getValidLeader(topic, partition)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	return b.sendAndReceive(bm.client.id, req, res)
@@ -151,30 +163,24 @@ func (bm *brokerManager) getDefault() *broker {
 	return bm.defaultBroker
 }
 
-func (bm *brokerManager) sendToAny(req apiEncoder, res decoder) error {
+func (bm *brokerManager) sendToAny(req requestEncoder, res decoder) (bool, error) {
 	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
-		err := b.sendAndReceive(bm.client.id, req, res)
+		gotResponse, err := b.sendAndReceive(bm.client.id, req, res)
 		switch err.(type) {
-		case nil:
-			// successfully received and decoded the packet, we're done
-			// (the actual decoded data is stored in the res parameter)
-			return nil
-		case EncodingError:
-			// encoding errors are our problem, not the broker's, so just return them
-			// rather than trying another broker
-			return err
+		case nil, EncodingError:
+			return gotResponse, err
 		default:
 			// broker error, so discard that broker
 			bm.defaultBroker = nil
 			bm.terminateBroker(b.id)
 		}
 	}
-	return OutOfBrokers{}
+	return false, OutOfBrokers{}
 }
 
 func (bm *brokerManager) refreshTopics(topics []*string) error {
 	response := new(metadata)
-	err := bm.sendToAny(&metadataRequest{topics}, response)
+	_, err := bm.sendToAny(&metadataRequest{topics}, response)
 	if err != nil {
 		return err
 	}

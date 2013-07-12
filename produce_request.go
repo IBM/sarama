@@ -25,6 +25,12 @@ func (p *produceRequestTopicBlock) encode(pe packetEncoder) {
 	}
 }
 
+const (
+	NO_RESPONSE    int16 = 0
+	WAIT_FOR_LOCAL int16 = 1
+	WAIT_FOR_ALL   int16 = -1
+)
+
 type produceRequest struct {
 	requiredAcks int16
 	timeout      int32
@@ -46,6 +52,10 @@ func (p *produceRequest) key() int16 {
 
 func (p *produceRequest) version() int16 {
 	return 0
+}
+
+func (p *produceRequest) expectResponse() bool {
+	return p.requiredAcks != NO_RESPONSE
 }
 
 func newSingletonProduceRequest(topic string, partition int32, set *messageSet) *produceRequest {

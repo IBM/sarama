@@ -164,7 +164,7 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) sendRequest(clientID *string, body apiEncoder, expectResponse bool) (*responsePromise, error) {
+func (b *broker) sendRequest(clientID *string, body requestEncoder) (*responsePromise, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 
@@ -179,7 +179,7 @@ func (b *broker) sendRequest(clientID *string, body apiEncoder, expectResponse b
 	realEnc.putInt32(int32(prepEnc.length))
 	req.encode(&realEnc)
 
-	request := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, expectResponse}
+	request := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, body.expectResponse()}
 
 	b.requests <- request
 	request.response.packets <- realEnc.raw // we cheat to avoid poofing up more channels than necessary
@@ -187,10 +187,12 @@ func (b *broker) sendRequest(clientID *string, body apiEncoder, expectResponse b
 	return &request.response, nil
 }
 
-func (b *broker) sendAndReceive(clientID *string, req apiEncoder, res decoder) error {
-	responseChan, err := b.sendRequest(clientID, req, res != nil)
+// returns true if there was a response, even if there was an error decoding it (in
+// which case it will also return an error of some sort)
+func (b *broker) sendAndReceive(clientID *string, req requestEncoder, res decoder) (bool, error) {
+	responseChan, err := b.sendRequest(clientID, req)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	select {
@@ -199,9 +201,10 @@ func (b *broker) sendAndReceive(clientID *string, req apiEncoder, res decoder) e
 		if buf != nil {
 			decoder := realDecoder{raw: buf}
 			err = res.decode(&decoder)
+			return true, err
 		}
 	case err = <-responseChan.errors:
 	}
 
-	return err
+	return false, err
 }

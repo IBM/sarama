@@ -72,3 +72,23 @@ func (pr *produceResponse) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func (pr *produceResponse) staleTopics() []*string {
+	ret := make([]*string, 0)
+
+	for i := range pr.topics {
+		topic := &pr.topics[i]
+
+	currentTopic:
+		for j := range topic.partitions {
+			partition := &topic.partitions[j]
+			switch partition.err {
+			case UNKNOWN, UNKNOWN_TOPIC_OR_PARTITION, LEADER_NOT_AVAILABLE, NOT_LEADER_FOR_PARTITION:
+				ret = append(ret, topic.name)
+				break currentTopic
+			}
+		}
+	}
+
+	return ret
+}

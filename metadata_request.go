@@ -35,3 +35,7 @@ func (mr *metadataRequest) key() int16 {
 func (mr *metadataRequest) version() int16 {
 	return 0
 }
+
+func (mr *metadataRequest) expectResponse() bool {
+	return true
+}
