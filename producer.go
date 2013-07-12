@@ -16,10 +16,10 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 	return NewProducer(client, topic, RandomPartitioner{}, WAIT_FOR_LOCAL, 0)
 }
 
-func (p *Producer) SendMessage(key, value encoder) error {
+func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 	partitions, err := p.client.brokers.partitionsForTopic(p.topic)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var partitioner PartitionChooser
@@ -32,16 +32,20 @@ func (p *Producer) SendMessage(key, value encoder) error {
 
 	msg, err := newMessage(key, value)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(msg))
 	request.requiredAcks = p.responseCondition
 	request.timeout = p.responseTimeout
 
-	err = p.client.brokers.sendToPartition(p.topic, partition, request, &produceResponse{})
+	var response *ProduceResponse
+	if request.expectResponse() {
+		response = new(ProduceResponse)
+	}
+	err = p.client.brokers.sendToPartition(p.topic, partition, request, response)
 
-	return err
+	return response, err
 }
 
 type encodableString string
@@ -50,6 +54,6 @@ func (s encodableString) encode(pe packetEncoder) {
 	pe.putRaw([]byte(s))
 }
 
-func (p *Producer) SendSimpleMessage(in string) error {
+func (p *Producer) SendSimpleMessage(in string) (*ProduceResponse, error) {
 	return p.SendMessage(nil, encodableString(in))
 }

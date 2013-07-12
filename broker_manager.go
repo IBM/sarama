@@ -104,7 +104,7 @@ func (bm *brokerManager) partitionsForTopic(topic string) ([]int32, error) {
 	return partitions, nil
 }
 
-func (bm *brokerManager) sendToPartition(topic string, partition int32, req requestEncoder, res responseDecoder) error {
+func (bm *brokerManager) sendToPartition(topic string, partition int32, req requestEncoder, res decoder) error {
 	b, err := bm.getLeader(topic, partition)
 	if err != nil {
 		return err
