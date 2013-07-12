@@ -1,5 +1,11 @@
 package kafka
 
+import (
+	"bytes"
+	"compress/gzip"
+	"io/ioutil"
+)
+
 type compressionCodec int
 
 const (
@@ -28,7 +34,24 @@ func (m *message) encode(pe packetEncoder) {
 	pe.putInt8(attributes)
 
 	pe.putBytes(m.key)
-	pe.putBytes(m.value)
+
+	var body *[]byte
+	switch m.codec {
+	case COMPRESSION_NONE:
+		body = m.value
+	case COMPRESSION_GZIP:
+		if m.value != nil {
+			var buf bytes.Buffer
+			writer := gzip.NewWriter(&buf)
+			writer.Write(*m.value)
+			writer.Close()
+			tmp := buf.Bytes()
+			body = &tmp
+		}
+	case COMPRESSION_SNAPPY:
+		// TODO
+	}
+	pe.putBytes(body)
 
 	pe.pop()
 }
@@ -61,6 +84,28 @@ func (m *message) decode(pd packetDecoder) (err error) {
 	m.value, err = pd.getBytes()
 	if err != nil {
 		return err
+	}
+
+	switch m.codec {
+	case COMPRESSION_NONE:
+		// nothing to do
+	case COMPRESSION_GZIP:
+		if m.value == nil {
+			return DecodingError{"Nil contents cannot be compressed."}
+		}
+		reader, err := gzip.NewReader(bytes.NewReader(*m.value))
+		if err != nil {
+			return err
+		}
+		tmp, err := ioutil.ReadAll(reader)
+		if err != nil {
+			return err
+		}
+		m.value = &tmp
+	case COMPRESSION_SNAPPY:
+		// TODO
+	default:
+		return DecodingError{"Unknown compression codec."}
 	}
 
 	err = pd.pop()
