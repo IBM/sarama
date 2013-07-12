@@ -192,14 +192,11 @@ func (bm *brokerManager) refreshTopics(topics []*string) error {
 		if topic.err != NO_ERROR {
 			return topic.err
 		}
+		bm.partitions[*topic.name] = make(map[int32]*partitionMetadata, len(topic.partitions))
 		for j := range topic.partitions {
 			partition := &topic.partitions[j]
 			if partition.err != NO_ERROR {
 				return partition.err
-			}
-			id_map := bm.partitions[*topic.name]
-			if id_map == nil {
-				bm.partitions[*topic.name] = make(map[int32]*partitionMetadata)
 			}
 			bm.partitions[*topic.name][partition.id] = partition
 		}
