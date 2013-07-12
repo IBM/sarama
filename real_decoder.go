@@ -146,6 +146,14 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 	}
 }
 
+func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
+	if rd.remaining() < length {
+		return nil, DecodingError{"Not enough data for subset."}
+	}
+
+	return &realDecoder{raw: rd.raw[rd.off : rd.off+length]}, nil
+}
+
 // stackable
 
 func (rd *realDecoder) push(in pushDecoder) error {

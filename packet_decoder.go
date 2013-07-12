@@ -17,6 +17,7 @@ type packetDecoder interface {
 	getError() (KError, error)
 	getString() (*string, error)
 	getBytes() (*[]byte, error)
+	getSubset(length int) (packetDecoder, error)
 
 	// stackable
 	push(in pushDecoder) error

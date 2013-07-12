@@ -47,7 +47,7 @@ func (ms *messageSet) encode(pe packetEncoder) {
 }
 
 func (ms *messageSet) decode(pd packetDecoder) (err error) {
-	ms.msgs = make([]*messageSetBlock, 0)
+	ms.msgs = nil
 
 	for pd.remaining() > 0 {
 		msb := new(messageSetBlock)

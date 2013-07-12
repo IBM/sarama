@@ -23,7 +23,18 @@ func (pr *fetchResponsePartitionBlock) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	return nil
+	msgSetSize, err := pd.getInt32()
+	if err != nil {
+		return err
+	}
+
+	msgSetDecoder, err := pd.getSubset(int(msgSetSize))
+	if err != nil {
+		return err
+	}
+	err = (&pr.msgSet).decode(msgSetDecoder)
+
+	return err
 }
 
 type fetchResponseTopicBlock struct {
