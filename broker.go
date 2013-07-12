@@ -101,7 +101,7 @@ func (b *broker) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if b.port > math.MaxUint16 {
-		return DecodingError{"Broker port > 65536"}
+		return DecodingError("Broker port > 65536")
 	}
 
 	err = b.connect()
@@ -141,13 +141,13 @@ func (b *broker) rcvResponseLoop() {
 		decoder := realDecoder{raw: header}
 		length, _ := decoder.getInt32()
 		if length <= 4 || length > 2*math.MaxUint16 {
-			b.forceDisconnect(&response, DecodingError{})
+			b.forceDisconnect(&response, DecodingError("Malformed length field."))
 			return
 		}
 
 		corr_id, _ := decoder.getInt32()
 		if response.correlation_id != corr_id {
-			b.forceDisconnect(&response, DecodingError{})
+			b.forceDisconnect(&response, DecodingError("Mismatched correlation id."))
 			return
 		}
 

@@ -63,18 +63,14 @@ func (err OutOfBrokers) Error() string {
 	return "kafka: Client has run out of available brokers to talk to. Is your cluster reachable?"
 }
 
-type EncodingError struct {
-	msg string
-}
+type EncodingError string
 
 func (err EncodingError) Error() string {
-	return "kafka: Could not encode packet. " + err.msg
+	return "kafka: Could not encode packet. " + string(err)
 }
 
-type DecodingError struct {
-	msg string
-}
+type DecodingError string
 
 func (err DecodingError) Error() string {
-	return "kafka: Could not decode packet. " + err.msg
+	return "kafka: Could not decode packet. " + string(err)
 }
