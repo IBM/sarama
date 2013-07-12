@@ -16,7 +16,7 @@ const (
 
 // The spec just says: "This is a version id used to allow backwards compatible evolution of the message
 // binary format." but it doesn't say what the current value is, so presumably 0...
-const MESSAGE_FORMAT int8 = 0
+const message_format int8 = 0
 
 type message struct {
 	codec compressionCodec
@@ -27,7 +27,7 @@ type message struct {
 func (m *message) encode(pe packetEncoder) {
 	pe.pushCRC32()
 
-	pe.putInt8(MESSAGE_FORMAT)
+	pe.putInt8(message_format)
 
 	var attributes int8 = 0
 	attributes |= int8(m.codec & 0x07)
@@ -66,7 +66,7 @@ func (m *message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	if format != MESSAGE_FORMAT {
+	if format != message_format {
 		return DecodingError{}
 	}
 
