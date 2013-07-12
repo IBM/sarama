@@ -1,10 +1,6 @@
 package kafka
 
-type responseAPI interface {
-	staleTopics() []*string
-}
-
-type responseDecoder interface {
+type response interface {
 	decoder
-	responseAPI
+	topics() []topicResponse
 }

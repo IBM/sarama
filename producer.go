@@ -17,6 +17,7 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 }
 
 func (p *Producer) SendMessage(key, value encoder) error {
+	/*
 	partitions, err := p.client.brokers.partitionsForTopic(p.topic)
 	if err != nil {
 		return err
@@ -42,6 +43,8 @@ func (p *Producer) SendMessage(key, value encoder) error {
 	_, err = p.client.brokers.sendToPartition(p.topic, partition, request, &produceResponse{})
 
 	return err
+	*/
+	return nil
 }
 
 type encodableString string

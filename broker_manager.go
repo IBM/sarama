@@ -27,13 +27,15 @@ func newBrokerManager(client *Client, host string, port int32) (bm *brokerManage
 	bm.partitions = make(map[string]map[int32]*partitionMetadata)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
-	err = bm.refreshTopics(make([]*string, 0))
+	//err = bm.refreshTopics(make([]*string, 0))
 	if err != nil {
 		return nil, err
 	}
 
 	return bm, nil
 }
+
+/*
 
 func (bm *brokerManager) terminateBroker(id int32) {
 	bm.lock.Lock()
@@ -104,7 +106,7 @@ func (bm *brokerManager) partitionsForTopic(topic string) ([]int32, error) {
 	return partitions, nil
 }
 
-func (bm *brokerManager) sendToPartition(topic string, partition int32, req requestEncoder, res responseDecoder) (bool, error) {
+func (bm *brokerManager) sendToPartition(topic string, partition int32, req requestBody, res response) (bool, error) {
 	b, err := bm.getValidLeader(topic, partition)
 	if err != nil {
 		return false, err
@@ -163,7 +165,7 @@ func (bm *brokerManager) getDefault() *broker {
 	return bm.defaultBroker
 }
 
-func (bm *brokerManager) sendToAny(req requestEncoder, res decoder) (bool, error) {
+func (bm *brokerManager) sendToAny(req requestBody, res decoder) (bool, error) {
 	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
 		gotResponse, err := b.sendAndReceive(bm.client.id, req, res)
 		switch err.(type) {
@@ -216,3 +218,4 @@ func (bm *brokerManager) refreshTopic(topic string) error {
 	tmp[0] = &topic
 	return bm.refreshTopics(tmp)
 }
+*/

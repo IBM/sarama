@@ -1,20 +1,17 @@
 package kafka
 
-type requestAPI interface {
+type requestBody interface {
+	encoder
 	key() int16
 	version() int16
 	expectResponse() bool
-}
-
-type requestEncoder interface {
-	encoder
-	requestAPI
+	topics() []topicRequest
 }
 
 type request struct {
 	correlation_id int32
 	id             *string
-	body           requestEncoder
+	body           requestBody
 }
 
 func (r *request) encode(pe packetEncoder) {
@@ -25,4 +22,8 @@ func (r *request) encode(pe packetEncoder) {
 	pe.putString(r.id)
 	r.body.encode(pe)
 	pe.pop()
+}
+
+func (r *request) expectResponse() bool {
+	return r.body.expectResponse()
 }
