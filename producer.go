@@ -1,7 +1,7 @@
 package kafka
 
 type Producer struct {
-	client            *Client
+	*Client
 	topic             string
 	partitioner       PartitionChooser
 	responseCondition int16
@@ -17,7 +17,7 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 }
 
 func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
-	partitions, err := p.client.brokers.partitionsForTopic(p.topic)
+	partitions, err := p.cache.partitions(p.topic)
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +35,11 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 		return nil, err
 	}
 
+	broker, err := p.Leader(p.topic, partition)
+	if err != nil {
+		return nil, err
+	}
+
 	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(msg))
 	request.requiredAcks = p.responseCondition
 	request.timeout = p.responseTimeout
@@ -43,7 +48,7 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 	if request.expectResponse() {
 		response = new(ProduceResponse)
 	}
-	err = p.client.brokers.sendToPartition(p.topic, partition, request, response)
+	err = broker.SendAndReceive(p.id, request, response)
 
 	return response, err
 }
