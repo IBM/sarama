@@ -19,7 +19,7 @@ func (rd *realDecoder) remaining() int {
 
 func (rd *realDecoder) getInt8() (int8, error) {
 	if rd.remaining() < 1 {
-		return -1, DecodingError{}
+		return -1, DecodingError("Insufficient data in getInt8.")
 	}
 	tmp := int8(rd.raw[rd.off])
 	rd.off += 1
@@ -28,7 +28,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 
 func (rd *realDecoder) getInt16() (int16, error) {
 	if rd.remaining() < 2 {
-		return -1, DecodingError{}
+		return -1, DecodingError("Insufficient data in getInt16.")
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
 	rd.off += 2
@@ -37,7 +37,7 @@ func (rd *realDecoder) getInt16() (int16, error) {
 
 func (rd *realDecoder) getInt32() (int32, error) {
 	if rd.remaining() < 4 {
-		return -1, DecodingError{}
+		return -1, DecodingError("Insufficient data in getInt32.")
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
@@ -46,7 +46,7 @@ func (rd *realDecoder) getInt32() (int32, error) {
 
 func (rd *realDecoder) getInt64() (int64, error) {
 	if rd.remaining() < 8 {
-		return -1, DecodingError{}
+		return -1, DecodingError("Insufficient data in getInt64.")
 	}
 	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
 	rd.off += 8
@@ -57,14 +57,14 @@ func (rd *realDecoder) getInt64() (int64, error) {
 
 func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	if rd.remaining() < 4 {
-		return nil, DecodingError{}
+		return nil, DecodingError("Insufficient data in getInt32Array.")
 	}
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
 	var ret []int32 = nil
 	if rd.remaining() < 4*n {
-		return nil, DecodingError{}
+		return nil, DecodingError("Insufficient data in getInt32Array.")
 	} else if n > 0 {
 		ret = make([]int32, n)
 		for i := range ret {
@@ -77,12 +77,12 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 
 func (rd *realDecoder) getArrayCount() (int, error) {
 	if rd.remaining() < 4 {
-		return -1, DecodingError{}
+		return -1, DecodingError("Insufficient data in getArrayCount.")
 	}
 	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 	if tmp > rd.remaining() || tmp > 2*math.MaxUint16 {
-		return -1, DecodingError{}
+		return -1, DecodingError("Array absurdly long in getArrayCount.")
 	}
 	return tmp, nil
 }
@@ -105,13 +105,13 @@ func (rd *realDecoder) getString() (*string, error) {
 
 	switch {
 	case n < -1:
-		return nil, DecodingError{}
+		return nil, DecodingError("Negative string length in getString.")
 	case n == -1:
 		return nil, nil
 	case n == 0:
 		return new(string), nil
 	case n > rd.remaining():
-		return nil, DecodingError{}
+		return nil, DecodingError("String too long in getString.")
 	default:
 		tmp := new(string)
 		*tmp = string(rd.raw[rd.off : rd.off+n])
@@ -131,14 +131,14 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 
 	switch {
 	case n < -1:
-		return nil, DecodingError{}
+		return nil, DecodingError("Negative byte length in getBytes.")
 	case n == -1:
 		return nil, nil
 	case n == 0:
 		tmp := make([]byte, 0)
 		return &tmp, nil
 	case n > rd.remaining():
-		return nil, DecodingError{}
+		return nil, DecodingError("Bytes too long in getBytes.")
 	default:
 		tmp := rd.raw[rd.off : rd.off+n]
 		rd.off += n
@@ -148,7 +148,7 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 
 func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
 	if rd.remaining() < length {
-		return nil, DecodingError{"Not enough data for subset."}
+		return nil, DecodingError("Not enough data for subset.")
 	}
 
 	return &realDecoder{raw: rd.raw[rd.off : rd.off+length]}, nil
@@ -160,7 +160,7 @@ func (rd *realDecoder) push(in pushDecoder) error {
 	in.saveOffset(rd.off)
 
 	if rd.remaining() < in.reserveLength() {
-		return DecodingError{}
+		return DecodingError("Insufficient data while reserving for push.")
 	}
 
 	rd.stack = append(rd.stack, in)

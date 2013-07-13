@@ -32,7 +32,7 @@ func (l *length32Decoder) reserveLength() int {
 
 func (l *length32Decoder) check(curOffset int, buf []byte) error {
 	if uint32(curOffset-l.startOffset-4) != binary.BigEndian.Uint32(buf[l.startOffset:]) {
-		return DecodingError{}
+		return DecodingError("Packet length did not match.")
 	}
 
 	return nil

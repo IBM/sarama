@@ -67,7 +67,7 @@ func (m *message) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if format != message_format {
-		return DecodingError{}
+		return DecodingError("Message format mismatch.")
 	}
 
 	attribute, err := pd.getInt8()
@@ -91,7 +91,7 @@ func (m *message) decode(pd packetDecoder) (err error) {
 		// nothing to do
 	case COMPRESSION_GZIP:
 		if m.value == nil {
-			return DecodingError{"Nil contents cannot be compressed."}
+			return DecodingError("Nil contents cannot be compressed.")
 		}
 		reader, err := gzip.NewReader(bytes.NewReader(*m.value))
 		if err != nil {
@@ -105,7 +105,7 @@ func (m *message) decode(pd packetDecoder) (err error) {
 	case COMPRESSION_SNAPPY:
 		// TODO
 	default:
-		return DecodingError{"Unknown compression codec."}
+		return DecodingError("Unknown compression codec.")
 	}
 
 	err = pd.pop()

@@ -48,7 +48,7 @@ func (pe *prepEncoder) putString(in *string) {
 		return
 	}
 	if len(*in) > math.MaxInt16 {
-		pe.err = EncodingError{"String too long"}
+		pe.err = EncodingError("String too long")
 	} else {
 		pe.length += len(*in)
 	}
@@ -60,7 +60,7 @@ func (pe *prepEncoder) putBytes(in *[]byte) {
 		return
 	}
 	if len(*in) > math.MaxInt32 {
-		pe.err = EncodingError{"Bytes too long"}
+		pe.err = EncodingError("Bytes too long.")
 	} else {
 		pe.length += len(*in)
 	}
