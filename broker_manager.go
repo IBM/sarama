@@ -110,7 +110,7 @@ func (bm *brokerManager) sendToPartition(topic string, partition int32, req requ
 		return err
 	}
 
-	err = b.sendAndReceive(bm.client.id, req, res)
+	err = b.SendAndReceive(bm.client.id, req, res)
 	switch err.(type) {
 	case EncodingError:
 		// encoding errors are our problem, not the broker's, so just return them
@@ -141,7 +141,7 @@ func (bm *brokerManager) getDefault() *broker {
 
 func (bm *brokerManager) sendToAny(req requestEncoder, res decoder) error {
 	for b := bm.getDefault(); b != nil; b = bm.getDefault() {
-		err := b.sendAndReceive(bm.client.id, req, res)
+		err := b.SendAndReceive(bm.client.id, req, res)
 		switch err.(type) {
 		case nil, EncodingError:
 			return err
@@ -155,7 +155,7 @@ func (bm *brokerManager) sendToAny(req requestEncoder, res decoder) error {
 }
 
 func (bm *brokerManager) refreshTopics(topics []*string) error {
-	response := new(metadata)
+	response := new(metadataResponse)
 	err := bm.sendToAny(&metadataRequest{topics}, response)
 	if err != nil {
 		return err

@@ -1,11 +1,11 @@
 package kafka
 
-type metadata struct {
+type metadataResponse struct {
 	brokers []broker
 	topics  []topicMetadata
 }
 
-func (m *metadata) encode(pe packetEncoder) {
+func (m *metadataResponse) encode(pe packetEncoder) {
 	pe.putInt32(int32(len(m.brokers)))
 	for i := range m.brokers {
 		(&m.brokers[i]).encode(pe)
@@ -16,7 +16,7 @@ func (m *metadata) encode(pe packetEncoder) {
 	}
 }
 
-func (m *metadata) decode(pd packetDecoder) (err error) {
+func (m *metadataResponse) decode(pd packetDecoder) (err error) {
 	n, err := pd.getArrayCount()
 	if err != nil {
 		return err

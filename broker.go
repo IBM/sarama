@@ -164,7 +164,7 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) sendAndReceive(clientID *string, req requestEncoder, res decoder) error {
+func (b *broker) SendAndReceive(clientID *string, req requestEncoder, res decoder) error {
 	fullRequest := request{b.correlation_id, clientID, req}
 	packet, err := buildBytes(&fullRequest)
 	if err != nil {
