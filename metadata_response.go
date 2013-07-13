@@ -1,7 +1,7 @@
 package kafka
 
 type metadataResponse struct {
-	brokers []broker
+	brokers []Broker
 	topics  []topicMetadata
 }
 
@@ -22,7 +22,7 @@ func (m *metadataResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	m.brokers = make([]broker, n)
+	m.brokers = make([]Broker, n)
 	for i := 0; i < n; i++ {
 		err = (&m.brokers[i]).decode(pd)
 		if err != nil {

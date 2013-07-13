@@ -17,7 +17,7 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 }
 
 func (p *Producer) choosePartition(key encoder) (int32, error) {
-	partitions, err := p.Partitions(p.topic)
+	partitions, err := p.partitions(p.topic)
 	if err != nil {
 		return -1, err
 	}
@@ -43,7 +43,7 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 		return nil, err
 	}
 
-	broker, err := p.Leader(p.topic, partition)
+	broker, err := p.leader(p.topic, partition)
 	if err != nil {
 		return nil, err
 	}

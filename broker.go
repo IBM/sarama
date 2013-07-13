@@ -6,7 +6,7 @@ import (
 	"net"
 )
 
-type broker struct {
+type Broker struct {
 	id   int32
 	host *string
 	port int32
@@ -32,8 +32,8 @@ type requestToSend struct {
 	expectResponse bool
 }
 
-func newBroker(host string, port int32) (b *broker, err error) {
-	b = new(broker)
+func NewBroker(host string, port int32) (b *Broker, err error) {
+	b = new(Broker)
 	b.id = -1 // don't know it yet
 	b.host = &host
 	b.port = port
@@ -44,7 +44,7 @@ func newBroker(host string, port int32) (b *broker, err error) {
 	return b, nil
 }
 
-func (b *broker) connect() (err error) {
+func (b *Broker) connect() (err error) {
 	addr, err := net.ResolveIPAddr("ip", *b.host)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (b *broker) connect() (err error) {
 	return nil
 }
 
-func (b *broker) forceDisconnect(reqRes *responsePromise, err error) {
+func (b *Broker) forceDisconnect(reqRes *responsePromise, err error) {
 	reqRes.errors <- err
 	close(reqRes.errors)
 	close(reqRes.packets)
@@ -79,13 +79,13 @@ func (b *broker) forceDisconnect(reqRes *responsePromise, err error) {
 	b.conn.Close()
 }
 
-func (b *broker) encode(pe packetEncoder) {
+func (b *Broker) encode(pe packetEncoder) {
 	pe.putInt32(b.id)
 	pe.putString(b.host)
 	pe.putInt32(b.port)
 }
 
-func (b *broker) decode(pd packetDecoder) (err error) {
+func (b *Broker) decode(pd packetDecoder) (err error) {
 	b.id, err = pd.getInt32()
 	if err != nil {
 		return err
@@ -112,7 +112,7 @@ func (b *broker) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func (b *broker) sendRequestLoop() {
+func (b *Broker) sendRequestLoop() {
 	for request := range b.requests {
 		buf := <-request.response.packets
 		_, err := b.conn.Write(buf)
@@ -129,7 +129,7 @@ func (b *broker) sendRequestLoop() {
 	}
 }
 
-func (b *broker) rcvResponseLoop() {
+func (b *Broker) rcvResponseLoop() {
 	header := make([]byte, 8)
 	for response := range b.responses {
 		_, err := io.ReadFull(b.conn, header)
@@ -164,7 +164,7 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) SendAndReceive(clientID *string, req requestEncoder) (decoder, error) {
+func (b *Broker) SendAndReceive(clientID *string, req requestEncoder) (decoder, error) {
 	fullRequest := request{b.correlation_id, clientID, req}
 	packet, err := buildBytes(&fullRequest)
 	if err != nil {

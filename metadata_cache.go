@@ -7,7 +7,7 @@ import (
 
 type metadataCache struct {
 	client  *Client
-	brokers map[int32]*broker          // maps broker ids to brokers
+	brokers map[int32]*Broker          // maps broker ids to brokers
 	leaders map[string]map[int32]int32 // maps topics to partition ids to broker ids
 	lock    sync.RWMutex               // protects access to the maps, only one since they're always accessed together
 }
@@ -15,13 +15,13 @@ type metadataCache struct {
 func newMetadataCache(client *Client, host string, port int32) (*metadataCache, error) {
 	mc := new(metadataCache)
 
-	starter, err := newBroker(host, port)
+	starter, err := NewBroker(host, port)
 	if err != nil {
 		return nil, err
 	}
 
 	mc.client = client
-	mc.brokers = make(map[int32]*broker)
+	mc.brokers = make(map[int32]*Broker)
 	mc.leaders = make(map[string]map[int32]int32)
 
 	mc.brokers[starter.id] = starter
@@ -35,7 +35,7 @@ func newMetadataCache(client *Client, host string, port int32) (*metadataCache, 
 	return mc, nil
 }
 
-func (mc *metadataCache) leader(topic string, partition_id int32) *broker {
+func (mc *metadataCache) leader(topic string, partition_id int32) *Broker {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 
@@ -52,7 +52,7 @@ func (mc *metadataCache) leader(topic string, partition_id int32) *broker {
 	return nil
 }
 
-func (mc *metadataCache) any() *broker {
+func (mc *metadataCache) any() *Broker {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 

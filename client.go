@@ -15,7 +15,7 @@ func NewClient(id *string, host string, port int32) (client *Client, err error) 
 	return client, nil
 }
 
-func (client *Client) Leader(topic string, partition_id int32) (*broker, error) {
+func (client *Client) leader(topic string, partition_id int32) (*Broker, error) {
 	leader := client.cache.leader(topic, partition_id)
 
 	if leader == nil {
@@ -34,7 +34,7 @@ func (client *Client) Leader(topic string, partition_id int32) (*broker, error) 
 	return leader, nil
 }
 
-func (client *Client) Partitions(topic string) ([]int32, error) {
+func (client *Client) partitions(topic string) ([]int32, error) {
 	partitions := client.cache.partitions(topic)
 
 	if partitions == nil {
