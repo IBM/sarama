@@ -60,13 +60,13 @@ func (mc *metadataCache) any() *broker {
 	return nil
 }
 
-func (mc *metadataCache) partitions(topic string) ([]int32, error) {
+func (mc *metadataCache) partitions(topic string) []int32 {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 
 	partitions := mc.leaders[topic]
 	if partitions == nil {
-		return nil, UNKNOWN_TOPIC_OR_PARTITION
+		return nil
 	}
 
 	ret := make([]int32, len(partitions))
@@ -74,7 +74,7 @@ func (mc *metadataCache) partitions(topic string) ([]int32, error) {
 		ret = append(ret, id)
 	}
 
-	return ret, nil
+	return ret
 }
 
 func (mc *metadataCache) refreshTopics(topics []*string) error {

@@ -17,7 +17,7 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 }
 
 func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
-	partitions, err := p.cache.partitions(p.topic)
+	partitions, err := p.Partitions(p.topic)
 	if err != nil {
 		return nil, err
 	}

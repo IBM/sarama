@@ -33,3 +33,22 @@ func (client *Client) Leader(topic string, partition_id int32) (*broker, error) 
 
 	return leader, nil
 }
+
+func (client *Client) Partitions(topic string) ([]int32, error) {
+	partitions := client.cache.partitions(topic)
+
+	if partitions == nil {
+		err := client.cache.refreshTopic(topic)
+		if err != nil {
+			return nil, err
+		}
+
+		partitions = client.cache.partitions(topic)
+	}
+
+	if partitions == nil {
+		return nil, UNKNOWN_TOPIC_OR_PARTITION
+	}
+
+	return partitions, nil
+}
