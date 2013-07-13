@@ -84,7 +84,7 @@ func (b *Broker) connect() (err error) {
 		return err
 	}
 
-	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{addr.IP, int(b.port), addr.Zone})
+	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port), Zone: addr.Zone})
 	if err != nil {
 		return err
 	}
