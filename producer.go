@@ -16,10 +16,10 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 	return NewProducer(client, topic, RandomPartitioner{}, WAIT_FOR_LOCAL, 0)
 }
 
-func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
+func (p *Producer) choosePartition(key encoder) (int32, error) {
 	partitions, err := p.Partitions(p.topic)
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
 
 	var partitioner PartitionChooser
@@ -28,7 +28,15 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 	} else {
 		partitioner = p.partitioner
 	}
-	partition := partitioner.ChoosePartition(key, partitions)
+
+	return partitions[partitioner.ChoosePartition(key, len(partitions))], nil
+}
+
+func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
+	partition, err := p.choosePartition(key)
+	if err != nil {
+		return nil, err
+	}
 
 	msg, err := newMessage(key, value)
 	if err != nil {

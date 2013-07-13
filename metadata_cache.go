@@ -1,6 +1,9 @@
 package kafka
 
-import "sync"
+import (
+	"sort"
+	"sync"
+)
 
 type metadataCache struct {
 	client  *Client
@@ -74,6 +77,7 @@ func (mc *metadataCache) partitions(topic string) []int32 {
 		ret = append(ret, id)
 	}
 
+	sort.Sort(int32Slice(ret))
 	return ret
 }
 
