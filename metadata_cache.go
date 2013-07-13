@@ -87,7 +87,7 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 		return OutOfBrokers{}
 	}
 
-	decoder, err := broker.SendAndReceive(mc.client.id, &metadataRequest{topics})
+	decoder, err := broker.Send(mc.client.id, &metadataRequest{topics})
 	if err != nil {
 		return err
 	}

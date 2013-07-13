@@ -52,7 +52,7 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 	request.requiredAcks = p.responseCondition
 	request.timeout = p.responseTimeout
 
-	decoder, err := broker.SendAndReceive(p.id, request)
+	decoder, err := broker.Send(p.id, request)
 	if err != nil {
 		return nil, err
 	}
