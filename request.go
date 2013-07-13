@@ -4,7 +4,7 @@ type requestEncoder interface {
 	encoder
 	key() int16
 	version() int16
-	expectResponse() bool
+	responseDecoder() decoder
 }
 
 type request struct {

@@ -87,11 +87,11 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 		return OutOfBrokers{}
 	}
 
-	response := new(metadataResponse)
-	err := broker.SendAndReceive(mc.client.id, &metadataRequest{topics}, response)
+	decoder, err := broker.SendAndReceive(mc.client.id, &metadataRequest{topics})
 	if err != nil {
 		return err
 	}
+	response := decoder.(*metadataResponse)
 
 	mc.lock.Lock()
 	defer mc.lock.Unlock()

@@ -54,8 +54,11 @@ func (p *produceRequest) version() int16 {
 	return 0
 }
 
-func (p *produceRequest) expectResponse() bool {
-	return p.requiredAcks != NO_RESPONSE
+func (p *produceRequest) responseDecoder() decoder {
+	if p.requiredAcks == NO_RESPONSE {
+		return nil
+	}
+	return new(ProduceResponse)
 }
 
 func newSingletonProduceRequest(topic string, partition int32, set *messageSet) *produceRequest {

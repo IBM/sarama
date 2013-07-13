@@ -164,14 +164,15 @@ func (b *broker) rcvResponseLoop() {
 	}
 }
 
-func (b *broker) SendAndReceive(clientID *string, req requestEncoder, res decoder) error {
+func (b *broker) SendAndReceive(clientID *string, req requestEncoder) (decoder, error) {
 	fullRequest := request{b.correlation_id, clientID, req}
 	packet, err := buildBytes(&fullRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	sendRequest := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, req.expectResponse()}
+	response := req.responseDecoder()
+	sendRequest := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, response != nil}
 
 	b.requests <- sendRequest
 	sendRequest.response.packets <- *packet // we cheat to avoid poofing up more channels than necessary
@@ -182,11 +183,11 @@ func (b *broker) SendAndReceive(clientID *string, req requestEncoder, res decode
 		// Only try to decode if we got a response.
 		if buf != nil {
 			decoder := realDecoder{raw: buf}
-			err = res.decode(&decoder)
-			return err
+			err = response.decode(&decoder)
+			return response, err
 		}
 	case err = <-sendRequest.response.errors:
 	}
 
-	return err
+	return nil, err
 }

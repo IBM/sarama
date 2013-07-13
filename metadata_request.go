@@ -36,6 +36,6 @@ func (mr *metadataRequest) version() int16 {
 	return 0
 }
 
-func (mr *metadataRequest) expectResponse() bool {
-	return true
+func (mr *metadataRequest) responseDecoder() decoder {
+	return new(metadataResponse)
 }

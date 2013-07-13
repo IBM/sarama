@@ -52,13 +52,15 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 	request.requiredAcks = p.responseCondition
 	request.timeout = p.responseTimeout
 
-	var response *ProduceResponse
-	if request.expectResponse() {
-		response = new(ProduceResponse)
+	decoder, err := broker.SendAndReceive(p.id, request)
+	if err != nil {
+		return nil, err
 	}
-	err = broker.SendAndReceive(p.id, request, response)
+	if decoder != nil {
+		return decoder.(*ProduceResponse), nil
+	}
 
-	return response, err
+	return nil, nil
 }
 
 type encodableString string
