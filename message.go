@@ -6,12 +6,12 @@ import (
 	"io/ioutil"
 )
 
-type compressionCodec int
+type CompressionCodec int
 
 const (
-	COMPRESSION_NONE   compressionCodec = 0
-	COMPRESSION_GZIP   compressionCodec = 1
-	COMPRESSION_SNAPPY compressionCodec = 2
+	COMPRESSION_NONE   CompressionCodec = 0
+	COMPRESSION_GZIP   CompressionCodec = 1
+	COMPRESSION_SNAPPY CompressionCodec = 2
 )
 
 // The spec just says: "This is a version id used to allow backwards compatible evolution of the message
@@ -19,7 +19,7 @@ const (
 const message_format int8 = 0
 
 type Message struct {
-	Codec compressionCodec // how  to compress the contents of the message
+	Codec CompressionCodec // codec used to compress the message contents
 	Key   []byte           // the message key, may be nil
 	Value []byte           // the message contents
 }
@@ -73,7 +73,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	m.Codec = compressionCodec(attribute & 0x07)
+	m.Codec = CompressionCodec(attribute & 0x07)
 
 	m.Key, err = pd.getBytes()
 	if err != nil {
