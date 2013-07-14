@@ -70,7 +70,7 @@ func (b *Broker) Close() error {
 	return b.conn.Close()
 }
 
-func (b *Broker) Send(clientID *string, req requestEncoder) (decoder, error) {
+func (b *Broker) Send(clientID *string, req RequestEncoder) (interface{}, error) {
 	fullRequest := request{b.correlation_id, clientID, req}
 	packet, err := encode(&fullRequest)
 	if err != nil {

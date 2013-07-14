@@ -1,6 +1,8 @@
 package kafka
 
-type requestEncoder interface {
+// An internal interface satisfied by all of the Request structures
+// (MetadataRequest, ProduceRequest, etc).
+type RequestEncoder interface {
 	encoder
 	key() int16
 	version() int16
@@ -10,7 +12,7 @@ type requestEncoder interface {
 type request struct {
 	correlation_id int32
 	id             *string
-	body           requestEncoder
+	body           RequestEncoder
 }
 
 func (r *request) encode(pe packetEncoder) {
