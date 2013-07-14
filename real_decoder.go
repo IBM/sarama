@@ -120,7 +120,7 @@ func (rd *realDecoder) getString() (*string, error) {
 	}
 }
 
-func (rd *realDecoder) getBytes() (*[]byte, error) {
+func (rd *realDecoder) getBytes() ([]byte, error) {
 	tmp, err := rd.getInt32()
 
 	if err != nil {
@@ -135,14 +135,13 @@ func (rd *realDecoder) getBytes() (*[]byte, error) {
 	case n == -1:
 		return nil, nil
 	case n == 0:
-		tmp := make([]byte, 0)
-		return &tmp, nil
+		return make([]byte, 0), nil
 	case n > rd.remaining():
 		return nil, DecodingError("Bytes too long in getBytes.")
 	default:
 		tmp := rd.raw[rd.off : rd.off+n]
 		rd.off += n
-		return &tmp, nil
+		return tmp, nil
 	}
 }
 

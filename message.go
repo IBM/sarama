@@ -20,8 +20,8 @@ const message_format int8 = 0
 
 type message struct {
 	codec compressionCodec
-	key   *[]byte
-	value *[]byte
+	key   []byte
+	value []byte
 }
 
 func (m *message) encode(pe packetEncoder) {
@@ -35,7 +35,7 @@ func (m *message) encode(pe packetEncoder) {
 
 	pe.putBytes(m.key)
 
-	var body *[]byte
+	var body []byte
 	switch m.codec {
 	case COMPRESSION_NONE:
 		body = m.value
@@ -43,10 +43,9 @@ func (m *message) encode(pe packetEncoder) {
 		if m.value != nil {
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
-			writer.Write(*m.value)
+			writer.Write(m.value)
 			writer.Close()
-			tmp := buf.Bytes()
-			body = &tmp
+			body = buf.Bytes()
 		}
 	case COMPRESSION_SNAPPY:
 		// TODO
@@ -93,15 +92,14 @@ func (m *message) decode(pd packetDecoder) (err error) {
 		if m.value == nil {
 			return DecodingError("Nil contents cannot be compressed.")
 		}
-		reader, err := gzip.NewReader(bytes.NewReader(*m.value))
+		reader, err := gzip.NewReader(bytes.NewReader(m.value))
 		if err != nil {
 			return err
 		}
-		tmp, err := ioutil.ReadAll(reader)
+		m.value, err = ioutil.ReadAll(reader)
 		if err != nil {
 			return err
 		}
-		m.value = &tmp
 	case COMPRESSION_SNAPPY:
 		// TODO
 	default:

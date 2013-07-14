@@ -54,15 +54,15 @@ func (pe *prepEncoder) putString(in *string) {
 	}
 }
 
-func (pe *prepEncoder) putBytes(in *[]byte) {
+func (pe *prepEncoder) putBytes(in []byte) {
 	pe.length += 4
 	if in == nil {
 		return
 	}
-	if len(*in) > math.MaxInt32 {
+	if len(in) > math.MaxInt32 {
 		pe.err = EncodingError("Bytes too long.")
 	} else {
-		pe.length += len(*in)
+		pe.length += len(in)
 	}
 }
 

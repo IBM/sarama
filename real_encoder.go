@@ -59,13 +59,13 @@ func (re *realEncoder) putString(in *string) {
 	re.off += len(*in)
 }
 
-func (re *realEncoder) putBytes(in *[]byte) {
+func (re *realEncoder) putBytes(in []byte) {
 	if in == nil {
 		re.putInt32(-1)
 		return
 	}
-	re.putInt32(int32(len(*in)))
-	re.putRaw(*in)
+	re.putInt32(int32(len(in)))
+	re.putRaw(in)
 }
 
 func (re *realEncoder) putRaw(in []byte) {

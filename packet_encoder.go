@@ -14,7 +14,7 @@ type packetEncoder interface {
 	// misc
 	putError(in KError)
 	putString(in *string)
-	putBytes(in *[]byte)
+	putBytes(in []byte)
 	putRaw(in []byte)
 
 	// stackable
@@ -30,7 +30,7 @@ type pushEncoder interface {
 	run(curOffset int, buf []byte)
 }
 
-func buildBytes(in encoder) (*[]byte, error) {
+func buildBytes(in encoder) ([]byte, error) {
 	if in == nil {
 		return nil, nil
 	}
@@ -46,5 +46,5 @@ func buildBytes(in encoder) (*[]byte, error) {
 	realEnc.raw = make([]byte, prepEnc.length)
 	in.encode(&realEnc)
 
-	return &(realEnc.raw), nil
+	return realEnc.raw, nil
 }

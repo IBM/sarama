@@ -61,7 +61,7 @@ func (b *Broker) Send(clientID *string, req requestEncoder) (decoder, error) {
 	sendRequest := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, response != nil}
 
 	b.requests <- sendRequest
-	sendRequest.response.packets <- *packet // we cheat to avoid poofing up more channels than necessary
+	sendRequest.response.packets <- packet // we cheat to avoid poofing up more channels than necessary
 	b.correlation_id++
 
 	select {
