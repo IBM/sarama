@@ -87,32 +87,32 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 		return OutOfBrokers{}
 	}
 
-	decoder, err := broker.Send(mc.client.id, &metadataRequest{topics})
+	decoder, err := broker.Send(mc.client.id, &MetadataRequest{topics})
 	if err != nil {
 		return err
 	}
-	response := decoder.(*metadataResponse)
+	response := decoder.(*MetadataResponse)
 
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
 
-	for i := range response.brokers {
-		broker := &response.brokers[i]
+	for i := range response.Brokers {
+		broker := &response.Brokers[i]
 		mc.brokers[broker.id] = broker
 	}
 
-	for i := range response.topics {
-		topic := &response.topics[i]
-		if topic.err != NO_ERROR {
-			return topic.err
+	for i := range response.Topics {
+		topic := &response.Topics[i]
+		if topic.Err != NO_ERROR {
+			return topic.Err
 		}
-		mc.leaders[*topic.name] = make(map[int32]int32, len(topic.partitions))
-		for j := range topic.partitions {
-			partition := &topic.partitions[j]
-			if partition.err != NO_ERROR {
-				return partition.err
+		mc.leaders[*topic.Name] = make(map[int32]int32, len(topic.Partitions))
+		for j := range topic.Partitions {
+			partition := &topic.Partitions[j]
+			if partition.Err != NO_ERROR {
+				return partition.Err
 			}
-			mc.leaders[*topic.name][partition.id] = partition.leader
+			mc.leaders[*topic.Name][partition.Id] = partition.Leader
 		}
 	}
 

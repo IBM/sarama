@@ -1,27 +1,18 @@
 package kafka
 
-type topicMetadata struct {
-	err        KError
-	name       *string
-	partitions []partitionMetadata
+type TopicMetadata struct {
+	Err        KError
+	Name       *string
+	Partitions []PartitionMetadata
 }
 
-func (tm *topicMetadata) encode(pe packetEncoder) {
-	pe.putError(tm.err)
-	pe.putString(tm.name)
-	pe.putArrayCount(len(tm.partitions))
-	for i := range tm.partitions {
-		(&tm.partitions[i]).encode(pe)
-	}
-}
-
-func (tm *topicMetadata) decode(pd packetDecoder) (err error) {
-	tm.err, err = pd.getError()
+func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
+	tm.Err, err = pd.getError()
 	if err != nil {
 		return err
 	}
 
-	tm.name, err = pd.getString()
+	tm.Name, err = pd.getString()
 	if err != nil {
 		return err
 	}
@@ -30,9 +21,9 @@ func (tm *topicMetadata) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	tm.partitions = make([]partitionMetadata, n)
+	tm.Partitions = make([]PartitionMetadata, n)
 	for i := 0; i < n; i++ {
-		err = (&tm.partitions[i]).decode(pd)
+		err = (&tm.Partitions[i]).decode(pd)
 		if err != nil {
 			return err
 		}

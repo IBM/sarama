@@ -1,41 +1,24 @@
 package kafka
 
-type metadataRequest struct {
-	topics []*string
+type MetadataRequest struct {
+	Topics []*string
 }
 
-func (mr *metadataRequest) encode(pe packetEncoder) {
-	pe.putArrayCount(len(mr.topics))
-	for i := range mr.topics {
-		pe.putString(mr.topics[i])
+func (mr *MetadataRequest) encode(pe packetEncoder) {
+	pe.putArrayCount(len(mr.Topics))
+	for i := range mr.Topics {
+		pe.putString(mr.Topics[i])
 	}
 }
 
-func (mr *metadataRequest) decode(pd packetDecoder) (err error) {
-	n, err := pd.getArrayCount()
-	if err != nil {
-		return err
-	}
-
-	mr.topics = make([]*string, n)
-	for i := 0; i < n; i++ {
-		mr.topics[i], err = pd.getString()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (mr *metadataRequest) key() int16 {
+func (mr *MetadataRequest) key() int16 {
 	return 3
 }
 
-func (mr *metadataRequest) version() int16 {
+func (mr *MetadataRequest) version() int16 {
 	return 0
 }
 
-func (mr *metadataRequest) responseDecoder() decoder {
-	return new(metadataResponse)
+func (mr *MetadataRequest) responseDecoder() decoder {
+	return new(MetadataResponse)
 }
