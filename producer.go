@@ -57,19 +57,15 @@ func (p *Producer) SendMessage(key, value Encoder) (*ProduceResponse, error) {
 		return nil, err
 	}
 
-	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(&Message{Key: keyBytes, Value: valBytes}))
-	request.requiredAcks = p.responseCondition
-	request.timeout = p.responseTimeout
+	request := &ProduceRequest{ResponseCondition: p.responseCondition, Timeout: p.responseTimeout}
+	request.AddMessageSet(&p.topic, partition, newSingletonMessageSet(&Message{Key: keyBytes, Value: valBytes}))
 
-	decoder, err := broker.Send(p.client.id, request)
+	response, err := broker.Produce(p.client.id, request)
 	if err != nil {
 		return nil, err
 	}
-	if decoder != nil {
-		return decoder.(*ProduceResponse), nil
-	}
 
-	return nil, nil
+	return response, nil
 }
 
 func (p *Producer) SendSimpleMessage(in string) (*ProduceResponse, error) {

@@ -70,15 +70,41 @@ func (b *Broker) Close() error {
 	return b.conn.Close()
 }
 
-func (b *Broker) Send(clientID *string, req RequestEncoder) (interface{}, error) {
-	fullRequest := request{b.correlation_id, clientID, req}
-	packet, err := encode(&fullRequest)
+func (b *Broker) RequestMetadata(clientID *string, request *MetadataRequest) (*MetadataResponse, error) {
+	response := new(MetadataResponse)
+
+	err := b.sendAndReceive(clientID, request, response)
+
 	if err != nil {
 		return nil, err
 	}
 
-	response := req.responseDecoder()
-	sendRequest := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, response != nil}
+	return response, nil
+}
+
+func (b *Broker) Produce(clientID *string, request *ProduceRequest) (*ProduceResponse, error) {
+	var response *ProduceResponse
+	if request.ResponseCondition != NO_RESPONSE {
+		response = new(ProduceResponse)
+	}
+
+	err := b.sendAndReceive(clientID, request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) sendAndReceive(clientID *string, req requestEncoder, res decoder) error {
+	fullRequest := request{b.correlation_id, clientID, req}
+	packet, err := encode(&fullRequest)
+	if err != nil {
+		return err
+	}
+
+	sendRequest := requestToSend{responsePromise{b.correlation_id, make(chan []byte), make(chan error)}, res != nil}
 
 	b.requests <- sendRequest
 	sendRequest.response.packets <- packet // we cheat to avoid poofing up more channels than necessary
@@ -86,15 +112,15 @@ func (b *Broker) Send(clientID *string, req RequestEncoder) (interface{}, error)
 
 	select {
 	case buf := <-sendRequest.response.packets:
-		err = decode(buf, response)
+		err = decode(buf, res)
 	case err = <-sendRequest.response.errors:
 	}
 
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return response, nil
+	return nil
 }
 
 func (b *Broker) encode(pe packetEncoder) {
