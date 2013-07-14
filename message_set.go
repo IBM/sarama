@@ -2,7 +2,7 @@ package kafka
 
 type messageSetBlock struct {
 	offset int64
-	msg    message
+	msg    Message
 }
 
 func (msb *messageSetBlock) encode(pe packetEncoder) {
@@ -61,7 +61,7 @@ func (ms *messageSet) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func newSingletonMessageSet(msg *message) *messageSet {
+func newSingletonMessageSet(msg *Message) *messageSet {
 	tmp := make([]*messageSetBlock, 1)
 	tmp[0] = &messageSetBlock{msg: *msg}
 	return &messageSet{tmp}

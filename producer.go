@@ -16,7 +16,7 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 	return NewProducer(client, topic, RandomPartitioner{}, WAIT_FOR_LOCAL, 0)
 }
 
-func (p *Producer) choosePartition(key encoder) (int32, error) {
+func (p *Producer) choosePartition(key Encoder) (int32, error) {
 	partitions, err := p.client.partitions(p.topic)
 	if err != nil {
 		return -1, err
@@ -32,13 +32,22 @@ func (p *Producer) choosePartition(key encoder) (int32, error) {
 	return partitions[partitioner.ChoosePartition(key, len(partitions))], nil
 }
 
-func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
+func (p *Producer) SendMessage(key, value Encoder) (*ProduceResponse, error) {
 	partition, err := p.choosePartition(key)
 	if err != nil {
 		return nil, err
 	}
 
-	msg, err := newMessage(key, value)
+	var keyBytes []byte
+	var valBytes []byte
+
+	if key != nil {
+		keyBytes, err = key.Encode()
+		if err != nil {
+			return nil, err
+		}
+	}
+	valBytes, err = value.Encode()
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +57,7 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 		return nil, err
 	}
 
-	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(msg))
+	request := newSingletonProduceRequest(p.topic, partition, newSingletonMessageSet(&Message{Key: keyBytes, Value: valBytes}))
 	request.requiredAcks = p.responseCondition
 	request.timeout = p.responseTimeout
 
@@ -61,12 +70,6 @@ func (p *Producer) SendMessage(key, value encoder) (*ProduceResponse, error) {
 	}
 
 	return nil, nil
-}
-
-type encodableString string
-
-func (s encodableString) encode(pe packetEncoder) {
-	pe.putRaw([]byte(s))
 }
 
 func (p *Producer) SendSimpleMessage(in string) (*ProduceResponse, error) {

@@ -1,5 +1,15 @@
 package kafka
 
+// Public Encoding
+
+// A simple interface for any type that can be encoded as an array of bytes
+// in order to be sent as the key or value of a Kafka message.
+type Encoder interface {
+	Encode() ([]byte, error)
+}
+
+// Kafka Encoding
+
 type encoder interface {
 	encode(pe packetEncoder)
 }
@@ -23,6 +33,8 @@ func encode(in encoder) ([]byte, error) {
 	return realEnc.raw, nil
 }
 
+// Kafka Decoding
+
 type decoder interface {
 	decode(pd packetDecoder) error
 }
@@ -34,9 +46,4 @@ func decode(buf []byte, in decoder) error {
 
 	helper := realDecoder{raw: buf}
 	return in.decode(&helper)
-}
-
-type encoderDecoder interface {
-	encoder
-	decoder
 }

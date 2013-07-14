@@ -18,32 +18,32 @@ const (
 // binary format." but it doesn't say what the current value is, so presumably 0...
 const message_format int8 = 0
 
-type message struct {
-	codec compressionCodec
-	key   []byte
-	value []byte
+type Message struct {
+	Codec compressionCodec // how  to compress the contents of the message
+	Key   []byte           // the message key, may be nil
+	Value []byte           // the message contents
 }
 
-func (m *message) encode(pe packetEncoder) {
+func (m *Message) encode(pe packetEncoder) {
 	pe.pushCRC32()
 
 	pe.putInt8(message_format)
 
 	var attributes int8 = 0
-	attributes |= int8(m.codec & 0x07)
+	attributes |= int8(m.Codec & 0x07)
 	pe.putInt8(attributes)
 
-	pe.putBytes(m.key)
+	pe.putBytes(m.Key)
 
 	var body []byte
-	switch m.codec {
+	switch m.Codec {
 	case COMPRESSION_NONE:
-		body = m.value
+		body = m.Value
 	case COMPRESSION_GZIP:
-		if m.value != nil {
+		if m.Value != nil {
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
-			writer.Write(m.value)
+			writer.Write(m.Value)
 			writer.Close()
 			body = buf.Bytes()
 		}
@@ -55,7 +55,7 @@ func (m *message) encode(pe packetEncoder) {
 	pe.pop()
 }
 
-func (m *message) decode(pd packetDecoder) (err error) {
+func (m *Message) decode(pd packetDecoder) (err error) {
 	err = pd.pushCRC32()
 	if err != nil {
 		return err
@@ -73,30 +73,30 @@ func (m *message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	m.codec = compressionCodec(attribute & 0x07)
+	m.Codec = compressionCodec(attribute & 0x07)
 
-	m.key, err = pd.getBytes()
+	m.Key, err = pd.getBytes()
 	if err != nil {
 		return err
 	}
 
-	m.value, err = pd.getBytes()
+	m.Value, err = pd.getBytes()
 	if err != nil {
 		return err
 	}
 
-	switch m.codec {
+	switch m.Codec {
 	case COMPRESSION_NONE:
 		// nothing to do
 	case COMPRESSION_GZIP:
-		if m.value == nil {
+		if m.Value == nil {
 			return DecodingError("Nil contents cannot be compressed.")
 		}
-		reader, err := gzip.NewReader(bytes.NewReader(m.value))
+		reader, err := gzip.NewReader(bytes.NewReader(m.Value))
 		if err != nil {
 			return err
 		}
-		m.value, err = ioutil.ReadAll(reader)
+		m.Value, err = ioutil.ReadAll(reader)
 		if err != nil {
 			return err
 		}
@@ -112,20 +112,4 @@ func (m *message) decode(pd packetDecoder) (err error) {
 	}
 
 	return nil
-}
-
-func newMessage(key, value encoder) (msg *message, err error) {
-	msg = new(message)
-
-	msg.key, err = encode(key)
-	if err != nil {
-		return nil, err
-	}
-
-	msg.value, err = encode(value)
-	if err != nil {
-		return nil, err
-	}
-
-	return msg, nil
 }
