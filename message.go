@@ -117,12 +117,12 @@ func (m *message) decode(pd packetDecoder) (err error) {
 func newMessage(key, value encoder) (msg *message, err error) {
 	msg = new(message)
 
-	msg.key, err = buildBytes(key)
+	msg.key, err = encode(key)
 	if err != nil {
 		return nil, err
 	}
 
-	msg.value, err = buildBytes(value)
+	msg.value, err = encode(value)
 	if err != nil {
 		return nil, err
 	}

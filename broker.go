@@ -52,7 +52,7 @@ func (b *Broker) Close() error {
 
 func (b *Broker) Send(clientID *string, req requestEncoder) (decoder, error) {
 	fullRequest := request{b.correlation_id, clientID, req}
-	packet, err := buildBytes(&fullRequest)
+	packet, err := encode(&fullRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -66,16 +66,15 @@ func (b *Broker) Send(clientID *string, req requestEncoder) (decoder, error) {
 
 	select {
 	case buf := <-sendRequest.response.packets:
-		// Only try to decode if we got a response.
-		if buf != nil {
-			decoder := realDecoder{raw: buf}
-			err = response.decode(&decoder)
-			return response, err
-		}
+		err = decode(buf, response)
 	case err = <-sendRequest.response.errors:
 	}
 
-	return nil, err
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (b *Broker) connect() (err error) {
@@ -154,20 +153,18 @@ func (b *Broker) rcvResponseLoop() {
 			continue
 		}
 
-		decoder := realDecoder{raw: header}
-		length, _ := decoder.getInt32()
-		if length <= 4 || length > 2*math.MaxUint16 {
-			response.errors <- DecodingError("Malformed length field.")
+		decodedHeader := responseHeader{}
+		err = decode(header, &decodedHeader)
+		if err != nil {
+			response.errors <- err
 			continue
 		}
-
-		corr_id, _ := decoder.getInt32()
-		if response.correlation_id != corr_id {
+		if decodedHeader.correlation_id != response.correlation_id {
 			response.errors <- DecodingError("Mismatched correlation id.")
 			continue
 		}
 
-		buf := make([]byte, length-4)
+		buf := make([]byte, decodedHeader.length-4)
 		_, err = io.ReadFull(b.conn, buf)
 		if err != nil {
 			response.errors <- err
