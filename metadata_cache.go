@@ -98,6 +98,10 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 
 	for i := range response.Brokers {
 		broker := &response.Brokers[i]
+		err = broker.Connect()
+		if err != nil {
+			return err
+		}
 		mc.brokers[broker.id] = broker
 	}
 

@@ -36,11 +36,31 @@ func NewBroker(host string, port int32) (b *Broker, err error) {
 	b.id = -1 // don't know it yet
 	b.host = &host
 	b.port = port
-	err = b.connect()
+	err = b.Connect()
 	if err != nil {
 		return nil, err
 	}
 	return b, nil
+}
+
+func (b *Broker) Connect() (err error) {
+	addr, err := net.ResolveIPAddr("ip", *b.host)
+	if err != nil {
+		return err
+	}
+
+	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port), Zone: addr.Zone})
+	if err != nil {
+		return err
+	}
+
+	b.requests = make(chan requestToSend)
+	b.responses = make(chan responsePromise)
+
+	go b.sendRequestLoop()
+	go b.rcvResponseLoop()
+
+	return nil
 }
 
 func (b *Broker) Close() error {
@@ -77,26 +97,6 @@ func (b *Broker) Send(clientID *string, req requestEncoder) (decoder, error) {
 	return response, nil
 }
 
-func (b *Broker) connect() (err error) {
-	addr, err := net.ResolveIPAddr("ip", *b.host)
-	if err != nil {
-		return err
-	}
-
-	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port), Zone: addr.Zone})
-	if err != nil {
-		return err
-	}
-
-	b.requests = make(chan requestToSend)
-	b.responses = make(chan responsePromise)
-
-	go b.sendRequestLoop()
-	go b.rcvResponseLoop()
-
-	return nil
-}
-
 func (b *Broker) encode(pe packetEncoder) {
 	pe.putInt32(b.id)
 	pe.putString(b.host)
@@ -120,11 +120,6 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 	}
 	if b.port > math.MaxUint16 {
 		return DecodingError("Broker port > 65536")
-	}
-
-	err = b.connect()
-	if err != nil {
-		return err
 	}
 
 	return nil
