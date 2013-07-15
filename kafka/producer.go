@@ -34,10 +34,10 @@ func (p *Producer) choosePartition(key Encoder) (int32, error) {
 	return partitions[partitioner.Partition(key, len(partitions))], nil
 }
 
-func (p *Producer) SendMessage(key, value Encoder) (*k.ProduceResponse, error) {
+func (p *Producer) safeSendMessage(key, value Encoder, retries int) error {
 	partition, err := p.choosePartition(key)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var keyBytes []byte
@@ -46,17 +46,17 @@ func (p *Producer) SendMessage(key, value Encoder) (*k.ProduceResponse, error) {
 	if key != nil {
 		keyBytes, err = key.Encode()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	valBytes, err = value.Encode()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	broker, err := p.client.leader(p.topic, partition)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	request := &k.ProduceRequest{ResponseCondition: p.responseCondition, Timeout: p.responseTimeout}
@@ -64,12 +64,35 @@ func (p *Producer) SendMessage(key, value Encoder) (*k.ProduceResponse, error) {
 
 	response, err := broker.Produce(p.client.id, request)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return response, nil
+	block := response.GetBlock(&p.topic, partition)
+	if block == nil {
+		return IncompleteResponse
+	}
+
+	switch block.Err {
+	case k.NO_ERROR:
+		return nil
+	case k.UNKNOWN_TOPIC_OR_PARTITION, k.NOT_LEADER_FOR_PARTITION:
+		if retries <= 0 {
+			return block.Err
+		}
+		err = p.client.cache.refreshTopic(p.topic)
+		if err != nil {
+			return err
+		}
+		return p.safeSendMessage(key, value, retries-1)
+	default:
+		return block.Err
+	}
 }
 
-func (p *Producer) SendSimpleMessage(in string) (*k.ProduceResponse, error) {
-	return p.SendMessage(nil, encodableString(in))
+func (p *Producer) SendMessage(key, value Encoder) error {
+	return p.safeSendMessage(key, value, 1)
+}
+
+func (p *Producer) SendSimpleMessage(msg string) error {
+	return p.safeSendMessage(nil, encodableString(msg), 1)
 }

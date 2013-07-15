@@ -60,3 +60,15 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func (pr *ProduceResponse) GetBlock(topic *string, partition int32) *ProduceResponseBlock {
+	if pr.Blocks == nil {
+		return nil
+	}
+
+	if pr.Blocks[topic] == nil {
+		return nil
+	}
+
+	return pr.Blocks[topic][partition]
+}

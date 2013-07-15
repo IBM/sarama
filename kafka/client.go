@@ -49,7 +49,7 @@ func (client *Client) partitions(topic string) ([]int32, error) {
 	}
 
 	if partitions == nil {
-		return nil, k.UNKNOWN_TOPIC_OR_PARTITION
+		return nil, NoSuchTopic
 	}
 
 	return partitions, nil
