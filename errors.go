@@ -1,5 +1,7 @@
 package kafka
 
+import "errors"
+
 // The various errors that can be returned by the Kafka server.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
@@ -58,12 +60,14 @@ func (err KError) Error() string {
 	}
 }
 
-type OutOfBrokers struct {
-}
+// Error returned when the client has run out of brokers to talk to (none of them are responding).
+var OutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
 
-func (err OutOfBrokers) Error() string {
-	return "kafka: Client has run out of available brokers to talk to. Is your cluster reachable?"
-}
+// Error returned when calling Connect() on a Broker that is already connected.
+var AlreadyConnected = errors.New("kafka: broker: already connected")
+
+// Error returned when trying to send or call Close() on a Broker that is not connected.
+var NotConnected = errors.New("kafka: broker: not connected")
 
 // Returned when there was an error encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do

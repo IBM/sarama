@@ -36,9 +36,14 @@ func NewBroker(host string, port int32) *Broker {
 	return b
 }
 
+// Opens a connection to the remote broker.
 func (b *Broker) Connect() error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+
+	if b.conn != nil {
+		return AlreadyConnected
+	}
 
 	addr, err := net.ResolveIPAddr("ip", *b.host)
 	if err != nil {
@@ -60,9 +65,14 @@ func (b *Broker) Connect() error {
 	return nil
 }
 
+// Closes the connection to the remote broker.
 func (b *Broker) Close() error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+
+	if b.conn == nil {
+		return NotConnected
+	}
 
 	close(b.responses)
 	<-b.done
@@ -135,6 +145,10 @@ func (b *Broker) Fetch(clientID *string, request *FetchRequest) (*FetchResponse,
 func (b *Broker) send(clientID *string, req requestEncoder, promiseResponse bool) (*responsePromise, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+
+	if b.conn == nil {
+		return nil, NotConnected
+	}
 
 	fullRequest := request{b.correlation_id, clientID, req}
 	buf, err := encode(&fullRequest)
