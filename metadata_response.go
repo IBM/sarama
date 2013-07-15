@@ -40,7 +40,7 @@ func (pm *PartitionMetadata) decode(pd packetDecoder) (err error) {
 type TopicMetadata struct {
 	Err        KError
 	Name       *string
-	Partitions []PartitionMetadata
+	Partitions []*PartitionMetadata
 }
 
 func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
@@ -58,9 +58,10 @@ func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	tm.Partitions = make([]PartitionMetadata, n)
+	tm.Partitions = make([]*PartitionMetadata, n)
 	for i := 0; i < n; i++ {
-		err = (&tm.Partitions[i]).decode(pd)
+		tm.Partitions[i] = new(PartitionMetadata)
+		err = tm.Partitions[i].decode(pd)
 		if err != nil {
 			return err
 		}
@@ -70,8 +71,8 @@ func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
 }
 
 type MetadataResponse struct {
-	Brokers []Broker
-	Topics  []TopicMetadata
+	Brokers []*Broker
+	Topics  []*TopicMetadata
 }
 
 func (m *MetadataResponse) decode(pd packetDecoder) (err error) {
@@ -80,9 +81,10 @@ func (m *MetadataResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	m.Brokers = make([]Broker, n)
+	m.Brokers = make([]*Broker, n)
 	for i := 0; i < n; i++ {
-		err = (&m.Brokers[i]).decode(pd)
+		m.Brokers[i] = new(Broker)
+		err = m.Brokers[i].decode(pd)
 		if err != nil {
 			return err
 		}
@@ -93,9 +95,10 @@ func (m *MetadataResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	m.Topics = make([]TopicMetadata, n)
+	m.Topics = make([]*TopicMetadata, n)
 	for i := 0; i < n; i++ {
-		err = (&m.Topics[i]).decode(pd)
+		m.Topics[i] = new(TopicMetadata)
+		err = m.Topics[i].decode(pd)
 		if err != nil {
 			return err
 		}

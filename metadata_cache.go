@@ -25,7 +25,7 @@ func newMetadataCache(client *Client, host string, port int32) (*metadataCache, 
 	mc.brokers = make(map[int32]*Broker)
 	mc.leaders = make(map[string]map[int32]int32)
 
-	mc.brokers[starter.id] = starter
+	mc.brokers[starter.ID()] = starter
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err = mc.refreshTopics(make([]*string, 0))
@@ -34,6 +34,18 @@ func newMetadataCache(client *Client, host string, port int32) (*metadataCache, 
 	}
 
 	return mc, nil
+}
+
+func (mc *metadataCache) removeBroker(broker *Broker) {
+	if broker == nil {
+		return
+	}
+
+	mc.lock.RLock()
+	defer mc.lock.RUnlock()
+
+	delete(mc.brokers, broker.ID())
+	go broker.Close()
 }
 
 func (mc *metadataCache) leader(topic string, partition_id int32) *Broker {
@@ -82,37 +94,32 @@ func (mc *metadataCache) partitions(topic string) []int32 {
 	return ret
 }
 
-func (mc *metadataCache) refreshTopics(topics []*string) error {
-	broker := mc.any()
-	if broker == nil {
-		return OutOfBrokers{}
-	}
-
-	response, err := broker.RequestMetadata(mc.client.id, &MetadataRequest{topics})
-	if err != nil {
-		return err
+func (mc *metadataCache) update(data *MetadataResponse) error {
+	// connect to the brokers before taking the lock, as this can take a while
+	// to timeout if one of them isn't reachable
+	for _, broker := range data.Brokers {
+		err := broker.Connect()
+		if err != nil {
+			return err
+		}
 	}
 
 	mc.lock.Lock()
 	defer mc.lock.Unlock()
 
-	for i := range response.Brokers {
-		broker := &response.Brokers[i]
-		err = broker.Connect()
-		if err != nil {
-			return err
+	for _, broker := range data.Brokers {
+		if mc.brokers[broker.ID()] != nil {
+			go mc.brokers[broker.ID()].Close()
 		}
-		mc.brokers[broker.id] = broker
+		mc.brokers[broker.ID()] = broker
 	}
 
-	for i := range response.Topics {
-		topic := &response.Topics[i]
+	for _, topic := range data.Topics {
 		if topic.Err != NO_ERROR {
 			return topic.Err
 		}
 		mc.leaders[*topic.Name] = make(map[int32]int32, len(topic.Partitions))
-		for j := range topic.Partitions {
-			partition := &topic.Partitions[j]
+		for _, partition := range topic.Partitions {
 			if partition.Err != NO_ERROR {
 				return partition.Err
 			}
@@ -121,6 +128,27 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 	}
 
 	return nil
+}
+
+func (mc *metadataCache) refreshTopics(topics []*string) error {
+	for broker := mc.any(); broker != nil; broker = mc.any() {
+		response, err := broker.RequestMetadata(mc.client.id, &MetadataRequest{topics})
+
+		switch err.(type) {
+		case nil:
+			// valid response, use it
+			return mc.update(response)
+		case EncodingError:
+			// didn't even send, return the error
+			return err
+		}
+
+		// some other error, remove that broker and try again
+		mc.removeBroker(broker)
+
+	}
+
+	return OutOfBrokers{}
 }
 
 func (mc *metadataCache) refreshTopic(topic string) error {

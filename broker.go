@@ -76,6 +76,11 @@ func (b *Broker) Close() error {
 	return err
 }
 
+// Returns the broker ID from Kafka, or -1 if that is not known.
+func (b *Broker) ID() int32 {
+	return b.id
+}
+
 func (b *Broker) RequestMetadata(clientID *string, request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
 
