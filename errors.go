@@ -1,5 +1,7 @@
 package kafka
 
+// The various errors that can be returned by the Kafka server.
+// See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
 
 const (
@@ -63,12 +65,17 @@ func (err OutOfBrokers) Error() string {
 	return "kafka: Client has run out of available brokers to talk to. Is your cluster reachable?"
 }
 
+// Returned when there was an error encoding a Kafka packet. This can happen, for example,
+// if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do
+// not permit that.
 type EncodingError string
 
 func (err EncodingError) Error() string {
 	return "kafka: Could not encode packet. " + string(err)
 }
 
+// Returned when there was an error decoding the Kafka server's response. Usually means that you've
+// connected to the wrong address.
 type DecodingError string
 
 func (err DecodingError) Error() string {

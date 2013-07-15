@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 )
 
+// The various compression codec recognized by Kafka in messages.
 type CompressionCodec int
 
 const (
