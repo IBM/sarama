@@ -1,18 +1,18 @@
 package kafka
 
 type FetchResponseBlock struct {
-	err                 KError
-	highWaterMarkOffset int64
-	msgSet              messageSet
+	Err                 KError
+	HighWaterMarkOffset int64
+	MsgSet              MessageSet
 }
 
 func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
-	pr.err, err = pd.getError()
+	pr.Err, err = pd.getError()
 	if err != nil {
 		return err
 	}
 
-	pr.highWaterMarkOffset, err = pd.getInt64()
+	pr.HighWaterMarkOffset, err = pd.getInt64()
 	if err != nil {
 		return err
 	}
@@ -26,7 +26,7 @@ func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	err = (&pr.msgSet).decode(msgSetDecoder)
+	err = (&pr.MsgSet).decode(msgSetDecoder)
 
 	return err
 }

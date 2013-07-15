@@ -10,7 +10,7 @@ const (
 type ProduceRequest struct {
 	ResponseCondition int16
 	Timeout           int32
-	msgSets           map[*string]map[int32]*messageSet
+	msgSets           map[*string]map[int32]*MessageSet
 }
 
 func (p *ProduceRequest) encode(pe packetEncoder) {
@@ -37,11 +37,11 @@ func (p *ProduceRequest) version() int16 {
 
 func (p *ProduceRequest) AddMessage(topic *string, partition int32, msg *Message) {
 	if p.msgSets == nil {
-		p.msgSets = make(map[*string]map[int32]*messageSet)
+		p.msgSets = make(map[*string]map[int32]*MessageSet)
 	}
 
 	if p.msgSets[topic] == nil {
-		p.msgSets[topic] = make(map[int32]*messageSet)
+		p.msgSets[topic] = make(map[int32]*MessageSet)
 	}
 
 	set := p.msgSets[topic][partition]
