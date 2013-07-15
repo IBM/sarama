@@ -18,7 +18,3 @@ func (mr *MetadataRequest) key() int16 {
 func (mr *MetadataRequest) version() int16 {
 	return 0
 }
-
-func (mr *MetadataRequest) responseDecoder() decoder {
-	return new(MetadataResponse)
-}
