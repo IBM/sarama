@@ -75,6 +75,26 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	return ret, nil
 }
 
+func (rd *realDecoder) getInt64Array() ([]int64, error) {
+	if rd.remaining() < 4 {
+		return nil, DecodingError("Insufficient data in getInt64Array.")
+	}
+	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+	rd.off += 4
+
+	var ret []int64 = nil
+	if rd.remaining() < 8*n {
+		return nil, DecodingError("Insufficient data in getInt64Array.")
+	} else if n > 0 {
+		ret = make([]int64, n)
+		for i := range ret {
+			ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
+			rd.off += 8
+		}
+	}
+	return ret, nil
+}
+
 func (rd *realDecoder) getArrayCount() (int, error) {
 	if rd.remaining() < 4 {
 		return -1, DecodingError("Insufficient data in getArrayCount.")

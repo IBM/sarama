@@ -81,8 +81,20 @@ func (b *Broker) ID() int32 {
 	return b.id
 }
 
-func (b *Broker) RequestMetadata(clientID *string, request *MetadataRequest) (*MetadataResponse, error) {
+func (b *Broker) GetMetadata(clientID *string, request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
+
+	err := b.sendAndReceive(clientID, request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) GetOffset(clientID *string, request *OffsetRequest) (*OffsetResponse, error) {
+	response := new(OffsetResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
 

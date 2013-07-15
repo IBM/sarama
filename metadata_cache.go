@@ -132,7 +132,7 @@ func (mc *metadataCache) update(data *MetadataResponse) error {
 
 func (mc *metadataCache) refreshTopics(topics []*string) error {
 	for broker := mc.any(); broker != nil; broker = mc.any() {
-		response, err := broker.RequestMetadata(mc.client.id, &MetadataRequest{topics})
+		response, err := broker.GetMetadata(mc.client.id, &MetadataRequest{topics})
 
 		switch err.(type) {
 		case nil:

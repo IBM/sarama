@@ -11,6 +11,7 @@ type packetDecoder interface {
 
 	// arrays
 	getInt32Array() ([]int32, error)
+	getInt64Array() ([]int64, error)
 	getArrayCount() (int, error)
 
 	// misc
