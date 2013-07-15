@@ -123,12 +123,6 @@ func (b *Broker) sendAndReceive(clientID *string, req requestEncoder, res decode
 	return nil
 }
 
-func (b *Broker) encode(pe packetEncoder) {
-	pe.putInt32(b.id)
-	pe.putString(b.host)
-	pe.putInt32(b.port)
-}
-
 func (b *Broker) decode(pd packetDecoder) (err error) {
 	b.id, err = pd.getInt32()
 	if err != nil {
