@@ -150,7 +150,7 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 
 	}
 
-	return k.OutOfBrokers
+	return OutOfBrokers
 }
 
 func (mc *metadataCache) refreshTopic(topic string) error {
