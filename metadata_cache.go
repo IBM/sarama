@@ -15,7 +15,8 @@ type metadataCache struct {
 func newMetadataCache(client *Client, host string, port int32) (*metadataCache, error) {
 	mc := new(metadataCache)
 
-	starter, err := NewBroker(host, port)
+	starter := NewBroker(host, port)
+	err := starter.Connect()
 	if err != nil {
 		return nil, err
 	}
