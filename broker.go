@@ -103,6 +103,18 @@ func (b *Broker) Produce(clientID *string, request *ProduceRequest) (*ProduceRes
 	return response, nil
 }
 
+func (b *Broker) Fetch(clientID *string, request *FetchRequest) (*FetchResponse, error) {
+	response := new(FetchResponse)
+
+	err := b.sendAndReceive(clientID, request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (b *Broker) send(clientID *string, req requestEncoder, promiseResponse bool) (*responsePromise, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()

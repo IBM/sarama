@@ -1,50 +1,56 @@
 package kafka
 
-type fetchRequestPartitionBlock struct {
-	partition   int32
+type fetchRequestPartition struct {
 	fetchOffset int64
 	maxBytes    int32
 }
 
-func (p *fetchRequestPartitionBlock) encode(pe packetEncoder) {
-	pe.putInt32(p.partition)
-	pe.putInt64(p.fetchOffset)
-	pe.putInt32(p.maxBytes)
+func (f *fetchRequestPartition) encode(pe packetEncoder) {
+	pe.putInt64(f.fetchOffset)
+	pe.putInt32(f.maxBytes)
 }
 
-type fetchRequestTopicBlock struct {
-	topic      *string
-	partitions []fetchRequestPartitionBlock
+type FetchRequest struct {
+	MaxWaitTime int32
+	MinBytes    int32
+	partitions  map[*string]map[int32]*fetchRequestPartition
 }
 
-func (p *fetchRequestTopicBlock) encode(pe packetEncoder) {
-	pe.putString(p.topic)
-	pe.putArrayCount(len(p.partitions))
-	for i := range p.partitions {
-		(&p.partitions[i]).encode(pe)
-	}
-}
-
-type fetchRequest struct {
-	maxWaitTime int32
-	minBytes    int32
-	topics      []fetchRequestTopicBlock
-}
-
-func (p *fetchRequest) encode(pe packetEncoder) {
+func (f *FetchRequest) encode(pe packetEncoder) {
 	pe.putInt32(-1) // replica ID is always -1 for clients
-	pe.putInt32(p.maxWaitTime)
-	pe.putInt32(p.minBytes)
-	pe.putArrayCount(len(p.topics))
-	for i := range p.topics {
-		(&p.topics[i]).encode(pe)
+	pe.putInt32(f.MaxWaitTime)
+	pe.putInt32(f.MinBytes)
+	pe.putArrayCount(len(f.partitions))
+	for topic, partitions := range f.partitions {
+		pe.putString(topic)
+		pe.putArrayCount(len(partitions))
+		for partition, block := range partitions {
+			pe.putInt32(partition)
+			block.encode(pe)
+		}
 	}
 }
 
-func (p *fetchRequest) key() int16 {
+func (f *FetchRequest) key() int16 {
 	return 1
 }
 
-func (p *fetchRequest) version() int16 {
+func (f *FetchRequest) version() int16 {
 	return 0
+}
+
+func (f *FetchRequest) AddPartition(topic *string, partition_id int32, fetchOffset int64, maxBytes int32) {
+	if f.partitions == nil {
+		f.partitions = make(map[*string]map[int32]*fetchRequestPartition)
+	}
+
+	if f.partitions[topic] == nil {
+		f.partitions[topic] = make(map[int32]*fetchRequestPartition)
+	}
+
+	tmp := new(fetchRequestPartition)
+	tmp.maxBytes = maxBytes
+	tmp.fetchOffset = fetchOffset
+
+	f.partitions[topic][partition_id] = tmp
 }

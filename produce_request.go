@@ -9,14 +9,14 @@ const (
 type ProduceRequest struct {
 	ResponseCondition int16
 	Timeout           int32
-	MsgSets           map[*string]map[int32]*messageSet
+	msgSets           map[*string]map[int32]*messageSet
 }
 
 func (p *ProduceRequest) encode(pe packetEncoder) {
 	pe.putInt16(p.ResponseCondition)
 	pe.putInt32(p.Timeout)
-	pe.putArrayCount(len(p.MsgSets))
-	for topic, partitions := range p.MsgSets {
+	pe.putArrayCount(len(p.msgSets))
+	for topic, partitions := range p.msgSets {
 		pe.putString(topic)
 		pe.putArrayCount(len(partitions))
 		for id, msgSet := range partitions {
@@ -35,19 +35,19 @@ func (p *ProduceRequest) version() int16 {
 }
 
 func (p *ProduceRequest) AddMessage(topic *string, partition int32, msg *Message) {
-	if p.MsgSets == nil {
-		p.MsgSets = make(map[*string]map[int32]*messageSet)
+	if p.msgSets == nil {
+		p.msgSets = make(map[*string]map[int32]*messageSet)
 	}
 
-	if p.MsgSets[topic] == nil {
-		p.MsgSets[topic] = make(map[int32]*messageSet)
+	if p.msgSets[topic] == nil {
+		p.msgSets[topic] = make(map[int32]*messageSet)
 	}
 
-	set := p.MsgSets[topic][partition]
+	set := p.msgSets[topic][partition]
 
 	if set == nil {
 		set = newMessageSet()
-		p.MsgSets[topic][partition] = set
+		p.msgSets[topic][partition] = set
 	}
 
 	set.addMessage(msg)

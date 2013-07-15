@@ -1,11 +1,11 @@
 package kafka
 
-type ProduceResponsePartition struct {
+type ProduceResponseBlock struct {
 	Err    KError
 	Offset int64
 }
 
-func (pr *ProduceResponsePartition) decode(pd packetDecoder) (err error) {
+func (pr *ProduceResponseBlock) decode(pd packetDecoder) (err error) {
 	pr.Err, err = pd.getError()
 	if err != nil {
 		return err
@@ -20,7 +20,7 @@ func (pr *ProduceResponsePartition) decode(pd packetDecoder) (err error) {
 }
 
 type ProduceResponse struct {
-	Partitions map[*string]map[int32]*ProduceResponsePartition
+	Blocks map[*string]map[int32]*ProduceResponseBlock
 }
 
 func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
@@ -29,32 +29,32 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	pr.Partitions = make(map[*string]map[int32]*ProduceResponsePartition, numTopics)
+	pr.Blocks = make(map[*string]map[int32]*ProduceResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {
 			return err
 		}
 
-		numPartitions, err := pd.getArrayCount()
+		numBlocks, err := pd.getArrayCount()
 		if err != nil {
 			return err
 		}
 
-		pr.Partitions[name] = make(map[int32]*ProduceResponsePartition, numPartitions)
+		pr.Blocks[name] = make(map[int32]*ProduceResponseBlock, numBlocks)
 
-		for j := 0; j < numPartitions; j++ {
+		for j := 0; j < numBlocks; j++ {
 			id, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
 
-			partition := new(ProduceResponsePartition)
-			err = partition.decode(pd)
+			block := new(ProduceResponseBlock)
+			err = block.decode(pd)
 			if err != nil {
 				return err
 			}
-			pr.Partitions[name][id] = partition
+			pr.Blocks[name][id] = block
 		}
 	}
 

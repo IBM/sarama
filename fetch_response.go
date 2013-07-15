@@ -1,18 +1,12 @@
 package kafka
 
-type fetchResponsePartitionBlock struct {
-	id                  int32
+type FetchResponseBlock struct {
 	err                 KError
 	highWaterMarkOffset int64
 	msgSet              messageSet
 }
 
-func (pr *fetchResponsePartitionBlock) decode(pd packetDecoder) (err error) {
-	pr.id, err = pd.getInt32()
-	if err != nil {
-		return err
-	}
-
+func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
 	pr.err, err = pd.getError()
 	if err != nil {
 		return err
@@ -37,48 +31,42 @@ func (pr *fetchResponsePartitionBlock) decode(pd packetDecoder) (err error) {
 	return err
 }
 
-type fetchResponseTopicBlock struct {
-	name       *string
-	partitions []fetchResponsePartitionBlock
+type FetchResponse struct {
+	Blocks map[*string]map[int32]*FetchResponseBlock
 }
 
-func (pr *fetchResponseTopicBlock) decode(pd packetDecoder) (err error) {
-	pr.name, err = pd.getString()
+func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
+	numTopics, err := pd.getArrayCount()
 	if err != nil {
 		return err
 	}
 
-	n, err := pd.getArrayCount()
-	if err != nil {
-		return err
-	}
-
-	pr.partitions = make([]fetchResponsePartitionBlock, n)
-	for i := range pr.partitions {
-		err = (&pr.partitions[i]).decode(pd)
+	fr.Blocks = make(map[*string]map[int32]*FetchResponseBlock, numTopics)
+	for i := 0; i < numTopics; i++ {
+		name, err := pd.getString()
 		if err != nil {
 			return err
 		}
-	}
 
-	return nil
-}
-
-type fetchResponse struct {
-	topics []fetchResponseTopicBlock
-}
-
-func (pr *fetchResponse) decode(pd packetDecoder) (err error) {
-	n, err := pd.getArrayCount()
-	if err != nil {
-		return err
-	}
-
-	pr.topics = make([]fetchResponseTopicBlock, n)
-	for i := range pr.topics {
-		err = (&pr.topics[i]).decode(pd)
+		numBlocks, err := pd.getArrayCount()
 		if err != nil {
 			return err
+		}
+
+		fr.Blocks[name] = make(map[int32]*FetchResponseBlock, numBlocks)
+
+		for j := 0; j < numBlocks; j++ {
+			id, err := pd.getInt32()
+			if err != nil {
+				return err
+			}
+
+			block := new(FetchResponseBlock)
+			err = block.decode(pd)
+			if err != nil {
+				return err
+			}
+			fr.Blocks[name][id] = block
 		}
 	}
 
