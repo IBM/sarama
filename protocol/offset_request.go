@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 // Special values accepted by Kafka for the 'time' parameter of OffsetRequest.AddBlock().
 const (

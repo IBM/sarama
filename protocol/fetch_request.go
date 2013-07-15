@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 type fetchRequestBlock struct {
 	fetchOffset int64

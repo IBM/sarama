@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 type PartitionMetadata struct {
 	Err      KError

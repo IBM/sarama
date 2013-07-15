@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 type OffsetCommitResponse struct {
 	Errors map[*string]map[int32]KError

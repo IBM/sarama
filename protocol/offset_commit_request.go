@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 type offsetCommitRequestBlock struct {
 	offset   int64

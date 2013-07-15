@@ -1,5 +1,7 @@
 package kafka
 
+import k "sarama/protocol"
+
 import (
 	"sort"
 	"sync"
@@ -7,7 +9,7 @@ import (
 
 type metadataCache struct {
 	client  *Client
-	brokers map[int32]*Broker          // maps broker ids to brokers
+	brokers map[int32]*k.Broker        // maps broker ids to brokers
 	leaders map[string]map[int32]int32 // maps topics to partition ids to broker ids
 	lock    sync.RWMutex               // protects access to the maps, only one since they're always accessed together
 }
@@ -15,14 +17,14 @@ type metadataCache struct {
 func newMetadataCache(client *Client, host string, port int32) (*metadataCache, error) {
 	mc := new(metadataCache)
 
-	starter := NewBroker(host, port)
+	starter := k.NewBroker(host, port)
 	err := starter.Connect()
 	if err != nil {
 		return nil, err
 	}
 
 	mc.client = client
-	mc.brokers = make(map[int32]*Broker)
+	mc.brokers = make(map[int32]*k.Broker)
 	mc.leaders = make(map[string]map[int32]int32)
 
 	mc.brokers[starter.ID()] = starter
@@ -36,7 +38,7 @@ func newMetadataCache(client *Client, host string, port int32) (*metadataCache, 
 	return mc, nil
 }
 
-func (mc *metadataCache) removeBroker(broker *Broker) {
+func (mc *metadataCache) removeBroker(broker *k.Broker) {
 	if broker == nil {
 		return
 	}
@@ -48,7 +50,7 @@ func (mc *metadataCache) removeBroker(broker *Broker) {
 	go broker.Close()
 }
 
-func (mc *metadataCache) leader(topic string, partition_id int32) *Broker {
+func (mc *metadataCache) leader(topic string, partition_id int32) *k.Broker {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 
@@ -65,7 +67,7 @@ func (mc *metadataCache) leader(topic string, partition_id int32) *Broker {
 	return nil
 }
 
-func (mc *metadataCache) any() *Broker {
+func (mc *metadataCache) any() *k.Broker {
 	mc.lock.RLock()
 	defer mc.lock.RUnlock()
 
@@ -94,7 +96,7 @@ func (mc *metadataCache) partitions(topic string) []int32 {
 	return ret
 }
 
-func (mc *metadataCache) update(data *MetadataResponse) error {
+func (mc *metadataCache) update(data *k.MetadataResponse) error {
 	// connect to the brokers before taking the lock, as this can take a while
 	// to timeout if one of them isn't reachable
 	for _, broker := range data.Brokers {
@@ -115,12 +117,12 @@ func (mc *metadataCache) update(data *MetadataResponse) error {
 	}
 
 	for _, topic := range data.Topics {
-		if topic.Err != NO_ERROR {
+		if topic.Err != k.NO_ERROR {
 			return topic.Err
 		}
 		mc.leaders[*topic.Name] = make(map[int32]int32, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
-			if partition.Err != NO_ERROR {
+			if partition.Err != k.NO_ERROR {
 				return partition.Err
 			}
 			mc.leaders[*topic.Name][partition.Id] = partition.Leader
@@ -132,13 +134,13 @@ func (mc *metadataCache) update(data *MetadataResponse) error {
 
 func (mc *metadataCache) refreshTopics(topics []*string) error {
 	for broker := mc.any(); broker != nil; broker = mc.any() {
-		response, err := broker.GetMetadata(mc.client.id, &MetadataRequest{topics})
+		response, err := broker.GetMetadata(mc.client.id, &k.MetadataRequest{Topics: topics})
 
 		switch err.(type) {
 		case nil:
 			// valid response, use it
 			return mc.update(response)
-		case EncodingError:
+		case k.EncodingError:
 			// didn't even send, return the error
 			return err
 		}
@@ -148,7 +150,7 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 
 	}
 
-	return OutOfBrokers
+	return k.OutOfBrokers
 }
 
 func (mc *metadataCache) refreshTopic(topic string) error {

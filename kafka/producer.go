@@ -1,5 +1,7 @@
 package kafka
 
+import k "sarama/protocol"
+
 type Producer struct {
 	client            *Client
 	topic             string
@@ -13,7 +15,7 @@ func NewProducer(client *Client, topic string, partitioner Partitioner, response
 }
 
 func NewSimpleProducer(client *Client, topic string) *Producer {
-	return NewProducer(client, topic, RandomPartitioner{}, WAIT_FOR_LOCAL, 0)
+	return NewProducer(client, topic, RandomPartitioner{}, k.WAIT_FOR_LOCAL, 0)
 }
 
 func (p *Producer) choosePartition(key Encoder) (int32, error) {
@@ -32,7 +34,7 @@ func (p *Producer) choosePartition(key Encoder) (int32, error) {
 	return partitions[partitioner.Partition(key, len(partitions))], nil
 }
 
-func (p *Producer) SendMessage(key, value Encoder) (*ProduceResponse, error) {
+func (p *Producer) SendMessage(key, value Encoder) (*k.ProduceResponse, error) {
 	partition, err := p.choosePartition(key)
 	if err != nil {
 		return nil, err
@@ -57,8 +59,8 @@ func (p *Producer) SendMessage(key, value Encoder) (*ProduceResponse, error) {
 		return nil, err
 	}
 
-	request := &ProduceRequest{ResponseCondition: p.responseCondition, Timeout: p.responseTimeout}
-	request.AddMessage(&p.topic, partition, &Message{Key: keyBytes, Value: valBytes})
+	request := &k.ProduceRequest{ResponseCondition: p.responseCondition, Timeout: p.responseTimeout}
+	request.AddMessage(&p.topic, partition, &k.Message{Key: keyBytes, Value: valBytes})
 
 	response, err := broker.Produce(p.client.id, request)
 	if err != nil {
@@ -68,6 +70,6 @@ func (p *Producer) SendMessage(key, value Encoder) (*ProduceResponse, error) {
 	return response, nil
 }
 
-func (p *Producer) SendSimpleMessage(in string) (*ProduceResponse, error) {
+func (p *Producer) SendSimpleMessage(in string) (*k.ProduceResponse, error) {
 	return p.SendMessage(nil, encodableString(in))
 }

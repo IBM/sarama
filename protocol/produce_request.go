@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 // Special values accepted by Kafka for the ResponseCondition member of produce requests.
 const (

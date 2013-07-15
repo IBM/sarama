@@ -1,4 +1,4 @@
-package kafka
+package protocol
 
 type packetEncoder interface {
 	// primitives

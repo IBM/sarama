@@ -1,10 +1,8 @@
 /*
-Package kafka (AKA sarama.go) provides client libraries for the Kafka 0.8 protocol.
+Package sarama provides client libraries for the Kafka 0.8 protocol.
 
-It provides a high-level API to make common tasks easy, as well as a low-level API for precise control
-over message batching etc. The high-level API consists of Client, Producer, Consumer, Encoder.
+You probably want "sarama/kafka" which contains the high-level bindings.
 
-If you need more control, you can connect to Kafka brokers directly using the Broker object,
-then send requests and receive responses using functions on the broker itself.
+Alternatively, "sarama/protocol" contains a lower-level API for more precise control.
 */
-package kafka
+package sarama

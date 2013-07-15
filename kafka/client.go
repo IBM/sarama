@@ -1,5 +1,7 @@
 package kafka
 
+import k "sarama/protocol"
+
 type Client struct {
 	id    *string
 	cache *metadataCache
@@ -15,7 +17,7 @@ func NewClient(id *string, host string, port int32) (client *Client, err error) 
 	return client, nil
 }
 
-func (client *Client) leader(topic string, partition_id int32) (*Broker, error) {
+func (client *Client) leader(topic string, partition_id int32) (*k.Broker, error) {
 	leader := client.cache.leader(topic, partition_id)
 
 	if leader == nil {
@@ -28,7 +30,7 @@ func (client *Client) leader(topic string, partition_id int32) (*Broker, error) 
 	}
 
 	if leader == nil {
-		return nil, UNKNOWN_TOPIC_OR_PARTITION
+		return nil, k.UNKNOWN_TOPIC_OR_PARTITION
 	}
 
 	return leader, nil
@@ -47,7 +49,7 @@ func (client *Client) partitions(topic string) ([]int32, error) {
 	}
 
 	if partitions == nil {
-		return nil, UNKNOWN_TOPIC_OR_PARTITION
+		return nil, k.UNKNOWN_TOPIC_OR_PARTITION
 	}
 
 	return partitions, nil
