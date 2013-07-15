@@ -20,7 +20,7 @@ func (pr *ProduceResponseBlock) decode(pd packetDecoder) (err error) {
 }
 
 type ProduceResponse struct {
-	Blocks map[*string]map[int32]*ProduceResponseBlock
+	Blocks map[string]map[int32]*ProduceResponseBlock
 }
 
 func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
@@ -29,7 +29,7 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	pr.Blocks = make(map[*string]map[int32]*ProduceResponseBlock, numTopics)
+	pr.Blocks = make(map[string]map[int32]*ProduceResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {
@@ -61,7 +61,7 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func (pr *ProduceResponse) GetBlock(topic *string, partition int32) *ProduceResponseBlock {
+func (pr *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
 	if pr.Blocks == nil {
 		return nil
 	}

@@ -114,27 +114,26 @@ func (rd *realDecoder) getError() (KError, error) {
 	return KError(val), err
 }
 
-func (rd *realDecoder) getString() (*string, error) {
+func (rd *realDecoder) getString() (string, error) {
 	tmp, err := rd.getInt16()
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	n := int(tmp)
 
 	switch {
 	case n < -1:
-		return nil, DecodingError("Negative string length in getString.")
+		return "", DecodingError("Negative string length in getString.")
 	case n == -1:
-		return nil, nil
+		return "", nil
 	case n == 0:
-		return new(string), nil
+		return "", nil
 	case n > rd.remaining():
-		return nil, DecodingError("String too long in getString.")
+		return "", DecodingError("String too long in getString.")
 	default:
-		tmp := new(string)
-		*tmp = string(rd.raw[rd.off : rd.off+n])
+		tmp := string(rd.raw[rd.off : rd.off+n])
 		rd.off += n
 		return tmp, nil
 	}

@@ -17,7 +17,7 @@ func (r *OffsetResponseBlock) decode(pd packetDecoder) (err error) {
 }
 
 type OffsetResponse struct {
-	Blocks map[*string]map[int32]*OffsetResponseBlock
+	Blocks map[string]map[int32]*OffsetResponseBlock
 }
 
 func (r *OffsetResponse) decode(pd packetDecoder) (err error) {
@@ -26,7 +26,7 @@ func (r *OffsetResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	r.Blocks = make(map[*string]map[int32]*OffsetResponseBlock, numTopics)
+	r.Blocks = make(map[string]map[int32]*OffsetResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {

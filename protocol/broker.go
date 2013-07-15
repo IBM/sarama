@@ -9,7 +9,7 @@ import (
 // A single Kafka broker. All operations on this object are entirely concurrency-safe.
 type Broker struct {
 	id   int32
-	host *string
+	host string
 	port int32
 
 	correlation_id int32
@@ -31,7 +31,7 @@ type responsePromise struct {
 func NewBroker(host string, port int32) *Broker {
 	b := new(Broker)
 	b.id = -1 // don't know it yet
-	b.host = &host
+	b.host = host
 	b.port = port
 	return b
 }
@@ -45,7 +45,7 @@ func (b *Broker) Connect() error {
 		return AlreadyConnected
 	}
 
-	addr, err := net.ResolveIPAddr("ip", *b.host)
+	addr, err := net.ResolveIPAddr("ip", b.host)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (b *Broker) ID() int32 {
 	return b.id
 }
 
-func (b *Broker) GetMetadata(clientID *string, request *MetadataRequest) (*MetadataResponse, error) {
+func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
@@ -103,7 +103,7 @@ func (b *Broker) GetMetadata(clientID *string, request *MetadataRequest) (*Metad
 	return response, nil
 }
 
-func (b *Broker) GetOffset(clientID *string, request *OffsetRequest) (*OffsetResponse, error) {
+func (b *Broker) GetOffset(clientID string, request *OffsetRequest) (*OffsetResponse, error) {
 	response := new(OffsetResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
@@ -115,7 +115,7 @@ func (b *Broker) GetOffset(clientID *string, request *OffsetRequest) (*OffsetRes
 	return response, nil
 }
 
-func (b *Broker) Produce(clientID *string, request *ProduceRequest) (*ProduceResponse, error) {
+func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResponse, error) {
 	var response *ProduceResponse
 	if request.ResponseCondition != NO_RESPONSE {
 		response = new(ProduceResponse)
@@ -130,7 +130,7 @@ func (b *Broker) Produce(clientID *string, request *ProduceRequest) (*ProduceRes
 	return response, nil
 }
 
-func (b *Broker) Fetch(clientID *string, request *FetchRequest) (*FetchResponse, error) {
+func (b *Broker) Fetch(clientID string, request *FetchRequest) (*FetchResponse, error) {
 	response := new(FetchResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
@@ -142,7 +142,7 @@ func (b *Broker) Fetch(clientID *string, request *FetchRequest) (*FetchResponse,
 	return response, nil
 }
 
-func (b *Broker) CommitOffset(clientID *string, request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
+func (b *Broker) CommitOffset(clientID string, request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
 	response := new(OffsetCommitResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
@@ -154,7 +154,7 @@ func (b *Broker) CommitOffset(clientID *string, request *OffsetCommitRequest) (*
 	return response, nil
 }
 
-func (b *Broker) FetchOffset(clientID *string, request *OffsetFetchRequest) (*OffsetFetchResponse, error) {
+func (b *Broker) FetchOffset(clientID string, request *OffsetFetchRequest) (*OffsetFetchResponse, error) {
 	response := new(OffsetFetchResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
@@ -166,7 +166,7 @@ func (b *Broker) FetchOffset(clientID *string, request *OffsetFetchRequest) (*Of
 	return response, nil
 }
 
-func (b *Broker) send(clientID *string, req requestEncoder, promiseResponse bool) (*responsePromise, error) {
+func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool) (*responsePromise, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -196,7 +196,7 @@ func (b *Broker) send(clientID *string, req requestEncoder, promiseResponse bool
 	return &promise, nil
 }
 
-func (b *Broker) sendAndReceive(clientID *string, req requestEncoder, res decoder) error {
+func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder) error {
 	promise, err := b.send(clientID, req, res != nil)
 
 	if err != nil {

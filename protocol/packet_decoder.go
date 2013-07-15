@@ -16,7 +16,7 @@ type packetDecoder interface {
 
 	// misc
 	getError() (KError, error)
-	getString() (*string, error)
+	getString() (string, error)
 	getBytes() ([]byte, error)
 	getSubset(length int) (packetDecoder, error)
 

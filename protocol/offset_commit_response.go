@@ -1,7 +1,7 @@
 package protocol
 
 type OffsetCommitResponse struct {
-	Errors map[*string]map[int32]KError
+	Errors map[string]map[int32]KError
 }
 
 func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {
@@ -10,7 +10,7 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	r.Errors = make(map[*string]map[int32]KError, numTopics)
+	r.Errors = make(map[string]map[int32]KError, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {

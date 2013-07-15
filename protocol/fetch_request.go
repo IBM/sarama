@@ -13,7 +13,7 @@ func (f *fetchRequestBlock) encode(pe packetEncoder) {
 type FetchRequest struct {
 	MaxWaitTime int32
 	MinBytes    int32
-	blocks      map[*string]map[int32]*fetchRequestBlock
+	blocks      map[string]map[int32]*fetchRequestBlock
 }
 
 func (f *FetchRequest) encode(pe packetEncoder) {
@@ -39,9 +39,9 @@ func (f *FetchRequest) version() int16 {
 	return 0
 }
 
-func (f *FetchRequest) AddBlock(topic *string, partition_id int32, fetchOffset int64, maxBytes int32) {
+func (f *FetchRequest) AddBlock(topic string, partition_id int32, fetchOffset int64, maxBytes int32) {
 	if f.blocks == nil {
-		f.blocks = make(map[*string]map[int32]*fetchRequestBlock)
+		f.blocks = make(map[string]map[int32]*fetchRequestBlock)
 	}
 
 	if f.blocks[topic] == nil {

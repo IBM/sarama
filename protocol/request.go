@@ -8,7 +8,7 @@ type requestEncoder interface {
 
 type request struct {
 	correlation_id int32
-	id             *string
+	id             string
 	body           requestEncoder
 }
 

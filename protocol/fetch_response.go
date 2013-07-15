@@ -32,7 +32,7 @@ func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
 }
 
 type FetchResponse struct {
-	Blocks map[*string]map[int32]*FetchResponseBlock
+	Blocks map[string]map[int32]*FetchResponseBlock
 }
 
 func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
@@ -41,7 +41,7 @@ func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	fr.Blocks = make(map[*string]map[int32]*FetchResponseBlock, numTopics)
+	fr.Blocks = make(map[string]map[int32]*FetchResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {

@@ -2,7 +2,7 @@ package protocol
 
 type offsetCommitRequestBlock struct {
 	offset   int64
-	metadata *string
+	metadata string
 }
 
 func (r *offsetCommitRequestBlock) encode(pe packetEncoder) {
@@ -11,8 +11,8 @@ func (r *offsetCommitRequestBlock) encode(pe packetEncoder) {
 }
 
 type OffsetCommitRequest struct {
-	ConsumerGroup *string
-	blocks        map[*string]map[int32]*offsetCommitRequestBlock
+	ConsumerGroup string
+	blocks        map[string]map[int32]*offsetCommitRequestBlock
 }
 
 func (r *OffsetCommitRequest) encode(pe packetEncoder) {
@@ -36,9 +36,9 @@ func (r *OffsetCommitRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetCommitRequest) AddBlock(topic *string, partition_id int32, offset int64, metadata *string) {
+func (r *OffsetCommitRequest) AddBlock(topic string, partition_id int32, offset int64, metadata string) {
 	if r.blocks == nil {
-		r.blocks = make(map[*string]map[int32]*offsetCommitRequestBlock)
+		r.blocks = make(map[string]map[int32]*offsetCommitRequestBlock)
 	}
 
 	if r.blocks[topic] == nil {

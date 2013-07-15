@@ -42,15 +42,12 @@ func (pe *prepEncoder) putError(in KError) {
 	pe.length += 2
 }
 
-func (pe *prepEncoder) putString(in *string) {
+func (pe *prepEncoder) putString(in string) {
 	pe.length += 2
-	if in == nil {
-		return
-	}
-	if len(*in) > math.MaxInt16 {
+	if len(in) > math.MaxInt16 {
 		pe.err = EncodingError("String too long")
 	} else {
-		pe.length += len(*in)
+		pe.length += len(in)
 	}
 }
 

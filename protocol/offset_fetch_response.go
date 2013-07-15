@@ -2,7 +2,7 @@ package protocol
 
 type OffsetFetchResponseBlock struct {
 	Offset   int64
-	Metadata *string
+	Metadata string
 	Err      KError
 }
 
@@ -23,7 +23,7 @@ func (r *OffsetFetchResponseBlock) decode(pd packetDecoder) (err error) {
 }
 
 type OffsetFetchResponse struct {
-	Blocks map[*string]map[int32]*OffsetFetchResponseBlock
+	Blocks map[string]map[int32]*OffsetFetchResponseBlock
 }
 
 func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
@@ -32,7 +32,7 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	r.Blocks = make(map[*string]map[int32]*OffsetFetchResponseBlock, numTopics)
+	r.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {

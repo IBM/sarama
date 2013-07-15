@@ -60,14 +60,18 @@ func (p *Producer) safeSendMessage(key, value Encoder, retries int) error {
 	}
 
 	request := &k.ProduceRequest{ResponseCondition: p.responseCondition, Timeout: p.responseTimeout}
-	request.AddMessage(&p.topic, partition, &k.Message{Key: keyBytes, Value: valBytes})
+	request.AddMessage(p.topic, partition, &k.Message{Key: keyBytes, Value: valBytes})
 
 	response, err := broker.Produce(p.client.id, request)
 	if err != nil {
 		return err
 	}
 
-	block := response.GetBlock(&p.topic, partition)
+	if response == nil {
+		return nil
+	}
+
+	block := response.GetBlock(p.topic, partition)
 	if block == nil {
 		return IncompleteResponse
 	}

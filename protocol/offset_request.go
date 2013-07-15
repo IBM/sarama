@@ -20,7 +20,7 @@ func (r *offsetRequestBlock) encode(pe packetEncoder) {
 }
 
 type OffsetRequest struct {
-	blocks map[*string]map[int32]*offsetRequestBlock
+	blocks map[string]map[int32]*offsetRequestBlock
 }
 
 func (r *OffsetRequest) encode(pe packetEncoder) {
@@ -44,9 +44,9 @@ func (r *OffsetRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetRequest) AddBlock(topic *string, partition_id int32, time int64, maxOffsets int32) {
+func (r *OffsetRequest) AddBlock(topic string, partition_id int32, time int64, maxOffsets int32) {
 	if r.blocks == nil {
-		r.blocks = make(map[*string]map[int32]*offsetRequestBlock)
+		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
 	}
 
 	if r.blocks[topic] == nil {

@@ -3,11 +3,11 @@ package kafka
 import k "sarama/protocol"
 
 type Client struct {
-	id    *string
+	id    string
 	cache *metadataCache
 }
 
-func NewClient(id *string, host string, port int32) (client *Client, err error) {
+func NewClient(id string, host string, port int32) (client *Client, err error) {
 	client = new(Client)
 	client.id = id
 	client.cache, err = newMetadataCache(client, host, port)

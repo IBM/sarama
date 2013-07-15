@@ -39,7 +39,7 @@ func (pm *PartitionMetadata) decode(pd packetDecoder) (err error) {
 
 type TopicMetadata struct {
 	Err        KError
-	Name       *string
+	Name       string
 	Partitions []*PartitionMetadata
 }
 

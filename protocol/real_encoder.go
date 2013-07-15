@@ -49,14 +49,10 @@ func (re *realEncoder) putError(in KError) {
 	re.putInt16(int16(in))
 }
 
-func (re *realEncoder) putString(in *string) {
-	if in == nil {
-		re.putInt16(-1)
-		return
-	}
-	re.putInt16(int16(len(*in)))
-	copy(re.raw[re.off:], *in)
-	re.off += len(*in)
+func (re *realEncoder) putString(in string) {
+	re.putInt16(int16(len(in)))
+	copy(re.raw[re.off:], in)
+	re.off += len(in)
 }
 
 func (re *realEncoder) putBytes(in []byte) {

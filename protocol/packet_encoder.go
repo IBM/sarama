@@ -13,7 +13,7 @@ type packetEncoder interface {
 
 	// misc
 	putError(in KError)
-	putString(in *string)
+	putString(in string)
 	putBytes(in []byte)
 	putRaw(in []byte)
 

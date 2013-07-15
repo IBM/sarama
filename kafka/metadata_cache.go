@@ -30,7 +30,7 @@ func newMetadataCache(client *Client, host string, port int32) (*metadataCache, 
 	mc.brokers[starter.ID()] = starter
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
-	err = mc.refreshTopics(make([]*string, 0))
+	err = mc.refreshTopics(make([]string, 0))
 	if err != nil {
 		return nil, err
 	}
@@ -120,19 +120,19 @@ func (mc *metadataCache) update(data *k.MetadataResponse) error {
 		if topic.Err != k.NO_ERROR {
 			return topic.Err
 		}
-		mc.leaders[*topic.Name] = make(map[int32]int32, len(topic.Partitions))
+		mc.leaders[topic.Name] = make(map[int32]int32, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
 			if partition.Err != k.NO_ERROR {
 				return partition.Err
 			}
-			mc.leaders[*topic.Name][partition.Id] = partition.Leader
+			mc.leaders[topic.Name][partition.Id] = partition.Leader
 		}
 	}
 
 	return nil
 }
 
-func (mc *metadataCache) refreshTopics(topics []*string) error {
+func (mc *metadataCache) refreshTopics(topics []string) error {
 	for broker := mc.any(); broker != nil; broker = mc.any() {
 		response, err := broker.GetMetadata(mc.client.id, &k.MetadataRequest{Topics: topics})
 
@@ -154,7 +154,7 @@ func (mc *metadataCache) refreshTopics(topics []*string) error {
 }
 
 func (mc *metadataCache) refreshTopic(topic string) error {
-	tmp := make([]*string, 1)
-	tmp[0] = &topic
+	tmp := make([]string, 1)
+	tmp[0] = topic
 	return mc.refreshTopics(tmp)
 }

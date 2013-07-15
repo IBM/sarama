@@ -1,7 +1,7 @@
 package protocol
 
 type MetadataRequest struct {
-	Topics []*string
+	Topics []string
 }
 
 func (mr *MetadataRequest) encode(pe packetEncoder) {
