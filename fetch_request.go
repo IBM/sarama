@@ -48,7 +48,3 @@ func (p *fetchRequest) key() int16 {
 func (p *fetchRequest) version() int16 {
 	return 0
 }
-
-func (p *fetchRequest) expectResponse() bool {
-	return true
-}
