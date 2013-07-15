@@ -1,9 +1,10 @@
 package kafka
 
+// Special values accepted by Kafka for the ResponseCondition member of produce requests.
 const (
-	NO_RESPONSE    int16 = 0
-	WAIT_FOR_LOCAL int16 = 1
-	WAIT_FOR_ALL   int16 = -1
+	NO_RESPONSE    int16 = 0  // Don't send any response, the TCP ACK is all you get.
+	WAIT_FOR_LOCAL int16 = 1  // Wait for only the local commit to succeed before responding.
+	WAIT_FOR_ALL   int16 = -1 // Wait for all replicas to commit before responding.
 )
 
 type ProduceRequest struct {
