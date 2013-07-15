@@ -113,22 +113,21 @@ func (b *Broker) sendAndReceive(clientID *string, req requestEncoder, res decode
 	if err != nil {
 		return err
 	}
+	b.correlation_id++
 
 	if res == nil {
 		return nil
 	}
 
-	promise := responsePromise{b.correlation_id, make(chan []byte), make(chan error)}
+	promise := responsePromise{fullRequest.correlation_id, make(chan []byte), make(chan error)}
 	b.responses <- promise
-	b.correlation_id++
 
 	select {
-	case buf := <-promise.packets:
-		err = decode(buf, res)
+	case buf = <-promise.packets:
+		return decode(buf, res)
 	case err = <-promise.errors:
+		return err
 	}
-
-	return err
 }
 
 func (b *Broker) decode(pd packetDecoder) (err error) {
