@@ -34,7 +34,7 @@ func (p *ProduceRequest) version() int16 {
 	return 0
 }
 
-func (p *ProduceRequest) AddMessageSet(topic *string, partition int32, set *messageSet) {
+func (p *ProduceRequest) AddMessage(topic *string, partition int32, msg *Message) {
 	if p.MsgSets == nil {
 		p.MsgSets = make(map[*string]map[int32]*messageSet)
 	}
@@ -43,5 +43,12 @@ func (p *ProduceRequest) AddMessageSet(topic *string, partition int32, set *mess
 		p.MsgSets[topic] = make(map[int32]*messageSet)
 	}
 
-	p.MsgSets[topic][partition] = set
+	set := p.MsgSets[topic][partition]
+
+	if set == nil {
+		set = newMessageSet()
+		p.MsgSets[topic][partition] = set
+	}
+
+	set.addMessage(msg)
 }

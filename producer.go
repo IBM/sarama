@@ -58,7 +58,7 @@ func (p *Producer) SendMessage(key, value Encoder) (*ProduceResponse, error) {
 	}
 
 	request := &ProduceRequest{ResponseCondition: p.responseCondition, Timeout: p.responseTimeout}
-	request.AddMessageSet(&p.topic, partition, newSingletonMessageSet(&Message{Key: keyBytes, Value: valBytes}))
+	request.AddMessage(&p.topic, partition, &Message{Key: keyBytes, Value: valBytes})
 
 	response, err := broker.Produce(p.client.id, request)
 	if err != nil {

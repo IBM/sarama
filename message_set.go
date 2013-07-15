@@ -2,13 +2,13 @@ package kafka
 
 type messageSetBlock struct {
 	offset int64
-	msg    Message
+	msg    *Message
 }
 
 func (msb *messageSetBlock) encode(pe packetEncoder) {
 	pe.putInt64(msb.offset)
 	pe.pushLength32()
-	(&msb.msg).encode(pe)
+	msb.msg.encode(pe)
 	pe.pop()
 }
 
@@ -23,7 +23,8 @@ func (msb *messageSetBlock) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	err = (&msb.msg).decode(pd)
+	msb.msg = new(Message)
+	err = msb.msg.decode(pd)
 	if err != nil {
 		return err
 	}
@@ -61,8 +62,14 @@ func (ms *messageSet) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func newSingletonMessageSet(msg *Message) *messageSet {
-	tmp := make([]*messageSetBlock, 1)
-	tmp[0] = &messageSetBlock{msg: *msg}
-	return &messageSet{tmp}
+func newMessageSet() *messageSet {
+	set := new(messageSet)
+	set.msgs = make([]*messageSetBlock, 0)
+	return set
+}
+
+func (ms *messageSet) addMessage(msg *Message) {
+	block := new(messageSetBlock)
+	block.msg = msg
+	ms.msgs = append(ms.msgs, block)
 }
