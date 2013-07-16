@@ -72,3 +72,15 @@ func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func (fr *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseBlock {
+	if fr.Blocks == nil {
+		return nil
+	}
+
+	if fr.Blocks[topic] == nil {
+		return nil
+	}
+
+	return fr.Blocks[topic][partition]
+}
