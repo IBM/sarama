@@ -38,7 +38,8 @@ func (msb *MessageBlock) decode(pd packetDecoder) (err error) {
 }
 
 type MessageSet struct {
-	Messages []*MessageBlock
+	PartialTrailingMessage bool
+	Messages               []*MessageBlock
 }
 
 func (ms *MessageSet) encode(pe packetEncoder) {
@@ -53,12 +54,16 @@ func (ms *MessageSet) decode(pd packetDecoder) (err error) {
 	for pd.remaining() > 0 {
 		msb := new(MessageBlock)
 		err = msb.decode(pd)
-		if err == nil {
+		switch err.(type) {
+		case nil:
 			ms.Messages = append(ms.Messages, msb)
-		} else {
+		case InsufficientData:
 			// As an optimization the server is allowed to return a partial message at the
 			// end of the message set. Clients should handle this case. So we just ignore such things.
-			break
+			ms.PartialTrailingMessage = true
+			return nil
+		default:
+			return err
 		}
 	}
 
