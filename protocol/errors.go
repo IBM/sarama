@@ -1,6 +1,9 @@
 package protocol
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // The various errors that can be returned by the Kafka server.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
@@ -73,6 +76,15 @@ type EncodingError string
 
 func (err EncodingError) Error() string {
 	return "kafka: Could not encode packet. " + string(err)
+}
+
+// InsufficientData is returned when decoding and the packet is truncated. This can be expected
+// when requesting messages, since as an optimization the server is allowed to return a partial message at the end
+// of the message set.
+type InsufficientData int
+
+func (err InsufficientData) Error() string {
+	return fmt.Sprintf("kafka: Insufficient data to decode packet, at least %d more bytes expected.", int(err))
 }
 
 // Returned when there was an error decoding the Kafka server's response. Usually means that you've

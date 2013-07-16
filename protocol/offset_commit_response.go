@@ -2,7 +2,7 @@ package protocol
 
 type OffsetCommitResponse struct {
 	ClientID string
-	Errors map[string]map[int32]KError
+	Errors   map[string]map[int32]KError
 }
 
 func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {

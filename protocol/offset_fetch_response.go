@@ -24,7 +24,7 @@ func (r *OffsetFetchResponseBlock) decode(pd packetDecoder) (err error) {
 
 type OffsetFetchResponse struct {
 	ClientID string
-	Blocks map[string]map[int32]*OffsetFetchResponseBlock
+	Blocks   map[string]map[int32]*OffsetFetchResponseBlock
 }
 
 func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
