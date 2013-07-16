@@ -19,9 +19,11 @@ func (slice int32Slice) Swap(i, j int) {
 // make strings encodable for convenience so they can be used as keys
 // and/or values in kafka messages
 
-type encodableString string
+// StringEncoder implements the Encoder interface for Go strings so that you can do things like
+//	producer.SendMessage(nil, kafka.StringEncoder("hello world"))
+type StringEncoder string
 
-func (s encodableString) Encode() ([]byte, error) {
+func (s StringEncoder) Encode() ([]byte, error) {
 	return []byte(s), nil
 }
 
