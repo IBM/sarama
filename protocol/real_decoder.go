@@ -177,11 +177,14 @@ func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
 func (rd *realDecoder) push(in pushDecoder) error {
 	in.saveOffset(rd.off)
 
-	if rd.remaining() < in.reserveLength() {
+	reserve := in.reserveLength()
+	if rd.remaining() < reserve {
 		return DecodingError("Insufficient data while reserving for push.")
 	}
 
 	rd.stack = append(rd.stack, in)
+
+	rd.off += reserve
 
 	return nil
 }
