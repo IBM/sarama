@@ -91,6 +91,17 @@ func (b *Broker) ID() int32 {
 	return b.id
 }
 
+// Two brokers are equal if they have the same host, port, and id.
+func (b *Broker) Equals(a *Broker) bool {
+	switch {
+	case a == nil && b == nil:
+		return true
+	case (a == nil && b != nil) || (a != nil && b == nil):
+		return false
+	}
+	return a.id == b.id && a.host == b.host && a.port == b.port
+}
+
 func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
 
