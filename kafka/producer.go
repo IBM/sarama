@@ -19,6 +19,14 @@ func NewSimpleProducer(client *Client, topic string) *Producer {
 	return NewProducer(client, topic, RandomPartitioner{}, k.WAIT_FOR_LOCAL, 0)
 }
 
+func (p *Producer) SendMessage(key, value Encoder) error {
+	return p.safeSendMessage(key, value, 1)
+}
+
+func (p *Producer) SendSimpleMessage(msg string) error {
+	return p.safeSendMessage(nil, encodableString(msg), 1)
+}
+
 func (p *Producer) choosePartition(key Encoder) (int32, error) {
 	partitions, err := p.client.partitions(p.topic)
 	if err != nil {
@@ -103,12 +111,4 @@ func (p *Producer) safeSendMessage(key, value Encoder, retries int) error {
 	default:
 		return block.Err
 	}
-}
-
-func (p *Producer) SendMessage(key, value Encoder) error {
-	return p.safeSendMessage(key, value, 1)
-}
-
-func (p *Producer) SendSimpleMessage(msg string) error {
-	return p.safeSendMessage(nil, encodableString(msg), 1)
 }
