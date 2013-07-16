@@ -53,10 +53,13 @@ func (ms *MessageSet) decode(pd packetDecoder) (err error) {
 	for pd.remaining() > 0 {
 		msb := new(MessageBlock)
 		err = msb.decode(pd)
-		if err != nil {
-			return err
+		if err == nil {
+			ms.Messages = append(ms.Messages, msb)
+		} else {
+			// As an optimization the server is allowed to return a partial message at the
+			// end of the message set. Clients should handle this case. So we just ignore such things.
+			break
 		}
-		ms.Messages = append(ms.Messages, msb)
 	}
 
 	return nil
