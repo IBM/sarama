@@ -66,11 +66,14 @@ func (c *Consumer) Close() {
 }
 
 func (c *Consumer) fetchMessages() {
+
+	var fetchSize int32 = 1024
+
 	for {
 		request := new(k.FetchRequest)
 		request.MinBytes = 1
-		request.MaxWaitTime = 10000
-		request.AddBlock(c.topic, c.partition, c.offset, 1024)
+		request.MaxWaitTime = 1000
+		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
 
 		response, err := c.broker.Fetch(c.client.id, request)
 		if err != nil {
@@ -111,12 +114,20 @@ func (c *Consumer) fetchMessages() {
 		}
 
 		if len(block.MsgSet.Messages) == 0 {
-			panic("What should we do here?")
-			/*
-				If we timed out waiting for a new message we should just poll again. However, if we got part of a message but
-				our maxBytes was too small (hard-coded 1024 at the moment) we should increase that and ask again. If we just poll
-				with the same size immediately we'll end up in an infinite loop DOSing the broker...
-			*/
+			// We got no messages. If we got a trailing one then we need to ask for more data.
+			// Otherwise we just poll again and wait for one to be produced...
+			if block.MsgSet.PartialTrailingMessage {
+				fetchSize *= 2
+			}
+			select {
+			case <-c.stopper:
+				close(c.messages)
+				close(c.errors)
+				close(c.done)
+				return
+			default:
+				continue
+			}
 		}
 
 		for _, msgBlock := range block.MsgSet.Messages {
