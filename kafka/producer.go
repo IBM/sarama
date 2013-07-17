@@ -40,7 +40,13 @@ func (p *Producer) choosePartition(key Encoder) (int32, error) {
 		partitioner = p.partitioner
 	}
 
-	return partitions[partitioner.Partition(key, len(partitions))], nil
+	choice := partitioner.Partition(key, len(partitions))
+
+	if choice >= len(partitions) {
+		return -1, InvalidPartition
+	}
+
+	return partitions[choice], nil
 }
 
 func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
