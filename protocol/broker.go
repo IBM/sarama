@@ -14,7 +14,7 @@ type Broker struct {
 
 	correlation_id int32
 	conn           net.Conn
-	sync.Mutex
+	lock           sync.Mutex
 
 	responses chan responsePromise
 	done      chan bool
@@ -38,8 +38,8 @@ func NewBroker(host string, port int32) *Broker {
 
 // Opens a connection to the remote broker.
 func (b *Broker) Connect() error {
-	b.Lock()
-	defer b.Unlock()
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	if b.conn != nil {
 		return AlreadyConnected
@@ -67,8 +67,8 @@ func (b *Broker) Connect() error {
 
 // Closes the connection to the remote broker.
 func (b *Broker) Close() error {
-	b.Lock()
-	defer b.Unlock()
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	if b.conn == nil {
 		return NotConnected
@@ -181,8 +181,8 @@ func (b *Broker) FetchOffset(clientID string, request *OffsetFetchRequest) (*Off
 }
 
 func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool) (*responsePromise, error) {
-	b.Lock()
-	defer b.Unlock()
+	b.lock.Lock()
+	defer b.lock.Unlock()
 
 	if b.conn == nil {
 		return nil, NotConnected
