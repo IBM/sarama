@@ -119,7 +119,24 @@ func (c *Consumer) fetchMessages() {
 			}
 		}
 
-		if block.Err != k.NO_ERROR {
+		switch block.Err {
+		case k.NO_ERROR:
+			break
+		case k.UNKNOWN_TOPIC_OR_PARTITION, k.NOT_LEADER_FOR_PARTITION, k.LEADER_NOT_AVAILABLE:
+			err = c.client.refreshTopic(c.topic)
+			if err != nil {
+				select {
+				case <-c.stopper:
+					close(c.messages)
+					close(c.errors)
+					close(c.done)
+					return
+				case c.errors <- block.Err:
+					continue
+				}
+			}
+			continue
+		default:
 			select {
 			case <-c.stopper:
 				close(c.messages)

@@ -1,7 +1,6 @@
 package kafka
 
 import k "sarama/protocol"
-import "time"
 
 // Producer publishes Kafka messages on a given topic. It routes messages to the correct broker, refreshing metadata as appropriate,
 // and parses responses for errors. A Producer itself does not need to be closed (thus no Close method) but you still need to close
@@ -65,20 +64,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 	}
 
 	broker, err := p.client.leader(p.topic, partition)
-	switch t := err.(type) {
-	case k.KError:
-		if t == k.LEADER_NOT_AVAILABLE {
-			time.Sleep(250 * time.Millisecond) // wait for leader election
-			broker, err = p.client.leader(p.topic, partition)
-			if err != nil {
-				return err
-			}
-		} else {
-			return err
-		}
-	case nil:
-		break
-	default:
+	if err != nil {
 		return err
 	}
 
@@ -111,18 +97,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 	switch block.Err {
 	case k.NO_ERROR:
 		return nil
-	case k.LEADER_NOT_AVAILABLE:
-		if !retry {
-			return block.Err
-		}
-		// wait for leader election to finish
-		time.Sleep(250 * time.Millisecond)
-		err = p.client.refreshTopic(p.topic)
-		if err != nil {
-			return err
-		}
-		return p.safeSendMessage(key, value, false)
-	case k.UNKNOWN_TOPIC_OR_PARTITION, k.NOT_LEADER_FOR_PARTITION:
+	case k.UNKNOWN_TOPIC_OR_PARTITION, k.NOT_LEADER_FOR_PARTITION, k.LEADER_NOT_AVAILABLE:
 		if !retry {
 			return block.Err
 		}
