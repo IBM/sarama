@@ -15,7 +15,13 @@ func (slice int32Slice) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-// make strings encodable for convenience so they can be used as keys
+// A simple interface for any type that can be encoded as an array of bytes
+// in order to be sent as the key or value of a Kafka message.
+type Encoder interface {
+	Encode() ([]byte, error)
+}
+
+// make strings and byte slices encodable for convenience so they can be used as keys
 // and/or values in kafka messages
 
 // StringEncoder implements the Encoder interface for Go strings so that you can do things like
@@ -26,10 +32,12 @@ func (s StringEncoder) Encode() ([]byte, error) {
 	return []byte(s), nil
 }
 
-// A simple interface for any type that can be encoded as an array of bytes
-// in order to be sent as the key or value of a Kafka message.
-type Encoder interface {
-	Encode() ([]byte, error)
+// ByteEncoder implements the Encoder interface for Go byte slices so that you can do things like
+//	producer.SendMessage(nil, kafka.ByteEncoder([]byte{0x00}))
+type ByteEncoder []byte
+
+func (b ByteEncoder) Encode() ([]byte, error) {
+	return b, nil
 }
 
 // create a message struct to return from high-level fetch requests
