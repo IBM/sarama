@@ -128,11 +128,14 @@ func (b *Broker) GetAvailableOffsets(clientID string, request *OffsetRequest) (*
 
 func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResponse, error) {
 	var response *ProduceResponse
-	if request.ResponseCondition != NO_RESPONSE {
-		response = new(ProduceResponse)
-	}
+	var err error
 
-	err := b.sendAndReceive(clientID, request, response)
+	if request.ResponseCondition == NO_RESPONSE {
+		err = b.sendAndReceive(clientID, request, nil)
+	} else {
+		response = new(ProduceResponse)
+		err = b.sendAndReceive(clientID, request, response)
+	}
 
 	if err != nil {
 		return nil, err
