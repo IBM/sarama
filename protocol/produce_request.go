@@ -22,7 +22,9 @@ func (p *ProduceRequest) encode(pe packetEncoder) {
 		pe.putArrayCount(len(partitions))
 		for id, msgSet := range partitions {
 			pe.putInt32(id)
+			pe.pushLength32()
 			msgSet.encode(pe)
+			pe.pop()
 		}
 	}
 }
