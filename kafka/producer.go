@@ -92,8 +92,11 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 	case nil:
 		break
 	default:
+		if !retry {
+			return err
+		}
 		p.client.disconnectBroker(broker)
-		return p.safeSendMessage(key, value, true)
+		return p.safeSendMessage(key, value, false)
 	}
 
 	if response == nil {
