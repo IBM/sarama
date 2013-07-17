@@ -95,7 +95,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		}
 		// wait for leader election to finish
 		time.Sleep(250 * time.Millisecond)
-		err = p.client.cache.refreshTopic(p.topic)
+		err = p.client.refreshTopic(p.topic)
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		if !retry {
 			return block.Err
 		}
-		err = p.client.cache.refreshTopic(p.topic)
+		err = p.client.refreshTopic(p.topic)
 		if err != nil {
 			return err
 		}
