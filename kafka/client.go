@@ -231,10 +231,15 @@ func (client *Client) update(data *k.MetadataResponse) error {
 		}
 		client.leaders[topic.Name] = make(map[int32]int32, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
-			if partition.Err != k.NO_ERROR {
+			switch partition.Err {
+			case k.NO_ERROR, k.LEADER_NOT_AVAILABLE:
+				// in the LEADER_NOT_AVAILABLE case partition.Leader will be -1 because the
+				// partition is in the middle of leader election, so we save it anyways to avoid
+				// returning the stale leader (since our broker map should never have a broker with ID -1)
+				client.leaders[topic.Name][partition.Id] = partition.Leader
+			default:
 				return partition.Err
 			}
-			client.leaders[topic.Name][partition.Id] = partition.Leader
 		}
 	}
 
