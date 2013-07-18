@@ -8,13 +8,13 @@ var (
 
 	metadataRequestOneTopic = []byte{
 		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x06,  't',  'o',  'p',  'i',  'c',  '1'}
+		0x00, 0x06, 't', 'o', 'p', 'i', 'c', '1'}
 
 	metadataRequestThreeTopics = []byte{
 		0x00, 0x00, 0x00, 0x03,
-		0x00, 0x03,  'f',  'o',  'o',
-		0x00, 0x03,  'b',  'a',  'r',
-		0x00, 0x03,  'b',  'a',  'z'}
+		0x00, 0x03, 'f', 'o', 'o',
+		0x00, 0x03, 'b', 'a', 'r',
+		0x00, 0x03, 'b', 'a', 'z'}
 )
 
 func TestMetadataRequest(t *testing.T) {
