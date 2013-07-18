@@ -1,9 +1,6 @@
 package protocol
 
-import (
-	"bytes"
-	"testing"
-)
+import "testing"
 
 var (
 	fetchRequestNoBlocks = []byte{
@@ -22,17 +19,7 @@ var (
 		0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, 0x00, 0x00, 0x00, 0x56}
 )
 
-func testEncodable(t *testing.T, name string, in encoder, result []byte) {
-	packet, err := encode(in)
-	if err != nil {
-		t.Error(err)
-	}
-	if !bytes.Equal(packet, result) {
-		t.Error("Encoding", name, "failed\ngot ", packet, "\nwant", result)
-	}
-}
-
-func TestFetchRequestEncoding(t *testing.T) {
+func TestFetchRequest(t *testing.T) {
 	request := new(FetchRequest)
 	testEncodable(t, "no blocks", request, fetchRequestNoBlocks)
 
