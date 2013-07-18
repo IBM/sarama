@@ -1,3 +1,8 @@
+/*
+Package kafka provides a high-level API for writing Kafka 0.8 clients.
+
+It is built strictly on sister package sarama/protocol.
+*/
 package kafka
 
 import k "sarama/protocol"

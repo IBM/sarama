@@ -1,6 +1,6 @@
 package protocol
 
-// Special values accepted by Kafka for the ResponseCondition member of produce requests.
+// Special values accepted by Kafka for the RequiredAcks member of produce requests.
 const (
 	NO_RESPONSE    int16 = 0  // Don't send any response, the TCP ACK is all you get.
 	WAIT_FOR_LOCAL int16 = 1  // Wait for only the local commit to succeed before responding.
@@ -8,13 +8,13 @@ const (
 )
 
 type ProduceRequest struct {
-	ResponseCondition int16
-	Timeout           int32
-	msgSets           map[string]map[int32]*MessageSet
+	RequiredAcks int16
+	Timeout      int32
+	msgSets      map[string]map[int32]*MessageSet
 }
 
 func (p *ProduceRequest) encode(pe packetEncoder) {
-	pe.putInt16(p.ResponseCondition)
+	pe.putInt16(p.RequiredAcks)
 	pe.putInt32(p.Timeout)
 	pe.putArrayCount(len(p.msgSets))
 	for topic, partitions := range p.msgSets {
@@ -49,7 +49,7 @@ func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 	set := p.msgSets[topic][partition]
 
 	if set == nil {
-		set = newMessageSet()
+		set = new(MessageSet)
 		p.msgSets[topic][partition] = set
 	}
 

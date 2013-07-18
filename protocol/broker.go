@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-// A single Kafka broker. All operations on this object are entirely concurrency-safe.
+// Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
 type Broker struct {
 	id   int32
 	host string
@@ -26,7 +26,7 @@ type responsePromise struct {
 	errors         chan error
 }
 
-// Creates and returns a Broker targetting the given host:port address.
+// NewBroker creates and returns a Broker targetting the given host:port address.
 // This does not attempt to actually connect, you have to call Connect() for that.
 func NewBroker(host string, port int32) *Broker {
 	b := new(Broker)
@@ -36,7 +36,6 @@ func NewBroker(host string, port int32) *Broker {
 	return b
 }
 
-// Opens a connection to the remote broker.
 func (b *Broker) Connect() error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -65,7 +64,6 @@ func (b *Broker) Connect() error {
 	return nil
 }
 
-// Closes the connection to the remote broker.
 func (b *Broker) Close() error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -86,12 +84,13 @@ func (b *Broker) Close() error {
 	return err
 }
 
-// Returns the broker ID from Kafka, or -1 if that is not known.
+// ID returns the broker ID retrieved from Kafka's metadata, or -1 if that is not known.
 func (b *Broker) ID() int32 {
 	return b.id
 }
 
-// Two brokers are equal if they have the same host, port, and id.
+// Equals compares two brokers. Two brokers are considered equal if they have the same host, port, and id,
+// or if they are both nil.
 func (b *Broker) Equals(a *Broker) bool {
 	switch {
 	case a == nil && b == nil:
@@ -130,7 +129,7 @@ func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResp
 	var response *ProduceResponse
 	var err error
 
-	if request.ResponseCondition == NO_RESPONSE {
+	if request.RequiredAcks == NO_RESPONSE {
 		err = b.sendAndReceive(clientID, request, nil)
 	} else {
 		response = new(ProduceResponse)

@@ -36,7 +36,7 @@ func TestProduceRequest(t *testing.T) {
 	request := new(ProduceRequest)
 	testEncodable(t, "empty", request, produceRequestEmpty)
 
-	request.ResponseCondition = 0x123
+	request.RequiredAcks = 0x123
 	request.Timeout = 0x444
 	testEncodable(t, "header", request, produceRequestHeader)
 

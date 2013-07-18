@@ -38,7 +38,7 @@ func (msb *MessageBlock) decode(pd packetDecoder) (err error) {
 }
 
 type MessageSet struct {
-	PartialTrailingMessage bool
+	PartialTrailingMessage bool // whether the set on the wire contained an incomplete trailing MessageBlock
 	Messages               []*MessageBlock
 }
 
@@ -74,10 +74,4 @@ func (ms *MessageSet) addMessage(msg *Message) {
 	block := new(MessageBlock)
 	block.Msg = msg
 	ms.Messages = append(ms.Messages, block)
-}
-
-func newMessageSet() *MessageSet {
-	set := new(MessageSet)
-	set.Messages = make([]*MessageBlock, 0)
-	return set
 }

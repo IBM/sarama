@@ -74,7 +74,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		return err
 	}
 
-	request := &k.ProduceRequest{ResponseCondition: k.WAIT_FOR_LOCAL, Timeout: 0}
+	request := &k.ProduceRequest{RequiredAcks: k.WAIT_FOR_LOCAL, Timeout: 0}
 	request.AddMessage(p.topic, partition, &k.Message{Key: keyBytes, Value: valBytes})
 
 	response, err := broker.Produce(p.client.id, request)

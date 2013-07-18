@@ -1,8 +1,8 @@
 /*
 Package sarama provides client libraries for the Kafka 0.8 protocol.
 
-You probably want "sarama/kafka" which contains the high-level bindings.
+Package sarama is a dummy package, you almost certainly want sarama/kafka instead, which contains the high-level userspace API.
 
-Alternatively, "sarama/protocol" contains a lower-level API for more precise control.
+If not, sarama/protocol contains the low-level API that gives you exact control over what goes on the wire.
 */
 package sarama

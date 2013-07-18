@@ -5,7 +5,7 @@ import (
 	"fmt"
 )
 
-// The various errors that can be returned by the Kafka server.
+// KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
 
@@ -63,15 +63,14 @@ func (err KError) Error() string {
 	}
 }
 
-// Error returned when calling Connect() on a Broker that is already connected.
+// AlreadyConnected is the error returned when calling Connect() on a Broker that is already connected.
 var AlreadyConnected = errors.New("kafka: broker: already connected")
 
-// Error returned when trying to send or call Close() on a Broker that is not connected.
+// NotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
 var NotConnected = errors.New("kafka: broker: not connected")
 
-// Returned when there was an error encoding a Kafka packet. This can happen, for example,
-// if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do
-// not permit that.
+// EncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
+// if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
 type EncodingError string
 
 func (err EncodingError) Error() string {
@@ -87,8 +86,8 @@ func (err InsufficientData) Error() string {
 	return fmt.Sprintf("kafka: Insufficient data to decode packet, at least %d more bytes expected.", int(err))
 }
 
-// Returned when there was an error decoding the Kafka server's response. Usually means that you've
-// connected to the wrong address.
+// DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
+// This can be a bad CRC or length field, or any other invalid value.
 type DecodingError string
 
 func (err DecodingError) Error() string {
