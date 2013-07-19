@@ -19,5 +19,8 @@ specific type and return a Response of the appropriate type, for example:
 	// do things with response
 
 	broker.Close()
+
+The objects and properties in this package are mostly undocumented, as they line up exactly with the
+protocol fields documented by Kafka at https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
 */
 package protocol
