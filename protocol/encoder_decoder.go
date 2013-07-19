@@ -37,5 +37,14 @@ func decode(buf []byte, in decoder) error {
 	}
 
 	helper := realDecoder{raw: buf}
-	return in.decode(&helper)
+	err := in.decode(&helper)
+	if err != nil {
+		return err
+	}
+
+	if helper.off != len(buf) {
+		return DecodingError("unused data")
+	}
+
+	return nil
 }
