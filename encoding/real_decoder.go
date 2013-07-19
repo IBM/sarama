@@ -176,7 +176,7 @@ func (rd *realDecoder) Push(in PushDecoder) error {
 
 	reserve := in.ReserveLength()
 	if rd.Remaining() < reserve {
-		return DecodingError
+		return InsufficientData
 	}
 
 	rd.stack = append(rd.stack, in)
