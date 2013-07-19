@@ -1,6 +1,6 @@
 /*
 Package types provides access to the types and constants that the Kafka protocol uses,
-since they may be needed by all levels of the saramago stack.
+since they are needed by all levels of the saramago stack.
 */
 package types
 

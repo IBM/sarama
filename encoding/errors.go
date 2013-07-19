@@ -1,28 +1,16 @@
 package encoding
 
-import "fmt"
+import "errors"
 
 // EncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
-type EncodingError string
-
-func (err EncodingError) Error() string {
-	return "kafka: Could not encode packet. " + string(err)
-}
+var EncodingError = errors.New("kafka: Error while encoding packet.")
 
 // InsufficientData is returned when decoding and the packet is truncated. This can be expected
 // when requesting messages, since as an optimization the server is allowed to return a partial message at the end
 // of the message set.
-type InsufficientData int
-
-func (err InsufficientData) Error() string {
-	return fmt.Sprintf("kafka: Insufficient data to decode packet, at least %d more bytes expected.", int(err))
-}
+var InsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected.")
 
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
-type DecodingError string
-
-func (err DecodingError) Error() string {
-	return "kafka: Could not decode packet. " + string(err)
-}
+var DecodingError = errors.New("kafka: Error while decoding packet.")

@@ -19,7 +19,7 @@ func (rd *realDecoder) remaining() int {
 
 func (rd *realDecoder) getInt8() (int8, error) {
 	if rd.remaining() < 1 {
-		return -1, InsufficientData(1)
+		return -1, InsufficientData
 	}
 	tmp := int8(rd.raw[rd.off])
 	rd.off += 1
@@ -28,7 +28,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 
 func (rd *realDecoder) getInt16() (int16, error) {
 	if rd.remaining() < 2 {
-		return -1, InsufficientData(2 - rd.remaining())
+		return -1, InsufficientData
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
 	rd.off += 2
@@ -37,7 +37,7 @@ func (rd *realDecoder) getInt16() (int16, error) {
 
 func (rd *realDecoder) getInt32() (int32, error) {
 	if rd.remaining() < 4 {
-		return -1, InsufficientData(4 - rd.remaining())
+		return -1, InsufficientData
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
@@ -46,7 +46,7 @@ func (rd *realDecoder) getInt32() (int32, error) {
 
 func (rd *realDecoder) getInt64() (int64, error) {
 	if rd.remaining() < 8 {
-		return -1, InsufficientData(8 - rd.remaining())
+		return -1, InsufficientData
 	}
 	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
 	rd.off += 8
@@ -57,14 +57,14 @@ func (rd *realDecoder) getInt64() (int64, error) {
 
 func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	if rd.remaining() < 4 {
-		return nil, InsufficientData(4 - rd.remaining())
+		return nil, InsufficientData
 	}
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
 	var ret []int32 = nil
 	if rd.remaining() < 4*n {
-		return nil, InsufficientData(4*n - rd.remaining())
+		return nil, InsufficientData
 	} else if n > 0 {
 		ret = make([]int32, n)
 		for i := range ret {
@@ -77,14 +77,14 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 
 func (rd *realDecoder) getInt64Array() ([]int64, error) {
 	if rd.remaining() < 4 {
-		return nil, InsufficientData(4 - rd.remaining())
+		return nil, InsufficientData
 	}
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
 	var ret []int64 = nil
 	if rd.remaining() < 8*n {
-		return nil, InsufficientData(8*n - rd.remaining())
+		return nil, InsufficientData
 	} else if n > 0 {
 		ret = make([]int64, n)
 		for i := range ret {
@@ -97,14 +97,14 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 
 func (rd *realDecoder) getArrayCount() (int, error) {
 	if rd.remaining() < 4 {
-		return -1, InsufficientData(4 - rd.remaining())
+		return -1, InsufficientData
 	}
 	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 	if tmp > rd.remaining() {
-		return -1, InsufficientData(tmp - rd.remaining())
+		return -1, InsufficientData
 	} else if tmp > 2*math.MaxUint16 {
-		return -1, DecodingError("Array absurdly long in getArrayCount.")
+		return -1, DecodingError
 	}
 	return tmp, nil
 }
@@ -122,13 +122,13 @@ func (rd *realDecoder) getString() (string, error) {
 
 	switch {
 	case n < -1:
-		return "", DecodingError("Negative string length in getString.")
+		return "", DecodingError
 	case n == -1:
 		return "", nil
 	case n == 0:
 		return "", nil
 	case n > rd.remaining():
-		return "", InsufficientData(rd.remaining() - n)
+		return "", InsufficientData
 	default:
 		tmp := string(rd.raw[rd.off : rd.off+n])
 		rd.off += n
@@ -147,13 +147,13 @@ func (rd *realDecoder) getBytes() ([]byte, error) {
 
 	switch {
 	case n < -1:
-		return nil, DecodingError("Negative byte length in getBytes.")
+		return nil, DecodingError
 	case n == -1:
 		return nil, nil
 	case n == 0:
 		return make([]byte, 0), nil
 	case n > rd.remaining():
-		return nil, InsufficientData(rd.remaining() - n)
+		return nil, InsufficientData
 	default:
 		tmp := rd.raw[rd.off : rd.off+n]
 		rd.off += n
@@ -163,7 +163,7 @@ func (rd *realDecoder) getBytes() ([]byte, error) {
 
 func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
 	if length > rd.remaining() {
-		return nil, InsufficientData(length - rd.remaining())
+		return nil, InsufficientData
 	}
 
 	return &realDecoder{raw: rd.raw[rd.off : rd.off+length]}, nil
@@ -176,7 +176,7 @@ func (rd *realDecoder) push(in pushDecoder) error {
 
 	reserve := in.reserveLength()
 	if rd.remaining() < reserve {
-		return DecodingError("Insufficient data while reserving for push.")
+		return DecodingError
 	}
 
 	rd.stack = append(rd.stack, in)

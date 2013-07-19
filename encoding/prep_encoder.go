@@ -4,78 +4,66 @@ import "math"
 
 type prepEncoder struct {
 	length int
-	err    error
 }
 
 // primitives
 
-func (pe *prepEncoder) putInt8(in int8) {
+func (pe *prepEncoder) PutInt8(in int8) error {
 	pe.length += 1
+	return nil
 }
 
-func (pe *prepEncoder) putInt16(in int16) {
+func (pe *prepEncoder) PutInt16(in int16) error {
 	pe.length += 2
+	return nil
 }
 
-func (pe *prepEncoder) putInt32(in int32) {
+func (pe *prepEncoder) PutInt32(in int32) error {
 	pe.length += 4
+	return nil
 }
 
-func (pe *prepEncoder) putInt64(in int64) {
+func (pe *prepEncoder) PutInt64(in int64) error {
 	pe.length += 8
+	return nil
 }
 
 // arrays
 
-func (pe *prepEncoder) putInt32Array(in []int32) {
-	pe.length += 4
-	pe.length += 4 * len(in)
-}
-
-func (pe *prepEncoder) putArrayCount(in int) {
-	pe.length += 4
-}
-
-// misc
-
-func (pe *prepEncoder) putString(in string) {
-	pe.length += 2
-	if len(in) > math.MaxInt16 {
-		pe.err = EncodingError("String too long")
-	} else {
-		pe.length += len(in)
-	}
-}
-
-func (pe *prepEncoder) putBytes(in []byte) {
+func (pe *prepEncoder) PutBytes(in []byte) error {
 	pe.length += 4
 	if in == nil {
-		return
+		return nil
 	}
 	if len(in) > math.MaxInt32 {
-		pe.err = EncodingError("Bytes too long.")
-	} else {
-		pe.length += len(in)
+		return EncodingError
 	}
+	pe.length += len(in)
+	return nil
 }
 
-func (pe *prepEncoder) putRaw(in []byte) {
+func (pe *prepEncoder) PutString(in string) error {
+	pe.length += 2
+	if len(in) > math.MaxInt16 {
+		return EncodingError
+	}
 	pe.length += len(in)
+	return nil
+}
+
+func (pe *prepEncoder) PutInt32Array(in []int32) error {
+	pe.length += 4
+	pe.length += 4 * len(in)
+	return nil
 }
 
 // stackable
 
-func (pe *prepEncoder) push(in pushEncoder) {
-	pe.length += in.reserveLength()
+func (pe *prepEncoder) Push(in PushEncoder) error {
+	pe.length += in.ReserveLength()
+	return nil
 }
 
-func (pe *prepEncoder) pushLength32() {
-	pe.length += 4
-}
-
-func (pe *prepEncoder) pushCRC32() {
-	pe.length += 4
-}
-
-func (pe *prepEncoder) pop() {
+func (pe *prepEncoder) Pop() error {
+	return nil
 }

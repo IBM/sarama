@@ -38,7 +38,7 @@ func (c *crc32Decoder) check(curOffset int, buf []byte) error {
 	crc := crc32.ChecksumIEEE(buf[c.startOffset+4 : curOffset])
 
 	if crc != binary.BigEndian.Uint32(buf[c.startOffset:]) {
-		return DecodingError("CRC did not match.")
+		return DecodingError
 	}
 
 	return nil
