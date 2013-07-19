@@ -8,6 +8,8 @@ package kafka
 import k "sarama/protocol"
 
 import (
+	"sarama/encoding"
+	"sarama/types"
 	"sort"
 	"sync"
 	"time"
@@ -89,7 +91,7 @@ func (client *Client) leader(topic string, partition_id int32) (*k.Broker, error
 	}
 
 	if leader == nil {
-		return nil, k.UNKNOWN_TOPIC_OR_PARTITION
+		return nil, types.UNKNOWN_TOPIC_OR_PARTITION
 	}
 
 	return leader, nil
@@ -136,8 +138,8 @@ func (client *Client) refreshTopics(topics []string, retries int) error {
 	for broker := client.any(); broker != nil; broker = client.any() {
 		response, err := broker.GetMetadata(client.id, &k.MetadataRequest{Topics: topics})
 
-		switch err.(type) {
-		case nil:
+		switch {
+		case err == nil:
 			// valid response, use it
 			retry, err := client.update(response)
 			switch {
@@ -147,12 +149,12 @@ func (client *Client) refreshTopics(topics []string, retries int) error {
 				return nil
 			default:
 				if retries <= 0 {
-					return k.LEADER_NOT_AVAILABLE
+					return types.LEADER_NOT_AVAILABLE
 				}
 				time.Sleep(250 * time.Millisecond) // wait for leader election
 				return client.refreshTopics(retry, retries-1)
 			}
-		case k.EncodingError:
+		case err == encoding.EncodingError:
 			// didn't even send, return the error
 			return err
 		}
@@ -245,9 +247,9 @@ func (client *Client) update(data *k.MetadataResponse) ([]string, error) {
 
 	for _, topic := range data.Topics {
 		switch topic.Err {
-		case k.NO_ERROR:
+		case types.NO_ERROR:
 			break
-		case k.LEADER_NOT_AVAILABLE:
+		case types.LEADER_NOT_AVAILABLE:
 			toRetry[topic.Name] = true
 		default:
 			return nil, topic.Err
@@ -255,13 +257,13 @@ func (client *Client) update(data *k.MetadataResponse) ([]string, error) {
 		client.leaders[topic.Name] = make(map[int32]int32, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
 			switch partition.Err {
-			case k.LEADER_NOT_AVAILABLE:
+			case types.LEADER_NOT_AVAILABLE:
 				// in the LEADER_NOT_AVAILABLE case partition.Leader will be -1 because the
 				// partition is in the middle of leader election, so we fallthrough to save it
 				// anyways in order to avoid returning the stale leader (since -1 isn't a valid broker ID)
 				toRetry[topic.Name] = true
 				fallthrough
-			case k.NO_ERROR:
+			case types.NO_ERROR:
 				client.leaders[topic.Name][partition.Id] = partition.Leader
 			default:
 				return nil, partition.Err

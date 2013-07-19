@@ -1,6 +1,10 @@
 package kafka
 
 import k "sarama/protocol"
+import (
+	"sarama/encoding"
+	"sarama/types"
+)
 
 // Consumer processes Kafka messages from a given topic and partition.
 // You MUST call Close() on a consumer to avoid leaks, it will not be garbage-collected automatically when
@@ -95,15 +99,15 @@ func (c *Consumer) fetchMessages() {
 		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
 
 		response, err := c.broker.Fetch(c.client.id, request)
-		switch err.(type) {
-		case k.EncodingError:
+		switch {
+		case err == nil:
+			break
+		case err == encoding.EncodingError:
 			if c.sendError(err) {
 				continue
 			} else {
 				return
 			}
-		case nil:
-			break
 		default:
 			c.client.disconnectBroker(c.broker)
 			c.broker, err = c.client.leader(c.topic, c.partition)
@@ -124,9 +128,9 @@ func (c *Consumer) fetchMessages() {
 		}
 
 		switch block.Err {
-		case k.NO_ERROR:
+		case types.NO_ERROR:
 			break
-		case k.UNKNOWN_TOPIC_OR_PARTITION, k.NOT_LEADER_FOR_PARTITION, k.LEADER_NOT_AVAILABLE:
+		case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
 			err = c.client.refreshTopic(c.topic)
 			if c.sendError(err) {
 				continue
