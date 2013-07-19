@@ -181,7 +181,7 @@ func (rd *realDecoder) GetSubset(length int) (PacketDecoder, error) {
 
 	start := rd.off
 	rd.off += length
-	return &realDecoder{raw: rd.raw[start : rd.off]}, nil
+	return &realDecoder{raw: rd.raw[start:rd.off]}, nil
 }
 
 // stacks
