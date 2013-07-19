@@ -1,17 +1,17 @@
 package protocol
 
 type OffsetResponseBlock struct {
-	err     KError
-	offsets []int64
+	Err     KError
+	Offsets []int64
 }
 
 func (r *OffsetResponseBlock) decode(pd packetDecoder) (err error) {
-	r.err, err = pd.getError()
+	r.Err, err = pd.getError()
 	if err != nil {
 		return err
 	}
 
-	r.offsets, err = pd.getInt64Array()
+	r.Offsets, err = pd.getInt64Array()
 
 	return err
 }
