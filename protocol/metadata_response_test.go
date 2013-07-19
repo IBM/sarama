@@ -106,7 +106,7 @@ func TestMetadataResponseWithTopics(t *testing.T) {
 				t.Error("Decoding produced invalid topic 0 partition 0 leader.")
 			}
 			if len(response.Topics[0].Partitions[0].Replicas) == 3 {
-				for i:=0; i<3; i++ {
+				for i := 0; i < 3; i++ {
 					if response.Topics[0].Partitions[0].Replicas[i] != int32(i+1) {
 						t.Error("Decoding produced invalid topic 0 partition 0 replica", i)
 					}
