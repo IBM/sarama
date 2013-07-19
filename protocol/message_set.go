@@ -63,10 +63,10 @@ func (ms *MessageSet) Decode(pd enc.PacketDecoder) (err error) {
 	for pd.Remaining() > 0 {
 		msb := new(MessageBlock)
 		err = msb.Decode(pd)
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			ms.Messages = append(ms.Messages, msb)
-		case err == enc.InsufficientData:
+		case enc.InsufficientData:
 			// As an optimization the server is allowed to return a partial message at the
 			// end of the message set. Clients should handle this case. So we just ignore such things.
 			ms.PartialTrailingMessage = true
