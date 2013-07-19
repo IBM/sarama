@@ -1,17 +1,19 @@
 package protocol
 
 import enc "sarama/encoding"
+import "sarama/types"
 
 type OffsetResponseBlock struct {
-	Err     KError
+	Err     types.KError
 	Offsets []int64
 }
 
 func (r *OffsetResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
-	r.Err, err = pd.GetError()
+	tmp, err := pd.GetInt16()
 	if err != nil {
 		return err
 	}
+	r.Err = types.KError(tmp)
 
 	r.Offsets, err = pd.GetInt64Array()
 

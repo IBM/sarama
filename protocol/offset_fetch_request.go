@@ -23,6 +23,7 @@ func (r *OffsetFetchRequest) Encode(pe enc.PacketEncoder) error {
 		}
 		pe.PutInt32Array(partitions)
 	}
+	return nil
 }
 
 func (r *OffsetFetchRequest) key() int16 {

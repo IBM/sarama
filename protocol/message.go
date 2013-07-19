@@ -24,7 +24,7 @@ func (m *Message) Encode(pe enc.PacketEncoder) error {
 	pe.PutInt8(message_format)
 
 	var attributes int8 = 0
-	attributes |= m.Codec & 0x07
+	attributes |= int8(m.Codec) & 0x07
 	pe.PutInt8(attributes)
 
 	err := pe.PutBytes(m.Key)
@@ -56,7 +56,7 @@ func (m *Message) Encode(pe enc.PacketEncoder) error {
 }
 
 func (m *Message) Decode(pd enc.PacketDecoder) (err error) {
-	err = pd.Push(&CRC32Field{})
+	err = pd.Push(&enc.CRC32Field{})
 	if err != nil {
 		return err
 	}
@@ -73,7 +73,7 @@ func (m *Message) Decode(pd enc.PacketDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	m.Codec = attribute & 0x07
+	m.Codec = types.CompressionCodec(attribute & 0x07)
 
 	m.Key, err = pd.GetBytes()
 	if err != nil {

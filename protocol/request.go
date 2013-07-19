@@ -14,8 +14,8 @@ type request struct {
 	body           requestEncoder
 }
 
-func (r *request) Encode(pe enc.PacketEncoder) error {
-	pe.Push(&LengthField{})
+func (r *request) Encode(pe enc.PacketEncoder) (err error) {
+	pe.Push(&enc.LengthField{})
 	pe.PutInt16(r.body.key())
 	pe.PutInt16(r.body.version())
 	pe.PutInt32(r.correlation_id)

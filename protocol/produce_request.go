@@ -10,7 +10,7 @@ type ProduceRequest struct {
 }
 
 func (p *ProduceRequest) Encode(pe enc.PacketEncoder) error {
-	pe.PutInt16(p.RequiredAcks)
+	pe.PutInt16(int16(p.RequiredAcks))
 	pe.PutInt32(p.Timeout)
 	err := pe.PutArrayLength(len(p.msgSets))
 	if err != nil {
@@ -27,7 +27,7 @@ func (p *ProduceRequest) Encode(pe enc.PacketEncoder) error {
 		}
 		for id, msgSet := range partitions {
 			pe.PutInt32(id)
-			pe.PushLength32()
+			pe.Push(&enc.LengthField{})
 			err = msgSet.Encode(pe)
 			if err != nil {
 				return err
@@ -38,6 +38,7 @@ func (p *ProduceRequest) Encode(pe enc.PacketEncoder) error {
 			}
 		}
 	}
+	return nil
 }
 
 func (p *ProduceRequest) key() int16 {

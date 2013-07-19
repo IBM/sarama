@@ -14,7 +14,7 @@ func (msb *MessageBlock) Encode(pe enc.PacketEncoder) error {
 	if err != nil {
 		return err
 	}
-	pe.Pop()
+	return pe.Pop()
 }
 
 func (msb *MessageBlock) Decode(pd enc.PacketDecoder) (err error) {
@@ -23,7 +23,7 @@ func (msb *MessageBlock) Decode(pd enc.PacketDecoder) (err error) {
 		return err
 	}
 
-	err = pd.Push(&enc.LengthField{})
+	pd.Push(&enc.LengthField{})
 	if err != nil {
 		return err
 	}
@@ -54,6 +54,7 @@ func (ms *MessageSet) Encode(pe enc.PacketEncoder) error {
 			return err
 		}
 	}
+	return nil
 }
 
 func (ms *MessageSet) Decode(pd enc.PacketDecoder) (err error) {
@@ -62,10 +63,10 @@ func (ms *MessageSet) Decode(pd enc.PacketDecoder) (err error) {
 	for pd.Remaining() > 0 {
 		msb := new(MessageBlock)
 		err = msb.Decode(pd)
-		switch err.(type) {
-		case nil:
+		switch {
+		case err == nil:
 			ms.Messages = append(ms.Messages, msb)
-		case enc.InsufficientData:
+		case err == enc.InsufficientData:
 			// As an optimization the server is allowed to return a partial message at the
 			// end of the message set. Clients should handle this case. So we just ignore such things.
 			ms.PartialTrailingMessage = true

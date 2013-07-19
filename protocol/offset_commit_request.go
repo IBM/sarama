@@ -43,6 +43,7 @@ func (r *OffsetCommitRequest) Encode(pe enc.PacketEncoder) error {
 			}
 		}
 	}
+	return nil
 }
 
 func (r *OffsetCommitRequest) key() int16 {

@@ -1,17 +1,19 @@
 package protocol
 
 import enc "sarama/encoding"
+import "sarama/types"
 
 type ProduceResponseBlock struct {
-	Err    KError
+	Err    types.KError
 	Offset int64
 }
 
 func (pr *ProduceResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
-	pr.Err, err = pd.GetError()
+	tmp, err := pd.GetInt16()
 	if err != nil {
 		return err
 	}
+	pr.Err = types.KError(tmp)
 
 	pr.Offset, err = pd.GetInt64()
 	if err != nil {

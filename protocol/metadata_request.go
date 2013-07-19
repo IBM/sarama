@@ -18,6 +18,7 @@ func (mr *MetadataRequest) Encode(pe enc.PacketEncoder) error {
 			return err
 		}
 	}
+	return nil
 }
 
 func (mr *MetadataRequest) key() int16 {

@@ -1,20 +1,22 @@
 package protocol
 
 import enc "sarama/encoding"
+import "sarama/types"
 
 type PartitionMetadata struct {
-	Err      KError
+	Err      types.KError
 	Id       int32
 	Leader   int32
 	Replicas []int32
 	Isr      []int32
 }
 
-func (pm *PartitionMetadata) decode(pd enc.PacketDecoder) (err error) {
-	pm.Err, err = pd.GetError()
+func (pm *PartitionMetadata) Decode(pd enc.PacketDecoder) (err error) {
+	tmp, err := pd.GetInt16()
 	if err != nil {
 		return err
 	}
+	pm.Err = types.KError(tmp)
 
 	pm.Id, err = pd.GetInt32()
 	if err != nil {
@@ -40,16 +42,17 @@ func (pm *PartitionMetadata) decode(pd enc.PacketDecoder) (err error) {
 }
 
 type TopicMetadata struct {
-	Err        KError
+	Err        types.KError
 	Name       string
 	Partitions []*PartitionMetadata
 }
 
 func (tm *TopicMetadata) Decode(pd enc.PacketDecoder) (err error) {
-	tm.Err, err = pd.GetError()
+	tmp, err := pd.GetInt16()
 	if err != nil {
 		return err
 	}
+	tm.Err = types.KError(tmp)
 
 	tm.Name, err = pd.GetString()
 	if err != nil {

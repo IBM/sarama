@@ -14,7 +14,7 @@ func (r *responseHeader) Decode(pd enc.PacketDecoder) (err error) {
 		return err
 	}
 	if r.length <= 4 || r.length > 2*math.MaxUint16 {
-		return enc.DecodingError("Malformed length field.")
+		return enc.DecodingError
 	}
 
 	r.correlation_id, err = pd.GetInt32()

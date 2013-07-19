@@ -8,8 +8,8 @@ type offsetRequestBlock struct {
 }
 
 func (r *offsetRequestBlock) Encode(pe enc.PacketEncoder) error {
-	pe.putInt64(r.time)
-	pe.putInt32(r.maxOffsets)
+	pe.PutInt64(r.time)
+	pe.PutInt32(r.maxOffsets)
 	return nil
 }
 
@@ -40,6 +40,7 @@ func (r *OffsetRequest) Encode(pe enc.PacketEncoder) error {
 			}
 		}
 	}
+	return nil
 }
 
 func (r *OffsetRequest) key() int16 {

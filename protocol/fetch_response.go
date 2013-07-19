@@ -1,18 +1,20 @@
 package protocol
 
 import enc "sarama/encoding"
+import "sarama/types"
 
 type FetchResponseBlock struct {
-	Err                 KError
+	Err                 types.KError
 	HighWaterMarkOffset int64
 	MsgSet              MessageSet
 }
 
 func (pr *FetchResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
-	pr.Err, err = pd.GetError()
+	tmp, err := pd.GetInt16()
 	if err != nil {
 		return err
 	}
+	pr.Err = types.KError(tmp)
 
 	pr.HighWaterMarkOffset, err = pd.GetInt64()
 	if err != nil {
@@ -64,7 +66,7 @@ func (fr *FetchResponse) Decode(pd enc.PacketDecoder) (err error) {
 			}
 
 			block := new(FetchResponseBlock)
-			err = block.decode(pd)
+			err = block.Decode(pd)
 			if err != nil {
 				return err
 			}

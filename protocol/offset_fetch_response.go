@@ -1,11 +1,12 @@
 package protocol
 
 import enc "sarama/encoding"
+import "sarama/types"
 
 type OffsetFetchResponseBlock struct {
 	Offset   int64
 	Metadata string
-	Err      KError
+	Err      types.KError
 }
 
 func (r *OffsetFetchResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
@@ -19,9 +20,13 @@ func (r *OffsetFetchResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
 		return err
 	}
 
-	r.Err, err = pd.GetError()
+	tmp, err := pd.GetInt16()
+	if err != nil {
+		return err
+	}
+	r.Err = types.KError(tmp)
 
-	return err
+	return nil
 }
 
 type OffsetFetchResponse struct {
