@@ -1,17 +1,19 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type ProduceResponseBlock struct {
 	Err    KError
 	Offset int64
 }
 
-func (pr *ProduceResponseBlock) decode(pd packetDecoder) (err error) {
-	pr.Err, err = pd.getError()
+func (pr *ProduceResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
+	pr.Err, err = pd.GetError()
 	if err != nil {
 		return err
 	}
 
-	pr.Offset, err = pd.getInt64()
+	pr.Offset, err = pd.GetInt64()
 	if err != nil {
 		return err
 	}
@@ -23,20 +25,20 @@ type ProduceResponse struct {
 	Blocks map[string]map[int32]*ProduceResponseBlock
 }
 
-func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
-	numTopics, err := pd.getArrayCount()
+func (pr *ProduceResponse) Decode(pd enc.PacketDecoder) (err error) {
+	numTopics, err := pd.GetArrayLength()
 	if err != nil {
 		return err
 	}
 
 	pr.Blocks = make(map[string]map[int32]*ProduceResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
-		name, err := pd.getString()
+		name, err := pd.GetString()
 		if err != nil {
 			return err
 		}
 
-		numBlocks, err := pd.getArrayCount()
+		numBlocks, err := pd.GetArrayLength()
 		if err != nil {
 			return err
 		}
@@ -44,13 +46,13 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 		pr.Blocks[name] = make(map[int32]*ProduceResponseBlock, numBlocks)
 
 		for j := 0; j < numBlocks; j++ {
-			id, err := pd.getInt32()
+			id, err := pd.GetInt32()
 			if err != nil {
 				return err
 			}
 
 			block := new(ProduceResponseBlock)
-			err = block.decode(pd)
+			err = block.Decode(pd)
 			if err != nil {
 				return err
 			}

@@ -5,10 +5,11 @@ package encoding
 // not about how a string is represented in Kafka.
 type PacketEncoder interface {
 	// Primitives
-	PutInt8(in int8) error
-	PutInt16(in int16) error
-	PutInt32(in int32) error
-	PutInt64(in int64) error
+	PutInt8(in int8)
+	PutInt16(in int16)
+	PutInt32(in int32)
+	PutInt64(in int64)
+	PutArrayLength(in int) error
 
 	// Collections
 	PutBytes(in []byte) error
@@ -16,7 +17,7 @@ type PacketEncoder interface {
 	PutInt32Array(in []int32) error
 
 	// Stacks, see PushEncoder
-	Push(in PushEncoder) error
+	Push(in PushEncoder)
 	Pop() error
 }
 

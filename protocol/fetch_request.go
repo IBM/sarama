@@ -1,13 +1,16 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type fetchRequestBlock struct {
 	fetchOffset int64
 	maxBytes    int32
 }
 
-func (f *fetchRequestBlock) encode(pe packetEncoder) {
-	pe.putInt64(f.fetchOffset)
-	pe.putInt32(f.maxBytes)
+func (f *fetchRequestBlock) Encode(pe enc.PacketEncoder) error {
+	pe.PutInt64(f.fetchOffset)
+	pe.PutInt32(f.maxBytes)
+	return nil
 }
 
 type FetchRequest struct {
@@ -16,19 +19,32 @@ type FetchRequest struct {
 	blocks      map[string]map[int32]*fetchRequestBlock
 }
 
-func (f *FetchRequest) encode(pe packetEncoder) {
-	pe.putInt32(-1) // replica ID is always -1 for clients
-	pe.putInt32(f.MaxWaitTime)
-	pe.putInt32(f.MinBytes)
-	pe.putArrayCount(len(f.blocks))
+func (f *FetchRequest) Encode(pe enc.PacketEncoder) (err error) {
+	pe.PutInt32(-1) // replica ID is always -1 for clients
+	pe.PutInt32(f.MaxWaitTime)
+	pe.PutInt32(f.MinBytes)
+	err = pe.PutArrayLength(len(f.blocks))
+	if err != nil {
+		return err
+	}
 	for topic, blocks := range f.blocks {
-		pe.putString(topic)
-		pe.putArrayCount(len(blocks))
+		err = pe.PutString(topic)
+		if err != nil {
+			return err
+		}
+		err = pe.PutArrayLength(len(blocks))
+		if err != nil {
+			return err
+		}
 		for partition, block := range blocks {
-			pe.putInt32(partition)
-			block.encode(pe)
+			pe.PutInt32(partition)
+			err = block.Encode(pe)
+			if err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 func (f *FetchRequest) key() int16 {

@@ -1,16 +1,27 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type OffsetFetchRequest struct {
 	ConsumerGroup string
 	partitions    map[string][]int32
 }
 
-func (r *OffsetFetchRequest) encode(pe packetEncoder) {
-	pe.putString(r.ConsumerGroup)
-	pe.putArrayCount(len(r.partitions))
+func (r *OffsetFetchRequest) Encode(pe enc.PacketEncoder) error {
+	err := pe.PutString(r.ConsumerGroup)
+	if err != nil {
+		return err
+	}
+	err = pe.PutArrayLength(len(r.partitions))
+	if err != nil {
+		return err
+	}
 	for topic, partitions := range r.partitions {
-		pe.putString(topic)
-		pe.putInt32Array(partitions)
+		err = pe.PutString(topic)
+		if err != nil {
+			return err
+		}
+		pe.PutInt32Array(partitions)
 	}
 }
 

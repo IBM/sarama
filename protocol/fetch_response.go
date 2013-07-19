@@ -1,32 +1,34 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type FetchResponseBlock struct {
 	Err                 KError
 	HighWaterMarkOffset int64
 	MsgSet              MessageSet
 }
 
-func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
-	pr.Err, err = pd.getError()
+func (pr *FetchResponseBlock) Decode(pd enc.PacketDecoder) (err error) {
+	pr.Err, err = pd.GetError()
 	if err != nil {
 		return err
 	}
 
-	pr.HighWaterMarkOffset, err = pd.getInt64()
+	pr.HighWaterMarkOffset, err = pd.GetInt64()
 	if err != nil {
 		return err
 	}
 
-	msgSetSize, err := pd.getInt32()
+	msgSetSize, err := pd.GetInt32()
 	if err != nil {
 		return err
 	}
 
-	msgSetDecoder, err := pd.getSubset(int(msgSetSize))
+	msgSetDecoder, err := pd.GetSubset(int(msgSetSize))
 	if err != nil {
 		return err
 	}
-	err = (&pr.MsgSet).decode(msgSetDecoder)
+	err = (&pr.MsgSet).Decode(msgSetDecoder)
 
 	return err
 }
@@ -35,20 +37,20 @@ type FetchResponse struct {
 	Blocks map[string]map[int32]*FetchResponseBlock
 }
 
-func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
-	numTopics, err := pd.getArrayCount()
+func (fr *FetchResponse) Decode(pd enc.PacketDecoder) (err error) {
+	numTopics, err := pd.GetArrayLength()
 	if err != nil {
 		return err
 	}
 
 	fr.Blocks = make(map[string]map[int32]*FetchResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
-		name, err := pd.getString()
+		name, err := pd.GetString()
 		if err != nil {
 			return err
 		}
 
-		numBlocks, err := pd.getArrayCount()
+		numBlocks, err := pd.GetArrayLength()
 		if err != nil {
 			return err
 		}
@@ -56,7 +58,7 @@ func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
 		fr.Blocks[name] = make(map[int32]*FetchResponseBlock, numBlocks)
 
 		for j := 0; j < numBlocks; j++ {
-			id, err := pd.getInt32()
+			id, err := pd.GetInt32()
 			if err != nil {
 				return err
 			}

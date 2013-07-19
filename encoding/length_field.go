@@ -15,8 +15,9 @@ func (l *LengthField) ReserveLength() int {
 	return 4
 }
 
-func (l *LengthField) Run(curOffset int, buf []byte) {
+func (l *LengthField) Run(curOffset int, buf []byte) error {
 	binary.BigEndian.PutUint32(buf[l.startOffset:], uint32(curOffset-l.startOffset-4))
+	return nil
 }
 
 func (l *LengthField) Check(curOffset int, buf []byte) error {

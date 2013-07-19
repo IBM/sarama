@@ -1,13 +1,22 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type MetadataRequest struct {
 	Topics []string
 }
 
-func (mr *MetadataRequest) encode(pe packetEncoder) {
-	pe.putArrayCount(len(mr.Topics))
+func (mr *MetadataRequest) Encode(pe enc.PacketEncoder) error {
+	err := pe.PutArrayLength(len(mr.Topics))
+	if err != nil {
+		return err
+	}
+
 	for i := range mr.Topics {
-		pe.putString(mr.Topics[i])
+		err = pe.PutString(mr.Topics[i])
+		if err != nil {
+			return err
+		}
 	}
 }
 

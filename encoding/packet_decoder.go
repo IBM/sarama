@@ -16,6 +16,9 @@ type PacketDecoder interface {
 	GetString() (string, error)
 	GetInt32Array() ([]int32, error)
 	GetInt64Array() ([]int64, error)
+
+	// Subsets
+	Remaining() int
 	GetSubset(length int) (PacketDecoder, error)
 
 	// Stacks, see PushDecoder

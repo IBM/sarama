@@ -1,28 +1,43 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type offsetRequestBlock struct {
 	time       int64
 	maxOffsets int32
 }
 
-func (r *offsetRequestBlock) encode(pe packetEncoder) {
+func (r *offsetRequestBlock) Encode(pe enc.PacketEncoder) error {
 	pe.putInt64(r.time)
 	pe.putInt32(r.maxOffsets)
+	return nil
 }
 
 type OffsetRequest struct {
 	blocks map[string]map[int32]*offsetRequestBlock
 }
 
-func (r *OffsetRequest) encode(pe packetEncoder) {
-	pe.putInt32(-1) // replica ID is always -1 for clients
-	pe.putArrayCount(len(r.blocks))
+func (r *OffsetRequest) Encode(pe enc.PacketEncoder) error {
+	pe.PutInt32(-1) // replica ID is always -1 for clients
+	err := pe.PutArrayLength(len(r.blocks))
+	if err != nil {
+		return err
+	}
 	for topic, partitions := range r.blocks {
-		pe.putString(topic)
-		pe.putArrayCount(len(partitions))
+		err = pe.PutString(topic)
+		if err != nil {
+			return err
+		}
+		err = pe.PutArrayLength(len(partitions))
+		if err != nil {
+			return err
+		}
 		for partition, block := range partitions {
-			pe.putInt32(partition)
-			block.encode(pe)
+			pe.PutInt32(partition)
+			err = block.Encode(pe)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

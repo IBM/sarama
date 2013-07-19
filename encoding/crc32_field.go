@@ -18,9 +18,10 @@ func (c *CRC32Field) ReserveLength() int {
 	return 4
 }
 
-func (c *CRC32Field) Run(curOffset int, buf []byte) {
+func (c *CRC32Field) Run(curOffset int, buf []byte) error {
 	crc := crc32.ChecksumIEEE(buf[c.startOffset+4 : curOffset])
 	binary.BigEndian.PutUint32(buf[c.startOffset:], crc)
+	return nil
 }
 
 func (c *CRC32Field) Check(curOffset int, buf []byte) error {

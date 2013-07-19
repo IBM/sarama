@@ -1,35 +1,40 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type MessageBlock struct {
 	Offset int64
 	Msg    *Message
 }
 
-func (msb *MessageBlock) encode(pe packetEncoder) {
-	pe.putInt64(msb.Offset)
-	pe.pushLength32()
-	msb.Msg.encode(pe)
-	pe.pop()
+func (msb *MessageBlock) Encode(pe enc.PacketEncoder) error {
+	pe.PutInt64(msb.Offset)
+	pe.Push(&enc.LengthField{})
+	err := msb.Msg.Encode(pe)
+	if err != nil {
+		return err
+	}
+	pe.Pop()
 }
 
-func (msb *MessageBlock) decode(pd packetDecoder) (err error) {
-	msb.Offset, err = pd.getInt64()
+func (msb *MessageBlock) Decode(pd enc.PacketDecoder) (err error) {
+	msb.Offset, err = pd.GetInt64()
 	if err != nil {
 		return err
 	}
 
-	err = pd.pushLength32()
+	err = pd.Push(&enc.LengthField{})
 	if err != nil {
 		return err
 	}
 
 	msb.Msg = new(Message)
-	err = msb.Msg.decode(pd)
+	err = msb.Msg.Decode(pd)
 	if err != nil {
 		return err
 	}
 
-	err = pd.pop()
+	err = pd.Pop()
 	if err != nil {
 		return err
 	}
@@ -42,22 +47,25 @@ type MessageSet struct {
 	Messages               []*MessageBlock
 }
 
-func (ms *MessageSet) encode(pe packetEncoder) {
+func (ms *MessageSet) Encode(pe enc.PacketEncoder) error {
 	for i := range ms.Messages {
-		ms.Messages[i].encode(pe)
+		err := ms.Messages[i].Encode(pe)
+		if err != nil {
+			return err
+		}
 	}
 }
 
-func (ms *MessageSet) decode(pd packetDecoder) (err error) {
+func (ms *MessageSet) Decode(pd enc.PacketDecoder) (err error) {
 	ms.Messages = nil
 
-	for pd.remaining() > 0 {
+	for pd.Remaining() > 0 {
 		msb := new(MessageBlock)
-		err = msb.decode(pd)
+		err = msb.Decode(pd)
 		switch err.(type) {
 		case nil:
 			ms.Messages = append(ms.Messages, msb)
-		case InsufficientData:
+		case enc.InsufficientData:
 			// As an optimization the server is allowed to return a partial message at the
 			// end of the message set. Clients should handle this case. So we just ignore such things.
 			ms.PartialTrailingMessage = true

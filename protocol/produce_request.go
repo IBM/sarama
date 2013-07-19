@@ -1,23 +1,41 @@
 package protocol
 
+import enc "sarama/encoding"
+import "sarama/types"
+
 type ProduceRequest struct {
-	RequiredAcks int16
+	RequiredAcks types.RequiredAcks
 	Timeout      int32
 	msgSets      map[string]map[int32]*MessageSet
 }
 
-func (p *ProduceRequest) encode(pe packetEncoder) {
-	pe.putInt16(p.RequiredAcks)
-	pe.putInt32(p.Timeout)
-	pe.putArrayCount(len(p.msgSets))
+func (p *ProduceRequest) Encode(pe enc.PacketEncoder) error {
+	pe.PutInt16(p.RequiredAcks)
+	pe.PutInt32(p.Timeout)
+	err := pe.PutArrayLength(len(p.msgSets))
+	if err != nil {
+		return err
+	}
 	for topic, partitions := range p.msgSets {
-		pe.putString(topic)
-		pe.putArrayCount(len(partitions))
+		err = pe.PutString(topic)
+		if err != nil {
+			return err
+		}
+		err = pe.PutArrayLength(len(partitions))
+		if err != nil {
+			return err
+		}
 		for id, msgSet := range partitions {
-			pe.putInt32(id)
-			pe.pushLength32()
-			msgSet.encode(pe)
-			pe.pop()
+			pe.PutInt32(id)
+			pe.PushLength32()
+			err = msgSet.Encode(pe)
+			if err != nil {
+				return err
+			}
+			err = pe.Pop()
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

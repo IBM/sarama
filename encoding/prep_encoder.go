@@ -8,23 +8,27 @@ type prepEncoder struct {
 
 // primitives
 
-func (pe *prepEncoder) PutInt8(in int8) error {
+func (pe *prepEncoder) PutInt8(in int8) {
 	pe.length += 1
-	return nil
 }
 
-func (pe *prepEncoder) PutInt16(in int16) error {
+func (pe *prepEncoder) PutInt16(in int16) {
 	pe.length += 2
-	return nil
 }
 
-func (pe *prepEncoder) PutInt32(in int32) error {
+func (pe *prepEncoder) PutInt32(in int32) {
 	pe.length += 4
-	return nil
 }
 
-func (pe *prepEncoder) PutInt64(in int64) error {
+func (pe *prepEncoder) PutInt64(in int64) {
 	pe.length += 8
+}
+
+func (pe *prepEncoder) PutArrayLength(in int) error {
+	if in > math.MaxInt32 {
+		return EncodingError
+	}
+	pe.length += 4
 	return nil
 }
 
@@ -52,16 +56,18 @@ func (pe *prepEncoder) PutString(in string) error {
 }
 
 func (pe *prepEncoder) PutInt32Array(in []int32) error {
-	pe.length += 4
+	err := pe.PutArrayLength(len(in))
+	if err != nil {
+		return err
+	}
 	pe.length += 4 * len(in)
 	return nil
 }
 
 // stackable
 
-func (pe *prepEncoder) Push(in PushEncoder) error {
+func (pe *prepEncoder) Push(in PushEncoder) {
 	pe.length += in.ReserveLength()
-	return nil
 }
 
 func (pe *prepEncoder) Pop() error {

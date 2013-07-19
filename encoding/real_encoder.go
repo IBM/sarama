@@ -10,27 +10,28 @@ type realEncoder struct {
 
 // primitives
 
-func (re *realEncoder) PutInt8(in int8) error {
+func (re *realEncoder) PutInt8(in int8) {
 	re.raw[re.off] = byte(in)
 	re.off += 1
-	return nil
 }
 
-func (re *realEncoder) PutInt16(in int16) error {
+func (re *realEncoder) PutInt16(in int16) {
 	binary.BigEndian.PutUint16(re.raw[re.off:], uint16(in))
 	re.off += 2
-	return nil
 }
 
-func (re *realEncoder) PutInt32(in int32) error {
+func (re *realEncoder) PutInt32(in int32) {
 	binary.BigEndian.PutUint32(re.raw[re.off:], uint32(in))
 	re.off += 4
-	return nil
 }
 
-func (re *realEncoder) PutInt64(in int64) error {
+func (re *realEncoder) PutInt64(in int64) {
 	binary.BigEndian.PutUint64(re.raw[re.off:], uint64(in))
 	re.off += 8
+}
+
+func (re *realEncoder) PutArrayLength(in int) error {
+	re.PutInt32(int32(in))
 	return nil
 }
 
@@ -55,7 +56,7 @@ func (re *realEncoder) PutString(in string) error {
 }
 
 func (re *realEncoder) PutInt32Array(in []int32) error {
-	re.PutInt32(int32(len(in)))
+	re.PutArrayLength(len(in))
 	for _, val := range in {
 		re.PutInt32(val)
 	}
@@ -64,11 +65,10 @@ func (re *realEncoder) PutInt32Array(in []int32) error {
 
 // stacks
 
-func (re *realEncoder) Push(in PushEncoder) error {
+func (re *realEncoder) Push(in PushEncoder) {
 	in.SaveOffset(re.off)
 	re.off += in.ReserveLength()
 	re.stack = append(re.stack, in)
-	return nil
 }
 
 func (re *realEncoder) Pop() error {

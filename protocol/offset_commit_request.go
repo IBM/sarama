@@ -1,13 +1,15 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type offsetCommitRequestBlock struct {
 	offset   int64
 	metadata string
 }
 
-func (r *offsetCommitRequestBlock) encode(pe packetEncoder) {
-	pe.putInt64(r.offset)
-	pe.putString(r.metadata)
+func (r *offsetCommitRequestBlock) Encode(pe enc.PacketEncoder) error {
+	pe.PutInt64(r.offset)
+	return pe.PutString(r.metadata)
 }
 
 type OffsetCommitRequest struct {
@@ -15,15 +17,30 @@ type OffsetCommitRequest struct {
 	blocks        map[string]map[int32]*offsetCommitRequestBlock
 }
 
-func (r *OffsetCommitRequest) encode(pe packetEncoder) {
-	pe.putString(r.ConsumerGroup)
-	pe.putArrayCount(len(r.blocks))
+func (r *OffsetCommitRequest) Encode(pe enc.PacketEncoder) error {
+	err := pe.PutString(r.ConsumerGroup)
+	if err != nil {
+		return err
+	}
+	err = pe.PutArrayLength(len(r.blocks))
+	if err != nil {
+		return err
+	}
 	for topic, partitions := range r.blocks {
-		pe.putString(topic)
-		pe.putArrayCount(len(partitions))
+		err = pe.PutString(topic)
+		if err != nil {
+			return err
+		}
+		err = pe.PutArrayLength(len(partitions))
+		if err != nil {
+			return err
+		}
 		for partition, block := range partitions {
-			pe.putInt32(partition)
-			block.encode(pe)
+			pe.PutInt32(partition)
+			err = block.Encode(pe)
+			if err != nil {
+				return err
+			}
 		}
 	}
 }

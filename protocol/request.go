@@ -1,7 +1,9 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type requestEncoder interface {
-	encoder
+	enc.Encoder
 	key() int16
 	version() int16
 }
@@ -12,12 +14,18 @@ type request struct {
 	body           requestEncoder
 }
 
-func (r *request) encode(pe packetEncoder) {
-	pe.pushLength32()
-	pe.putInt16(r.body.key())
-	pe.putInt16(r.body.version())
-	pe.putInt32(r.correlation_id)
-	pe.putString(r.id)
-	r.body.encode(pe)
-	pe.pop()
+func (r *request) Encode(pe enc.PacketEncoder) error {
+	pe.Push(&LengthField{})
+	pe.PutInt16(r.body.key())
+	pe.PutInt16(r.body.version())
+	pe.PutInt32(r.correlation_id)
+	err = pe.PutString(r.id)
+	if err != nil {
+		return err
+	}
+	err = r.body.Encode(pe)
+	if err != nil {
+		return err
+	}
+	return pe.Pop()
 }

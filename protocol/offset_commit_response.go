@@ -1,29 +1,31 @@
 package protocol
 
+import enc "sarama/encoding"
+
 type OffsetCommitResponse struct {
 	ClientID string
 	Errors   map[string]map[int32]KError
 }
 
-func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {
-	r.ClientID, err = pd.getString()
+func (r *OffsetCommitResponse) Decode(pd enc.PacketDecoder) (err error) {
+	r.ClientID, err = pd.GetString()
 	if err != nil {
 		return err
 	}
 
-	numTopics, err := pd.getArrayCount()
+	numTopics, err := pd.GetArrayLength()
 	if err != nil {
 		return err
 	}
 
 	r.Errors = make(map[string]map[int32]KError, numTopics)
 	for i := 0; i < numTopics; i++ {
-		name, err := pd.getString()
+		name, err := pd.GetString()
 		if err != nil {
 			return err
 		}
 
-		numErrors, err := pd.getArrayCount()
+		numErrors, err := pd.GetArrayLength()
 		if err != nil {
 			return err
 		}
@@ -31,12 +33,12 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {
 		r.Errors[name] = make(map[int32]KError, numErrors)
 
 		for j := 0; j < numErrors; j++ {
-			id, err := pd.getInt32()
+			id, err := pd.GetInt32()
 			if err != nil {
 				return err
 			}
 
-			tmp, err := pd.getError()
+			tmp, err := pd.GetError()
 			if err != nil {
 				return err
 			}

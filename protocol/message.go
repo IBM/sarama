@@ -1,5 +1,6 @@
 package protocol
 
+import enc "sarama/encoding"
 import (
 	"bytes"
 	"compress/gzip"
@@ -13,26 +14,29 @@ const message_format int8 = 0
 
 type Message struct {
 	Codec types.CompressionCodec // codec used to compress the message contents
-	Key   []byte           // the message key, may be nil
-	Value []byte           // the message contents
+	Key   []byte                 // the message key, may be nil
+	Value []byte                 // the message contents
 }
 
-func (m *Message) encode(pe packetEncoder) {
-	pe.pushCRC32()
+func (m *Message) Encode(pe enc.PacketEncoder) error {
+	pe.Push(&enc.CRC32Field{})
 
-	pe.putInt8(message_format)
+	pe.PutInt8(message_format)
 
 	var attributes int8 = 0
 	attributes |= m.Codec & 0x07
-	pe.putInt8(attributes)
+	pe.PutInt8(attributes)
 
-	pe.putBytes(m.Key)
+	err := pe.PutBytes(m.Key)
+	if err != nil {
+		return err
+	}
 
 	var body []byte
 	switch m.Codec {
-	case COMPRESSION_NONE:
+	case types.COMPRESSION_NONE:
 		body = m.Value
-	case COMPRESSION_GZIP:
+	case types.COMPRESSION_GZIP:
 		if m.Value != nil {
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
@@ -40,50 +44,53 @@ func (m *Message) encode(pe packetEncoder) {
 			writer.Close()
 			body = buf.Bytes()
 		}
-	case COMPRESSION_SNAPPY:
+	case types.COMPRESSION_SNAPPY:
 		// TODO
 	}
-	pe.putBytes(body)
-
-	pe.pop()
-}
-
-func (m *Message) decode(pd packetDecoder) (err error) {
-	err = pd.pushCRC32()
+	err = pe.PutBytes(body)
 	if err != nil {
 		return err
 	}
 
-	format, err := pd.getInt8()
+	return pe.Pop()
+}
+
+func (m *Message) Decode(pd enc.PacketDecoder) (err error) {
+	err = pd.Push(&CRC32Field{})
+	if err != nil {
+		return err
+	}
+
+	format, err := pd.GetInt8()
 	if err != nil {
 		return err
 	}
 	if format != message_format {
-		return DecodingError("Message format mismatch.")
+		return enc.DecodingError
 	}
 
-	attribute, err := pd.getInt8()
+	attribute, err := pd.GetInt8()
 	if err != nil {
 		return err
 	}
 	m.Codec = attribute & 0x07
 
-	m.Key, err = pd.getBytes()
+	m.Key, err = pd.GetBytes()
 	if err != nil {
 		return err
 	}
 
-	m.Value, err = pd.getBytes()
+	m.Value, err = pd.GetBytes()
 	if err != nil {
 		return err
 	}
 
 	switch m.Codec {
-	case COMPRESSION_NONE:
+	case types.COMPRESSION_NONE:
 		// nothing to do
-	case COMPRESSION_GZIP:
+	case types.COMPRESSION_GZIP:
 		if m.Value == nil {
-			return DecodingError("Nil contents cannot be compressed.")
+			return enc.DecodingError
 		}
 		reader, err := gzip.NewReader(bytes.NewReader(m.Value))
 		if err != nil {
@@ -93,13 +100,13 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if err != nil {
 			return err
 		}
-	case COMPRESSION_SNAPPY:
+	case types.COMPRESSION_SNAPPY:
 		// TODO
 	default:
-		return DecodingError("Unknown compression codec.")
+		return enc.DecodingError
 	}
 
-	err = pd.pop()
+	err = pd.Pop()
 	if err != nil {
 		return err
 	}

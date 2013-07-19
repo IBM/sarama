@@ -1,5 +1,7 @@
 package protocol
 
+import enc "sarama/encoding"
+import "sarama/types"
 import (
 	"io"
 	"net"
@@ -129,7 +131,7 @@ func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResp
 	var response *ProduceResponse
 	var err error
 
-	if request.RequiredAcks == NO_RESPONSE {
+	if request.RequiredAcks == types.NO_RESPONSE {
 		err = b.sendAndReceive(clientID, request, nil)
 	} else {
 		response = new(ProduceResponse)
@@ -188,7 +190,7 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	}
 
 	fullRequest := request{b.correlation_id, clientID, req}
-	buf, err := encode(&fullRequest)
+	buf, err := enc.Encode(&fullRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +211,7 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	return &promise, nil
 }
 
-func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder) error {
+func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res enc.Decoder) error {
 	promise, err := b.send(clientID, req, res != nil)
 
 	if err != nil {
@@ -222,24 +224,24 @@ func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder
 
 	select {
 	case buf := <-promise.packets:
-		return decode(buf, res)
+		return enc.Decode(buf, res)
 	case err = <-promise.errors:
 		return err
 	}
 }
 
-func (b *Broker) decode(pd packetDecoder) (err error) {
-	b.id, err = pd.getInt32()
+func (b *Broker) Decode(pd enc.PacketDecoder) (err error) {
+	b.id, err = pd.GetInt32()
 	if err != nil {
 		return err
 	}
 
-	b.host, err = pd.getString()
+	b.host, err = pd.GetString()
 	if err != nil {
 		return err
 	}
 
-	b.port, err = pd.getInt32()
+	b.port, err = pd.GetInt32()
 	if err != nil {
 		return err
 	}
@@ -257,13 +259,13 @@ func (b *Broker) responseReceiver() {
 		}
 
 		decodedHeader := responseHeader{}
-		err = decode(header, &decodedHeader)
+		err = enc.Decode(header, &decodedHeader)
 		if err != nil {
 			response.errors <- err
 			continue
 		}
 		if decodedHeader.correlation_id != response.correlation_id {
-			response.errors <- DecodingError("Mismatched correlation id.")
+			response.errors <- enc.DecodingError
 			continue
 		}
 
