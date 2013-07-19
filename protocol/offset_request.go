@@ -1,14 +1,5 @@
 package protocol
 
-// Special values accepted by Kafka for the 'time' parameter of OffsetRequest.AddBlock().
-const (
-	// Ask for the latest offsets.
-	LATEST_OFFSETS int64 = -1
-	// Ask for the earliest available offset. Note that because offsets are pulled in descending order,
-	// asking for the earliest offset will always return you a single element.
-	EARLIEST_OFFSET int64 = -2
-)
-
 type offsetRequestBlock struct {
 	time       int64
 	maxOffsets int32

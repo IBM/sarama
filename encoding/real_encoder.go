@@ -1,4 +1,4 @@
-package protocol
+package encoding
 
 import "encoding/binary"
 
@@ -44,10 +44,6 @@ func (re *realEncoder) putArrayCount(in int) {
 }
 
 // misc
-
-func (re *realEncoder) putError(in KError) {
-	re.putInt16(int16(in))
-}
 
 func (re *realEncoder) putString(in string) {
 	re.putInt16(int16(len(in)))

@@ -4,15 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io/ioutil"
-)
-
-// The various compression codec recognized by Kafka in messages.
-type CompressionCodec int
-
-const (
-	COMPRESSION_NONE   CompressionCodec = 0
-	COMPRESSION_GZIP   CompressionCodec = 1
-	COMPRESSION_SNAPPY CompressionCodec = 2
+	"sarama/types"
 )
 
 // The spec just says: "This is a version id used to allow backwards compatible evolution of the message
@@ -20,7 +12,7 @@ const (
 const message_format int8 = 0
 
 type Message struct {
-	Codec CompressionCodec // codec used to compress the message contents
+	Codec types.CompressionCodec // codec used to compress the message contents
 	Key   []byte           // the message key, may be nil
 	Value []byte           // the message contents
 }
@@ -31,7 +23,7 @@ func (m *Message) encode(pe packetEncoder) {
 	pe.putInt8(message_format)
 
 	var attributes int8 = 0
-	attributes |= int8(m.Codec & 0x07)
+	attributes |= m.Codec & 0x07
 	pe.putInt8(attributes)
 
 	pe.putBytes(m.Key)
@@ -74,7 +66,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	m.Codec = CompressionCodec(attribute & 0x07)
+	m.Codec = attribute & 0x07
 
 	m.Key, err = pd.getBytes()
 	if err != nil {

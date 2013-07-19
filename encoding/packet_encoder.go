@@ -1,4 +1,4 @@
-package protocol
+package encoding
 
 type packetEncoder interface {
 	// primitives
@@ -12,7 +12,6 @@ type packetEncoder interface {
 	putArrayCount(in int)
 
 	// misc
-	putError(in KError)
 	putString(in string)
 	putBytes(in []byte)
 	putRaw(in []byte)

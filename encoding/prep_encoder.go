@@ -1,4 +1,4 @@
-package protocol
+package encoding
 
 import "math"
 
@@ -37,10 +37,6 @@ func (pe *prepEncoder) putArrayCount(in int) {
 }
 
 // misc
-
-func (pe *prepEncoder) putError(in KError) {
-	pe.length += 2
-}
 
 func (pe *prepEncoder) putString(in string) {
 	pe.length += 2

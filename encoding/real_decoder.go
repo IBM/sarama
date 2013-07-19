@@ -1,4 +1,4 @@
-package protocol
+package encoding
 
 import (
 	"encoding/binary"
@@ -110,11 +110,6 @@ func (rd *realDecoder) getArrayCount() (int, error) {
 }
 
 // misc
-
-func (rd *realDecoder) getError() (KError, error) {
-	val, err := rd.getInt16()
-	return KError(val), err
-}
 
 func (rd *realDecoder) getString() (string, error) {
 	tmp, err := rd.getInt16()

@@ -1,6 +1,8 @@
-package protocol
-
-import "errors"
+/*
+Package types provides access to the types and constants that the Kafka protocol uses,
+since they may be needed by all levels of the saramago stack.
+*/
+package types
 
 // KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
@@ -60,8 +62,33 @@ func (err KError) Error() string {
 	}
 }
 
-// AlreadyConnected is the error returned when calling Connect() on a Broker that is already connected.
-var AlreadyConnected = errors.New("kafka: broker: already connected")
+// CompressionCodec represents the various compression codecs recognized by Kafka in messages.
+type CompressionCodec int8
 
-// NotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
-var NotConnected = errors.New("kafka: broker: not connected")
+const (
+	COMPRESSION_NONE   CompressionCodec = 0
+	COMPRESSION_GZIP   CompressionCodec = 1
+	COMPRESSION_SNAPPY CompressionCodec = 2
+)
+
+// RequiredAcks is used in Produce Requests to tell the broker how many replica acknowledgements
+// it must see before responding. Any positive int16 value is valid, or the constants defined here.
+type RequiredAcks int16
+
+const (
+	NO_RESPONSE    RequiredAcks = 0  // Don't send any response, the TCP ACK is all you get.
+	WAIT_FOR_LOCAL RequiredAcks = 1  // Wait for only the local commit to succeed before responding.
+	WAIT_FOR_ALL   RequiredAcks = -1 // Wait for all replicas to commit before responding.
+)
+
+// OffsetTime is used in Offset Requests to ask for all messages before a certain time. Any positive int64
+// value will be interpreted as milliseconds, or use the special constants defined here.
+type OffsetTime int64
+
+const (
+	// Ask for the latest offsets.
+	LATEST_OFFSETS OffsetTime = -1
+	// Ask for the earliest available offset. Note that because offsets are pulled in descending order,
+	// asking for the earliest offset will always return you a single element.
+	EARLIEST_OFFSET OffsetTime = -2
+)

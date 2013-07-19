@@ -1,4 +1,4 @@
-package protocol
+package encoding
 
 type packetDecoder interface {
 	remaining() int
@@ -15,7 +15,6 @@ type packetDecoder interface {
 	getArrayCount() (int, error)
 
 	// misc
-	getError() (KError, error)
 	getString() (string, error)
 	getBytes() ([]byte, error)
 	getSubset(length int) (packetDecoder, error)
