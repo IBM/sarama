@@ -1,6 +1,6 @@
 package encoding
 
-// PacketEncoder is the interface providing helpers for Kafka's encoding rules.
+// PacketEncoder is the interface providing helpers for writing with Kafka's encoding rules.
 // Types implementing Encoder only need to worry about calling methods like PutString,
 // not about how a string is represented in Kafka.
 type PacketEncoder interface {
