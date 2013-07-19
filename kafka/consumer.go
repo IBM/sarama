@@ -110,11 +110,10 @@ func (c *Consumer) fetchMessages() {
 			}
 		default:
 			c.client.disconnectBroker(c.broker)
-			c.broker, err = c.client.leader(c.topic, c.partition)
-			if c.sendError(err) {
-				continue
-			} else {
-				return
+			for c.broker = nil; err != nil; c.broker, err = c.client.leader(c.topic, c.partition) {
+				if !c.sendError(err) {
+					return
+				}
 			}
 		}
 
