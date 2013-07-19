@@ -1,5 +1,6 @@
 package protocol
 
+import enc "sarama/encoding"
 import (
 	"bytes"
 	"testing"
@@ -7,12 +8,12 @@ import (
 
 var (
 	requestSimple = []byte{
-		0x00, 0x00, 0x00, 0x16, // msglen
+		0x00, 0x00, 0x00, 0x17, // msglen
 		0x06, 0x66,
 		0x00, 0xD2,
 		0x00, 0x00, 0x12, 0x34,
 		0x00, 0x08, 'm', 'y', 'C', 'l', 'i', 'e', 'n', 't',
-		0xDE, 0xAD, 0xBE, 0xEF}
+		0x00, 0x03, 'a', 'b', 'c'}
 )
 
 type testRequestBody struct {
@@ -26,8 +27,8 @@ func (s *testRequestBody) version() int16 {
 	return 0xD2
 }
 
-func (s *testRequestBody) encode(pe packetEncoder) {
-	pe.putRaw([]byte{0xDE, 0xAD, 0xBE, 0xEF})
+func (s *testRequestBody) Encode(pe enc.PacketEncoder) error {
+	return pe.PutString("abc")
 }
 
 func TestRequest(t *testing.T) {
@@ -38,8 +39,8 @@ func TestRequest(t *testing.T) {
 // not specific to request tests, just helper functions for testing structures that
 // implement the encoder or decoder interfaces that needed somewhere to live
 
-func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
-	packet, err := encode(in)
+func testEncodable(t *testing.T, name string, in enc.Encoder, expect []byte) {
+	packet, err := enc.Encode(in)
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(packet, expect) {
@@ -47,8 +48,8 @@ func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
 	}
 }
 
-func testDecodable(t *testing.T, name string, out decoder, in []byte) {
-	err := decode(in, out)
+func testDecodable(t *testing.T, name string, out enc.Decoder, in []byte) {
+	err := enc.Decode(in, out)
 	if err != nil {
 		t.Error("Decoding", name, "failed:", err)
 	}

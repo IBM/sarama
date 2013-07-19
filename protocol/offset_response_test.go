@@ -1,6 +1,7 @@
 package protocol
 
 import "testing"
+import "sarama/types"
 
 var (
 	emptyOffsetResponse = []byte{
@@ -40,7 +41,7 @@ func TestNormalOffsetResponse(t *testing.T) {
 		}
 
 		if len(response.Blocks["z"]) == 1 {
-			if response.Blocks["z"][2].Err != NO_ERROR {
+			if response.Blocks["z"][2].Err != types.NO_ERROR {
 				t.Error("Decoding produced invalid error for topic z partition 2.")
 			}
 			if len(response.Blocks["z"][2].Offsets) == 2 {

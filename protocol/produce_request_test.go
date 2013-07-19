@@ -1,6 +1,7 @@
 package protocol
 
 import "testing"
+import "sarama/types"
 
 var (
 	produceRequestEmpty = []byte{
@@ -40,6 +41,6 @@ func TestProduceRequest(t *testing.T) {
 	request.Timeout = 0x444
 	testEncodable(t, "header", request, produceRequestHeader)
 
-	request.AddMessage("topic", 0xAD, &Message{Codec: COMPRESSION_NONE, Key: nil, Value: []byte{0x00, 0xEE}})
+	request.AddMessage("topic", 0xAD, &Message{Codec: types.COMPRESSION_NONE, Key: nil, Value: []byte{0x00, 0xEE}})
 	testEncodable(t, "one message", request, produceRequestOneMessage)
 }
