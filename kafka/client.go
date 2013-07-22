@@ -138,8 +138,8 @@ func (client *Client) refreshTopics(topics []string, retries int) error {
 	for broker := client.any(); broker != nil; broker = client.any() {
 		response, err := broker.GetMetadata(client.id, &k.MetadataRequest{Topics: topics})
 
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			// valid response, use it
 			retry, err := client.update(response)
 			switch {
@@ -154,7 +154,7 @@ func (client *Client) refreshTopics(topics []string, retries int) error {
 				time.Sleep(250 * time.Millisecond) // wait for leader election
 				return client.refreshTopics(retry, retries-1)
 			}
-		case err == encoding.EncodingError:
+		case encoding.EncodingError:
 			// didn't even send, return the error
 			return err
 		}
