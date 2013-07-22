@@ -1,14 +1,15 @@
 package protocol
 
 import enc "sarama/encoding"
+import "sarama/types"
 
 type offsetRequestBlock struct {
-	time       int64
+	time       types.OffsetTime
 	maxOffsets int32
 }
 
 func (r *offsetRequestBlock) Encode(pe enc.PacketEncoder) error {
-	pe.PutInt64(r.time)
+	pe.PutInt64(int64(r.time))
 	pe.PutInt32(r.maxOffsets)
 	return nil
 }
@@ -51,7 +52,7 @@ func (r *OffsetRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetRequest) AddBlock(topic string, partition_id int32, time int64, maxOffsets int32) {
+func (r *OffsetRequest) AddBlock(topic string, partition_id int32, time types.OffsetTime, maxOffsets int32) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
 	}
