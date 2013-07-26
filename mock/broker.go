@@ -42,19 +42,19 @@ func (b *Broker) Close() {
 }
 
 // NewBroker launches a fake Kafka broker. It takes a testing.T as provided by the test framework and a channel of responses to use.
-// If an error occurs in the broker it is simply logged to the testing.T and the broker exits.
-func NewBroker(t *testing.T, responses chan []byte) (*Broker, error) {
+// If an error occurs it is simply logged to the testing.T and the broker exits.
+func NewBroker(t *testing.T, responses chan []byte) *Broker {
 	ln, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 	_, portStr, err := net.SplitHostPort(ln.Addr().String())
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 	tmp, err := strconv.ParseInt(portStr, 10, 32)
 	if err != nil {
-		return nil, err
+		t.Fatal(err)
 	}
 	broker := new(Broker)
 	broker.port = int32(tmp)
@@ -125,5 +125,5 @@ func NewBroker(t *testing.T, responses chan []byte) (*Broker, error) {
 			return
 		}
 	}()
-	return broker, nil
+	return broker
 }

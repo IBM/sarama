@@ -81,14 +81,11 @@ func TestBrokerID(t *testing.T) {
 
 func TestSimpleBrokerCommunication(t *testing.T) {
 	responses := make(chan []byte)
-	mockBroker, err := mock.NewBroker(t, responses)
-	if err != nil {
-		t.Fatal(err)
-	}
+	mockBroker := mock.NewBroker(t, responses)
 	defer mockBroker.Close()
 
 	broker := NewBroker("localhost", mockBroker.Port())
-	err = broker.Connect()
+	err := broker.Connect()
 	if err != nil {
 		t.Fatal(err)
 	}

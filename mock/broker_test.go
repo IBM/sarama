@@ -4,9 +4,6 @@ import "testing"
 
 func ExampleBroker(t *testing.T) {
 	responses := make(chan []byte)
-	broker, err := NewBroker(t, responses)
-	if err != nil {
-		t.Fatal(err)
-	}
+	broker := NewBroker(t, responses)
 	defer broker.Close()
 }
