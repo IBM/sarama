@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 	"sarama/types"
@@ -115,6 +116,23 @@ func FakeKafkaServer(t *testing.T, responses <-chan []byte) (int32, <-chan bool,
 func StopFakeServer(responses chan []byte, done <-chan bool) {
 	close(responses)
 	<-done
+}
+
+func ExampleBroker() error {
+	broker := NewBroker("localhost", 9092)
+	err := broker.Connect()
+	if err != nil {
+		return err
+	}
+
+	request := MetadataRequest{Topics: []string{"myTopic"}}
+	response, err := broker.GetMetadata("myClient", &request)
+
+	fmt.Println("There are", len(response.Topics), "topics active in the cluster.")
+
+	broker.Close()
+
+	return nil
 }
 
 func TestBrokerEquals(t *testing.T) {

@@ -1,3 +1,15 @@
+/*
+Package protocol provides the low-level primitives necessary for communicating with a Kafka 0.8 cluster.
+
+The core of the package is the Broker. It represents a connection to a single Kafka broker service, and
+has methods for querying the broker.
+
+The other types are mostly Request types or Response types. Most of the Broker methods take a Request of a
+specific type and return a Response of the appropriate type.
+
+The objects and properties in this package are mostly undocumented, as they line up exactly with the
+protocol fields documented by Kafka at https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
+*/
 package protocol
 
 import enc "sarama/encoding"
