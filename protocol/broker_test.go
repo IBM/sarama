@@ -201,6 +201,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	}
 }
 
+// We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
 var brokerTestTable = []struct {
 	response []byte
 	runner   func(*testing.T, *Broker)
@@ -208,9 +209,12 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := MetadataRequest{}
-			_, err := broker.GetMetadata("clientID", &request)
+			response, err := broker.GetMetadata("clientID", &request)
 			if err != nil {
 				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Metadata request got no response!")
 			}
 		}},
 
@@ -237,6 +241,54 @@ var brokerTestTable = []struct {
 			}
 			if response == nil {
 				t.Error("Produce request without NO_RESPONSE got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := FetchRequest{}
+			response, err := broker.Fetch("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Fetch request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := OffsetFetchRequest{}
+			response, err := broker.FetchOffset("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("OffsetFetch request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := OffsetCommitRequest{}
+			response, err := broker.CommitOffset("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("OffsetCommit request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := OffsetRequest{}
+			response, err := broker.GetAvailableOffsets("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Offset request got no response!")
 			}
 		}},
 }
