@@ -186,10 +186,12 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, tt := range brokerTestTable {
-		go func() {
+	go func() {
+		for _, tt := range brokerTestTable {
 			responses <- tt.response
-		}()
+		}
+	}()
+	for _, tt := range brokerTestTable {
 		tt.runner(t, broker)
 	}
 
@@ -222,6 +224,19 @@ var brokerTestTable = []struct {
 			}
 			if response != nil {
 				t.Error("Produce request with NO_RESPONSE got a response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = types.WAIT_FOR_LOCAL
+			response, err := broker.Produce("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Produce request without NO_RESPONSE got no response!")
 			}
 		}},
 }
