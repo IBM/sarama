@@ -122,7 +122,7 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{nil,
+	{[]byte{},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = types.NO_RESPONSE
