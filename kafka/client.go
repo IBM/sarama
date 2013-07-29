@@ -203,7 +203,7 @@ func (client *Client) cachedPartitions(topic string) []int32 {
 		return nil
 	}
 
-	ret := make([]int32, len(partitions))
+	ret := make([]int32, 0, len(partitions))
 	for id, _ := range partitions {
 		ret = append(ret, id)
 	}
