@@ -123,6 +123,7 @@ func NewBroker(t *testing.T, responses chan []byte) *Broker {
 	broker := new(Broker)
 	broker.stopper = make(chan bool)
 	broker.responses = responses
+	broker.t = t
 
 	broker.listener, err = net.Listen("tcp", "localhost:0")
 	if err != nil {
