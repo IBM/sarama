@@ -36,16 +36,19 @@ func NewConsumer(client *Client, topic string, partition int32, group string) (*
 	c.topic = topic
 	c.partition = partition
 	c.group = group
-
-	// We should really be sending an OffsetFetchRequest, but that doesn't seem to
-	// work in kafka yet. Hopefully will in beta 2...
-	c.offset = 0
 	c.broker = broker
+
+	// fetch the saved offset for this partition
+	err = c.fetchOffset()
+	if err != nil {
+		return nil, err
+	}
+
+	// start the fetching loop
 	c.stopper = make(chan bool)
 	c.done = make(chan bool)
 	c.messages = make(chan *Message)
 	c.errors = make(chan error)
-
 	go c.fetchMessages()
 
 	return c, nil
@@ -67,6 +70,69 @@ func (c *Consumer) Messages() <-chan *Message {
 func (c *Consumer) Close() {
 	close(c.stopper)
 	<-c.done
+}
+
+// fetches the offset from the broker and stores it in c.offset
+// TODO: need to figure out how kafka behaves when the topic exists but doesn't have a stored offset
+// (offset of 0? -1? error?).
+func (c *Consumer) fetchOffset() error {
+	request := new(k.OffsetFetchRequest)
+	request.ConsumerGroup = c.group
+	request.AddPartition(c.topic, c.partition)
+
+	response, err := c.broker.FetchOffset(c.client.id, request)
+	switch {
+	case err == nil:
+		break
+	case err == encoding.EncodingError:
+		return err
+	default:
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.FetchOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+	}
+
+	block := response.GetBlock(c.topic, c.partition)
+	if block == nil {
+		return IncompleteResponse
+	}
+
+	switch block.Err {
+	case types.NO_ERROR:
+		c.offset = block.Offset
+		return nil
+	case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
+		err = c.client.refreshTopic(c.topic)
+		if err != nil {
+			return err
+		}
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err := c.broker.FetchOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		block := response.GetBlock(c.topic, c.partition)
+		if block == nil {
+			return IncompleteResponse
+		}
+		if block.Err == types.NO_ERROR {
+			c.offset = block.Offset
+			return nil
+		} else {
+			return block.Err
+		}
+	default:
+		return block.Err
+	}
 }
 
 // helper function for safely sending an error on the errors channel
