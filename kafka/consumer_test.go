@@ -2,8 +2,10 @@ package kafka
 
 import (
 	"encoding/binary"
+	"fmt"
 	"sarama/mock"
 	"testing"
+	"time"
 )
 
 func TestSimpleConsumer(t *testing.T) {
@@ -81,6 +83,38 @@ func TestSimpleConsumer(t *testing.T) {
 			}
 		case err := <-consumer.Errors():
 			t.Error(err)
+		}
+	}
+
+	consumer.Close()
+	client.Close()
+}
+
+func ExampleConsumer() {
+	client, err := NewClient("myClient", "localhost", 9092)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> connected")
+	}
+
+	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup")
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> consumer ready")
+	}
+
+consumerLoop:
+	for {
+		select {
+		case msg := <-consumer.Messages():
+			fmt.Println(msg)
+		case err := <-consumer.Errors():
+			panic(err)
+		case <-time.After(5 * time.Second):
+			fmt.Println("> timed out")
+			break consumerLoop
 		}
 	}
 

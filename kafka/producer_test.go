@@ -2,6 +2,7 @@ package kafka
 
 import (
 	"encoding/binary"
+	"fmt"
 	"sarama/mock"
 	"testing"
 )
@@ -56,6 +57,25 @@ func TestSimpleProducer(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+	}
+
+	client.Close()
+}
+
+func ExampleProducer() {
+	client, err := NewClient("myClient", "localhost", 9092)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> connected")
+	}
+	producer := NewProducer(client, "myTopic", RandomPartitioner{})
+
+	err = producer.SendMessage(nil, StringEncoder("testing 123"))
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> message sent")
 	}
 
 	client.Close()
