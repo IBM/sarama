@@ -76,8 +76,7 @@ func (c *Consumer) Close() {
 // TODO: need to figure out how kafka behaves when the topic exists but doesn't have a stored offset
 // (offset of 0? -1? error?).
 func (c *Consumer) fetchOffset() error {
-	request := new(k.OffsetFetchRequest)
-	request.ConsumerGroup = c.group
+	request := &k.OffsetFetchRequest{ConsumerGroup: c.group}
 	request.AddPartition(c.topic, c.partition)
 
 	response, err := c.broker.FetchOffset(c.client.id, request)
@@ -100,7 +99,19 @@ func (c *Consumer) fetchOffset() error {
 
 	block := response.GetBlock(c.topic, c.partition)
 	if block == nil {
-		return IncompleteResponse
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.FetchOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		block := response.GetBlock(c.topic, c.partition)
+		if block == nil {
+			return IncompleteResponse
+		}
 	}
 
 	switch block.Err {
@@ -155,7 +166,6 @@ func (c *Consumer) sendError(err error) bool {
 }
 
 func (c *Consumer) fetchMessages() {
-
 	var fetchSize int32 = 1024
 
 	for {
