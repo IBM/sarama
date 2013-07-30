@@ -24,7 +24,7 @@ type Consumer struct {
 }
 
 // NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
-// part of the named consumer group.
+// part of the named consumer group. It automatically fetches the offset at which to start reading from the Kafka cluster.
 func NewConsumer(client *Client, topic string, partition int32, group string) (*Consumer, error) {
 	broker, err := client.leader(topic, partition)
 	if err != nil {
@@ -70,6 +70,76 @@ func (c *Consumer) Messages() <-chan *Message {
 func (c *Consumer) Close() {
 	close(c.stopper)
 	<-c.done
+}
+
+// Commit saves the given offset to the Kafka cluster so that the next time a consumer is started on this
+// topic and partition, it will know the offset at which it can start.
+func (c *Consumer) Commit(offset int64) error {
+	request := &k.OffsetCommitRequest{ConsumerGroup: c.group}
+	request.AddBlock(c.topic, c.partition, offset, "")
+
+	response, err := c.broker.CommitOffset(c.client.id, request)
+	switch err {
+	case nil:
+		break
+	case encoding.EncodingError:
+		return err
+	default:
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.CommitOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+	}
+
+	kerr := response.GetError(c.topic, c.partition)
+	if kerr == nil {
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.CommitOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		kerr := response.GetError(c.topic, c.partition)
+		if kerr == nil {
+			return IncompleteResponse
+		}
+	}
+
+	switch *kerr {
+	case types.NO_ERROR:
+		return nil
+	case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
+		err = c.client.refreshTopic(c.topic)
+		if err != nil {
+			return err
+		}
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err := c.broker.CommitOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		kerr := response.GetError(c.topic, c.partition)
+		if kerr == nil {
+			return IncompleteResponse
+		} else if *kerr == types.NO_ERROR {
+			return nil
+		} else {
+			return *kerr
+		}
+	default:
+		return *kerr
+	}
 }
 
 // fetches the offset from the broker and stores it in c.offset
