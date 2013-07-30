@@ -34,6 +34,15 @@ func TestSimpleConsumer(t *testing.T) {
 	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
 	masterResponses <- response
 	go func() {
+		extraResponses <- []byte{
+			0x00, 0x02, 'i', 'd',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00,
+			0x00, 0x00}
 		for i := 0; i < 10; i++ {
 			msg := []byte{
 				0x00, 0x00, 0x00, 0x01,
@@ -55,6 +64,21 @@ func TestSimpleConsumer(t *testing.T) {
 			binary.BigEndian.PutUint64(msg[35:], uint64(i))
 			extraResponses <- msg
 		}
+		extraResponses <- []byte{
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00}
+		extraResponses <- []byte{
+			0x00, 0x02, 'i', 'd',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00}
 		extraResponses <- []byte{
 			0x00, 0x00, 0x00, 0x01,
 			0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
@@ -85,6 +109,10 @@ func TestSimpleConsumer(t *testing.T) {
 			t.Error(err)
 		}
 	}
+	err = consumer.Commit(9)
+	if err != nil {
+		t.Error(err)
+	}
 
 	consumer.Close()
 	client.Close()
@@ -110,6 +138,10 @@ consumerLoop:
 		select {
 		case msg := <-consumer.Messages():
 			fmt.Println(msg)
+			err := consumer.Commit(msg.Offset)
+			if err != nil {
+				panic(err)
+			}
 		case err := <-consumer.Errors():
 			panic(err)
 		case <-time.After(5 * time.Second):

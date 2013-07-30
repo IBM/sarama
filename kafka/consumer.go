@@ -24,7 +24,7 @@ type Consumer struct {
 }
 
 // NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
-// part of the named consumer group.
+// part of the named consumer group. It automatically fetches the offset at which to start reading from the Kafka cluster.
 func NewConsumer(client *Client, topic string, partition int32, group string) (*Consumer, error) {
 	broker, err := client.leader(topic, partition)
 	if err != nil {
@@ -36,16 +36,19 @@ func NewConsumer(client *Client, topic string, partition int32, group string) (*
 	c.topic = topic
 	c.partition = partition
 	c.group = group
-
-	// We should really be sending an OffsetFetchRequest, but that doesn't seem to
-	// work in kafka yet. Hopefully will in beta 2...
-	c.offset = 0
 	c.broker = broker
+
+	// fetch the saved offset for this partition
+	err = c.fetchOffset()
+	if err != nil {
+		return nil, err
+	}
+
+	// start the fetching loop
 	c.stopper = make(chan bool)
 	c.done = make(chan bool)
 	c.messages = make(chan *Message)
 	c.errors = make(chan error)
-
 	go c.fetchMessages()
 
 	return c, nil
@@ -69,6 +72,150 @@ func (c *Consumer) Close() {
 	<-c.done
 }
 
+// Commit saves the given offset to the Kafka cluster so that the next time a consumer is started on this
+// topic and partition, it will know the offset at which it can start.
+func (c *Consumer) Commit(offset int64) error {
+	request := &k.OffsetCommitRequest{ConsumerGroup: c.group}
+	request.AddBlock(c.topic, c.partition, offset, "")
+
+	response, err := c.broker.CommitOffset(c.client.id, request)
+	switch err {
+	case nil:
+		break
+	case encoding.EncodingError:
+		return err
+	default:
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.CommitOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+	}
+
+	kerr := response.GetError(c.topic, c.partition)
+	if kerr == nil {
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.CommitOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		kerr := response.GetError(c.topic, c.partition)
+		if kerr == nil {
+			return IncompleteResponse
+		}
+	}
+
+	switch *kerr {
+	case types.NO_ERROR:
+		return nil
+	case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
+		err = c.client.refreshTopic(c.topic)
+		if err != nil {
+			return err
+		}
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err := c.broker.CommitOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		kerr := response.GetError(c.topic, c.partition)
+		if kerr == nil {
+			return IncompleteResponse
+		} else if *kerr == types.NO_ERROR {
+			return nil
+		} else {
+			return *kerr
+		}
+	default:
+		return *kerr
+	}
+}
+
+// fetches the offset from the broker and stores it in c.offset
+// TODO: need to figure out how kafka behaves when the topic exists but doesn't have a stored offset
+// (offset of 0? -1? error?).
+func (c *Consumer) fetchOffset() error {
+	request := &k.OffsetFetchRequest{ConsumerGroup: c.group}
+	request.AddPartition(c.topic, c.partition)
+
+	response, err := c.broker.FetchOffset(c.client.id, request)
+	switch {
+	case err == nil:
+		break
+	case err == encoding.EncodingError:
+		return err
+	default:
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.FetchOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+	}
+
+	block := response.GetBlock(c.topic, c.partition)
+	if block == nil {
+		c.client.disconnectBroker(c.broker)
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err = c.broker.FetchOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		block := response.GetBlock(c.topic, c.partition)
+		if block == nil {
+			return IncompleteResponse
+		}
+	}
+
+	switch block.Err {
+	case types.NO_ERROR:
+		c.offset = block.Offset
+		return nil
+	case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
+		err = c.client.refreshTopic(c.topic)
+		if err != nil {
+			return err
+		}
+		c.broker, err = c.client.leader(c.topic, c.partition)
+		if err != nil {
+			return err
+		}
+		response, err := c.broker.FetchOffset(c.client.id, request)
+		if err != nil {
+			return err
+		}
+		block := response.GetBlock(c.topic, c.partition)
+		if block == nil {
+			return IncompleteResponse
+		}
+		if block.Err == types.NO_ERROR {
+			c.offset = block.Offset
+			return nil
+		} else {
+			return block.Err
+		}
+	default:
+		return block.Err
+	}
+}
+
 // helper function for safely sending an error on the errors channel
 // if it returns true, the error was sent (or was nil)
 // if it returns false, the stopper channel signaled that your goroutine should return!
@@ -89,7 +236,6 @@ func (c *Consumer) sendError(err error) bool {
 }
 
 func (c *Consumer) fetchMessages() {
-
 	var fetchSize int32 = 1024
 
 	for {
