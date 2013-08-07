@@ -1,11 +1,5 @@
 package kafka
 
-import k "sarama/protocol"
-import (
-	"sarama/encoding"
-	"sarama/types"
-)
-
 // Consumer processes Kafka messages from a given topic and partition.
 // You MUST call Close() on a consumer to avoid leaks, it will not be garbage-collected automatically when
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
@@ -17,7 +11,7 @@ type Consumer struct {
 	group     string
 
 	offset        int64
-	broker        *k.Broker
+	broker        *Broker
 	stopper, done chan bool
 	messages      chan *Message
 	errors        chan error
@@ -93,7 +87,7 @@ func (c *Consumer) fetchMessages() {
 	var fetchSize int32 = 1024
 
 	for {
-		request := new(k.FetchRequest)
+		request := new(FetchRequest)
 		request.MinBytes = 1
 		request.MaxWaitTime = 1000
 		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
@@ -102,7 +96,7 @@ func (c *Consumer) fetchMessages() {
 		switch {
 		case err == nil:
 			break
-		case err == encoding.EncodingError:
+		case err == EncodingError:
 			if c.sendError(err) {
 				continue
 			} else {
@@ -127,9 +121,9 @@ func (c *Consumer) fetchMessages() {
 		}
 
 		switch block.Err {
-		case types.NO_ERROR:
+		case NO_ERROR:
 			break
-		case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
+		case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
 			err = c.client.refreshTopic(c.topic)
 			if c.sendError(err) {
 				for c.broker = nil; err != nil; c.broker, err = c.client.leader(c.topic, c.partition) {

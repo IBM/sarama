@@ -39,14 +39,3 @@ type ByteEncoder []byte
 func (b ByteEncoder) Encode() ([]byte, error) {
 	return b, nil
 }
-
-// create a message struct to return from high-level fetch requests
-// we could in theory use sarama/protocol/message.go but that has to match the
-// wire protocol, which doesn't quite line up with what we actually need to return
-
-// Message is what is returned from fetch requests.
-type Message struct {
-	Offset int64
-	Key    []byte
-	Value  []byte
-}

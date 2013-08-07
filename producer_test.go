@@ -3,15 +3,14 @@ package kafka
 import (
 	"encoding/binary"
 	"fmt"
-	"sarama/mock"
 	"testing"
 )
 
 func TestSimpleProducer(t *testing.T) {
 	responses := make(chan []byte, 1)
 	extraResponses := make(chan []byte)
-	mockBroker := mock.NewBroker(t, responses)
-	mockExtra := mock.NewBroker(t, extraResponses)
+	mockBroker := NewMockBroker(t, responses)
+	mockExtra := NewMockBroker(t, extraResponses)
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 

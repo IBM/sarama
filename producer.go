@@ -1,11 +1,5 @@
 package kafka
 
-import k "sarama/protocol"
-import (
-	"sarama/encoding"
-	"sarama/types"
-)
-
 // Producer publishes Kafka messages on a given topic. It routes messages to the correct broker, refreshing metadata as appropriate,
 // and parses responses for errors. A Producer itself does not need to be closed (thus no Close method) but you still need to close
 // its underlying Client.
@@ -78,14 +72,14 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		return err
 	}
 
-	request := &k.ProduceRequest{RequiredAcks: types.WAIT_FOR_LOCAL, Timeout: 0}
-	request.AddMessage(p.topic, partition, &k.Message{Key: keyBytes, Value: valBytes})
+	request := &ProduceRequest{RequiredAcks: WAIT_FOR_LOCAL, Timeout: 0}
+	request.AddMessage(p.topic, partition, &Message{Key: keyBytes, Value: valBytes})
 
 	response, err := broker.Produce(p.client.id, request)
 	switch err {
 	case nil:
 		break
-	case encoding.EncodingError:
+	case EncodingError:
 		return err
 	default:
 		if !retry {
@@ -105,9 +99,9 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 	}
 
 	switch block.Err {
-	case types.NO_ERROR:
+	case NO_ERROR:
 		return nil
-	case types.UNKNOWN_TOPIC_OR_PARTITION, types.NOT_LEADER_FOR_PARTITION, types.LEADER_NOT_AVAILABLE:
+	case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
 		if !retry {
 			return block.Err
 		}

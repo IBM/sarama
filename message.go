@@ -20,9 +20,10 @@ const (
 const message_format int8 = 0
 
 type Message struct {
-	Codec CompressionCodec // codec used to compress the message contents
-	Key   []byte           // the message key, may be nil
-	Value []byte           // the message contents
+	Codec  CompressionCodec // codec used to compress the message contents
+	Key    []byte           // the message key, may be nil
+	Value  []byte           // the message contents
+	Offset int64            // the offset of this message (not usually set)
 }
 
 func (m *Message) encode(pe packetEncoder) error {

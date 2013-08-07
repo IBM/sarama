@@ -2,13 +2,12 @@ package kafka
 
 import (
 	"encoding/binary"
-	"sarama/mock"
 	"testing"
 )
 
 func TestSimpleClient(t *testing.T) {
 	responses := make(chan []byte, 1)
-	mockBroker := mock.NewBroker(t, responses)
+	mockBroker := NewMockBroker(t, responses)
 	defer mockBroker.Close()
 
 	// Only one response needed, an empty metadata response
@@ -23,8 +22,8 @@ func TestSimpleClient(t *testing.T) {
 
 func TestClientExtraBrokers(t *testing.T) {
 	responses := make(chan []byte, 1)
-	mockBroker := mock.NewBroker(t, responses)
-	mockExtra := mock.NewBroker(t, make(chan []byte))
+	mockBroker := NewMockBroker(t, responses)
+	mockExtra := NewMockBroker(t, make(chan []byte))
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
@@ -47,8 +46,8 @@ func TestClientExtraBrokers(t *testing.T) {
 
 func TestClientMetadata(t *testing.T) {
 	responses := make(chan []byte, 1)
-	mockBroker := mock.NewBroker(t, responses)
-	mockExtra := mock.NewBroker(t, make(chan []byte))
+	mockBroker := NewMockBroker(t, responses)
+	mockExtra := NewMockBroker(t, make(chan []byte))
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
@@ -95,8 +94,8 @@ func TestClientMetadata(t *testing.T) {
 
 func TestClientRefreshBehaviour(t *testing.T) {
 	responses := make(chan []byte, 3)
-	mockBroker := mock.NewBroker(t, responses)
-	mockExtra := mock.NewBroker(t, make(chan []byte))
+	mockBroker := NewMockBroker(t, responses)
+	mockExtra := NewMockBroker(t, make(chan []byte))
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
