@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 type offsetCommitRequestBlock struct {
 	offset   int64

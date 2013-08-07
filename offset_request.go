@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // OffsetTime is used in Offset Requests to ask for all messages before a certain time. Any positive int64
 // value will be interpreted as milliseconds, or use the special constants defined here.

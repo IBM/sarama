@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // Consumer processes Kafka messages from a given topic and partition.
 // You MUST call Close() on a consumer to avoid leaks, it will not be garbage-collected automatically when

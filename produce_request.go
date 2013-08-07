@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // RequiredAcks is used in Produce Requests to tell the broker how many replica acknowledgements
 // it must see before responding. Any positive int16 value is valid, or the constants defined here.

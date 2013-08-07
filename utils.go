@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // make []int32 sortable so we can sort partition numbers
 type int32Slice []int32

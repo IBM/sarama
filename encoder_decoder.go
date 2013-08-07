@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // Encoder is the interface that wraps the basic Encode method.
 // Anything implementing Encoder can be turned into bytes using Kafka's encoding rules.

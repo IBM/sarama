@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // PacketDecoder is the interface providing helpers for reading with Kafka's encoding rules.
 // Types implementing Decoder only need to worry about calling methods like GetString,

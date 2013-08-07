@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 // PacketEncoder is the interface providing helpers for writing with Kafka's encoding rules.
 // Types implementing Encoder only need to worry about calling methods like PutString,

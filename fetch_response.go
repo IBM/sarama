@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 type FetchResponseBlock struct {
 	Err                 KError

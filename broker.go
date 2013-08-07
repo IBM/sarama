@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 import (
 	"io"

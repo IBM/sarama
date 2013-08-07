@@ -1,4 +1,4 @@
-package kafka
+package sarama
 
 type OffsetFetchResponseBlock struct {
 	Offset   int64
