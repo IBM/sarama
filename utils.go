@@ -25,7 +25,7 @@ type Encoder interface {
 // and/or values in kafka messages
 
 // StringEncoder implements the Encoder interface for Go strings so that you can do things like
-//	producer.SendMessage(nil, kafka.StringEncoder("hello world"))
+//	producer.SendMessage(nil, sarama.StringEncoder("hello world"))
 type StringEncoder string
 
 func (s StringEncoder) Encode() ([]byte, error) {
@@ -33,7 +33,7 @@ func (s StringEncoder) Encode() ([]byte, error) {
 }
 
 // ByteEncoder implements the Encoder interface for Go byte slices so that you can do things like
-//	producer.SendMessage(nil, kafka.ByteEncoder([]byte{0x00}))
+//	producer.SendMessage(nil, sarama.ByteEncoder([]byte{0x00}))
 type ByteEncoder []byte
 
 func (b ByteEncoder) Encode() ([]byte, error) {
