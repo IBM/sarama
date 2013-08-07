@@ -1,4 +1,4 @@
-package encoding
+package kafka
 
 import (
 	"encoding/binary"
@@ -8,13 +8,13 @@ import (
 type realDecoder struct {
 	raw   []byte
 	off   int
-	stack []PushDecoder
+	stack []pushDecoder
 }
 
 // primitives
 
-func (rd *realDecoder) GetInt8() (int8, error) {
-	if rd.Remaining() < 1 {
+func (rd *realDecoder) getInt8() (int8, error) {
+	if rd.remaining() < 1 {
 		rd.off = len(rd.raw)
 		return -1, InsufficientData
 	}
@@ -23,8 +23,8 @@ func (rd *realDecoder) GetInt8() (int8, error) {
 	return tmp, nil
 }
 
-func (rd *realDecoder) GetInt16() (int16, error) {
-	if rd.Remaining() < 2 {
+func (rd *realDecoder) getInt16() (int16, error) {
+	if rd.remaining() < 2 {
 		rd.off = len(rd.raw)
 		return -1, InsufficientData
 	}
@@ -33,8 +33,8 @@ func (rd *realDecoder) GetInt16() (int16, error) {
 	return tmp, nil
 }
 
-func (rd *realDecoder) GetInt32() (int32, error) {
-	if rd.Remaining() < 4 {
+func (rd *realDecoder) getInt32() (int32, error) {
+	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
 		return -1, InsufficientData
 	}
@@ -43,8 +43,8 @@ func (rd *realDecoder) GetInt32() (int32, error) {
 	return tmp, nil
 }
 
-func (rd *realDecoder) GetInt64() (int64, error) {
-	if rd.Remaining() < 8 {
+func (rd *realDecoder) getInt64() (int64, error) {
+	if rd.remaining() < 8 {
 		rd.off = len(rd.raw)
 		return -1, InsufficientData
 	}
@@ -53,14 +53,14 @@ func (rd *realDecoder) GetInt64() (int64, error) {
 	return tmp, nil
 }
 
-func (rd *realDecoder) GetArrayLength() (int, error) {
-	if rd.Remaining() < 4 {
+func (rd *realDecoder) getArrayLength() (int, error) {
+	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
 		return -1, InsufficientData
 	}
 	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
-	if tmp > rd.Remaining() {
+	if tmp > rd.remaining() {
 		rd.off = len(rd.raw)
 		return -1, InsufficientData
 	} else if tmp > 2*math.MaxUint16 {
@@ -71,8 +71,8 @@ func (rd *realDecoder) GetArrayLength() (int, error) {
 
 // collections
 
-func (rd *realDecoder) GetBytes() ([]byte, error) {
-	tmp, err := rd.GetInt32()
+func (rd *realDecoder) getBytes() ([]byte, error) {
+	tmp, err := rd.getInt32()
 
 	if err != nil {
 		return nil, err
@@ -87,7 +87,7 @@ func (rd *realDecoder) GetBytes() ([]byte, error) {
 		return nil, nil
 	case n == 0:
 		return make([]byte, 0), nil
-	case n > rd.Remaining():
+	case n > rd.remaining():
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
 	default:
@@ -97,8 +97,8 @@ func (rd *realDecoder) GetBytes() ([]byte, error) {
 	}
 }
 
-func (rd *realDecoder) GetString() (string, error) {
-	tmp, err := rd.GetInt16()
+func (rd *realDecoder) getString() (string, error) {
+	tmp, err := rd.getInt16()
 
 	if err != nil {
 		return "", err
@@ -113,7 +113,7 @@ func (rd *realDecoder) GetString() (string, error) {
 		return "", nil
 	case n == 0:
 		return "", nil
-	case n > rd.Remaining():
+	case n > rd.remaining():
 		rd.off = len(rd.raw)
 		return "", InsufficientData
 	default:
@@ -123,8 +123,8 @@ func (rd *realDecoder) GetString() (string, error) {
 	}
 }
 
-func (rd *realDecoder) GetInt32Array() ([]int32, error) {
-	if rd.Remaining() < 4 {
+func (rd *realDecoder) getInt32Array() ([]int32, error) {
+	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
 	}
@@ -132,7 +132,7 @@ func (rd *realDecoder) GetInt32Array() ([]int32, error) {
 	rd.off += 4
 
 	var ret []int32 = nil
-	if rd.Remaining() < 4*n {
+	if rd.remaining() < 4*n {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
 	} else if n > 0 {
@@ -145,8 +145,8 @@ func (rd *realDecoder) GetInt32Array() ([]int32, error) {
 	return ret, nil
 }
 
-func (rd *realDecoder) GetInt64Array() ([]int64, error) {
-	if rd.Remaining() < 4 {
+func (rd *realDecoder) getInt64Array() ([]int64, error) {
+	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
 	}
@@ -154,7 +154,7 @@ func (rd *realDecoder) GetInt64Array() ([]int64, error) {
 	rd.off += 4
 
 	var ret []int64 = nil
-	if rd.Remaining() < 8*n {
+	if rd.remaining() < 8*n {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
 	} else if n > 0 {
@@ -169,12 +169,12 @@ func (rd *realDecoder) GetInt64Array() ([]int64, error) {
 
 // subsets
 
-func (rd *realDecoder) Remaining() int {
+func (rd *realDecoder) remaining() int {
 	return len(rd.raw) - rd.off
 }
 
-func (rd *realDecoder) GetSubset(length int) (PacketDecoder, error) {
-	if length > rd.Remaining() {
+func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
+	if length > rd.remaining() {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
 	}
@@ -186,11 +186,11 @@ func (rd *realDecoder) GetSubset(length int) (PacketDecoder, error) {
 
 // stacks
 
-func (rd *realDecoder) Push(in PushDecoder) error {
-	in.SaveOffset(rd.off)
+func (rd *realDecoder) push(in pushDecoder) error {
+	in.saveOffset(rd.off)
 
-	reserve := in.ReserveLength()
-	if rd.Remaining() < reserve {
+	reserve := in.reserveLength()
+	if rd.remaining() < reserve {
 		rd.off = len(rd.raw)
 		return InsufficientData
 	}
@@ -202,10 +202,10 @@ func (rd *realDecoder) Push(in PushDecoder) error {
 	return nil
 }
 
-func (rd *realDecoder) Pop() error {
+func (rd *realDecoder) pop() error {
 	// this is go's ugly pop pattern (the inverse of append)
 	in := rd.stack[len(rd.stack)-1]
 	rd.stack = rd.stack[:len(rd.stack)-1]
 
-	return in.Check(rd.off, rd.raw)
+	return in.check(rd.off, rd.raw)
 }

@@ -1,80 +1,80 @@
-package encoding
+package kafka
 
 import "encoding/binary"
 
 type realEncoder struct {
 	raw   []byte
 	off   int
-	stack []PushEncoder
+	stack []pushEncoder
 }
 
 // primitives
 
-func (re *realEncoder) PutInt8(in int8) {
+func (re *realEncoder) putInt8(in int8) {
 	re.raw[re.off] = byte(in)
 	re.off += 1
 }
 
-func (re *realEncoder) PutInt16(in int16) {
+func (re *realEncoder) putInt16(in int16) {
 	binary.BigEndian.PutUint16(re.raw[re.off:], uint16(in))
 	re.off += 2
 }
 
-func (re *realEncoder) PutInt32(in int32) {
+func (re *realEncoder) putInt32(in int32) {
 	binary.BigEndian.PutUint32(re.raw[re.off:], uint32(in))
 	re.off += 4
 }
 
-func (re *realEncoder) PutInt64(in int64) {
+func (re *realEncoder) putInt64(in int64) {
 	binary.BigEndian.PutUint64(re.raw[re.off:], uint64(in))
 	re.off += 8
 }
 
-func (re *realEncoder) PutArrayLength(in int) error {
-	re.PutInt32(int32(in))
+func (re *realEncoder) putArrayLength(in int) error {
+	re.putInt32(int32(in))
 	return nil
 }
 
 // collection
 
-func (re *realEncoder) PutBytes(in []byte) error {
+func (re *realEncoder) putBytes(in []byte) error {
 	if in == nil {
-		re.PutInt32(-1)
+		re.putInt32(-1)
 		return nil
 	}
-	re.PutInt32(int32(len(in)))
+	re.putInt32(int32(len(in)))
 	copy(re.raw[re.off:], in)
 	re.off += len(in)
 	return nil
 }
 
-func (re *realEncoder) PutString(in string) error {
-	re.PutInt16(int16(len(in)))
+func (re *realEncoder) putString(in string) error {
+	re.putInt16(int16(len(in)))
 	copy(re.raw[re.off:], in)
 	re.off += len(in)
 	return nil
 }
 
-func (re *realEncoder) PutInt32Array(in []int32) error {
-	re.PutArrayLength(len(in))
+func (re *realEncoder) putInt32Array(in []int32) error {
+	re.putArrayLength(len(in))
 	for _, val := range in {
-		re.PutInt32(val)
+		re.putInt32(val)
 	}
 	return nil
 }
 
 // stacks
 
-func (re *realEncoder) Push(in PushEncoder) {
-	in.SaveOffset(re.off)
-	re.off += in.ReserveLength()
+func (re *realEncoder) push(in pushEncoder) {
+	in.saveOffset(re.off)
+	re.off += in.reserveLength()
 	re.stack = append(re.stack, in)
 }
 
-func (re *realEncoder) Pop() error {
+func (re *realEncoder) pop() error {
 	// this is go's ugly pop pattern (the inverse of append)
 	in := re.stack[len(re.stack)-1]
 	re.stack = re.stack[:len(re.stack)-1]
 
-	return in.Run(re.off, re.raw)
+	return in.run(re.off, re.raw)
 }

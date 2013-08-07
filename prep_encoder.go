@@ -1,4 +1,4 @@
-package encoding
+package kafka
 
 import "math"
 
@@ -8,23 +8,23 @@ type prepEncoder struct {
 
 // primitives
 
-func (pe *prepEncoder) PutInt8(in int8) {
+func (pe *prepEncoder) putInt8(in int8) {
 	pe.length += 1
 }
 
-func (pe *prepEncoder) PutInt16(in int16) {
+func (pe *prepEncoder) putInt16(in int16) {
 	pe.length += 2
 }
 
-func (pe *prepEncoder) PutInt32(in int32) {
+func (pe *prepEncoder) putInt32(in int32) {
 	pe.length += 4
 }
 
-func (pe *prepEncoder) PutInt64(in int64) {
+func (pe *prepEncoder) putInt64(in int64) {
 	pe.length += 8
 }
 
-func (pe *prepEncoder) PutArrayLength(in int) error {
+func (pe *prepEncoder) putArrayLength(in int) error {
 	if in > math.MaxInt32 {
 		return EncodingError
 	}
@@ -34,7 +34,7 @@ func (pe *prepEncoder) PutArrayLength(in int) error {
 
 // arrays
 
-func (pe *prepEncoder) PutBytes(in []byte) error {
+func (pe *prepEncoder) putBytes(in []byte) error {
 	pe.length += 4
 	if in == nil {
 		return nil
@@ -46,7 +46,7 @@ func (pe *prepEncoder) PutBytes(in []byte) error {
 	return nil
 }
 
-func (pe *prepEncoder) PutString(in string) error {
+func (pe *prepEncoder) putString(in string) error {
 	pe.length += 2
 	if len(in) > math.MaxInt16 {
 		return EncodingError
@@ -55,8 +55,8 @@ func (pe *prepEncoder) PutString(in string) error {
 	return nil
 }
 
-func (pe *prepEncoder) PutInt32Array(in []int32) error {
-	err := pe.PutArrayLength(len(in))
+func (pe *prepEncoder) putInt32Array(in []int32) error {
+	err := pe.putArrayLength(len(in))
 	if err != nil {
 		return err
 	}
@@ -66,10 +66,10 @@ func (pe *prepEncoder) PutInt32Array(in []int32) error {
 
 // stackable
 
-func (pe *prepEncoder) Push(in PushEncoder) {
-	pe.length += in.ReserveLength()
+func (pe *prepEncoder) push(in pushEncoder) {
+	pe.length += in.reserveLength()
 }
 
-func (pe *prepEncoder) Pop() error {
+func (pe *prepEncoder) pop() error {
 	return nil
 }

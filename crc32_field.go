@@ -1,30 +1,30 @@
-package encoding
+package kafka
 
 import (
 	"encoding/binary"
 	"hash/crc32"
 )
 
-// CRC32Field implements the PushEncoder and PushDecoder interfaces for calculating CRC32s.
-type CRC32Field struct {
+// crc32field implements the pushEncoder and pushDecoder interfaces for calculating CRC32s.
+type crc32field struct {
 	startOffset int
 }
 
-func (c *CRC32Field) SaveOffset(in int) {
+func (c *crc32field) saveOffset(in int) {
 	c.startOffset = in
 }
 
-func (c *CRC32Field) ReserveLength() int {
+func (c *crc32field) reserveLength() int {
 	return 4
 }
 
-func (c *CRC32Field) Run(curOffset int, buf []byte) error {
+func (c *crc32field) run(curOffset int, buf []byte) error {
 	crc := crc32.ChecksumIEEE(buf[c.startOffset+4 : curOffset])
 	binary.BigEndian.PutUint32(buf[c.startOffset:], crc)
 	return nil
 }
 
-func (c *CRC32Field) Check(curOffset int, buf []byte) error {
+func (c *crc32field) check(curOffset int, buf []byte) error {
 	crc := crc32.ChecksumIEEE(buf[c.startOffset+4 : curOffset])
 
 	if crc != binary.BigEndian.Uint32(buf[c.startOffset:]) {
