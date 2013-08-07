@@ -3,6 +3,18 @@ package protocol
 import enc "sarama/encoding"
 import "sarama/types"
 
+// OffsetTime is used in Offset Requests to ask for all messages before a certain time. Any positive int64
+// value will be interpreted as milliseconds, or use the special constants defined here.
+type OffsetTime int64
+
+const (
+	// Ask for the latest offsets.
+	LATEST_OFFSETS OffsetTime = -1
+	// Ask for the earliest available offset. Note that because offsets are pulled in descending order,
+	// asking for the earliest offset will always return you a single element.
+	EARLIEST_OFFSET OffsetTime = -2
+)
+
 type offsetRequestBlock struct {
 	time       types.OffsetTime
 	maxOffsets int32

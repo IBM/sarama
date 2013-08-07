@@ -8,6 +8,16 @@ import (
 	"sarama/types"
 )
 
+// CompressionCodec represents the various compression codecs recognized by Kafka in messages.
+type CompressionCodec int8
+
+const (
+	COMPRESSION_NONE   CompressionCodec = 0
+	COMPRESSION_GZIP   CompressionCodec = 1
+	COMPRESSION_SNAPPY CompressionCodec = 2
+)
+
+
 // The spec just says: "This is a version id used to allow backwards compatible evolution of the message
 // binary format." but it doesn't say what the current value is, so presumably 0...
 const message_format int8 = 0

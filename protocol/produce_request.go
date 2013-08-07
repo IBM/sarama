@@ -3,6 +3,17 @@ package protocol
 import enc "sarama/encoding"
 import "sarama/types"
 
+// RequiredAcks is used in Produce Requests to tell the broker how many replica acknowledgements
+// it must see before responding. Any positive int16 value is valid, or the constants defined here.
+type RequiredAcks int16
+
+const (
+	NO_RESPONSE    RequiredAcks = 0  // Don't send any response, the TCP ACK is all you get.
+	WAIT_FOR_LOCAL RequiredAcks = 1  // Wait for only the local commit to succeed before responding.
+	WAIT_FOR_ALL   RequiredAcks = -1 // Wait for all replicas to commit before responding.
+)
+
+
 type ProduceRequest struct {
 	RequiredAcks types.RequiredAcks
 	Timeout      int32
