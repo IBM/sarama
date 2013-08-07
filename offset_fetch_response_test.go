@@ -1,0 +1,64 @@
+package kafka
+
+import "testing"
+
+var (
+	emptyOffsetFetchResponse = []byte{
+		0xFF, 0xFF,
+		0x00, 0x00, 0x00, 0x00}
+
+	normalOffsetFetchResponse = []byte{
+		0x00, 0x02, 'z', 'a',
+		0x00, 0x00, 0x00, 0x02,
+
+		0x00, 0x01, 'm',
+		0x00, 0x00, 0x00, 0x00,
+
+		0x00, 0x01, 't',
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x02, 'm', 'd',
+		0x00, 0x07}
+)
+
+func TestEmptyOffsetFetchResponse(t *testing.T) {
+	response := OffsetFetchResponse{}
+
+	testDecodable(t, "empty", &response, emptyOffsetFetchResponse)
+	if response.ClientID != "" {
+		t.Error("Decoding produced client ID where there was none.")
+	}
+	if len(response.Blocks) != 0 {
+		t.Error("Decoding produced topic blocks where there were none.")
+	}
+}
+
+func TestNormalOffsetFetchResponse(t *testing.T) {
+	response := OffsetFetchResponse{}
+
+	testDecodable(t, "normal", &response, normalOffsetFetchResponse)
+	if response.ClientID != "za" {
+		t.Error("Decoding produced wrong client ID.")
+	}
+	if len(response.Blocks) == 2 {
+		if len(response.Blocks["m"]) != 0 {
+			t.Error("Decoding produced partitions for topic 'm' where there were none.")
+		}
+		if len(response.Blocks["t"]) == 1 {
+			if response.Blocks["t"][0].Offset != 0 {
+				t.Error("Decoding produced wrong offset for topic 't' partition 0.")
+			}
+			if response.Blocks["t"][0].Metadata != "md" {
+				t.Error("Decoding produced wrong metadata for topic 't' partition 0.")
+			}
+			if response.Blocks["t"][0].Err != REQUEST_TIMED_OUT {
+				t.Error("Decoding produced wrong error for topic 't' partition 0.")
+			}
+		} else {
+			t.Error("Decoding produced wrong number of blocks for topic 't'.")
+		}
+	} else {
+		t.Error("Decoding produced wrong number of blocks.")
+	}
+}

@@ -2,6 +2,12 @@ package kafka
 
 import "errors"
 
+// AlreadyConnected is the error returned when calling Connect() on a Broker that is already connected.
+var AlreadyConnected = errors.New("kafka: broker: already connected")
+
+// NotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
+var NotConnected = errors.New("kafka: broker: not connected")
+
 // EncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
 var EncodingError = errors.New("kafka: Error while encoding packet.")
@@ -72,4 +78,3 @@ func (err KError) Error() string {
 		return "Unknown error, how did this happen?"
 	}
 }
-
