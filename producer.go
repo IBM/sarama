@@ -110,7 +110,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 			return err
 		}
 		return p.safeSendMessage(key, value, false)
-	default:
-		return block.Err
 	}
+
+	return block.Err
 }

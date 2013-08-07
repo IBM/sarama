@@ -90,11 +90,11 @@ func (rd *realDecoder) getBytes() ([]byte, error) {
 	case n > rd.remaining():
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
-	default:
-		tmp := rd.raw[rd.off : rd.off+n]
-		rd.off += n
-		return tmp, nil
 	}
+
+	tmpStr := rd.raw[rd.off : rd.off+n]
+	rd.off += n
+	return tmpStr, nil
 }
 
 func (rd *realDecoder) getString() (string, error) {
@@ -116,11 +116,11 @@ func (rd *realDecoder) getString() (string, error) {
 	case n > rd.remaining():
 		rd.off = len(rd.raw)
 		return "", InsufficientData
-	default:
-		tmp := string(rd.raw[rd.off : rd.off+n])
-		rd.off += n
-		return tmp, nil
 	}
+
+	tmpStr := string(rd.raw[rd.off : rd.off+n])
+	rd.off += n
+	return tmpStr, nil
 }
 
 func (rd *realDecoder) getInt32Array() ([]int32, error) {

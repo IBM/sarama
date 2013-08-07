@@ -80,6 +80,8 @@ func (c *Consumer) sendError(err error) bool {
 	case c.errors <- err:
 		return true
 	}
+
+	return true
 }
 
 func (c *Consumer) fetchMessages() {

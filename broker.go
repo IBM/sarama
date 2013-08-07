@@ -49,7 +49,7 @@ func (b *Broker) Connect() error {
 		return err
 	}
 
-	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port), Zone: addr.Zone})
+	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
 	if err != nil {
 		return err
 	}
@@ -226,6 +226,8 @@ func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder
 	case err = <-promise.errors:
 		return err
 	}
+
+	return nil
 }
 
 func (b *Broker) decode(pd packetDecoder) (err error) {

@@ -89,7 +89,7 @@ func (err KError) Error() string {
 		return "kafka server: Stale controller epoch code. ???"
 	case OFFSET_METADATA_TOO_LARGE:
 		return "kafka server: Specified a string larger than the configured maximum for offset metadata."
-	default:
-		return "Unknown error, how did this happen?"
 	}
+
+	return "Unknown error, how did this happen?"
 }
