@@ -25,6 +25,18 @@ func (p *Producer) SendMessage(key, value Encoder) error {
 	return p.safeSendMessage(key, value, true)
 }
 
+func (p *Producer) SendMessageString(key, value string) error {
+	keyEnc := StringEncoder(key)
+	valueEnc := StringEncoder(value)
+	return p.safeSendMessage(keyEnc, valueEnc, true)
+}
+
+func (p *Producer) SendMessageBytes(key, value []byte) error {
+	keyEnc := ByteEncoder(key)
+	valueEnc := ByteEncoder(value)
+	return p.safeSendMessage(keyEnc, valueEnc, true)
+}
+
 func (p *Producer) choosePartition(key Encoder) (int32, error) {
 	partitions, err := p.client.partitions(p.topic)
 	if err != nil {

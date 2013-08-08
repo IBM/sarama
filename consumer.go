@@ -1,5 +1,10 @@
 package sarama
 
+type MessageOrError struct {
+	MessageBlock
+	Err error
+}
+
 // Consumer processes Kafka messages from a given topic and partition.
 // You MUST call Close() on a consumer to avoid leaks, it will not be garbage-collected automatically when
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
@@ -13,14 +18,13 @@ type Consumer struct {
 	offset        int64
 	broker        *Broker
 	stopper, done chan bool
-	messages      chan *MessageBlock
-	errors        chan error
+	messages      chan *MessageOrError
 }
 
 // NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
 // part of the named consumer group.
-func NewConsumer(client *Client, topic string, partition int32, group string) (*Consumer, error) {
-	broker, err := client.leader(topic, partition)
+func NewConsumer(client *Client, topic string, partition int, group string) (*Consumer, error) {
+	broker, err := client.leader(topic, int32(partition))
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +32,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string) (*
 	c := new(Consumer)
 	c.client = client
 	c.topic = topic
-	c.partition = partition
+	c.partition = int32(partition)
 	c.group = group
 
 	// We should really be sending an OffsetFetchRequest, but that doesn't seem to
@@ -37,21 +41,15 @@ func NewConsumer(client *Client, topic string, partition int32, group string) (*
 	c.broker = broker
 	c.stopper = make(chan bool)
 	c.done = make(chan bool)
-	c.messages = make(chan *MessageBlock)
-	c.errors = make(chan error)
+	c.messages = make(chan *MessageOrError)
 
 	go c.fetchMessages()
 
 	return c, nil
 }
 
-// Errors returns the read channel for any errors that might be returned by the broker.
-func (c *Consumer) Errors() <-chan error {
-	return c.errors
-}
-
 // Messages returns the read channel for all messages that will be returned by the broker.
-func (c *Consumer) Messages() <-chan *MessageBlock {
+func (c *Consumer) Messages() <-chan *MessageOrError {
 	return c.messages
 }
 
@@ -63,7 +61,7 @@ func (c *Consumer) Close() {
 	<-c.done
 }
 
-// helper function for safely sending an error on the errors channel
+// helper function for safely sending an error
 // if it returns true, the error was sent (or was nil)
 // if it returns false, the stopper channel signaled that your goroutine should return!
 func (c *Consumer) sendError(err error) bool {
@@ -74,10 +72,9 @@ func (c *Consumer) sendError(err error) bool {
 	select {
 	case <-c.stopper:
 		close(c.messages)
-		close(c.errors)
 		close(c.done)
 		return false
-	case c.errors <- err:
+	case c.messages <- &MessageOrError{Err: err}:
 		return true
 	}
 
@@ -154,7 +151,6 @@ func (c *Consumer) fetchMessages() {
 			select {
 			case <-c.stopper:
 				close(c.messages)
-				close(c.errors)
 				close(c.done)
 				return
 			default:
@@ -166,10 +162,9 @@ func (c *Consumer) fetchMessages() {
 			select {
 			case <-c.stopper:
 				close(c.messages)
-				close(c.errors)
 				close(c.done)
 				return
-			case c.messages <- msgBlock:
+			case c.messages <- &MessageOrError{*msgBlock, nil}:
 				c.offset++
 			}
 		}

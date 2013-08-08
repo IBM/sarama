@@ -28,11 +28,11 @@ type responsePromise struct {
 
 // NewBroker creates and returns a Broker targetting the given host:port address.
 // This does not attempt to actually connect, you have to call Connect() for that.
-func NewBroker(host string, port int32) *Broker {
+func NewBroker(host string, port int) *Broker {
 	b := new(Broker)
 	b.id = -1 // don't know it yet
 	b.host = host
-	b.port = port
+	b.port = int32(port)
 	return b
 }
 
