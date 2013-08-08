@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"bytes"
+	"code.google.com/p/snappy-go/snappy"
 	"compress/gzip"
 	"io/ioutil"
 )
@@ -52,7 +53,10 @@ func (m *Message) encode(pe packetEncoder) error {
 			body = buf.Bytes()
 		}
 	case COMPRESSION_SNAPPY:
-		// TODO
+		body, err = snappy.Encode(nil, m.Value)
+		if err != nil {
+			return err
+		}
 	}
 	err = pe.putBytes(body)
 	if err != nil {
@@ -108,7 +112,13 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 			return err
 		}
 	case COMPRESSION_SNAPPY:
-		// TODO
+		if m.Value == nil {
+			return DecodingError
+		}
+		m.Value, err = snappy.Decode(nil, m.Value)
+		if err != nil {
+			return err
+		}
 	default:
 		return DecodingError
 	}
