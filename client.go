@@ -20,7 +20,7 @@ type Client struct {
 // NewClient creates a new Client with the given client ID. It connects to the broker at the given
 // host:port address, and uses that broker to automatically fetch metadata on the rest of the kafka cluster.
 // If metadata cannot be retrieved (even if the connection otherwise succeeds) then the client is not created.
-func NewClient(id string, host string, port int32) (client *Client, err error) {
+func NewClient(id string, host string, port int) (client *Client, err error) {
 	tmp := NewBroker(host, port)
 	err = tmp.Connect()
 	if err != nil {
@@ -195,7 +195,7 @@ func (client *Client) cachedPartitions(topic string) []int32 {
 	}
 
 	ret := make([]int32, 0, len(partitions))
-	for id, _ := range partitions {
+	for id := range partitions {
 		ret = append(ret, id)
 	}
 
@@ -265,7 +265,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	}
 
 	ret := make([]string, 0, len(toRetry))
-	for topic, _ := range toRetry {
+	for topic := range toRetry {
 		ret = append(ret, topic)
 	}
 	return ret, nil
