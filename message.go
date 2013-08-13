@@ -40,25 +40,25 @@ func (m *Message) encode(pe packetEncoder) error {
 		return err
 	}
 
-	var body []byte
 	switch m.Codec {
-	case COMPRESSION_NONE:
-		body = m.Value
 	case COMPRESSION_GZIP:
 		if m.Value != nil {
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
 			writer.Write(m.Value)
 			writer.Close()
-			body = buf.Bytes()
+			m.Value = buf.Bytes()
+			m.Codec = COMPRESSION_NONE
 		}
 	case COMPRESSION_SNAPPY:
-		body, err = snappy.Encode(nil, m.Value)
+		tmp, err := snappy.Encode(nil, m.Value)
 		if err != nil {
 			return err
 		}
+		m.Value = tmp
+		m.Codec = COMPRESSION_NONE
 	}
-	err = pe.putBytes(body)
+	err = pe.putBytes(m.Value)
 	if err != nil {
 		return err
 	}
