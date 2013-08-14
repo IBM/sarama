@@ -50,7 +50,10 @@ func TestSimpleProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	producer := NewProducer(client, "myTopic", &RandomPartitioner{})
+	producer, err := NewProducer(client, "myTopic", ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 10; i++ {
 		err = producer.SendMessage(nil, StringEncoder("ABC THE MESSAGE"))
 		if err != nil {
@@ -68,7 +71,10 @@ func ExampleProducer() {
 	} else {
 		fmt.Println("> connected")
 	}
-	producer := NewProducer(client, "myTopic", RandomPartitioner{})
+	producer, err := NewProducer(client, "myTopic", ProducerConfig{})
+	if err != nil {
+		panic(err)
+	}
 
 	err = producer.SendMessage(nil, StringEncoder("testing 123"))
 	if err != nil {
