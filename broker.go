@@ -14,6 +14,7 @@ type Broker struct {
 
 	correlation_id int32
 	conn           net.Conn
+	conn_err       error
 	lock           sync.Mutex
 
 	responses chan responsePromise
@@ -27,7 +28,7 @@ type responsePromise struct {
 }
 
 // NewBroker creates and returns a Broker targetting the given host:port address.
-// This does not attempt to actually connect, you have to call Connect() for that.
+// This does not attempt to actually connect, you have to call Open() for that.
 func NewBroker(host string, port int32) *Broker {
 	b := new(Broker)
 	b.id = -1 // don't know it yet
@@ -36,32 +37,50 @@ func NewBroker(host string, port int32) *Broker {
 	return b
 }
 
-func (b *Broker) Connect() error {
+// Open tries to connect to the Broker. It takes the broker lock synchronously, then spawns a goroutine which
+// connects and releases the lock. This means any subsequent operations on the broker will block waiting for
+// the connection to finish. To get the effect of a fully synchronous Open call, follow it by a call to Connected().
+// The only error Open will return directly is AlreadyConnected.
+func (b *Broker) Open() error {
 	b.lock.Lock()
-	defer b.lock.Unlock()
 
 	if b.conn != nil {
+		b.lock.Unlock()
 		return AlreadyConnected
 	}
 
-	addr, err := net.ResolveIPAddr("ip", b.host)
-	if err != nil {
-		return err
-	}
+	go func() {
+		defer b.lock.Unlock()
 
-	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
-	if err != nil {
-		return err
-	}
+		var addr *net.IPAddr
+		addr, b.conn_err = net.ResolveIPAddr("ip", b.host)
+		if b.conn_err != nil {
+			return
+		}
 
-	b.done = make(chan bool)
+		b.conn, b.conn_err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
+		if b.conn_err != nil {
+			return
+		}
 
-	// permit a few outstanding requests before we block waiting for responses
-	b.responses = make(chan responsePromise, 4)
+		b.done = make(chan bool)
 
-	go b.responseReceiver()
+		// permit a few outstanding requests before we block waiting for responses
+		b.responses = make(chan responsePromise, 4)
+
+		go b.responseReceiver()
+	}()
 
 	return nil
+}
+
+// Connected returns true if the broker is connected and false otherwise. If the broker is not
+// connected but it had tried to connect, the error from that connection attempt is also returned.
+func (b *Broker) Connected() (bool, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	return b.conn != nil, b.conn_err
 }
 
 func (b *Broker) Close() error {
@@ -78,6 +97,7 @@ func (b *Broker) Close() error {
 	err := b.conn.Close()
 
 	b.conn = nil
+	b.conn_err = nil
 	b.done = nil
 	b.responses = nil
 
@@ -184,7 +204,11 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	defer b.lock.Unlock()
 
 	if b.conn == nil {
-		return nil, NotConnected
+		if b.conn_err != nil {
+			return nil, b.conn_err
+		} else {
+			return nil, NotConnected
+		}
 	}
 
 	fullRequest := request{b.correlation_id, clientID, req}
