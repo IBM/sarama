@@ -26,14 +26,14 @@ func NewProducer(client *Client, topic string, config ProducerConfig) (*Producer
 		return nil, ConfigurationError("Invalid Timeout")
 	}
 
+	if config.Partitioner == nil {
+		config.Partitioner = RandomPartitioner{}
+	}
+
 	p := new(Producer)
 	p.client = client
 	p.topic = topic
 	p.config = config
-
-	if p.config.Partitioner == nil {
-		p.config.Partitioner = RandomPartitioner{}
-	}
 
 	return p, nil
 }

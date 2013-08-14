@@ -36,12 +36,15 @@ var InsufficientData = errors.New("kafka: Insufficient data to decode packet, mo
 // This can be a bad CRC or length field, or any other invalid value.
 var DecodingError = errors.New("kafka: Error while decoding packet.")
 
+// MessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
+var MessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
+
 // ConfigurationError is the type of error returned from NewClient, NewProducer or NewConsumer when the specified
 // configuration is invalid.
 type ConfigurationError string
 
 func (err ConfigurationError) Error() string {
-	return "Invalid Configuration: " + string(err)
+	return "kafka: Invalid Configuration: " + string(err)
 }
 
 // KError is the type of error that can be returned directly by the Kafka broker.

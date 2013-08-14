@@ -69,7 +69,7 @@ func TestSimpleConsumer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup")
+	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup", ConsumerConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func ExampleConsumer() {
 		fmt.Println("> connected")
 	}
 
-	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup")
+	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup", ConsumerConfig{})
 	if err != nil {
 		panic(err)
 	} else {
