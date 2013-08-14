@@ -14,6 +14,7 @@ type Broker struct {
 
 	correlation_id int32
 	conn           net.Conn
+	conn_err       error
 	lock           sync.Mutex
 
 	responses chan responsePromise
@@ -27,7 +28,7 @@ type responsePromise struct {
 }
 
 // NewBroker creates and returns a Broker targetting the given host:port address.
-// This does not attempt to actually connect, you have to call Connect() for that.
+// This does not attempt to actually connect, you have to call Connect() or AsyncConnect() for that.
 func NewBroker(host string, port int32) *Broker {
 	b := new(Broker)
 	b.id = -1 // don't know it yet
@@ -40,17 +41,39 @@ func (b *Broker) Connect() error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	return b.connect()
+}
+
+// AsyncConnect tries to connect to the Broker in a non-blocking way. Calling `broker.AsyncConnect()` is
+// *NOT* the same as calling `go broker.Connect()` - AsyncConnect takes the broker lock synchronously before
+// launching its goroutine, so that subsequent operations on the broker are guaranteed to block waiting for
+// the connection instead of simply returning NotConnected. This does mean that if someone is already operating
+// on the broker, AsyncConnect may not be truly asynchronous while it waits for the lock.
+func (b *Broker) AsyncConnect() {
+	b.lock.Lock()
+
+	go func() {
+		defer b.lock.Unlock()
+		b.connect()
+	}()
+
+}
+
+func (b *Broker) connect() error {
 	if b.conn != nil {
 		return AlreadyConnected
 	}
+	b.conn_err = nil
 
 	addr, err := net.ResolveIPAddr("ip", b.host)
 	if err != nil {
+		b.conn_err = err
 		return err
 	}
 
 	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
 	if err != nil {
+		b.conn_err = err
 		return err
 	}
 
@@ -78,6 +101,7 @@ func (b *Broker) Close() error {
 	err := b.conn.Close()
 
 	b.conn = nil
+	b.conn_err = nil
 	b.done = nil
 	b.responses = nil
 
@@ -184,7 +208,11 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	defer b.lock.Unlock()
 
 	if b.conn == nil {
-		return nil, NotConnected
+		if b.conn_err != nil {
+			return nil, b.conn_err
+		} else {
+			return nil, NotConnected
+		}
 	}
 
 	fullRequest := request{b.correlation_id, clientID, req}
