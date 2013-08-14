@@ -74,6 +74,7 @@ func TestClientMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	parts, err := client.partitions("myTopic")
 	if err != nil {
@@ -88,8 +89,6 @@ func TestClientMetadata(t *testing.T) {
 	} else if tst.ID() != 5 {
 		t.Error("Leader for myTopic had incorrect ID.")
 	}
-
-	client.Close()
 }
 
 func TestClientRefreshBehaviour(t *testing.T) {
@@ -135,6 +134,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	parts, err := client.partitions("myTopic")
 	if err != nil {
@@ -151,6 +151,4 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	}
 
 	client.disconnectBroker(tst)
-
-	client.Close()
 }
