@@ -145,13 +145,15 @@ func ExampleBroker() error {
 	if err != nil {
 		return err
 	}
+	defer broker.Close()
 
 	request := MetadataRequest{Topics: []string{"myTopic"}}
 	response, err := broker.GetMetadata("myClient", &request)
+	if err != nil {
+		return err
+	}
 
 	fmt.Println("There are", len(response.Topics), "topics active in the cluster.")
-
-	broker.Close()
 
 	return nil
 }
