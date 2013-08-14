@@ -8,8 +8,8 @@ type ProducerConfig struct {
 }
 
 // Producer publishes Kafka messages on a given topic. It routes messages to the correct broker, refreshing metadata as appropriate,
-// and parses responses for errors. A Producer itself does not need to be closed (thus no Close method) but you still need to close
-// its underlying Client.
+// and parses responses for errors. You must call Close() on a producer to avoid leaks, it may not be garbage-collected automatically when
+// it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
 type Producer struct {
 	client *Client
 	topic  string
@@ -40,6 +40,15 @@ func NewProducer(client *Client, topic string, config *ProducerConfig) (*Produce
 	p.config = *config
 
 	return p, nil
+}
+
+// Close shuts down the producer and flushes any messages it may have buffered. You must call this function before
+// a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
+// on the underlying client.
+func (p *Producer) Close() error {
+	// no-op for now, adding for consistency and so the API doesn't change when we add buffering
+	// (which will require a goroutine, which will require a close method in order to flush the buffer).
+	return nil
 }
 
 // SendMessage sends a message with the given key and value. The partition to send to is selected by the Producer's Partitioner.
