@@ -22,7 +22,11 @@ type Client struct {
 // If metadata cannot be retrieved (even if the connection otherwise succeeds) then the client is not created.
 func NewClient(id string, host string, port int32) (client *Client, err error) {
 	tmp := NewBroker(host, port)
-	err = tmp.Connect()
+	err = tmp.Open()
+	if err != nil {
+		return nil, err
+	}
+	_, err = tmp.Connected()
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +231,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		if client.brokers[broker.ID()] != nil {
 			go client.brokers[broker.ID()].Close()
 		}
-		broker.AsyncConnect()
+		broker.Open()
 		client.brokers[broker.ID()] = broker
 	}
 

@@ -17,7 +17,7 @@ var IncompleteResponse = errors.New("kafka: Response did not contain all the exp
 // (meaning one outside of the range [0...numPartitions-1]).
 var InvalidPartition = errors.New("kafka: Partitioner returned an invalid partition index.")
 
-// AlreadyConnected is the error returned when calling Connect() on a Broker that is already connected.
+// AlreadyConnected is the error returned when calling Open() on a Broker that is already connected.
 var AlreadyConnected = errors.New("kafka: broker: already connected")
 
 // NotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
