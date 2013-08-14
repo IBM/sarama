@@ -2,9 +2,9 @@ package sarama
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
-	Partitioner  Partitioner  // Chooses the partition to send messages to, or randomly if this is nil
-	RequiredAcks RequiredAcks // The level of acknowledgement reliability needed from the broker
-	Timeout      int32        // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks
+	Partitioner  Partitioner  // Chooses the partition to send messages to, or randomly if this is nil.
+	RequiredAcks RequiredAcks // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
+	Timeout      int32        // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
 }
 
 // Producer publishes Kafka messages on a given topic. It routes messages to the correct broker, refreshing metadata as appropriate,

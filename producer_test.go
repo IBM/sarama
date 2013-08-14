@@ -71,7 +71,7 @@ func ExampleProducer() {
 	} else {
 		fmt.Println("> connected")
 	}
-	producer, err := NewProducer(client, "myTopic", ProducerConfig{})
+	producer, err := NewProducer(client, "myTopic", ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
 	if err != nil {
 		panic(err)
 	}
