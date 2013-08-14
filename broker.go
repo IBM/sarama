@@ -63,18 +63,16 @@ func (b *Broker) connect() error {
 	if b.conn != nil {
 		return AlreadyConnected
 	}
-	b.conn_err = nil
 
-	addr, err := net.ResolveIPAddr("ip", b.host)
-	if err != nil {
-		b.conn_err = err
-		return err
+	var addr *net.IPAddr
+	addr, b.conn_err = net.ResolveIPAddr("ip", b.host)
+	if b.conn_err != nil {
+		return b.conn_err
 	}
 
-	b.conn, err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
-	if err != nil {
-		b.conn_err = err
-		return err
+	b.conn, b.conn_err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
+	if b.conn_err != nil {
+		return b.conn_err
 	}
 
 	b.done = make(chan bool)
