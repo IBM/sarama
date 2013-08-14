@@ -27,7 +27,11 @@ type Client struct {
 // NewClient creates a new Client with the given client ID. It connects to the broker at the given
 // host:port address, and uses that broker to automatically fetch metadata on the rest of the kafka cluster.
 // If metadata cannot be retrieved (even if the connection otherwise succeeds) then the client is not created.
-func NewClient(id string, host string, port int32, config ClientConfig) (client *Client, err error) {
+func NewClient(id string, host string, port int32, config *ClientConfig) (client *Client, err error) {
+	if config == nil {
+		config = new(ClientConfig)
+	}
+
 	if config.MetadataRetries < 0 {
 		return nil, ConfigurationError("Invalid MetadataRetries")
 	}
@@ -40,7 +44,7 @@ func NewClient(id string, host string, port int32, config ClientConfig) (client 
 
 	client = new(Client)
 	client.id = id
-	client.config = config
+	client.config = *config
 
 	client.brokers = make(map[int32]*Broker)
 	client.leaders = make(map[string]map[int32]int32)

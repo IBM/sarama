@@ -35,7 +35,11 @@ type Consumer struct {
 
 // NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
 // part of the named consumer group.
-func NewConsumer(client *Client, topic string, partition int32, group string, config ConsumerConfig) (*Consumer, error) {
+func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
+	if config == nil {
+		config = new(ConsumerConfig)
+	}
+
 	if config.DefaultFetchSize < 0 {
 		return nil, ConfigurationError("Invalid DefaultFetchSize")
 	} else if config.DefaultFetchSize == 0 {
@@ -66,7 +70,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 	c.topic = topic
 	c.partition = partition
 	c.group = group
-	c.config = config
+	c.config = *config
 
 	// We should really be sending an OffsetFetchRequest, but that doesn't seem to
 	// work in kafka yet. Hopefully will in beta 2...

@@ -17,7 +17,11 @@ type Producer struct {
 }
 
 // NewProducer creates a new Producer using the given client. The resulting producer will publish messages on the given topic.
-func NewProducer(client *Client, topic string, config ProducerConfig) (*Producer, error) {
+func NewProducer(client *Client, topic string, config *ProducerConfig) (*Producer, error) {
+	if config == nil {
+		config = new(ProducerConfig)
+	}
+
 	if config.RequiredAcks < -1 {
 		return nil, ConfigurationError("Invalid RequiredAcks")
 	}
@@ -33,7 +37,7 @@ func NewProducer(client *Client, topic string, config ProducerConfig) (*Producer
 	p := new(Producer)
 	p.client = client
 	p.topic = topic
-	p.config = config
+	p.config = *config
 
 	return p, nil
 }
