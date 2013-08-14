@@ -141,17 +141,19 @@ func NewMockBroker(t *testing.T, responses chan []byte) *MockBroker {
 
 func ExampleBroker() error {
 	broker := NewBroker("localhost", 9092)
-	err := broker.Connect()
+	err := broker.Open()
+	if err != nil {
+		return err
+	}
+	defer broker.Close()
+
+	request := MetadataRequest{Topics: []string{"myTopic"}}
+	response, err := broker.GetMetadata("myClient", &request)
 	if err != nil {
 		return err
 	}
 
-	request := MetadataRequest{Topics: []string{"myTopic"}}
-	response, err := broker.GetMetadata("myClient", &request)
-
 	fmt.Println("There are", len(response.Topics), "topics active in the cluster.")
-
-	broker.Close()
 
 	return nil
 }
@@ -217,7 +219,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	defer mockBroker.Close()
 
 	broker := NewBroker("localhost", mockBroker.Port())
-	err := broker.Connect()
+	err := broker.Open()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,7 +22,11 @@ type Client struct {
 // If metadata cannot be retrieved (even if the connection otherwise succeeds) then the client is not created.
 func NewClient(id string, host string, port int32) (client *Client, err error) {
 	tmp := NewBroker(host, port)
-	err = tmp.Connect()
+	err = tmp.Open()
+	if err != nil {
+		return nil, err
+	}
+	_, err = tmp.Connected()
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +181,7 @@ func (client *Client) cachedLeader(topic string, partition_id int32) *Broker {
 	partitions := client.leaders[topic]
 	if partitions != nil {
 		leader, ok := partitions[partition_id]
-		if ok && leader != -1 {
+		if ok {
 			return client.brokers[leader]
 		}
 	}
@@ -205,34 +209,29 @@ func (client *Client) cachedPartitions(topic string) []int32 {
 
 // if no fatal error, returns a list of topics that need retrying due to LEADER_NOT_AVAILABLE
 func (client *Client) update(data *MetadataResponse) ([]string, error) {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+
 	// First discard brokers that we already know about. This avoids bouncing TCP connections,
 	// and especially avoids closing valid connections out from under other code which may be trying
-	// to use them. We only need a read-lock for this.
+	// to use them.
 	var newBrokers []*Broker
-	client.lock.RLock()
 	for _, broker := range data.Brokers {
 		if !broker.Equals(client.brokers[broker.ID()]) {
 			newBrokers = append(newBrokers, broker)
 		}
 	}
-	client.lock.RUnlock()
 
-	// connect to the brokers before taking the write lock, as this can take a while
-	// to timeout if one of them isn't reachable
-	for _, broker := range newBrokers {
-		err := broker.Connect()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	client.lock.Lock()
-	defer client.lock.Unlock()
-
+	// Now asynchronously try to open connections to the new brokers. We don't care if they
+	// fail, since maybe that broker is unreachable but doesn't have a topic we care about.
+	// If it fails and we do care, whoever tries to use it will get the connection error.
+	// If we have an old broker with that ID (but a different host/port, since they didn't
+	// compare as equals above) then close and remove that broker before saving the new one.
 	for _, broker := range newBrokers {
 		if client.brokers[broker.ID()] != nil {
 			go client.brokers[broker.ID()].Close()
 		}
+		broker.Open()
 		client.brokers[broker.ID()] = broker
 	}
 
@@ -251,11 +250,8 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		for _, partition := range topic.Partitions {
 			switch partition.Err {
 			case LEADER_NOT_AVAILABLE:
-				// in the LEADER_NOT_AVAILABLE case partition.Leader will be -1 because the
-				// partition is in the middle of leader election, so we fallthrough to save it
-				// anyways in order to avoid returning the stale leader (since -1 isn't a valid broker ID)
 				toRetry[topic.Name] = true
-				fallthrough
+				delete(client.leaders[topic.Name], partition.Id)
 			case NO_ERROR:
 				client.leaders[topic.Name][partition.Id] = partition.Leader
 			default:
