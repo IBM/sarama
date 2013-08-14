@@ -45,12 +45,15 @@ func TestSimpleProducer(t *testing.T) {
 		}
 	}()
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port())
+	client, err := NewClient("clientID", "localhost", mockBroker.Port(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	producer := NewProducer(client, "myTopic", &RandomPartitioner{})
+	producer, err := NewProducer(client, "myTopic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for i := 0; i < 10; i++ {
 		err = producer.SendMessage(nil, StringEncoder("ABC THE MESSAGE"))
 		if err != nil {
@@ -62,13 +65,16 @@ func TestSimpleProducer(t *testing.T) {
 }
 
 func ExampleProducer() {
-	client, err := NewClient("myClient", "localhost", 9092)
+	client, err := NewClient("myClient", "localhost", 9092, nil)
 	if err != nil {
 		panic(err)
 	} else {
 		fmt.Println("> connected")
 	}
-	producer := NewProducer(client, "myTopic", RandomPartitioner{})
+	producer, err := NewProducer(client, "myTopic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
+	if err != nil {
+		panic(err)
+	}
 
 	err = producer.SendMessage(nil, StringEncoder("testing 123"))
 	if err != nil {
