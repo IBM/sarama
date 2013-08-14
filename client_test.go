@@ -13,7 +13,7 @@ func TestSimpleClient(t *testing.T) {
 	// Only one response needed, an empty metadata response
 	responses <- []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port())
+	client, err := NewClient("clientID", "localhost", mockBroker.Port(), ClientConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestClientExtraBrokers(t *testing.T) {
 	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
 	responses <- response
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port())
+	client, err := NewClient("clientID", "localhost", mockBroker.Port(), ClientConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +70,7 @@ func TestClientMetadata(t *testing.T) {
 	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
 	responses <- response
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port())
+	client, err := NewClient("clientID", "localhost", mockBroker.Port(), ClientConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00}
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port())
+	client, err := NewClient("clientID", "localhost", mockBroker.Port(), ClientConfig{MetadataRetries: 1})
 	if err != nil {
 		t.Fatal(err)
 	}

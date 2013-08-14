@@ -64,7 +64,7 @@ func TestSimpleConsumer(t *testing.T) {
 			0x00, 0x00, 0x00, 0x00}
 	}()
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port())
+	client, err := NewClient("clientID", "localhost", mockBroker.Port(), ClientConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func TestSimpleConsumer(t *testing.T) {
 }
 
 func ExampleConsumer() {
-	client, err := NewClient("myClient", "localhost", 9092)
+	client, err := NewClient("myClient", "localhost", 9092, ClientConfig{})
 	if err != nil {
 		panic(err)
 	} else {
