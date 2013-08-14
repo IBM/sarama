@@ -58,20 +58,14 @@ func TestMetadataResponseWithBrokers(t *testing.T) {
 		if response.Brokers[0].id != 0xabff {
 			t.Error("Decoding produced invalid broker 0 id.")
 		}
-		if response.Brokers[0].host != "localhost" {
-			t.Error("Decoding produced invalid broker 0 host.")
-		}
-		if response.Brokers[0].port != 0x33 {
-			t.Error("Decoding produced invalid broker 0 port.")
+		if response.Brokers[0].addr != "localhost:51" {
+			t.Error("Decoding produced invalid broker 0 address.")
 		}
 		if response.Brokers[1].id != 0x010203 {
 			t.Error("Decoding produced invalid broker 1 id.")
 		}
-		if response.Brokers[1].host != "google.com" {
-			t.Error("Decoding produced invalid broker 1 host.")
-		}
-		if response.Brokers[1].port != 0x111 {
-			t.Error("Decoding produced invalid broker 1 port.")
+		if response.Brokers[1].addr != "google.com:273" {
+			t.Error("Decoding produced invalid broker 1 address.")
 		}
 	} else {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were two!")

@@ -28,9 +28,12 @@ type MockBroker struct {
 	t         *testing.T
 }
 
-// Port is the kernel-select TCP port the broker is listening on.
 func (b *MockBroker) Port() int32 {
 	return b.port
+}
+
+func (b *MockBroker) Addr() string {
+	return b.listener.Addr().String()
 }
 
 // Close closes the response channel originally provided, then waits to make sure
@@ -140,7 +143,7 @@ func NewMockBroker(t *testing.T, responses chan []byte) *MockBroker {
 }
 
 func ExampleBroker() error {
-	broker := NewBroker("localhost", 9092)
+	broker := NewBroker("localhost:9092")
 	err := broker.Open()
 	if err != nil {
 		return err
@@ -168,7 +171,7 @@ func TestBrokerEquals(t *testing.T) {
 		t.Error("Two nil brokers didn't compare equal.")
 	}
 
-	b1 = NewBroker("abc", 123)
+	b1 = NewBroker("abc:123")
 
 	if b1.Equals(b2) {
 		t.Error("Non-nil and nil brokers compared equal.")
@@ -177,17 +180,12 @@ func TestBrokerEquals(t *testing.T) {
 		t.Error("Nil and non-nil brokers compared equal.")
 	}
 
-	b2 = NewBroker("abc", 1234)
+	b2 = NewBroker("abc:1234")
 	if b1.Equals(b2) || b2.Equals(b1) {
-		t.Error("Brokers with different ports compared equal.")
+		t.Error("Brokers with different addrs compared equal.")
 	}
 
-	b2 = NewBroker("abcd", 123)
-	if b1.Equals(b2) || b2.Equals(b1) {
-		t.Error("Brokers with different hosts compared equal.")
-	}
-
-	b2 = NewBroker("abc", 123)
+	b2 = NewBroker("abc:123")
 	b2.id = -2
 	if b1.Equals(b2) || b2.Equals(b1) {
 		t.Error("Brokers with different ids compared equal.")
@@ -201,7 +199,7 @@ func TestBrokerEquals(t *testing.T) {
 
 func TestBrokerID(t *testing.T) {
 
-	broker := NewBroker("abc", 123)
+	broker := NewBroker("abc:123")
 
 	if broker.ID() != -1 {
 		t.Error("New broker didn't have an ID of -1.")
@@ -218,7 +216,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	mockBroker := NewMockBroker(t, responses)
 	defer mockBroker.Close()
 
-	broker := NewBroker("localhost", mockBroker.Port())
+	broker := NewBroker(mockBroker.Addr())
 	err := broker.Open()
 	if err != nil {
 		t.Fatal(err)

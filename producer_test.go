@@ -45,7 +45,7 @@ func TestSimpleProducer(t *testing.T) {
 		}
 	}()
 
-	client, err := NewClient("clientID", "localhost", mockBroker.Port(), nil)
+	client, err := NewClient("clientID", mockBroker.Addr(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestSimpleProducer(t *testing.T) {
 }
 
 func ExampleProducer() {
-	client, err := NewClient("myClient", "localhost", 9092, nil)
+	client, err := NewClient("myClient", "localhost:9092", nil)
 	if err != nil {
 		panic(err)
 	} else {

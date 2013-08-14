@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -9,8 +10,7 @@ import (
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
 type Broker struct {
 	id   int32
-	host string
-	port int32
+	addr string
 
 	correlation_id int32
 	conn           net.Conn
@@ -29,11 +29,10 @@ type responsePromise struct {
 
 // NewBroker creates and returns a Broker targetting the given host:port address.
 // This does not attempt to actually connect, you have to call Open() for that.
-func NewBroker(host string, port int32) *Broker {
+func NewBroker(addr string) *Broker {
 	b := new(Broker)
 	b.id = -1 // don't know it yet
-	b.host = host
-	b.port = port
+	b.addr = addr
 	return b
 }
 
@@ -52,13 +51,7 @@ func (b *Broker) Open() error {
 	go func() {
 		defer b.lock.Unlock()
 
-		var addr *net.IPAddr
-		addr, b.conn_err = net.ResolveIPAddr("ip", b.host)
-		if b.conn_err != nil {
-			return
-		}
-
-		b.conn, b.conn_err = net.DialTCP("tcp", nil, &net.TCPAddr{IP: addr.IP, Port: int(b.port)})
+		b.conn, b.conn_err = net.Dial("tcp", b.addr)
 		if b.conn_err != nil {
 			return
 		}
@@ -109,7 +102,7 @@ func (b *Broker) ID() int32 {
 	return b.id
 }
 
-// Equals compares two brokers. Two brokers are considered equal if they have the same host, port, and id,
+// Equals compares two brokers. Two brokers are considered equal if they have the same address and id,
 // or if they are both nil.
 func (b *Broker) Equals(a *Broker) bool {
 	switch {
@@ -118,7 +111,7 @@ func (b *Broker) Equals(a *Broker) bool {
 	case (a == nil && b != nil) || (a != nil && b == nil):
 		return false
 	}
-	return a.id == b.id && a.host == b.host && a.port == b.port
+	return a.id == b.id && a.addr == b.addr
 }
 
 func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*MetadataResponse, error) {
@@ -260,15 +253,17 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	b.host, err = pd.getString()
+	host, err := pd.getString()
 	if err != nil {
 		return err
 	}
 
-	b.port, err = pd.getInt32()
+	port, err := pd.getInt32()
 	if err != nil {
 		return err
 	}
+
+	b.addr = fmt.Sprint(host, ":", port)
 
 	return nil
 }
