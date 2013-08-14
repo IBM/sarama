@@ -68,11 +68,13 @@ func TestSimpleConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer consumer.Close()
 
 	for i := 0; i < 10; i++ {
 		select {
@@ -84,9 +86,6 @@ func TestSimpleConsumer(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
-	consumer.Close()
-	client.Close()
 }
 
 func ExampleConsumer() {
@@ -96,6 +95,7 @@ func ExampleConsumer() {
 	} else {
 		fmt.Println("> connected")
 	}
+	defer client.Close()
 
 	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup", nil)
 	if err != nil {
@@ -103,6 +103,7 @@ func ExampleConsumer() {
 	} else {
 		fmt.Println("> consumer ready")
 	}
+	defer consumer.Close()
 
 consumerLoop:
 	for {
@@ -116,7 +117,4 @@ consumerLoop:
 			break consumerLoop
 		}
 	}
-
-	consumer.Close()
-	client.Close()
 }

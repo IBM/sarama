@@ -99,9 +99,10 @@ func (c *Consumer) Messages() <-chan *MessageBlock {
 // Close stops the consumer from fetching messages. It is required to call this function before
 // a consumer object passes out of scope, as it will otherwise leak memory. You must call this before
 // calling Close on the underlying client.
-func (c *Consumer) Close() {
+func (c *Consumer) Close() error {
 	close(c.stopper)
 	<-c.done
+	return nil
 }
 
 // helper function for safely sending an error on the errors channel

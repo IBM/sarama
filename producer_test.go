@@ -49,19 +49,20 @@ func TestSimpleProducer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	producer, err := NewProducer(client, "myTopic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer producer.Close()
+
 	for i := 0; i < 10; i++ {
 		err = producer.SendMessage(nil, StringEncoder("ABC THE MESSAGE"))
 		if err != nil {
 			t.Error(err)
 		}
 	}
-
-	client.Close()
 }
 
 func ExampleProducer() {
@@ -71,10 +72,13 @@ func ExampleProducer() {
 	} else {
 		fmt.Println("> connected")
 	}
+	defer client.Close()
+
 	producer, err := NewProducer(client, "myTopic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
 	if err != nil {
 		panic(err)
 	}
+	defer producer.Close()
 
 	err = producer.SendMessage(nil, StringEncoder("testing 123"))
 	if err != nil {
@@ -82,6 +86,4 @@ func ExampleProducer() {
 	} else {
 		fmt.Println("> message sent")
 	}
-
-	client.Close()
 }

@@ -78,7 +78,7 @@ func NewClient(id string, host string, port int32, config *ClientConfig) (client
 // Close shuts down all broker connections managed by this client. It is required to call this function before
 // a client object passes out of scope, as it will otherwise leak memory. You must close any Producers or Consumers
 // using a client before you close the client.
-func (client *Client) Close() {
+func (client *Client) Close() error {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
@@ -87,6 +87,7 @@ func (client *Client) Close() {
 	}
 	client.brokers = nil
 	client.leaders = nil
+	return nil
 }
 
 // functions for use by producers and consumers
