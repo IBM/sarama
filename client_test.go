@@ -13,7 +13,7 @@ func TestSimpleClient(t *testing.T) {
 	// Only one response needed, an empty metadata response
 	responses <- []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 
-	client, err := NewClient("clientID", []string{mockBroker.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestClientExtraBrokers(t *testing.T) {
 	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
 	responses <- response
 
-	client, err := NewClient("clientID", []string{mockBroker.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestClientMetadata(t *testing.T) {
 
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
-		0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
@@ -70,24 +70,24 @@ func TestClientMetadata(t *testing.T) {
 	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
 	responses <- response
 
-	client, err := NewClient("clientID", []string{mockBroker.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	parts, err := client.partitions("myTopic")
+	parts, err := client.partitions("my_topic")
 	if err != nil {
 		t.Error(err)
 	} else if len(parts) != 1 || parts[0] != 0 {
-		t.Error("Client returned incorrect partitions for myTopic:", parts)
+		t.Error("Client returned incorrect partitions for my_topic:", parts)
 	}
 
-	tst, err := client.leader("myTopic", 0)
+	tst, err := client.leader("my_topic", 0)
 	if err != nil {
 		t.Error(err)
 	} else if tst.ID() != 5 {
-		t.Error("Leader for myTopic had incorrect ID.")
+		t.Error("Leader for my_topic had incorrect ID.")
 	}
 }
 
@@ -112,7 +112,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
-		0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x05,
 		0x00, 0x00, 0x00, 0x0e,
@@ -123,7 +123,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
-		0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
 		0x00, 0x00, 0x00, 0x0b,
@@ -137,18 +137,18 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	}
 	defer client.Close()
 
-	parts, err := client.partitions("myTopic")
+	parts, err := client.partitions("my_topic")
 	if err != nil {
 		t.Error(err)
 	} else if len(parts) != 1 || parts[0] != 0xb {
-		t.Error("Client returned incorrect partitions for myTopic:", parts)
+		t.Error("Client returned incorrect partitions for my_topic:", parts)
 	}
 
-	tst, err := client.leader("myTopic", 0xb)
+	tst, err := client.leader("my_topic", 0xb)
 	if err != nil {
 		t.Error(err)
 	} else if tst.ID() != 0xaa {
-		t.Error("Leader for myTopic had incorrect ID.")
+		t.Error("Leader for my_topic had incorrect ID.")
 	}
 
 	client.disconnectBroker(tst)

@@ -22,7 +22,7 @@ func TestSimpleProducer(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
-		0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
@@ -35,7 +35,7 @@ func TestSimpleProducer(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			msg := []byte{
 				0x00, 0x00, 0x00, 0x01,
-				0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+				0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 				0x00, 0x00, 0x00, 0x01,
 				0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00,
@@ -45,13 +45,13 @@ func TestSimpleProducer(t *testing.T) {
 		}
 	}()
 
-	client, err := NewClient("clientID", []string{mockBroker.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, "myTopic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
+	producer, err := NewProducer(client, "my_topic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestSimpleProducer(t *testing.T) {
 }
 
 func ExampleProducer() {
-	client, err := NewClient("myClient", []string{"localhost:9092"}, nil)
+	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
 	} else {
@@ -74,7 +74,7 @@ func ExampleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, "myTopic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
+	producer, err := NewProducer(client, "my_topic", &ProducerConfig{RequiredAcks: WAIT_FOR_LOCAL})
 	if err != nil {
 		panic(err)
 	}

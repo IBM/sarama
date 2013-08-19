@@ -23,7 +23,7 @@ func TestSimpleConsumer(t *testing.T) {
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
-		0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00,
@@ -36,7 +36,7 @@ func TestSimpleConsumer(t *testing.T) {
 		for i := 0; i < 10; i++ {
 			msg := []byte{
 				0x00, 0x00, 0x00, 0x01,
-				0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+				0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 				0x00, 0x00, 0x00, 0x01,
 				0x00, 0x00, 0x00, 0x00,
 				0x00, 0x00,
@@ -51,12 +51,12 @@ func TestSimpleConsumer(t *testing.T) {
 				0x00,
 				0xFF, 0xFF, 0xFF, 0xFF,
 				0x00, 0x00, 0x00, 0x02, 0x00, 0xEE}
-			binary.BigEndian.PutUint64(msg[35:], uint64(i))
+			binary.BigEndian.PutUint64(msg[36:], uint64(i))
 			extraResponses <- msg
 		}
 		extraResponses <- []byte{
 			0x00, 0x00, 0x00, 0x01,
-			0x00, 0x07, 'm', 'y', 'T', 'o', 'p', 'i', 'c',
+			0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
 			0x00, 0x00, 0x00, 0x01,
 			0x00, 0x00, 0x00, 0x00,
 			0x00, 0x00,
@@ -64,13 +64,13 @@ func TestSimpleConsumer(t *testing.T) {
 			0x00, 0x00, 0x00, 0x00}
 	}()
 
-	client, err := NewClient("clientID", []string{mockBroker.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup", nil)
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestSimpleConsumer(t *testing.T) {
 }
 
 func ExampleConsumer() {
-	client, err := NewClient("myClient", []string{"localhost:9092"}, nil)
+	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
 	} else {
@@ -96,7 +96,7 @@ func ExampleConsumer() {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "myTopic", 0, "myConsumerGroup", nil)
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
 	if err != nil {
 		panic(err)
 	} else {
