@@ -77,13 +77,12 @@ func TestSimpleConsumer(t *testing.T) {
 	defer consumer.Close()
 
 	for i := 0; i < 10; i++ {
-		select {
-		case msg := <-consumer.Messages():
-			if msg.Offset != int64(i) {
-				t.Error("Incorrect message offset!")
-			}
-		case err := <-consumer.Errors():
+		event := <-consumer.Events()
+		if event.Err != nil {
 			t.Error(err)
+		}
+		if event.Offset != int64(i) {
+			t.Error("Incorrect message offset!")
 		}
 	}
 }
@@ -105,16 +104,19 @@ func ExampleConsumer() {
 	}
 	defer consumer.Close()
 
+	msgCount := 0
 consumerLoop:
 	for {
 		select {
-		case msg := <-consumer.Messages():
-			fmt.Println(msg)
-		case err := <-consumer.Errors():
-			panic(err)
+		case event := <-consumer.Events():
+			if event.Err != nil {
+				panic(event.Err)
+			}
+			msgCount += 1
 		case <-time.After(5 * time.Second):
 			fmt.Println("> timed out")
 			break consumerLoop
 		}
 	}
+	fmt.Println("Got", msgCount, "messages.")
 }
