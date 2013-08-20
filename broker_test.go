@@ -197,12 +197,16 @@ func TestBrokerEquals(t *testing.T) {
 	}
 }
 
-func TestBrokerID(t *testing.T) {
+func TestBrokerAccessors(t *testing.T) {
 
 	broker := NewBroker("abc:123")
 
 	if broker.ID() != -1 {
 		t.Error("New broker didn't have an ID of -1.")
+	}
+
+	if broker.Addr() != "abc:123" {
+		t.Error("New broker didn't have the correct address")
 	}
 
 	broker.id = 34
