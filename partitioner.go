@@ -8,8 +8,8 @@ import (
 )
 
 // Partitioner is anything that, given a Kafka message key and a number of partitions indexed [0...numPartitions-1],
-// decides to which partition to send the message. RandomPartitioner and RoundRobinPartitioner are the
-// two simple default implementations.
+// decides to which partition to send the message. RandomPartitioner, RoundRobinPartitioner and HashPartitioner are provided
+// as simple default implementations.
 type Partitioner interface {
 	Partition(key Encoder, numPartitions int) int
 }
