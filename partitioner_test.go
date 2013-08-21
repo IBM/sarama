@@ -16,7 +16,7 @@ func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Enc
 }
 
 func TestRandomPartitioner(t *testing.T) {
-	partitioner := RandomPartitioner{}
+	partitioner := NewRandomPartitioner()
 
 	choice := partitioner.Partition(nil, 1)
 	if choice != 0 {
@@ -48,7 +48,7 @@ func TestRoundRobinPartitioner(t *testing.T) {
 }
 
 func TestHashPartitioner(t *testing.T) {
-	partitioner := HashPartitioner{}
+	partitioner := NewHashPartitioner()
 
 	choice := partitioner.Partition(nil, 1)
 	if choice != 0 {

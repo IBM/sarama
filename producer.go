@@ -32,7 +32,7 @@ func NewProducer(client *Client, topic string, config *ProducerConfig) (*Produce
 	}
 
 	if config.Partitioner == nil {
-		config.Partitioner = RandomPartitioner{}
+		config.Partitioner = NewRandomPartitioner()
 	}
 
 	p := new(Producer)
