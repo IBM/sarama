@@ -24,6 +24,8 @@ type Message struct {
 	Codec CompressionCodec // codec used to compress the message contents
 	Key   []byte           // the message key, may be nil
 	Value []byte           // the message contents
+
+	compressedCache []byte
 }
 
 func (m *Message) encode(pe packetEncoder) error {
@@ -40,25 +42,35 @@ func (m *Message) encode(pe packetEncoder) error {
 		return err
 	}
 
-	switch m.Codec {
-	case COMPRESSION_GZIP:
-		if m.Value != nil {
+	var payload []byte
+
+	if m.compressedCache != nil {
+		payload = m.compressedCache
+		m.compressedCache = nil
+	} else {
+		switch m.Codec {
+		case COMPRESSION_NONE:
+			payload = m.Value
+		case COMPRESSION_GZIP:
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
 			writer.Write(m.Value)
 			writer.Close()
-			m.Value = buf.Bytes()
-			m.Codec = COMPRESSION_NONE
+			m.compressedCache = buf.Bytes()
+			payload = m.compressedCache
+		case COMPRESSION_SNAPPY:
+			tmp, err := snappy.Encode(nil, m.Value)
+			if err != nil {
+				return err
+			}
+			m.compressedCache = tmp
+			payload = m.compressedCache
+		default:
+			return EncodingError
 		}
-	case COMPRESSION_SNAPPY:
-		tmp, err := snappy.Encode(nil, m.Value)
-		if err != nil {
-			return err
-		}
-		m.Value = tmp
-		m.Codec = COMPRESSION_NONE
 	}
-	err = pe.putBytes(m.Value)
+
+	err = pe.putBytes(payload)
 	if err != nil {
 		return err
 	}
