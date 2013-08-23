@@ -9,10 +9,10 @@ const (
 	OFFSET_METHOD_MANUAL OffsetMethod = iota
 	// OFFSET_METHOD_NEWEST causes the consumer to start at the most recent available offset, as
 	// determined by querying the broker.
-	OFFSET_METHOD_NEWEST OffsetMethod = iota
+	OFFSET_METHOD_NEWEST
 	// OFFSET_METHOD_OLDEST causes the consumer to start at the oldest available offset, as
 	// determined by querying the broker.
-	OFFSET_METHOD_OLDEST OffsetMethod = iota
+	OFFSET_METHOD_OLDEST
 )
 
 // ConsumerConfig is used to pass multiple configuration options to NewConsumer.
