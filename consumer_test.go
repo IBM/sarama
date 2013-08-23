@@ -116,7 +116,7 @@ func TestConsumerRawOffset(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: RAW_OFFSET, OffsetValue: 1234})
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: METHOD_MANUAL, OffsetValue: 1234})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: LATEST_OFFSET})
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: METHOD_NEWEST})
 	if err != nil {
 		t.Fatal(err)
 	}
