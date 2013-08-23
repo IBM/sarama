@@ -4,12 +4,12 @@ package sarama
 type OffsetMethod int
 
 const (
-	// METHOD_MANUAL causes the consumer to interpret the OffsetValue in the ConsumerConfig as the
+	// OFFSET_METHOD_MANUAL causes the consumer to interpret the OffsetValue in the ConsumerConfig as the
 	// offset at which to start, allowing the user to manually specify their desired starting offset.
-	METHOD_MANUAL OffsetMethod = iota
-	// METHOD_NEWEST causes the consumer to start at the most recent available offset, as determined
-	// by querying the broker.
-	METHOD_NEWEST OffsetMethod = iota
+	OFFSET_METHOD_MANUAL OffsetMethod = iota
+	// OFFSET_METHOD_NEWEST causes the consumer to start at the most recent available offset, as
+	// determined by querying the broker.
+	OFFSET_METHOD_NEWEST OffsetMethod = iota
 )
 
 // ConsumerConfig is used to pass multiple configuration options to NewConsumer.
@@ -97,12 +97,12 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 	c.broker = broker
 
 	switch config.OffsetMethod {
-	case METHOD_MANUAL:
+	case OFFSET_METHOD_MANUAL:
 		if config.OffsetValue < 0 {
 			return nil, ConfigurationError("OffsetValue cannot be < 0 when OffsetMethod is MANUAL")
 		}
 		c.offset = config.OffsetValue
-	case METHOD_NEWEST:
+	case OFFSET_METHOD_NEWEST:
 		c.offset, err = c.getLatestOffset(true)
 		if err != nil {
 			return nil, err
