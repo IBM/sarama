@@ -156,6 +156,7 @@ func (c *Consumer) fetchMessages() {
 					return
 				}
 			}
+			continue
 		}
 
 		block := response.GetBlock(c.topic, c.partition)
