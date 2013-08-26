@@ -1,8 +1,11 @@
 package sarama
 
-import "testing"
+import (
+	"crypto/rand"
+	"testing"
+)
 
-func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Encoder, numPartitions int) {
+func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Encoder, numPartitions int32) {
 	choice := partitioner.Partition(key, numPartitions)
 	if choice < 0 || choice >= numPartitions {
 		t.Error(partitioner, "returned partition", choice, "outside of range for", key)
@@ -39,7 +42,8 @@ func TestRoundRobinPartitioner(t *testing.T) {
 		t.Error("Returned non-zero partition when only one available.")
 	}
 
-	for i := 1; i < 50; i++ {
+	var i int32
+	for i = 1; i < 50; i++ {
 		choice := partitioner.Partition(nil, 7)
 		if choice != i%7 {
 			t.Error("Returned partition", choice, "expecting", i%7)
@@ -62,7 +66,9 @@ func TestHashPartitioner(t *testing.T) {
 		}
 	}
 
-	assertPartitioningConsistent(t, partitioner, StringEncoder("ABC"), 50)
-	assertPartitioningConsistent(t, partitioner, StringEncoder("ABCDEF"), 37)
-	assertPartitioningConsistent(t, partitioner, StringEncoder("some random thing"), 3)
+	buf := make([]byte, 256)
+	for i := 1; i < 50; i++ {
+		rand.Read(buf)
+		assertPartitioningConsistent(t, partitioner, ByteEncoder(buf), 50)
+	}
 }
