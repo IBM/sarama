@@ -58,7 +58,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (client *Client,
 	client.leaders = make(map[string]map[int32]int32)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
-	err = client.refreshTopics(make([]string, 0), client.config.MetadataRetries)
+	err = client.RefreshAllMetadata()
 	if err != nil {
 		client.Close() // this closes tmp, since it's still in the brokers hash
 		return nil, err
@@ -87,32 +87,12 @@ func (client *Client) Close() error {
 	return nil
 }
 
-// functions for use by producers and consumers
-// if Go had the concept they would be marked 'protected'
-
-func (client *Client) leader(topic string, partition_id int32) (*Broker, error) {
-	leader := client.cachedLeader(topic, partition_id)
-
-	if leader == nil {
-		err := client.refreshTopic(topic)
-		if err != nil {
-			return nil, err
-		}
-		leader = client.cachedLeader(topic, partition_id)
-	}
-
-	if leader == nil {
-		return nil, UNKNOWN_TOPIC_OR_PARTITION
-	}
-
-	return leader, nil
-}
-
-func (client *Client) partitions(topic string) ([]int32, error) {
+// Partitions returns the sorted list of available partition IDs for the given topic.
+func (client *Client) Partitions(topic string) ([]int32, error) {
 	partitions := client.cachedPartitions(topic)
 
 	if partitions == nil {
-		err := client.refreshTopic(topic)
+		err := client.RefreshTopicMetadata(topic)
 		if err != nil {
 			return nil, err
 		}
@@ -124,6 +104,53 @@ func (client *Client) partitions(topic string) ([]int32, error) {
 	}
 
 	return partitions, nil
+}
+
+// Topics returns the set of available topics as retrieved from the cluster metadata.
+func (client *Client) Topics() ([]string, error) {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	ret := make([]string, 0, len(client.leaders))
+	for topic, _ := range client.leaders {
+		ret = append(ret, topic)
+	}
+
+	return ret, nil
+}
+
+// RefreshTopicMetadata takes a list of topics and queries the cluster to refresh the
+// available metadata for those topics.
+func (client *Client) RefreshTopicMetadata(topics ...string) error {
+	return client.refreshMetadata(topics, client.config.MetadataRetries)
+}
+
+// RefreshAllMetadata queries the cluster to refresh the available metadata for all topics.
+func (client *Client) RefreshAllMetadata() error {
+	// Kafka refreshes all when you encode it an empty array...
+	return client.refreshMetadata(make([]string, 0), client.config.MetadataRetries)
+}
+
+// functions for use by producers and consumers
+// if Go had the concept they would be marked 'protected'
+// TODO: see https://github.com/Shopify/sarama/issues/23
+
+func (client *Client) leader(topic string, partition_id int32) (*Broker, error) {
+	leader := client.cachedLeader(topic, partition_id)
+
+	if leader == nil {
+		err := client.RefreshTopicMetadata(topic)
+		if err != nil {
+			return nil, err
+		}
+		leader = client.cachedLeader(topic, partition_id)
+	}
+
+	if leader == nil {
+		return nil, UNKNOWN_TOPIC_OR_PARTITION
+	}
+
+	return leader, nil
 }
 
 func (client *Client) disconnectBroker(broker *Broker) {
@@ -147,16 +174,9 @@ func (client *Client) disconnectBroker(broker *Broker) {
 	go broker.Close()
 }
 
-func (client *Client) refreshTopic(topic string) error {
-	tmp := make([]string, 1)
-	tmp[0] = topic
-	// we permit three retries by default, 'cause that seemed like a nice number
-	return client.refreshTopics(tmp, client.config.MetadataRetries)
-}
-
 // truly private helper functions
 
-func (client *Client) refreshTopics(topics []string, retries int) error {
+func (client *Client) refreshMetadata(topics []string, retries int) error {
 	for broker := client.any(); broker != nil; broker = client.any() {
 		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
 
@@ -174,7 +194,7 @@ func (client *Client) refreshTopics(topics []string, retries int) error {
 					return LEADER_NOT_AVAILABLE
 				}
 				time.Sleep(client.config.WaitForElection) // wait for leader election
-				return client.refreshTopics(retry, retries-1)
+				return client.refreshMetadata(retry, retries-1)
 			}
 		case EncodingError:
 			// didn't even send, return the error

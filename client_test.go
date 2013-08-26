@@ -76,7 +76,14 @@ func TestClientMetadata(t *testing.T) {
 	}
 	defer client.Close()
 
-	parts, err := client.partitions("my_topic")
+	topics, err := client.Topics()
+	if err != nil {
+		t.Error(err)
+	} else if len(topics) != 1 || topics[0] != "my_topic" {
+		t.Error("Client returned incorrect topics:", topics)
+	}
+
+	parts, err := client.Partitions("my_topic")
 	if err != nil {
 		t.Error(err)
 	} else if len(parts) != 1 || parts[0] != 0 {
@@ -137,7 +144,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	}
 	defer client.Close()
 
-	parts, err := client.partitions("my_topic")
+	parts, err := client.Partitions("my_topic")
 	if err != nil {
 		t.Error(err)
 	} else if len(parts) != 1 || parts[0] != 0xb {
