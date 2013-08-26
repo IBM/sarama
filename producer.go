@@ -59,7 +59,7 @@ func (p *Producer) SendMessage(key, value Encoder) error {
 }
 
 func (p *Producer) choosePartition(key Encoder) (int32, error) {
-	partitions, err := p.client.partitions(p.topic)
+	partitions, err := p.client.Partitions(p.topic)
 	if err != nil {
 		return -1, err
 	}
@@ -133,7 +133,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		if !retry {
 			return block.Err
 		}
-		err = p.client.refreshTopic(p.topic)
+		err = p.client.RefreshTopicMetadata(p.topic)
 		if err != nil {
 			return err
 		}
