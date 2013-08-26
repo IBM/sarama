@@ -215,7 +215,7 @@ func (c *Consumer) fetchMessages() {
 		case NO_ERROR:
 			break
 		case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
-			err = c.client.refreshTopic(c.topic)
+			err = c.client.RefreshTopicMetadata(c.topic)
 			if c.sendError(err) {
 				for c.broker = nil; err != nil; c.broker, err = c.client.leader(c.topic, c.partition) {
 					if !c.sendError(err) {
@@ -317,7 +317,7 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 		if !retry {
 			return -1, block.Err
 		}
-		err = c.client.refreshTopic(c.topic)
+		err = c.client.RefreshTopicMetadata(c.topic)
 		if err != nil {
 			return -1, err
 		}
