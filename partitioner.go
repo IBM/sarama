@@ -11,7 +11,7 @@ import (
 // decides to which partition to send the message. RandomPartitioner, RoundRobinPartitioner and HashPartitioner are provided
 // as simple default implementations.
 type Partitioner interface {
-	Partition(key Encoder, numPartitions int) int
+	Partition(key Encoder, numPartitions int32) int32
 }
 
 // RandomPartitioner implements the Partitioner interface by choosing a random partition each time.
@@ -25,16 +25,16 @@ func NewRandomPartitioner() *RandomPartitioner {
 	return p
 }
 
-func (p *RandomPartitioner) Partition(key Encoder, numPartitions int) int {
-	return p.generator.Intn(numPartitions)
+func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+	return int32(p.generator.Intn(int(numPartitions)))
 }
 
 // RoundRobinPartitioner implements the Partitioner interface by walking through the available partitions one at a time.
 type RoundRobinPartitioner struct {
-	partition int
+	partition int32
 }
 
-func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int) int {
+func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int32 {
 	if p.partition >= numPartitions {
 		p.partition = 0
 	}
@@ -58,7 +58,7 @@ func NewHashPartitioner() *HashPartitioner {
 	return p
 }
 
-func (p *HashPartitioner) Partition(key Encoder, numPartitions int) int {
+func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
 	if key == nil {
 		return p.random.Partition(key, numPartitions)
 	}
@@ -68,5 +68,9 @@ func (p *HashPartitioner) Partition(key Encoder, numPartitions int) int {
 	}
 	p.hasher.Reset()
 	p.hasher.Write(bytes)
-	return int(p.hasher.Sum32()) % numPartitions
+	hash := int32(p.hasher.Sum32())
+	if hash < 0 {
+		hash = -hash
+	}
+	return hash % numPartitions
 }

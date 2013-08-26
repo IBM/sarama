@@ -64,9 +64,11 @@ func (p *Producer) choosePartition(key Encoder) (int32, error) {
 		return -1, err
 	}
 
-	choice := p.config.Partitioner.Partition(key, len(partitions))
+	numPartitions := int32(len(partitions))
 
-	if choice >= len(partitions) {
+	choice := p.config.Partitioner.Partition(key, numPartitions)
+
+	if choice < 0 || choice >= numPartitions {
 		return -1, InvalidPartition
 	}
 
