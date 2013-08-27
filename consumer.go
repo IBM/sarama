@@ -96,7 +96,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 		return nil, ConfigurationError("Invalid EventBufferSize")
 	}
 
-	broker, err := client.leader(topic, partition)
+	broker, err := client.Leader(topic, partition)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +194,7 @@ func (c *Consumer) fetchMessages() {
 			}
 		default:
 			c.client.disconnectBroker(c.broker)
-			for c.broker = nil; err != nil; c.broker, err = c.client.leader(c.topic, c.partition) {
+			for c.broker = nil; err != nil; c.broker, err = c.client.Leader(c.topic, c.partition) {
 				if !c.sendError(err) {
 					return
 				}
@@ -217,7 +217,7 @@ func (c *Consumer) fetchMessages() {
 		case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
 			err = c.client.RefreshTopicMetadata(c.topic)
 			if c.sendError(err) {
-				for c.broker = nil; err != nil; c.broker, err = c.client.leader(c.topic, c.partition) {
+				for c.broker = nil; err != nil; c.broker, err = c.client.Leader(c.topic, c.partition) {
 					if !c.sendError(err) {
 						return
 					}
@@ -295,7 +295,7 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 			return -1, err
 		}
 		c.client.disconnectBroker(c.broker)
-		c.broker, err = c.client.leader(c.topic, c.partition)
+		c.broker, err = c.client.Leader(c.topic, c.partition)
 		if err != nil {
 			return -1, err
 		}
@@ -321,7 +321,7 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 		if err != nil {
 			return -1, err
 		}
-		c.broker, err = c.client.leader(c.topic, c.partition)
+		c.broker, err = c.client.Leader(c.topic, c.partition)
 		if err != nil {
 			return -1, err
 		}

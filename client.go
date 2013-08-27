@@ -119,23 +119,9 @@ func (client *Client) Topics() ([]string, error) {
 	return ret, nil
 }
 
-// RefreshTopicMetadata takes a list of topics and queries the cluster to refresh the
-// available metadata for those topics.
-func (client *Client) RefreshTopicMetadata(topics ...string) error {
-	return client.refreshMetadata(topics, client.config.MetadataRetries)
-}
-
-// RefreshAllMetadata queries the cluster to refresh the available metadata for all topics.
-func (client *Client) RefreshAllMetadata() error {
-	// Kafka refreshes all when you encode it an empty array...
-	return client.refreshMetadata(make([]string, 0), client.config.MetadataRetries)
-}
-
-// functions for use by producers and consumers
-// if Go had the concept they would be marked 'protected'
-// TODO: see https://github.com/Shopify/sarama/issues/23
-
-func (client *Client) leader(topic string, partition_id int32) (*Broker, error) {
+// Leader returns the broker object that is the leader of the current topic/partition, as
+// determined by querying the cluster metadata.
+func (client *Client) Leader(topic string, partition_id int32) (*Broker, error) {
 	leader := client.cachedLeader(topic, partition_id)
 
 	if leader == nil {
@@ -153,6 +139,24 @@ func (client *Client) leader(topic string, partition_id int32) (*Broker, error) 
 	return leader, nil
 }
 
+// RefreshTopicMetadata takes a list of topics and queries the cluster to refresh the
+// available metadata for those topics.
+func (client *Client) RefreshTopicMetadata(topics ...string) error {
+	return client.refreshMetadata(topics, client.config.MetadataRetries)
+}
+
+// RefreshAllMetadata queries the cluster to refresh the available metadata for all topics.
+func (client *Client) RefreshAllMetadata() error {
+	// Kafka refreshes all when you encode it an empty array...
+	return client.refreshMetadata(make([]string, 0), client.config.MetadataRetries)
+}
+
+// misc private helper functions
+
+// XXX: see https://github.com/Shopify/sarama/issues/15
+//      and https://github.com/Shopify/sarama/issues/23
+// disconnectBroker is a bad hacky way to accomplish broker management. It should be replaced with
+// something sane and the replacement should be made part of the public Client API
 func (client *Client) disconnectBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
@@ -173,8 +177,6 @@ func (client *Client) disconnectBroker(broker *Broker) {
 
 	go broker.Close()
 }
-
-// truly private helper functions
 
 func (client *Client) refreshMetadata(topics []string, retries int) error {
 	for broker := client.any(); broker != nil; broker = client.any() {
