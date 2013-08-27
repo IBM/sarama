@@ -95,7 +95,7 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		return err
 	}
 
-	broker, err := p.client.leader(p.topic, partition)
+	broker, err := p.client.Leader(p.topic, partition)
 	if err != nil {
 		return err
 	}
