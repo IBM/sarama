@@ -107,18 +107,6 @@ func (b *Broker) Addr() string {
 	return b.addr
 }
 
-// Equals compares two brokers. Two brokers are considered equal if they have the same address and id,
-// or if they are both nil.
-func (b *Broker) Equals(a *Broker) bool {
-	switch {
-	case a == nil && b == nil:
-		return true
-	case (a == nil && b != nil) || (a != nil && b == nil):
-		return false
-	}
-	return a.id == b.id && a.addr == b.addr
-}
-
 func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
 
