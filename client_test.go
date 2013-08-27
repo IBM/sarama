@@ -90,7 +90,7 @@ func TestClientMetadata(t *testing.T) {
 		t.Error("Client returned incorrect partitions for my_topic:", parts)
 	}
 
-	tst, err := client.leader("my_topic", 0)
+	tst, err := client.Leader("my_topic", 0)
 	if err != nil {
 		t.Error(err)
 	} else if tst.ID() != 5 {
@@ -151,7 +151,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 		t.Error("Client returned incorrect partitions for my_topic:", parts)
 	}
 
-	tst, err := client.leader("my_topic", 0xb)
+	tst, err := client.Leader("my_topic", 0xb)
 	if err != nil {
 		t.Error(err)
 	} else if tst.ID() != 0xaa {
