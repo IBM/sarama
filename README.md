@@ -5,7 +5,7 @@ Sarama is an MIT-licensed Go client library for Apache Kafka 0.8 (and later).
 
 Documentation is available via godoc at http://godoc.org/github.com/Shopify/sarama
 
-It is compatible with Go 1.0 and 1.1 (which means `go vet` on Go 1.1 will return
+It is compatible with Go 1.0 and 1.1 (which means `go vet` on 1.1 will return
 some suggestions that we are ignoring for the sake of compatibility with 1.0).
 
 A word of warning: the API is not 100% stable yet. It won't change much (in particular the low-level
