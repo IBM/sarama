@@ -136,8 +136,12 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 		return nil, InsufficientData
 	}
 
-	if n <= 0 {
+	if n == 0 {
 		return nil, nil
+	}
+
+	if n < 0 {
+		return nil, DecodingError
 	}
 
 	ret := make([]int32, n)
@@ -161,8 +165,12 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 		return nil, InsufficientData
 	}
 
-	if n <= 0 {
+	if n == 0 {
 		return nil, nil
+	}
+
+	if n < 0 {
+		return nil, DecodingError
 	}
 
 	ret := make([]int64, n)
