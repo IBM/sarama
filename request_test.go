@@ -31,7 +31,7 @@ func (s *testRequestBody) encode(pe packetEncoder) error {
 }
 
 func TestRequest(t *testing.T) {
-	request := request{correlation_id: 0x1234, id: "myClient", body: new(testRequestBody)}
+	request := request{correlationID: 0x1234, id: "myClient", body: new(testRequestBody)}
 	testEncodable(t, "simple", &request, requestSimple)
 }
 

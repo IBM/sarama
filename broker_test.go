@@ -225,26 +225,26 @@ var brokerTestTable = []struct {
 	{[]byte{},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
-			request.RequiredAcks = NO_RESPONSE
+			request.RequiredAcks = NoResponse
 			response, err := broker.Produce("clientID", &request)
 			if err != nil {
 				t.Error(err)
 			}
 			if response != nil {
-				t.Error("Produce request with NO_RESPONSE got a response!")
+				t.Error("Produce request with NoResponse got a response!")
 			}
 		}},
 
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
-			request.RequiredAcks = WAIT_FOR_LOCAL
+			request.RequiredAcks = WaitForLocal
 			response, err := broker.Produce("clientID", &request)
 			if err != nil {
 				t.Error(err)
 			}
 			if response == nil {
-				t.Error("Produce request without NO_RESPONSE got no response!")
+				t.Error("Produce request without NoResponse got no response!")
 			}
 		}},
 
