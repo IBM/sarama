@@ -101,13 +101,17 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 		return nil, err
 	}
 
-	c := new(Consumer)
-	c.client = client
-	c.topic = topic
-	c.partition = partition
-	c.group = group
-	c.config = *config
-	c.broker = broker
+	c := &Consumer{
+		client:    client,
+		topic:     topic,
+		partition: partition,
+		group:     group,
+		config:    *config,
+		broker:    broker,
+		stopper:   make(chan bool),
+		done:      make(chan bool),
+		events:    make(chan *ConsumerEvent, config.EventBufferSize),
+	}
 
 	switch config.OffsetMethod {
 	case OffsetMethodManual:
@@ -128,10 +132,6 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 	default:
 		return nil, ConfigurationError("Invalid OffsetMethod")
 	}
-
-	c.stopper = make(chan bool)
-	c.done = make(chan bool)
-	c.events = make(chan *ConsumerEvent, config.EventBufferSize)
 
 	go c.fetchMessages()
 

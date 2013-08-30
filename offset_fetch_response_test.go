@@ -41,24 +41,28 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 	if response.ClientID != "za" {
 		t.Error("Decoding produced wrong client ID.")
 	}
-	if len(response.Blocks) == 2 {
-		if len(response.Blocks["m"]) != 0 {
-			t.Error("Decoding produced partitions for topic 'm' where there were none.")
-		}
-		if len(response.Blocks["t"]) == 1 {
-			if response.Blocks["t"][0].Offset != 0 {
-				t.Error("Decoding produced wrong offset for topic 't' partition 0.")
-			}
-			if response.Blocks["t"][0].Metadata != "md" {
-				t.Error("Decoding produced wrong metadata for topic 't' partition 0.")
-			}
-			if response.Blocks["t"][0].Err != RequestTimedOut {
-				t.Error("Decoding produced wrong error for topic 't' partition 0.")
-			}
-		} else {
-			t.Error("Decoding produced wrong number of blocks for topic 't'.")
-		}
-	} else {
-		t.Error("Decoding produced wrong number of blocks.")
+
+	if len(response.Blocks) != 2 {
+		t.Fatal("Decoding produced wrong number of blocks.")
+	}
+
+	if len(response.Blocks["m"]) != 0 {
+		t.Error("Decoding produced partitions for topic 'm' where there were none.")
+	}
+
+	if len(response.Blocks["t"]) != 1 {
+		t.Fatal("Decoding produced wrong number of blocks for topic 't'.")
+	}
+
+	if response.Blocks["t"][0].Offset != 0 {
+		t.Error("Decoding produced wrong offset for topic 't' partition 0.")
+	}
+
+	if response.Blocks["t"][0].Metadata != "md" {
+		t.Error("Decoding produced wrong metadata for topic 't' partition 0.")
+	}
+
+	if response.Blocks["t"][0].Err != RequestTimedOut {
+		t.Error("Decoding produced wrong error for topic 't' partition 0.")
 	}
 }

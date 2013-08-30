@@ -34,7 +34,7 @@ type Client struct {
 // NewClient creates a new Client with the given client ID. It connects to one of the given broker addresses
 // and uses that broker to automatically fetch metadata on the rest of the kafka cluster. If metadata cannot
 // be retrieved from any of the given broker addresses, the client is not created.
-func NewClient(id string, addrs []string, config *ClientConfig) (client *Client, err error) {
+func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error) {
 	if config == nil {
 		config = new(ClientConfig)
 	}
@@ -47,18 +47,18 @@ func NewClient(id string, addrs []string, config *ClientConfig) (client *Client,
 		return nil, ConfigurationError("You must provide at least one broker address")
 	}
 
-	client = new(Client)
-	client.id = id
-	client.config = *config
-	client.extraBrokerAddrs = addrs
-	client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
+	client := &Client{
+		id:               id,
+		config:           *config,
+		extraBrokerAddrs: addrs,
+		extraBroker:      NewBroker(addrs[0]),
+		brokers:          make(map[int32]*Broker),
+		leaders:          make(map[string]map[int32]int32),
+	}
 	client.extraBroker.Open()
 
-	client.brokers = make(map[int32]*Broker)
-	client.leaders = make(map[string]map[int32]int32)
-
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
-	err = client.RefreshAllMetadata()
+	err := client.RefreshAllMetadata()
 	if err != nil {
 		client.Close() // this closes tmp, since it's still in the brokers hash
 		return nil, err

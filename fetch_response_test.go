@@ -42,44 +42,43 @@ func TestOneMessageFetchResponse(t *testing.T) {
 	response := FetchResponse{}
 	testDecodable(t, "one message", &response, oneMessageFetchResponse)
 
-	if len(response.Blocks) == 1 {
-		if len(response.Blocks["topic"]) == 1 {
-			block := response.GetBlock("topic", 5)
-			if block != nil {
-				if block.Err != OffsetOutOfRange {
-					t.Error("Decoding didn't produce correct error code.")
-				}
-				if block.HighWaterMarkOffset != 0x10101010 {
-					t.Error("Decoding didn't produce correct high water mark offset.")
-				}
-				if block.MsgSet.PartialTrailingMessage {
-					t.Error("Decoding detected a partial trailing message where there wasn't one.")
-				}
-				if len(block.MsgSet.Messages) == 1 {
-					msgBlock := block.MsgSet.Messages[0]
-					if msgBlock.Offset != 0x550000 {
-						t.Error("Decoding produced incorrect message offset.")
-					}
-					msg := msgBlock.Msg
-					if msg.Codec != CompressionNone {
-						t.Error("Decoding produced incorrect message compression.")
-					}
-					if msg.Key != nil {
-						t.Error("Decoding produced message key where there was none.")
-					}
-					if !bytes.Equal(msg.Value, []byte{0x00, 0xEE}) {
-						t.Error("Decoding produced incorrect message value.")
-					}
-				} else {
-					t.Error("Decoding produced incorrect number of messages.")
-				}
-			} else {
-				t.Error("GetBlock didn't return block.")
-			}
-		} else {
-			t.Error("Decoding produced incorrect number of partition blocks for topic.")
-		}
-	} else {
-		t.Error("Decoding produced incorrect number of topic blocks.")
+	if len(response.Blocks) != 1 {
+		t.Fatal("Decoding produced incorrect number of topic blocks.")
+	}
+
+	if len(response.Blocks["topic"]) != 1 {
+		t.Fatal("Decoding produced incorrect number of partition blocks for topic.")
+	}
+
+	block := response.GetBlock("topic", 5)
+	if block == nil {
+		t.Fatal("GetBlock didn't return block.")
+	}
+	if block.Err != OffsetOutOfRange {
+		t.Error("Decoding didn't produce correct error code.")
+	}
+	if block.HighWaterMarkOffset != 0x10101010 {
+		t.Error("Decoding didn't produce correct high water mark offset.")
+	}
+	if block.MsgSet.PartialTrailingMessage {
+		t.Error("Decoding detected a partial trailing message where there wasn't one.")
+	}
+
+	if len(block.MsgSet.Messages) != 1 {
+		t.Fatal("Decoding produced incorrect number of messages.")
+	}
+	msgBlock := block.MsgSet.Messages[0]
+	if msgBlock.Offset != 0x550000 {
+		t.Error("Decoding produced incorrect message offset.")
+	}
+	msg := msgBlock.Msg
+	if msg.Codec != CompressionNone {
+		t.Error("Decoding produced incorrect message compression.")
+	}
+	if msg.Key != nil {
+		t.Error("Decoding produced message key where there was none.")
+	}
+	if !bytes.Equal(msg.Value, []byte{0x00, 0xEE}) {
+		t.Error("Decoding produced incorrect message value.")
 	}
 }

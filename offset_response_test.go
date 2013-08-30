@@ -34,26 +34,29 @@ func TestNormalOffsetResponse(t *testing.T) {
 	response := OffsetResponse{}
 
 	testDecodable(t, "normal", &response, normalOffsetResponse)
-	if len(response.Blocks) == 2 {
-		if len(response.Blocks["a"]) != 0 {
-			t.Error("Decoding produced", len(response.Blocks["a"]), "partitions for topic 'a' where there were none.")
-		}
 
-		if len(response.Blocks["z"]) == 1 {
-			if response.Blocks["z"][2].Err != NoError {
-				t.Error("Decoding produced invalid error for topic z partition 2.")
-			}
-			if len(response.Blocks["z"][2].Offsets) == 2 {
-				if response.Blocks["z"][2].Offsets[0] != 5 || response.Blocks["z"][2].Offsets[1] != 6 {
-					t.Error("Decoding produced invalid offsets for topic z partition 2.")
-				}
-			} else {
-				t.Error("Decoding produced invalid number of offsets for topic z partition 2.")
-			}
-		} else {
-			t.Error("Decoding produced", len(response.Blocks["z"]), "partitions for topic 'z' where there was one.")
-		}
-	} else {
-		t.Error("Decoding produced", len(response.Blocks), "topics where there were two.")
+	if len(response.Blocks) != 2 {
+		t.Fatal("Decoding produced", len(response.Blocks), "topics where there were two.")
 	}
+
+	if len(response.Blocks["a"]) != 0 {
+		t.Fatal("Decoding produced", len(response.Blocks["a"]), "partitions for topic 'a' where there were none.")
+	}
+
+	if len(response.Blocks["z"]) != 1 {
+		t.Fatal("Decoding produced", len(response.Blocks["z"]), "partitions for topic 'z' where there was one.")
+	}
+
+	if response.Blocks["z"][2].Err != NoError {
+		t.Fatal("Decoding produced invalid error for topic z partition 2.")
+	}
+
+	if len(response.Blocks["z"][2].Offsets) != 2 {
+		t.Fatal("Decoding produced invalid number of offsets for topic z partition 2.")
+	}
+
+	if response.Blocks["z"][2].Offsets[0] != 5 || response.Blocks["z"][2].Offsets[1] != 6 {
+		t.Fatal("Decoding produced invalid offsets for topic z partition 2.")
+	}
+
 }
