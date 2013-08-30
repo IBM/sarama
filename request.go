@@ -7,16 +7,16 @@ type requestEncoder interface {
 }
 
 type request struct {
-	correlation_id int32
-	id             string
-	body           requestEncoder
+	correlationID int32
+	id            string
+	body          requestEncoder
 }
 
 func (r *request) encode(pe packetEncoder) (err error) {
 	pe.push(&lengthField{})
 	pe.putInt16(r.body.key())
 	pe.putInt16(r.body.version())
-	pe.putInt32(r.correlation_id)
+	pe.putInt32(r.correlationID)
 	err = pe.putString(r.id)
 	if err != nil {
 		return err

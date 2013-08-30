@@ -83,17 +83,17 @@ func TestMetadataResponseWithTopics(t *testing.T) {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
 	}
 	if len(response.Topics) == 2 {
-		if response.Topics[0].Err != NO_ERROR {
+		if response.Topics[0].Err != NoError {
 			t.Error("Decoding produced invalid topic 0 error.")
 		}
 		if response.Topics[0].Name != "foo" {
 			t.Error("Decoding produced invalid topic 0 name.")
 		}
 		if len(response.Topics[0].Partitions) == 1 {
-			if response.Topics[0].Partitions[0].Err != INVALID_MESSAGE_SIZE {
+			if response.Topics[0].Partitions[0].Err != InvalidMessageSize {
 				t.Error("Decoding produced invalid topic 0 partition 0 error.")
 			}
-			if response.Topics[0].Partitions[0].Id != 0x01 {
+			if response.Topics[0].Partitions[0].ID != 0x01 {
 				t.Error("Decoding produced invalid topic 0 partition 0 id.")
 			}
 			if response.Topics[0].Partitions[0].Leader != 0x07 {
@@ -114,7 +114,7 @@ func TestMetadataResponseWithTopics(t *testing.T) {
 		} else {
 			t.Error("Decoding produced invalid partition count for topic 0.")
 		}
-		if response.Topics[1].Err != NO_ERROR {
+		if response.Topics[1].Err != NoError {
 			t.Error("Decoding produced invalid topic 1 error.")
 		}
 		if response.Topics[1].Name != "bar" {

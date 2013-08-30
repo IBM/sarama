@@ -12,28 +12,25 @@ type Broker struct {
 	id   int32
 	addr string
 
-	correlation_id int32
-	conn           net.Conn
-	conn_err       error
-	lock           sync.Mutex
+	correlationID int32
+	conn          net.Conn
+	connErr       error
+	lock          sync.Mutex
 
 	responses chan responsePromise
 	done      chan bool
 }
 
 type responsePromise struct {
-	correlation_id int32
-	packets        chan []byte
-	errors         chan error
+	correlationID int32
+	packets       chan []byte
+	errors        chan error
 }
 
 // NewBroker creates and returns a Broker targetting the given host:port address.
 // This does not attempt to actually connect, you have to call Open() for that.
 func NewBroker(addr string) *Broker {
-	b := new(Broker)
-	b.id = -1 // don't know it yet
-	b.addr = addr
-	return b
+	return &Broker{id: -1, addr: addr}
 }
 
 // Open tries to connect to the Broker. It takes the broker lock synchronously, then spawns a goroutine which
@@ -51,8 +48,8 @@ func (b *Broker) Open() error {
 	go func() {
 		defer b.lock.Unlock()
 
-		b.conn, b.conn_err = net.Dial("tcp", b.addr)
-		if b.conn_err != nil {
+		b.conn, b.connErr = net.Dial("tcp", b.addr)
+		if b.connErr != nil {
 			return
 		}
 
@@ -73,7 +70,7 @@ func (b *Broker) Connected() (bool, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	return b.conn != nil, b.conn_err
+	return b.conn != nil, b.connErr
 }
 
 func (b *Broker) Close() error {
@@ -90,7 +87,7 @@ func (b *Broker) Close() error {
 	err := b.conn.Close()
 
 	b.conn = nil
-	b.conn_err = nil
+	b.connErr = nil
 	b.done = nil
 	b.responses = nil
 
@@ -135,7 +132,7 @@ func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResp
 	var response *ProduceResponse
 	var err error
 
-	if request.RequiredAcks == NO_RESPONSE {
+	if request.RequiredAcks == NoResponse {
 		err = b.sendAndReceive(clientID, request, nil)
 	} else {
 		response = new(ProduceResponse)
@@ -190,14 +187,13 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	defer b.lock.Unlock()
 
 	if b.conn == nil {
-		if b.conn_err != nil {
-			return nil, b.conn_err
-		} else {
-			return nil, NotConnected
+		if b.connErr != nil {
+			return nil, b.connErr
 		}
+		return nil, NotConnected
 	}
 
-	fullRequest := request{b.correlation_id, clientID, req}
+	fullRequest := request{b.correlationID, clientID, req}
 	buf, err := encode(&fullRequest)
 	if err != nil {
 		return nil, err
@@ -207,13 +203,13 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	if err != nil {
 		return nil, err
 	}
-	b.correlation_id++
+	b.correlationID++
 
 	if !promiseResponse {
 		return nil, nil
 	}
 
-	promise := responsePromise{fullRequest.correlation_id, make(chan []byte), make(chan error)}
+	promise := responsePromise{fullRequest.correlationID, make(chan []byte), make(chan error)}
 	b.responses <- promise
 
 	return &promise, nil
@@ -276,7 +272,7 @@ func (b *Broker) responseReceiver() {
 			response.errors <- err
 			continue
 		}
-		if decodedHeader.correlation_id != response.correlation_id {
+		if decodedHeader.correlationID != response.correlationID {
 			response.errors <- DecodingError
 			continue
 		}

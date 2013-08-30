@@ -27,14 +27,14 @@ func TestMessageEncoding(t *testing.T) {
 	testEncodable(t, "empty", &message, emptyMessage)
 
 	message.Value = []byte{}
-	message.Codec = COMPRESSION_GZIP
+	message.Codec = CompressionGZIP
 	testEncodable(t, "empty gzip", &message, emptyGzipMessage)
 }
 
 func TestMessageDecoding(t *testing.T) {
 	message := Message{}
 	testDecodable(t, "empty", &message, emptyMessage)
-	if message.Codec != COMPRESSION_NONE {
+	if message.Codec != CompressionNone {
 		t.Error("Decoding produced compression codec where there was none.")
 	}
 	if message.Key != nil {
@@ -45,7 +45,7 @@ func TestMessageDecoding(t *testing.T) {
 	}
 
 	testDecodable(t, "empty gzip", &message, emptyGzipMessage)
-	if message.Codec != COMPRESSION_GZIP {
+	if message.Codec != CompressionGZIP {
 		t.Error("Decoding produced incorrect compression codec (was gzip).")
 	}
 	if message.Key != nil {

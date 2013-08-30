@@ -46,7 +46,7 @@ func TestOneMessageFetchResponse(t *testing.T) {
 		if len(response.Blocks["topic"]) == 1 {
 			block := response.GetBlock("topic", 5)
 			if block != nil {
-				if block.Err != OFFSET_OUT_OF_RANGE {
+				if block.Err != OffsetOutOfRange {
 					t.Error("Decoding didn't produce correct error code.")
 				}
 				if block.HighWaterMarkOffset != 0x10101010 {
@@ -61,7 +61,7 @@ func TestOneMessageFetchResponse(t *testing.T) {
 						t.Error("Decoding produced incorrect message offset.")
 					}
 					msg := msgBlock.Msg
-					if msg.Codec != COMPRESSION_NONE {
+					if msg.Codec != CompressionNone {
 						t.Error("Decoding produced incorrect message compression.")
 					}
 					if msg.Key != nil {

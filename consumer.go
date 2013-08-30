@@ -4,15 +4,15 @@ package sarama
 type OffsetMethod int
 
 const (
-	// OFFSET_METHOD_MANUAL causes the consumer to interpret the OffsetValue in the ConsumerConfig as the
+	// OffsetMethodManual causes the consumer to interpret the OffsetValue in the ConsumerConfig as the
 	// offset at which to start, allowing the user to manually specify their desired starting offset.
-	OFFSET_METHOD_MANUAL OffsetMethod = iota
-	// OFFSET_METHOD_NEWEST causes the consumer to start at the most recent available offset, as
+	OffsetMethodManual OffsetMethod = iota
+	// OffsetMethodNewest causes the consumer to start at the most recent available offset, as
 	// determined by querying the broker.
-	OFFSET_METHOD_NEWEST
-	// OFFSET_METHOD_OLDEST causes the consumer to start at the oldest available offset, as
+	OffsetMethodNewest
+	// OffsetMethodOldest causes the consumer to start at the oldest available offset, as
 	// determined by querying the broker.
-	OFFSET_METHOD_OLDEST
+	OffsetMethodOldest
 )
 
 // ConsumerConfig is used to pass multiple configuration options to NewConsumer.
@@ -110,18 +110,18 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 	c.broker = broker
 
 	switch config.OffsetMethod {
-	case OFFSET_METHOD_MANUAL:
+	case OffsetMethodManual:
 		if config.OffsetValue < 0 {
 			return nil, ConfigurationError("OffsetValue cannot be < 0 when OffsetMethod is MANUAL")
 		}
 		c.offset = config.OffsetValue
-	case OFFSET_METHOD_NEWEST:
-		c.offset, err = c.getOffset(LATEST_OFFSETS, true)
+	case OffsetMethodNewest:
+		c.offset, err = c.getOffset(LatestOffsets, true)
 		if err != nil {
 			return nil, err
 		}
-	case OFFSET_METHOD_OLDEST:
-		c.offset, err = c.getOffset(EARLIEST_OFFSET, true)
+	case OffsetMethodOldest:
+		c.offset, err = c.getOffset(EarliestOffset, true)
 		if err != nil {
 			return nil, err
 		}
@@ -174,7 +174,7 @@ func (c *Consumer) sendError(err error) bool {
 
 func (c *Consumer) fetchMessages() {
 
-	var fetchSize int32 = c.config.DefaultFetchSize
+	fetchSize := c.config.DefaultFetchSize
 
 	for {
 		request := new(FetchRequest)
@@ -212,9 +212,9 @@ func (c *Consumer) fetchMessages() {
 		}
 
 		switch block.Err {
-		case NO_ERROR:
+		case NoError:
 			break
-		case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
+		case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 			err = c.client.RefreshTopicMetadata(c.topic)
 			if c.sendError(err) {
 				for c.broker, err = c.client.Leader(c.topic, c.partition); err != nil; c.broker, err = c.client.Leader(c.topic, c.partition) {
@@ -308,12 +308,12 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 	}
 
 	switch block.Err {
-	case NO_ERROR:
+	case NoError:
 		if len(block.Offsets) < 1 {
 			return -1, IncompleteResponse
 		}
 		return block.Offsets[0], nil
-	case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
+	case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 		if !retry {
 			return -1, block.Err
 		}

@@ -52,7 +52,7 @@ func (r *OffsetCommitRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetCommitRequest) AddBlock(topic string, partition_id int32, offset int64, metadata string) {
+func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset int64, metadata string) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetCommitRequestBlock)
 	}
@@ -65,5 +65,5 @@ func (r *OffsetCommitRequest) AddBlock(topic string, partition_id int32, offset 
 	tmp.offset = offset
 	tmp.metadata = metadata
 
-	r.blocks[topic][partition_id] = tmp
+	r.blocks[topic][partitionID] = tmp
 }

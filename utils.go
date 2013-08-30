@@ -15,7 +15,7 @@ func (slice int32Slice) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
-// A simple interface for any type that can be encoded as an array of bytes
+// Encoder is a simple interface for any type that can be encoded as an array of bytes
 // in order to be sent as the key or value of a Kafka message.
 type Encoder interface {
 	Encode() ([]byte, error)

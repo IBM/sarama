@@ -19,7 +19,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 		return -1, InsufficientData
 	}
 	tmp := int8(rd.raw[rd.off])
-	rd.off += 1
+	rd.off += binary.Size(tmp)
 	return tmp, nil
 }
 
@@ -29,7 +29,7 @@ func (rd *realDecoder) getInt16() (int16, error) {
 		return -1, InsufficientData
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
-	rd.off += 2
+	rd.off += binary.Size(tmp)
 	return tmp, nil
 }
 
@@ -39,7 +39,7 @@ func (rd *realDecoder) getInt32() (int32, error) {
 		return -1, InsufficientData
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
-	rd.off += 4
+	rd.off += binary.Size(tmp)
 	return tmp, nil
 }
 
@@ -49,7 +49,7 @@ func (rd *realDecoder) getInt64() (int64, error) {
 		return -1, InsufficientData
 	}
 	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
-	rd.off += 8
+	rd.off += binary.Size(tmp)
 	return tmp, nil
 }
 
@@ -131,16 +131,19 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
-	var ret []int32 = nil
 	if rd.remaining() < 4*n {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
-	} else if n > 0 {
-		ret = make([]int32, n)
-		for i := range ret {
-			ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
-			rd.off += 4
-		}
+	}
+
+	if n <= 0 {
+		return nil, nil
+	}
+
+	ret := make([]int32, n)
+	for i := range ret {
+		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+		rd.off += 4
 	}
 	return ret, nil
 }
@@ -153,16 +156,19 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
-	var ret []int64 = nil
 	if rd.remaining() < 8*n {
 		rd.off = len(rd.raw)
 		return nil, InsufficientData
-	} else if n > 0 {
-		ret = make([]int64, n)
-		for i := range ret {
-			ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
-			rd.off += 8
-		}
+	}
+
+	if n <= 0 {
+		return nil, nil
+	}
+
+	ret := make([]int64, n)
+	for i := range ret {
+		ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
+		rd.off += 8
 	}
 	return ret, nil
 }

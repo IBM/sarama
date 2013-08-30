@@ -40,7 +40,7 @@ func TestNormalOffsetResponse(t *testing.T) {
 		}
 
 		if len(response.Blocks["z"]) == 1 {
-			if response.Blocks["z"][2].Err != NO_ERROR {
+			if response.Blocks["z"][2].Err != NoError {
 				t.Error("Decoding produced invalid error for topic z partition 2.")
 			}
 			if len(response.Blocks["z"][2].Offsets) == 2 {

@@ -44,7 +44,7 @@ func TestNormalOffsetCommitResponse(t *testing.T) {
 			t.Error("Decoding produced errors for topic 'm' where there were none.")
 		}
 		if len(response.Errors["t"]) == 1 {
-			if response.Errors["t"][0] != NOT_LEADER_FOR_PARTITION {
+			if response.Errors["t"][0] != NotLeaderForPartition {
 				t.Error("Decoding produced wrong error for topic 't' partition 0.")
 			}
 		} else {

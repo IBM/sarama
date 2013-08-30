@@ -52,7 +52,7 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 			if response.Blocks["t"][0].Metadata != "md" {
 				t.Error("Decoding produced wrong metadata for topic 't' partition 0.")
 			}
-			if response.Blocks["t"][0].Err != REQUEST_TIMED_OUT {
+			if response.Blocks["t"][0].Err != RequestTimedOut {
 				t.Error("Decoding produced wrong error for topic 't' partition 0.")
 			}
 		} else {

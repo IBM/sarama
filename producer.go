@@ -127,9 +127,9 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 	}
 
 	switch block.Err {
-	case NO_ERROR:
+	case NoError:
 		return nil
-	case UNKNOWN_TOPIC_OR_PARTITION, NOT_LEADER_FOR_PARTITION, LEADER_NOT_AVAILABLE:
+	case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 		if !retry {
 			return block.Err
 		}

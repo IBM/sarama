@@ -12,22 +12,22 @@ type realEncoder struct {
 
 func (re *realEncoder) putInt8(in int8) {
 	re.raw[re.off] = byte(in)
-	re.off += 1
+	re.off += binary.Size(in)
 }
 
 func (re *realEncoder) putInt16(in int16) {
 	binary.BigEndian.PutUint16(re.raw[re.off:], uint16(in))
-	re.off += 2
+	re.off += binary.Size(in)
 }
 
 func (re *realEncoder) putInt32(in int32) {
 	binary.BigEndian.PutUint32(re.raw[re.off:], uint32(in))
-	re.off += 4
+	re.off += binary.Size(in)
 }
 
 func (re *realEncoder) putInt64(in int64) {
 	binary.BigEndian.PutUint64(re.raw[re.off:], uint64(in))
-	re.off += 8
+	re.off += binary.Size(in)
 }
 
 func (re *realEncoder) putArrayLength(in int) error {

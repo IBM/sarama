@@ -11,14 +11,14 @@ import (
 type CompressionCodec int8
 
 const (
-	COMPRESSION_NONE   CompressionCodec = 0
-	COMPRESSION_GZIP   CompressionCodec = 1
-	COMPRESSION_SNAPPY CompressionCodec = 2
+	CompressionNone   CompressionCodec = 0
+	CompressionGZIP   CompressionCodec = 1
+	CompressionSnappy CompressionCodec = 2
 )
 
 // The spec just says: "This is a version id used to allow backwards compatible evolution of the message
 // binary format." but it doesn't say what the current value is, so presumably 0...
-const message_format int8 = 0
+const messageFormat int8 = 0
 
 type Message struct {
 	Codec CompressionCodec // codec used to compress the message contents
@@ -31,10 +31,9 @@ type Message struct {
 func (m *Message) encode(pe packetEncoder) error {
 	pe.push(&crc32Field{})
 
-	pe.putInt8(message_format)
+	pe.putInt8(messageFormat)
 
-	var attributes int8 = 0
-	attributes |= int8(m.Codec) & 0x07
+	attributes := int8(m.Codec) & 0x07
 	pe.putInt8(attributes)
 
 	err := pe.putBytes(m.Key)
@@ -49,16 +48,16 @@ func (m *Message) encode(pe packetEncoder) error {
 		m.compressedCache = nil
 	} else {
 		switch m.Codec {
-		case COMPRESSION_NONE:
+		case CompressionNone:
 			payload = m.Value
-		case COMPRESSION_GZIP:
+		case CompressionGZIP:
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
 			writer.Write(m.Value)
 			writer.Close()
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
-		case COMPRESSION_SNAPPY:
+		case CompressionSnappy:
 			tmp, err := snappy.Encode(nil, m.Value)
 			if err != nil {
 				return err
@@ -88,7 +87,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	if format != message_format {
+	if format != messageFormat {
 		return DecodingError
 	}
 
@@ -109,9 +108,9 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	}
 
 	switch m.Codec {
-	case COMPRESSION_NONE:
+	case CompressionNone:
 		// nothing to do
-	case COMPRESSION_GZIP:
+	case CompressionGZIP:
 		if m.Value == nil {
 			return DecodingError
 		}
@@ -123,7 +122,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if err != nil {
 			return err
 		}
-	case COMPRESSION_SNAPPY:
+	case CompressionSnappy:
 		if m.Value == nil {
 			return DecodingError
 		}

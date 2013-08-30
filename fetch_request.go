@@ -53,7 +53,7 @@ func (f *FetchRequest) version() int16 {
 	return 0
 }
 
-func (f *FetchRequest) AddBlock(topic string, partition_id int32, fetchOffset int64, maxBytes int32) {
+func (f *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
 	if f.blocks == nil {
 		f.blocks = make(map[string]map[int32]*fetchRequestBlock)
 	}
@@ -66,5 +66,5 @@ func (f *FetchRequest) AddBlock(topic string, partition_id int32, fetchOffset in
 	tmp.maxBytes = maxBytes
 	tmp.fetchOffset = fetchOffset
 
-	f.blocks[topic][partition_id] = tmp
+	f.blocks[topic][partitionID] = tmp
 }
