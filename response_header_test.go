@@ -15,7 +15,7 @@ func TestResponseHeader(t *testing.T) {
 	if header.length != 0xf00 {
 		t.Error("Decoding header length failed, got", header.length)
 	}
-	if header.correlation_id != 0x0abbccff {
-		t.Error("Decoding header correlation id failed, got", header.correlation_id)
+	if header.correlationID != 0x0abbccff {
+		t.Error("Decoding header correlation id failed, got", header.correlationID)
 	}
 }

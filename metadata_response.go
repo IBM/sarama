@@ -2,7 +2,7 @@ package sarama
 
 type PartitionMetadata struct {
 	Err      KError
-	Id       int32
+	ID       int32
 	Leader   int32
 	Replicas []int32
 	Isr      []int32
@@ -15,7 +15,7 @@ func (pm *PartitionMetadata) decode(pd packetDecoder) (err error) {
 	}
 	pm.Err = KError(tmp)
 
-	pm.Id, err = pd.getInt32()
+	pm.ID, err = pd.getInt32()
 	if err != nil {
 		return err
 	}

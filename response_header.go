@@ -3,8 +3,8 @@ package sarama
 import "math"
 
 type responseHeader struct {
-	length         int32
-	correlation_id int32
+	length        int32
+	correlationID int32
 }
 
 func (r *responseHeader) decode(pd packetDecoder) (err error) {
@@ -16,6 +16,6 @@ func (r *responseHeader) decode(pd packetDecoder) (err error) {
 		return DecodingError
 	}
 
-	r.correlation_id, err = pd.getInt32()
+	r.correlationID, err = pd.getInt32()
 	return err
 }

@@ -32,10 +32,10 @@ func (r *OffsetFetchRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetFetchRequest) AddPartition(topic string, partition_id int32) {
+func (r *OffsetFetchRequest) AddPartition(topic string, partitionID int32) {
 	if r.partitions == nil {
 		r.partitions = make(map[string][]int32)
 	}
 
-	r.partitions[topic] = append(r.partitions[topic], partition_id)
+	r.partitions[topic] = append(r.partitions[topic], partitionID)
 }

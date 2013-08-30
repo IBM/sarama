@@ -5,9 +5,12 @@ package sarama
 type RequiredAcks int16
 
 const (
-	NO_RESPONSE    RequiredAcks = 0  // Don't send any response, the TCP ACK is all you get.
-	WAIT_FOR_LOCAL RequiredAcks = 1  // Wait for only the local commit to succeed before responding.
-	WAIT_FOR_ALL   RequiredAcks = -1 // Wait for all replicas to commit before responding.
+	// NoResponse doesn't send any response, the TCP ACK is all you get.
+	NoResponse RequiredAcks = 0
+	// WaitForLocal waits for only the local commit to succeed before responding.
+	WaitForLocal RequiredAcks = 1
+	// WaitForAll waits for all replicas to commit before responding.
+	WaitForAll RequiredAcks = -1
 )
 
 type ProduceRequest struct {

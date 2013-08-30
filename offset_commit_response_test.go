@@ -39,18 +39,21 @@ func TestNormalOffsetCommitResponse(t *testing.T) {
 	if response.ClientID != "az" {
 		t.Error("Decoding produced wrong client ID.")
 	}
-	if len(response.Errors) == 2 {
-		if len(response.Errors["m"]) != 0 {
-			t.Error("Decoding produced errors for topic 'm' where there were none.")
-		}
-		if len(response.Errors["t"]) == 1 {
-			if response.Errors["t"][0] != NOT_LEADER_FOR_PARTITION {
-				t.Error("Decoding produced wrong error for topic 't' partition 0.")
-			}
-		} else {
-			t.Error("Decoding produced wrong number of errors for topic 't'.")
-		}
-	} else {
-		t.Error("Decoding produced wrong number of errors.")
+
+	if len(response.Errors) != 2 {
+		t.Fatal("Decoding produced wrong number of errors.")
 	}
+
+	if len(response.Errors["m"]) != 0 {
+		t.Error("Decoding produced errors for topic 'm' where there were none.")
+	}
+
+	if len(response.Errors["t"]) != 1 {
+		t.Fatal("Decoding produced wrong number of errors for topic 't'.")
+	}
+
+	if response.Errors["t"][0] != NotLeaderForPartition {
+		t.Error("Decoding produced wrong error for topic 't' partition 0.")
+	}
+
 }

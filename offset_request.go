@@ -5,11 +5,11 @@ package sarama
 type OffsetTime int64
 
 const (
-	// Ask for the latest offsets.
-	LATEST_OFFSETS OffsetTime = -1
-	// Ask for the earliest available offset. Note that because offsets are pulled in descending order,
+	// LatestOffsets askes for the latest offsets.
+	LatestOffsets OffsetTime = -1
+	// EarliestOffset askes for the earliest available offset. Note that because offsets are pulled in descending order,
 	// asking for the earliest offset will always return you a single element.
-	EARLIEST_OFFSET OffsetTime = -2
+	EarliestOffset OffsetTime = -2
 )
 
 type offsetRequestBlock struct {
@@ -61,7 +61,7 @@ func (r *OffsetRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetRequest) AddBlock(topic string, partition_id int32, time OffsetTime, maxOffsets int32) {
+func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time OffsetTime, maxOffsets int32) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
 	}
@@ -74,5 +74,5 @@ func (r *OffsetRequest) AddBlock(topic string, partition_id int32, time OffsetTi
 	tmp.time = time
 	tmp.maxOffsets = maxOffsets
 
-	r.blocks[topic][partition_id] = tmp
+	r.blocks[topic][partitionID] = tmp
 }
