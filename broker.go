@@ -232,8 +232,6 @@ func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder
 	case err = <-promise.errors:
 		return err
 	}
-
-	return nil
 }
 
 func (b *Broker) decode(pd packetDecoder) (err error) {

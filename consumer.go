@@ -168,8 +168,6 @@ func (c *Consumer) sendError(err error) bool {
 	case c.events <- &ConsumerEvent{Err: err}:
 		return true
 	}
-
-	return true
 }
 
 func (c *Consumer) fetchMessages() {
