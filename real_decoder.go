@@ -143,7 +143,7 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	ret := make([]int32, n)
 	for i := range ret {
 		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
-		rd.off += 4
+		rd.off += binary.Size(ret[i])
 	}
 	return ret, nil
 }
@@ -168,7 +168,7 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 	ret := make([]int64, n)
 	for i := range ret {
 		ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
-		rd.off += 8
+		rd.off += binary.Size(ret[i])
 	}
 	return ret, nil
 }

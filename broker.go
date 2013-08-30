@@ -232,6 +232,9 @@ func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder
 	case err = <-promise.errors:
 		return err
 	}
+
+	// For backward compatibility with go1.0
+	return nil
 }
 
 func (b *Broker) decode(pd packetDecoder) (err error) {
