@@ -8,7 +8,7 @@ import (
 )
 
 // CompressionCodec represents the various compression codecs recognized by Kafka in messages.
-type CompressionCodec uint8
+type CompressionCodec int8
 
 const (
 	CompressionNone   CompressionCodec = 0
@@ -33,7 +33,7 @@ func (m *Message) encode(pe packetEncoder) error {
 
 	pe.putInt8(messageFormat)
 
-	attributes := int8(m.Codec << 5)
+	attributes := int8(m.Codec) & 0x07
 	pe.putInt8(attributes)
 
 	err := pe.putBytes(m.Key)
@@ -95,7 +95,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	m.Codec = CompressionCodec(attribute >> 5)
+	m.Codec = CompressionCodec(attribute & 0x07)
 
 	m.Key, err = pd.getBytes()
 	if err != nil {
