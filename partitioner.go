@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"math/rand"
 	"time"
+	"sync"
 )
 
 // Partitioner is anything that, given a Kafka message key and a number of partitions indexed [0...numPartitions-1],
@@ -16,6 +17,7 @@ type Partitioner interface {
 
 // RandomPartitioner implements the Partitioner interface by choosing a random partition each time.
 type RandomPartitioner struct {
+        lock := sync.Mutex
 	generator *rand.Rand
 }
 
@@ -26,6 +28,8 @@ func NewRandomPartitioner() *RandomPartitioner {
 }
 
 func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+        p.lock.Lock()
+        defer p.lock.Unlock()
 	return int32(p.generator.Intn(int(numPartitions)))
 }
 
