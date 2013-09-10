@@ -21,12 +21,12 @@ type RandomPartitioner struct {
 
 func NewRandomPartitioner() *RandomPartitioner {
 	p := new(RandomPartitioner)
-	p.generator = rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
+	rand.Seed(time.Now().UTC().UnixNano())
 	return p
 }
 
 func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
-	return int32(p.generator.Intn(int(numPartitions)))
+	return int32(rand.Intn(int(numPartitions)))
 }
 
 // RoundRobinPartitioner implements the Partitioner interface by walking through the available partitions one at a time.
