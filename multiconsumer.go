@@ -38,6 +38,7 @@ type topicPartition struct {
 	Topic     string
 	Partition int32
 	Offset    int64
+	FetchSize int32
 }
 
 func NewMultiConsumer(client *Client, group string, config *ConsumerConfig) (*MultiConsumer, error) {
@@ -85,24 +86,49 @@ func NewMultiConsumer(client *Client, group string, config *ConsumerConfig) (*Mu
 	return m, nil
 }
 
-func (m *MultiConsumer) Close() {
+func (m *MultiConsumer) Close() error {
+	close(m.stopper)
+	<-m.done
+	return nil
+}
 
+func (m *MultiConsumer) sendError(topic string, partition int32, err error) bool {
+	if err == nil {
+		return true
+	}
+
+	select {
+	case <-m.stopper:
+		close(m.events)
+		close(m.done)
+		return false
+	case m.events <- &MultiConsumerEvent{Err: err, Topic: topic, Partition: partition}:
+		return true
+	}
 }
 
 func (m *MultiConsumer) AddTopicPartition(topic string, partition int32, offset int64) {
-	m.waiting <- &topicPartition{Topic: topic, Partition: partition, Offset: offset}
-}
-
-func (m *MultiConsumer) Events() {
-
+	m.waiting <- &topicPartition{
+		Topic:     topic,
+		Partition: partition,
+		Offset:    offset,
+		FetchSize: m.config.DefaultFetchSize,
+	}
 }
 
 func (m *MultiConsumer) allocator() {
 	for tp := range m.waiting {
-		// should we refresh metadata before this?
+		err := m.client.RefreshTopicMetadata(tp.Topic)
+		if err != nil {
+			m.sendError("", -1, err)
+			m.waiting <- tp // good idea? or should we discard it?
+			continue
+		}
 		broker, err := m.client.Leader(tp.Topic, tp.Partition)
 		if err != nil {
-			panic(err)
+			m.sendError("", -1, err)
+			m.waiting <- tp // good idea? or should we discard it?
+			continue
 		}
 
 		m.m.Lock()
@@ -115,6 +141,11 @@ func (m *MultiConsumer) allocator() {
 		}
 		m.m.Unlock()
 	}
+}
+
+// Events returns the read channel for any events (messages or errors) that might be returned by the broker.
+func (m *MultiConsumer) Events() <-chan *MultiConsumerEvent {
+	return m.events
 }
 
 func (m *MultiConsumer) brokerRunner(broker *Broker) {
@@ -141,14 +172,12 @@ func (m *MultiConsumer) brokerRunner(broker *Broker) {
 }
 
 func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*topicPartition {
-	fetchSize := m.config.DefaultFetchSize
-
 	request := new(FetchRequest)
 	request.MinBytes = m.config.MinFetchSize
 	request.MaxWaitTime = m.config.MaxWaitTime
 	for topic, data := range m.topicPartitions {
 		for partition, tp := range data {
-			request.AddBlock(topic, partition, tp.Offset, fetchSize)
+			request.AddBlock(topic, partition, tp.Offset, tp.FetchSize)
 		}
 	}
 
@@ -157,18 +186,26 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 	case err == nil:
 		break
 	case err == EncodingError:
-		// TODO
+		m.sendError("", -1, err)
+		return tps
 	default:
-		// TODO
+		m.client.disconnectBroker(broker)
+		for _, tp := range tps {
+			m.waiting <- tp
+		}
+		return nil
 	}
 
 	for _, tp := range tps {
 		block := response.GetBlock(tp.Topic, tp.Partition)
 		if block == nil {
-			panic("block is nil")
+			m.sendError(tp.Topic, tp.Partition, IncompleteResponse)
+			continue
 		}
 
 		switch block.Err {
+		case NoError:
+			break
 		case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 			oldTps := tps
 			tps = []*topicPartition{}
@@ -182,8 +219,47 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 
 			m.waiting <- tp
 		default:
-			// send to client
+			m.sendError(tp.Topic, tp.Partition, IncompleteResponse)
+			continue
 		}
+
+		if len(block.MsgSet.Messages) == 0 {
+			if block.MsgSet.PartialTrailingMessage {
+				if m.config.MaxMessageSize == 0 {
+					tp.FetchSize *= 2
+				} else {
+					if tp.FetchSize == m.config.MaxMessageSize {
+						m.sendError(tp.Topic, tp.Partition, MessageTooLarge)
+						continue
+					} else {
+						tp.FetchSize *= 2
+						if tp.FetchSize > m.config.MaxMessageSize {
+							tp.FetchSize = m.config.MaxMessageSize
+						}
+					}
+				}
+			}
+		} else {
+			tp.FetchSize = m.config.DefaultFetchSize
+		}
+
+		for _, msgBlock := range block.MsgSet.Messages {
+			select {
+			case <-m.stopper:
+				close(m.events)
+				close(m.done)
+				return nil
+			case m.events <- &MultiConsumerEvent{
+				Topic:     tp.Topic,
+				Partition: tp.Partition,
+				Key:       msgBlock.Msg.Key,
+				Value:     msgBlock.Msg.Value,
+				Offset:    msgBlock.Offset,
+			}:
+				tp.Offset++
+			}
+		}
+
 	}
 
 	return tps
