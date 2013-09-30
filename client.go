@@ -4,12 +4,14 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"log"
 )
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
 	MetadataRetries int           // How many times to retry a metadata request when a partition is in the middle of leader election.
 	WaitForElection time.Duration // How long to wait for leader election to finish between retries.
+	Logger          *log.Logger   // The interface to log broker connection events to.
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -51,7 +53,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		id:               id,
 		config:           *config,
 		extraBrokerAddrs: addrs,
-		extraBroker:      NewBroker(addrs[0]),
+		extraBroker:      NewBroker(addrs[0], config.Logger),
 		brokers:          make(map[int32]*Broker),
 		leaders:          make(map[string]map[int32]int32),
 	}
@@ -164,7 +166,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 	if broker == client.extraBroker {
 		client.extraBrokerAddrs = client.extraBrokerAddrs[1:]
 		if len(client.extraBrokerAddrs) > 0 {
-			client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
+			client.extraBroker = NewBroker(client.extraBrokerAddrs[0], client.config.Logger)
 			client.extraBroker.Open()
 		} else {
 			client.extraBroker = nil

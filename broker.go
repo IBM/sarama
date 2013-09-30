@@ -5,12 +5,14 @@ import (
 	"io"
 	"net"
 	"sync"
+	"log"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
 type Broker struct {
-	id   int32
-	addr string
+	id     int32
+	addr   string
+	logger *log.Logger
 
 	correlationID int32
 	conn          net.Conn
@@ -29,8 +31,8 @@ type responsePromise struct {
 
 // NewBroker creates and returns a Broker targetting the given host:port address.
 // This does not attempt to actually connect, you have to call Open() for that.
-func NewBroker(addr string) *Broker {
-	return &Broker{id: -1, addr: addr}
+func NewBroker(addr string, logger *log.Logger) *Broker {
+	return &Broker{id: -1, addr: addr, logger: logger}
 }
 
 // Open tries to connect to the Broker. It takes the broker lock synchronously, then spawns a goroutine which
@@ -42,6 +44,10 @@ func (b *Broker) Open() error {
 
 	if b.conn != nil {
 		b.lock.Unlock()
+		if b.logger != nil {
+			b.logger.Printf("Failed to connect to broker %s\n", b.addr)
+			b.logger.Println(AlreadyConnected)
+		}
 		return AlreadyConnected
 	}
 
@@ -50,6 +56,10 @@ func (b *Broker) Open() error {
 
 		b.conn, b.connErr = net.Dial("tcp", b.addr)
 		if b.connErr != nil {
+			if b.logger != nil {
+				b.logger.Printf("Failed to connect to broker %s\n", b.addr)
+				b.logger.Println(b.connErr)
+			}
 			return
 		}
 
@@ -57,6 +67,10 @@ func (b *Broker) Open() error {
 
 		// permit a few outstanding requests before we block waiting for responses
 		b.responses = make(chan responsePromise, 4)
+
+		if b.logger != nil {
+			b.logger.Printf("Connected to broker %s\n", b.addr)
+		}
 
 		go b.responseReceiver()
 	}()
@@ -73,9 +87,19 @@ func (b *Broker) Connected() (bool, error) {
 	return b.conn != nil, b.connErr
 }
 
-func (b *Broker) Close() error {
+func (b *Broker) Close() (err error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
+	if b.logger != nil {
+		defer func() {
+			if err == nil {
+				b.logger.Printf("Closed connection to broker #%d %s\n", b.id, b.addr)
+			} else {
+				b.logger.Printf("Failed to close connection to broker #%d %s.\n", b.id, b.addr)
+				b.logger.Println(err)
+			}
+		}()
+	}
 
 	if b.conn == nil {
 		return NotConnected
@@ -84,14 +108,14 @@ func (b *Broker) Close() error {
 	close(b.responses)
 	<-b.done
 
-	err := b.conn.Close()
+	err = b.conn.Close()
 
 	b.conn = nil
 	b.connErr = nil
 	b.done = nil
 	b.responses = nil
 
-	return err
+	return
 }
 
 // ID returns the broker ID retrieved from Kafka's metadata, or -1 if that is not known.
