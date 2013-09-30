@@ -143,7 +143,7 @@ func NewMockBroker(t *testing.T, responses chan []byte) *MockBroker {
 }
 
 func ExampleBroker() error {
-	broker := NewBroker("localhost:9092", nil)
+	broker := NewBroker("localhost:9092")
 	err := broker.Open()
 	if err != nil {
 		return err
@@ -162,8 +162,7 @@ func ExampleBroker() error {
 }
 
 func TestBrokerAccessors(t *testing.T) {
-
-	broker := NewBroker("abc:123", nil)
+	broker := NewBroker("abc:123")
 
 	if broker.ID() != -1 {
 		t.Error("New broker didn't have an ID of -1.")
@@ -184,7 +183,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	mockBroker := NewMockBroker(t, responses)
 	defer mockBroker.Close()
 
-	broker := NewBroker(mockBroker.Addr(), nil)
+	broker := NewBroker(mockBroker.Addr())
 	err := broker.Open()
 	if err != nil {
 		t.Fatal(err)

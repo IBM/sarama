@@ -5,3 +5,12 @@ The Request/Response objects and properties are mostly undocumented, as they lin
 protocol fields documented by Kafka at https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
 */
 package sarama
+
+import (
+  "log"
+  "io/ioutil"
+)
+
+var (
+  Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
+)
