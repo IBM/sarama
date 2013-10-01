@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"sync"
 )
 
@@ -71,14 +72,15 @@ func NewMultiConsumer(client *Client, group string, config *ConsumerConfig) (*Mu
 	}
 
 	m := &MultiConsumer{
-		client:        client,
-		group:         group,
-		config:        *config,
-		brokerRunners: make(map[*Broker]*brokerRunner),
-		waiting:       make(chan *topicPartition),
-		stopper:       make(chan bool),
-		done:          make(chan bool),
-		events:        make(chan *MultiConsumerEvent, config.EventBufferSize),
+		client:          client,
+		group:           group,
+		config:          *config,
+		brokerRunners:   make(map[*Broker]*brokerRunner),
+		waiting:         make(chan *topicPartition, 16),
+		topicPartitions: make(map[string]map[int32]*topicPartition),
+		stopper:         make(chan bool),
+		done:            make(chan bool),
+		events:          make(chan *MultiConsumerEvent, config.EventBufferSize),
 	}
 
 	go m.allocator()
@@ -107,13 +109,43 @@ func (m *MultiConsumer) sendError(topic string, partition int32, err error) bool
 	}
 }
 
-func (m *MultiConsumer) AddTopicPartition(topic string, partition int32, offset int64) {
-	m.waiting <- &topicPartition{
+// TODO: Don't add TPs that are already tracked.
+func (m *MultiConsumer) AddTopicPartition(topic string, partition int32, offset int64, offsetMethod OffsetMethod) (err error) {
+
+	switch offsetMethod {
+	case OffsetMethodManual:
+		if offset < 0 {
+			return ConfigurationError("OffsetValue cannot be < 0 when OffsetMethod is MANUAL")
+		}
+	case OffsetMethodNewest:
+		offset, err = m.getOffset(topic, partition, LatestOffsets, true)
+		if err != nil {
+			return err
+		}
+	case OffsetMethodOldest:
+		offset, err = m.getOffset(topic, partition, EarliestOffset, true)
+		if err != nil {
+			return err
+		}
+	default:
+		return ConfigurationError("Invalid OffsetMethod")
+	}
+
+	tp := &topicPartition{
 		Topic:     topic,
 		Partition: partition,
 		Offset:    offset,
 		FetchSize: m.config.DefaultFetchSize,
 	}
+	m.m.Lock()
+	if _, ok := m.topicPartitions[topic]; !ok {
+		m.topicPartitions[topic] = make(map[int32]*topicPartition)
+	}
+	m.topicPartitions[topic][partition] = tp
+	m.m.Unlock()
+	m.waiting <- tp
+
+	return nil
 }
 
 func (m *MultiConsumer) allocator() {
@@ -136,9 +168,9 @@ func (m *MultiConsumer) allocator() {
 		if !ok {
 			br = &brokerRunner{intake: make(chan *topicPartition, 8)}
 			m.brokerRunners[broker] = br
-			br.intake <- tp
 			go m.brokerRunner(broker)
 		}
+		br.intake <- tp
 		m.m.Unlock()
 	}
 }
@@ -181,7 +213,9 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 		}
 	}
 
+	fmt.Printf("Sending request... ")
 	response, err := broker.Fetch(m.client.id, request)
+	fmt.Printf("done.\n")
 	switch {
 	case err == nil:
 		break
@@ -196,6 +230,7 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 		return nil
 	}
 
+tploop:
 	for _, tp := range tps {
 		block := response.GetBlock(tp.Topic, tp.Partition)
 		if block == nil {
@@ -205,7 +240,6 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 
 		switch block.Err {
 		case NoError:
-			break
 		case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 			oldTps := tps
 			tps = []*topicPartition{}
@@ -218,9 +252,10 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 			}
 
 			m.waiting <- tp
+			continue tploop
 		default:
-			m.sendError(tp.Topic, tp.Partition, IncompleteResponse)
-			continue
+			m.sendError(tp.Topic, tp.Partition, block.Err)
+			continue tploop
 		}
 
 		if len(block.MsgSet.Messages) == 0 {
@@ -270,4 +305,60 @@ func (m *MultiConsumer) cleanupBrokerRunner(br *brokerRunner) {
 	close(br.intake)
 	delete(m.brokerRunners, br.Broker)
 	m.m.Unlock()
+}
+
+func (m *MultiConsumer) getOffset(topic string, partition int32, where OffsetTime, retry bool) (int64, error) {
+	request := &OffsetRequest{}
+	request.AddBlock(topic, partition, where, 1)
+
+	broker, err := m.client.Leader(topic, partition)
+	if err != nil {
+		return -1, err
+	}
+
+	response, err := broker.GetAvailableOffsets(m.client.id, request)
+	switch err {
+	case nil:
+		break
+	case EncodingError:
+		return -1, err
+	default:
+		if !retry {
+			return -1, err
+		}
+		m.client.disconnectBroker(broker)
+		broker, err = m.client.Leader(topic, partition)
+		if err != nil {
+			return -1, err
+		}
+		return m.getOffset(topic, partition, where, false)
+	}
+
+	block := response.GetBlock(topic, partition)
+	if block == nil {
+		return -1, IncompleteResponse
+	}
+
+	switch block.Err {
+	case NoError:
+		if len(block.Offsets) < 1 {
+			return -1, IncompleteResponse
+		}
+		return block.Offsets[0], nil
+	case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
+		if !retry {
+			return -1, block.Err
+		}
+		err = m.client.RefreshTopicMetadata(topic)
+		if err != nil {
+			return -1, err
+		}
+		broker, err = m.client.Leader(topic, partition)
+		if err != nil {
+			return -1, err
+		}
+		return m.getOffset(topic, partition, where, false)
+	}
+
+	return -1, block.Err
 }
