@@ -162,7 +162,6 @@ func ExampleBroker() error {
 }
 
 func TestBrokerAccessors(t *testing.T) {
-
 	broker := NewBroker("abc:123")
 
 	if broker.ID() != -1 {
