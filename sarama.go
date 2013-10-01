@@ -7,10 +7,10 @@ protocol fields documented by Kafka at https://cwiki.apache.org/confluence/displ
 package sarama
 
 import (
-  "log"
-  "io/ioutil"
+	"io/ioutil"
+	"log"
 )
 
 var (
-  Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags) // Logger instance to write connection management events to.
+	Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags) // Logger instance to write connection management events to.
 )
