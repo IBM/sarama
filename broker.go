@@ -9,8 +9,8 @@ import (
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
 type Broker struct {
-	id     int32
-	addr   string
+	id   int32
+	addr string
 
 	correlationID int32
 	conn          net.Conn

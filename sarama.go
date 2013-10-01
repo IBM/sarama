@@ -12,5 +12,5 @@ import (
 )
 
 var (
-  Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
+  Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags) // Logger instance to write connection management events to.
 )
