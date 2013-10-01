@@ -83,9 +83,9 @@ func (b *Broker) Close() (err error) {
 	defer b.lock.Unlock()
 	defer func() {
 		if err == nil {
-			Logger.Printf("Closed connection to broker #%d %s\n", b.id, b.addr)
+			Logger.Printf("Closed connection to broker %s\n", b.addr)
 		} else {
-			Logger.Printf("Failed to close connection to broker #%d %s.\n", b.id, b.addr)
+			Logger.Printf("Failed to close connection to broker %s.\n", b.addr)
 			Logger.Println(err)
 		}
 	}()

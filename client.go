@@ -270,10 +270,12 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		if client.brokers[broker.ID()] == nil {
 			broker.Open()
 			client.brokers[broker.ID()] = broker
+			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			go client.brokers[broker.ID()].Close()
 			broker.Open()
 			client.brokers[broker.ID()] = broker
+			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
 	}
 
