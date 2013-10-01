@@ -1,16 +1,16 @@
 package sarama
 
 import (
-	"fmt"
 	"sync"
 )
 
-type brokerRunner struct {
-	m      sync.Mutex
-	intake chan *topicPartition
-	Broker *Broker
-}
-
+// MultiConsumer processes Kafka messages from an arbitrarily large set of Kafka
+// topic-partitions. You MUST call Close() on a MultiConsumer to avoid leaks; it
+// will not be garbage-collected otherwise.
+//
+// It is STRONGLY recommended to pass MinFetchSize and MaxWaitTime options via
+// the ConsumerConfig parameter to avoid excessive network traffic. Sensible
+// defaults are 50*1024 and 1000, respsectively.
 type MultiConsumer struct {
 	m sync.RWMutex
 
@@ -27,12 +27,22 @@ type MultiConsumer struct {
 	events        chan *MultiConsumerEvent
 }
 
+// MultiConsumerEvent type is a sort of Either monad; it contains a Key+Value or
+// an error. If Key+Value+Offset is given, it will always contain a
+// Topic+Partition. In the error case, it will contain Topic+Partition if
+// relevant; otherwise they will be ("",-1).
 type MultiConsumerEvent struct {
 	Topic      string
 	Partition  int32
 	Key, Value []byte
 	Offset     int64
 	Err        error
+}
+
+type brokerRunner struct {
+	m      sync.Mutex
+	intake chan *topicPartition
+	Broker *Broker
 }
 
 type topicPartition struct {
@@ -42,6 +52,8 @@ type topicPartition struct {
 	FetchSize int32
 }
 
+// NewMultiConsumer creates a new multiconsumer attached to a given client. It
+// will read messages as a member of the given consumer group.
 func NewMultiConsumer(client *Client, group string, config *ConsumerConfig) (*MultiConsumer, error) {
 	if config == nil {
 		config = new(ConsumerConfig)
@@ -88,6 +100,10 @@ func NewMultiConsumer(client *Client, group string, config *ConsumerConfig) (*Mu
 	return m, nil
 }
 
+// Close stops the multiconsumer from fetching messages. It is required to call
+// this function before a multiconsumer object passes out of scope, as it will
+// otherwise leak memory. You must call this before calling Close on the
+// underlying client.
 func (m *MultiConsumer) Close() error {
 	close(m.stopper)
 	<-m.done
@@ -109,7 +125,12 @@ func (m *MultiConsumer) sendError(topic string, partition int32, err error) bool
 	}
 }
 
-// TODO: Don't add TPs that are already tracked.
+// Register a given topic-partition with the multiconsumer, beginning at the
+// determined offset. If the topic-partition is already registered with the
+// multiconsumer, this method has no effect. To specify an offset manually, give
+// the offset as `offset` and pass `OffsetMethodManual` for the last parameter.
+// If you pass `OffsetMethodEarliest` or `OffsetMethodLatest`, the `offset`
+// parameter is ignored, and you should generally pass -1.
 func (m *MultiConsumer) AddTopicPartition(topic string, partition int32, offset int64, offsetMethod OffsetMethod) (err error) {
 
 	switch offsetMethod {
@@ -131,19 +152,21 @@ func (m *MultiConsumer) AddTopicPartition(topic string, partition int32, offset 
 		return ConfigurationError("Invalid OffsetMethod")
 	}
 
-	tp := &topicPartition{
-		Topic:     topic,
-		Partition: partition,
-		Offset:    offset,
-		FetchSize: m.config.DefaultFetchSize,
-	}
 	m.m.Lock()
 	if _, ok := m.topicPartitions[topic]; !ok {
 		m.topicPartitions[topic] = make(map[int32]*topicPartition)
 	}
-	m.topicPartitions[topic][partition] = tp
+	if _, ok := m.topicPartitions[topic][partition]; !ok {
+		tp := &topicPartition{
+			Topic:     topic,
+			Partition: partition,
+			Offset:    offset,
+			FetchSize: m.config.DefaultFetchSize,
+		}
+		m.topicPartitions[topic][partition] = tp
+		m.waiting <- tp
+	}
 	m.m.Unlock()
-	m.waiting <- tp
 
 	return nil
 }
@@ -175,7 +198,8 @@ func (m *MultiConsumer) allocator() {
 	}
 }
 
-// Events returns the read channel for any events (messages or errors) that might be returned by the broker.
+// Events returns the read channel for any events (messages or errors) that
+// might be returned by the broker.
 func (m *MultiConsumer) Events() <-chan *MultiConsumerEvent {
 	return m.events
 }
@@ -213,9 +237,7 @@ func (m *MultiConsumer) fetchMessages(broker *Broker, tps []*topicPartition) []*
 		}
 	}
 
-	fmt.Printf("Sending request... ")
 	response, err := broker.Fetch(m.client.id, request)
-	fmt.Printf("done.\n")
 	switch {
 	case err == nil:
 		break
