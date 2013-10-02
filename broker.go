@@ -38,7 +38,7 @@ func NewBroker(addr string) *Broker {
 // the connection to finish. To get the effect of a fully synchronous Open call, follow it by a call to Connected().
 // The only error Open will return directly is AlreadyConnected. The maxOpenRequests parameter determines how many
 // requests can be issued concurrently before future requests block. You generally will want at least one for each
-// topic-partition the broker will be listening on concurrently.
+// topic-partition the broker will be interacting with concurrently.
 func (b *Broker) Open(maxOpenRequests int) error {
 	b.lock.Lock()
 
