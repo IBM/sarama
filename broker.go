@@ -36,8 +36,10 @@ func NewBroker(addr string) *Broker {
 // Open tries to connect to the Broker. It takes the broker lock synchronously, then spawns a goroutine which
 // connects and releases the lock. This means any subsequent operations on the broker will block waiting for
 // the connection to finish. To get the effect of a fully synchronous Open call, follow it by a call to Connected().
-// The only error Open will return directly is AlreadyConnected.
-func (b *Broker) Open() error {
+// The only error Open will return directly is AlreadyConnected. The maxOpenRequests parameter determines how many
+// requests can be issued concurrently before future requests block. You generally will want at least one for each
+// topic-partition the broker will be interacting with concurrently.
+func (b *Broker) Open(maxOpenRequests int) error {
 	b.lock.Lock()
 
 	if b.conn != nil {
@@ -60,7 +62,7 @@ func (b *Broker) Open() error {
 		b.done = make(chan bool)
 
 		// permit a few outstanding requests before we block waiting for responses
-		b.responses = make(chan responsePromise, 4)
+		b.responses = make(chan responsePromise, maxOpenRequests)
 
 		Logger.Printf("Connected to broker %s\n", b.addr)
 		go b.responseReceiver()
