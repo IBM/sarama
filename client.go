@@ -8,8 +8,9 @@ import (
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
-	MetadataRetries int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection time.Duration // How long to wait for leader election to finish between retries.
+	MetadataRetries   int           // How many times to retry a metadata request when a partition is in the middle of leader election.
+	WaitForElection   time.Duration // How long to wait for leader election to finish between retries.
+	BrokerConcurrency int           // How many outstanding requests is each broker allowed to have?. Default 4.
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -43,6 +44,10 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		return nil, ConfigurationError("Invalid MetadataRetries")
 	}
 
+	if config.BrokerConcurrency < 1 {
+		config.BrokerConcurrency = 4
+	}
+
 	if len(addrs) < 1 {
 		return nil, ConfigurationError("You must provide at least one broker address")
 	}
@@ -55,7 +60,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		brokers:          make(map[int32]*Broker),
 		leaders:          make(map[string]map[int32]int32),
 	}
-	client.extraBroker.Open()
+	client.extraBroker.Open(config.BrokerConcurrency)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
@@ -165,7 +170,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		client.extraBrokerAddrs = client.extraBrokerAddrs[1:]
 		if len(client.extraBrokerAddrs) > 0 {
 			client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
-			client.extraBroker.Open()
+			client.extraBroker.Open(client.config.BrokerConcurrency)
 		} else {
 			client.extraBroker = nil
 		}
@@ -268,11 +273,11 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			broker.Open()
+			broker.Open(client.config.BrokerConcurrency)
 			client.brokers[broker.ID()] = broker
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			go client.brokers[broker.ID()].Close()
-			broker.Open()
+			broker.Open(client.config.BrokerConcurrency)
 			client.brokers[broker.ID()] = broker
 		}
 	}

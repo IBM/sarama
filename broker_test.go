@@ -144,7 +144,7 @@ func NewMockBroker(t *testing.T, responses chan []byte) *MockBroker {
 
 func ExampleBroker() error {
 	broker := NewBroker("localhost:9092")
-	err := broker.Open()
+	err := broker.Open(4)
 	if err != nil {
 		return err
 	}
@@ -185,7 +185,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	defer mockBroker.Close()
 
 	broker := NewBroker(mockBroker.Addr())
-	err := broker.Open()
+	err := broker.Open(4)
 	if err != nil {
 		t.Fatal(err)
 	}
