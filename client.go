@@ -10,7 +10,7 @@ import (
 type ClientConfig struct {
 	MetadataRetries   int           // How many times to retry a metadata request when a partition is in the middle of leader election.
 	WaitForElection   time.Duration // How long to wait for leader election to finish between retries.
-	BrokerConcurrency int           // How many outstanding requests is each broker allowed to have?. Default 4.
+	BrokerConcurrency int           // How many outstanding requests is each broker allowed to have.
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
