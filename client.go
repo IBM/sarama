@@ -44,8 +44,8 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		return nil, ConfigurationError("Invalid MetadataRetries")
 	}
 
-	if config.BrokerConcurrency < 1 {
-		config.BrokerConcurrency = 4
+	if config.BrokerConcurrency < 0 {
+		return nil, ConfigurationError("Invalid BrokerConcurrency")
 	}
 
 	if len(addrs) < 1 {
