@@ -8,9 +8,9 @@ import (
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
-	MetadataRetries   int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection   time.Duration // How long to wait for leader election to finish between retries.
-	BrokerConcurrency int           // How many outstanding requests is each broker allowed to have.
+	MetadataRetries      int           // How many times to retry a metadata request when a partition is in the middle of leader election.
+	WaitForElection      time.Duration // How long to wait for leader election to finish between retries.
+	ConcurrencyPerBroker int           // How many outstanding requests is each broker allowed to have.
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -44,8 +44,8 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		return nil, ConfigurationError("Invalid MetadataRetries")
 	}
 
-	if config.BrokerConcurrency < 0 {
-		return nil, ConfigurationError("Invalid BrokerConcurrency")
+	if config.ConcurrencyPerBroker < 0 {
+		return nil, ConfigurationError("Invalid ConcurrencyPerBroker")
 	}
 
 	if len(addrs) < 1 {
@@ -60,7 +60,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		brokers:          make(map[int32]*Broker),
 		leaders:          make(map[string]map[int32]int32),
 	}
-	client.extraBroker.Open(config.BrokerConcurrency)
+	client.extraBroker.Open(config.ConcurrencyPerBroker)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
@@ -170,7 +170,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		client.extraBrokerAddrs = client.extraBrokerAddrs[1:]
 		if len(client.extraBrokerAddrs) > 0 {
 			client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
-			client.extraBroker.Open(client.config.BrokerConcurrency)
+			client.extraBroker.Open(client.config.ConcurrencyPerBroker)
 		} else {
 			client.extraBroker = nil
 		}
@@ -273,11 +273,11 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			broker.Open(client.config.BrokerConcurrency)
+			broker.Open(client.config.ConcurrencyPerBroker)
 			client.brokers[broker.ID()] = broker
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			go client.brokers[broker.ID()].Close()
-			broker.Open(client.config.BrokerConcurrency)
+			broker.Open(client.config.ConcurrencyPerBroker)
 			client.brokers[broker.ID()] = broker
 		}
 	}
