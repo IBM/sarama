@@ -96,6 +96,10 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 		return nil, ConfigurationError("Invalid EventBufferSize")
 	}
 
+	if topic == "" {
+		return nil, ConfigurationError("Empty topic")
+	}
+
 	broker, err := client.Leader(topic, partition)
 	if err != nil {
 		return nil, err

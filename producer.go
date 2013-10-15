@@ -35,6 +35,10 @@ func NewProducer(client *Client, topic string, config *ProducerConfig) (*Produce
 		config.Partitioner = NewRandomPartitioner()
 	}
 
+	if topic == "" {
+		return nil, ConfigurationError("Empty topic")
+	}
+
 	p := new(Producer)
 	p.client = client
 	p.topic = topic

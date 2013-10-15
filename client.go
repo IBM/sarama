@@ -184,6 +184,15 @@ func (client *Client) disconnectBroker(broker *Broker) {
 }
 
 func (client *Client) refreshMetadata(topics []string, retries int) error {
+	// Kafka will throw exceptions on an empty topic and not return a proper
+	// error. This handles the case by returning an error instead of sending it
+	// off to Kafka. See: https://github.com/Shopify/sarama/pull/38#issuecomment-26362310
+	for _, topic := range topics {
+		if len(topic) == 0 {
+			return NoSuchTopic
+		}
+	}
+
 	for broker := client.any(); broker != nil; broker = client.any() {
 		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
 
