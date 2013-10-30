@@ -75,7 +75,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 	if config.DefaultFetchSize < 0 {
 		return nil, ConfigurationError("Invalid DefaultFetchSize")
 	} else if config.DefaultFetchSize == 0 {
-		config.DefaultFetchSize = 1024
+		config.DefaultFetchSize = 4 * 1024
 	}
 
 	if config.MinFetchSize < 0 {
@@ -90,10 +90,14 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 
 	if config.MaxWaitTime < 0 {
 		return nil, ConfigurationError("Invalid MaxWaitTime")
+	} else if config.MaxWaitTime == 0 {
+		config.MaxWaitTime = 100
 	}
 
 	if config.EventBufferSize < 0 {
 		return nil, ConfigurationError("Invalid EventBufferSize")
+	} else if config.EventBufferSize == 0 {
+		config.EventBufferSize = 64
 	}
 
 	if topic == "" {
