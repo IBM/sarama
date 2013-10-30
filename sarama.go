@@ -11,6 +11,7 @@ import (
 	"log"
 )
 
-var (
-	Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags) // Logger instance to write connection management events to.
-)
+// Logger is the instance of golang's log.Logger that Sarama writes connection
+// management events to. By default it is set to discard all log messages via ioutil.Discard,
+// but you can set it to redirect wherever you want.
+var Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
