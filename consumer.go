@@ -1,7 +1,5 @@
 package sarama
 
-import "log"
-
 // OffsetMethod is passed in ConsumerConfig to tell the consumer how to determine the starting offset.
 type OffsetMethod int
 
@@ -76,7 +74,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 	}
 
 	if config.MaxWaitTime < 100 {
-		log.Println("ConsumerConfig{MaxWaitTime} is very low. This can cause high CPU and network usage. Consider increasing this value.")
+		Logger.Println("ConsumerConfig{MaxWaitTime} is very low. This can cause high CPU and network usage. Consider increasing this value.")
 	}
 
 	if config.DefaultFetchSize < 0 {
