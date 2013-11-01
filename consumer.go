@@ -28,7 +28,8 @@ type ConsumerConfig struct {
 	// treated as no limit.
 	MaxMessageSize int32
 	// The maximum amount of time (in ms) the broker will wait for MinFetchSize bytes to become available before it
-	// returns fewer than that anyways. The default of 0 is treated as no limit.
+	// returns fewer than that anyways. The default of 0 causes Kafka to return immediately when there are no pending events.
+	// This is rarely desirable behaviour. 500 is a reasonable setting for most use-cases.
 	MaxWaitTime int32
 
 	// The method used to determine at which offset to begin consuming messages.
