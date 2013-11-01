@@ -1,5 +1,7 @@
 package sarama
 
+import "log"
+
 // OffsetMethod is passed in ConsumerConfig to tell the consumer how to determine the starting offset.
 type OffsetMethod int
 
@@ -70,6 +72,10 @@ type Consumer struct {
 func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
 	if config == nil {
 		config = new(ConsumerConfig)
+	}
+
+	if config.MaxWaitTime == 0 && config.MinFetchSize == 0 && config.DefaultFetchSize == 0 {
+		log.Println("ConsumerConfig{MaxWaitTime, MinFetchSize, DefaultFetchSize} are all set to 0. This causes busy-looping when no events are available. You should seriously consider changing these values. MinFetchSize should be at least 1 in almost all scenarios.")
 	}
 
 	if config.DefaultFetchSize < 0 {
