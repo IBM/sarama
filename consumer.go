@@ -26,7 +26,8 @@ type ConsumerConfig struct {
 	// treated as no limit.
 	MaxMessageSize int32
 	// The maximum amount of time (in ms) the broker will wait for MinFetchSize bytes to become available before it
-	// returns fewer than that anyways. The default of 0 is treated as no limit.
+	// returns fewer than that anyways. The default of 0 causes Kafka to return immediately, which is rarely desirable
+	// as it causes the Consumer to spin when no events are available. 100-500ms is a reasonable range for most cases.
 	MaxWaitTime int32
 
 	// The method used to determine at which offset to begin consuming messages.
@@ -90,6 +91,8 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 
 	if config.MaxWaitTime < 0 {
 		return nil, ConfigurationError("Invalid MaxWaitTime")
+	} else if config.MaxWaitTime < 100 {
+		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
 	}
 
 	if config.EventBufferSize < 0 {
