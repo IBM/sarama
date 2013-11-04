@@ -305,13 +305,15 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 	case EncodingError:
 		// No sense in retrying; it'll just fail again. But what about all the other
 		// messages that weren't invalid? Really, this is a "shit's broke real good"
-		// scenario, so angrily logging it and moving on is probably acceptable.
+		// scenario, so logging it and moving on is probably acceptable.
+		Logger.Printf("[DATA LOSS] EncodingError! Dropped %d messages.\n", len(messages))
 		p.errors <- err
 		goto releaseAllLocks
 	default:
 		p.client.disconnectBroker(bp.broker)
 		bp.Close()
 
+		overlimit := 0
 		// ie. for msg := range reverse(messages)
 		for i := len(messages) - 1; i >= 0; i-- {
 			msg := messages[i]
@@ -322,8 +324,13 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 				// to preserve ordering, we have to prepend the items starting from the last one.
 				p.addMessage(msg, true)
 			} else {
+				overlimit++
 				// log about message failing too many times?
 			}
+		}
+		if overlimit > 0 {
+			Logger.Printf("[DATA LOSS] %d messages exceeded the retry limit of %d and were dropped.\n",
+				overlimit, p.config.MaxDeliveryRetries)
 		}
 		goto releaseAllLocks
 	}
@@ -340,7 +347,8 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 			if block == nil {
 				// IncompleteResponse. Here we just drop all the messages; we don't know whether
 				// they were successfully sent or not. Non-ideal, but how often does it happen?
-				// TODO Log angrily.
+				Logger.Printf("[DATA LOSS] IncompleteResponse: up to %d messages for %s:%d are in an unknown state\n",
+					len(messages), topic, partition)
 			}
 			switch block.Err {
 			case NoError:
@@ -350,6 +358,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 			case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 				p.client.RefreshTopicMetadata(topic)
 
+				overlimit := 0
 				// ie. for msg := range reverse(messages)
 				for i := len(messages) - 1; i >= 0; i-- {
 					msg := messages[i]
@@ -361,12 +370,17 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 							// to preserve ordering, we have to prepend the items starting from the last one.
 							p.addMessage(msg, true)
 						} else {
-							// TODO dropping message; log angrily maybe.
+							overlimit++
 						}
 					}
 				}
+				if overlimit > 0 {
+					Logger.Printf("[DATA LOSS] %d messages exceeded the retry limit of %d and were dropped.\n",
+						overlimit, p.config.MaxDeliveryRetries)
+				}
 			default:
-				// TODO non-retriable error. Drop the messages and log angrily.
+				Logger.Printf("[DATA LOSS] Non-retriable error from kafka! Dropped up to %d messages for %s:%d.\n",
+					len(messages), topic, partition)
 			}
 			p.releaseDeliveryLock(topic, partition)
 		}
