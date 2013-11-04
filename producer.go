@@ -235,7 +235,6 @@ func (bp *brokerProducer) addMessage(msg *produceMessage, maxBufferBytes uint32,
 
 	bp.mapM.Unlock()
 	if bp.bufferedBytes > maxBufferBytes {
-		// TODO: decrement this later on
 		bp.tryFlush()
 	}
 }
@@ -292,6 +291,14 @@ func (bp *brokerProducer) Close() error {
 func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, messages []*produceMessage) {
 	response, err := bp.broker.Produce(p.client.id, request)
 
+	size := 0
+	for _, m := range messages {
+		size += len(m.key) + len(m.value)
+	}
+	bp.mapM.Lock()
+	bp.bufferedBytes -= uint32(size)
+	bp.mapM.Unlock()
+
 	switch err {
 	case nil:
 		break
@@ -302,8 +309,6 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 		p.errors <- err
 		goto releaseAllLocks
 	default:
-		// TODO: Now we have to sift through the messages and determine which should be retried.
-
 		p.client.disconnectBroker(bp.broker)
 		bp.Close()
 
@@ -335,7 +340,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 			if block == nil {
 				// IncompleteResponse. Here we just drop all the messages; we don't know whether
 				// they were successfully sent or not. Non-ideal, but how often does it happen?
-				// Log angrily.
+				// TODO Log angrily.
 			}
 			switch block.Err {
 			case NoError:
@@ -343,7 +348,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 				// Unlock delivery for this topic-partition and discard the produceMessage objects.
 				p.errors <- nil
 			case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-				// TODO: should we refresh metadata for this topic?
+				p.client.RefreshTopicMetadata(topic)
 
 				// ie. for msg := range reverse(messages)
 				for i := len(messages) - 1; i >= 0; i-- {
@@ -356,12 +361,12 @@ func (bp *brokerProducer) flushRequest(p *Producer, request *ProduceRequest, mes
 							// to preserve ordering, we have to prepend the items starting from the last one.
 							p.addMessage(msg, true)
 						} else {
-							// dropping message; log angrily maybe.
+							// TODO dropping message; log angrily maybe.
 						}
 					}
 				}
 			default:
-				// non-retriable error. Drop the messages and log angrily.
+				// TODO non-retriable error. Drop the messages and log angrily.
 			}
 			p.releaseDeliveryLock(topic, partition)
 		}

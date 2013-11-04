@@ -57,18 +57,80 @@ func TestSimpleProducer(t *testing.T) {
 	})
 	defer producer.Close()
 
-	for i := 0; i < 10; i++ {
-		err = producer.SendMessage("my_topic", nil, StringEncoder("ABC THE MESSAGE"))
-		if err != nil {
-			t.Error(err)
+	// flush only on 10th and final message
+	returns := []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	for _, f := range returns {
+		sendMessage(t, producer, "my_topic", "ABC THE MESSAGE", f)
+	}
+}
+
+func sendMessage(t *testing.T, producer *Producer, topic string, key string, expectedResponses int) {
+	err := producer.SendMessage(topic, nil, StringEncoder(key))
+	if err != nil {
+		t.Error(err)
+	}
+	for i := 0; i < expectedResponses; i++ {
+		readMessage(t, producer.Errors())
+	}
+	assertNoMessages(t, producer.Errors())
+}
+
+func TestMultipleFlushes(t *testing.T) {
+	responses := make(chan []byte, 1)
+	extraResponses := make(chan []byte)
+	mockBroker := NewMockBroker(t, responses)
+	mockExtra := NewMockBroker(t, extraResponses)
+	defer mockBroker.Close()
+	defer mockExtra.Close()
+
+	// return the extra mock as another available broker
+	response := []byte{
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00,
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00}
+	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
+	responses <- response
+	go func() {
+		msg := []byte{
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00,
+			0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		}
+		binary.BigEndian.PutUint64(msg[23:], 0)
+		extraResponses <- msg
+		extraResponses <- msg
+	}()
+
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	readMessage(t, producer.Errors())
-	assertNoMessages(t, producer.Errors())
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush once, after the 5th message.
+		MaxBufferBytes: uint32((len("ABC THE MESSAGE") * 5) - 1),
+	})
+	defer producer.Close()
 
-	// TODO: This doesn't really test that we ONLY flush once.
-	// For example, change the MaxBufferBytes to be much lower.
+	returns := []int{0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
+	for _, f := range returns {
+		sendMessage(t, producer, "my_topic", "ABC THE MESSAGE", f)
+	}
 }
 
 func TestMultipleProducer(t *testing.T) {
@@ -167,11 +229,6 @@ func TestMultipleProducer(t *testing.T) {
 		responsesB <- msg
 	}()
 
-	// TODO: Submit events to 3 different topics on 2 different brokers.
-	// Need to figure out how the request format works to return the broker
-	// info for those two new brokers, and how to return multiple blocks in
-	// a ProduceRespose
-
 	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -185,33 +242,23 @@ func TestMultipleProducer(t *testing.T) {
 	})
 	defer producer.Close()
 
-	for i := 0; i < 10; i++ {
-		err = producer.SendMessage("topic_a", nil, StringEncoder("ABC THE MESSAGE"))
-		if err != nil {
-			t.Error(err)
-		}
+	// flush only on 10th and final message
+	returns := []int{0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
+	for _, f := range returns {
+		sendMessage(t, producer, "topic_a", "ABC THE MESSAGE", f)
 	}
 
-	for i := 0; i < 5; i++ {
-		err = producer.SendMessage("topic_b", nil, StringEncoder("ABC THE MESSAGE"))
-		if err != nil {
-			t.Error(err)
-		}
+	// no flushes
+	returns = []int{0, 0, 0, 0, 0}
+	for _, f := range returns {
+		sendMessage(t, producer, "topic_b", "ABC THE MESSAGE", f)
 	}
 
-	for i := 0; i < 5; i++ {
-		err = producer.SendMessage("topic_c", nil, StringEncoder("ABC THE MESSAGE"))
-		if err != nil {
-			t.Error(err)
-		}
+	// flush both topic_b and topic_c on 5th (ie. 10th for this broker)
+	returns = []int{0, 0, 0, 0, 2}
+	for _, f := range returns {
+		sendMessage(t, producer, "topic_c", "ABC THE MESSAGE", f)
 	}
-
-	// read three messages for topics A, B, and C. Assert they are nil.
-	readMessage(t, producer.Errors())
-	readMessage(t, producer.Errors())
-	readMessage(t, producer.Errors())
-
-	assertNoMessages(t, producer.Errors())
 }
 
 func readMessage(t *testing.T, ch chan error) {
@@ -227,8 +274,8 @@ func readMessage(t *testing.T, ch chan error) {
 
 func assertNoMessages(t *testing.T, ch chan error) {
 	select {
-	case <-ch:
-		t.Error(fmt.Errorf("too many values returned"))
+	case x := <-ch:
+		t.Error(fmt.Errorf("unexpected value received: %#v", x))
 	case <-time.After(5 * time.Millisecond):
 	}
 }
