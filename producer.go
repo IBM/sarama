@@ -40,7 +40,9 @@ type ProducerConfig struct {
 // operating in "synchronous" mode. This means that errors will be returned
 // directly from calls to SendMessage. If either value is greater than zero, the
 // Producer is operating in "asynchronous" mode, and you must read these return
-// values back from the channel returned by Errors().
+// values back from the channel returned by Errors(). Note that you actually
+// *must* read these error values: The channel has a fixed capacity, and the
+// producer will block if it's full.
 type Producer struct {
 	client          *Client
 	config          ProducerConfig
