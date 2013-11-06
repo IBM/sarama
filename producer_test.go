@@ -64,8 +64,65 @@ func TestSimpleProducer(t *testing.T) {
 	}
 }
 
+func TestSimpleSyncProducer(t *testing.T) {
+	responses := make(chan []byte, 1)
+	extraResponses := make(chan []byte)
+	mockBroker := NewMockBroker(t, responses)
+	mockExtra := NewMockBroker(t, extraResponses)
+	defer mockBroker.Close()
+	defer mockExtra.Close()
+
+	// return the extra mock as another available broker
+	response := []byte{
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00,
+		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00}
+	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
+	responses <- response
+	go func() {
+		msg := []byte{
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
+			0x00, 0x00, 0x00, 0x01,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+		binary.BigEndian.PutUint64(msg[23:], 0)
+		for i := 0; i < 10; i++ {
+			extraResponses <- msg
+		}
+	}()
+
+	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush once, after the 10th message.
+		MaxBufferBytes: uint32((len("ABC THE MESSAGE") * 10) - 1),
+	})
+	defer producer.Close()
+
+	for i := 0; i < 10; i++ {
+		sendSyncMessage(t, producer, "my_topic", "ABC THE MESSAGE")
+	}
+}
+
 func sendMessage(t *testing.T, producer *Producer, topic string, key string, expectedResponses int) {
-	err := producer.SendMessage(topic, nil, StringEncoder(key))
+	err := producer.QueueMessage(topic, nil, StringEncoder(key))
 	if err != nil {
 		t.Error(err)
 	}
@@ -75,7 +132,14 @@ func sendMessage(t *testing.T, producer *Producer, topic string, key string, exp
 	assertNoMessages(t, producer.Errors())
 }
 
-/*
+func sendSyncMessage(t *testing.T, producer *Producer, topic string, key string) {
+	err := producer.SendMessage(topic, nil, StringEncoder(key))
+	if err != nil {
+		t.Error(err)
+	}
+	assertNoMessages(t, producer.Errors())
+}
+
 func TestMultipleFlushes(t *testing.T) {
 	responses := make(chan []byte, 1)
 	extraResponses := make(chan []byte)
@@ -262,7 +326,6 @@ func TestMultipleProducer(t *testing.T) {
 	}
 }
 
-*/
 func readMessage(t *testing.T, ch chan error) {
 	select {
 	case err := <-ch:

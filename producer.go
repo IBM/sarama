@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -176,7 +175,7 @@ func (p *Producer) QueueMessage(topic string, key, value Encoder) (err error) {
 //
 // If you care about message ordering, you should not call QueueMessage and
 // SendMessage on the same Producer.
-func (p *Producer) SendMessage(topic string, key, value Encoder) error {
+func (p *Producer) SendMessage(topic string, key, value Encoder) (err error) {
 	var keyBytes, valBytes []byte
 
 	if key != nil {
@@ -202,6 +201,18 @@ func (p *Producer) SendMessage(topic string, key, value Encoder) error {
 		failures: 0,
 	}
 
+	bp, err := p.brokerProducerFor(msg.tp)
+	if err != nil {
+		return err
+	}
+
+	// TODO: don't pass through QueueMessage pipeline if failed.
+	var prb produceRequestBuilder = []*produceMessage{msg}
+	errs := make(chan error, 1)
+	bp.flushRequest(p, prb, func(err error) {
+		errs <- err
+	})
+	return <-errs
 }
 
 func (p *Producer) addMessage(msg *produceMessage) error {
@@ -253,7 +264,6 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 		timer := time.NewTimer(maxBufferTime)
 		wg.Done()
 		for {
-			println("SEL")
 			select {
 			case <-bp.flushNow:
 				bp.flush(p)
@@ -316,7 +326,6 @@ func (bp *brokerProducer) flushIfAnyMessages(p *Producer) {
 
 func (bp *brokerProducer) flush(p *Producer) {
 	var prb produceRequestBuilder
-	fmt.Println("FLUSHING")
 
 	// only deliver messages for topic-partitions that are not currently being delivered.
 	bp.mapM.Lock()
