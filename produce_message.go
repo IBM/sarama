@@ -4,18 +4,36 @@ type produceMessage struct {
 	tp         topicPartition
 	key, value []byte
 	failures   uint32
+	sync       bool
 }
 
 type produceRequestBuilder []*produceMessage
 
-func (msg *produceMessage) reenqueue(p *Producer) (ok bool) {
+func (msg *produceMessage) enqueue(p *Producer) error {
+	if msg.sync {
+		var prb produceRequestBuilder = []*produceMessage{msg}
+		bp, err := p.brokerProducerFor(msg.tp)
+		if err != nil {
+			return err
+		}
+		errs := make(chan error, 1)
+		bp.flushRequest(p, prb, func(err error) {
+			errs <- err
+		})
+		return <-errs
+	} else {
+		p.addMessage(msg)
+		return nil
+	}
+
+}
+
+func (msg *produceMessage) reenqueue(p *Producer) error {
 	if msg.failures < p.config.MaxDeliveryRetries {
 		msg.failures++
-		p.addMessage(msg)
-		return true
-	} else {
-		return false
+		return msg.enqueue(p)
 	}
+	return nil
 }
 
 func (msg *produceMessage) hasTopicPartition(topic string, partition int32) bool {
