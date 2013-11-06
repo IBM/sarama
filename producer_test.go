@@ -75,6 +75,7 @@ func sendMessage(t *testing.T, producer *Producer, topic string, key string, exp
 	assertNoMessages(t, producer.Errors())
 }
 
+/*
 func TestMultipleFlushes(t *testing.T) {
 	responses := make(chan []byte, 1)
 	extraResponses := make(chan []byte)
@@ -261,6 +262,7 @@ func TestMultipleProducer(t *testing.T) {
 	}
 }
 
+*/
 func readMessage(t *testing.T, ch chan error) {
 	select {
 	case err := <-ch:
