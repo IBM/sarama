@@ -318,7 +318,10 @@ func (bp *brokerProducer) flushIfOverCapacity(maxBufferBytes uint32) {
 func (bp *brokerProducer) flushIfAnyMessages(p *Producer) {
 	select {
 	case <-bp.hasMessages:
-		bp.hasMessages <- true
+		select {
+		case bp.hasMessages <- true:
+		default:
+		}
 		bp.flush(p)
 	default:
 	}
