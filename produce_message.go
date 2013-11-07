@@ -22,8 +22,7 @@ func (msg *produceMessage) enqueue(p *Producer) error {
 		})
 		return <-errs
 	} else {
-		p.addMessage(msg)
-		return nil
+		return p.addMessage(msg)
 	}
 
 }
