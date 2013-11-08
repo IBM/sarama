@@ -113,18 +113,6 @@ func (p *Producer) SendMessage(topic string, key, value Encoder) error {
 
 func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 
-	if p.config.Compression != CompressionNone {
-		set := new(MessageSet)
-		set.addMessage(&Message{Codec: CompressionNone, Key: keyBytes, Value: valBytes})
-		valBytes, err = encode(set)
-		if err != nil {
-			return err
-		}
-	}
-
-	request := &ProduceRequest{RequiredAcks: p.config.RequiredAcks, Timeout: p.config.Timeout}
-	request.AddMessage(p.topic, partition, &Message{Codec: p.config.Compression, Key: keyBytes, Value: valBytes})
-
 	response, err := broker.Produce(p.client.id, request)
 	switch err {
 	case nil:
@@ -218,7 +206,7 @@ func (p *Producer) dispatcher() {
 				if batchers[queue.broker] == nil {
 					batcherChan := make(chan *pendingMessage)
 					batchers[queue.broker] = &batcherHandle{batcherChan, 1}
-					go p.batcher(batcherChan)
+					go p.batcher(queue.broker, batcherChan)
 				}
 				batchers[queue.broker].msgs <- msg
 			} else {
@@ -242,7 +230,7 @@ func (p *Producer) dispatcher() {
 			if batchers[queue.broker] == nil {
 				batcherChan := make(chan *pendingMessage)
 				batchers[queue.broker] = &batcherHandle{batcherChan, 1}
-				go p.batcher(batcherChan)
+				go p.batcher(queue.broker, batcherChan)
 			} else {
 				batchers[queue.broker].refs += 1
 			}
@@ -265,35 +253,85 @@ func (p *Producer) dispatcher() {
 	}
 }
 
-func (p *Producer) batcher(msgs <-chan *pendingMessage) {
-	owns := make(map[string]map[int32]bool)
-	timer := time.NewTimer(time.Duration(p.config.MaxBufferTime) * time.Milliseconds)
+func (p *Producer) buildProduceRequest(msgs map[string]map[int32][]*pendingMessage) (*ProduceRequest, error) {
 
-	var buffer []*pendingMessages
+	request := &ProduceRequest{RequiredAcks: p.config.RequiredAcks, Timeout: p.config.Timeout}
+
+	if p.config.Compression == CompressionNone {
+		for _, tmp := range msgs {
+			for _, buffer := range tmp {
+				for _, msg := range buffer {
+					request.AddMessage(msg.topic, msg.partition,
+						&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
+				}
+			}
+		}
+	} else {
+		sets := make(map[string]map[int32]*MessageSet)
+		for topic, tmp := range msgs {
+			for part, buffer := range tmp {
+				if sets[topic] == nil {
+					sets[topic] = make(map[int32]*MessageSet)
+				}
+				if sets[topic][part] == nil {
+					sets[topic][part] = new(MessageSet)
+				}
+				for _, msg := range buffer {
+					sets[topic][part].addMessage(&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
+				}
+			}
+		}
+		for topic, tmp := range sets {
+			for part, set := range tmp {
+				bytes, err := encode(set)
+				if err != nil {
+					return nil, err
+				}
+				request.AddMessage(topic, part,
+					&Message{Codec: p.config.Compression, Key: nil, Value: bytes})
+			}
+		}
+	}
+
+	return request, nil
+}
+
+func (p *Producer) batcher(broker *Broker, msgs <-chan *pendingMessage) {
+	buffers := make(map[string]map[int32][]*pendingMessage)
+	timeout := time.Duration(p.config.MaxBufferTime) * time.Millisecond
+	timer := time.NewTimer(timeout)
+
 	var bufferedBytes uint
+	var bufferedMsgs uint
 
 	for {
 		select {
-		case msg <- msgs:
-			if owns[msg.topic] == nil {
-				owns[msg.topic] = make(map[int32]bool)
+		case msg := <-msgs:
+			if buffers[msg.topic] == nil {
+				buffers[msg.topic] = make(map[int32][]*pendingMessage)
 			}
-			owner, exists := owns[msg.topic][msg.partition]
+			buffer, exists := buffers[msg.topic][msg.partition]
 			if !exists {
-				owner = true
-				owns[msg.topic][msg.partition] = true
+				buffers[msg.topic][msg.partition] = nil
 			}
-			if owner {
-				buffer = append(buffer, msg)
-				bufferedBytes += len(msg.value)
-				if len(buffer) > p.config.MaxBufferedMessages || bufferedBytes > p.config.MaxBufferedBytes {
-					// flush + reset timer
+			if buffer != nil {
+				buffers[msg.topic][msg.partition] = append(buffers[msg.topic][msg.partition], msg)
+				bufferedMsgs += 1
+				bufferedBytes += uint(len(msg.value))
+				if bufferedMsgs > p.config.MaxBufferedMessages || bufferedBytes > p.config.MaxBufferedBytes {
+					request, err := p.buildProduceRequest(buffers)        // TODO handle err
+					response, err := broker.Produce(p.client.id, request) // TODO handle err
+					// TODO check response
+					timer.Reset(timeout)
 				}
 			} else {
 				p.msgs <- msg
 			}
 		case <-timer.C:
-			// flush + reset timer
+			request, err := p.buildProduceRequest(buffers)        // TODO handle err
+			response, err := broker.Produce(p.client.id, request) // TODO handle err
+			// TODO check response
+			timer.Reset(timeout)
 		}
 	}
 }
