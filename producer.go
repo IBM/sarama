@@ -44,9 +44,9 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		config.Partitioner = NewRandomPartitioner()
 	}
 
-	prod := &Producer{client, nil, *config, make(chan *ProduceError)}
+	prod := &Producer{client, nil, *config, make(chan *ProduceError, 32)}
 	prod.dispatcher = &dispatcher{
-		make(chan *pendingMessage),
+		make(chan *pendingMessage, 32),
 		prod,
 		make(map[string]map[int32]*msgQueue),
 		make(map[*Broker]*batcher),
@@ -177,7 +177,7 @@ func (d *dispatcher) createBatcher(broker *Broker) {
 	}
 
 	d.batchers[broker] = &batcher{d.prod, broker, 1,
-		make(chan *pendingMessage),
+		make(chan *pendingMessage, 32),
 		timer,
 		make(map[string]map[int32][]*pendingMessage),
 		0, 0,
@@ -198,6 +198,7 @@ func (d *dispatcher) getQueue(msg *pendingMessage) *msgQueue {
 
 func (d *dispatcher) dispatch() {
 	for msg := range d.msgs {
+		Logger.Println("dispatcher", msg)
 
 		queue := d.getQueue(msg)
 
@@ -218,6 +219,7 @@ func (d *dispatcher) dispatch() {
 				if d.batchers[queue.broker] == nil {
 					d.createBatcher(queue.broker)
 				}
+				Logger.Println("dispatching")
 				d.batchers[queue.broker].msgs <- msg
 			} else {
 				queue.backlog = append(queue.backlog, msg)
@@ -327,6 +329,8 @@ func (b *batcher) flush() {
 		return
 	}
 
+	Logger.Println("flushing")
+
 	response, err := b.broker.Produce(b.prod.client.id, request)
 
 	switch err {
@@ -395,6 +399,7 @@ func (b *batcher) flush() {
 		}
 	}
 
+	b.buffers = make(map[string]map[int32][]*pendingMessage)
 	b.timer.Reset()
 }
 
@@ -402,14 +407,15 @@ func (b *batcher) processMessages() {
 	for {
 		select {
 		case msg := <-b.msgs:
+			Logger.Println("batcher", msg)
 			if b.buffers[msg.topic] == nil {
 				b.buffers[msg.topic] = make(map[int32][]*pendingMessage)
 			}
-			buffer, exists := b.buffers[msg.topic][msg.partition]
+			_, exists := b.buffers[msg.topic][msg.partition]
 			if !exists {
-				b.buffers[msg.topic][msg.partition] = nil
+				b.buffers[msg.topic][msg.partition] = make([]*pendingMessage, 0)
 			}
-			if buffer != nil {
+			if b.buffers[msg.topic][msg.partition] != nil {
 				b.buffers[msg.topic][msg.partition] = append(b.buffers[msg.topic][msg.partition], msg)
 				b.bufferedMsgs += 1
 				b.bufferedBytes += uint(len(msg.value))
