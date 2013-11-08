@@ -10,8 +10,8 @@ import (
 // CompressionCodec represents the various compression codecs recognized by Kafka in messages.
 type CompressionCodec int8
 
-// only the last three bits are really used
-const compressionCodecMask int8 = 0x07
+// only the last two bits are really used
+const compressionCodecMask int8 = 0x03
 
 const (
 	CompressionNone   CompressionCodec = 0
