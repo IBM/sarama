@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 // make []int32 sortable so we can sort partition numbers
 type int32Slice []int32
 
@@ -13,6 +15,36 @@ func (slice int32Slice) Less(i, j int) bool {
 
 func (slice int32Slice) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
+}
+
+// simple resettable timer and mock for when no timer is necessary
+type timer interface {
+	C() <-chan time.Time
+	Reset()
+}
+
+type realTimer struct {
+	t *time.Timer
+	d time.Duration
+}
+
+func (t *realTimer) C() <-chan time.Time {
+	return t.t.C
+}
+
+func (t *realTimer) Reset() {
+	t.t.Reset(t.d)
+}
+
+type fakeTimer struct {
+	f <-chan time.Time
+}
+
+func (t *fakeTimer) C() <-chan time.Time {
+	return t.f
+}
+
+func (t *fakeTimer) Reset() {
 }
 
 // Encoder is a simple interface for any type that can be encoded as an array of bytes

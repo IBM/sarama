@@ -152,7 +152,7 @@ type batcher struct {
 	refs   uint
 
 	msgs    chan *pendingMessage
-	timer   *time.Timer
+	timer   timer
 	buffers map[string]map[int32][]*pendingMessage
 
 	bufferedBytes uint
@@ -166,9 +166,19 @@ type msgQueue struct {
 }
 
 func (d *dispatcher) createBatcher(broker *Broker) {
+	var timer timer
+	if d.prod.config.MaxBufferTime == 0 {
+		timer = &fakeTimer{make(chan time.Time)}
+	} else {
+		timer = &realTimer{
+			time.NewTimer(d.prod.config.MaxBufferTime),
+			d.prod.config.MaxBufferTime,
+		}
+	}
+
 	d.batchers[broker] = &batcher{d.prod, broker, 1,
 		make(chan *pendingMessage),
-		time.NewTimer(d.prod.config.MaxBufferTime),
+		timer,
 		make(map[string]map[int32][]*pendingMessage),
 		0, 0,
 	}
@@ -259,11 +269,13 @@ func (d *dispatcher) dispatch() {
 func (b *batcher) buildRequest() *ProduceRequest {
 
 	request := &ProduceRequest{RequiredAcks: b.prod.config.RequiredAcks, Timeout: b.prod.config.Timeout}
+	msgs := 0
 
 	if b.prod.config.Compression == CompressionNone {
 		for _, tmp := range b.buffers {
 			for _, buffer := range tmp {
 				for _, msg := range buffer {
+					msgs += 1
 					request.AddMessage(msg.topic, msg.partition,
 						&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
 				}
@@ -280,6 +292,7 @@ func (b *batcher) buildRequest() *ProduceRequest {
 					sets[topic][part] = new(MessageSet)
 				}
 				for _, msg := range buffer {
+					msgs += 1
 					sets[topic][part].addMessage(&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
 				}
 			}
@@ -292,6 +305,7 @@ func (b *batcher) buildRequest() *ProduceRequest {
 						&Message{Codec: b.prod.config.Compression, Key: nil, Value: bytes})
 				} else {
 					for _, msg := range b.buffers[topic][part] {
+						msgs -= 1
 						b.prod.errors <- &ProduceError{topic, msg.origKey, msg.origValue, err}
 					}
 				}
@@ -299,11 +313,19 @@ func (b *batcher) buildRequest() *ProduceRequest {
 		}
 	}
 
-	return request
+	if msgs > 0 {
+		return request
+	} else {
+		return nil
+	}
 }
 
 func (b *batcher) flush() {
 	request := b.buildRequest()
+
+	if request == nil {
+		return
+	}
 
 	response, err := b.broker.Produce(b.prod.client.id, request)
 
@@ -373,7 +395,7 @@ func (b *batcher) flush() {
 		}
 	}
 
-	b.timer.Reset(b.prod.config.MaxBufferTime)
+	b.timer.Reset()
 }
 
 func (b *batcher) processMessages() {
@@ -397,7 +419,7 @@ func (b *batcher) processMessages() {
 			} else {
 				b.prod.dispatcher.msgs <- msg
 			}
-		case <-b.timer.C:
+		case <-b.timer.C():
 			b.flush()
 		}
 	}
