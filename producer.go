@@ -104,6 +104,15 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		return err
 	}
 
+	if p.config.Compression != CompressionNone {
+		set := new(MessageSet)
+		set.addMessage(&Message{Codec: CompressionNone, Key: keyBytes, Value: valBytes})
+		valBytes, err = encode(set)
+		if err != nil {
+			return err
+		}
+	}
+
 	request := &ProduceRequest{RequiredAcks: p.config.RequiredAcks, Timeout: p.config.Timeout}
 	request.AddMessage(p.topic, partition, &Message{Codec: p.config.Compression, Key: keyBytes, Value: valBytes})
 
