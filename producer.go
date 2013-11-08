@@ -39,6 +39,10 @@ func NewProducer(client *Client, topic string, config *ProducerConfig) (*Produce
 		return nil, ConfigurationError("Empty topic")
 	}
 
+	if err := client.CheckUsable(); err != nil {
+		return nil, err
+	}
+
 	p := new(Producer)
 	p.client = client
 	p.topic = topic

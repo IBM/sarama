@@ -21,6 +21,9 @@ type Client struct {
 	id     string
 	config ClientConfig
 
+	// True if this client was closed, for error tracking
+	closed bool
+
 	// the broker addresses given to us through the constructor are not guaranteed to be returned in
 	// the cluster metadata (I *think* it only returns brokers who are currently leading partitions?)
 	// so we store them separately
@@ -84,6 +87,7 @@ func (client *Client) Close() error {
 	}
 	client.brokers = nil
 	client.leaders = nil
+	client.closed = true
 
 	if client.extraBroker != nil {
 		go client.extraBroker.Close()
@@ -183,7 +187,22 @@ func (client *Client) disconnectBroker(broker *Broker) {
 	go broker.Close()
 }
 
+func (client *Client) CheckUsable() error {
+     	if client.closed {
+		return ClosedClient
+	}
+	return nil
+}
+
+
 func (client *Client) refreshMetadata(topics []string, retries int) error {
+	// This function is a sort of central point for most functions that create new
+	// resources.  Check to see if we're dealing with a closed Client and error
+	// out immediately if so.
+	if err := client.CheckUsable(); err != nil {
+		return err
+	}
+
 	// Kafka will throw exceptions on an empty topic and not return a proper
 	// error. This handles the case by returning an error instead of sending it
 	// off to Kafka. See: https://github.com/Shopify/sarama/pull/38#issuecomment-26362310
