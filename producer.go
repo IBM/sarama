@@ -1,24 +1,30 @@
 package sarama
 
+import "errors"
+
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
-	Partitioner  Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
-	RequiredAcks RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
-	Timeout      int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
-	Compression  CompressionCodec // The type of compression to use on messages (defaults to no compression).
+	Partitioner         Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
+	RequiredAcks        RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
+	Timeout             int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
+	Compression         CompressionCodec // The type of compression to use on messages (defaults to no compression).
+	MaxBufferedMessages uint             // The maximum number of messages permitted to buffer before flushing.
+	MaxBufferedBytes    uint             // The maximum number of message bytes permitted to buffer before flushing.
+	MaxBufferTime       uint             // The maximum amount of time (in milliseconds) permitted to buffer before flushing.
 }
 
-// Producer publishes Kafka messages on a given topic. It routes messages to the correct broker, refreshing metadata as appropriate,
+// Producer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
 // and parses responses for errors. You must call Close() on a producer to avoid leaks, it may not be garbage-collected automatically when
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
 type Producer struct {
 	client *Client
-	topic  string
 	config ProducerConfig
+	msgs   chan *pendingMessage
+	events chan error
 }
 
-// NewProducer creates a new Producer using the given client. The resulting producer will publish messages on the given topic.
-func NewProducer(client *Client, topic string, config *ProducerConfig) (*Producer, error) {
+// NewProducer creates a new Producer using the given client.
+func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	if config == nil {
 		config = new(ProducerConfig)
 	}
@@ -35,14 +41,9 @@ func NewProducer(client *Client, topic string, config *ProducerConfig) (*Produce
 		config.Partitioner = NewRandomPartitioner()
 	}
 
-	if topic == "" {
-		return nil, ConfigurationError("Empty topic")
-	}
+	p := &Producer{client, *config, make(chan *pendingMessage), make(chan error)}
 
-	p := new(Producer)
-	p.client = client
-	p.topic = topic
-	p.config = *config
+	go p.dispatcher()
 
 	return p, nil
 }
@@ -51,19 +52,16 @@ func NewProducer(client *Client, topic string, config *ProducerConfig) (*Produce
 // a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
 // on the underlying client.
 func (p *Producer) Close() error {
-	// no-op for now, adding for consistency and so the API doesn't change when we add buffering
-	// (which will require a goroutine, which will require a close method in order to flush the buffer).
+	close(p.msgs)
 	return nil
 }
 
-// SendMessage sends a message with the given key and value. The partition to send to is selected by the Producer's Partitioner.
-// To send strings as either key or value, see the StringEncoder type.
-func (p *Producer) SendMessage(key, value Encoder) error {
-	return p.safeSendMessage(key, value, true)
+func (p *Producer) Events() <-chan error {
+	return p.events
 }
 
-func (p *Producer) choosePartition(key Encoder) (int32, error) {
-	partitions, err := p.client.Partitions(p.topic)
+func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
+	partitions, err := p.client.Partitions(topic)
 	if err != nil {
 		return -1, err
 	}
@@ -79,8 +77,14 @@ func (p *Producer) choosePartition(key Encoder) (int32, error) {
 	return partitions[choice], nil
 }
 
-func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
-	partition, err := p.choosePartition(key)
+// SendMessage produces a message on the given topic with the given key and value. The partition to send to is selected
+// by the Producer's Partitioner. To send strings as either key or value, see the StringEncoder type.
+func (p *Producer) SendMessage(topic string, key, value Encoder) error {
+	if topic == "" {
+		return ConfigurationError("Empty topic")
+	}
+
+	partition, err := p.choosePartition(topic, key)
 	if err != nil {
 		return err
 	}
@@ -99,10 +103,12 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 		return err
 	}
 
-	broker, err := p.client.Leader(p.topic, partition)
-	if err != nil {
-		return err
-	}
+	p.msgs <- &pendingMessage{topic, partition, keyBytes, valBytes, nil}
+
+	return nil
+}
+
+func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 
 	if p.config.Compression != CompressionNone {
 		set := new(MessageSet)
@@ -154,4 +160,107 @@ func (p *Producer) safeSendMessage(key, value Encoder, retry bool) error {
 	}
 
 	return block.Err
+}
+
+// special errors for communication between batcher and dispatcher
+// simpler than adding *another* field to all pendingMessages
+var forceFlush = errors.New("")
+var flushDone = errors.New("")
+
+type pendingMessage struct {
+	topic      string
+	partition  int32
+	key, value []byte
+	err        error
+}
+
+type batcherHandle struct {
+	msgs chan *pendingMessage
+	refs uint
+}
+
+type msgQueue struct {
+	broker  *Broker
+	backlog []*pendingMessage
+	requeue []*pendingMessage
+}
+
+func (p *Producer) dispatcher() {
+	queues := make(map[string]map[int32]*msgQueue)
+	batchers := make(map[*Broker]*batcherHandle)
+
+	for msg := range p.msgs {
+		if queues[msg.topic] == nil {
+			queues[msg.topic] = make(map[int32]*msgQueue)
+		}
+		if queues[msg.topic][msg.partition] == nil {
+			queues[msg.topic][msg.partition] = new(msgQueue)
+		}
+		queue := queues[msg.topic][msg.partition]
+
+		switch msg.err {
+		case nil:
+			if len(queue.requeue) == 0 {
+				if queue.broker == nil {
+					var err error
+					queue.broker, err = p.client.Leader(msg.topic, msg.partition)
+					if err != nil {
+						p.events <- err
+						continue
+					}
+					if batchers[queue.broker] != nil {
+						batchers[queue.broker].refs += 1
+					}
+				}
+				if batchers[queue.broker] == nil {
+					batcherChan := make(chan *pendingMessage)
+					batchers[queue.broker] = &batcherHandle{batcherChan, 1}
+					go p.batcher(batcherChan)
+				}
+				batchers[queue.broker].msgs <- msg
+			} else {
+				queue.backlog = append(queue.backlog, msg)
+			}
+		case flushDone:
+			batcher := batchers[queue.broker]
+			batcher.refs -= 1
+			if batcher.refs == 0 {
+				close(batcher.msgs)
+				delete(batchers, queue.broker)
+			}
+			var err error
+			queue.broker, err = p.client.Leader(msg.topic, msg.partition)
+			if err != nil {
+				p.events <- err
+				queue.backlog = nil
+				queue.requeue = nil
+				continue
+			}
+			if batchers[queue.broker] == nil {
+				batcherChan := make(chan *pendingMessage)
+				batchers[queue.broker] = &batcherHandle{batcherChan, 1}
+				go p.batcher(batcherChan)
+			} else {
+				batchers[queue.broker].refs += 1
+			}
+			batcher = batchers[queue.broker]
+			for _, tmp := range queue.requeue {
+				batcher.msgs <- tmp
+			}
+			for _, tmp := range queue.backlog {
+				batcher.msgs <- tmp
+			}
+			queue.backlog = nil
+			queue.requeue = nil
+		default:
+			queue.requeue = append(queue.requeue, msg)
+			if len(queue.requeue) == 1 {
+				// no need to check for nil etc, we just got a message from it so it must exist
+				batchers[queue.broker].msgs <- &pendingMessage{err: forceFlush}
+			}
+		}
+	}
+}
+
+func (p *Producer) batcher(msgs <-chan *pendingMessage) {
 }
