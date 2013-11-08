@@ -9,6 +9,9 @@ import (
 // or otherwise failed to respond.
 var OutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
 
+// ClosedClient is the error returned when the client was previously closed but used subsequently.
+var ClosedClient = errors.New("kafka: Use of a client that was previously closed")
+
 // NoSuchTopic is the error returned when the supplied topic is rejected by the Kafka servers.
 var NoSuchTopic = errors.New("kafka: Topic not recognized by brokers.")
 
