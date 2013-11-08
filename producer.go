@@ -1,6 +1,9 @@
 package sarama
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
@@ -263,4 +266,34 @@ func (p *Producer) dispatcher() {
 }
 
 func (p *Producer) batcher(msgs <-chan *pendingMessage) {
+	owns := make(map[string]map[int32]bool)
+	timer := time.NewTimer(time.Duration(p.config.MaxBufferTime) * time.Milliseconds)
+
+	var buffer []*pendingMessages
+	var bufferedBytes uint
+
+	for {
+		select {
+		case msg <- msgs:
+			if owns[msg.topic] == nil {
+				owns[msg.topic] = make(map[int32]bool)
+			}
+			owner, exists := owns[msg.topic][msg.partition]
+			if !exists {
+				owner = true
+				owns[msg.topic][msg.partition] = true
+			}
+			if owner {
+				buffer = append(buffer, msg)
+				bufferedBytes += len(msg.value)
+				if len(buffer) > p.config.MaxBufferedMessages || bufferedBytes > p.config.MaxBufferedBytes {
+					// flush + reset timer
+				}
+			} else {
+				p.msgs <- msg
+			}
+		case <-timer.C:
+			// flush + reset timer
+		}
+	}
 }
