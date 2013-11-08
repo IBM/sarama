@@ -2,12 +2,13 @@ package sarama
 
 import (
 	"encoding/binary"
+	"github.com/Shopify/sarama/mockbroker"
 	"testing"
 )
 
 func TestSimpleClient(t *testing.T) {
 	responses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, responses)
+	mockBroker := mockbroker.New(t, responses)
 	defer mockBroker.Close()
 
 	// Only one response needed, an empty metadata response
@@ -22,8 +23,8 @@ func TestSimpleClient(t *testing.T) {
 
 func TestClientExtraBrokers(t *testing.T) {
 	responses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, make(chan []byte))
+	mockBroker := mockbroker.New(t, responses)
+	mockExtra := mockbroker.New(t, make(chan []byte))
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
@@ -46,8 +47,8 @@ func TestClientExtraBrokers(t *testing.T) {
 
 func TestClientMetadata(t *testing.T) {
 	responses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, make(chan []byte))
+	mockBroker := mockbroker.New(t, responses)
+	mockExtra := mockbroker.New(t, make(chan []byte))
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
@@ -101,8 +102,8 @@ func TestClientMetadata(t *testing.T) {
 func TestClientRefreshBehaviour(t *testing.T) {
 	responses := make(chan []byte, 1)
 	extraResponses := make(chan []byte, 2)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, extraResponses)
+	mockBroker := mockbroker.New(t, responses)
+	mockExtra := mockbroker.New(t, extraResponses)
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 

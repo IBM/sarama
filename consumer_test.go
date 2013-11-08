@@ -3,6 +3,7 @@ package sarama
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/Shopify/sarama/mockbroker"
 	"testing"
 	"time"
 )
@@ -37,8 +38,8 @@ var (
 func TestSimpleConsumer(t *testing.T) {
 	masterResponses := make(chan []byte, 1)
 	extraResponses := make(chan []byte)
-	mockBroker := NewMockBroker(t, masterResponses)
-	mockExtra := NewMockBroker(t, extraResponses)
+	mockBroker := mockbroker.New(t, masterResponses)
+	mockExtra := mockbroker.New(t, extraResponses)
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
@@ -98,8 +99,8 @@ func TestSimpleConsumer(t *testing.T) {
 func TestConsumerRawOffset(t *testing.T) {
 	masterResponses := make(chan []byte, 1)
 	extraResponses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, masterResponses)
-	mockExtra := NewMockBroker(t, extraResponses)
+	mockBroker := mockbroker.New(t, masterResponses)
+	mockExtra := mockbroker.New(t, extraResponses)
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 
@@ -130,8 +131,8 @@ func TestConsumerRawOffset(t *testing.T) {
 func TestConsumerLatestOffset(t *testing.T) {
 	masterResponses := make(chan []byte, 1)
 	extraResponses := make(chan []byte, 2)
-	mockBroker := NewMockBroker(t, masterResponses)
-	mockExtra := NewMockBroker(t, extraResponses)
+	mockBroker := mockbroker.New(t, masterResponses)
+	mockExtra := mockbroker.New(t, extraResponses)
 	defer mockBroker.Close()
 	defer mockExtra.Close()
 

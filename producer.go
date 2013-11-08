@@ -1,6 +1,8 @@
 package sarama
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -210,6 +212,7 @@ func (p *Producer) brokerProducerFor(tp topicPartition) (*brokerProducer, error)
 		}
 		p.m.Unlock()
 	}
+
 	return bp, nil
 }
 
@@ -275,6 +278,7 @@ func (bp *brokerProducer) addMessage(msg *produceMessage, maxBufferBytes uint32)
 }
 
 func (bp *brokerProducer) flushIfOverCapacity(maxBufferBytes uint32) {
+	fmt.Printf("%p %d %d\n", bp, bp.bufferedBytes, maxBufferBytes)
 	if bp.bufferedBytes > maxBufferBytes {
 		select {
 		case bp.flushNow <- true:

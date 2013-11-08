@@ -243,6 +243,13 @@ func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder
 
 	select {
 	case buf := <-promise.packets:
+		a := decode(buf, res)
+		color := "34"
+		if a != nil {
+			color = "31"
+		}
+		fmt.Printf("\x1b[%sm{{{\n  bytes: %+v\n  result: %+v\n  err: %+v\n  type: %T\n}}}\x1b[0m\n",
+			color, buf, res, a, res)
 		return decode(buf, res)
 	case err = <-promise.errors:
 		return err
