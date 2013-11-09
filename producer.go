@@ -322,6 +322,17 @@ func (b *batcher) buildRequest() *ProduceRequest {
 	}
 }
 
+func (b *batcher) handleError(buf []*pendingMessage, err error) {
+	for _, msg := range buf {
+		if msg.err != nil {
+			b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
+		} else {
+			msg.err = err
+			b.prod.dispatcher.msgs <- msg
+		}
+	}
+}
+
 func (b *batcher) flush() {
 	request := b.buildRequest()
 
@@ -347,54 +358,31 @@ func (b *batcher) flush() {
 	default:
 		for _, tmp := range b.buffers {
 			for _, buffer := range tmp {
-				for _, msg := range buffer {
-					if msg.err != nil {
-						b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-					} else {
-						msg.err = err
-						b.prod.dispatcher.msgs <- msg
-					}
-				}
+				b.handleError(buffer, err)
 			}
 		}
 	}
 
-	if response == nil {
-		return
-	}
+	if response != nil {
+		for topic, tmp := range b.buffers {
+			for part, buffer := range tmp {
+				block := response.GetBlock(topic, part)
 
-	for topic, tmp := range b.buffers {
-		for part, buffer := range tmp {
-			block := response.GetBlock(topic, part)
-
-			if block == nil {
-				for _, msg := range buffer {
-					if msg.err != nil {
-						b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, IncompleteResponse}
-					} else {
-						msg.err = IncompleteResponse
-						b.prod.dispatcher.msgs <- msg
-					}
-				}
-			} else {
-				switch block.Err {
-				case NoError:
-					break
-				case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-					for _, msg := range buffer {
-						if msg.err != nil {
+				if block == nil {
+					b.handleError(buffer, IncompleteResponse)
+				} else {
+					switch block.Err {
+					case NoError:
+						break
+					case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
+						b.handleError(buffer, err)
+					default:
+						for _, msg := range buffer {
 							b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-						} else {
-							msg.err = err
-							b.prod.dispatcher.msgs <- msg
 						}
 					}
-				default:
-					for _, msg := range buffer {
-						b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-					}
-				}
 
+				}
 			}
 		}
 	}
@@ -408,6 +396,13 @@ func (b *batcher) processMessages() {
 		select {
 		case msg := <-b.msgs:
 			Logger.Println("batcher", msg)
+
+			if msg == nil {
+				b.flush()
+				Logger.Println("batcher exiting")
+				return
+			}
+
 			if b.buffers[msg.topic] == nil {
 				b.buffers[msg.topic] = make(map[int32][]*pendingMessage)
 			}
