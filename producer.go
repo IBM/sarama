@@ -126,10 +126,9 @@ func (p *Producer) SendMessage(topic string, key, value Encoder) {
 	p.dispatcher.msgs <- &pendingMessage{topic, partition, keyBytes, valBytes, key, value, nil}
 }
 
-// special errors for communication between batcher and dispatcher
-// simpler than adding *another* field to all pendingMessages
+// special error for communication between batcher and dispatcher
+// simpler to use an error than to add another field to all pendingMessages
 var forceFlush = errors.New("")
-var flushDone = errors.New("")
 
 type pendingMessage struct {
 	topic              string
@@ -224,7 +223,7 @@ func (d *dispatcher) dispatch() {
 			} else {
 				queue.backlog = append(queue.backlog, msg)
 			}
-		case flushDone:
+		case forceFlush:
 			batcher := d.batchers[queue.broker]
 			batcher.refs -= 1
 			if batcher.refs == 0 {
@@ -262,7 +261,7 @@ func (d *dispatcher) dispatch() {
 			queue.requeue = append(queue.requeue, msg)
 			if len(queue.requeue) == 1 {
 				// no need to check for nil etc, we just got a message from it so it must exist
-				d.batchers[queue.broker].msgs <- &pendingMessage{err: forceFlush}
+				d.batchers[queue.broker].msgs <- &pendingMessage{topic: msg.topic, partition: msg.partition, err: forceFlush}
 			}
 		}
 	}
@@ -406,6 +405,13 @@ func (b *batcher) processMessages() {
 			if b.buffers[msg.topic] == nil {
 				b.buffers[msg.topic] = make(map[int32][]*pendingMessage)
 			}
+
+			if msg.err == forceFlush {
+				delete(b.buffers[msg.topic], msg.partition)
+				b.prod.dispatcher.msgs <- msg
+				continue
+			}
+
 			_, exists := b.buffers[msg.topic][msg.partition]
 			if !exists {
 				b.buffers[msg.topic][msg.partition] = make([]*pendingMessage, 0)
