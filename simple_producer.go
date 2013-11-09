@@ -32,13 +32,9 @@ func NewSimpleProducer(client *Client, topic string) (*SimpleProducer, error) {
 func (sp *SimpleProducer) SendMessage(key, value Encoder) error {
 	sp.producer.Send() <- &MessageToSend{sp.topic, key, value}
 
-	err := <-sp.producer.Errors() // we always get something because AckSuccesses is true
+	result := <-sp.producer.Errors() // we always get something because AckSuccesses is true
 
-	if err != nil {
-		return err.Err
-	}
-
-	return nil
+	return result.Err
 }
 
 // Close shuts down the producer and flushes any messages it may have buffered. You must call this function before

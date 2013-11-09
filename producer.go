@@ -14,7 +14,7 @@ type ProducerConfig struct {
 	MaxBufferedMessages uint             // The maximum number of messages permitted to buffer before flushing.
 	MaxBufferedBytes    uint             // The maximum number of message bytes permitted to buffer before flushing.
 	MaxBufferTime       time.Duration    // The maximum amount of time permitted to buffer before flushing (or zero for no timer).
-	AckSuccesses        bool             // When true, every successful delivery causes a nil to be sent on the Errors channel.
+	AckSuccesses        bool             // When true, every message sent results in a ProduceError, even if Err is nil
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
@@ -398,7 +398,7 @@ func (b *batcher) flush() {
 					switch block.Err {
 					case NoError:
 						if b.prod.config.AckSuccesses {
-							b.prod.errors <- nil
+							b.prod.errors <- &ProduceError{msg.orig, nil}
 						}
 					case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 						b.redispatch(msg, err)
@@ -409,8 +409,8 @@ func (b *batcher) flush() {
 				}
 			}
 		} else if b.prod.config.AckSuccesses {
-			for _ = range b.buffer {
-				b.prod.errors <- nil
+			for _, msg := range b.buffer {
+				b.prod.errors <- &ProduceError{msg.orig, nil}
 			}
 		}
 	case EncodingError:
