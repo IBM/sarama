@@ -25,6 +25,7 @@ type Producer struct {
 	dispatcher *dispatcher
 	config     ProducerConfig
 	errors     chan *ProduceError
+	closed     bool
 }
 
 // NewProducer creates a new Producer using the given client.
@@ -45,7 +46,7 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		config.Partitioner = NewRandomPartitioner()
 	}
 
-	prod := &Producer{client, nil, *config, make(chan *ProduceError, 32)}
+	prod := &Producer{client, nil, *config, make(chan *ProduceError, 32), false}
 	prod.dispatcher = &dispatcher{
 		make(chan *pendingMessage, 32),
 		prod,
@@ -62,7 +63,8 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 // a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
 // on the underlying client.
 func (p *Producer) Close() error {
-	close(p.dispatcher.msgs)
+	p.closed = true
+	p.dispatcher.msgs <- nil
 	return nil
 }
 
@@ -99,6 +101,11 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 // SendMessage produces a message on the given topic with the given key and value. The partition to send to is selected
 // by the Producer's Partitioner. To send strings as either key or value, see the StringEncoder type.
 func (p *Producer) SendMessage(topic string, key, value Encoder) {
+	if p.closed {
+		p.errors <- &ProduceError{topic, key, value, ConfigurationError("Producer Closed")}
+		return
+	}
+
 	if topic == "" {
 		p.errors <- &ProduceError{topic, key, value, ConfigurationError("Empty topic")}
 		return
@@ -215,12 +222,33 @@ func (d *dispatcher) getQueue(msg *pendingMessage) *msgQueue {
 
 func (d *dispatcher) cleanup() {
 	for _, batcher := range d.batchers {
-		close(batcher.msgs)
+		batcher.msgs <- nil
+	}
+	waiting := len(d.batchers)
+	for msg := range d.msgs {
+		if msg == nil {
+			waiting -= 1
+			if waiting == 0 {
+				for _, batcher := range d.batchers {
+					close(batcher.msgs)
+				}
+				close(d.msgs)
+			}
+		} else if msg.err == nil {
+			d.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, ConfigurationError("Producer Closed")}
+		} else {
+			d.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, msg.err}
+		}
 	}
 }
 
 func (d *dispatcher) dispatch() {
 	for msg := range d.msgs {
+
+		if msg == nil {
+			d.cleanup()
+			return
+		}
 
 		queue := d.getQueue(msg)
 
@@ -277,7 +305,6 @@ func (d *dispatcher) dispatch() {
 			}
 		}
 	}
-	d.cleanup()
 }
 
 func (b *batcher) buildRequest() *ProduceRequest {
@@ -392,6 +419,7 @@ func (b *batcher) processMessages() {
 
 			if msg == nil {
 				b.flush()
+				b.prod.dispatcher.msgs <- nil
 				return
 			}
 
