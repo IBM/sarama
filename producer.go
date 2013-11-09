@@ -13,7 +13,8 @@ type ProducerConfig struct {
 	Compression         CompressionCodec // The type of compression to use on messages (defaults to no compression).
 	MaxBufferedMessages uint             // The maximum number of messages permitted to buffer before flushing.
 	MaxBufferedBytes    uint             // The maximum number of message bytes permitted to buffer before flushing.
-	MaxBufferTime       time.Duration    // The maximum amount of time permitted to buffer before flushing.
+	MaxBufferTime       time.Duration    // The maximum amount of time permitted to buffer before flushing (or zero for no timer).
+	AckSuccesses        bool             // When true, every successful delivery causes a nil to be sent on the Errors channel.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
@@ -197,9 +198,14 @@ func (d *dispatcher) getQueue(msg *pendingMessage) *msgQueue {
 	return d.queues[msg.topic][msg.partition]
 }
 
+func (d *dispatcher) cleanup() {
+	for _, batcher := range d.batchers {
+		close(batcher.msgs)
+	}
+}
+
 func (d *dispatcher) dispatch() {
 	for msg := range d.msgs {
-		Logger.Println("dispatcher", msg)
 
 		queue := d.getQueue(msg)
 
@@ -220,7 +226,6 @@ func (d *dispatcher) dispatch() {
 				if d.batchers[queue.broker] == nil {
 					d.createBatcher(queue.broker)
 				}
-				Logger.Println("dispatching")
 				d.batchers[queue.broker].msgs <- msg
 			} else {
 				queue.backlog = append(queue.backlog, msg)
@@ -267,6 +272,7 @@ func (d *dispatcher) dispatch() {
 			}
 		}
 	}
+	d.cleanup()
 }
 
 func (b *batcher) buildRequest() *ProduceRequest {
@@ -341,13 +347,37 @@ func (b *batcher) flush() {
 		return
 	}
 
-	Logger.Println("flushing")
-
 	response, err := b.broker.Produce(b.prod.client.id, request)
 
 	switch err {
 	case nil:
-		break
+		if response != nil {
+			for topic, tmp := range b.buffers {
+				for part, buffer := range tmp {
+					block := response.GetBlock(topic, part)
+
+					if block == nil {
+						b.handleError(buffer, IncompleteResponse)
+					} else {
+						switch block.Err {
+						case NoError:
+							if b.prod.config.AckSuccesses {
+								for _ = range buffer {
+									b.prod.errors <- nil
+								}
+							}
+						case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
+							b.handleError(buffer, err)
+						default:
+							for _, msg := range buffer {
+								b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
+							}
+						}
+
+					}
+				}
+			}
+		}
 	case EncodingError:
 		for _, tmp := range b.buffers {
 			for _, buffer := range tmp {
@@ -364,30 +394,6 @@ func (b *batcher) flush() {
 		}
 	}
 
-	if response != nil {
-		for topic, tmp := range b.buffers {
-			for part, buffer := range tmp {
-				block := response.GetBlock(topic, part)
-
-				if block == nil {
-					b.handleError(buffer, IncompleteResponse)
-				} else {
-					switch block.Err {
-					case NoError:
-						break
-					case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-						b.handleError(buffer, err)
-					default:
-						for _, msg := range buffer {
-							b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-						}
-					}
-
-				}
-			}
-		}
-	}
-
 	b.buffers = make(map[string]map[int32][]*pendingMessage)
 	b.timer.Reset()
 }
@@ -396,11 +402,9 @@ func (b *batcher) processMessages() {
 	for {
 		select {
 		case msg := <-b.msgs:
-			Logger.Println("batcher", msg)
 
 			if msg == nil {
 				b.flush()
-				Logger.Println("batcher exiting")
 				return
 			}
 
