@@ -65,13 +65,15 @@ func (p *Producer) Close() error {
 	return nil
 }
 
-// TODO
+// ProduceError is the type of error generated when the producer fails to deliver a message.
+// It contains the topic, key and value of the original message as well as the actual error value.
 type ProduceError struct {
 	Topic      string
 	Key, Value Encoder
 	Err        error
 }
 
+// Errors is the channel of ProduceErrors for asynchronous delivery.
 func (p *Producer) Errors() <-chan *ProduceError {
 	return p.errors
 }
