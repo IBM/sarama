@@ -377,6 +377,14 @@ func (b *batcher) flush() {
 					}
 				}
 			}
+		} else if b.prod.config.AckSuccesses {
+			for _, tmp := range b.buffers {
+				for _, buffer := range tmp {
+					for _ = range buffer {
+						b.prod.errors <- nil
+					}
+				}
+			}
 		}
 	case EncodingError:
 		for _, tmp := range b.buffers {
