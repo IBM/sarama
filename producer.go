@@ -192,7 +192,7 @@ func (q *msgQueue) flushBacklog() <-chan *pendingMessage {
 func (d *dispatcher) createBatcher(broker *Broker) {
 	var timer timer
 	if d.prod.config.MaxBufferTime == 0 {
-		timer = &fakeTimer{make(chan time.Time)}
+		timer = &fakeTimer{}
 	} else {
 		timer = &realTimer{
 			time.NewTimer(d.prod.config.MaxBufferTime),

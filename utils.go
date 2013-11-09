@@ -37,11 +37,10 @@ func (t *realTimer) Reset() {
 }
 
 type fakeTimer struct {
-	f <-chan time.Time
 }
 
 func (t *fakeTimer) C() <-chan time.Time {
-	return t.f
+	return nil
 }
 
 func (t *fakeTimer) Reset() {
