@@ -30,7 +30,7 @@ func NewSimpleProducer(client *Client, topic string) (*SimpleProducer, error) {
 // SendMessage produces a message with the given key and value. The partition to send to is selected
 // at random. To send strings as either key or value, see the StringEncoder type.
 func (sp *SimpleProducer) SendMessage(key, value Encoder) error {
-	sp.producer.SendMessage(sp.topic, key, value)
+	sp.producer.Send() <- &MessageToSend{sp.topic, key, value}
 
 	err := <-sp.producer.Errors() // we always get something because AckSuccesses is true
 
