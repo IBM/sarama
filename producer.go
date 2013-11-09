@@ -26,6 +26,7 @@ type Producer struct {
 	config     ProducerConfig
 	errors     chan *ProduceError
 	input      chan *MessageToSend
+	stopper    chan bool
 }
 
 // NewProducer creates a new Producer using the given client.
@@ -46,7 +47,11 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		config.Partitioner = NewRandomPartitioner()
 	}
 
-	prod := &Producer{client, nil, *config, make(chan *ProduceError, 32), make(chan *MessageToSend, 32)}
+	prod := &Producer{client, nil, *config,
+		make(chan *ProduceError, 32),
+		make(chan *MessageToSend, 32),
+		make(chan bool),
+	}
 	prod.dispatcher = &dispatcher{
 		make(chan *pendingMessage, 32),
 		prod,
@@ -64,6 +69,8 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 // a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
 // on the underlying client.
 func (p *Producer) Close() error {
+	close(p.input)
+	<-p.stopper
 	p.dispatcher.msgs <- nil
 	return nil
 }
@@ -138,6 +145,7 @@ func (p *Producer) receive() {
 
 		p.dispatcher.msgs <- &pendingMessage{msg, partition, keyBytes, valBytes, nil}
 	}
+	close(p.stopper)
 }
 
 // special error for communication between batcher and dispatcher
@@ -236,6 +244,7 @@ func (d *dispatcher) cleanup() {
 					close(batcher.msgs)
 				}
 				close(d.msgs)
+				close(d.prod.errors)
 			}
 		} else if msg.err == nil {
 			d.prod.errors <- &ProduceError{msg.orig, ConfigurationError("Producer Closed")}
