@@ -7,14 +7,15 @@ import (
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
-	Partitioner         Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
-	RequiredAcks        RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
-	Timeout             int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
-	Compression         CompressionCodec // The type of compression to use on messages (defaults to no compression).
-	MaxBufferedMessages uint             // The maximum number of messages permitted to buffer before flushing.
-	MaxBufferedBytes    uint             // The maximum number of message bytes permitted to buffer before flushing.
-	MaxBufferTime       time.Duration    // The maximum amount of time permitted to buffer before flushing (or zero for no timer).
-	AckSuccesses        bool             // When true, every message sent results in a ProduceError, even if Err is nil
+	Partitioners        map[string]Partitioner // Map of topics to partitioners. If a topic does not exist in the map, DefaultPartitioner is used.
+	DefaultPartitioner  Partitioner            // Default method of choosing the partition to send messages to. Random is used if this is nil.
+	RequiredAcks        RequiredAcks           // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
+	Timeout             int32                  // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
+	Compression         CompressionCodec       // The type of compression to use on messages (defaults to no compression).
+	MaxBufferedMessages uint                   // The maximum number of messages permitted to buffer before flushing.
+	MaxBufferedBytes    uint                   // The maximum number of message bytes permitted to buffer before flushing.
+	MaxBufferTime       time.Duration          // The maximum amount of time permitted to buffer before flushing (or zero for no timer).
+	AckSuccesses        bool                   // When true, every message sent results in a ProduceError, even if Err is nil
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
@@ -43,8 +44,8 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		return nil, ConfigurationError("Invalid Timeout")
 	}
 
-	if config.Partitioner == nil {
-		config.Partitioner = NewRandomPartitioner()
+	if config.DefaultPartitioner == nil {
+		config.DefaultPartitioner = NewRandomPartitioner()
 	}
 
 	prod := &Producer{client, nil, *config,
@@ -59,7 +60,7 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		make(map[*Broker]*batcher),
 	}
 
-	go prod.receive()
+	go prod.messagePreprocessor()
 	go prod.dispatcher.dispatch()
 
 	return prod, nil
@@ -105,7 +106,12 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 
 	numPartitions := int32(len(partitions))
 
-	choice := p.config.Partitioner.Partition(key, numPartitions)
+	chooser := p.config.Partitioners[topic]
+	if chooser == nil {
+		chooser = p.config.DefaultPartitioner
+	}
+
+	choice := chooser.Partition(key, numPartitions)
 
 	if choice < 0 || choice >= numPartitions {
 		return -1, InvalidPartition
@@ -114,7 +120,7 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 	return partitions[choice], nil
 }
 
-func (p *Producer) receive() {
+func (p *Producer) messagePreprocessor() {
 	for msg := range p.input {
 		if msg.Topic == "" {
 			p.errors <- &ProduceError{msg, ConfigurationError("Empty topic")}
