@@ -373,6 +373,7 @@ func (b *batcher) redispatch(msg *pendingMessage, err error) {
 	} else {
 		msg.err = err
 		b.toRequeue = append(b.toRequeue, msg)
+		b.owner[msg.orig.Topic][msg.partition] = false
 	}
 }
 
