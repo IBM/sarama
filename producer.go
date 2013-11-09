@@ -172,11 +172,13 @@ type batcher struct {
 	refs   uint
 
 	msgs   chan *pendingMessage
-	timer  timer
 	owner  map[string]map[int32]bool
 	buffer []*pendingMessage
 
+	timer         timer
 	bufferedBytes uint
+
+	toRequeue []*pendingMessage
 }
 
 type msgQueue struct {
@@ -213,9 +215,8 @@ func (d *dispatcher) createBatcher(broker *Broker) {
 
 	d.batchers[broker] = &batcher{d.prod, broker, 1,
 		make(chan *pendingMessage, 32),
-		timer,
 		make(map[string]map[int32]bool),
-		nil, 0,
+		nil, timer, 0, nil,
 	}
 
 	go d.batchers[broker].processMessages()
@@ -370,7 +371,7 @@ func (b *batcher) redispatch(msg *pendingMessage, err error) {
 		b.prod.errors <- &ProduceError{msg.orig, err}
 	} else {
 		msg.err = err
-		b.prod.dispatcher.msgs <- msg
+		b.toRequeue = append(b.toRequeue, msg)
 	}
 }
 
@@ -424,42 +425,59 @@ func (b *batcher) flush() {
 	b.timer.Reset()
 }
 
+func (b *batcher) processMessage(msg *pendingMessage) {
+	if msg == nil {
+		b.flush()
+		b.toRequeue = append(b.toRequeue, nil)
+		return
+	}
+
+	if b.owner[msg.orig.Topic] == nil {
+		b.owner[msg.orig.Topic] = make(map[int32]bool)
+	}
+
+	if msg.err == orderMarker {
+		delete(b.owner[msg.orig.Topic], msg.partition)
+		b.toRequeue = append(b.toRequeue, msg)
+		return
+	}
+
+	_, exists := b.owner[msg.orig.Topic][msg.partition]
+	if !exists {
+		b.owner[msg.orig.Topic][msg.partition] = true
+	}
+	if b.owner[msg.orig.Topic][msg.partition] {
+		b.buffer = append(b.buffer, msg)
+		b.bufferedBytes += uint(len(msg.value))
+		if uint(len(b.buffer)) > b.prod.config.MaxBufferedMessages || b.bufferedBytes > b.prod.config.MaxBufferedBytes {
+			b.flush()
+		}
+	} else {
+		b.toRequeue = append(b.toRequeue, msg)
+	}
+}
+
 func (b *batcher) processMessages() {
 	for {
-		select {
-		case msg := <-b.msgs:
-
-			if msg == nil {
+		if len(b.toRequeue) == 0 {
+			select {
+			case msg := <-b.msgs:
+				b.processMessage(msg)
+			case <-b.timer.C():
 				b.flush()
-				b.prod.dispatcher.msgs <- nil
-				return
 			}
-
-			if b.owner[msg.orig.Topic] == nil {
-				b.owner[msg.orig.Topic] = make(map[int32]bool)
-			}
-
-			if msg.err == orderMarker {
-				delete(b.owner[msg.orig.Topic], msg.partition)
-				b.prod.dispatcher.msgs <- msg
-				continue
-			}
-
-			_, exists := b.owner[msg.orig.Topic][msg.partition]
-			if !exists {
-				b.owner[msg.orig.Topic][msg.partition] = true
-			}
-			if b.owner[msg.orig.Topic][msg.partition] {
-				b.buffer = append(b.buffer, msg)
-				b.bufferedBytes += uint(len(msg.value))
-				if uint(len(b.buffer)) > b.prod.config.MaxBufferedMessages || b.bufferedBytes > b.prod.config.MaxBufferedBytes {
-					b.flush()
+		} else {
+			select {
+			case b.prod.dispatcher.msgs <- b.toRequeue[0]:
+				if b.toRequeue[0] == nil {
+					return
 				}
-			} else {
-				b.prod.dispatcher.msgs <- msg
+				b.toRequeue = b.toRequeue[1:]
+			case msg := <-b.msgs:
+				b.processMessage(msg)
+			case <-b.timer.C():
+				b.flush()
 			}
-		case <-b.timer.C():
-			b.flush()
 		}
 	}
 }
