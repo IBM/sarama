@@ -167,6 +167,21 @@ type msgQueue struct {
 	requeue []*pendingMessage
 }
 
+func (q *msgQueue) flushBacklog() <-chan *pendingMessage {
+	msgs := make(chan *pendingMessage)
+	go func() {
+		for _, msg := range q.requeue {
+			msgs <- msg
+		}
+		for _, msg := range q.backlog {
+			msgs <- msg
+		}
+		q.requeue = nil
+		q.backlog = nil
+	}()
+	return msgs
+}
+
 func (d *dispatcher) createBatcher(broker *Broker) {
 	var timer timer
 	if d.prod.config.MaxBufferTime == 0 {
@@ -240,14 +255,9 @@ func (d *dispatcher) dispatch() {
 			var err error
 			queue.broker, err = d.prod.client.Leader(msg.topic, msg.partition)
 			if err != nil {
-				for _, tmp := range queue.requeue {
+				for tmp := range queue.flushBacklog() {
 					d.prod.errors <- &ProduceError{tmp.topic, tmp.origKey, tmp.origValue, err}
 				}
-				for _, tmp := range queue.backlog {
-					d.prod.errors <- &ProduceError{tmp.topic, tmp.origKey, tmp.origValue, err}
-				}
-				queue.requeue = nil
-				queue.backlog = nil
 				continue
 			}
 			if d.batchers[queue.broker] == nil {
@@ -256,14 +266,9 @@ func (d *dispatcher) dispatch() {
 				d.batchers[queue.broker].refs += 1
 			}
 			batcher = d.batchers[queue.broker]
-			for _, tmp := range queue.requeue {
+			for tmp := range queue.flushBacklog() {
 				batcher.msgs <- tmp
 			}
-			for _, tmp := range queue.backlog {
-				batcher.msgs <- tmp
-			}
-			queue.backlog = nil
-			queue.requeue = nil
 		default:
 			queue.requeue = append(queue.requeue, msg)
 			if len(queue.requeue) == 1 {
