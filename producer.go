@@ -153,12 +153,12 @@ type batcher struct {
 	broker *Broker
 	refs   uint
 
-	msgs    chan *pendingMessage
-	timer   timer
-	buffers map[string]map[int32][]*pendingMessage
+	msgs   chan *pendingMessage
+	timer  timer
+	owner  map[string]map[int32]bool
+	buffer []*pendingMessage
 
 	bufferedBytes uint
-	bufferedMsgs  uint
 }
 
 type msgQueue struct {
@@ -196,8 +196,8 @@ func (d *dispatcher) createBatcher(broker *Broker) {
 	d.batchers[broker] = &batcher{d.prod, broker, 1,
 		make(chan *pendingMessage, 32),
 		timer,
-		make(map[string]map[int32][]*pendingMessage),
-		0, 0,
+		make(map[string]map[int32]bool),
+		nil, 0,
 	}
 
 	go d.batchers[broker].processMessages()
@@ -283,33 +283,23 @@ func (d *dispatcher) dispatch() {
 func (b *batcher) buildRequest() *ProduceRequest {
 
 	request := &ProduceRequest{RequiredAcks: b.prod.config.RequiredAcks, Timeout: b.prod.config.Timeout}
-	msgs := 0
+	msgs := len(b.buffer)
 
 	if b.prod.config.Compression == CompressionNone {
-		for _, tmp := range b.buffers {
-			for _, buffer := range tmp {
-				for _, msg := range buffer {
-					msgs += 1
-					request.AddMessage(msg.topic, msg.partition,
-						&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
-				}
-			}
+		for _, msg := range b.buffer {
+			request.AddMessage(msg.topic, msg.partition,
+				&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
 		}
 	} else {
 		sets := make(map[string]map[int32]*MessageSet)
-		for topic, tmp := range b.buffers {
-			for part, buffer := range tmp {
-				if sets[topic] == nil {
-					sets[topic] = make(map[int32]*MessageSet)
-				}
-				if sets[topic][part] == nil {
-					sets[topic][part] = new(MessageSet)
-				}
-				for _, msg := range buffer {
-					msgs += 1
-					sets[topic][part].addMessage(&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
-				}
+		for _, msg := range b.buffer {
+			if sets[msg.topic] == nil {
+				sets[msg.topic] = make(map[int32]*MessageSet)
 			}
+			if sets[msg.topic][msg.partition] == nil {
+				sets[msg.topic][msg.partition] = new(MessageSet)
+			}
+			sets[msg.topic][msg.partition].addMessage(&Message{Codec: CompressionNone, Key: msg.key, Value: msg.value})
 		}
 		for topic, tmp := range sets {
 			for part, set := range tmp {
@@ -318,9 +308,11 @@ func (b *batcher) buildRequest() *ProduceRequest {
 					request.AddMessage(topic, part,
 						&Message{Codec: b.prod.config.Compression, Key: nil, Value: bytes})
 				} else {
-					for _, msg := range b.buffers[topic][part] {
-						msgs -= 1
-						b.prod.errors <- &ProduceError{topic, msg.origKey, msg.origValue, err}
+					for _, msg := range b.buffer {
+						if msg.topic == topic && msg.partition == part {
+							msgs -= 1
+							b.prod.errors <- &ProduceError{topic, msg.origKey, msg.origValue, err}
+						}
 					}
 				}
 			}
@@ -334,14 +326,12 @@ func (b *batcher) buildRequest() *ProduceRequest {
 	}
 }
 
-func (b *batcher) handleError(buf []*pendingMessage, err error) {
-	for _, msg := range buf {
-		if msg.err != nil {
-			b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-		} else {
-			msg.err = err
-			b.prod.dispatcher.msgs <- msg
-		}
+func (b *batcher) redispatch(msg *pendingMessage, err error) {
+	if msg.err != nil {
+		b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
+	} else {
+		msg.err = err
+		b.prod.dispatcher.msgs <- msg
 	}
 }
 
@@ -357,57 +347,41 @@ func (b *batcher) flush() {
 	switch err {
 	case nil:
 		if response != nil {
-			for topic, tmp := range b.buffers {
-				for part, buffer := range tmp {
-					block := response.GetBlock(topic, part)
+			for _, msg := range b.buffer {
+				block := response.GetBlock(msg.topic, msg.partition)
 
-					if block == nil {
-						b.handleError(buffer, IncompleteResponse)
-					} else {
-						switch block.Err {
-						case NoError:
-							if b.prod.config.AckSuccesses {
-								for _ = range buffer {
-									b.prod.errors <- nil
-								}
-							}
-						case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-							b.handleError(buffer, err)
-						default:
-							for _, msg := range buffer {
-								b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-							}
+				if block == nil {
+					b.redispatch(msg, IncompleteResponse)
+				} else {
+					switch block.Err {
+					case NoError:
+						if b.prod.config.AckSuccesses {
+							b.prod.errors <- nil
 						}
-
+					case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
+						b.redispatch(msg, err)
+					default:
+						b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
 					}
+
 				}
 			}
 		} else if b.prod.config.AckSuccesses {
-			for _, tmp := range b.buffers {
-				for _, buffer := range tmp {
-					for _ = range buffer {
-						b.prod.errors <- nil
-					}
-				}
+			for _ = range b.buffer {
+				b.prod.errors <- nil
 			}
 		}
 	case EncodingError:
-		for _, tmp := range b.buffers {
-			for _, buffer := range tmp {
-				for _, msg := range buffer {
-					b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
-				}
-			}
+		for _, msg := range b.buffer {
+			b.prod.errors <- &ProduceError{msg.topic, msg.origKey, msg.origValue, err}
 		}
 	default:
-		for _, tmp := range b.buffers {
-			for _, buffer := range tmp {
-				b.handleError(buffer, err)
-			}
+		for _, msg := range b.buffer {
+			b.redispatch(msg, err)
 		}
 	}
 
-	b.buffers = make(map[string]map[int32][]*pendingMessage)
+	b.buffer = nil
 	b.timer.Reset()
 }
 
@@ -421,25 +395,24 @@ func (b *batcher) processMessages() {
 				return
 			}
 
-			if b.buffers[msg.topic] == nil {
-				b.buffers[msg.topic] = make(map[int32][]*pendingMessage)
+			if b.owner[msg.topic] == nil {
+				b.owner[msg.topic] = make(map[int32]bool)
 			}
 
 			if msg.err == orderMarker {
-				delete(b.buffers[msg.topic], msg.partition)
+				delete(b.owner[msg.topic], msg.partition)
 				b.prod.dispatcher.msgs <- msg
 				continue
 			}
 
-			_, exists := b.buffers[msg.topic][msg.partition]
+			_, exists := b.owner[msg.topic][msg.partition]
 			if !exists {
-				b.buffers[msg.topic][msg.partition] = make([]*pendingMessage, 0)
+				b.owner[msg.topic][msg.partition] = true
 			}
-			if b.buffers[msg.topic][msg.partition] != nil {
-				b.buffers[msg.topic][msg.partition] = append(b.buffers[msg.topic][msg.partition], msg)
-				b.bufferedMsgs += 1
+			if b.owner[msg.topic][msg.partition] {
+				b.buffer = append(b.buffer, msg)
 				b.bufferedBytes += uint(len(msg.value))
-				if b.bufferedMsgs > b.prod.config.MaxBufferedMessages || b.bufferedBytes > b.prod.config.MaxBufferedBytes {
+				if uint(len(b.buffer)) > b.prod.config.MaxBufferedMessages || b.bufferedBytes > b.prod.config.MaxBufferedBytes {
 					b.flush()
 				}
 			} else {
