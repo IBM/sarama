@@ -156,8 +156,11 @@ func (p *Producer) messagePreprocessor() {
 
 // special errors for communication between batcher and dispatcher
 // simpler to use an error than to add another field to all pendingMessages
-var orderMarker = errors.New("")
-var shuttingDown = errors.New("")
+var (
+	bounced  = errors.New("")
+	reset    = errors.New("")
+	shutdown = errors.New("")
+)
 
 type pendingMessage struct {
 	orig       *MessageToSend
@@ -241,12 +244,12 @@ func (d *dispatcher) getQueue(msg *pendingMessage) *msgQueue {
 
 func (d *dispatcher) cleanup() {
 	for _, batcher := range d.batchers {
-		batcher.msgs <- &pendingMessage{err: shuttingDown}
+		batcher.msgs <- &pendingMessage{err: shutdown}
 	}
 	waiting := len(d.batchers)
 	for msg := range d.msgs {
 		switch msg.err {
-		case shuttingDown:
+		case shutdown:
 			waiting -= 1
 			if waiting == 0 {
 				close(d.msgs)
@@ -291,11 +294,11 @@ func (d *dispatcher) dispatch() {
 			} else {
 				queue.backlog = append(queue.backlog, msg)
 			}
-		case orderMarker:
+		case reset:
 			batcher := d.batchers[queue.broker]
 			batcher.refs -= 1
 			if batcher.refs == 0 {
-				batcher.msgs <- &pendingMessage{err: shuttingDown}
+				batcher.msgs <- &pendingMessage{err: shutdown}
 				delete(d.batchers, queue.broker)
 			}
 			var err error
@@ -315,13 +318,16 @@ func (d *dispatcher) dispatch() {
 			for tmp := range queue.flushBacklog() {
 				batcher.msgs <- tmp
 			}
-		case shuttingDown:
+		case shutdown:
 			break // no-op, this is only useful in dispatcher.cleanup()
+		case bounced:
+			msg.err = nil
+			fallthrough
 		default:
 			queue.requeue = append(queue.requeue, msg)
 			if len(queue.requeue) == 1 {
 				// no need to check for nil etc, we just got a message from it so it must exist
-				d.batchers[queue.broker].msgs <- &pendingMessage{orig: msg.orig, partition: msg.partition, err: orderMarker}
+				d.batchers[queue.broker].msgs <- &pendingMessage{orig: msg.orig, partition: msg.partition, err: reset}
 			}
 		}
 	}
@@ -434,7 +440,7 @@ func (b *batcher) flush() {
 }
 
 func (b *batcher) processMessage(msg *pendingMessage) {
-	if msg.err == shuttingDown {
+	if msg.err == shutdown {
 		b.flush()
 		b.toRequeue = append(b.toRequeue, msg)
 		return
@@ -444,7 +450,7 @@ func (b *batcher) processMessage(msg *pendingMessage) {
 		b.owner[msg.orig.Topic] = make(map[int32]bool)
 	}
 
-	if msg.err == orderMarker {
+	if msg.err == reset {
 		delete(b.owner[msg.orig.Topic], msg.partition)
 		b.toRequeue = append(b.toRequeue, msg)
 		return
@@ -461,6 +467,9 @@ func (b *batcher) processMessage(msg *pendingMessage) {
 			b.flush()
 		}
 	} else {
+		if msg.err == nil {
+			msg.err = bounced
+		}
 		b.toRequeue = append(b.toRequeue, msg)
 	}
 }
@@ -477,7 +486,7 @@ func (b *batcher) processMessages() {
 		} else {
 			select {
 			case b.prod.dispatcher.msgs <- b.toRequeue[0]:
-				if b.toRequeue[0].err == shuttingDown {
+				if b.toRequeue[0].err == shutdown {
 					close(b.msgs)
 					return
 				}
