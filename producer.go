@@ -302,7 +302,10 @@ func (d *dispatcher) dispatch() {
 				delete(d.batchers, queue.broker)
 			}
 			var err error
-			queue.broker, err = d.prod.client.Leader(msg.orig.Topic, msg.partition)
+			err = d.prod.client.RefreshTopicMetadata(msg.orig.Topic)
+			if err == nil {
+				queue.broker, err = d.prod.client.Leader(msg.orig.Topic, msg.partition)
+			}
 			if err != nil {
 				for tmp := range queue.flushBacklog() {
 					d.prod.errors <- &ProduceError{tmp.orig, err}
