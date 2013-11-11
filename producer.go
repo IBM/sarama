@@ -236,7 +236,9 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 		for {
 			select {
 			case <-bp.flushNow:
+				println("{{")
 				bp.flush(p)
+				println("}}")
 			case <-timer.C:
 				bp.flushIfAnyMessages(p)
 			case <-bp.stopper:

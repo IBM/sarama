@@ -60,7 +60,7 @@ func (e *MetadataRequestExpectation) ResponseBytes() []byte {
 		// we don't support mocking errors at topic-level; only partition-level
 		binary.Write(buf, binary.BigEndian, uint16(0))
 		binary.Write(buf, binary.BigEndian, uint16(len(topic)))
-		buf.Write([]byte(topic)) // TODO: Does this write a null?
+		buf.Write([]byte(topic))
 		binary.Write(buf, binary.BigEndian, uint32(len(tps)))
 		for _, tp := range tps {
 			binary.Write(buf, binary.BigEndian, uint16(0)) // TODO: Write the error code instead
