@@ -8,7 +8,7 @@ import (
 type MetadataRequestExpectation struct {
 	err             error
 	topicPartitions []metadataRequestTP
-	brokers         []*MockBroker
+	brokers         []mockbrokerish
 }
 
 type metadataRequestTP struct {
@@ -17,7 +17,12 @@ type metadataRequestTP struct {
 	brokerId  int
 }
 
-func (e *MetadataRequestExpectation) AddBroker(b *MockBroker) *MetadataRequestExpectation {
+type mockbrokerish interface {
+	BrokerID() int
+	Port() int32
+}
+
+func (e *MetadataRequestExpectation) AddBroker(b mockbrokerish) *MetadataRequestExpectation {
 	e.brokers = append(e.brokers, b)
 	return e
 }
@@ -40,9 +45,9 @@ func (e *MetadataRequestExpectation) ResponseBytes() []byte {
 
 	binary.Write(buf, binary.BigEndian, uint32(len(e.brokers)))
 	for _, broker := range e.brokers {
-		binary.Write(buf, binary.BigEndian, uint32(broker.BrokerID))
+		binary.Write(buf, binary.BigEndian, uint32(broker.BrokerID()))
 		buf.Write([]byte{0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't'})
-		binary.Write(buf, binary.BigEndian, uint32(broker.port))
+		binary.Write(buf, binary.BigEndian, uint32(broker.Port()))
 	}
 
 	byTopic := make(map[string][]metadataRequestTP)
@@ -56,7 +61,7 @@ func (e *MetadataRequestExpectation) ResponseBytes() []byte {
 		binary.Write(buf, binary.BigEndian, uint16(0))
 		binary.Write(buf, binary.BigEndian, uint16(len(topic)))
 		buf.Write([]byte(topic)) // TODO: Does this write a null?
-		binary.Write(buf, binary.BigEndian, uint16(len(tps)))
+		binary.Write(buf, binary.BigEndian, uint32(len(tps)))
 		for _, tp := range tps {
 			binary.Write(buf, binary.BigEndian, uint16(0)) // TODO: Write the error code instead
 			binary.Write(buf, binary.BigEndian, uint32(tp.partition))

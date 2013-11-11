@@ -3,7 +3,6 @@ package mockbroker
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -21,12 +20,17 @@ import (
 // It is not necessary to prefix message length or correlation ID to your response bytes, the server does that
 // automatically as a convenience.
 type MockBroker struct {
-	BrokerID     int
+	brokerID     int
 	port         int32
 	stopper      chan bool
 	expectations chan Expectation
 	listener     net.Listener
 	t            *testing.T
+	expecting    bool
+}
+
+func (b *MockBroker) BrokerID() int {
+	return b.brokerID
 }
 
 type Expectation interface {
@@ -42,6 +46,9 @@ func (b *MockBroker) Addr() string {
 }
 
 func (b *MockBroker) Close() {
+	if b.expecting {
+		b.t.Fatalf("Not all expectations were satisfied in mockBroker with ID=%d!", b.BrokerID())
+	}
 	close(b.expectations)
 	<-b.stopper
 }
@@ -59,15 +66,12 @@ func (b *MockBroker) serverLoop() (ok bool) {
 	reqHeader := make([]byte, 4)
 	resHeader := make([]byte, 8)
 	for expectation := range b.expectations {
-		/* AfterDelay(time.Duration) maybe? */
-		/* if response == nil { */
-		/* 	time.Sleep(250 * time.Millisecond) */
-		/* 	continue */
-		/* } */
-		if _, err = io.ReadFull(conn, reqHeader); err != nil {
+		b.expecting = true
+		_, err = io.ReadFull(conn, reqHeader)
+		b.expecting = false
+		if err != nil {
 			return b.serverError(err, conn)
 		}
-		fmt.Println("\x1b[36m", reqHeader, "\x1b[0m")
 		body := make([]byte, binary.BigEndian.Uint32(reqHeader))
 		if len(body) < 10 {
 			return b.serverError(errors.New("Kafka request too short."), conn)
@@ -75,10 +79,6 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		if _, err = io.ReadFull(conn, body); err != nil {
 			return b.serverError(err, conn)
 		}
-		fmt.Println("\x1b[35m", body, "\x1b[0m")
-		apiKey := binary.BigEndian.Uint16(body[0:])
-		fmt.Println("\x1b[35m", apiKey, "\x1b[0m")
-
 		response := expectation.ResponseBytes()
 
 		binary.BigEndian.PutUint32(resHeader, uint32(len(response)+4))
@@ -112,13 +112,13 @@ func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 // New launches a fake Kafka broker. It takes a testing.T as provided by the
 // test framework and a channel of responses to use.  If an error occurs it is
 // simply logged to the testing.T and the broker exits.
-func New(t *testing.T, brokerId int) *MockBroker {
+func New(t *testing.T, brokerID int) *MockBroker {
 	var err error
 
 	broker := &MockBroker{
 		stopper:      make(chan bool),
 		t:            t,
-		BrokerID:     brokerId,
+		brokerID:     brokerID,
 		expectations: make(chan Expectation, 512),
 	}
 
