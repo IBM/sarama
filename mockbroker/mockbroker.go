@@ -45,6 +45,16 @@ func (b *MockBroker) Addr() string {
 	return b.listener.Addr().String()
 }
 
+type rawExpectation []byte
+
+func (r rawExpectation) ResponseBytes() []byte {
+	return r
+}
+
+func (b *MockBroker) ExpectBytes(bytes []byte) {
+	b.expectations <- rawExpectation(bytes)
+}
+
 func (b *MockBroker) Close() {
 	if b.expecting {
 		b.t.Fatalf("Not all expectations were satisfied in mockBroker with ID=%d!", b.BrokerID())
@@ -80,6 +90,9 @@ func (b *MockBroker) serverLoop() (ok bool) {
 			return b.serverError(err, conn)
 		}
 		response := expectation.ResponseBytes()
+		if len(response) == 0 {
+			continue
+		}
 
 		binary.BigEndian.PutUint32(resHeader, uint32(len(response)+4))
 		binary.BigEndian.PutUint32(resHeader[4:], binary.BigEndian.Uint32(body[4:]))
