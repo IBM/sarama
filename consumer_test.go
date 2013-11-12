@@ -1,8 +1,8 @@
 package sarama
 
 import (
-	"encoding/binary"
 	"fmt"
+	"github.com/Shopify/sarama/mockbroker"
 	"testing"
 	"time"
 )
@@ -35,44 +35,20 @@ var (
 )
 
 func TestSimpleConsumer(t *testing.T) {
-	masterResponses := make(chan []byte, 1)
-	extraResponses := make(chan []byte)
-	mockBroker := NewMockBroker(t, masterResponses)
-	mockExtra := NewMockBroker(t, extraResponses)
-	defer mockBroker.Close()
-	defer mockExtra.Close()
 
-	// return the extra mock as another available broker
-	response := make([]byte, len(extraBrokerMetadata))
-	copy(response, extraBrokerMetadata)
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	masterResponses <- response
-	go func() {
-		for i := 0; i < 10; i++ {
-			msg := []byte{
-				0x00, 0x00, 0x00, 0x01,
-				0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-				0x00, 0x00, 0x00, 0x01,
-				0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x1C,
-				// messageSet
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00, 0x00, 0x10,
-				// message
-				0x23, 0x96, 0x4a, 0xf7, // CRC
-				0x00,
-				0x00,
-				0xFF, 0xFF, 0xFF, 0xFF,
-				0x00, 0x00, 0x00, 0x02, 0x00, 0xEE}
-			binary.BigEndian.PutUint64(msg[36:], uint64(i))
-			extraResponses <- msg
-		}
-		extraResponses <- consumerStopper
-	}()
+	mb1 := mockbroker.New(t, 1)
+	mb2 := mockbroker.New(t, 2)
 
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb2).
+		AddTopicPartition("my_topic", 0, 2)
+
+	for i := 0; i < 10; i++ {
+		mb2.ExpectFetchRequest().
+			AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), uint64(i))
+	}
+
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,6 +59,8 @@ func TestSimpleConsumer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer consumer.Close()
+	defer mb1.Close()
+	defer mb2.Close()
 
 	for i := 0; i < 10; i++ {
 		event := <-consumer.Events()
@@ -93,24 +71,19 @@ func TestSimpleConsumer(t *testing.T) {
 			t.Error("Incorrect message offset!")
 		}
 	}
+
 }
 
 func TestConsumerRawOffset(t *testing.T) {
-	masterResponses := make(chan []byte, 1)
-	extraResponses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, masterResponses)
-	mockExtra := NewMockBroker(t, extraResponses)
-	defer mockBroker.Close()
-	defer mockExtra.Close()
 
-	// return the extra mock as another available broker
-	response := make([]byte, len(extraBrokerMetadata))
-	copy(response, extraBrokerMetadata)
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	masterResponses <- response
-	extraResponses <- consumerStopper
+	mb1 := mockbroker.New(t, 1)
+	mb2 := mockbroker.New(t, 2)
 
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb2).
+		AddTopicPartition("my_topic", 0, 2)
+
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,36 +95,27 @@ func TestConsumerRawOffset(t *testing.T) {
 	}
 	defer consumer.Close()
 
+	defer mb1.Close()
+	defer mb2.Close()
+
 	if consumer.offset != 1234 {
 		t.Error("Raw offset not set correctly")
 	}
 }
 
 func TestConsumerLatestOffset(t *testing.T) {
-	masterResponses := make(chan []byte, 1)
-	extraResponses := make(chan []byte, 2)
-	mockBroker := NewMockBroker(t, masterResponses)
-	mockExtra := NewMockBroker(t, extraResponses)
-	defer mockBroker.Close()
-	defer mockExtra.Close()
 
-	// return the extra mock as another available broker
-	response := make([]byte, len(extraBrokerMetadata))
-	copy(response, extraBrokerMetadata)
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	masterResponses <- response
-	extraResponses <- []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01,
-	}
-	extraResponses <- consumerStopper
+	mb1 := mockbroker.New(t, 1)
+	mb2 := mockbroker.New(t, 2)
 
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb2).
+		AddTopicPartition("my_topic", 0, 2)
+
+	mb2.ExpectOffsetFetchRequest().
+		AddTopicPartition("my_topic", 0, 0x010101)
+
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,6 +126,9 @@ func TestConsumerLatestOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer consumer.Close()
+
+	defer mb2.Close()
+	defer mb1.Close()
 
 	if consumer.offset != 0x010101 {
 		t.Error("Latest offset not fetched correctly")
