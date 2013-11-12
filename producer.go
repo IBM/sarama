@@ -7,15 +7,20 @@ import (
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
-	Partitioners        map[string]Partitioner // Map of topics to partitioners. If a topic does not exist in the map, DefaultPartitioner is used.
-	DefaultPartitioner  Partitioner            // Default method of choosing the partition to send messages to. Random is used if this is nil.
-	RequiredAcks        RequiredAcks           // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
-	Timeout             int32                  // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
-	Compression         CompressionCodec       // The type of compression to use on messages (defaults to no compression).
-	MaxBufferedMessages uint                   // The maximum number of messages permitted to buffer before flushing.
-	MaxBufferedBytes    uint                   // The maximum number of message bytes permitted to buffer before flushing.
-	MaxBufferTime       time.Duration          // The maximum amount of time permitted to buffer before flushing (or zero for no timer).
-	AckSuccesses        bool                   // When true, every message sent results in a ProduceError, even if Err is nil
+	Partitioners       map[string]Partitioner // Map of topics to partitioners. If a topic does not exist in the map, DefaultPartitioner is used.
+	DefaultPartitioner Partitioner            // Default method of choosing the partition to send messages to. Random is used if this is nil.
+
+	RequiredAcks RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
+	Timeout      int32            // The maximum time in ms the broker will wait for the receipt of the number of RequiredAcks.
+	Compression  CompressionCodec // The type of compression to use on messages (defaults to no compression).
+
+	MaxBufferedMessages uint          // The maximum number of messages permitted to buffer before flushing.
+	MaxBufferedBytes    uint          // The maximum number of message bytes permitted to buffer before flushing (before compression).
+	MaxBufferTime       time.Duration // The maximum amount of time permitted to buffer before flushing (or zero for no timer).
+
+	// When true, every message sent results in exactly one ProduceError on the Errors() channel,
+	// even if the message was delivered successfully (in which case the Err field will be nil).
+	AckSuccesses bool
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
