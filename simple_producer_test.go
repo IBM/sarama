@@ -51,7 +51,7 @@ func TestSimpleProducer(t *testing.T) {
 	}
 	defer client.Close()
 
-	producer, err := NewSimpleProducer(client, "my_topic")
+	producer, err := NewSimpleProducer(client, "my_topic", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func ExampleSimpleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewSimpleProducer(client, "my_topic")
+	producer, err := NewSimpleProducer(client, "my_topic", nil)
 	if err != nil {
 		panic(err)
 	}
