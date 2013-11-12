@@ -36,14 +36,25 @@ func (t *realTimer) Reset() {
 	t.t.Reset(t.d)
 }
 
-type fakeTimer struct {
-}
+type fakeTimer struct{}
 
 func (t *fakeTimer) C() <-chan time.Time {
 	return nil
 }
 
-func (t *fakeTimer) Reset() {
+func (t *fakeTimer) Reset() {}
+
+// helper for launching goroutines with the appropriate panic handler
+func withRecover(fn func()) {
+	if PanicHandler != nil {
+		defer func() {
+			if err := recover(); err != nil {
+				PanicHandler(err)
+			}
+		}()
+	}
+
+	fn()
 }
 
 // Encoder is a simple interface for any type that can be encoded as an array of bytes
