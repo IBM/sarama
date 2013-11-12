@@ -49,7 +49,7 @@ func (b *Broker) Open(maxOpenRequests int) error {
 		return AlreadyConnected
 	}
 
-	go func() {
+	go withRecover(func() {
 		defer b.lock.Unlock()
 
 		b.conn, b.connErr = net.Dial("tcp", b.addr)
@@ -65,8 +65,8 @@ func (b *Broker) Open(maxOpenRequests int) error {
 		b.responses = make(chan responsePromise, maxOpenRequests)
 
 		Logger.Printf("Connected to broker %s\n", b.addr)
-		go b.responseReceiver()
-	}()
+		go withRecover(b.responseReceiver)
+	})
 
 	return nil
 }
