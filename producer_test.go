@@ -1,51 +1,31 @@
 package sarama
 
 import (
-	"encoding/binary"
 	"fmt"
+	"github.com/Shopify/sarama/mockbroker"
 	"testing"
 )
 
 func TestSimpleProducer(t *testing.T) {
-	responses := make(chan []byte, 1)
-	extraResponses := make(chan []byte)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, extraResponses)
-	defer mockBroker.Close()
-	defer mockExtra.Close()
 
-	// return the extra mock as another available broker
-	response := []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	responses <- response
-	go func() {
-		for i := 0; i < 10; i++ {
-			msg := []byte{
-				0x00, 0x00, 0x00, 0x01,
-				0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-				0x00, 0x00, 0x00, 0x01,
-				0x00, 0x00, 0x00, 0x00,
-				0x00, 0x00,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
-			binary.BigEndian.PutUint64(msg[23:], uint64(i))
-			extraResponses <- msg
-		}
-	}()
+	mb1 := mockbroker.New(t, 1)
+	mb2 := mockbroker.New(t, 2)
+	defer mb1.Close()
+	defer mb2.Close()
 
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb2).
+		AddTopicPartition("my_topic", 0, 2)
+
+	// TODO: While the third parameter is the number of messages to expect,
+	// really nothing about the message is actually asserted by the mock. This is
+	// a problem for the future.
+	for i := 0; i < 10; i++ {
+		mb2.ExpectProduceRequest().
+			AddTopicPartition("my_topic", 0, 1, nil)
+	}
+
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
