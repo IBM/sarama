@@ -15,6 +15,18 @@ func (slice int32Slice) Swap(i, j int) {
 	slice[i], slice[j] = slice[j], slice[i]
 }
 
+func withRecover(fn func()) {
+	if PanicHandler != nil {
+		defer func() {
+			if err := recover(); err != nil {
+				PanicHandler(err)
+			}
+		}()
+	}
+
+	fn()
+}
+
 // Encoder is a simple interface for any type that can be encoded as an array of bytes
 // in order to be sent as the key or value of a Kafka message.
 type Encoder interface {
