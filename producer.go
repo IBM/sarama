@@ -55,12 +55,12 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	}
 
 	prod := &Producer{client, nil, *config,
-		make(chan *ProduceError, 32),
-		make(chan *MessageToSend, 32),
+		make(chan *ProduceError, 32),  // buffer is arbitrary, for scheduling efficiency
+		make(chan *MessageToSend, 32), // buffer is arbitrary, for scheduling efficiency
 		make(chan bool),
 	}
 	prod.dispatcher = &dispatcher{
-		make(chan *pendingMessage, 32),
+		make(chan *pendingMessage, 32), // buffer is arbitrary, for scheduling efficiency
 		prod,
 		make(map[string]map[int32]*msgQueue),
 		make(map[*Broker]*batcher),
@@ -253,7 +253,7 @@ func (d *dispatcher) createBatcher(broker *Broker) {
 	}
 
 	d.batchers[broker] = &batcher{d.prod, broker, 1,
-		make(chan *pendingMessage, 32),
+		make(chan *pendingMessage, 32), // buffer is arbitrary, for scheduling efficiency
 		make(map[string]map[int32]bool),
 		nil, timer, 0, nil,
 	}
