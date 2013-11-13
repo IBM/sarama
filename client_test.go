@@ -1,80 +1,57 @@
 package sarama
 
 import (
-	"encoding/binary"
+	"github.com/Shopify/sarama/mockbroker"
 	"testing"
 )
 
 func TestSimpleClient(t *testing.T) {
-	responses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, responses)
-	defer mockBroker.Close()
 
-	// Only one response needed, an empty metadata response
-	responses <- []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
+	mb := mockbroker.New(t, 1)
 
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client.Close()
-}
+	mb.ExpectMetadataRequest()
 
-func TestClientExtraBrokers(t *testing.T) {
-	responses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, make(chan []byte))
-	defer mockBroker.Close()
-	defer mockExtra.Close()
-
-	// return the extra mock as another available broker
-	response := []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	responses <- response
-
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client.Close()
-}
-
-func TestClientMetadata(t *testing.T) {
-	responses := make(chan []byte, 1)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, make(chan []byte))
-	defer mockBroker.Close()
-	defer mockExtra.Close()
-
-	// return the extra mock as another available broker
-	response := []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x05,
-		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
-		0x00, 0x00, 0x00, 0x00,
-
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x05,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	responses <- response
-
-	client, err := NewClient("client_id", []string{mockBroker.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	defer mb.Close()
+}
+
+func TestClientExtraBrokers(t *testing.T) {
+
+	mb1 := mockbroker.New(t, 1)
+	mb2 := mockbroker.New(t, 2)
+
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb2)
+
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	defer mb1.Close()
+	defer mb2.Close()
+}
+
+func TestClientMetadata(t *testing.T) {
+
+	mb1 := mockbroker.New(t, 1)
+	mb5 := mockbroker.New(t, 5)
+
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb5).
+		AddTopicPartition("my_topic", 0, mb5.BrokerID())
+
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	defer mb1.Close()
+	defer mb5.Close()
 
 	topics, err := client.Topics()
 	if err != nil {
@@ -99,50 +76,22 @@ func TestClientMetadata(t *testing.T) {
 }
 
 func TestClientRefreshBehaviour(t *testing.T) {
-	responses := make(chan []byte, 1)
-	extraResponses := make(chan []byte, 2)
-	mockBroker := NewMockBroker(t, responses)
-	mockExtra := NewMockBroker(t, extraResponses)
-	defer mockBroker.Close()
-	defer mockExtra.Close()
+	mb1 := mockbroker.New(t, 1)
+	mb5 := mockbroker.New(t, 5)
 
-	// return the extra mock as another available broker
-	response := []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0xaa,
-		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
-	binary.BigEndian.PutUint32(response[19:], uint32(mockExtra.Port()))
-	responses <- response
-	extraResponses <- []byte{
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x05,
-		0x00, 0x00, 0x00, 0x0e,
-		0xFF, 0xFF, 0xFF, 0xFF,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
-	extraResponses <- []byte{
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x0b,
-		0x00, 0x00, 0x00, 0xaa,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00}
+	mb1.ExpectMetadataRequest().
+		AddBroker(mb5)
 
-	client, err := NewClient("clientID", []string{mockBroker.Addr()}, &ClientConfig{MetadataRetries: 1})
+	mb5.ExpectMetadataRequest().
+		AddTopicPartition("my_topic", 0xb, 5)
+
+	client, err := NewClient("clientID", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
+	defer mb1.Close()
+	defer mb5.Close()
 
 	parts, err := client.Partitions("my_topic")
 	if err != nil {
@@ -154,7 +103,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	tst, err := client.Leader("my_topic", 0xb)
 	if err != nil {
 		t.Error(err)
-	} else if tst.ID() != 0xaa {
+	} else if tst.ID() != 5 {
 		t.Error("Leader for my_topic had incorrect ID.")
 	}
 
