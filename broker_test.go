@@ -41,13 +41,11 @@ func TestBrokerAccessors(t *testing.T) {
 	}
 }
 
-/*
 func TestSimpleBrokerCommunication(t *testing.T) {
-	responses := make(chan []byte)
-	mockBroker := mockbroker.New(t, responses)
-	defer mockBroker.Close()
+	mb := NewMockBroker(t, 0)
+	defer mb.Close()
 
-	broker := NewBroker(mockBroker.Addr())
+	broker := NewBroker(mb.Addr())
 	err := broker.Open(4)
 	if err != nil {
 		t.Fatal(err)
@@ -55,7 +53,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 
 	go func() {
 		for _, tt := range brokerTestTable {
-			responses <- tt.response
+			mb.ExpectBytes(tt.response)
 		}
 	}()
 	for _, tt := range brokerTestTable {
@@ -67,7 +65,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		t.Error(err)
 	}
 }
-*/
 
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
 var brokerTestTable = []struct {

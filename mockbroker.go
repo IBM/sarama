@@ -1,4 +1,4 @@
-package mockbroker
+package sarama
 
 import (
 	"encoding/binary"
@@ -45,6 +45,16 @@ func (b *MockBroker) Addr() string {
 	return b.listener.Addr().String()
 }
 
+type rawExpectation []byte
+
+func (r rawExpectation) ResponseBytes() []byte {
+	return r
+}
+
+func (b *MockBroker) ExpectBytes(bytes []byte) {
+	b.expectations <- rawExpectation(bytes)
+}
+
 func (b *MockBroker) Close() {
 	if b.expecting {
 		b.t.Fatalf("Not all expectations were satisfied in mockBroker with ID=%d!", b.BrokerID())
@@ -80,6 +90,9 @@ func (b *MockBroker) serverLoop() (ok bool) {
 			return b.serverError(err, conn)
 		}
 		response := expectation.ResponseBytes()
+		if len(response) == 0 {
+			continue
+		}
 
 		binary.BigEndian.PutUint32(resHeader, uint32(len(response)+4))
 		binary.BigEndian.PutUint32(resHeader[4:], binary.BigEndian.Uint32(body[4:]))
@@ -112,7 +125,7 @@ func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 // New launches a fake Kafka broker. It takes a testing.T as provided by the
 // test framework and a channel of responses to use.  If an error occurs it is
 // simply logged to the testing.T and the broker exits.
-func New(t *testing.T, brokerID int) *MockBroker {
+func NewMockBroker(t *testing.T, brokerID int) *MockBroker {
 	var err error
 
 	broker := &MockBroker{

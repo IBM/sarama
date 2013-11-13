@@ -1,4 +1,4 @@
-package mockbroker
+package sarama
 
 import (
 	"bytes"
@@ -14,11 +14,11 @@ type produceRequestTP struct {
 	topic     string
 	partition int32
 	nMessages int
-	err       error
+	err       KError
 }
 
 func (e *ProduceRequestExpectation) AddTopicPartition(
-	topic string, partition int32, nMessages int, err error,
+	topic string, partition int32, nMessages int, err KError,
 ) *ProduceRequestExpectation {
 	prtp := produceRequestTP{topic, partition, nMessages, err}
 	e.topicPartitions = append(e.topicPartitions, prtp)
@@ -46,8 +46,8 @@ func (e *ProduceRequestExpectation) ResponseBytes() []byte {
 		binary.Write(buf, binary.BigEndian, uint32(len(tps)))
 		for _, tp := range tps {
 			binary.Write(buf, binary.BigEndian, uint32(tp.partition))
-			binary.Write(buf, binary.BigEndian, uint16(0)) // TODO: error
-			binary.Write(buf, binary.BigEndian, uint64(0)) // offset
+			binary.Write(buf, binary.BigEndian, uint16(tp.err)) // TODO: error
+			binary.Write(buf, binary.BigEndian, uint64(0))      // offset
 		}
 	}
 

@@ -2,7 +2,6 @@ package sarama
 
 import (
 	"fmt"
-	"github.com/shopify/sarama/mockbroker"
 	"testing"
 	"time"
 )
@@ -11,17 +10,17 @@ const TestMessage = "ABC THE MESSAGE"
 
 func TestSimpleProducer(t *testing.T) {
 
-	mb1 := mockbroker.New(t, 1)
-	mb2 := mockbroker.New(t, 2)
+	mb1 := NewMockBroker(t, 1)
+	mb2 := NewMockBroker(t, 2)
 	defer mb1.Close()
 	defer mb2.Close()
 
 	mb1.ExpectMetadataRequest().
 		AddBroker(mb2).
-		AddTopicPartition("my_topic", 1, 2)
+		AddTopicPartition("my_topic", 0, 2)
 
 	mb2.ExpectProduceRequest().
-		AddTopicPartition("my_topic", 1, 10, nil)
+		AddTopicPartition("my_topic", 0, 1, nil)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -32,7 +31,7 @@ func TestSimpleProducer(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush once, after the 10th message.
-		MaxBufferBytes: uint32((len(TestMessage) * 10) - 1),
+		MaxBufferedBytes: uint32((len(TestMessage) * 10) - 1),
 	})
 	defer producer.Close()
 
@@ -45,8 +44,8 @@ func TestSimpleProducer(t *testing.T) {
 
 func TestSimpleSyncProducer(t *testing.T) {
 
-	mb1 := mockbroker.New(t, 1)
-	mb2 := mockbroker.New(t, 2)
+	mb1 := NewMockBroker(t, 1)
+	mb2 := NewMockBroker(t, 2)
 	defer mb1.Close()
 	defer mb2.Close()
 
@@ -68,7 +67,7 @@ func TestSimpleSyncProducer(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush once, after the 10th message.
-		MaxBufferBytes: uint32((len(TestMessage) * 10) - 1),
+		MaxBufferedBytes: uint32((len(TestMessage) * 10) - 1),
 	})
 	defer producer.Close()
 
@@ -78,16 +77,19 @@ func TestSimpleSyncProducer(t *testing.T) {
 }
 
 func TestMultipleFlushes(t *testing.T) {
-	t.Fatal("pending")
 
-	mb1 := mockbroker.New(t, 1)
-	mb2 := mockbroker.New(t, 2)
+	mb1 := NewMockBroker(t, 1)
+	mb2 := NewMockBroker(t, 2)
 	defer mb1.Close()
 	defer mb2.Close()
 
 	mb1.ExpectMetadataRequest().
 		AddBroker(mb2).
 		AddTopicPartition("my_topic", 0, 2)
+
+	mb2.ExpectProduceRequest().
+		AddTopicPartition("my_topic", 0, 1, nil).
+		AddTopicPartition("my_topic", 0, 1, nil)
 
 	mb2.ExpectProduceRequest().
 		AddTopicPartition("my_topic", 0, 1, nil).
@@ -102,7 +104,7 @@ func TestMultipleFlushes(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush once, after the 5th message.
-		MaxBufferBytes: uint32((len(TestMessage) * 5) - 1),
+		MaxBufferedBytes: uint32((len(TestMessage) * 5) - 1),
 	})
 	defer producer.Close()
 
@@ -113,11 +115,10 @@ func TestMultipleFlushes(t *testing.T) {
 }
 
 func TestMultipleProducer(t *testing.T) {
-	t.Fatal("pending")
 
-	mb1 := mockbroker.New(t, 1)
-	mb2 := mockbroker.New(t, 2)
-	mb3 := mockbroker.New(t, 3)
+	mb1 := NewMockBroker(t, 1)
+	mb2 := NewMockBroker(t, 2)
+	mb3 := NewMockBroker(t, 3)
 	defer mb1.Close()
 	defer mb2.Close()
 	defer mb3.Close()
@@ -125,9 +126,9 @@ func TestMultipleProducer(t *testing.T) {
 	mb1.ExpectMetadataRequest().
 		AddBroker(mb2).
 		AddBroker(mb3).
-		AddTopicPartition("topic_a", 0, 1).
-		AddTopicPartition("topic_b", 0, 2).
-		AddTopicPartition("topic_c", 0, 2)
+		AddTopicPartition("topic_a", 0, 2).
+		AddTopicPartition("topic_b", 0, 3).
+		AddTopicPartition("topic_c", 0, 3)
 
 	mb2.ExpectProduceRequest().
 		AddTopicPartition("topic_a", 0, 1, nil)
@@ -145,7 +146,7 @@ func TestMultipleProducer(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush once, after the 10th message.
-		MaxBufferBytes: uint32((len(TestMessage) * 10) - 1),
+		MaxBufferedBytes: uint32((len(TestMessage) * 10) - 1),
 	})
 	defer producer.Close()
 
@@ -173,10 +174,9 @@ func TestMultipleProducer(t *testing.T) {
 // happens correctly; that is, the first messages are retried before the next
 // batch is allowed to submit.
 func TestFailureRetry(t *testing.T) {
-	t.Fatal("pending")
 
-	mb1 := mockbroker.New(t, 1)
-	mb2 := mockbroker.New(t, 2)
+	mb1 := NewMockBroker(t, 1)
+	mb2 := NewMockBroker(t, 2)
 	defer mb1.Close()
 	defer mb2.Close()
 
@@ -188,15 +188,15 @@ func TestFailureRetry(t *testing.T) {
 
 	mb2.ExpectProduceRequest().
 		AddTopicPartition("topic_b", 0, 1, NotLeaderForPartition).
-		AddTopicPartition("topic_c", 0, 1, nil)
+		AddTopicPartition("topic_c", 0, 1, NoError)
 
 	mb1.ExpectMetadataRequest().
 		AddBroker(mb2).
 		AddTopicPartition("topic_b", 0, 1)
 
 	mb1.ExpectProduceRequest().
-		AddTopicPartition("topic_a", 0, 1, nil).
-		AddTopicPartition("topic_b", 0, 1, nil)
+		AddTopicPartition("topic_a", 0, 1, NoError).
+		AddTopicPartition("topic_b", 0, 1, NoError)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -208,7 +208,7 @@ func TestFailureRetry(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush after the 2nd message.
-		MaxBufferBytes:     uint32((len(TestMessage) * 2) - 1),
+		MaxBufferedBytes:   uint32((len(TestMessage) * 2) - 1),
 		MaxDeliveryRetries: 1,
 	})
 	if err != nil {

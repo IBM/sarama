@@ -1,4 +1,4 @@
-package mockbroker
+package sarama
 
 import (
 	"bytes"

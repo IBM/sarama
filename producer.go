@@ -8,20 +8,20 @@ import (
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 //
-// If MaxBufferTime=MaxBufferBytes=0, messages will be delivered immediately and
+// If MaxBufferTime=MaxBufferedBytes=0, messages will be delivered immediately and
 // constantly, but if multiple messages are received while a roundtrip to kafka
 // is in progress, they will both be combined into the next request. In this
 // mode, errors are not returned from SendMessage, but over the Errors()
 // channel.
 //
-// With MaxBufferTime and/or MaxBufferBytes set to values > 0, sarama will
+// With MaxBufferTime and/or MaxBufferedBytes set to values > 0, sarama will
 // buffer messages before sending, to reduce traffic.
 type ProducerConfig struct {
 	Partitioner        Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
 	RequiredAcks       RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
 	Timeout            int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
 	Compression        CompressionCodec // The type of compression to use on messages (defaults to no compression).
-	MaxBufferBytes     uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
+	MaxBufferedBytes   uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
 	MaxBufferTime      uint32           // The maximum number of milliseconds to buffer messages before sending to a broker.
 	MaxDeliveryRetries uint32           // The number of times to retry a failed message. You should always specify at least 1.
 }
@@ -33,7 +33,7 @@ type ProducerConfig struct {
 // scope (this is in addition to calling Close on the underlying client, which
 // is still necessary).
 //
-// If MaxBufferBytes=0 and MaxBufferTime=0, the Producer is considered to be
+// If MaxBufferedBytes=0 and MaxBufferTime=0, the Producer is considered to be
 // operating in "synchronous" mode. This means that errors will be returned
 // directly from calls to SendMessage. If either value is greater than zero, the
 // Producer is operating in "asynchronous" mode, and you must read these return
@@ -88,8 +88,8 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		config.Partitioner = NewRandomPartitioner()
 	}
 
-	if config.MaxBufferBytes == 0 {
-		config.MaxBufferBytes = 1
+	if config.MaxBufferedBytes == 0 {
+		config.MaxBufferedBytes = 1
 	}
 
 	return &Producer{
@@ -125,7 +125,7 @@ func (p *Producer) Close() error {
 // strings as either key or value, see the StringEncoder type.
 //
 // QueueMessage uses buffering semantics to reduce the nubmer of requests to the
-// broker. The buffer logic is tunable with config.MaxBufferBytes and
+// broker. The buffer logic is tunable with config.MaxBufferedBytes and
 // config.MaxBufferTime.
 //
 // QueueMessage will return an error if it's unable to construct the message
@@ -189,7 +189,7 @@ func (p *Producer) addMessage(msg *produceMessage) error {
 	if err != nil {
 		return err
 	}
-	bp.addMessage(msg, p.config.MaxBufferBytes)
+	bp.addMessage(msg, p.config.MaxBufferedBytes)
 	return nil
 }
 
@@ -236,9 +236,7 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 		for {
 			select {
 			case <-bp.flushNow:
-				println("{{")
 				bp.flush(p)
-				println("}}")
 			case <-timer.C:
 				bp.flushIfAnyMessages(p)
 			case <-bp.stopper:
@@ -317,6 +315,8 @@ func (bp *brokerProducer) flush(p *Producer) {
 		bp.mapM.Lock()
 		bp.bufferedBytes -= prb.byteSize()
 		bp.mapM.Unlock()
+
+		// TODO: Compression probably discards messages because they need to be wrapped in a MessageSet or something.
 
 		bp.flushRequest(p, prb, func(err error) {
 			p.errors <- err
