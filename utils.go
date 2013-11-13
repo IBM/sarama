@@ -16,13 +16,13 @@ func (slice int32Slice) Swap(i, j int) {
 }
 
 func withRecover(fn func()) {
-	if PanicHandler != nil {
-		defer func() {
+	defer func() {
+		if PanicHandler != nil {
 			if err := recover(); err != nil {
 				PanicHandler(err)
 			}
-		}()
-	}
+		}
+	}()
 
 	fn()
 }
