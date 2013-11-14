@@ -9,21 +9,24 @@ type produceMessage struct {
 
 type produceRequestBuilder []*produceMessage
 
+// If the message is synchronous, we manually send it and wait for a return.
+// Otherwise, we just hand it back to the producer to enqueue using the normal
+// method.
 func (msg *produceMessage) enqueue(p *Producer) error {
-	if msg.sync {
-		var prb produceRequestBuilder = []*produceMessage{msg}
-		bp, err := p.brokerProducerFor(msg.tp)
-		if err != nil {
-			return err
-		}
-		errs := make(chan error, 1)
-		bp.flushRequest(p, prb, func(err error) {
-			errs <- err
-		})
-		return <-errs
-	} else {
+	if !msg.sync {
 		return p.addMessage(msg)
 	}
+
+	var prb produceRequestBuilder = []*produceMessage{msg}
+	bp, err := p.brokerProducerFor(msg.tp)
+	if err != nil {
+		return err
+	}
+	errs := make(chan error, 1)
+	bp.flushRequest(p, prb, func(err error) {
+		errs <- err
+	})
+	return <-errs
 
 }
 
