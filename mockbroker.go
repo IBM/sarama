@@ -89,6 +89,7 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		if _, err = io.ReadFull(conn, body); err != nil {
 			return b.serverError(err, conn)
 		}
+
 		response := expectation.ResponseBytes()
 		if len(response) == 0 {
 			continue

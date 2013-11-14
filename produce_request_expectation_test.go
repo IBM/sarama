@@ -8,8 +8,8 @@ import (
 func TestProduceRequestSerialization(t *testing.T) {
 
 	exp := new(ProduceRequestExpectation).
-		AddTopicPartition("topic_b", 0, 1, nil).
-		AddTopicPartition("topic_c", 0, 1, nil)
+		AddTopicPartition("topic_b", 0, 1, NoError).
+		AddTopicPartition("topic_c", 0, 1, NoError)
 
 	expected := []byte{
 		0x00, 0x00, 0x00, 0x02, // 0:3 number of topics

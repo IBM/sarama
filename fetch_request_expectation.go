@@ -10,19 +10,20 @@ type FetchRequestExpectation struct {
 	messages []fetchResponseMessage
 }
 
-type encoder interface {
+// this is why single-namespace projects are literally retarded.
+type encoder2 interface {
 	Encode() ([]byte, error)
 }
 
 type fetchResponseMessage struct {
 	topic      string
 	partition  int32
-	key, value encoder
+	key, value encoder2
 	offset     uint64
 }
 
 func (e *FetchRequestExpectation) AddMessage(
-	topic string, partition int32, key, value encoder, offset uint64,
+	topic string, partition int32, key, value encoder2, offset uint64,
 ) *FetchRequestExpectation {
 	e.messages = append(e.messages, fetchResponseMessage{
 		topic:     topic,
