@@ -178,9 +178,9 @@ func (p *Producer) messagePreprocessor() {
 // special errors for communication between batcher and dispatcher
 // simpler to use an error than to add another field to all pendingMessages
 var (
-	bounced  = errors.New("") // message was rejected by the batcher without being sent as it no longer owns the relevant topic/partition
-	reset    = errors.New("")
-	shutdown = errors.New("")
+	bounced  = errors.New("message was rejected by the batcher without being sent as it no longer owns the relevant topic/partition")
+	reset    = errors.New("leader of topic/partition is changing")
+	shutdown = errors.New("shutting down batcher")
 )
 
 // each topic/partition has an associated message queue
