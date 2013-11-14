@@ -51,7 +51,7 @@ func TestSimpleProducer(t *testing.T) {
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, "my_topic", &ProducerConfig{RequiredAcks: WaitForLocal})
+	producer, err := NewSimpleProducer(client, "my_topic", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,7 +65,7 @@ func TestSimpleProducer(t *testing.T) {
 	}
 }
 
-func ExampleProducer() {
+func ExampleSimpleProducer() {
 	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
@@ -74,7 +74,7 @@ func ExampleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, "my_topic", &ProducerConfig{RequiredAcks: WaitForLocal})
+	producer, err := NewSimpleProducer(client, "my_topic", nil)
 	if err != nil {
 		panic(err)
 	}
