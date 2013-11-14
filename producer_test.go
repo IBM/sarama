@@ -174,8 +174,6 @@ func TestMultipleProducer(t *testing.T) {
 // happens correctly; that is, the first messages are retried before the next
 // batch is allowed to submit.
 func TestFailureRetry(t *testing.T) {
-	println("=============================================")
-
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 	mb3 := NewMockBroker(t, 3)

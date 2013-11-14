@@ -1,7 +1,7 @@
 package sarama
 
 import (
-	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -320,8 +320,6 @@ func (bp *brokerProducer) flush(p *Producer) {
 		bp.bufferedBytes -= prb.byteSize()
 		bp.mapM.Unlock()
 
-		// TODO: Compression probably discards messages because they need to be wrapped in a MessageSet or something.
-
 		bp.flushRequest(p, prb, func(err error) {
 			p.errors <- err
 		})
@@ -329,6 +327,7 @@ func (bp *brokerProducer) flush(p *Producer) {
 }
 
 func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, errorCb func(error)) {
+	// produce_message.go
 	req := prb.toRequest(&p.config)
 	response, err := bp.broker.Produce(p.client.id, req)
 
@@ -354,7 +353,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 		if overlimit > 0 {
 			Logger.Printf("[DATA LOSS] %d messages exceeded the retry limit of %d and were dropped.\n",
 				overlimit, p.config.MaxDeliveryRetries)
-			// TODO errorCb() ???
+			errorCb(fmt.Errorf("Dropped %d messages that exceeded the retry limit", overlimit))
 		}
 		return
 	}
@@ -405,7 +404,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 func (bp *brokerProducer) Close() error {
 	select {
 	case <-bp.stopper:
-		return errors.New("already closed or closing")
+		return fmt.Errorf("already closed or closing")
 	default:
 		close(bp.stopper)
 		<-bp.done

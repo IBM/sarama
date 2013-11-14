@@ -1,5 +1,7 @@
 package sarama
 
+import "log"
+
 type produceMessage struct {
 	tp         topicPartition
 	key, value []byte
@@ -44,6 +46,35 @@ func (msg *produceMessage) hasTopicPartition(topic string, partition int32) bool
 
 func (b produceRequestBuilder) toRequest(config *ProducerConfig) *ProduceRequest {
 	req := &ProduceRequest{RequiredAcks: config.RequiredAcks, Timeout: config.Timeout}
+
+	// If compression is enabled, we need to group messages by topic-partition and
+	// wrap them in MessageSets. We already discarded that grouping, so we
+	// inefficiently re-sort them. This could be optimized (ie. pass a hash around
+	// rather than an array. Not sure what the best way is.
+	if config.Compression != CompressionNone {
+		msgSets := make(map[topicPartition]*MessageSet)
+		for _, pmsg := range b {
+			msgSet, ok := msgSets[pmsg.tp]
+			if !ok {
+				msgSet = new(MessageSet)
+				msgSets[pmsg.tp] = msgSet
+			}
+
+			msgSet.addMessage(&Message{Codec: CompressionNone, Key: pmsg.key, Value: pmsg.value})
+		}
+		for tp, msgSet := range msgSets {
+			valBytes, err := encode(msgSet)
+			if err != nil {
+				log.Fatal(err) // if this happens, it's basically our fault.
+			}
+			msg := Message{Codec: config.Compression, Key: nil, Value: valBytes}
+			req.AddMessage(tp.topic, tp.partition, &msg)
+		}
+		return req
+	}
+
+	// Compression is not enabled. Dumb-ly append each request directly to the
+	// request, with no MessageSet wrapper.
 	for _, pmsg := range b {
 		msg := Message{Codec: config.Compression, Key: pmsg.key, Value: pmsg.value}
 		req.AddMessage(pmsg.tp.topic, pmsg.tp.partition, &msg)
