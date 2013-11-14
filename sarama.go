@@ -15,3 +15,7 @@ import (
 // management events to. By default it is set to discard all log messages via ioutil.Discard,
 // but you can set it to redirect wherever you want.
 var Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
+
+// PanicHandler is called for recovering from panics spawned internally to the library (and thus
+// not recoverable by the caller's goroutine). Defaults to nil, which means panics are not recovered.
+var PanicHandler func(interface{})

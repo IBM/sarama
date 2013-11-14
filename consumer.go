@@ -140,7 +140,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 		return nil, ConfigurationError("Invalid OffsetMethod")
 	}
 
-	go c.fetchMessages()
+	go withRecover(c.fetchMessages)
 
 	return c, nil
 }
