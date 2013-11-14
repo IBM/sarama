@@ -2,6 +2,12 @@ package sarama
 
 import "time"
 
+// many of our channels don't *need* any buffering at all, but go likely behaves more efficiently
+// if the goroutine scheduler isn't forced to context-switch all the time by bufferless channels,
+// so we define a bufferSize for that purpose
+// TODO: benchmark to find the real optimum / verify this makes a difference
+const efficientBufferSize = 32
+
 // make []int32 sortable so we can sort partition numbers
 type int32Slice []int32
 

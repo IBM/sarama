@@ -25,7 +25,7 @@ type ProducerConfig struct {
 
 // Producer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
 // and parses responses for errors. You must call Close() on a producer to avoid leaks, it will not be garbage-collected automatically when
-// it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary). The
+// it passes out of scope (this is in addition to calling Close() on the underlying client, which is still necessary). The
 // Producer is fully asynchronous to enable maximum throughput.
 type Producer struct {
 	client     *Client
@@ -55,19 +55,19 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	}
 
 	prod := &Producer{client, nil, *config,
-		make(chan *ProduceError, 32),  // buffer is arbitrary, for scheduling efficiency
-		make(chan *MessageToSend, 32), // buffer is arbitrary, for scheduling efficiency
+		make(chan *ProduceError, efficientBufferSize),
+		make(chan *MessageToSend, efficientBufferSize),
 		make(chan bool),
 	}
 	prod.dispatcher = &dispatcher{
-		make(chan *pendingMessage, 32), // buffer is arbitrary, for scheduling efficiency
+		make(chan *pendingMessage, efficientBufferSize),
 		prod,
 		make(map[string]map[int32]*msgQueue),
 		make(map[*Broker]*batcher),
 	}
 
-	go prod.messagePreprocessor()
-	go prod.dispatcher.dispatch()
+	go withRecover(prod.messagePreprocessor)
+	go withRecover(prod.dispatcher.dispatch)
 
 	return prod, nil
 }
@@ -197,7 +197,7 @@ type msgQueue struct {
 // helper to stitch the two queues together into a single queue in the correct order
 func (q *msgQueue) flushBacklog() <-chan *pendingMessage {
 	msgs := make(chan *pendingMessage)
-	go func() {
+	go withRecover(func() {
 		for _, msg := range q.requeue {
 			msgs <- msg
 		}
@@ -206,7 +206,7 @@ func (q *msgQueue) flushBacklog() <-chan *pendingMessage {
 		}
 		q.requeue = nil
 		q.backlog = nil
-	}()
+	})
 	return msgs
 }
 
@@ -253,12 +253,12 @@ func (d *dispatcher) createBatcher(broker *Broker) {
 	}
 
 	d.batchers[broker] = &batcher{d.prod, broker, 1,
-		make(chan *pendingMessage, 32), // buffer is arbitrary, for scheduling efficiency
+		make(chan *pendingMessage, efficientBufferSize),
 		make(map[string]map[int32]bool),
 		nil, timer, 0, nil,
 	}
 
-	go d.batchers[broker].processMessages()
+	go withRecover(d.batchers[broker].processMessages)
 }
 
 // helper to get the appropriate msgQueue, or create it if it doesn't exist
