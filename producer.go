@@ -521,7 +521,13 @@ func (b *batcher) processMessage(msg *pendingMessage) {
 	if b.owner[msg.orig.Topic][msg.partition] {
 		b.buffer = append(b.buffer, msg)
 		b.bufferedBytes += uint(len(msg.value))
-		if uint(len(b.buffer)) > b.prod.config.MaxBufferedMessages || b.bufferedBytes > b.prod.config.MaxBufferedBytes {
+		conf := b.prod.config
+		// flush if all three are zero (indicating message-at-a-time) or if either of our two
+		// message-dependent conditions are both non-zero and met
+		if (conf.MaxBufferedMessages == 0 && conf.MaxBufferedBytes == 0 && conf.MaxBufferTime == 0) ||
+			(conf.MaxBufferedMessages > 0 && uint(len(b.buffer)) > conf.MaxBufferedMessages) ||
+			(conf.MaxBufferedBytes > 0 && b.bufferedBytes > conf.MaxBufferedMessages) {
+
 			b.flush()
 		}
 	} else {
