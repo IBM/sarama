@@ -19,6 +19,12 @@ type Producer struct {
 
 // NewProducer creates a new Producer using the given client. The resulting producer will publish messages on the given topic.
 func NewProducer(client *Client, topic string, config *ProducerConfig) (*Producer, error) {
+	// Check that we are not dealing with a closed Client before processing
+	// any other arguments
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	if config == nil {
 		config = new(ProducerConfig)
 	}
