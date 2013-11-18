@@ -26,6 +26,19 @@ func (r *OffsetFetchResponseBlock) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
+func (r *OffsetFetchResponseBlock) encode(pe packetEncoder) (err error) {
+	pe.putInt64(r.Offset)
+
+	err = pe.putString(r.Metadata)
+	if err != nil {
+		return err
+	}
+
+	pe.putInt16(int16(r.Err))
+
+	return nil
+}
+
 type OffsetFetchResponse struct {
 	ClientID string
 	Blocks   map[string]map[int32]*OffsetFetchResponseBlock
@@ -72,4 +85,49 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
 	}
 
 	return nil
+}
+
+func (r *OffsetFetchResponse) encode(pe packetEncoder) (err error) {
+	err = pe.putString(r.ClientID)
+	if err != nil {
+		return err
+	}
+
+	err = pe.putArrayLength(len(r.Blocks))
+	if err != nil {
+		return err
+	}
+
+	for topic, partitions := range r.Blocks {
+		err = pe.putString(topic)
+		if err != nil {
+			return err
+		}
+
+		err = pe.putArrayLength(len(partitions))
+		if err != nil {
+			return err
+		}
+
+		for id, block := range partitions {
+			pe.putInt32(id)
+			err = block.encode(pe)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// testing API
+
+func (r *OffsetFetchResponse) AddTopicPartition(topic string, partition int32, offset int64) {
+	byTopic, ok := r.Blocks[topic]
+	if !ok {
+		byTopic = make(map[int32]*OffsetFetchResponseBlock)
+		r.Blocks[topic] = byTopic
+	}
+	byTopic[partition] = &OffsetFetchResponseBlock{Offset: offset}
 }

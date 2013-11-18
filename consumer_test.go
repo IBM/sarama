@@ -38,13 +38,15 @@ func TestSimpleConsumer(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddTopicPartition("my_topic", 0, 2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 0, 2)
+	mb2.Returns(mdr)
 
 	for i := 0; i < 10; i++ {
-		mb2.ExpectFetchRequest().
-			AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), uint64(i))
+		fr := new(FetchResponse)
+		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), uint64(i))
+		mb2.Returns(fr)
 	}
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
@@ -78,9 +80,10 @@ func TestConsumerRawOffset(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddTopicPartition("my_topic", 0, 2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 0, 2)
+	mb2.Returns(mdr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -107,12 +110,14 @@ func TestConsumerLatestOffset(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddTopicPartition("my_topic", 0, 2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 0, 2)
+	mb2.Returns(mdr)
 
-	mb2.ExpectOffsetFetchRequest().
-		AddTopicPartition("my_topic", 0, 0x010101)
+	ofr := new(OffsetFetchResponse)
+	ofr.AddTopicPartition("my_topic", 0, 0x010101)
+	mb2.Returns(ofr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {

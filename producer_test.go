@@ -15,12 +15,14 @@ func TestSimpleProducer(t *testing.T) {
 	defer mb1.Close()
 	defer mb2.Close()
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddTopicPartition("my_topic", 0, 2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 0, 2)
+	mb1.Returns(mdr)
 
-	mb2.ExpectProduceRequest().
-		AddTopicPartition("my_topic", 0, 1, NoError)
+	pr := new(ProduceResponse)
+	pr.AddTopicPartition("my_topic", 0, NoError)
+	mb2.Returns(pr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -49,13 +51,16 @@ func TestSimpleSyncProducer(t *testing.T) {
 	defer mb1.Close()
 	defer mb2.Close()
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddTopicPartition("my_topic", 1, 2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 1, 2)
+	mb1.Returns(mdr)
+
+	pr := new(ProduceResponse)
+	pr.AddTopicPartition("my_topic", 1, NoError)
 
 	for i := 0; i < 10; i++ {
-		mb2.ExpectProduceRequest().
-			AddTopicPartition("my_topic", 1, 10, NoError)
+		mb2.Returns(pr)
 	}
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
@@ -83,17 +88,16 @@ func TestMultipleFlushes(t *testing.T) {
 	defer mb1.Close()
 	defer mb2.Close()
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddTopicPartition("my_topic", 0, 2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 0, 2)
+	mb1.Returns(mdr)
 
-	mb2.ExpectProduceRequest().
-		AddTopicPartition("my_topic", 0, 1, NoError).
-		AddTopicPartition("my_topic", 0, 1, NoError)
-
-	mb2.ExpectProduceRequest().
-		AddTopicPartition("my_topic", 0, 1, NoError).
-		AddTopicPartition("my_topic", 0, 1, NoError)
+	pr := new(ProduceResponse)
+	pr.AddTopicPartition("my_topic", 0, NoError)
+	pr.AddTopicPartition("my_topic", 0, NoError)
+	mb2.Returns(pr)
+	mb2.Returns(pr) // yes, twice.
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -123,19 +127,22 @@ func TestMultipleProducer(t *testing.T) {
 	defer mb2.Close()
 	defer mb3.Close()
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddBroker(mb3).
-		AddTopicPartition("topic_a", 0, 2).
-		AddTopicPartition("topic_b", 0, 3).
-		AddTopicPartition("topic_c", 0, 3)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
+	mdr.AddTopicPartition("topic_a", 0, 2)
+	mdr.AddTopicPartition("topic_b", 0, 3)
+	mdr.AddTopicPartition("topic_c", 0, 3)
+	mb1.Returns(mdr)
 
-	mb2.ExpectProduceRequest().
-		AddTopicPartition("topic_a", 0, 1, NoError)
+	pr1 := new(ProduceResponse)
+	pr1.AddTopicPartition("topic_a", 0, NoError)
+	mb2.Returns(pr1)
 
-	mb3.ExpectProduceRequest().
-		AddTopicPartition("topic_b", 0, 1, NoError).
-		AddTopicPartition("topic_c", 0, 1, NoError)
+	pr2 := new(ProduceResponse)
+	pr2.AddTopicPartition("topic_b", 0, NoError)
+	pr2.AddTopicPartition("topic_c", 0, NoError)
+	mb3.Returns(pr2)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -178,28 +185,51 @@ func TestFailureRetry(t *testing.T) {
 	mb2 := NewMockBroker(t, 2)
 	mb3 := NewMockBroker(t, 3)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2).
-		AddBroker(mb3).
-		AddTopicPartition("topic_a", 0, 2).
-		AddTopicPartition("topic_b", 0, 2).
-		AddTopicPartition("topic_c", 0, 3)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
+	mdr.AddTopicPartition("topic_a", 0, 2)
+	mdr.AddTopicPartition("topic_b", 0, 3)
+	mdr.AddTopicPartition("topic_c", 0, 3)
+	mb1.Returns(mdr)
 
-	mb2.ExpectProduceRequest().
-		AddTopicPartition("topic_a", 0, 1, NoError).
-		AddTopicPartition("topic_b", 0, 1, NotLeaderForPartition)
+	/* mb1.ExpectMetadataRequest(). */
+	/* 	AddBroker(mb2). */
+	/* 	AddBroker(mb3). */
+	/* 	AddTopicPartition("topic_a", 0, 2). */
+	/* 	AddTopicPartition("topic_b", 0, 2). */
+	/* 	AddTopicPartition("topic_c", 0, 3) */
+
+	pr := new(ProduceResponse)
+	pr.AddTopicPartition("topic_a", 0, NoError)
+	pr.AddTopicPartition("topic_a", 0, NotLeaderForPartition)
+	mb2.Returns(pr)
+
+	/* mb2.ExpectProduceRequest(). */
+	/* 	AddTopicPartition("topic_a", 0, 1, NoError). */
+	/* 	AddTopicPartition("topic_b", 0, 1, NotLeaderForPartition) */
 
 	// The fact that mb2 is chosen here is not well-defined. In theory,
 	// it's a random choice between mb1, mb2, and mb3. Go's hash iteration
 	// isn't quite as random as claimed, though, it seems. Maybe because
 	// the same random seed is used each time?
-	mb2.ExpectMetadataRequest().
-		AddBroker(mb3).
-		AddTopicPartition("topic_b", 0, 3)
+	mdr2 := new(MetadataResponse)
+	mdr2.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
+	mdr2.AddTopicPartition("topic_b", 0, 3)
+	mb2.Returns(mdr2)
 
-	mb3.ExpectProduceRequest().
-		AddTopicPartition("topic_c", 0, 1, NoError).
-		AddTopicPartition("topic_b", 0, 1, NoError)
+	/* mb2.ExpectMetadataRequest(). */
+	/* 	AddBroker(mb3). */
+	/* 	AddTopicPartition("topic_b", 0, 3) */
+
+	pr2 := new(ProduceResponse)
+	pr2.AddTopicPartition("topic_c", 0, NoError)
+	pr2.AddTopicPartition("topic_b", 0, NoError)
+	mb3.Returns(pr2)
+
+	/* mb3.ExpectProduceRequest(). */
+	/* 	AddTopicPartition("topic_c", 0, 1, NoError). */
+	/* 	AddTopicPartition("topic_b", 0, 1, NoError) */
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {

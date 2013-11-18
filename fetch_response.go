@@ -36,6 +36,16 @@ type FetchResponse struct {
 	Blocks map[string]map[int32]*FetchResponseBlock
 }
 
+func (pr *FetchResponseBlock) encode(pe packetEncoder) (err error) {
+	pe.putInt16(int16(pr.Err))
+
+	pe.putInt64(pr.HighWaterMarkOffset)
+
+	// TODO: Encode message set
+
+	return nil
+}
+
 func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
@@ -71,6 +81,35 @@ func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
 		}
 	}
 
+	return nil
+}
+
+func (fr *FetchResponse) encode(pe packetEncoder) (err error) {
+	err = pe.putArrayLength(len(fr.Blocks))
+	if err != nil {
+		return err
+	}
+
+	for topic, partitions := range fr.Blocks {
+		err = pe.putString(topic)
+		if err != nil {
+			return err
+		}
+
+		err = pe.putArrayLength(len(partitions))
+		if err != nil {
+			return err
+		}
+
+		for id, block := range partitions {
+			pe.putInt32(id)
+			err = block.encode(pe)
+			if err != nil {
+				return err
+			}
+		}
+
+	}
 	return nil
 }
 

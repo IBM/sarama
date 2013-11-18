@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -269,6 +271,29 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 	}
 
 	b.addr = fmt.Sprint(host, ":", port)
+
+	return nil
+}
+
+func (b *Broker) encode(pe packetEncoder) (err error) {
+
+	parts := strings.Split(b.addr, ":")
+	if len(parts) != 2 {
+		return fmt.Errorf("invalid addr")
+	}
+	port, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return err
+	}
+
+	pe.putInt32(b.id)
+
+	err = pe.putString(parts[0])
+	if err != nil {
+		return err
+	}
+
+	pe.putInt32(int32(port))
 
 	return nil
 }

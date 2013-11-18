@@ -8,7 +8,7 @@ func TestSimpleClient(t *testing.T) {
 
 	mb := NewMockBroker(t, 1)
 
-	mb.ExpectMetadataRequest()
+	mb.Returns(new(MetadataResponse))
 
 	client, err := NewClient("client_id", []string{mb.Addr()}, nil)
 	if err != nil {
@@ -23,8 +23,9 @@ func TestClientExtraBrokers(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb2)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mb1.Returns(mdr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -40,9 +41,10 @@ func TestClientMetadata(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb5 := NewMockBroker(t, 5)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb5).
-		AddTopicPartition("my_topic", 0, mb5.BrokerID())
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb5.Addr(), int32(mb5.BrokerID()))
+	mdr.AddTopicPartition("my_topic", 0, int32(mb5.BrokerID()))
+	mb1.Returns(mdr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -78,11 +80,14 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb5 := NewMockBroker(t, 5)
 
-	mb1.ExpectMetadataRequest().
-		AddBroker(mb5)
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb5.Addr(), int32(mb5.BrokerID()))
+	mb1.Returns(mdr)
 
-	mb5.ExpectMetadataRequest().
-		AddTopicPartition("my_topic", 0xb, 5)
+	mdr2 := new(MetadataResponse)
+	mdr2.AddBroker(mb5.Addr(), int32(mb5.BrokerID()))
+	mdr2.AddTopicPartition("my_topic", 0xb, int32(mb5.BrokerID()))
+	mb5.Returns(mdr2)
 
 	client, err := NewClient("clientID", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1})
 	if err != nil {

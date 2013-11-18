@@ -154,3 +154,7 @@ func NewMockBroker(t *testing.T, brokerID int) *MockBroker {
 
 	return broker
 }
+
+func (b *MockBroker) Returns(e encoder) {
+
+}
