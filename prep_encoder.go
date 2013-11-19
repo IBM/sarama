@@ -67,6 +67,15 @@ func (pe *prepEncoder) putInt32Array(in []int32) error {
 	return nil
 }
 
+func (pe *prepEncoder) putInt64Array(in []int64) error {
+	err := pe.putArrayLength(len(in))
+	if err != nil {
+		return err
+	}
+	pe.length += 8 * len(in)
+	return nil
+}
+
 // stackable
 
 func (pe *prepEncoder) push(in pushEncoder) {

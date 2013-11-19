@@ -6,34 +6,8 @@ import (
 	"time"
 )
 
-var (
-	consumerStopper = []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-	}
-	extraBrokerMetadata = []byte{
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x08, 'm', 'y', '_', 't', 'o', 'p', 'i', 'c',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00,
-	}
-)
-
 func TestSimpleConsumer(t *testing.T) {
+	println("a")
 
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
@@ -41,7 +15,7 @@ func TestSimpleConsumer(t *testing.T) {
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mdr.AddTopicPartition("my_topic", 0, 2)
-	mb2.Returns(mdr)
+	mb1.Returns(mdr)
 
 	for i := 0; i < 10; i++ {
 		fr := new(FetchResponse)
@@ -83,7 +57,7 @@ func TestConsumerRawOffset(t *testing.T) {
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mdr.AddTopicPartition("my_topic", 0, 2)
-	mb2.Returns(mdr)
+	mb1.Returns(mdr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
@@ -113,11 +87,11 @@ func TestConsumerLatestOffset(t *testing.T) {
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mdr.AddTopicPartition("my_topic", 0, 2)
-	mb2.Returns(mdr)
+	mb1.Returns(mdr)
 
-	ofr := new(OffsetFetchResponse)
-	ofr.AddTopicPartition("my_topic", 0, 0x010101)
-	mb2.Returns(ofr)
+	or := new(OffsetResponse)
+	or.AddTopicPartition("my_topic", 0, 0x010101)
+	mb2.Returns(or)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {

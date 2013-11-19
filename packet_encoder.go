@@ -15,6 +15,7 @@ type packetEncoder interface {
 	putBytes(in []byte) error
 	putString(in string) error
 	putInt32Array(in []int32) error
+	putInt64Array(in []int64) error
 
 	// Stacks, see PushEncoder
 	push(in pushEncoder)

@@ -181,6 +181,8 @@ func TestMultipleProducer(t *testing.T) {
 // happens correctly; that is, the first messages are retried before the next
 // batch is allowed to submit.
 func TestFailureRetry(t *testing.T) {
+	t.Fatal("skip")
+
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 	mb3 := NewMockBroker(t, 3)
@@ -202,7 +204,7 @@ func TestFailureRetry(t *testing.T) {
 
 	pr := new(ProduceResponse)
 	pr.AddTopicPartition("topic_a", 0, NoError)
-	pr.AddTopicPartition("topic_a", 0, NotLeaderForPartition)
+	pr.AddTopicPartition("topic_b", 0, NotLeaderForPartition)
 	mb2.Returns(pr)
 
 	/* mb2.ExpectProduceRequest(). */

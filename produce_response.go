@@ -100,6 +100,9 @@ func (pr *ProduceResponse) GetBlock(topic string, partition int32) *ProduceRespo
 // Testing API
 
 func (pr *ProduceResponse) AddTopicPartition(topic string, partition int32, err KError) {
+	if pr.Blocks == nil {
+		pr.Blocks = make(map[string]map[int32]*ProduceResponseBlock)
+	}
 	byTopic, ok := pr.Blocks[topic]
 	if !ok {
 		byTopic = make(map[int32]*ProduceResponseBlock)

@@ -41,9 +41,12 @@ func (pr *FetchResponseBlock) encode(pe packetEncoder) (err error) {
 
 	pe.putInt64(pr.HighWaterMarkOffset)
 
-	// TODO: Encode message set
-
-	return nil
+	pe.push(&lengthField{})
+	err = pr.MsgSet.encode(pe)
+	if err != nil {
+		return err
+	}
+	return pe.pop()
 }
 
 func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
@@ -126,15 +129,27 @@ func (fr *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseB
 }
 
 func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
+	if fr.Blocks == nil {
+		fr.Blocks = make(map[string]map[int32]*FetchResponseBlock)
+	}
 	partitions, ok := fr.Blocks[topic]
 	if !ok {
 		partitions = make(map[int32]*FetchResponseBlock)
 		fr.Blocks[topic] = partitions
 	}
-	msgSet := partitions[partition].MsgSet
-	kb, _ := key.Encode()
-	vb, _ := value.Encode()
+	frb := new(FetchResponseBlock)
+	partitions[partition] = frb
+	var kb []byte
+	var vb []byte
+	if key != nil {
+		kb, _ = key.Encode()
+	}
+	if value != nil {
+		vb, _ = value.Encode()
+	}
+	var msgSet MessageSet
 	msg := &Message{Key: kb, Value: vb}
 	msgBlock := &MessageBlock{Msg: msg, Offset: offset}
 	msgSet.Messages = append(msgSet.Messages, msgBlock)
+	frb.MsgSet = msgSet
 }

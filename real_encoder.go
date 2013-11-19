@@ -63,6 +63,14 @@ func (re *realEncoder) putInt32Array(in []int32) error {
 	return nil
 }
 
+func (re *realEncoder) putInt64Array(in []int64) error {
+	re.putArrayLength(len(in))
+	for _, val := range in {
+		re.putInt64(val)
+	}
+	return nil
+}
+
 // stacks
 
 func (re *realEncoder) push(in pushEncoder) {
