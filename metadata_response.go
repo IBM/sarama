@@ -161,7 +161,6 @@ func (m *MetadataResponse) encode(pe packetEncoder) error {
 			return err
 		}
 	}
-	return nil
 
 	err = pe.putArrayLength(len(m.Topics))
 	if err != nil {
@@ -194,6 +193,7 @@ func (m *MetadataResponse) AddTopicPartition(topic string, partition, brokerID i
 	}
 
 	match = new(TopicMetadata)
+	match.Name = topic
 	m.Topics = append(m.Topics, match)
 
 foundTopic:

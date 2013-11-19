@@ -45,7 +45,7 @@ func TestSimpleConsumer(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		fr := new(FetchResponse)
-		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), uint64(i))
+		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i))
 		mb2.Returns(fr)
 	}
 

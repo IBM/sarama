@@ -124,3 +124,17 @@ func (fr *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseB
 
 	return fr.Blocks[topic][partition]
 }
+
+func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
+	partitions, ok := fr.Blocks[topic]
+	if !ok {
+		partitions = make(map[int32]*FetchResponseBlock)
+		fr.Blocks[topic] = partitions
+	}
+	msgSet := partitions[partition].MsgSet
+	kb, _ := key.Encode()
+	vb, _ := value.Encode()
+	msg := &Message{Key: kb, Value: vb}
+	msgBlock := &MessageBlock{Msg: msg, Offset: offset}
+	msgSet.Messages = append(msgSet.Messages, msgBlock)
+}

@@ -3,6 +3,7 @@ package sarama
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -23,7 +24,7 @@ type MockBroker struct {
 	brokerID     int
 	port         int32
 	stopper      chan bool
-	expectations chan Expectation
+	expectations chan encoder
 	listener     net.Listener
 	t            *testing.T
 	expecting    bool
@@ -31,10 +32,6 @@ type MockBroker struct {
 
 func (b *MockBroker) BrokerID() int {
 	return b.brokerID
-}
-
-type Expectation interface {
-	ResponseBytes() []byte
 }
 
 func (b *MockBroker) Port() int32 {
@@ -49,10 +46,6 @@ type rawExpectation []byte
 
 func (r rawExpectation) ResponseBytes() []byte {
 	return r
-}
-
-func (b *MockBroker) ExpectBytes(bytes []byte) {
-	b.expectations <- rawExpectation(bytes)
 }
 
 func (b *MockBroker) Close() {
@@ -90,7 +83,11 @@ func (b *MockBroker) serverLoop() (ok bool) {
 			return b.serverError(err, conn)
 		}
 
-		response := expectation.ResponseBytes()
+		response, err := encode(expectation)
+		fmt.Println(response, err)
+		if err != nil {
+			return false
+		}
 		if len(response) == 0 {
 			continue
 		}
@@ -133,7 +130,7 @@ func NewMockBroker(t *testing.T, brokerID int) *MockBroker {
 		stopper:      make(chan bool),
 		t:            t,
 		brokerID:     brokerID,
-		expectations: make(chan Expectation, 512),
+		expectations: make(chan encoder, 512),
 	}
 
 	broker.listener, err = net.Listen("tcp", "localhost:0")
@@ -156,5 +153,5 @@ func NewMockBroker(t *testing.T, brokerID int) *MockBroker {
 }
 
 func (b *MockBroker) Returns(e encoder) {
-
+	b.expectations <- e
 }
