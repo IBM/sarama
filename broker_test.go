@@ -24,6 +24,16 @@ func ExampleBroker() error {
 	return nil
 }
 
+type mockEncoder struct {
+	bytes []byte
+}
+
+func (m mockEncoder) encode(pe packetEncoder) error {
+	fmt.Println(m.bytes)
+	pe.putBytes(m.bytes)
+	return nil
+}
+
 func TestBrokerAccessors(t *testing.T) {
 	broker := NewBroker("abc:123")
 
@@ -41,7 +51,6 @@ func TestBrokerAccessors(t *testing.T) {
 	}
 }
 
-/*
 func TestSimpleBrokerCommunication(t *testing.T) {
 	mb := NewMockBroker(t, 0)
 	defer mb.Close()
@@ -52,11 +61,9 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	go func() {
-		for _, tt := range brokerTestTable {
-			mb.ExpectBytes(tt.response)
-		}
-	}()
+	for _, tt := range brokerTestTable {
+		mb.Returns(&mockEncoder{tt.response})
+	}
 	for _, tt := range brokerTestTable {
 		tt.runner(t, broker)
 	}
@@ -66,7 +73,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		t.Error(err)
 	}
 }
-*/
 
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
 var brokerTestTable = []struct {
