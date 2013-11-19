@@ -85,7 +85,6 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	mb1.Returns(mdr)
 
 	mdr2 := new(MetadataResponse)
-	mdr2.AddBroker(mb5.Addr(), int32(mb5.BrokerID()))
 	mdr2.AddTopicPartition("my_topic", 0xb, int32(mb5.BrokerID()))
 	mb5.Returns(mdr2)
 

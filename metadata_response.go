@@ -208,6 +208,7 @@ foundTopic:
 	}
 
 	pmatch = new(PartitionMetadata)
+	pmatch.ID = partition
 	match.Partitions = append(match.Partitions, pmatch)
 
 foundPartition:

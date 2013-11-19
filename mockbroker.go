@@ -3,7 +3,6 @@ package sarama
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"strconv"
@@ -84,7 +83,6 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		}
 
 		response, err := encode(expectation)
-		fmt.Println(response, err)
 		if err != nil {
 			return false
 		}

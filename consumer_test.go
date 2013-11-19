@@ -7,8 +7,6 @@ import (
 )
 
 func TestSimpleConsumer(t *testing.T) {
-	println("a")
-
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
 
