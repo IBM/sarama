@@ -29,8 +29,7 @@ type mockEncoder struct {
 }
 
 func (m mockEncoder) encode(pe packetEncoder) error {
-	fmt.Println(m.bytes)
-	pe.putBytes(m.bytes)
+	pe.putRawBytes(m.bytes)
 	return nil
 }
 

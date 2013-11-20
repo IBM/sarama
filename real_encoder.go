@@ -37,6 +37,12 @@ func (re *realEncoder) putArrayLength(in int) error {
 
 // collection
 
+func (re *realEncoder) putRawBytes(in []byte) error {
+	copy(re.raw[re.off:], in)
+	re.off += len(in)
+	return nil
+}
+
 func (re *realEncoder) putBytes(in []byte) error {
 	if in == nil {
 		re.putInt32(-1)
