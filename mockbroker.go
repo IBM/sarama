@@ -26,7 +26,7 @@ type MockBroker struct {
 	expectations chan encoder
 	listener     net.Listener
 	t            *testing.T
-	expecting    bool
+	expecting    encoder
 }
 
 func (b *MockBroker) BrokerID() int {
@@ -48,8 +48,8 @@ func (r rawExpectation) ResponseBytes() []byte {
 }
 
 func (b *MockBroker) Close() {
-	if b.expecting {
-		b.t.Fatalf("Not all expectations were satisfied in mockBroker with ID=%d!", b.BrokerID())
+	if b.expecting != nil {
+		b.t.Fatalf("Not all expectations were satisfied in mockBroker with ID=%d! Still waiting on %#v", b.BrokerID(), b.expecting)
 	}
 	close(b.expectations)
 	<-b.stopper
@@ -68,9 +68,9 @@ func (b *MockBroker) serverLoop() (ok bool) {
 	reqHeader := make([]byte, 4)
 	resHeader := make([]byte, 8)
 	for expectation := range b.expectations {
-		b.expecting = true
+		b.expecting = expectation
 		_, err = io.ReadFull(conn, reqHeader)
-		b.expecting = false
+		b.expecting = nil
 		if err != nil {
 			return b.serverError(err, conn)
 		}
