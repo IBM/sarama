@@ -2,7 +2,9 @@ package sarama
 
 import (
 	"encoding/binary"
+	"net"
 	"testing"
+	"time"
 )
 
 func TestSimpleClient(t *testing.T) {
@@ -159,4 +161,70 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	}
 
 	client.disconnectBroker(tst)
+}
+
+func TestClientTimeout(t *testing.T) {
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Error("Failed to create a listener, err:%s", err)
+		return
+	}
+	defer listener.Close()
+
+	connChannel := make(chan net.Conn, 1)
+	socketErrorChannel := make(chan error, 1)
+	clientChannel := make(chan *Client, 1)
+	clientErrorChannel := make(chan error, 1)
+
+	// spin up a simple server that will accept connections but send/receive no data
+	go func() {
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				socketErrorChannel <- err
+				continue
+			}
+			connChannel <- conn
+		}
+	}()
+
+	go func() {
+		addr := listener.Addr()
+		config := &ClientConfig{
+			MetadataRetries:      1,
+			WaitForElection:      1 * time.Second,
+			ConcurrencyPerBroker: 1,
+			ConnectTimeout:       1 * time.Second}
+		client, err := NewClient("TestClientTimeout", []string{addr.String()}, config)
+		if err != nil {
+			clientErrorChannel <- err
+			return
+		}
+		clientChannel <- client
+	}()
+
+	connected := false
+	for {
+		select {
+		case <-connChannel:
+			connected = true
+		case err := <-socketErrorChannel:
+			t.Error("Unexpected socket error:%v", err)
+			return
+		case client := <-clientChannel:
+			t.Error("Connect should have failed:%v", client)
+			return
+		case err := <-clientErrorChannel:
+			if !connected {
+				t.Error("Unexpected error during NewClient(), error:%v", err)
+			}
+			if err != OutOfBrokers {
+				t.Error("Unexpected error during NewClient(), error:%v", err)
+			}
+			return
+		case <-time.After(time.Second * 5):
+			t.Error("Failed to detect a socket timeout")
+			return
+		}
+	}
 }

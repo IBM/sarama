@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"time"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -17,8 +18,9 @@ type Broker struct {
 	connErr       error
 	lock          sync.Mutex
 
-	responses chan responsePromise
-	done      chan bool
+	responses      chan responsePromise
+	done           chan bool
+	connectTimeout time.Duration
 }
 
 type responsePromise struct {
@@ -275,11 +277,32 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 
 func (b *Broker) responseReceiver() {
 	header := make([]byte, 8)
+	firstMessage := true
 	for response := range b.responses {
+
+		// apply a connect timeout on the first receive
+		if firstMessage && b.connectTimeout != 0 {
+			err := b.conn.SetReadDeadline(time.Now().Add(b.connectTimeout))
+			if err != nil {
+				response.errors <- err
+				continue
+			}
+		}
+
 		_, err := io.ReadFull(b.conn, header)
 		if err != nil {
 			response.errors <- err
 			continue
+		}
+
+		// Clear the deadline
+		if firstMessage && b.connectTimeout != 0 {
+			firstMessage = false
+			err := b.conn.SetReadDeadline(time.Time{})
+			if err != nil {
+				response.errors <- err
+				continue
+			}
 		}
 
 		decodedHeader := responseHeader{}
