@@ -11,6 +11,7 @@ type ClientConfig struct {
 	MetadataRetries      int           // How many times to retry a metadata request when a partition is in the middle of leader election.
 	WaitForElection      time.Duration // How long to wait for leader election to finish between retries.
 	ConcurrencyPerBroker int           // How many outstanding requests each broker is allowed to have.
+	ConnectTimeout       time.Duration // How long to wait for an initial client connection
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -60,6 +61,8 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		brokers:          make(map[int32]*Broker),
 		leaders:          make(map[string]map[int32]int32),
 	}
+
+	client.extraBroker.connectTimeout = config.ConnectTimeout
 	client.extraBroker.Open(config.ConcurrencyPerBroker)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
