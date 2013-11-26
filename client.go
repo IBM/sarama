@@ -88,13 +88,13 @@ func (client *Client) Close() error {
 	defer client.lock.Unlock()
 
 	for _, broker := range client.brokers {
-		go broker.Close()
+		go withRecover(func() { broker.Close() })
 	}
 	client.brokers = nil
 	client.leaders = nil
 
 	if client.extraBroker != nil {
-		go client.extraBroker.Close()
+		go withRecover(func() { client.extraBroker.Close() })
 	}
 
 	return nil
@@ -198,7 +198,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		delete(client.brokers, broker.ID())
 	}
 
-	go broker.Close()
+	go withRecover(func() { broker.Close() })
 }
 
 func (client *Client) Closed() bool {
@@ -318,7 +318,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
-			go client.brokers[broker.ID()].Close()
+			go withRecover(func() { client.brokers[broker.ID()].Close() })
 			broker.Open(client.config.ConcurrencyPerBroker)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())

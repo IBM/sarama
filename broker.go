@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"sync"
 )
 
@@ -49,7 +50,7 @@ func (b *Broker) Open(maxOpenRequests int) error {
 		return AlreadyConnected
 	}
 
-	go func() {
+	go withRecover(func() {
 		defer b.lock.Unlock()
 
 		b.conn, b.connErr = net.Dial("tcp", b.addr)
@@ -65,8 +66,8 @@ func (b *Broker) Open(maxOpenRequests int) error {
 		b.responses = make(chan responsePromise, maxOpenRequests)
 
 		Logger.Printf("Connected to broker %s\n", b.addr)
-		go b.responseReceiver()
-	}()
+		go withRecover(b.responseReceiver)
+	})
 
 	return nil
 }
@@ -269,6 +270,29 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 	}
 
 	b.addr = fmt.Sprint(host, ":", port)
+
+	return nil
+}
+
+func (b *Broker) encode(pe packetEncoder) (err error) {
+
+	host, portstr, err := net.SplitHostPort(b.addr)
+	if err != nil {
+		return err
+	}
+	port, err := strconv.Atoi(portstr)
+	if err != nil {
+		return err
+	}
+
+	pe.putInt32(b.id)
+
+	err = pe.putString(host)
+	if err != nil {
+		return err
+	}
+
+	pe.putInt32(int32(port))
 
 	return nil
 }

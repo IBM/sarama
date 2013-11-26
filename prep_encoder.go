@@ -49,6 +49,14 @@ func (pe *prepEncoder) putBytes(in []byte) error {
 	return nil
 }
 
+func (pe *prepEncoder) putRawBytes(in []byte) error {
+	if len(in) > math.MaxInt32 {
+		return EncodingError
+	}
+	pe.length += len(in)
+	return nil
+}
+
 func (pe *prepEncoder) putString(in string) error {
 	pe.length += 2
 	if len(in) > math.MaxInt16 {
@@ -64,6 +72,15 @@ func (pe *prepEncoder) putInt32Array(in []int32) error {
 		return err
 	}
 	pe.length += 4 * len(in)
+	return nil
+}
+
+func (pe *prepEncoder) putInt64Array(in []int64) error {
+	err := pe.putArrayLength(len(in))
+	if err != nil {
+		return err
+	}
+	pe.length += 8 * len(in)
 	return nil
 }
 

@@ -26,6 +26,19 @@ func (r *OffsetFetchResponseBlock) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
+func (r *OffsetFetchResponseBlock) encode(pe packetEncoder) (err error) {
+	pe.putInt64(r.Offset)
+
+	err = pe.putString(r.Metadata)
+	if err != nil {
+		return err
+	}
+
+	pe.putInt16(int16(r.Err))
+
+	return nil
+}
+
 type OffsetFetchResponse struct {
 	ClientID string
 	Blocks   map[string]map[int32]*OffsetFetchResponseBlock

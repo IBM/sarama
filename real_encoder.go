@@ -37,6 +37,12 @@ func (re *realEncoder) putArrayLength(in int) error {
 
 // collection
 
+func (re *realEncoder) putRawBytes(in []byte) error {
+	copy(re.raw[re.off:], in)
+	re.off += len(in)
+	return nil
+}
+
 func (re *realEncoder) putBytes(in []byte) error {
 	if in == nil {
 		re.putInt32(-1)
@@ -59,6 +65,14 @@ func (re *realEncoder) putInt32Array(in []int32) error {
 	re.putArrayLength(len(in))
 	for _, val := range in {
 		re.putInt32(val)
+	}
+	return nil
+}
+
+func (re *realEncoder) putInt64Array(in []int64) error {
+	re.putArrayLength(len(in))
+	for _, val := range in {
+		re.putInt64(val)
 	}
 	return nil
 }

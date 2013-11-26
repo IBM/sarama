@@ -4,6 +4,7 @@ import (
 	"hash"
 	"hash/fnv"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type Partitioner interface {
 // RandomPartitioner implements the Partitioner interface by choosing a random partition each time.
 type RandomPartitioner struct {
 	generator *rand.Rand
+	m         sync.Mutex
 }
 
 func NewRandomPartitioner() *RandomPartitioner {
@@ -26,15 +28,20 @@ func NewRandomPartitioner() *RandomPartitioner {
 }
 
 func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+	p.m.Lock()
+	defer p.m.Unlock()
 	return int32(p.generator.Intn(int(numPartitions)))
 }
 
 // RoundRobinPartitioner implements the Partitioner interface by walking through the available partitions one at a time.
 type RoundRobinPartitioner struct {
 	partition int32
+	m         sync.Mutex
 }
 
 func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+	p.m.Lock()
+	defer p.m.Unlock()
 	if p.partition >= numPartitions {
 		p.partition = 0
 	}
@@ -49,6 +56,7 @@ func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int3
 type HashPartitioner struct {
 	random *RandomPartitioner
 	hasher hash.Hash32
+	m      sync.Mutex
 }
 
 func NewHashPartitioner() *HashPartitioner {
@@ -59,6 +67,8 @@ func NewHashPartitioner() *HashPartitioner {
 }
 
 func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+	p.m.Lock()
+	defer p.m.Unlock()
 	if key == nil {
 		return p.random.Partition(key, numPartitions)
 	}
