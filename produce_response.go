@@ -62,6 +62,29 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
+func (pr *ProduceResponse) encode(pe packetEncoder) error {
+	err := pe.putArrayLength(len(pr.Blocks))
+	if err != nil {
+		return err
+	}
+	for topic, partitions := range pr.Blocks {
+		err = pe.putString(topic)
+		if err != nil {
+			return err
+		}
+		err = pe.putArrayLength(len(partitions))
+		if err != nil {
+			return err
+		}
+		for id, prb := range partitions {
+			pe.putInt32(id)
+			pe.putInt16(int16(prb.Err))
+			pe.putInt64(prb.Offset)
+		}
+	}
+	return nil
+}
+
 func (pr *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
 	if pr.Blocks == nil {
 		return nil
@@ -72,4 +95,18 @@ func (pr *ProduceResponse) GetBlock(topic string, partition int32) *ProduceRespo
 	}
 
 	return pr.Blocks[topic][partition]
+}
+
+// Testing API
+
+func (pr *ProduceResponse) AddTopicPartition(topic string, partition int32, err KError) {
+	if pr.Blocks == nil {
+		pr.Blocks = make(map[string]map[int32]*ProduceResponseBlock)
+	}
+	byTopic, ok := pr.Blocks[topic]
+	if !ok {
+		byTopic = make(map[int32]*ProduceResponseBlock)
+		pr.Blocks[topic] = byTopic
+	}
+	byTopic[partition] = &ProduceResponseBlock{Err: err}
 }

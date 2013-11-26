@@ -4,6 +4,7 @@ import (
 	"hash"
 	"hash/fnv"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type Partitioner interface {
 // RandomPartitioner implements the Partitioner interface by choosing a random partition each time.
 type RandomPartitioner struct {
 	generator *rand.Rand
+	m         sync.Mutex
 }
 
 func NewRandomPartitioner() *RandomPartitioner {
@@ -26,6 +28,8 @@ func NewRandomPartitioner() *RandomPartitioner {
 }
 
 func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+	p.m.Lock()
+	defer p.m.Unlock()
 	return int32(p.generator.Intn(int(numPartitions)))
 }
 
