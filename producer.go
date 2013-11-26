@@ -63,11 +63,6 @@ type brokerProducer struct {
 	hasMessages   chan bool
 }
 
-type topicPartition struct {
-	topic     string
-	partition int32
-}
-
 // NewProducer creates a new Producer using the given client.
 func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	if config == nil {

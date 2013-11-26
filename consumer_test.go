@@ -12,8 +12,11 @@ func TestSimpleConsumer(t *testing.T) {
 
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
-	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
+
+	mdr2 := new(MetadataResponse)
+	mdr2.AddTopicPartition("my_topic", 0, 2)
+	mb2.Returns(mdr2)
 
 	for i := 0; i < 10; i++ {
 		fr := new(FetchResponse)
@@ -27,13 +30,20 @@ func TestSimpleConsumer(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
+	consumer, err := NewConsumer(client, "my_consumer_group", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer consumer.Close()
+
 	defer mb1.Close()
 	defer mb2.Close()
+
+	defer consumer.Close()
+
+	err = consumer.AddTopicPartition("my_topic", 0, OffsetMethodManual, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 10; i++ {
 		event := <-consumer.Events()
@@ -63,16 +73,19 @@ func TestConsumerRawOffset(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: OffsetMethodManual, OffsetValue: 1234})
+	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	err = consumer.AddTopicPartition("my_topic", 0, OffsetMethodManual, 1234)
+
 	defer consumer.Close()
 
 	defer mb1.Close()
 	defer mb2.Close()
 
-	if consumer.offset != 1234 {
+	if consumer.offset("my_topic", 0) != 1234 {
 		t.Error("Raw offset not set correctly")
 	}
 }
@@ -97,16 +110,21 @@ func TestConsumerLatestOffset(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: OffsetMethodNewest})
+	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer consumer.Close()
 
+	err = consumer.AddTopicPartition("my_topic", 0, OffsetMethodNewest, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	defer mb2.Close()
 	defer mb1.Close()
 
-	if consumer.offset != 0x010101 {
+	if consumer.offset("my_topic", 0) != 0x010101 {
 		t.Error("Latest offset not fetched correctly")
 	}
 }
@@ -120,13 +138,18 @@ func ExampleConsumer() {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
+	consumer, err := NewConsumer(client, "my_consumer_group", nil)
 	if err != nil {
 		panic(err)
 	} else {
 		fmt.Println("> consumer ready")
 	}
 	defer consumer.Close()
+
+	err = consumer.AddTopicPartition("my_topic", 0, OffsetMethodManual, 0)
+	if err != nil {
+		panic(err)
+	}
 
 	msgCount := 0
 consumerLoop:
