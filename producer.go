@@ -172,11 +172,10 @@ func (p *Producer) genericSendMessage(topic string, key, value Encoder, synchron
 
 	// produce_message.go
 	msg := &produceMessage{
-		tp:       topicPartition{topic, partition},
-		key:      keyBytes,
-		value:    valBytes,
-		failures: 0,
-		sync:     synchronous,
+		tp:    topicPartition{topic, partition},
+		key:   keyBytes,
+		value: valBytes,
+		sync:  synchronous,
 	}
 
 	// produce_message.go
@@ -257,7 +256,7 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 
 func (bp *brokerProducer) addMessage(msg *produceMessage, maxBufferBytes uint32) {
 	bp.mapM.Lock()
-	if msg.failures > 0 {
+	if msg.retried {
 		// Prepend: Deliver first, before any more recently-added messages.
 		bp.messages[msg.tp] = append([]*produceMessage{msg}, bp.messages[msg.tp]...)
 	} else {
