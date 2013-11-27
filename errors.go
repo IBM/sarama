@@ -50,6 +50,19 @@ func (err ConfigurationError) Error() string {
 	return "kafka: Invalid Configuration: " + string(err)
 }
 
+type DroppedMessagesError struct {
+	ndropped int
+	err      error
+}
+
+func (err DroppedMessagesError) Error() string {
+	if err.err != nil {
+		return fmt.Sprintf("kafka: Dropped %d messages: %s", err.ndropped, err.Error())
+	} else {
+		return fmt.Sprintf("kafka: Dropped %d messages", err.ndropped)
+	}
+}
+
 // KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
