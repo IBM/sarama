@@ -346,7 +346,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			}
 		})
 		if overlimit > 0 {
-			Logger.Printf("[DATA LOSS] %d cannot find a leader for %d messages %d, so they were dropped.\n", overlimit)
+			Logger.Printf("[DATA LOSS] cannot find a leader for %d messages, so they were dropped.\n", overlimit)
 			errorCb(fmt.Errorf("Dropped %d messages that exceeded the retry limit", overlimit))
 		}
 		return
@@ -384,7 +384,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 					}
 				})
 				if overlimit > 0 {
-					Logger.Printf("[DATA LOSS] %d cannot find a leader for %d messages %d, so they were dropped.\n", overlimit)
+					Logger.Printf("[DATA LOSS] cannot find a leader for %d messages, so they were dropped.\n", overlimit)
 				}
 			default:
 				Logger.Printf("[DATA LOSS] Non-retriable error from kafka! Dropped up to %d messages for %s:%d.\n",
