@@ -17,13 +17,12 @@ import (
 // With MaxBufferTime and/or MaxBufferedBytes set to values > 0, sarama will
 // buffer messages before sending, to reduce traffic.
 type ProducerConfig struct {
-	Partitioner        Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
-	RequiredAcks       RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
-	Timeout            int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
-	Compression        CompressionCodec // The type of compression to use on messages (defaults to no compression).
-	MaxBufferedBytes   uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
-	MaxBufferTime      uint32           // The maximum number of milliseconds to buffer messages before sending to a broker.
-	MaxDeliveryRetries uint32           // The number of times to retry a failed message. You should always specify at least 1.
+	Partitioner      Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
+	RequiredAcks     RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
+	Timeout          int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
+	Compression      CompressionCodec // The type of compression to use on messages (defaults to no compression).
+	MaxBufferedBytes uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
+	MaxBufferTime    uint32           // The maximum number of milliseconds to buffer messages before sending to a broker.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
@@ -80,10 +79,6 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 
 	if config.Timeout < 0 {
 		return nil, ConfigurationError("Invalid Timeout")
-	}
-
-	if config.MaxDeliveryRetries < 1 {
-		Logger.Println("Warning: config.MaxDeliveryRetries is set dangerously low. This will lead to occasional data loss.")
 	}
 
 	if config.Partitioner == nil {
@@ -351,8 +346,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			}
 		})
 		if overlimit > 0 {
-			Logger.Printf("[DATA LOSS] %d messages exceeded the retry limit of %d and were dropped.\n",
-				overlimit, p.config.MaxDeliveryRetries)
+			Logger.Printf("[DATA LOSS] %d cannot find a leader for %d messages %d, so they were dropped.\n", overlimit)
 			errorCb(fmt.Errorf("Dropped %d messages that exceeded the retry limit", overlimit))
 		}
 		return
@@ -390,8 +384,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 					}
 				})
 				if overlimit > 0 {
-					Logger.Printf("[DATA LOSS] %d messages exceeded the retry limit of %d and were dropped.\n",
-						overlimit, p.config.MaxDeliveryRetries)
+					Logger.Printf("[DATA LOSS] %d cannot find a leader for %d messages %d, so they were dropped.\n", overlimit)
 				}
 			default:
 				Logger.Printf("[DATA LOSS] Non-retriable error from kafka! Dropped up to %d messages for %s:%d.\n",
