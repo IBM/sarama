@@ -336,7 +336,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 		// No sense in retrying; it'll just fail again. But what about all the other
 		// messages that weren't invalid? Really, this is a "shit's broke real good"
 		// scenario, so logging it and moving on is probably acceptable.
-		errorCb(fmt.Errorf("[DATA LOSS] EncodingError! Dropped %d messages.\n", len(prb)))
+		errorCb(fmt.Errorf("[DATA LOSS] EncodingError! Dropped %d messages: %s", len(prb), err.Error()))
 		return
 	default:
 		bp.Close()
