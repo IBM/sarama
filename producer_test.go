@@ -243,8 +243,7 @@ func TestFailureRetry(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush after the 2nd message.
-		MaxBufferedBytes:   uint32((len(TestMessage) * 2) - 1),
-		MaxDeliveryRetries: 1,
+		MaxBufferedBytes: uint32((len(TestMessage) * 2) - 1),
 	})
 	if err != nil {
 		t.Fatal(err)

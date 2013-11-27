@@ -9,6 +9,8 @@ type produceMessage struct {
 	sync       bool
 }
 
+const retryLimit = 1
+
 type produceRequestBuilder []*produceMessage
 
 // If the message is synchronous, we manually send it and wait for a return.
@@ -33,7 +35,7 @@ func (msg *produceMessage) enqueue(p *Producer) error {
 }
 
 func (msg *produceMessage) reenqueue(p *Producer) error {
-	if msg.failures < p.config.MaxDeliveryRetries {
+	if msg.failures < retryLimit {
 		msg.failures++
 		return msg.enqueue(p)
 	}
