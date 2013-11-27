@@ -50,16 +50,17 @@ func (err ConfigurationError) Error() string {
 	return "kafka: Invalid Configuration: " + string(err)
 }
 
+// DroppedMessagesError is returned from a producer when messages weren't able to be successfully delivered to a broker.
 type DroppedMessagesError struct {
-	ndropped int
-	err      error
+	DroppedMessages int
+	Err             error
 }
 
 func (err DroppedMessagesError) Error() string {
-	if err.err != nil {
-		return fmt.Sprintf("kafka: Dropped %d messages: %s", err.ndropped, err.Error())
+	if err.Err != nil {
+		return fmt.Sprintf("kafka: Dropped %d messages: %s", err.DroppedMessages, err.Err.Error())
 	} else {
-		return fmt.Sprintf("kafka: Dropped %d messages", err.ndropped)
+		return fmt.Sprintf("kafka: Dropped %d messages", err.DroppedMessages)
 	}
 }
 
