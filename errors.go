@@ -111,7 +111,7 @@ func (err KError) Error() string {
 	case BrokerNotAvailable:
 		return "kafka server: Broker not available. Not a client facing error, we should never receive this!!!"
 	case ReplicaNotAvailable:
-		return "kafka server: Replica not available. What is the difference between this and LeaderNotAvailable?"
+		return "kafka server: Replica not available. No replicas are available to read from this topic-partition."
 	case MessageSizeTooLarge:
 		return "kafka server: Message was too large, server rejected it to avoid allocation error."
 	case StaleControllerEpochCode:
