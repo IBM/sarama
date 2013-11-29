@@ -237,11 +237,13 @@ func (m *Consumer) allocator() {
 			br, ok := m.brokerRunners[broker]
 			if !ok {
 				br = &brokerRunner{intake: make(chan *consumerTP, 8)}
+				br.intake <- tp
 				m.brokerRunners[broker] = br
 				m.wg.Add(1)
 				go withRecover(func() { m.brokerRunner(broker) })
+			} else {
+				br.intake <- tp
 			}
-			br.intake <- tp
 			m.m.Unlock()
 		}
 	}
