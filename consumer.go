@@ -3,6 +3,7 @@ package sarama
 import (
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/tomb"
 )
@@ -222,13 +223,13 @@ func (m *Consumer) allocator() {
 			err := m.client.RefreshTopicMetadata(tp.Topic)
 			if err != nil {
 				m.sendError("", -1, err)
-				m.waiting <- tp // good idea? or should we discard it?
+				m.delayReenqueue(tp, 500*time.Millisecond)
 				continue
 			}
 			broker, err := m.client.Leader(tp.Topic, tp.Partition)
 			if err != nil {
 				m.sendError("", -1, err)
-				m.waiting <- tp // good idea? or should we discard it?
+				m.delayReenqueue(tp, 500*time.Millisecond)
 				continue
 			}
 
@@ -278,6 +279,14 @@ func (m *Consumer) brokerRunner(broker *Broker) {
 	}
 }
 
+func (m *Consumer) delayReenqueue(tp *consumerTP, delay time.Duration) {
+	time.Sleep(delay)
+	select {
+	case <-m.tomb.Dying():
+	case m.waiting <- tp:
+	}
+}
+
 func (m *Consumer) fetchMessages(broker *Broker, tps []*consumerTP) []*consumerTP {
 	request := new(FetchRequest)
 	request.MinBytes = m.config.MinFetchSize
@@ -303,7 +312,7 @@ func (m *Consumer) fetchMessages(broker *Broker, tps []*consumerTP) []*consumerT
 	default:
 		m.client.disconnectBroker(broker)
 		for _, tp := range tps {
-			m.waiting <- tp
+			m.delayReenqueue(tp, 500*time.Millisecond)
 		}
 		return nil
 	}
@@ -329,7 +338,8 @@ tploop:
 				}
 			}
 
-			m.waiting <- tp
+			// Prevents broker spam. Leader elections are rare, so 500ms is no big deal.
+			go m.delayReenqueue(tp, 500*time.Millisecond)
 			continue tploop
 		default:
 			m.sendError(tp.Topic, tp.Partition, block.Err)
