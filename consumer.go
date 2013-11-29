@@ -89,7 +89,7 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 		return nil, ConfigurationError("Invalid MaxMessageSize")
 	}
 
-	if config.MaxWaitTime < 0 {
+	if config.MaxWaitTime <= 0 {
 		return nil, ConfigurationError("Invalid MaxWaitTime")
 	} else if config.MaxWaitTime < 100 {
 		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
