@@ -86,7 +86,11 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	}
 
 	if config.MaxBufferedBytes == 0 {
-		config.MaxBufferedBytes = 1
+		return nil, ConfigurationError("Invalid MaxBufferedBytes")
+	}
+
+	if config.MaxBufferTime == 0 {
+		return nil, ConfigurationError("Invalid MaxBufferTime")
 	}
 
 	return &Producer{
