@@ -30,7 +30,7 @@ func TestSimpleConsumer(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_consumer_group", nil)
+	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestConsumerRawOffset(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{})
+	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,7 +110,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{})
+	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 100})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func ExampleConsumer() {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_consumer_group", nil)
+	consumer, err := NewConsumer(client, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 100})
 	if err != nil {
 		panic(err)
 	} else {
