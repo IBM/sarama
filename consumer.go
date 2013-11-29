@@ -282,7 +282,7 @@ func (m *Consumer) fetchMessages(broker *Broker, tps []*consumerTP) []*consumerT
 	request := new(FetchRequest)
 	request.MinBytes = m.config.MinFetchSize
 	request.MaxWaitTime = m.config.MaxWaitTime
-	for _, tp := range m.consumerTPs {
+	for _, tp := range tps {
 		request.AddBlock(tp.Topic, tp.Partition, tp.Offset, tp.FetchSize)
 	}
 
