@@ -59,8 +59,8 @@ type Consumer struct {
 	group  string
 	config ConsumerConfig
 
-	brokerRunners map[*Broker]*brokerRunner
-	consumerTPs   map[topicPartition]*consumerTP
+	brokerConsumers map[*Broker]*brokerConsumer
+	consumerTPs     map[topicPartition]*consumerTP
 
 	waiting chan *consumerTP
 	tomb    tomb.Tomb
@@ -78,12 +78,6 @@ type ConsumerEvent struct {
 	Key, Value []byte
 	Offset     int64
 	Err        error
-}
-
-type brokerRunner struct {
-	m      sync.Mutex
-	intake chan *consumerTP
-	Broker *Broker
 }
 
 type consumerTP struct {
@@ -125,13 +119,13 @@ func NewConsumer(client *Client, group string, config *ConsumerConfig) (*Consume
 	}
 
 	m := &Consumer{
-		client:        client,
-		group:         group,
-		config:        *config,
-		brokerRunners: make(map[*Broker]*brokerRunner),
-		waiting:       make(chan *consumerTP, 16),
-		consumerTPs:   make(map[topicPartition]*consumerTP),
-		events:        make(chan *ConsumerEvent, config.EventBufferSize),
+		client:          client,
+		group:           group,
+		config:          *config,
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		waiting:         make(chan *consumerTP, 16),
+		consumerTPs:     make(map[topicPartition]*consumerTP),
+		events:          make(chan *ConsumerEvent, config.EventBufferSize),
 	}
 
 	go withRecover(m.allocator)
@@ -206,18 +200,18 @@ func (m *Consumer) AddTopicPartition(topic string, partition int32, offsetMethod
 }
 
 func (m *Consumer) allocator() {
+	defer m.tomb.Done()
 	for {
 		select {
 		case <-m.tomb.Dying():
 			// interrupt all brokers so that any currently-blocking FetchReqeusts are interrupted.
 			// This is pretty hackish, but it does the trick.
-			for broker := range m.brokerRunners {
+			for broker := range m.brokerConsumers {
 				if broker.conn != nil {
 					broker.conn.Close()
 				}
 			}
 			m.wg.Wait()
-			m.tomb.Done()
 			return
 		case tp := <-m.waiting:
 			err := m.client.RefreshTopicMetadata(tp.Topic)
@@ -234,13 +228,13 @@ func (m *Consumer) allocator() {
 			}
 
 			m.m.Lock()
-			br, ok := m.brokerRunners[broker]
+			br, ok := m.brokerConsumers[broker]
 			if !ok {
-				br = &brokerRunner{intake: make(chan *consumerTP, 8)}
+				br = &brokerConsumer{intake: make(chan *consumerTP, 8)}
 				br.intake <- tp
-				m.brokerRunners[broker] = br
+				m.brokerConsumers[broker] = br
 				m.wg.Add(1)
-				go withRecover(func() { m.brokerRunner(broker) })
+				go withRecover(func() { newBrokerConsumer(m, broker) })
 			} else {
 				br.intake <- tp
 			}
@@ -255,144 +249,12 @@ func (m *Consumer) Events() <-chan *ConsumerEvent {
 	return m.events
 }
 
-func (m *Consumer) brokerRunner(broker *Broker) {
-	defer m.wg.Done()
-	m.m.RLock()
-	br := m.brokerRunners[broker]
-	m.m.RUnlock()
-
-	defer m.cleanupBrokerRunner(br)
-
-	var tps []*consumerTP
-	for {
-		select {
-		case <-m.tomb.Dying():
-			return
-		case tp := <-br.intake:
-			br.m.Lock()
-			tps = append(tps, tp)
-			br.m.Unlock()
-		default:
-			if len(tps) == 0 {
-				return
-			}
-			tps = m.fetchMessages(broker, tps)
-		}
-	}
-}
-
 func (m *Consumer) delayReenqueue(tp *consumerTP, delay time.Duration) {
 	time.Sleep(delay)
 	select {
 	case <-m.tomb.Dying():
 	case m.waiting <- tp:
 	}
-}
-
-func (m *Consumer) fetchMessages(broker *Broker, tps []*consumerTP) []*consumerTP {
-	request := new(FetchRequest)
-	request.MinBytes = m.config.MinFetchSize
-	request.MaxWaitTime = m.config.MaxWaitTime
-	for _, tp := range tps {
-		request.AddBlock(tp.Topic, tp.Partition, tp.Offset, tp.FetchSize)
-	}
-
-	response, err := broker.Fetch(m.client.id, request)
-
-	select {
-	case <-m.tomb.Dying():
-		return nil
-	default:
-	}
-
-	switch {
-	case err == nil:
-		break
-	case err == EncodingError:
-		m.sendError("", -1, err)
-		return tps
-	default:
-		m.client.disconnectBroker(broker)
-		for _, tp := range tps {
-			m.delayReenqueue(tp, 500*time.Millisecond)
-		}
-		return nil
-	}
-
-tploop:
-	for _, tp := range tps {
-		block := response.GetBlock(tp.Topic, tp.Partition)
-		if block == nil {
-			m.sendError(tp.Topic, tp.Partition, IncompleteResponse)
-			continue
-		}
-
-		switch block.Err {
-		case NoError:
-		case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-			oldTps := tps
-			tps = []*consumerTP{}
-
-			// tps.reject! { |otp| otp == tp }
-			for _, otp := range oldTps {
-				if otp != tp {
-					tps = append(tps, otp)
-				}
-			}
-
-			// Prevents broker spam. Leader elections are rare, so 500ms is no big deal.
-			go m.delayReenqueue(tp, 500*time.Millisecond)
-			continue tploop
-		default:
-			m.sendError(tp.Topic, tp.Partition, block.Err)
-			continue tploop
-		}
-
-		if len(block.MsgSet.Messages) == 0 {
-			if block.MsgSet.PartialTrailingMessage {
-				if m.config.MaxMessageSize == 0 {
-					tp.FetchSize *= 2
-				} else {
-					if tp.FetchSize == m.config.MaxMessageSize {
-						m.sendError(tp.Topic, tp.Partition, MessageTooLarge)
-						continue
-					} else {
-						tp.FetchSize *= 2
-						if tp.FetchSize > m.config.MaxMessageSize {
-							tp.FetchSize = m.config.MaxMessageSize
-						}
-					}
-				}
-			}
-		} else {
-			tp.FetchSize = m.config.DefaultFetchSize
-		}
-
-		for _, msgBlock := range block.MsgSet.Messages {
-			select {
-			case <-m.tomb.Dying():
-				return nil
-			case m.events <- &ConsumerEvent{
-				Topic:     tp.Topic,
-				Partition: tp.Partition,
-				Key:       msgBlock.Msg.Key,
-				Value:     msgBlock.Msg.Value,
-				Offset:    msgBlock.Offset,
-			}:
-				tp.Offset++
-			}
-		}
-
-	}
-
-	return tps
-}
-
-func (m *Consumer) cleanupBrokerRunner(br *brokerRunner) {
-	m.m.Lock()
-	close(br.intake)
-	delete(m.brokerRunners, br.Broker)
-	m.m.Unlock()
 }
 
 func (m *Consumer) getOffset(topic string, partition int32, where OffsetTime, retry bool) (int64, error) {
