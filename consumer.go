@@ -64,7 +64,6 @@ type Consumer struct {
 
 	waiting chan *consumerTP
 	tomb    tomb.Tomb
-	wg      sync.WaitGroup
 	events  chan *ConsumerEvent
 }
 
@@ -142,19 +141,6 @@ func (m *Consumer) Close() error {
 	return m.tomb.Wait()
 }
 
-func (m *Consumer) sendError(topic string, partition int32, err error) bool {
-	if err == nil {
-		return true
-	}
-
-	select {
-	case <-m.tomb.Dying():
-		return false
-	case m.events <- &ConsumerEvent{Err: err, Topic: topic, Partition: partition}:
-		return true
-	}
-}
-
 // Register a given topic-partition with the multiconsumer, beginning at the
 // determined offset. If the topic-partition is already registered with the
 // multiconsumer, this method has no effect. To specify an offset manually, give
@@ -192,11 +178,21 @@ func (m *Consumer) AddTopicPartition(topic string, partition int32, offsetMethod
 			FetchSize: m.config.DefaultFetchSize,
 		}
 		m.consumerTPs[tp] = ctp
-		m.waiting <- ctp
+		m.allocateConsumerTP(ctp)
 	}
 	m.m.Unlock()
 
 	return nil
+}
+
+func (m *Consumer) removeBrokerConsumer(bc *brokerConsumer) {
+	m.m.Lock()
+	delete(m.brokerConsumers, bc.Broker)
+	m.m.Unlock()
+}
+
+func (m *Consumer) allocateConsumerTP(ctp *consumerTP) {
+	m.waiting <- ctp
 }
 
 func (m *Consumer) allocator() {
@@ -204,14 +200,9 @@ func (m *Consumer) allocator() {
 	for {
 		select {
 		case <-m.tomb.Dying():
-			// interrupt all brokers so that any currently-blocking FetchReqeusts are interrupted.
-			// This is pretty hackish, but it does the trick.
-			for broker := range m.brokerConsumers {
-				if broker.conn != nil {
-					broker.conn.Close()
-				}
+			for _, bc := range m.brokerConsumers {
+				bc.Close() // could parallelize this if necessary (use a wg)
 			}
-			m.wg.Wait()
 			return
 		case tp := <-m.waiting:
 			err := m.client.RefreshTopicMetadata(tp.Topic)
@@ -230,17 +221,25 @@ func (m *Consumer) allocator() {
 			m.m.Lock()
 			br, ok := m.brokerConsumers[broker]
 			if !ok {
-				br = &brokerConsumer{intake: make(chan *consumerTP, 8)}
-				br.intake <- tp
+				br = newBrokerConsumer(m, &m.config, broker, m.client.id)
 				m.brokerConsumers[broker] = br
-				m.wg.Add(1)
-				go withRecover(func() { newBrokerConsumer(m, broker) })
-			} else {
-				br.intake <- tp
 			}
+			br.intake <- tp
 			m.m.Unlock()
 		}
 	}
+}
+
+func (m *Consumer) sendError(topic string, partition int32, err error) {
+	select {
+	case <-m.tomb.Dying():
+	default:
+		m.sendEvent(&ConsumerEvent{Err: err, Topic: topic, Partition: partition})
+	}
+}
+
+func (m *Consumer) sendEvent(ev *ConsumerEvent) {
+	m.events <- ev
 }
 
 // Events returns the read channel for any events (messages or errors) that
@@ -253,7 +252,8 @@ func (m *Consumer) delayReenqueue(tp *consumerTP, delay time.Duration) {
 	time.Sleep(delay)
 	select {
 	case <-m.tomb.Dying():
-	case m.waiting <- tp:
+	default:
+		m.allocateConsumerTP(tp)
 	}
 }
 

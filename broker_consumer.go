@@ -1,75 +1,105 @@
 package sarama
 
 import (
+	"errors"
+	"github.com/Sirupsen/tomb"
+
 	"sync"
 	"time"
 )
 
 type brokerConsumer struct {
-	m      sync.Mutex
-	intake chan *consumerTP
-	Broker *Broker
+	m        sync.Mutex
+	intake   chan *consumerTP
+	Broker   *Broker
+	consumer consumerish
+	tomb     tomb.Tomb
+	config   *ConsumerConfig
+	clientID string
 }
 
-func newBrokerConsumer(m *Consumer, broker *Broker) {
-	defer m.wg.Done()
-	m.m.RLock()
-	br := m.brokerConsumers[broker]
-	m.m.RUnlock()
+type consumerish interface {
+	removeBrokerConsumer(*brokerConsumer)
+	sendEvent(*ConsumerEvent)
+	allocateConsumerTP(tp *consumerTP)
+}
 
-	defer m.cleanupBrokerConsumer(br)
+func newBrokerConsumer(m consumerish, config *ConsumerConfig, broker *Broker, clientID string) *brokerConsumer {
+	bc := &brokerConsumer{
+		intake:   make(chan *consumerTP, 16),
+		Broker:   broker,
+		consumer: m,
+		config:   config,
+		clientID: clientID,
+	}
+	go withRecover(bc.run)
+	return bc
+}
+
+func (bc *brokerConsumer) Close() error {
+	bc.tomb.Kill(errors.New("Close() called"))
+	return bc.tomb.Wait()
+}
+
+func (bc *brokerConsumer) run() {
+	defer bc.tomb.Done()
 
 	var tps []*consumerTP
 	for {
 		select {
-		case <-m.tomb.Dying():
-			return
-		case tp := <-br.intake:
-			br.m.Lock()
+		case <-bc.tomb.Dying():
+			goto shutdown
+		case tp := <-bc.intake:
+			bc.m.Lock()
 			tps = append(tps, tp)
-			br.m.Unlock()
+			bc.m.Unlock()
 		default:
 			if len(tps) == 0 {
-				return
+				goto shutdown
 			}
-			tps = m.fetchMessages(broker, tps)
+			tps = bc.fetchMessages(tps)
 		}
+	}
+
+shutdown:
+	bc.consumer.removeBrokerConsumer(bc)
+	close(bc.intake)
+	if bc.Broker.conn != nil {
+		// calling broker.Close() doesn't interrupt pending requests. We would like
+		// to force any pending requests to terminate prematurely, since we would be
+		// discarding their output anyway.
+		bc.Broker.conn.Close()
+	}
+	bc.Broker.Close()
+}
+
+func (bc *brokerConsumer) sendError(topic string, partition int32, err error) {
+	select {
+	case <-bc.tomb.Dying():
+	default:
+		bc.consumer.sendEvent(&ConsumerEvent{Err: err, Topic: topic, Partition: partition})
 	}
 }
 
-func (m *Consumer) cleanupBrokerConsumer(br *brokerConsumer) {
-	m.m.Lock()
-	close(br.intake)
-	delete(m.brokerConsumers, br.Broker)
-	m.m.Unlock()
-}
-
-func (m *Consumer) fetchMessages(broker *Broker, tps []*consumerTP) []*consumerTP {
+func (bc *brokerConsumer) fetchMessages(tps []*consumerTP) []*consumerTP {
 	request := new(FetchRequest)
-	request.MinBytes = m.config.MinFetchSize
-	request.MaxWaitTime = m.config.MaxWaitTime
+	request.MinBytes = bc.config.MinFetchSize
+	request.MaxWaitTime = bc.config.MaxWaitTime
 	for _, tp := range tps {
 		request.AddBlock(tp.Topic, tp.Partition, tp.Offset, tp.FetchSize)
 	}
 
-	response, err := broker.Fetch(m.client.id, request)
-
-	select {
-	case <-m.tomb.Dying():
-		return nil
-	default:
-	}
+	response, err := bc.Broker.Fetch(bc.clientID, request)
 
 	switch {
 	case err == nil:
 		break
 	case err == EncodingError:
-		m.sendError("", -1, err)
+		bc.sendError("", -1, err)
 		return tps
 	default:
-		m.client.disconnectBroker(broker)
 		for _, tp := range tps {
-			m.delayReenqueue(tp, 500*time.Millisecond)
+			bc.delayReenqueue(tp, 500*time.Millisecond)
 		}
 		return nil
 	}
@@ -78,7 +108,7 @@ tploop:
 	for _, tp := range tps {
 		block := response.GetBlock(tp.Topic, tp.Partition)
 		if block == nil {
-			m.sendError(tp.Topic, tp.Partition, IncompleteResponse)
+			bc.sendError(tp.Topic, tp.Partition, IncompleteResponse)
 			continue
 		}
 
@@ -96,44 +126,46 @@ tploop:
 			}
 
 			// Prevents broker spam. Leader elections are rare, so 500ms is no big deal.
-			go m.delayReenqueue(tp, 500*time.Millisecond)
+			go bc.delayReenqueue(tp, 500*time.Millisecond)
 			continue tploop
 		default:
-			m.sendError(tp.Topic, tp.Partition, block.Err)
+			bc.sendError(tp.Topic, tp.Partition, block.Err)
 			continue tploop
 		}
 
 		if len(block.MsgSet.Messages) == 0 {
 			if block.MsgSet.PartialTrailingMessage {
-				if m.config.MaxMessageSize == 0 {
+				if bc.config.MaxMessageSize == 0 {
 					tp.FetchSize *= 2
 				} else {
-					if tp.FetchSize == m.config.MaxMessageSize {
-						m.sendError(tp.Topic, tp.Partition, MessageTooLarge)
+					if tp.FetchSize == bc.config.MaxMessageSize {
+						bc.sendError(tp.Topic, tp.Partition, MessageTooLarge)
 						continue
 					} else {
 						tp.FetchSize *= 2
-						if tp.FetchSize > m.config.MaxMessageSize {
-							tp.FetchSize = m.config.MaxMessageSize
+						if tp.FetchSize > bc.config.MaxMessageSize {
+							tp.FetchSize = bc.config.MaxMessageSize
 						}
 					}
 				}
 			}
 		} else {
-			tp.FetchSize = m.config.DefaultFetchSize
+			tp.FetchSize = bc.config.DefaultFetchSize
 		}
 
 		for _, msgBlock := range block.MsgSet.Messages {
 			select {
-			case <-m.tomb.Dying():
+			case <-bc.tomb.Dying():
 				return nil
-			case m.events <- &ConsumerEvent{
-				Topic:     tp.Topic,
-				Partition: tp.Partition,
-				Key:       msgBlock.Msg.Key,
-				Value:     msgBlock.Msg.Value,
-				Offset:    msgBlock.Offset,
-			}:
+			default:
+				ev := &ConsumerEvent{
+					Topic:     tp.Topic,
+					Partition: tp.Partition,
+					Key:       msgBlock.Msg.Key,
+					Value:     msgBlock.Msg.Value,
+					Offset:    msgBlock.Offset,
+				}
+				bc.consumer.sendEvent(ev)
 				tp.Offset++
 			}
 		}
@@ -141,4 +173,13 @@ tploop:
 	}
 
 	return tps
+}
+
+func (bc *brokerConsumer) delayReenqueue(tp *consumerTP, delay time.Duration) {
+	time.Sleep(delay)
+	select {
+	case <-bc.tomb.Dying():
+	default:
+		bc.consumer.allocateConsumerTP(tp)
+	}
 }
