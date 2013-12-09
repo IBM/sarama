@@ -45,6 +45,20 @@ func (bc *brokerConsumer) run() {
 	defer bc.tomb.Done()
 
 	var tps []*consumerTP
+
+	in := make(chan []*consumerTP)
+	out := make(chan []*consumerTP)
+	go func() {
+		for {
+			select {
+			case tps := <-in:
+				out <- bc.fetchMessages(tps)
+			case <-bc.tomb.Dying():
+				return
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-bc.tomb.Dying():
@@ -52,12 +66,15 @@ func (bc *brokerConsumer) run() {
 		case tp := <-bc.intake:
 			bc.m.Lock()
 			tps = append(tps, tp)
+			if len(tps) == 1 {
+				in <- tps
+			}
 			bc.m.Unlock()
-		default:
+		case tps := <-out:
 			if len(tps) == 0 {
 				goto shutdown
 			}
-			tps = bc.fetchMessages(tps)
+			in <- tps
 		}
 	}
 
