@@ -233,6 +233,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 		}
 
 		// some other error, remove that broker and try again
+		Logger.Println("Unexpected error from GetMetadata, closing broker:", err)
 		client.disconnectBroker(broker)
 	}
 
