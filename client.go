@@ -41,8 +41,12 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		config = new(ClientConfig)
 	}
 
-	if config.MetadataRetries < 0 {
-		return nil, ConfigurationError("Invalid MetadataRetries")
+	if config.MetadataRetries <= 0 {
+		return nil, ConfigurationError("Invalid MetadataRetries. Try 10")
+	}
+
+	if config.WaitForElection <= time.Duration(0) {
+		return nil, ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
 	}
 
 	if config.ConcurrencyPerBroker < 0 {
