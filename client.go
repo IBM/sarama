@@ -209,7 +209,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 	}
 
 	for broker := client.any(); broker != nil; broker = client.any() {
-		Logger.Printf("Getting metadata from broker %s\n", broker.addr)
+		Logger.Printf("Fetching metadata from broker %s\n", broker.addr)
 		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
 
 		switch err {
@@ -225,7 +225,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 				if retries <= 0 {
 					return LeaderNotAvailable
 				}
-				Logger.Printf("Failed to get metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection, retries)
+				Logger.Printf("Failed to fetch metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection/time.Millisecond, retries)
 				time.Sleep(client.config.WaitForElection) // wait for leader election
 				return client.refreshMetadata(retry, retries-1)
 			}
@@ -240,7 +240,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 	}
 
 	if retries > 0 {
-		Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection, retries)
+		Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
 		time.Sleep(client.config.WaitForElection)
 		client.resurrectDeadBrokers()
 		return client.refreshMetadata(topics, retries-1)
@@ -252,7 +252,6 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 }
 
 func (client *Client) resurrectDeadBrokers() {
-	Logger.Println("Ran out of connectable brokers. Retrying with brokers marked dead.")
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
