@@ -37,7 +37,14 @@ var InsufficientData = errors.New("kafka: Insufficient data to decode packet, mo
 
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
-var DecodingError = errors.New("kafka: Error while decoding packet.")
+type DecodingError struct {
+	Info   string
+	Packet []byte
+}
+
+func (err DecodingError) Error() string {
+	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
+}
 
 // MessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
 var MessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
