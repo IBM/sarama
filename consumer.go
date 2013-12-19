@@ -201,6 +201,7 @@ func (c *Consumer) fetchMessages() {
 				return
 			}
 		default:
+			Logger.Printf("Unexpected error processing FetchRequest; disconnecting broker %s: %s\n", c.broker.addr, err)
 			c.client.disconnectBroker(c.broker)
 			for c.broker, err = c.client.Leader(c.topic, c.partition); err != nil; c.broker, err = c.client.Leader(c.topic, c.partition) {
 				if !c.sendError(err) {
@@ -302,6 +303,7 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 		if !retry {
 			return -1, err
 		}
+		Logger.Printf("Unexpected error processing OffsetRequest; disconnecting broker %s: %s\n", c.broker.addr, err)
 		c.client.disconnectBroker(c.broker)
 		c.broker, err = c.client.Leader(c.topic, c.partition)
 		if err != nil {
