@@ -5,7 +5,7 @@ import "log"
 type produceMessage struct {
 	tp         topicPartition
 	key, value []byte
-	failures   uint32
+	retried    bool
 	sync       bool
 }
 
@@ -33,8 +33,8 @@ func (msg *produceMessage) enqueue(p *Producer) error {
 }
 
 func (msg *produceMessage) reenqueue(p *Producer) error {
-	if msg.failures < p.config.MaxDeliveryRetries {
-		msg.failures++
+	if !msg.retried {
+		msg.retried = true
 		return msg.enqueue(p)
 	}
 	return nil

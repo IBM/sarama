@@ -26,6 +26,7 @@ type Client struct {
 	// so we store them separately
 	extraBrokerAddrs []string
 	extraBroker      *Broker
+	deadBrokerAddrs  []string
 
 	brokers map[int32]*Broker          // maps broker ids to brokers
 	leaders map[string]map[int32]int32 // maps topics to partition ids to broker ids
@@ -36,12 +37,18 @@ type Client struct {
 // and uses that broker to automatically fetch metadata on the rest of the kafka cluster. If metadata cannot
 // be retrieved from any of the given broker addresses, the client is not created.
 func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error) {
+	Logger.Println("Initializing new client")
+
 	if config == nil {
 		config = new(ClientConfig)
 	}
 
-	if config.MetadataRetries < 0 {
-		return nil, ConfigurationError("Invalid MetadataRetries")
+	if config.MetadataRetries <= 0 {
+		return nil, ConfigurationError("Invalid MetadataRetries. Try 10")
+	}
+
+	if config.WaitForElection <= time.Duration(0) {
+		return nil, ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
 	}
 
 	if config.ConcurrencyPerBroker < 0 {
@@ -69,6 +76,8 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		return nil, err
 	}
 
+	Logger.Println("Successfully initialized new client")
+
 	return client, nil
 }
 
@@ -78,9 +87,11 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 func (client *Client) Close() error {
 	client.lock.Lock()
 	defer client.lock.Unlock()
+	Logger.Println("Closing Client")
 
 	for _, broker := range client.brokers {
-		go withRecover(func() { broker.Close() })
+		myBroker := broker // NB: block-local prevents clobbering
+		go withRecover(func() { myBroker.Close() })
 	}
 	client.brokers = nil
 	client.leaders = nil
@@ -165,6 +176,9 @@ func (client *Client) RefreshAllMetadata() error {
 func (client *Client) disconnectBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
+	Logger.Printf("Disconnecting Broker %d\n", broker.ID())
+
+	client.deadBrokerAddrs = append(client.deadBrokerAddrs, broker.addr)
 
 	if broker == client.extraBroker {
 		client.extraBrokerAddrs = client.extraBrokerAddrs[1:]
@@ -180,7 +194,8 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		delete(client.brokers, broker.ID())
 	}
 
-	go withRecover(func() { broker.Close() })
+	myBroker := broker // NB: block-local prevents clobbering
+	go withRecover(func() { myBroker.Close() })
 }
 
 func (client *Client) refreshMetadata(topics []string, retries int) error {
@@ -194,6 +209,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 	}
 
 	for broker := client.any(); broker != nil; broker = client.any() {
+		Logger.Printf("Fetching metadata from broker %s\n", broker.addr)
 		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
 
 		switch err {
@@ -209,6 +225,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 				if retries <= 0 {
 					return LeaderNotAvailable
 				}
+				Logger.Printf("Failed to fetch metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection/time.Millisecond, retries)
 				time.Sleep(client.config.WaitForElection) // wait for leader election
 				return client.refreshMetadata(retry, retries-1)
 			}
@@ -218,10 +235,42 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 		}
 
 		// some other error, remove that broker and try again
+		Logger.Println("Unexpected error from GetMetadata, closing broker:", err)
 		client.disconnectBroker(broker)
 	}
 
+	if retries > 0 {
+		Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
+		time.Sleep(client.config.WaitForElection)
+		client.resurrectDeadBrokers()
+		return client.refreshMetadata(topics, retries-1)
+	} else {
+		Logger.Printf("Out of available brokers.\n")
+	}
+
 	return OutOfBrokers
+}
+
+func (client *Client) resurrectDeadBrokers() {
+	client.lock.Lock()
+	defer client.lock.Unlock()
+
+	brokers := make(map[string]struct{})
+	for _, addr := range client.deadBrokerAddrs {
+		brokers[addr] = struct{}{}
+	}
+	for _, addr := range client.extraBrokerAddrs {
+		brokers[addr] = struct{}{}
+	}
+
+	client.deadBrokerAddrs = []string{}
+	client.extraBrokerAddrs = []string{}
+	for addr, _ := range brokers {
+		client.extraBrokerAddrs = append(client.extraBrokerAddrs, addr)
+	}
+
+	client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
+	client.extraBroker.Open(client.config.ConcurrencyPerBroker)
 }
 
 func (client *Client) any() *Broker {
@@ -286,7 +335,8 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
-			go withRecover(func() { client.brokers[broker.ID()].Close() })
+			myBroker := client.brokers[broker.ID()] // use block-local to prevent clobbering `broker` for Gs
+			go withRecover(func() { myBroker.Close() })
 			broker.Open(client.config.ConcurrencyPerBroker)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())

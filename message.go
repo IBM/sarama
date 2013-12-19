@@ -91,7 +91,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if format != messageFormat {
-		return DecodingError
+		return DecodingError{Info: "Unexpected messageFormat"}
 	}
 
 	attribute, err := pd.getInt8()
@@ -115,7 +115,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		// nothing to do
 	case CompressionGZIP:
 		if m.Value == nil {
-			return DecodingError
+			return DecodingError{Info: "GZIP compression specified, but no data to uncompress"}
 		}
 		reader, err := gzip.NewReader(bytes.NewReader(m.Value))
 		if err != nil {
@@ -127,14 +127,14 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		}
 	case CompressionSnappy:
 		if m.Value == nil {
-			return DecodingError
+			return DecodingError{Info: "Snappy compression specified, but no data to uncompress"}
 		}
 		m.Value, err = snappy.Decode(nil, m.Value)
 		if err != nil {
 			return err
 		}
 	default:
-		return DecodingError
+		return DecodingError{Info: "Invalid compression specified"}
 	}
 
 	err = pd.pop()

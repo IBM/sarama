@@ -24,7 +24,7 @@ func TestSimpleProducer(t *testing.T) {
 	pr.AddTopicPartition("my_topic", 0, NoError)
 	mb2.Returns(pr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestSimpleSyncProducer(t *testing.T) {
 		mb2.Returns(pr)
 	}
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestMultipleFlushes(t *testing.T) {
 	mb2.Returns(pr)
 	mb2.Returns(pr) // yes, twice.
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestMultipleProducer(t *testing.T) {
 	pr2.AddTopicPartition("topic_c", 0, NoError)
 	mb3.Returns(pr2)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestFailureRetry(t *testing.T) {
 	/* 	AddTopicPartition("topic_c", 0, 1, NoError). */
 	/* 	AddTopicPartition("topic_b", 0, 1, NoError) */
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,8 +243,7 @@ func TestFailureRetry(t *testing.T) {
 		RequiredAcks:  WaitForLocal,
 		MaxBufferTime: 1000000, // "never"
 		// So that we flush after the 2nd message.
-		MaxBufferedBytes:   uint32((len(TestMessage) * 2) - 1),
-		MaxDeliveryRetries: 1,
+		MaxBufferedBytes: uint32((len(TestMessage) * 2) - 1),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -306,7 +305,7 @@ func assertNoMessages(t *testing.T, ch chan error) {
 }
 
 func ExampleProducer() {
-	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
+	client, err := NewClient("client_id", []string{"localhost:9092"}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		panic(err)
 	} else {

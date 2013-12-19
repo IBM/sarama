@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"testing"
+	"time"
 )
 
 func TestSimpleClient(t *testing.T) {
@@ -10,7 +11,7 @@ func TestSimpleClient(t *testing.T) {
 
 	mb.Returns(new(MetadataResponse))
 
-	client, err := NewClient("client_id", []string{mb.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb.Addr()}, &ClientConfig{MetadataRetries: 10, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +28,7 @@ func TestClientExtraBrokers(t *testing.T) {
 	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mb1.Returns(mdr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 10, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +47,7 @@ func TestClientMetadata(t *testing.T) {
 	mdr.AddTopicPartition("my_topic", 0, int32(mb5.BrokerID()))
 	mb1.Returns(mdr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 10, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +89,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	mdr2.AddTopicPartition("my_topic", 0xb, int32(mb5.BrokerID()))
 	mb5.Returns(mdr2)
 
-	client, err := NewClient("clientID", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1})
+	client, err := NewClient("clientID", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}

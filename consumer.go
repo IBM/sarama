@@ -276,6 +276,7 @@ func (m *Consumer) getOffset(topic string, partition int32, where OffsetTime, re
 		if !retry {
 			return -1, err
 		}
+		Logger.Printf("Unexpected error processing OffsetRequest; disconnecting broker %s: %s\n", broker.addr, err)
 		m.client.disconnectBroker(broker)
 		broker, err = m.client.Leader(topic, partition)
 		if err != nil {

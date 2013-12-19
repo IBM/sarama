@@ -37,7 +37,13 @@ var InsufficientData = errors.New("kafka: Insufficient data to decode packet, mo
 
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
-var DecodingError = errors.New("kafka: Error while decoding packet.")
+type DecodingError struct {
+	Info string
+}
+
+func (err DecodingError) Error() string {
+	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
+}
 
 // MessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
 var MessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
@@ -48,6 +54,20 @@ type ConfigurationError string
 
 func (err ConfigurationError) Error() string {
 	return "kafka: Invalid Configuration: " + string(err)
+}
+
+// DroppedMessagesError is returned from a producer when messages weren't able to be successfully delivered to a broker.
+type DroppedMessagesError struct {
+	DroppedMessages int
+	Err             error
+}
+
+func (err DroppedMessagesError) Error() string {
+	if err.Err != nil {
+		return fmt.Sprintf("kafka: Dropped %d messages: %s", err.DroppedMessages, err.Err.Error())
+	} else {
+		return fmt.Sprintf("kafka: Dropped %d messages", err.DroppedMessages)
+	}
 }
 
 // KError is the type of error that can be returned directly by the Kafka broker.
@@ -97,7 +117,7 @@ func (err KError) Error() string {
 	case BrokerNotAvailable:
 		return "kafka server: Broker not available. Not a client facing error, we should never receive this!!!"
 	case ReplicaNotAvailable:
-		return "kafka server: Replica not available. What is the difference between this and LeaderNotAvailable?"
+		return "kafka server: Replica not available. No replicas are available to read from this topic-partition."
 	case MessageSizeTooLarge:
 		return "kafka server: Message was too large, server rejected it to avoid allocation error."
 	case StaleControllerEpochCode:
