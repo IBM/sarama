@@ -313,7 +313,7 @@ func (b *Broker) responseReceiver() {
 			continue
 		}
 		if decodedHeader.correlationID != response.correlationID {
-			response.errors <- DecodingError
+			response.errors <- DecodingError{Info: "CorrelationID didn't match"}
 			continue
 		}
 
