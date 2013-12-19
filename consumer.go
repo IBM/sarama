@@ -1,5 +1,13 @@
 package sarama
 
+import (
+	"errors"
+	"sync"
+	"time"
+
+	"github.com/Sirupsen/tomb"
+)
+
 // OffsetMethod is passed in ConsumerConfig to tell the consumer how to determine the starting offset.
 type OffsetMethod int
 
@@ -30,45 +38,57 @@ type ConsumerConfig struct {
 	// as it causes the Consumer to spin when no events are available. 100-500ms is a reasonable range for most cases.
 	MaxWaitTime int32
 
-	// The method used to determine at which offset to begin consuming messages.
-	OffsetMethod OffsetMethod
-	// Interpreted differently according to the value of OffsetMethod.
-	OffsetValue int64
-
 	// The number of events to buffer in the Events channel. Setting this can let the
 	// consumer continue fetching messages in the background while local code consumes events,
 	// greatly improving throughput.
 	EventBufferSize int
 }
 
-// ConsumerEvent is what is provided to the user when an event occurs. It is either an error (in which case Err is non-nil) or
-// a message (in which case Err is nil and the other fields are all set).
+// Consumer processes Kafka messages from an arbitrarily large set of Kafka
+// topic-partitions. You MUST call Close() on a Consumer to avoid leaks; it
+// will not be garbage-collected otherwise.
+//
+// It is STRONGLY recommended to pass MinFetchSize and MaxWaitTime options via
+// the ConsumerConfig parameter to avoid excessive network traffic. Sensible
+// defaults are 50*1024 and 1000, respsectively.
+type Consumer struct {
+	m sync.RWMutex
+
+	client *Client
+
+	group  string
+	config ConsumerConfig
+
+	brokerConsumers map[*Broker]*brokerConsumer
+	consumerTPs     map[topicPartition]*consumerTP
+
+	waiting chan *consumerTP
+	tomb    tomb.Tomb
+	events  chan *ConsumerEvent
+}
+
+// ConsumerEvent type is a sort of Either monad; it contains a Key+Value or
+// an error. If Key+Value+Offset is given, it will always contain a
+// Topic+Partition. In the error case, it will contain Topic+Partition if
+// relevant; otherwise they will be ("",-1).
 type ConsumerEvent struct {
+	Topic      string
+	Partition  int32
 	Key, Value []byte
 	Offset     int64
 	Err        error
 }
 
-// Consumer processes Kafka messages from a given topic and partition.
-// You MUST call Close() on a consumer to avoid leaks, it will not be garbage-collected automatically when
-// it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
-type Consumer struct {
-	client *Client
-
-	topic     string
-	partition int32
-	group     string
-	config    ConsumerConfig
-
-	offset        int64
-	broker        *Broker
-	stopper, done chan bool
-	events        chan *ConsumerEvent
+type consumerTP struct {
+	Topic     string
+	Partition int32
+	Offset    int64
+	FetchSize int32
 }
 
-// NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
-// part of the named consumer group.
-func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
+// NewConsumer creates a new multiconsumer attached to a given client. It
+// will read messages as a member of the given consumer group.
+func NewConsumer(client *Client, group string, config *ConsumerConfig) (*Consumer, error) {
 	if config == nil {
 		config = new(ConsumerConfig)
 	}
@@ -91,209 +111,162 @@ func NewConsumer(client *Client, topic string, partition int32, group string, co
 
 	if config.MaxWaitTime <= 0 {
 		return nil, ConfigurationError("Invalid MaxWaitTime")
-	} else if config.MaxWaitTime < 100 {
-		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
 	}
 
 	if config.EventBufferSize < 0 {
 		return nil, ConfigurationError("Invalid EventBufferSize")
 	}
 
-	if topic == "" {
-		return nil, ConfigurationError("Empty topic")
+	m := &Consumer{
+		client:          client,
+		group:           group,
+		config:          *config,
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		waiting:         make(chan *consumerTP, 16),
+		consumerTPs:     make(map[topicPartition]*consumerTP),
+		events:          make(chan *ConsumerEvent, config.EventBufferSize),
 	}
 
-	broker, err := client.Leader(topic, partition)
-	if err != nil {
-		return nil, err
-	}
+	go withRecover(m.allocator)
 
-	c := &Consumer{
-		client:    client,
-		topic:     topic,
-		partition: partition,
-		group:     group,
-		config:    *config,
-		broker:    broker,
-		stopper:   make(chan bool),
-		done:      make(chan bool),
-		events:    make(chan *ConsumerEvent, config.EventBufferSize),
-	}
+	return m, nil
+}
 
-	switch config.OffsetMethod {
+// Close stops the multiconsumer from fetching messages. It is required to call
+// this function before a multiconsumer object passes out of scope, as it will
+// otherwise leak memory. You must call this before calling Close on the
+// underlying client.
+func (m *Consumer) Close() error {
+	m.tomb.Kill(errors.New("Close() called"))
+	return m.tomb.Wait()
+}
+
+// Register a given topic-partition with the multiconsumer, beginning at the
+// determined offset. If the topic-partition is already registered with the
+// multiconsumer, this method has no effect. To specify an offset manually, give
+// the offset as `offset` and pass `OffsetMethodManual` for the last parameter.
+// If you pass `OffsetMethodEarliest` or `OffsetMethodLatest`, the `offset`
+// parameter is ignored, and you should generally pass -1.
+func (m *Consumer) AddTopicPartition(topic string, partition int32, offsetMethod OffsetMethod, offset int64) (err error) {
+
+	switch offsetMethod {
 	case OffsetMethodManual:
-		if config.OffsetValue < 0 {
-			return nil, ConfigurationError("OffsetValue cannot be < 0 when OffsetMethod is MANUAL")
+		if offset < 0 {
+			return ConfigurationError("OffsetValue cannot be < 0 when OffsetMethod is MANUAL")
 		}
-		c.offset = config.OffsetValue
 	case OffsetMethodNewest:
-		c.offset, err = c.getOffset(LatestOffsets, true)
+		offset, err = m.getOffset(topic, partition, LatestOffsets, true)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	case OffsetMethodOldest:
-		c.offset, err = c.getOffset(EarliestOffset, true)
+		offset, err = m.getOffset(topic, partition, EarliestOffset, true)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	default:
-		return nil, ConfigurationError("Invalid OffsetMethod")
+		return ConfigurationError("Invalid OffsetMethod")
 	}
 
-	go withRecover(c.fetchMessages)
+	tp := topicPartition{topic, partition}
+	m.m.Lock()
+	if _, ok := m.consumerTPs[tp]; !ok {
+		ctp := &consumerTP{
+			Topic:     topic,
+			Partition: partition,
+			Offset:    offset,
+			FetchSize: m.config.DefaultFetchSize,
+		}
+		m.consumerTPs[tp] = ctp
+		m.allocateConsumerTP(ctp)
+	}
+	m.m.Unlock()
 
-	return c, nil
-}
-
-// Events returns the read channel for any events (messages or errors) that might be returned by the broker.
-func (c *Consumer) Events() <-chan *ConsumerEvent {
-	return c.events
-}
-
-// Close stops the consumer from fetching messages. It is required to call this function before
-// a consumer object passes out of scope, as it will otherwise leak memory. You must call this before
-// calling Close on the underlying client.
-func (c *Consumer) Close() error {
-	close(c.stopper)
-	<-c.done
 	return nil
 }
 
-// helper function for safely sending an error on the errors channel
-// if it returns true, the error was sent (or was nil)
-// if it returns false, the stopper channel signaled that your goroutine should return!
-func (c *Consumer) sendError(err error) bool {
-	if err == nil {
-		return true
-	}
-
-	select {
-	case <-c.stopper:
-		close(c.events)
-		close(c.done)
-		return false
-	case c.events <- &ConsumerEvent{Err: err}:
-		return true
-	}
-
-	// For backward compatibility with go1.0
-	return true
+func (m *Consumer) removeBrokerConsumer(bc *brokerConsumer) {
+	m.m.Lock()
+	delete(m.brokerConsumers, bc.Broker)
+	m.m.Unlock()
 }
 
-func (c *Consumer) fetchMessages() {
+func (m *Consumer) allocateConsumerTP(ctp *consumerTP) {
+	m.waiting <- ctp
+}
 
-	fetchSize := c.config.DefaultFetchSize
-
+func (m *Consumer) allocator() {
+	defer m.tomb.Done()
 	for {
-		request := new(FetchRequest)
-		request.MinBytes = c.config.MinFetchSize
-		request.MaxWaitTime = c.config.MaxWaitTime
-		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
-
-		response, err := c.broker.Fetch(c.client.id, request)
-		switch {
-		case err == nil:
-			break
-		case err == EncodingError:
-			if c.sendError(err) {
-				continue
-			} else {
-				return
+		select {
+		case <-m.tomb.Dying():
+			for _, bc := range m.brokerConsumers {
+				bc.Close() // could parallelize this if necessary (use a wg)
 			}
-		default:
-			Logger.Printf("Unexpected error processing FetchRequest; disconnecting broker %s: %s\n", c.broker.addr, err)
-			c.client.disconnectBroker(c.broker)
-			for c.broker, err = c.client.Leader(c.topic, c.partition); err != nil; c.broker, err = c.client.Leader(c.topic, c.partition) {
-				if !c.sendError(err) {
-					return
-				}
-			}
-			continue
-		}
-
-		block := response.GetBlock(c.topic, c.partition)
-		if block == nil {
-			if c.sendError(IncompleteResponse) {
-				continue
-			} else {
-				return
-			}
-		}
-
-		switch block.Err {
-		case NoError:
-			break
-		case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-			err = c.client.RefreshTopicMetadata(c.topic)
-			if c.sendError(err) {
-				for c.broker, err = c.client.Leader(c.topic, c.partition); err != nil; c.broker, err = c.client.Leader(c.topic, c.partition) {
-					if !c.sendError(err) {
-						return
-					}
-				}
-				continue
-			} else {
-				return
-			}
-		default:
-			if c.sendError(block.Err) {
-				continue
-			} else {
-				return
-			}
-		}
-
-		if len(block.MsgSet.Messages) == 0 {
-			// We got no messages. If we got a trailing one then we need to ask for more data.
-			// Otherwise we just poll again and wait for one to be produced...
-			if block.MsgSet.PartialTrailingMessage {
-				if c.config.MaxMessageSize == 0 {
-					fetchSize *= 2
-				} else {
-					if fetchSize == c.config.MaxMessageSize {
-						if c.sendError(MessageTooLarge) {
-							continue
-						} else {
-							return
-						}
-					} else {
-						fetchSize *= 2
-						if fetchSize > c.config.MaxMessageSize {
-							fetchSize = c.config.MaxMessageSize
-						}
-					}
-				}
-			}
-			select {
-			case <-c.stopper:
-				close(c.events)
-				close(c.done)
-				return
-			default:
+			return
+		case tp := <-m.waiting:
+			err := m.client.RefreshTopicMetadata(tp.Topic)
+			if err != nil {
+				m.sendError("", -1, err)
+				m.delayReenqueue(tp, 500*time.Millisecond)
 				continue
 			}
-		} else {
-			fetchSize = c.config.DefaultFetchSize
-		}
-
-		for _, msgBlock := range block.MsgSet.Messages {
-			select {
-			case <-c.stopper:
-				close(c.events)
-				close(c.done)
-				return
-			case c.events <- &ConsumerEvent{Key: msgBlock.Msg.Key, Value: msgBlock.Msg.Value, Offset: msgBlock.Offset}:
-				c.offset++
+			broker, err := m.client.Leader(tp.Topic, tp.Partition)
+			if err != nil {
+				m.sendError("", -1, err)
+				m.delayReenqueue(tp, 500*time.Millisecond)
+				continue
 			}
+
+			m.m.Lock()
+			br, ok := m.brokerConsumers[broker]
+			if !ok {
+				br = newBrokerConsumer(m, &m.config, broker, m.client.id)
+				m.brokerConsumers[broker] = br
+			}
+			br.intake <- tp
+			m.m.Unlock()
 		}
 	}
 }
 
-func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
-	request := &OffsetRequest{}
-	request.AddBlock(c.topic, c.partition, where, 1)
+func (m *Consumer) sendError(topic string, partition int32, err error) {
+	select {
+	case <-m.tomb.Dying():
+	default:
+		m.sendEvent(&ConsumerEvent{Err: err, Topic: topic, Partition: partition})
+	}
+}
 
-	response, err := c.broker.GetAvailableOffsets(c.client.id, request)
+func (m *Consumer) sendEvent(ev *ConsumerEvent) {
+	m.events <- ev
+}
+
+// Events returns the read channel for any events (messages or errors) that
+// might be returned by the broker.
+func (m *Consumer) Events() <-chan *ConsumerEvent {
+	return m.events
+}
+
+func (m *Consumer) delayReenqueue(tp *consumerTP, delay time.Duration) {
+	time.Sleep(delay)
+	select {
+	case <-m.tomb.Dying():
+	default:
+		m.allocateConsumerTP(tp)
+	}
+}
+
+func (m *Consumer) getOffset(topic string, partition int32, where OffsetTime, retry bool) (int64, error) {
+	request := &OffsetRequest{}
+	request.AddBlock(topic, partition, where, 1)
+
+	broker, err := m.client.Leader(topic, partition)
+	if err != nil {
+		return -1, err
+	}
+
+	response, err := broker.GetAvailableOffsets(m.client.id, request)
 	switch err {
 	case nil:
 		break
@@ -303,16 +276,16 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 		if !retry {
 			return -1, err
 		}
-		Logger.Printf("Unexpected error processing OffsetRequest; disconnecting broker %s: %s\n", c.broker.addr, err)
-		c.client.disconnectBroker(c.broker)
-		c.broker, err = c.client.Leader(c.topic, c.partition)
+		Logger.Printf("Unexpected error processing OffsetRequest; disconnecting broker %s: %s\n", broker.addr, err)
+		m.client.disconnectBroker(broker)
+		broker, err = m.client.Leader(topic, partition)
 		if err != nil {
 			return -1, err
 		}
-		return c.getOffset(where, false)
+		return m.getOffset(topic, partition, where, false)
 	}
 
-	block := response.GetBlock(c.topic, c.partition)
+	block := response.GetBlock(topic, partition)
 	if block == nil {
 		return -1, IncompleteResponse
 	}
@@ -327,16 +300,21 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 		if !retry {
 			return -1, block.Err
 		}
-		err = c.client.RefreshTopicMetadata(c.topic)
+		err = m.client.RefreshTopicMetadata(topic)
 		if err != nil {
 			return -1, err
 		}
-		c.broker, err = c.client.Leader(c.topic, c.partition)
+		broker, err = m.client.Leader(topic, partition)
 		if err != nil {
 			return -1, err
 		}
-		return c.getOffset(where, false)
+		return m.getOffset(topic, partition, where, false)
 	}
 
 	return -1, block.Err
+}
+
+// really just for testing.
+func (c *Consumer) offset(topic string, partition int32) int64 {
+	return c.consumerTPs[topicPartition{topic, partition}].Offset
 }
