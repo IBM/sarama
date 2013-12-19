@@ -49,7 +49,7 @@ func decode(buf []byte, in decoder) error {
 	}
 
 	if helper.off != len(buf) {
-		return DecodingError{Info: "Length was invalid", Packet: buf}
+		return DecodingError{Info: "Length was invalid"}
 	}
 
 	return nil

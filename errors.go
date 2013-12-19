@@ -38,8 +38,7 @@ var InsufficientData = errors.New("kafka: Insufficient data to decode packet, mo
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
 type DecodingError struct {
-	Info   string
-	Packet []byte
+	Info string
 }
 
 func (err DecodingError) Error() string {
