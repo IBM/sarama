@@ -2,7 +2,6 @@ package sarama
 
 import (
 	"bytes"
-	"code.google.com/p/snappy-go/snappy"
 	"compress/gzip"
 	"io/ioutil"
 )
@@ -61,7 +60,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionSnappy:
-			tmp, err := snappy.Encode(nil, m.Value)
+			tmp, err := SnappyEncode(m.Value)
 			if err != nil {
 				return err
 			}
@@ -129,7 +128,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if m.Value == nil {
 			return DecodingError{Info: "Snappy compression specified, but no data to uncompress"}
 		}
-		m.Value, err = snappy.Decode(nil, m.Value)
+		m.Value, err = SnappyDecode(m.Value)
 		if err != nil {
 			return err
 		}
