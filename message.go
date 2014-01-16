@@ -121,10 +121,11 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if err != nil {
 			return err
 		}
-		m.Value, err = ioutil.ReadAll(reader)
+		raw, err := ioutil.ReadAll(reader)
 		if err != nil {
 			return err
 		}
+		return m.decodeSet(&realDecoder{raw: raw})
 	case CompressionSnappy:
 		if m.Value == nil {
 			return DecodingError{Info: "Snappy compression specified, but no data to uncompress"}
