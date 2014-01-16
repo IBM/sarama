@@ -277,13 +277,15 @@ func (c *Consumer) fetchMessages() {
 		}
 
 		for _, msgBlock := range block.MsgSet.Messages {
-			select {
-			case <-c.stopper:
-				close(c.events)
-				close(c.done)
-				return
-			case c.events <- &ConsumerEvent{Key: msgBlock.Msg.Key, Value: msgBlock.Msg.Value, Offset: msgBlock.Offset}:
-				c.offset++
+			for _, msg := range msgBlock.Messages() {
+				select {
+				case <-c.stopper:
+					close(c.events)
+					close(c.done)
+					return
+				case c.events <- &ConsumerEvent{Key: msg.Msg.Key, Value: msg.Msg.Value, Offset: msg.Offset}:
+					c.offset++
+				}
 			}
 		}
 	}
