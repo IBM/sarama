@@ -313,7 +313,7 @@ func ExampleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, &ProducerConfig{RequiredAcks: WaitForLocal})
+	producer, err := NewProducer(client, &ProducerConfig{RequiredAcks: WaitForLocal, MaxBufferedBytes: 1024, MaxBufferTime: 1000})
 	if err != nil {
 		panic(err)
 	}
