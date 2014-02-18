@@ -5,6 +5,15 @@ type MessageBlock struct {
 	Msg    *Message
 }
 
+// Messages convenience helper which returns either all the
+// messages that are wrapped in this block
+func (msb *MessageBlock) Messages() []*MessageBlock {
+	if msb.Msg.Set != nil {
+		return msb.Msg.Set.Messages
+	}
+	return []*MessageBlock{msb}
+}
+
 func (msb *MessageBlock) encode(pe packetEncoder) error {
 	pe.putInt64(msb.Offset)
 	pe.push(&lengthField{})
