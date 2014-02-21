@@ -2,7 +2,7 @@ package sarama
 
 import (
 	"bytes"
-	"code.google.com/p/snappy-go/snappy"
+	"github.com/VividCortex/snappy-go/snappy"
 	"compress/gzip"
 	"io/ioutil"
 )
