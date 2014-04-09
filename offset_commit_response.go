@@ -1,7 +1,7 @@
 package sarama
 
 type OffsetCommitResponse struct {
-	Errors   map[string]map[int32]KError
+	Errors map[string]map[int32]KError
 }
 
 func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {

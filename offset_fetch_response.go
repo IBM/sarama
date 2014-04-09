@@ -40,7 +40,7 @@ func (r *OffsetFetchResponseBlock) encode(pe packetEncoder) (err error) {
 }
 
 type OffsetFetchResponse struct {
-	Blocks   map[string]map[int32]*OffsetFetchResponseBlock
+	Blocks map[string]map[int32]*OffsetFetchResponseBlock
 }
 
 func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
