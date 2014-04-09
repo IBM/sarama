@@ -4,11 +4,9 @@ import "testing"
 
 var (
 	emptyOffsetFetchResponse = []byte{
-		0xFF, 0xFF,
 		0x00, 0x00, 0x00, 0x00}
 
 	normalOffsetFetchResponse = []byte{
-		0x00, 0x02, 'z', 'a',
 		0x00, 0x00, 0x00, 0x02,
 
 		0x00, 0x01, 'm',
@@ -26,9 +24,7 @@ func TestEmptyOffsetFetchResponse(t *testing.T) {
 	response := OffsetFetchResponse{}
 
 	testDecodable(t, "empty", &response, emptyOffsetFetchResponse)
-	if response.ClientID != "" {
-		t.Error("Decoding produced client ID where there was none.")
-	}
+
 	if len(response.Blocks) != 0 {
 		t.Error("Decoding produced topic blocks where there were none.")
 	}
@@ -38,9 +34,6 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 	response := OffsetFetchResponse{}
 
 	testDecodable(t, "normal", &response, normalOffsetFetchResponse)
-	if response.ClientID != "za" {
-		t.Error("Decoding produced wrong client ID.")
-	}
 
 	if len(response.Blocks) != 2 {
 		t.Fatal("Decoding produced wrong number of blocks.")
