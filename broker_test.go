@@ -128,7 +128,7 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetFetchRequest{}
 			response, err := broker.FetchOffset("clientID", &request)
@@ -140,7 +140,7 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetCommitRequest{}
 			response, err := broker.CommitOffset("clientID", &request)

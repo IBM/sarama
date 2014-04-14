@@ -25,7 +25,7 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) error {
 }
 
 func (r *OffsetFetchRequest) key() int16 {
-	return 7
+	return 9
 }
 
 func (r *OffsetFetchRequest) version() int16 {
