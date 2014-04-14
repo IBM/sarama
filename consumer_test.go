@@ -121,7 +121,7 @@ func ExampleConsumer() {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 200})
 	if err != nil {
 		panic(err)
 	} else {
