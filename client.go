@@ -265,7 +265,7 @@ func (client *Client) resurrectDeadBrokers() {
 
 	client.deadBrokerAddrs = []string{}
 	client.extraBrokerAddrs = []string{}
-	for addr, _ := range brokers {
+	for addr := range brokers {
 		client.extraBrokerAddrs = append(client.extraBrokerAddrs, addr)
 	}
 

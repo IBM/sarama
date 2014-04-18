@@ -137,7 +137,7 @@ consumerLoop:
 			if event.Err != nil {
 				panic(event.Err)
 			}
-			msgCount += 1
+			msgCount++
 		case <-time.After(5 * time.Second):
 			fmt.Println("> timed out")
 			break consumerLoop

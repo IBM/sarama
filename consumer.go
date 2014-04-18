@@ -175,9 +175,6 @@ func (c *Consumer) sendError(err error) bool {
 	case c.events <- &ConsumerEvent{Err: err}:
 		return true
 	}
-
-	// For backward compatibility with go1.0
-	return true
 }
 
 func (c *Consumer) fetchMessages() {
