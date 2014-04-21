@@ -124,7 +124,7 @@ func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 	return false
 }
 
-// New launches a fake Kafka broker. It takes a TestState (e.g. *testing.T) as provided by the
+// NewMockBroker launches a fake Kafka broker. It takes a TestState (e.g. *testing.T) as provided by the
 // test framework and a channel of responses to use.  If an error occurs it is
 // simply logged to the TestState and the broker exits.
 func NewMockBroker(t TestState, brokerID int) *MockBroker {
