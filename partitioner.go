@@ -1,8 +1,6 @@
 package sarama
 
 import (
-	"hash"
-	"hash/fnv"
 	"math/rand"
 	"sync"
 	"time"
@@ -55,14 +53,12 @@ func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int3
 // with the same key always end up on the same partition.
 type HashPartitioner struct {
 	random *RandomPartitioner
-	hasher hash.Hash32
 	m      sync.Mutex
 }
 
 func NewHashPartitioner() *HashPartitioner {
 	p := new(HashPartitioner)
 	p.random = NewRandomPartitioner()
-	p.hasher = fnv.New32a()
 	return p
 }
 
@@ -76,9 +72,10 @@ func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
 	if err != nil {
 		return p.random.Partition(key, numPartitions)
 	}
-	p.hasher.Reset()
-	p.hasher.Write(bytes)
-	hash := int32(p.hasher.Sum32())
+	var hash int32 = 1
+	for _, e := range bytes {
+		hash = 31*hash + int32(e)
+	}
 	if hash < 0 {
 		hash = -hash
 	}
