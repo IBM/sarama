@@ -18,6 +18,7 @@ var (
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00, 0x52, 0x21,
 		0x00, 0x00, 0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
 		0x00, 0x08, 'm', 'e', 't', 'a', 'd', 'a', 't', 'a'}
 )
 
@@ -28,6 +29,6 @@ func TestOffsetCommitRequest(t *testing.T) {
 	request.ConsumerGroup = "foobar"
 	testEncodable(t, "no blocks", request, offsetCommitRequestNoBlocks)
 
-	request.AddBlock("topic", 0x5221, 0xDEADBEEF, "metadata")
+	request.AddBlock("topic", 0x5221, 0xDEADBEEF, ReceiveTime, "metadata")
 	testEncodable(t, "one block", request, offsetCommitRequestOneBlock)
 }
