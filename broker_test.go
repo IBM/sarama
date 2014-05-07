@@ -90,6 +90,18 @@ var brokerTestTable = []struct {
 			}
 		}},
 
+	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 't', 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := ConsumerMetadataRequest{}
+			response, err := broker.GetConsumerMetadata("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Consumer Metadata request got no response!")
+			}
+		}},
+
 	{[]byte{},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
