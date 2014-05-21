@@ -1,6 +1,10 @@
 package sarama
 
-import "log"
+import (
+	"log"
+	"time"
+	"errors"
+)
 
 type produceMessage struct {
 	tp         topicPartition
@@ -28,7 +32,14 @@ func (msg *produceMessage) enqueue(p *Producer) error {
 	bp.flushRequest(p, prb, func(err error) {
 		errs <- err
 	})
-	return <-errs
+	select {
+	case e := <-errs:
+		return e
+	case <- time.After(10 * time.Second):
+		bp.Close()
+		bp.broker.Close()
+		return errors.New("send timed out")
+	}
 
 }
 
