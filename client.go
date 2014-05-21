@@ -40,7 +40,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	Logger.Println("Initializing new client")
 
 	if config == nil {
-		config = new(ClientConfig)
+		config = NewClientConfig()
 	}
 
 	if err := config.Validate(); err != nil {
@@ -367,10 +367,17 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	return ret, nil
 }
 
-// Validates a ClientConfig instance. This will change zero
-// values into sensible defaults if possible, and it will return a
-// ConfigurationError if the specified value doesn't make sense and
-// cannot be corrected.
+// Creates a new ClientConfig instance with sensible defaults
+func NewClientConfig() *ClientConfig {
+	return &ClientConfig{
+		MetadataRetries:      3,
+		WaitForElection:      250 * time.Millisecond,
+		ConcurrencyPerBroker: 0,
+	}
+}
+
+// Validates a ClientConfig instance. This will return a
+// ConfigurationError if the specified value doesn't make sense..
 func (config *ClientConfig) Validate() error {
 	if config.MetadataRetries <= 0 {
 		return ConfigurationError("Invalid MetadataRetries. Try 10")
