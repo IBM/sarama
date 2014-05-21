@@ -72,7 +72,7 @@ type Consumer struct {
 // part of the named consumer group.
 func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
 	if config == nil {
-		config = new(ConsumerConfig)
+		config = NewConsumerConfig()
 	}
 
 	if err := config.Validate(); err != nil {
@@ -320,21 +320,25 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 	return -1, block.Err
 }
 
+func NewConsumerConfig() *ConsumerConfig {
+	return &ConsumerConfig{
+		DefaultFetchSize: 1024,
+		MinFetchSize:     1,
+		MaxWaitTime:      250,
+	}
+}
+
 // Validates a ConsumerConfig instance. This will change zero
 // values into sensible defaults if possible, and it will return a
 // ConfigurationError if the specified value doesn't make sense and
 // cannot be corrected.
 func (config *ConsumerConfig) Validate() error {
-	if config.DefaultFetchSize < 0 {
+	if config.DefaultFetchSize <= 0 {
 		return ConfigurationError("Invalid DefaultFetchSize")
-	} else if config.DefaultFetchSize == 0 {
-		config.DefaultFetchSize = 1024
 	}
 
-	if config.MinFetchSize < 0 {
+	if config.MinFetchSize <= 0 {
 		return ConfigurationError("Invalid MinFetchSize")
-	} else if config.MinFetchSize == 0 {
-		config.MinFetchSize = 1
 	}
 
 	if config.MaxMessageSize < 0 {
