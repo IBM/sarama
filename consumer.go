@@ -42,7 +42,7 @@ type ConsumerConfig struct {
 }
 
 // ConsumerEvent is what is provided to the user when an event occurs. It is either an error (in which case Err is non-nil) or
-// a message (in which case Err is nil and the other fields are all set).
+// a message (in which case Err is nil and Offset, Key, and Value are set). Topic and Partition are always set.
 type ConsumerEvent struct {
 	Key, Value []byte
 	Topic      string
@@ -174,7 +174,7 @@ func (c *Consumer) sendError(err error) bool {
 		close(c.events)
 		close(c.done)
 		return false
-	case c.events <- &ConsumerEvent{Err: err}:
+	case c.events <- &ConsumerEvent{Err: err, Topic: c.topic, Partition: c.partition}:
 		return true
 	}
 }
