@@ -70,27 +70,11 @@ type topicPartition struct {
 // NewProducer creates a new Producer using the given client.
 func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	if config == nil {
-		config = new(ProducerConfig)
+		config = NewProducerConfig()
 	}
 
-	if config.RequiredAcks < -1 {
-		return nil, ConfigurationError("Invalid RequiredAcks")
-	}
-
-	if config.Timeout < 0 {
-		return nil, ConfigurationError("Invalid Timeout")
-	}
-
-	if config.Partitioner == nil {
-		config.Partitioner = NewRandomPartitioner()
-	}
-
-	if config.MaxBufferedBytes == 0 {
-		return nil, ConfigurationError("Invalid MaxBufferedBytes")
-	}
-
-	if config.MaxBufferTime == 0 {
-		return nil, ConfigurationError("Invalid MaxBufferTime")
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	return &Producer{
@@ -462,4 +446,38 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 	}
 
 	return partitions[choice], nil
+}
+
+// Creates a new ProducerConfig instance with sensible defaults.
+func NewProducerConfig() *ProducerConfig {
+	return &ProducerConfig{
+		Partitioner:  NewRandomPartitioner(),
+		RequiredAcks: WaitForLocal,
+	}
+}
+
+// Validates a ProducerConfig instance. It will return a
+// ConfigurationError if the specified value doesn't make sense.
+func (config *ProducerConfig) Validate() error {
+	if config.RequiredAcks < -1 {
+		return ConfigurationError("Invalid RequiredAcks")
+	}
+
+	if config.Timeout < 0 {
+		return ConfigurationError("Invalid Timeout")
+	}
+
+	if config.MaxBufferedBytes == 0 {
+		return ConfigurationError("Invalid MaxBufferedBytes")
+	}
+
+	if config.MaxBufferTime == 0 {
+		return ConfigurationError("Invalid MaxBufferTime")
+	}
+
+	if config.Partitioner == nil {
+		return ConfigurationError("No partitioner set")
+	}
+
+	return nil
 }

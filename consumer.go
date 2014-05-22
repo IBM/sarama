@@ -72,33 +72,11 @@ type Consumer struct {
 // part of the named consumer group.
 func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
 	if config == nil {
-		config = new(ConsumerConfig)
+		config = NewConsumerConfig()
 	}
 
-	if config.DefaultFetchSize < 0 {
-		return nil, ConfigurationError("Invalid DefaultFetchSize")
-	} else if config.DefaultFetchSize == 0 {
-		config.DefaultFetchSize = 1024
-	}
-
-	if config.MinFetchSize < 0 {
-		return nil, ConfigurationError("Invalid MinFetchSize")
-	} else if config.MinFetchSize == 0 {
-		config.MinFetchSize = 1
-	}
-
-	if config.MaxMessageSize < 0 {
-		return nil, ConfigurationError("Invalid MaxMessageSize")
-	}
-
-	if config.MaxWaitTime <= 0 {
-		return nil, ConfigurationError("Invalid MaxWaitTime")
-	} else if config.MaxWaitTime < 100 {
-		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
-	}
-
-	if config.EventBufferSize < 0 {
-		return nil, ConfigurationError("Invalid EventBufferSize")
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	if topic == "" {
@@ -340,4 +318,41 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 	}
 
 	return -1, block.Err
+}
+
+// Creates a ConsumerConfig instance with sane defaults.
+func NewConsumerConfig() *ConsumerConfig {
+	return &ConsumerConfig{
+		DefaultFetchSize: 1024,
+		MinFetchSize:     1,
+		MaxWaitTime:      250,
+	}
+}
+
+// Validates a ConsumerConfig instance. It will return a
+// ConfigurationError if the specified value doesn't make sense.
+func (config *ConsumerConfig) Validate() error {
+	if config.DefaultFetchSize <= 0 {
+		return ConfigurationError("Invalid DefaultFetchSize")
+	}
+
+	if config.MinFetchSize <= 0 {
+		return ConfigurationError("Invalid MinFetchSize")
+	}
+
+	if config.MaxMessageSize < 0 {
+		return ConfigurationError("Invalid MaxMessageSize")
+	}
+
+	if config.MaxWaitTime <= 0 {
+		return ConfigurationError("Invalid MaxWaitTime")
+	} else if config.MaxWaitTime < 100 {
+		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
+	}
+
+	if config.EventBufferSize < 0 {
+		return ConfigurationError("Invalid EventBufferSize")
+	}
+
+	return nil
 }

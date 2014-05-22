@@ -40,19 +40,11 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	Logger.Println("Initializing new client")
 
 	if config == nil {
-		config = new(ClientConfig)
+		config = NewClientConfig()
 	}
 
-	if config.MetadataRetries <= 0 {
-		return nil, ConfigurationError("Invalid MetadataRetries. Try 10")
-	}
-
-	if config.WaitForElection <= time.Duration(0) {
-		return nil, ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
-	}
-
-	if config.ConcurrencyPerBroker < 0 {
-		return nil, ConfigurationError("Invalid ConcurrencyPerBroker")
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	if len(addrs) < 1 {
@@ -373,4 +365,29 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		ret = append(ret, topic)
 	}
 	return ret, nil
+}
+
+// Creates a new ClientConfig instance with sensible defaults
+func NewClientConfig() *ClientConfig {
+	return &ClientConfig{
+		MetadataRetries: 3,
+		WaitForElection: 250 * time.Millisecond,
+	}
+}
+
+// Validates a ClientConfig instance. This will return a
+// ConfigurationError if the specified value doesn't make sense..
+func (config *ClientConfig) Validate() error {
+	if config.MetadataRetries <= 0 {
+		return ConfigurationError("Invalid MetadataRetries. Try 10")
+	}
+
+	if config.WaitForElection <= time.Duration(0) {
+		return ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
+	}
+
+	if config.ConcurrencyPerBroker < 0 {
+		return ConfigurationError("Invalid ConcurrencyPerBroker")
+	}
+	return nil
 }

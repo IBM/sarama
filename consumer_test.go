@@ -21,14 +21,14 @@ func TestSimpleConsumer(t *testing.T) {
 		mb2.Returns(fr)
 	}
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 100})
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,13 +58,16 @@ func TestConsumerRawOffset(t *testing.T) {
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: OffsetMethodManual, OffsetValue: 1234, MaxWaitTime: 100})
+	config := NewConsumerConfig()
+	config.OffsetMethod = OffsetMethodManual
+	config.OffsetValue = 1234
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,13 +95,15 @@ func TestConsumerLatestOffset(t *testing.T) {
 	or.AddTopicPartition("my_topic", 0, 0x010101)
 	mb2.Returns(or)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{OffsetMethod: OffsetMethodNewest, MaxWaitTime: 100})
+	config := NewConsumerConfig()
+	config.OffsetMethod = OffsetMethodNewest
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +118,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 }
 
 func ExampleConsumer() {
-	client, err := NewClient("my_client", []string{"localhost:9092"}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
 	} else {
@@ -121,7 +126,7 @@ func ExampleConsumer() {
 	}
 	defer client.Close()
 
-	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", &ConsumerConfig{MaxWaitTime: 200})
+	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", NewConsumerConfig())
 	if err != nil {
 		panic(err)
 	} else {
