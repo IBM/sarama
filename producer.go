@@ -456,7 +456,7 @@ func NewProducerConfig() *ProducerConfig {
 	}
 }
 
-// Validates a ProducerConfig instance. t will return a
+// Validates a ProducerConfig instance. It will return a
 // ConfigurationError if the specified value doesn't make sense.
 func (config *ProducerConfig) Validate() error {
 	if config.RequiredAcks < -1 {

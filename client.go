@@ -370,9 +370,8 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 // Creates a new ClientConfig instance with sensible defaults
 func NewClientConfig() *ClientConfig {
 	return &ClientConfig{
-		MetadataRetries:      3,
-		WaitForElection:      250 * time.Millisecond,
-		ConcurrencyPerBroker: 0,
+		MetadataRetries: 3,
+		WaitForElection: 250 * time.Millisecond,
 	}
 }
 
