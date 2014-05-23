@@ -8,9 +8,9 @@ import (
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
-	MetadataRetries      int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection      time.Duration // How long to wait for leader election to finish between retries.
-	ConcurrencyPerBroker int           // How many outstanding requests each broker is allowed to have.
+	MetadataRetries   int           // How many times to retry a metadata request when a partition is in the middle of leader election.
+	WaitForElection   time.Duration // How long to wait for leader election to finish between retries.
+	DefaultBrokerConf *BrokerConfig // Default configuration for broker connections created by this client.
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -59,7 +59,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		brokers:          make(map[int32]*Broker),
 		leaders:          make(map[string]map[int32]int32),
 	}
-	client.extraBroker.Open(config.ConcurrencyPerBroker)
+	client.extraBroker.Open(config.DefaultBrokerConf)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
@@ -176,7 +176,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		client.extraBrokerAddrs = client.extraBrokerAddrs[1:]
 		if len(client.extraBrokerAddrs) > 0 {
 			client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
-			client.extraBroker.Open(client.config.ConcurrencyPerBroker)
+			client.extraBroker.Open(client.config.DefaultBrokerConf)
 		} else {
 			client.extraBroker = nil
 		}
@@ -262,7 +262,7 @@ func (client *Client) resurrectDeadBrokers() {
 	}
 
 	client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
-	client.extraBroker.Open(client.config.ConcurrencyPerBroker)
+	client.extraBroker.Open(client.config.DefaultBrokerConf)
 }
 
 func (client *Client) any() *Broker {
@@ -323,13 +323,13 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			broker.Open(client.config.ConcurrencyPerBroker)
+			broker.Open(client.config.DefaultBrokerConf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			myBroker := client.brokers[broker.ID()] // use block-local to prevent clobbering `broker` for Gs
 			go withRecover(func() { myBroker.Close() })
-			broker.Open(client.config.ConcurrencyPerBroker)
+			broker.Open(client.config.DefaultBrokerConf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
@@ -376,7 +376,7 @@ func NewClientConfig() *ClientConfig {
 }
 
 // Validates a ClientConfig instance. This will return a
-// ConfigurationError if the specified value doesn't make sense..
+// ConfigurationError if the specified values don't make sense.
 func (config *ClientConfig) Validate() error {
 	if config.MetadataRetries <= 0 {
 		return ConfigurationError("Invalid MetadataRetries. Try 10")
@@ -386,8 +386,11 @@ func (config *ClientConfig) Validate() error {
 		return ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
 	}
 
-	if config.ConcurrencyPerBroker < 0 {
-		return ConfigurationError("Invalid ConcurrencyPerBroker")
+	if config.DefaultBrokerConf != nil {
+		if err := config.DefaultBrokerConf.Validate(); err != nil {
+			return err
+		}
 	}
+
 	return nil
 }

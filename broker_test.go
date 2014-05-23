@@ -7,7 +7,7 @@ import (
 
 func ExampleBroker() error {
 	broker := NewBroker("localhost:9092")
-	err := broker.Open(4)
+	err := broker.Open(nil)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	defer mb.Close()
 
 	broker := NewBroker(mb.Addr())
-	err := broker.Open(4)
+	err := broker.Open(nil)
 	if err != nil {
 		t.Fatal(err)
 	}

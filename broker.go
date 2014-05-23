@@ -8,11 +8,34 @@ import (
 	"sync"
 )
 
+// BrokerConfig is used to pass multiple configuration options to Broker.Open.
+type BrokerConfig struct {
+	MaxOpenRequests int // How many outstanding requests the broker is allowed to have before blocking attempts to send.
+}
+
+// NewBrokerConfig returns a new broker configuration with sane defaults.
+func NewBrokerConfig() *BrokerConfig {
+	return &BrokerConfig{
+		MaxOpenRequests: 1,
+	}
+}
+
+// Validates a BrokerConfig instance. This will return a
+// ConfigurationError if the specified values don't make sense.
+func (config *BrokerConfig) Validate() error {
+	if config.MaxOpenRequests < 0 {
+		return ConfigurationError("Invalid MaxOpenRequests")
+	}
+
+	return nil
+}
+
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
 type Broker struct {
 	id   int32
 	addr string
 
+	conf          *BrokerConfig
 	correlationID int32
 	conn          net.Conn
 	connErr       error
@@ -37,10 +60,18 @@ func NewBroker(addr string) *Broker {
 // Open tries to connect to the Broker. It takes the broker lock synchronously, then spawns a goroutine which
 // connects and releases the lock. This means any subsequent operations on the broker will block waiting for
 // the connection to finish. To get the effect of a fully synchronous Open call, follow it by a call to Connected().
-// The only error Open will return directly is AlreadyConnected. The maxOpenRequests parameter determines how many
-// requests can be issued concurrently before future requests block. You generally will want at least one for each
-// topic-partition the broker will be interacting with concurrently.
-func (b *Broker) Open(maxOpenRequests int) error {
+// The only errors Open will return directly are ConfigurationError or AlreadyConnected. If conf is nil, the result of
+// NewBrokerConfig() is used.
+func (b *Broker) Open(conf *BrokerConfig) error {
+	if conf == nil {
+		conf = NewBrokerConfig()
+	}
+
+	err := conf.Validate()
+	if err != nil {
+		return err
+	}
+
 	b.lock.Lock()
 
 	if b.conn != nil {
@@ -60,10 +91,9 @@ func (b *Broker) Open(maxOpenRequests int) error {
 			return
 		}
 
+		b.conf = conf
 		b.done = make(chan bool)
-
-		// permit a few outstanding requests before we block waiting for responses
-		b.responses = make(chan responsePromise, maxOpenRequests)
+		b.responses = make(chan responsePromise, b.conf.MaxOpenRequests)
 
 		Logger.Printf("Connected to broker %s\n", b.addr)
 		go withRecover(b.responseReceiver)
