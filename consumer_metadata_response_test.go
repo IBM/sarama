@@ -4,7 +4,10 @@ import "testing"
 
 var (
 	consumerMetadataResponseError = []byte{
-		0x00, 0x0E}
+		0x00, 0x0E,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00}
 
 	consumerMetadataResponseSuccess = []byte{
 		0x00, 0x00,
@@ -23,15 +26,15 @@ func TestConsumerMetadataResponseError(t *testing.T) {
 	}
 
 	if response.CoordinatorId != 0 {
-		t.Error("Decoding produced ID when the message contained an error.")
+		t.Error("Decoding produced incorrect ID.")
 	}
 
 	if len(response.CoordinatorHost) != 0 {
-		t.Error("Decoding produced host when the message contained an error.")
+		t.Error("Decoding produced incorrect host.")
 	}
 
 	if response.CoordinatorPort != 0 {
-		t.Error("Decoding produced port when the message contained an error.")
+		t.Error("Decoding produced incorrect port.")
 	}
 }
 

@@ -14,21 +14,19 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder) (err error) {
 	}
 	r.Err = KError(tmp)
 
-	if r.Err == NoError {
-		r.CoordinatorId, err = pd.getInt32()
-		if err != nil {
-			return err
-		}
+	r.CoordinatorId, err = pd.getInt32()
+	if err != nil {
+		return err
+	}
 
-		r.CoordinatorHost, err = pd.getString()
-		if err != nil {
-			return err
-		}
+	r.CoordinatorHost, err = pd.getString()
+	if err != nil {
+		return err
+	}
 
-		r.CoordinatorPort, err = pd.getInt32()
-		if err != nil {
-			return err
-		}
+	r.CoordinatorPort, err = pd.getInt32()
+	if err != nil {
+		return err
 	}
 
 	return nil
