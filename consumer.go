@@ -130,6 +130,13 @@ func (c *Consumer) Events() <-chan *ConsumerEvent {
 	return c.events
 }
 
+// Offset returns the current offset of this consumer.
+func (c *Consumer) Offset() int64 {
+	// we read this potentially concurrent with the fetching goroutine writing it, but worst case
+	// it's just a cycle or two stale...?
+	return c.offset
+}
+
 // Close stops the consumer from fetching messages. It is required to call this function before
 // a consumer object passes out of scope, as it will otherwise leak memory. You must call this before
 // calling Close on the underlying client.
