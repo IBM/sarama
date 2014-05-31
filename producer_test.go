@@ -285,6 +285,9 @@ func TestFailureRetry(t *testing.T) {
 func readMessage(t *testing.T, ch chan error) {
 	select {
 	case err := <-ch:
+		if err == nil {
+			t.Error(fmt.Errorf("nil is not an error"))
+		}
 		if err != nil {
 			t.Error(err)
 		}
