@@ -312,8 +312,8 @@ func (bp *brokerProducer) flush(p *Producer) (shutdownRequired bool) {
 		return bp.flushRequest(p, prb, func(err error) {
 			if err != nil {
 				Logger.Println(err)
+				p.errors <- err
 			}
-			p.errors <- err
 		})
 	}
 	return false
