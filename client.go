@@ -99,7 +99,13 @@ func (client *Client) Close() error {
 func (client *Client) Partitions(topic string) ([]int32, error) {
 	partitions := client.cachedPartitions(topic)
 
-	if partitions == nil {
+	// len==0 catches when it's nil (no such topic) and the odd case when every single
+	// partition is undergoing leader election simultaneously. Callers have to be able to handle
+	// this function returning an empty slice (which is a valid return value) but catching it
+	// here the first time (note we *don't* catch it below where we return NoSuchTopic) triggers
+	// a metadata refresh as a nicety so callers can just try again and don't have to manually
+	// trigger a refresh (otherwise they'd just keep getting a stale cached copy).
+	if len(partitions) == 0 {
 		err := client.RefreshTopicMetadata(topic)
 		if err != nil {
 			return nil, err
