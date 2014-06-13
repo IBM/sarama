@@ -439,6 +439,10 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 
 	numPartitions := int32(len(partitions))
 
+	if numPartitions == 0 {
+		return -1, LeaderNotAvailable
+	}
+
 	choice := p.config.Partitioner.Partition(key, numPartitions)
 
 	if choice < 0 || choice >= numPartitions {
