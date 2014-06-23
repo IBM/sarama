@@ -1,0 +1,57 @@
+<!doctype html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en"> <![endif]-->
+<!--[if IE 9 ]><html class="ie9 no-js"> <![endif]-->
+<!--[if (gt IE 9)|!(IE)]><!--> <html class="no-js"> <!--<![endif]-->
+  <head>
+  {% include head.html %}
+  </head>
+    <body>
+    <div class="hero">
+      <div class="hero-lines"></div>
+      <header class="hero-header">
+        <div class="pagewidth">
+          <div class="logo--ie">
+            <img src="http://shopify.github.io/images/shopify-open-source-sub.svg" alt="Shopify Open Source" class="logo">
+            <span class="breadcrumb"><a href="http://shopify.github.io">Open Source</a> > {{ site.github.project_title }}</span>
+          </div>
+          <div class="repo-lang {{ site.github.language | downcase }}">
+            {{ site.github.language }}
+          </div>
+        </div>
+      </header>
+      <div class="pagewidth">
+        <div class="hero-inner">
+          <h1 class="hero-logo">{{ site.github.project_title }}</h1>
+          <h2 class="hero-text">{{ site.github.project_tagline }}</h2>
+          <div class="cta-buttons">
+            <a href="{{ site.github.zip_url }}" class="float">Download ZIP</a>
+            <a href="{{ site.github.repository_url }}" class="float github">
+              Github Repo
+              <i class="icon-star" title="Stars"></i> <span id="starCount"></span>
+              <i class="icon-forks" title="Forks"></i> <span id="forkCount"></span>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="documentation">
+      <div class="pagewidth">
+
+        {{ content }}
+
+      </div>
+    </div>
+    {% include footer.html %}
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.0/jquery.min.js"></script>
+    <script src="//shopify.github.io/javascripts/sub.js"></script>
+    <script>
+    jQuery(function($) {
+      shopifyOpenSource.init({
+        repo_name: '{{ site.github.repository_nwo }}'
+      });
+    });
+    </script>
+    </body>
+</html>
