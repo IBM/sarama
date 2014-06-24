@@ -18,29 +18,26 @@ var (
 )
 
 func init() {
-	env := func(key, defaultValue string) string {
-		if value := os.Getenv(key); value != "" {
-			return value
-		}
-		return defaultValue
+	kafkaAddr = os.Getenv("KAFKA_ADDR")
+	if kafkaAddr == "" {
+		kafkaAddr = "localhost:9092"
 	}
 
-	kafkaAddr := env("KAFKA_ADDR", "localhost:9092")
 	c, err := net.Dial("tcp", kafkaAddr)
 	if err == nil {
 		kafkaIsAvailable = true
 		c.Close()
 	}
 
-	kafkaShouldBeAvailable = (env("CI", "") != "")
+	kafkaShouldBeAvailable = os.Getenv("CI") != ""
 }
 
 func checkKafkaAvailability(t *testing.T) {
 	if !kafkaIsAvailable {
 		if kafkaShouldBeAvailable {
-			t.Fatal("Kafka broker is not available")
+			t.Fatalf("Kafka broker is not available on %s. Set KAFKA_ADDR to connect to Kafka on a different location.", kafkaAddr)
 		} else {
-			t.Skip("Kafka broker is not available")
+			t.Skipf("Kafka broker is not available on %s. Set KAFKA_ADDR to connect to Kafka on a different location.", kafkaAddr)
 		}
 	}
 }
