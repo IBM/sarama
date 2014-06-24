@@ -9,7 +9,7 @@ There is a google group for discussion
 * web: https://groups.google.com/forum/#!forum/sarama-users
 * email: sarama-users@googlegroups.com
 
-It is compatible with Go 1.1 and 1.2 (which means `go vet` on 1.2 may return
+It is compatible with Go 1.1, 1.2, and 1.3 (which means `go vet` on 1.2 or 1.3 may return
 some suggestions that we are ignoring for the sake of compatibility with 1.1).
 
 A word of warning: the API is not 100% stable yet. It won't change much (in particular the low-level
