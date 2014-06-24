@@ -8,14 +8,11 @@ import (
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 //
-// If MaxBufferTime=MaxBufferedBytes=0, messages will be delivered immediately and
+// If MaxBufferTime=MaxBufferedBytes=1, messages will be delivered immediately and
 // constantly, but if multiple messages are received while a roundtrip to kafka
 // is in progress, they will both be combined into the next request. In this
 // mode, errors are not returned from SendMessage, but over the Errors()
 // channel.
-//
-// With MaxBufferTime and/or MaxBufferedBytes set to values > 0, sarama will
-// buffer messages before sending, to reduce traffic.
 type ProducerConfig struct {
 	Partitioner      Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
 	RequiredAcks     RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
@@ -455,8 +452,10 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 // Creates a new ProducerConfig instance with sensible defaults.
 func NewProducerConfig() *ProducerConfig {
 	return &ProducerConfig{
-		Partitioner:  NewRandomPartitioner(),
-		RequiredAcks: WaitForLocal,
+		Partitioner:      NewRandomPartitioner(),
+		RequiredAcks:     WaitForLocal,
+		MaxBufferTime:    1,
+		MaxBufferedBytes: 1,
 	}
 }
 
