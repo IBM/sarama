@@ -324,6 +324,37 @@ func ExampleProducer() {
 	}
 }
 
+func ExampleAsyncProducer() {
+	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> connected")
+	}
+	defer client.Close()
+
+	producer, err := NewProducer(client, nil)
+	if err != nil {
+		panic(err)
+	}
+	defer producer.Close()
+
+	go func() {
+		for err := range producer.Errors() {
+			panic(err)
+		}
+	}()
+
+	for {
+		err = producer.QueueMessage("my_topic", nil, StringEncoder("testing 123"))
+		if err != nil {
+			panic(err)
+		} else {
+			fmt.Println("> message sent")
+		}
+	}
+}
+
 func sendMessage(t *testing.T, producer *Producer, topic string, key string, expectedResponses int) {
 	err := producer.QueueMessage(topic, nil, StringEncoder(key))
 	if err != nil {
