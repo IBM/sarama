@@ -17,17 +17,17 @@ const (
 
 // ConsumerConfig is used to pass multiple configuration options to NewConsumer.
 type ConsumerConfig struct {
-	// The default (maximum) amount of data to fetch from the broker in each request. The default of 0 is treated as 1024 bytes.
+	// The default (maximum) amount of data to fetch from the broker in each request. The default is 32768 bytes.
 	DefaultFetchSize int32
 	// The minimum amount of data to fetch in a request - the broker will wait until at least this many bytes are available.
-	// The default of 0 is treated as 'at least one' to prevent the consumer from spinning when no messages are available.
+	// The default is 1, as 0 causes the consumer to spin when no messages are available.
 	MinFetchSize int32
 	// The maximum permittable message size - messages larger than this will return MessageTooLarge. The default of 0 is
 	// treated as no limit.
 	MaxMessageSize int32
 	// The maximum amount of time (in ms) the broker will wait for MinFetchSize bytes to become available before it
-	// returns fewer than that anyways. The default of 0 causes Kafka to return immediately, which is rarely desirable
-	// as it causes the Consumer to spin when no events are available. 100-500ms is a reasonable range for most cases.
+	// returns fewer than that anyways. The default is 250ms, since 0 causes the consumer to spin when no events are available.
+	// 100-500ms is a reasonable range for most cases.
 	MaxWaitTime int32
 
 	// The method used to determine at which offset to begin consuming messages.
@@ -35,9 +35,9 @@ type ConsumerConfig struct {
 	// Interpreted differently according to the value of OffsetMethod.
 	OffsetValue int64
 
-	// The number of events to buffer in the Events channel. Setting this can let the
-	// consumer continue fetching messages in the background while local code consumes events,
-	// greatly improving throughput.
+	// The number of events to buffer in the Events channel. Having this non-zero permits the
+	// consumer to continue fetching messages in the background while client code consumes events,
+	// greatly improving throughput. The default is 16.
 	EventBufferSize int
 }
 
@@ -323,9 +323,10 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 // Creates a ConsumerConfig instance with sane defaults.
 func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
-		DefaultFetchSize: 1024,
+		DefaultFetchSize: 32768,
 		MinFetchSize:     1,
 		MaxWaitTime:      250,
+		EventBufferSize:  16,
 	}
 }
 
