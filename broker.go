@@ -25,7 +25,7 @@ func NewBrokerConfig() *BrokerConfig {
 	}
 }
 
-// Validates a BrokerConfig instance. This will return a
+// Validate checks a BrokerConfig instance. This will return a
 // ConfigurationError if the specified values don't make sense.
 func (config *BrokerConfig) Validate() error {
 	if config.MaxOpenRequests < 0 {

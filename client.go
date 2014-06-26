@@ -403,7 +403,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	return ret, nil
 }
 
-// Creates a new ClientConfig instance with sensible defaults
+// NewClientConfig creates a new ClientConfig instance with sensible defaults
 func NewClientConfig() *ClientConfig {
 	return &ClientConfig{
 		MetadataRetries: 3,
@@ -411,7 +411,7 @@ func NewClientConfig() *ClientConfig {
 	}
 }
 
-// Validates a ClientConfig instance. This will return a
+// Validate checks a ClientConfig instance. This will return a
 // ConfigurationError if the specified values don't make sense.
 func (config *ClientConfig) Validate() error {
 	if config.MetadataRetries <= 0 {

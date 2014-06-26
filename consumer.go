@@ -306,7 +306,7 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 	return offset, nil
 }
 
-// Creates a ConsumerConfig instance with sane defaults.
+// NewConsumerConfig creates a ConsumerConfig instance with sane defaults.
 func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
 		DefaultFetchSize: 32768,
@@ -316,7 +316,7 @@ func NewConsumerConfig() *ConsumerConfig {
 	}
 }
 
-// Validates a ConsumerConfig instance. It will return a
+// Validate checks a ConsumerConfig instance. It will return a
 // ConfigurationError if the specified value doesn't make sense.
 func (config *ConsumerConfig) Validate() error {
 	if config.DefaultFetchSize <= 0 {

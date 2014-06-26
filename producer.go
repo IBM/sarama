@@ -83,9 +83,8 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	}, nil
 }
 
-// When operating in asynchronous mode, provides access to errors generated
-// while parsing ProduceResponses from kafka. Should never be called in
-// synchronous mode.
+// Errors provides access to errors generated while parsing ProduceResponses from kafka
+// when operating in asynchronous mode. Should never be called in synchronous mode.
 func (p *Producer) Errors() chan error {
 	return p.errors
 }
@@ -452,7 +451,7 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 	return partitions[choice], nil
 }
 
-// Creates a new ProducerConfig instance with sensible defaults.
+// NewProducerConfig creates a new ProducerConfig instance with sensible defaults.
 func NewProducerConfig() *ProducerConfig {
 	return &ProducerConfig{
 		Partitioner:      NewRandomPartitioner(),
@@ -462,7 +461,7 @@ func NewProducerConfig() *ProducerConfig {
 	}
 }
 
-// Validates a ProducerConfig instance. It will return a
+// Validate checks a ProducerConfig instance. It will return a
 // ConfigurationError if the specified value doesn't make sense.
 func (config *ProducerConfig) Validate() error {
 	if config.RequiredAcks < -1 {
