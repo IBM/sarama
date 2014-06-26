@@ -6,6 +6,13 @@ import (
 	"time"
 )
 
+func TestDefaultConsumerConfigValidates(t *testing.T) {
+	config := NewConsumerConfig()
+	if err := config.Validate(); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestSimpleConsumer(t *testing.T) {
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)

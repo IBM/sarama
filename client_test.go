@@ -4,6 +4,13 @@ import (
 	"testing"
 )
 
+func TestDefaultClientConfigValidates(t *testing.T) {
+	config := NewClientConfig()
+	if err := config.Validate(); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestSimpleClient(t *testing.T) {
 
 	mb := NewMockBroker(t, 1)

@@ -10,9 +10,16 @@ const TestMessage = "ABC THE MESSAGE"
 
 func defaultProducerConfig() *ProducerConfig {
 	config := NewProducerConfig()
-	config.MaxBufferTime = 1000000                                // don't flush based on time
+	config.MaxBufferTime = 1000000 * time.Millisecond             // don't flush based on time
 	config.MaxBufferedBytes = uint32((len(TestMessage) * 10) - 1) // flush after 10 messages
 	return config
+}
+
+func TestDefaultProducerConfigValidates(t *testing.T) {
+	config := NewProducerConfig()
+	if err := config.Validate(); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestSimpleProducer(t *testing.T) {
