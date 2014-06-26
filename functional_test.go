@@ -64,7 +64,6 @@ func TestProducingMessages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer producer.Close()
 
 	for i := 1; i <= TestBatchSize; i++ {
 		err = producer.SendMessage("single_partition", nil, StringEncoder(fmt.Sprintf("testing %d", i)))
@@ -72,6 +71,7 @@ func TestProducingMessages(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	producer.Close()
 
 	events := consumer.Events()
 	for i := 1; i <= TestBatchSize; i++ {
