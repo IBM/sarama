@@ -64,7 +64,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
 	if err != nil {
-		client.Close() // this closes tmp, since it's still in the brokers hash
+		client.Close()
 		return nil, err
 	}
 
