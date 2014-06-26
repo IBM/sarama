@@ -81,7 +81,7 @@ func TestProducingMessages(t *testing.T) {
 
 		case event := <-events:
 			if string(event.Value) != fmt.Sprintf("testing %d", i) {
-				t.Fatal("Unexpected message with index %d: %s", i, event.Value)
+				t.Fatalf("Unexpected message with index %d: %s", i, event.Value)
 			}
 		}
 
