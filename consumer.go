@@ -75,6 +75,12 @@ type Consumer struct {
 // NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
 // part of the named consumer group.
 func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
+	// Check that we are not dealing with a closed Client before processing
+	// any other arguments
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	if config == nil {
 		config = NewConsumerConfig()
 	}
