@@ -14,14 +14,14 @@ import (
 // mode, errors are not returned from SendMessage, but over the Errors()
 // channel.
 type ProducerConfig struct {
-	Partitioner          Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
-	RequiredAcks         RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
-	Timeout              int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
-	Compression          CompressionCodec // The type of compression to use on messages (defaults to no compression).
-	MaxBufferedBytes     uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
-	MaxBufferTime        uint32           // The maximum number of milliseconds to buffer messages before sending to a broker.
-	ReturnFailedMessages bool             // Whether messages that have failed to be stored in Kafka should be returned via the Failed() channel. If true (default false) then you *must* read the values from the Failed() channel.
-	ReturnAckCounts      bool             // Whether to return the number of acks per partition (per topic) on the Acked() channel. If true (defaul false) then you *must* read the values from the Acked() channel.
+	Partitioner      Partitioner          // Chooses the partition to send messages to, or randomly if this is nil.
+	RequiredAcks     RequiredAcks         // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal).
+	Timeout          time.Duration        // The maximum duration the broker will wait the receipt of the number of RequiredAcks. This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated.
+	Compression      CompressionCodec     // The type of compression to use on messages (defaults to no compression).
+	MaxBufferedBytes uint32               // The maximum number of bytes to buffer per-broker before sending to Kafka.
+	MaxBufferTime    time.Duration        // The maximum duration to buffer messages before sending to a broker.
+	FailedChannel    chan *ConsumerEvent  // Messages that could not be successfully acked will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
+	AckingChannel    chan map[int32]int64 // Counts per parition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
@@ -46,8 +46,6 @@ type Producer struct {
 	brokerProducers map[*Broker]*brokerProducer
 	m               sync.RWMutex
 	errors          chan error
-	acked           chan map[int32]int64
-	failed          chan []byte
 	deliveryLocks   map[topicPartition]chan bool
 	dm              sync.RWMutex
 }
@@ -88,8 +86,6 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 		client:          client,
 		config:          *config,
 		errors:          make(chan error, 16),
-		acked:           make(chan map[int32]int64, 16),
-		failed:          make(chan []byte, 16),
 		deliveryLocks:   make(map[topicPartition]chan bool),
 		brokerProducers: make(map[*Broker]*brokerProducer),
 	}, nil
@@ -110,22 +106,6 @@ func (p *Producer) Close() error {
 		bp.Close()
 	}
 	return nil
-}
-
-// Acked provides access to the counts of acked messages per partition when the messages have been flushed.
-// Setting ReturnAckCounts = true in the producer config is required for the ack counts to
-// be sent. You must consume this channel or it
-// will eventually block
-func (p *Producer) Acked() chan map[int32]int64 {
-	return p.acked
-}
-
-// Failed provides access to the messages that were not succesfully acked with Kafka.
-// Setting ReturnFailedMessages = true in the producer config is required for the failed messages to
-// be sent. You must consume this channel or it
-// will eventually block
-func (p *Producer) Failed() chan []byte {
-	return p.failed
 }
 
 // QueueMessage sends a message with the given key and value to the given topic.
@@ -339,9 +319,17 @@ func (bp *brokerProducer) flush(p *Producer) (shutdownRequired bool) {
 		return bp.flushRequest(p, prb, func(err error) {
 			if err != nil {
 				Logger.Println(err)
-				if p.config.ReturnFailedMessages {
+				if p.config.FailedChannel != nil {
 					for _, msg := range prb {
-						p.failed <- msg.value
+						ce := &ConsumerEvent{
+							Key:       msg.key,
+							Value:     msg.value,
+							Topic:     msg.tp.topic,
+							Partition: msg.tp.partition,
+							Offset:    -1,
+							Err:       err,
+						}
+						p.config.FailedChannel <- ce
 					}
 				}
 			}
@@ -403,7 +391,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			case NoError:
 				// All the messages for this topic-partition were delivered successfully!
 				// Unlock delivery for this topic-partition and discard the produceMessage objects.
-				if p.config.ReturnAckCounts {
+				if p.config.AckingChannel != nil {
 					acksPerTopic[partition] = int64(len(prb))
 				}
 				errorCb(nil)
@@ -421,15 +409,14 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 				if overlimit > 0 {
 					errorCb(DroppedMessagesError{overlimit, err})
 				} else {
-					errorCb(nil)
 					errorCb(DroppedMessagesError{overlimit, block.Err})
 				}
 			default:
 				errorCb(DroppedMessagesError{len(prb), block.Err})
 			}
 		}
-		if p.config.ReturnAckCounts {
-			p.acked <- acksPerTopic
+		if p.config.AckingChannel != nil {
+			p.config.AckingChannel <- acksPerTopic
 		}
 	}
 
