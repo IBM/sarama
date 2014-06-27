@@ -1,6 +1,9 @@
 package sarama
 
-import "log"
+import (
+	"log"
+	"time"
+)
 
 type produceMessage struct {
 	tp         topicPartition
@@ -45,7 +48,7 @@ func (msg *produceMessage) hasTopicPartition(topic string, partition int32) bool
 }
 
 func (b produceRequestBuilder) toRequest(config *ProducerConfig) *ProduceRequest {
-	req := &ProduceRequest{RequiredAcks: config.RequiredAcks, Timeout: config.Timeout}
+	req := &ProduceRequest{RequiredAcks: config.RequiredAcks, Timeout: int32(config.Timeout / time.Millisecond)}
 
 	// If compression is enabled, we need to group messages by topic-partition and
 	// wrap them in MessageSets. We already discarded that grouping, so we

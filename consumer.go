@@ -1,5 +1,9 @@
 package sarama
 
+import (
+	"time"
+)
+
 // OffsetMethod is passed in ConsumerConfig to tell the consumer how to determine the starting offset.
 type OffsetMethod int
 
@@ -25,10 +29,10 @@ type ConsumerConfig struct {
 	// The maximum permittable message size - messages larger than this will return MessageTooLarge. The default of 0 is
 	// treated as no limit.
 	MaxMessageSize int32
-	// The maximum amount of time (in ms) the broker will wait for MinFetchSize bytes to become available before it
+	// The maximum amount of time the broker will wait for MinFetchSize bytes to become available before it
 	// returns fewer than that anyways. The default is 250ms, since 0 causes the consumer to spin when no events are available.
-	// 100-500ms is a reasonable range for most cases.
-	MaxWaitTime int32
+	// 100-500ms is a reasonable range for most cases. Kafka only supports precision up to milliseconds; nanoseconds will be truncated.
+	MaxWaitTime time.Duration
 
 	// The method used to determine at which offset to begin consuming messages.
 	OffsetMethod OffsetMethod
@@ -164,7 +168,7 @@ func (c *Consumer) fetchMessages() {
 	for {
 		request := new(FetchRequest)
 		request.MinBytes = c.config.MinFetchSize
-		request.MaxWaitTime = c.config.MaxWaitTime
+		request.MaxWaitTime = int32(c.config.MaxWaitTime / time.Millisecond)
 		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
 
 		response, err := c.broker.Fetch(c.client.id, request)
@@ -311,7 +315,7 @@ func NewConsumerConfig() *ConsumerConfig {
 	return &ConsumerConfig{
 		DefaultFetchSize: 32768,
 		MinFetchSize:     1,
-		MaxWaitTime:      250,
+		MaxWaitTime:      250 * time.Millisecond,
 		EventBufferSize:  16,
 	}
 }
@@ -331,10 +335,12 @@ func (config *ConsumerConfig) Validate() error {
 		return ConfigurationError("Invalid MaxMessageSize")
 	}
 
-	if config.MaxWaitTime <= 0 {
-		return ConfigurationError("Invalid MaxWaitTime")
-	} else if config.MaxWaitTime < 100 {
+	if config.MaxWaitTime < 1*time.Millisecond {
+		return ConfigurationError("Invalid MaxWaitTime, it needs to be at least 1ms")
+	} else if config.MaxWaitTime < 100*time.Millisecond {
 		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
+	} else if config.MaxWaitTime%time.Millisecond != 0 {
+		Logger.Println("ConsumerConfig.MaxWaitTime only supports millisecond precision; nanoseconds will be truncated.")
 	}
 
 	if config.EventBufferSize < 0 {
