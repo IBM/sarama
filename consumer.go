@@ -273,6 +273,7 @@ func (c *Consumer) fetchMessages() {
 					event.Key = msg.Msg.Key
 					event.Value = msg.Msg.Value
 					event.Offset = msg.Offset
+					c.offset++
 				}
 
 				select {
@@ -281,7 +282,6 @@ func (c *Consumer) fetchMessages() {
 					close(c.done)
 					return
 				case c.events <- event:
-					c.offset++
 				}
 			}
 		}
