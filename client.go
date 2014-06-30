@@ -245,10 +245,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 }
 
 func (client *Client) Closed() bool {
-	if client.brokers == nil {
-		return true
-	}
-	return false
+	return client.brokers == nil
 }
 
 func (client *Client) refreshMetadata(topics []string, retries int) error {
