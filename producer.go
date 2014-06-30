@@ -66,6 +66,12 @@ type topicPartition struct {
 
 // NewProducer creates a new Producer using the given client.
 func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
+	// Check that we are not dealing with a closed Client before processing
+	// any other arguments
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	if config == nil {
 		config = NewProducerConfig()
 	}

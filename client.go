@@ -77,6 +77,14 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 // a client object passes out of scope, as it will otherwise leak memory. You must close any Producers or Consumers
 // using a client before you close the client.
 func (client *Client) Close() error {
+	// Check to see whether the client is closed
+	if client.Closed() {
+		// Chances are this is being called from a defer() and the error will go unobserved
+		// so we go ahead and log the event in this case.
+		Logger.Printf("Close() called on already closed client")
+		return ClosedClient
+	}
+
 	client.lock.Lock()
 	defer client.lock.Unlock()
 	Logger.Println("Closing Client")
@@ -97,6 +105,11 @@ func (client *Client) Close() error {
 
 // Partitions returns the sorted list of available partition IDs for the given topic.
 func (client *Client) Partitions(topic string) ([]int32, error) {
+	// Check to see whether the client is closed
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	partitions := client.cachedPartitions(topic)
 
 	// len==0 catches when it's nil (no such topic) and the odd case when every single
@@ -122,6 +135,11 @@ func (client *Client) Partitions(topic string) ([]int32, error) {
 
 // Topics returns the set of available topics as retrieved from the cluster metadata.
 func (client *Client) Topics() ([]string, error) {
+	// Check to see whether the client is closed
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
@@ -226,7 +244,18 @@ func (client *Client) disconnectBroker(broker *Broker) {
 	go withRecover(func() { myBroker.Close() })
 }
 
+func (client *Client) Closed() bool {
+	return client.brokers == nil
+}
+
 func (client *Client) refreshMetadata(topics []string, retries int) error {
+	// This function is a sort of central point for most functions that create new
+	// resources.  Check to see if we're dealing with a closed Client and error
+	// out immediately if so.
+	if client.Closed() {
+		return ClosedClient
+	}
+
 	// Kafka will throw exceptions on an empty topic and not return a proper
 	// error. This handles the case by returning an error instead of sending it
 	// off to Kafka. See: https://github.com/Shopify/sarama/pull/38#issuecomment-26362310
