@@ -30,7 +30,7 @@ func TestSimpleProducer(t *testing.T) {
 	defer mb2.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
@@ -64,7 +64,7 @@ func TestSimpleSyncProducer(t *testing.T) {
 	defer mb2.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mdr.AddTopicPartition("my_topic", 1, 2)
 	mb1.Returns(mdr)
 
@@ -99,7 +99,7 @@ func TestMultipleFlushes(t *testing.T) {
 	defer mb2.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
@@ -139,8 +139,8 @@ func TestMultipleProducer(t *testing.T) {
 	defer mb3.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
-	mdr.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
+	mdr.AddBroker(mb3.Addr(), mb3.BrokerID())
 	mdr.AddTopicPartition("topic_a", 0, 2)
 	mdr.AddTopicPartition("topic_b", 0, 3)
 	mdr.AddTopicPartition("topic_c", 0, 3)
@@ -197,8 +197,8 @@ func TestFailureRetry(t *testing.T) {
 	mb3 := NewMockBroker(t, 3)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
-	mdr.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
+	mdr.AddBroker(mb3.Addr(), mb3.BrokerID())
 	mdr.AddTopicPartition("topic_a", 0, 2)
 	mdr.AddTopicPartition("topic_b", 0, 3)
 	mdr.AddTopicPartition("topic_c", 0, 3)
@@ -225,7 +225,7 @@ func TestFailureRetry(t *testing.T) {
 	// isn't quite as random as claimed, though, it seems. Maybe because
 	// the same random seed is used each time?
 	mdr2 := new(MetadataResponse)
-	mdr2.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
+	mdr2.AddBroker(mb3.Addr(), mb3.BrokerID())
 	mdr2.AddTopicPartition("topic_b", 0, 3)
 	mb2.Returns(mdr2)
 

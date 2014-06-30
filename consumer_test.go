@@ -18,7 +18,7 @@ func TestSimpleConsumer(t *testing.T) {
 	mb2 := NewMockBroker(t, 2)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
@@ -61,7 +61,7 @@ func TestConsumerRawOffset(t *testing.T) {
 	mb2 := NewMockBroker(t, 2)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
@@ -94,7 +94,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 	mb2 := NewMockBroker(t, 2)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
