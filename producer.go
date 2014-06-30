@@ -138,7 +138,10 @@ func (p *Producer) QueueMessage(topic string, key, value Encoder) error {
 // If you care about message ordering, you should not call QueueMessage and
 // SendMessage on the same Producer.
 func (p *Producer) SendMessage(topic string, key, value Encoder) (err error) {
-	return p.genericSendMessage(topic, key, value, true)
+	fmt.Println("producer: sending", value)
+	x := p.genericSendMessage(topic, key, value, true)
+	fmt.Println("producer: done", value)
+	return x
 }
 
 func (p *Producer) genericSendMessage(topic string, key, value Encoder, synchronous bool) (err error) {

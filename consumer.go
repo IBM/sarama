@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -176,6 +177,7 @@ func (c *Consumer) fetchMessages() {
 		request.MinBytes = c.config.MinFetchSize
 		request.MaxWaitTime = int32(c.config.MaxWaitTime / time.Millisecond)
 		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
+		fmt.Println("consumer: sending request for offset", c.offset)
 
 		response, err := c.broker.Fetch(c.client.id, request)
 		switch {
@@ -265,6 +267,7 @@ func (c *Consumer) fetchMessages() {
 
 		for _, msgBlock := range block.MsgSet.Messages {
 			for _, msg := range msgBlock.Messages() {
+				fmt.Println("consumer: processing message with offset", msg.Offset)
 				select {
 				case <-c.stopper:
 					close(c.events)
