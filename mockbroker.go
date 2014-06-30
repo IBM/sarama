@@ -26,7 +26,7 @@ type TestState interface {
 // It is not necessary to prefix message length or correlation ID to your response bytes, the server does that
 // automatically as a convenience.
 type MockBroker struct {
-	brokerID     int
+	brokerID     int32
 	port         int32
 	stopper      chan bool
 	expectations chan encoder
@@ -35,7 +35,7 @@ type MockBroker struct {
 	expecting    encoder
 }
 
-func (b *MockBroker) BrokerID() int {
+func (b *MockBroker) BrokerID() int32 {
 	return b.brokerID
 }
 
@@ -127,7 +127,7 @@ func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 // NewMockBroker launches a fake Kafka broker. It takes a TestState (e.g. *testing.T) as provided by the
 // test framework and a channel of responses to use.  If an error occurs it is
 // simply logged to the TestState and the broker exits.
-func NewMockBroker(t TestState, brokerID int) *MockBroker {
+func NewMockBroker(t TestState, brokerID int32) *MockBroker {
 	var err error
 
 	broker := &MockBroker{
