@@ -347,6 +347,8 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 		})
 		if overlimit > 0 {
 			errorCb(DroppedMessagesError{overlimit, nil})
+		} else {
+			errorCb(nil)
 		}
 		return true
 	}
@@ -358,8 +360,11 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 		return false
 	}
 
+	seenPartitions := false
 	for topic, d := range response.Blocks {
 		for partition, block := range d {
+			seenPartitions = true
+
 			if block == nil {
 				// IncompleteResponse. Here we just drop all the messages; we don't know whether
 				// they were successfully sent or not. Non-ideal, but how often does it happen?
@@ -383,12 +388,19 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 				})
 				if overlimit > 0 {
 					errorCb(DroppedMessagesError{overlimit, nil})
+				} else {
+					errorCb(nil)
 				}
 			default:
 				errorCb(DroppedMessagesError{len(prb), err})
 			}
 		}
 	}
+
+	if !seenPartitions {
+		errorCb(DroppedMessagesError{len(prb), IncompleteResponse})
+	}
+
 	return false
 }
 
