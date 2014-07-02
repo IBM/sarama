@@ -30,17 +30,18 @@ func (msg *produceMessage) enqueue(p *Producer) error {
 	errs := make(chan error, 1)
 	bp.flushRequest(p, prb, func(err error) {
 		errs <- err
+		close(errs)
 	})
 	return <-errs
 
 }
 
 func (msg *produceMessage) reenqueue(p *Producer) error {
-	if !msg.retried {
-		msg.retried = true
-		return msg.enqueue(p)
+	if msg.retried {
+		return DroppedMessagesError{}
 	}
-	return nil
+	msg.retried = true
+	return msg.enqueue(p)
 }
 
 func (msg *produceMessage) hasTopicPartition(topic string, partition int32) bool {
