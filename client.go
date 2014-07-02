@@ -207,7 +207,7 @@ func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTim
 		return -1, block.Err
 	}
 	if len(block.Offsets) != 1 {
-		return -1, IncompleteResponse
+		return -1, OffsetOutOfRange
 	}
 
 	return block.Offsets[0], nil
