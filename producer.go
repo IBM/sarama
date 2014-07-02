@@ -346,7 +346,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			}
 		})
 		if overlimit > 0 {
-			errorCb(DroppedMessagesError{overlimit, nil})
+			errorCb(DroppedMessagesError{overlimit, err})
 		} else {
 			errorCb(nil)
 		}
@@ -387,7 +387,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 					}
 				})
 				if overlimit > 0 {
-					errorCb(DroppedMessagesError{overlimit, nil})
+					errorCb(DroppedMessagesError{overlimit, err})
 				} else {
 					errorCb(nil)
 				}
