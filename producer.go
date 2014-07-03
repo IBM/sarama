@@ -14,12 +14,14 @@ import (
 // mode, errors are not returned from SendMessage, but over the Errors()
 // channel.
 type ProducerConfig struct {
-	Partitioner      Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
-	RequiredAcks     RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal).
-	Timeout          time.Duration    // The maximum duration the broker will wait the receipt of the number of RequiredAcks. This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated.
-	Compression      CompressionCodec // The type of compression to use on messages (defaults to no compression).
-	MaxBufferedBytes uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
-	MaxBufferTime    time.Duration    // The maximum duration to buffer messages before sending to a broker.
+	Partitioner      Partitioner          // Chooses the partition to send messages to, or randomly if this is nil.
+	RequiredAcks     RequiredAcks         // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal).
+	Timeout          time.Duration        // The maximum duration the broker will wait the receipt of the number of RequiredAcks. This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated.
+	Compression      CompressionCodec     // The type of compression to use on messages (defaults to no compression).
+	MaxBufferedBytes uint32               // The maximum number of bytes to buffer per-broker before sending to Kafka.
+	MaxBufferTime    time.Duration        // The maximum duration to buffer messages before sending to a broker.
+	FailedChannel    chan *ConsumerEvent  // Messages that could not be successfully acked will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
+	AckingChannel    chan map[int32]int64 // Counts per parition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
@@ -317,6 +319,19 @@ func (bp *brokerProducer) flush(p *Producer) (shutdownRequired bool) {
 		return bp.flushRequest(p, prb, func(err error) {
 			if err != nil {
 				Logger.Println(err)
+				if p.config.FailedChannel != nil {
+					for _, msg := range prb {
+						ce := &ConsumerEvent{
+							Key:       msg.key,
+							Value:     msg.value,
+							Topic:     msg.tp.topic,
+							Partition: msg.tp.partition,
+							Offset:    -1,
+							Err:       err,
+						}
+						p.config.FailedChannel <- ce
+					}
+				}
 			}
 			p.errors <- err
 		})
@@ -362,6 +377,8 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 
 	seenPartitions := false
 	for topic, d := range response.Blocks {
+		// Used for sending back ack counts per partition when config.ReturnAckCounts is set to true
+		acksPerTopic := make(map[int32]int64)
 		for partition, block := range d {
 			seenPartitions = true
 
@@ -374,6 +391,9 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			case NoError:
 				// All the messages for this topic-partition were delivered successfully!
 				// Unlock delivery for this topic-partition and discard the produceMessage objects.
+				if p.config.AckingChannel != nil {
+					acksPerTopic[partition] = int64(len(prb))
+				}
 				errorCb(nil)
 			case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 				p.client.RefreshTopicMetadata(topic)
@@ -392,8 +412,11 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 					errorCb(nil)
 				}
 			default:
-				errorCb(DroppedMessagesError{len(prb), err})
+				errorCb(DroppedMessagesError{len(prb), block.Err})
 			}
+		}
+		if p.config.AckingChannel != nil {
+			p.config.AckingChannel <- acksPerTopic
 		}
 	}
 
