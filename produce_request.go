@@ -77,3 +77,15 @@ func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 
 	set.addMessage(msg)
 }
+
+func (p *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
+	if p.msgSets == nil {
+		p.msgSets = make(map[string]map[int32]*MessageSet)
+	}
+
+	if p.msgSets[topic] == nil {
+		p.msgSets[topic] = make(map[int32]*MessageSet)
+	}
+
+	p.msgSets[topic][partition] = set
+}
