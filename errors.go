@@ -38,6 +38,9 @@ var EncodingError = errors.New("kafka: Error while encoding packet.")
 // of the message set.
 var InsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected.")
 
+// ShuttingDown is returned when a producer receives a message during shutdown.
+var ShuttingDown = errors.New("kafka: Message received by producer in process of shutting down.")
+
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
 type DecodingError struct {

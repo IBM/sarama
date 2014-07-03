@@ -42,7 +42,37 @@ func checkKafkaAvailability(t *testing.T) {
 	}
 }
 
-func TestProducingMessages(t *testing.T) {
+func TestFuncProducing(t *testing.T) {
+	config := NewProducerConfig()
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingGzip(t *testing.T) {
+	config := NewProducerConfig()
+	config.Compression = CompressionGZIP
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingSnappy(t *testing.T) {
+	config := NewProducerConfig()
+	config.Compression = CompressionSnappy
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingNoResponse(t *testing.T) {
+	config := NewProducerConfig()
+	config.RequiredAcks = NoResponse
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingFlushing(t *testing.T) {
+	config := NewProducerConfig()
+	config.FlushMsgCount = TestBatchSize / 8
+	config.FlushFrequency = 250 * time.Millisecond
+	testProducingMessages(t, config)
+}
+
+func testProducingMessages(t *testing.T, config *ProducerConfig) {
 	checkKafkaAvailability(t)
 
 	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
@@ -60,15 +90,32 @@ func TestProducingMessages(t *testing.T) {
 	}
 	defer consumer.Close()
 
-	producer, err := NewProducer(client, nil)
+	config.AckSuccesses = true
+	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for i := 1; i <= TestBatchSize; i++ {
-		err = producer.SendMessage("single_partition", nil, StringEncoder(fmt.Sprintf("testing %d", i)))
-		if err != nil {
-			t.Fatal(err)
+	expectedResponses := TestBatchSize
+	for i := 1; i <= TestBatchSize; {
+		msg := &MessageToSend{Topic: "single_partition", Key: nil, Value: StringEncoder(fmt.Sprintf("testing %d", i))}
+		select {
+		case producer.Input() <- msg:
+			i++
+		case ret := <-producer.Errors():
+			if ret.Err == nil {
+				expectedResponses--
+			} else {
+				t.Fatal(ret.Err)
+			}
+		}
+	}
+	for expectedResponses > 0 {
+		ret := <-producer.Errors()
+		if ret.Err == nil {
+			expectedResponses--
+		} else {
+			t.Fatal(ret.Err)
 		}
 	}
 	producer.Close()
