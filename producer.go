@@ -21,7 +21,7 @@ type ProducerConfig struct {
 	MaxBufferedBytes uint32               // The maximum number of bytes to buffer per-broker before sending to Kafka.
 	MaxBufferTime    time.Duration        // The maximum duration to buffer messages before sending to a broker.
 	FailedChannel    chan *ConsumerEvent  // Messages that could not be successfully acked will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
-	AckingChannel    chan map[int32]int64 // Counts per parition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
+	AckingChannel    chan map[int32]int64 // Counts per partition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
@@ -378,7 +378,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 	seenPartitions := false
 	for topic, d := range response.Blocks {
 		// Used for sending back ack counts per partition when config.ReturnAckCounts is set to true
-		acksPerTopic := make(map[int32]int64)
+		acksPerPartition := make(map[int32]int64)
 		for partition, block := range d {
 			seenPartitions = true
 
@@ -392,7 +392,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 				// All the messages for this topic-partition were delivered successfully!
 				// Unlock delivery for this topic-partition and discard the produceMessage objects.
 				if p.config.AckingChannel != nil {
-					acksPerTopic[partition] = int64(len(prb))
+					acksPerPartition[partition] = int64(len(prb))
 				}
 				errorCb(nil)
 			case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
@@ -416,7 +416,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			}
 		}
 		if p.config.AckingChannel != nil {
-			p.config.AckingChannel <- acksPerTopic
+			p.config.AckingChannel <- acksPerPartition
 		}
 	}
 
