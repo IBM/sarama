@@ -21,7 +21,7 @@ type ProducerConfig struct {
 	MaxBufferedBytes uint32               // The maximum number of bytes to buffer per-broker before sending to Kafka.
 	MaxBufferTime    time.Duration        // The maximum duration to buffer messages before sending to a broker.
 	Failures         chan *ConsumerEvent  // Messages that could not be successfully acked will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
-	Acks             chan map[int32]int64 // Counts per partition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
+	Acks             chan map[int32]int64 // Counts per partition for each topic of acked messages will be sent on this channel after a flush. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
