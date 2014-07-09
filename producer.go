@@ -20,8 +20,8 @@ type ProducerConfig struct {
 	Compression      CompressionCodec     // The type of compression to use on messages (defaults to no compression).
 	MaxBufferedBytes uint32               // The maximum number of bytes to buffer per-broker before sending to Kafka.
 	MaxBufferTime    time.Duration        // The maximum duration to buffer messages before sending to a broker.
-	FailedChannel    chan *ConsumerEvent  // Messages that could not be successfully acked will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
-	AckingChannel    chan map[int32]int64 // Counts per partition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
+	Failures         chan *ConsumerEvent  // Messages that could not be successfully acked will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
+	Acks             chan map[int32]int64 // Counts per partition per topic of acked messages will be sent on this channel. If supplied you *must* read the values from the channel.  It is advised but not required to use a buffered channel.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
@@ -319,7 +319,7 @@ func (bp *brokerProducer) flush(p *Producer) (shutdownRequired bool) {
 		return bp.flushRequest(p, prb, func(err error) {
 			if err != nil {
 				Logger.Println(err)
-				if p.config.FailedChannel != nil {
+				if p.config.Failures != nil {
 					for _, msg := range prb {
 						ce := &ConsumerEvent{
 							Key:       msg.key,
@@ -329,7 +329,7 @@ func (bp *brokerProducer) flush(p *Producer) (shutdownRequired bool) {
 							Offset:    -1,
 							Err:       err,
 						}
-						p.config.FailedChannel <- ce
+						p.config.Failures <- ce
 					}
 				}
 			}
@@ -391,7 +391,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			case NoError:
 				// All the messages for this topic-partition were delivered successfully!
 				// Unlock delivery for this topic-partition and discard the produceMessage objects.
-				if p.config.AckingChannel != nil {
+				if p.config.Acks != nil {
 					acksPerPartition[partition] = int64(len(prb))
 				}
 				errorCb(nil)
@@ -415,8 +415,8 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 				errorCb(DroppedMessagesError{len(prb), block.Err})
 			}
 		}
-		if p.config.AckingChannel != nil {
-			p.config.AckingChannel <- acksPerPartition
+		if p.config.Acks != nil {
+			p.config.Acks <- acksPerPartition
 		}
 	}
 
