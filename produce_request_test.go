@@ -1,6 +1,8 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+)
 
 var (
 	produceRequestEmpty = []byte{

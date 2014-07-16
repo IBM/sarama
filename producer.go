@@ -8,21 +8,18 @@ import (
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 //
-// If MaxBufferTime=MaxBufferedBytes=0, messages will be delivered immediately and
+// If MaxBufferTime=MaxBufferedBytes=1, messages will be delivered immediately and
 // constantly, but if multiple messages are received while a roundtrip to kafka
 // is in progress, they will both be combined into the next request. In this
 // mode, errors are not returned from SendMessage, but over the Errors()
 // channel.
-//
-// With MaxBufferTime and/or MaxBufferedBytes set to values > 0, sarama will
-// buffer messages before sending, to reduce traffic.
 type ProducerConfig struct {
 	Partitioner      Partitioner      // Chooses the partition to send messages to, or randomly if this is nil.
-	RequiredAcks     RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to no acknowledgement).
-	Timeout          int32            // The maximum time in ms the broker will wait the receipt of the number of RequiredAcks.
+	RequiredAcks     RequiredAcks     // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal).
+	Timeout          time.Duration    // The maximum duration the broker will wait the receipt of the number of RequiredAcks. This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated.
 	Compression      CompressionCodec // The type of compression to use on messages (defaults to no compression).
 	MaxBufferedBytes uint32           // The maximum number of bytes to buffer per-broker before sending to Kafka.
-	MaxBufferTime    uint32           // The maximum number of milliseconds to buffer messages before sending to a broker.
+	MaxBufferTime    time.Duration    // The maximum duration to buffer messages before sending to a broker.
 }
 
 // Producer publishes Kafka messages. It routes messages to the correct broker
@@ -69,28 +66,18 @@ type topicPartition struct {
 
 // NewProducer creates a new Producer using the given client.
 func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
+	// Check that we are not dealing with a closed Client before processing
+	// any other arguments
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	if config == nil {
-		config = new(ProducerConfig)
+		config = NewProducerConfig()
 	}
 
-	if config.RequiredAcks < -1 {
-		return nil, ConfigurationError("Invalid RequiredAcks")
-	}
-
-	if config.Timeout < 0 {
-		return nil, ConfigurationError("Invalid Timeout")
-	}
-
-	if config.Partitioner == nil {
-		config.Partitioner = NewRandomPartitioner()
-	}
-
-	if config.MaxBufferedBytes == 0 {
-		return nil, ConfigurationError("Invalid MaxBufferedBytes")
-	}
-
-	if config.MaxBufferTime == 0 {
-		return nil, ConfigurationError("Invalid MaxBufferTime")
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	return &Producer{
@@ -102,9 +89,8 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	}, nil
 }
 
-// When operating in asynchronous mode, provides access to errors generated
-// while parsing ProduceResponses from kafka. Should never be called in
-// synchronous mode.
+// Errors provides access to errors generated while parsing ProduceResponses from kafka
+// when operating in asynchronous mode. Should never be called in synchronous mode.
 func (p *Producer) Errors() chan error {
 	return p.errors
 }
@@ -227,13 +213,11 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 		hasMessages: make(chan bool, 1),
 	}
 
-	maxBufferTime := time.Duration(p.config.MaxBufferTime) * time.Millisecond
-
 	var wg sync.WaitGroup
 	wg.Add(1)
 
 	go func() {
-		timer := time.NewTimer(maxBufferTime)
+		timer := time.NewTimer(p.config.MaxBufferTime)
 		var shutdownRequired bool
 		wg.Done()
 		for {
@@ -242,7 +226,6 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 				if shutdownRequired = bp.flush(p); shutdownRequired {
 					goto shutdown
 				}
-				bp.flush(p)
 			case <-timer.C:
 				if shutdownRequired = bp.flushIfAnyMessages(p); shutdownRequired {
 					goto shutdown
@@ -250,12 +233,14 @@ func (p *Producer) newBrokerProducer(broker *Broker) *brokerProducer {
 			case <-bp.stopper:
 				goto shutdown
 			}
-			timer.Reset(maxBufferTime)
+			timer.Reset(p.config.MaxBufferTime)
 		}
 	shutdown:
 		delete(p.brokerProducers, bp.broker)
 		bp.flushIfAnyMessages(p)
-		p.client.disconnectBroker(bp.broker)
+		if shutdownRequired {
+			p.client.disconnectBroker(bp.broker)
+		}
 		close(bp.flushNow)
 		close(bp.hasMessages)
 		close(bp.done)
@@ -286,7 +271,10 @@ func (bp *brokerProducer) addMessage(msg *produceMessage, maxBufferBytes uint32)
 }
 
 func (bp *brokerProducer) flushIfOverCapacity(maxBufferBytes uint32) {
-	if bp.bufferedBytes > maxBufferBytes {
+	bp.mapM.Lock()
+	over := bp.bufferedBytes > maxBufferBytes
+	bp.mapM.Unlock()
+	if over {
 		select {
 		case bp.flushNow <- true:
 		default:
@@ -314,9 +302,9 @@ func (bp *brokerProducer) flush(p *Producer) (shutdownRequired bool) {
 	bp.mapM.Lock()
 	for tp, messages := range bp.messages {
 		if len(messages) > 0 && p.tryAcquireDeliveryLock(tp) {
-			defer p.releaseDeliveryLock(tp)
 			prb = append(prb, messages...)
 			delete(bp.messages, tp)
+			p.releaseDeliveryLock(tp)
 		}
 	}
 	bp.mapM.Unlock()
@@ -351,6 +339,7 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 		errorCb(err)
 		return false
 	default:
+		p.client.disconnectBroker(bp.broker)
 		overlimit := 0
 		prb.reverseEach(func(msg *produceMessage) {
 			if err := msg.reenqueue(p); err != nil {
@@ -358,7 +347,9 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 			}
 		})
 		if overlimit > 0 {
-			errorCb(DroppedMessagesError{overlimit, nil})
+			errorCb(DroppedMessagesError{overlimit, err})
+		} else {
+			errorCb(nil)
 		}
 		return true
 	}
@@ -370,8 +361,11 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 		return false
 	}
 
+	seenPartitions := false
 	for topic, d := range response.Blocks {
 		for partition, block := range d {
+			seenPartitions = true
+
 			if block == nil {
 				// IncompleteResponse. Here we just drop all the messages; we don't know whether
 				// they were successfully sent or not. Non-ideal, but how often does it happen?
@@ -394,13 +388,20 @@ func (bp *brokerProducer) flushRequest(p *Producer, prb produceRequestBuilder, e
 					}
 				})
 				if overlimit > 0 {
-					errorCb(DroppedMessagesError{overlimit, nil})
+					errorCb(DroppedMessagesError{overlimit, err})
+				} else {
+					errorCb(nil)
 				}
 			default:
 				errorCb(DroppedMessagesError{len(prb), err})
 			}
 		}
 	}
+
+	if !seenPartitions {
+		errorCb(DroppedMessagesError{len(prb), IncompleteResponse})
+	}
+
 	return false
 }
 
@@ -456,6 +457,10 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 
 	numPartitions := int32(len(partitions))
 
+	if numPartitions == 0 {
+		return -1, LeaderNotAvailable
+	}
+
 	choice := p.config.Partitioner.Partition(key, numPartitions)
 
 	if choice < 0 || choice >= numPartitions {
@@ -463,4 +468,42 @@ func (p *Producer) choosePartition(topic string, key Encoder) (int32, error) {
 	}
 
 	return partitions[choice], nil
+}
+
+// NewProducerConfig creates a new ProducerConfig instance with sensible defaults.
+func NewProducerConfig() *ProducerConfig {
+	return &ProducerConfig{
+		Partitioner:      NewRandomPartitioner(),
+		RequiredAcks:     WaitForLocal,
+		MaxBufferTime:    1 * time.Millisecond,
+		MaxBufferedBytes: 1,
+	}
+}
+
+// Validate checks a ProducerConfig instance. It will return a
+// ConfigurationError if the specified value doesn't make sense.
+func (config *ProducerConfig) Validate() error {
+	if config.RequiredAcks < -1 {
+		return ConfigurationError("Invalid RequiredAcks")
+	}
+
+	if config.Timeout < 0 {
+		return ConfigurationError("Invalid Timeout")
+	} else if config.Timeout%time.Millisecond != 0 {
+		Logger.Println("ProducerConfig.Timeout only supports millisecond resolution; nanoseconds will be truncated.")
+	}
+
+	if config.MaxBufferedBytes == 0 {
+		return ConfigurationError("Invalid MaxBufferedBytes")
+	}
+
+	if config.MaxBufferTime == 0 {
+		return ConfigurationError("Invalid MaxBufferTime")
+	}
+
+	if config.Partitioner == nil {
+		return ConfigurationError("No partitioner set")
+	}
+
+	return nil
 }

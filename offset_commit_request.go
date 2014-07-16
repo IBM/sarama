@@ -1,12 +1,18 @@
 package sarama
 
+// ReceiveTime is a special value for the timestamp field of Offset Commit Requests which
+// tells the broker to set the timestamp to the time at which the request was received.
+const ReceiveTime int64 = -1
+
 type offsetCommitRequestBlock struct {
-	offset   int64
-	metadata string
+	offset    int64
+	timestamp int64
+	metadata  string
 }
 
 func (r *offsetCommitRequestBlock) encode(pe packetEncoder) error {
 	pe.putInt64(r.offset)
+	pe.putInt64(r.timestamp)
 	return pe.putString(r.metadata)
 }
 
@@ -45,14 +51,14 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 }
 
 func (r *OffsetCommitRequest) key() int16 {
-	return 6
+	return 8
 }
 
 func (r *OffsetCommitRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset int64, metadata string) {
+func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset int64, timestamp int64, metadata string) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetCommitRequestBlock)
 	}
@@ -61,9 +67,5 @@ func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset i
 		r.blocks[topic] = make(map[int32]*offsetCommitRequestBlock)
 	}
 
-	tmp := new(offsetCommitRequestBlock)
-	tmp.offset = offset
-	tmp.metadata = metadata
-
-	r.blocks[topic][partitionID] = tmp
+	r.blocks[topic][partitionID] = &offsetCommitRequestBlock{offset, timestamp, metadata}
 }

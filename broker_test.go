@@ -7,7 +7,7 @@ import (
 
 func ExampleBroker() error {
 	broker := NewBroker("localhost:9092")
-	err := broker.Open(4)
+	err := broker.Open(nil)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	defer mb.Close()
 
 	broker := NewBroker(mb.Addr())
-	err := broker.Open(4)
+	err := broker.Open(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,6 +87,18 @@ var brokerTestTable = []struct {
 			}
 			if response == nil {
 				t.Error("Metadata request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 't', 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := ConsumerMetadataRequest{}
+			response, err := broker.GetConsumerMetadata("clientID", &request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Consumer Metadata request got no response!")
 			}
 		}},
 
@@ -128,7 +140,7 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetFetchRequest{}
 			response, err := broker.FetchOffset("clientID", &request)
@@ -140,7 +152,7 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetCommitRequest{}
 			response, err := broker.CommitOffset("clientID", &request)
