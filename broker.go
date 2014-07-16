@@ -12,6 +12,7 @@ import (
 // BrokerConfig is used to pass multiple configuration options to Broker.Open.
 type BrokerConfig struct {
 	MaxOpenRequests int           // How many outstanding requests the broker is allowed to have before blocking attempts to send.
+	DialTimeout     time.Duration // How long to wait for the initial connection to succeed before timing out and returning an error.
 	ReadTimeout     time.Duration // How long to wait for a response before timing out and returning an error.
 	WriteTimeout    time.Duration // How long to wait for a transmit to succeed before timing out and returning an error.
 }
@@ -20,6 +21,7 @@ type BrokerConfig struct {
 func NewBrokerConfig() *BrokerConfig {
 	return &BrokerConfig{
 		MaxOpenRequests: 4,
+		DialTimeout:     1 * time.Minute,
 		ReadTimeout:     1 * time.Minute,
 		WriteTimeout:    1 * time.Minute,
 	}
@@ -97,7 +99,7 @@ func (b *Broker) Open(conf *BrokerConfig) error {
 	go withRecover(func() {
 		defer b.lock.Unlock()
 
-		b.conn, b.connErr = net.Dial("tcp", b.addr)
+		b.conn, b.connErr = net.DialTimeout("tcp", b.addr, conf.DialTimeout)
 		if b.connErr != nil {
 			Logger.Printf("Failed to connect to broker %s\n", b.addr)
 			Logger.Println(b.connErr)
