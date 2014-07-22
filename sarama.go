@@ -19,3 +19,9 @@ var Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
 // PanicHandler is called for recovering from panics spawned internally to the library (and thus
 // not recoverable by the caller's goroutine). Defaults to nil, which means panics are not recovered.
 var PanicHandler func(interface{})
+
+// MaxRequestSize is the maximum size (in bytes) of any request that Sarama will attempt to send. Trying
+// to send a request larger than this will result in an EncodingError. The default of 100 MiB is aligned
+// with Kafka's default `socket.request.max.bytes`, which is the largest request the broker will attempt
+// to process.
+var MaxRequestSize uint32 = 100 * 1024 * 1024

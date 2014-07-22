@@ -20,6 +20,10 @@ func encode(in encoder) ([]byte, error) {
 		return nil, err
 	}
 
+	if prepEnc.length < 0 || uint32(prepEnc.length) > MaxRequestSize {
+		return nil, EncodingError
+	}
+
 	realEnc.raw = make([]byte, prepEnc.length)
 	err = in.encode(&realEnc)
 	if err != nil {
