@@ -4,9 +4,11 @@ import "testing"
 
 var (
 	emptyOffsetCommitResponse = []byte{
+		0xFF, 0xFF,
 		0x00, 0x00, 0x00, 0x00}
 
 	normalOffsetCommitResponse = []byte{
+		0x00, 0x02, 'a', 'z',
 		0x00, 0x00, 0x00, 0x02,
 
 		0x00, 0x01, 'm',
@@ -22,7 +24,9 @@ func TestEmptyOffsetCommitResponse(t *testing.T) {
 	response := OffsetCommitResponse{}
 
 	testDecodable(t, "empty", &response, emptyOffsetCommitResponse)
-
+	if response.ClientID != "" {
+		t.Error("Decoding produced client ID where there was none.")
+	}
 	if len(response.Errors) != 0 {
 		t.Error("Decoding produced errors where there were none.")
 	}
@@ -32,6 +36,9 @@ func TestNormalOffsetCommitResponse(t *testing.T) {
 	response := OffsetCommitResponse{}
 
 	testDecodable(t, "normal", &response, normalOffsetCommitResponse)
+	if response.ClientID != "az" {
+		t.Error("Decoding produced wrong client ID.")
+	}
 
 	if len(response.Errors) != 2 {
 		t.Fatal("Decoding produced wrong number of errors.")

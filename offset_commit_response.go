@@ -1,10 +1,16 @@
 package sarama
 
 type OffsetCommitResponse struct {
-	Errors map[string]map[int32]KError
+	ClientID string
+	Errors   map[string]map[int32]KError
 }
 
 func (r *OffsetCommitResponse) decode(pd packetDecoder) (err error) {
+	r.ClientID, err = pd.getString()
+	if err != nil {
+		return err
+	}
+
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err

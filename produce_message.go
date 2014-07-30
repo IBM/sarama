@@ -1,9 +1,6 @@
 package sarama
 
-import (
-	"log"
-	"time"
-)
+import "log"
 
 type produceMessage struct {
 	tp         topicPartition
@@ -30,18 +27,17 @@ func (msg *produceMessage) enqueue(p *Producer) error {
 	errs := make(chan error, 1)
 	bp.flushRequest(p, prb, func(err error) {
 		errs <- err
-		close(errs)
 	})
 	return <-errs
 
 }
 
 func (msg *produceMessage) reenqueue(p *Producer) error {
-	if msg.retried {
-		return DroppedMessagesError{}
+	if !msg.retried {
+		msg.retried = true
+		return msg.enqueue(p)
 	}
-	msg.retried = true
-	return msg.enqueue(p)
+	return nil
 }
 
 func (msg *produceMessage) hasTopicPartition(topic string, partition int32) bool {
@@ -49,7 +45,7 @@ func (msg *produceMessage) hasTopicPartition(topic string, partition int32) bool
 }
 
 func (b produceRequestBuilder) toRequest(config *ProducerConfig) *ProduceRequest {
-	req := &ProduceRequest{RequiredAcks: config.RequiredAcks, Timeout: int32(config.Timeout / time.Millisecond)}
+	req := &ProduceRequest{RequiredAcks: config.RequiredAcks, Timeout: config.Timeout}
 
 	// If compression is enabled, we need to group messages by topic-partition and
 	// wrap them in MessageSets. We already discarded that grouping, so we

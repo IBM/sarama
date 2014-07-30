@@ -8,9 +8,9 @@ import (
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
-	MetadataRetries   int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection   time.Duration // How long to wait for leader election to finish between retries.
-	DefaultBrokerConf *BrokerConfig // Default configuration for broker connections created by this client.
+	MetadataRetries      int           // How many times to retry a metadata request when a partition is in the middle of leader election.
+	WaitForElection      time.Duration // How long to wait for leader election to finish between retries.
+	ConcurrencyPerBroker int           // How many outstanding requests each broker is allowed to have.
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -40,11 +40,19 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	Logger.Println("Initializing new client")
 
 	if config == nil {
-		config = NewClientConfig()
+		config = new(ClientConfig)
 	}
 
-	if err := config.Validate(); err != nil {
-		return nil, err
+	if config.MetadataRetries <= 0 {
+		return nil, ConfigurationError("Invalid MetadataRetries. Try 10")
+	}
+
+	if config.WaitForElection <= time.Duration(0) {
+		return nil, ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
+	}
+
+	if config.ConcurrencyPerBroker < 0 {
+		return nil, ConfigurationError("Invalid ConcurrencyPerBroker")
 	}
 
 	if len(addrs) < 1 {
@@ -59,12 +67,12 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		brokers:          make(map[int32]*Broker),
 		leaders:          make(map[string]map[int32]int32),
 	}
-	client.extraBroker.Open(config.DefaultBrokerConf)
+	client.extraBroker.Open(config.ConcurrencyPerBroker)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
 	if err != nil {
-		client.Close()
+		client.Close() // this closes tmp, since it's still in the brokers hash
 		return nil, err
 	}
 
@@ -77,14 +85,6 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 // a client object passes out of scope, as it will otherwise leak memory. You must close any Producers or Consumers
 // using a client before you close the client.
 func (client *Client) Close() error {
-	// Check to see whether the client is closed
-	if client.Closed() {
-		// Chances are this is being called from a defer() and the error will go unobserved
-		// so we go ahead and log the event in this case.
-		Logger.Printf("Close() called on already closed client")
-		return ClosedClient
-	}
-
 	client.lock.Lock()
 	defer client.lock.Unlock()
 	Logger.Println("Closing Client")
@@ -105,20 +105,9 @@ func (client *Client) Close() error {
 
 // Partitions returns the sorted list of available partition IDs for the given topic.
 func (client *Client) Partitions(topic string) ([]int32, error) {
-	// Check to see whether the client is closed
-	if client.Closed() {
-		return nil, ClosedClient
-	}
-
 	partitions := client.cachedPartitions(topic)
 
-	// len==0 catches when it's nil (no such topic) and the odd case when every single
-	// partition is undergoing leader election simultaneously. Callers have to be able to handle
-	// this function returning an empty slice (which is a valid return value) but catching it
-	// here the first time (note we *don't* catch it below where we return NoSuchTopic) triggers
-	// a metadata refresh as a nicety so callers can just try again and don't have to manually
-	// trigger a refresh (otherwise they'd just keep getting a stale cached copy).
-	if len(partitions) == 0 {
+	if partitions == nil {
 		err := client.RefreshTopicMetadata(topic)
 		if err != nil {
 			return nil, err
@@ -135,11 +124,6 @@ func (client *Client) Partitions(topic string) ([]int32, error) {
 
 // Topics returns the set of available topics as retrieved from the cluster metadata.
 func (client *Client) Topics() ([]string, error) {
-	// Check to see whether the client is closed
-	if client.Closed() {
-		return nil, ClosedClient
-	}
-
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
@@ -183,36 +167,6 @@ func (client *Client) RefreshAllMetadata() error {
 	return client.refreshMetadata(make([]string, 0), client.config.MetadataRetries)
 }
 
-// GetOffset queries the cluster to get the most recent available offset at the given
-// time on the topic/partition combination.
-func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTime) (int64, error) {
-	broker, err := client.Leader(topic, partitionID)
-	if err != nil {
-		return -1, err
-	}
-
-	request := &OffsetRequest{}
-	request.AddBlock(topic, partitionID, where, 1)
-
-	response, err := broker.GetAvailableOffsets(client.id, request)
-	if err != nil {
-		return -1, err
-	}
-
-	block := response.GetBlock(topic, partitionID)
-	if block == nil {
-		return -1, IncompleteResponse
-	}
-	if block.Err != NoError {
-		return -1, block.Err
-	}
-	if len(block.Offsets) != 1 {
-		return -1, OffsetOutOfRange
-	}
-
-	return block.Offsets[0], nil
-}
-
 // misc private helper functions
 
 // XXX: see https://github.com/Shopify/sarama/issues/15
@@ -230,7 +184,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		client.extraBrokerAddrs = client.extraBrokerAddrs[1:]
 		if len(client.extraBrokerAddrs) > 0 {
 			client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
-			client.extraBroker.Open(client.config.DefaultBrokerConf)
+			client.extraBroker.Open(client.config.ConcurrencyPerBroker)
 		} else {
 			client.extraBroker = nil
 		}
@@ -244,18 +198,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 	go withRecover(func() { myBroker.Close() })
 }
 
-func (client *Client) Closed() bool {
-	return client.brokers == nil
-}
-
 func (client *Client) refreshMetadata(topics []string, retries int) error {
-	// This function is a sort of central point for most functions that create new
-	// resources.  Check to see if we're dealing with a closed Client and error
-	// out immediately if so.
-	if client.Closed() {
-		return ClosedClient
-	}
-
 	// Kafka will throw exceptions on an empty topic and not return a proper
 	// error. This handles the case by returning an error instead of sending it
 	// off to Kafka. See: https://github.com/Shopify/sarama/pull/38#issuecomment-26362310
@@ -322,12 +265,12 @@ func (client *Client) resurrectDeadBrokers() {
 
 	client.deadBrokerAddrs = []string{}
 	client.extraBrokerAddrs = []string{}
-	for addr := range brokers {
+	for addr, _ := range brokers {
 		client.extraBrokerAddrs = append(client.extraBrokerAddrs, addr)
 	}
 
 	client.extraBroker = NewBroker(client.extraBrokerAddrs[0])
-	client.extraBroker.Open(client.config.DefaultBrokerConf)
+	client.extraBroker.Open(client.config.ConcurrencyPerBroker)
 }
 
 func (client *Client) any() *Broker {
@@ -388,13 +331,13 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			broker.Open(client.config.DefaultBrokerConf)
+			broker.Open(client.config.ConcurrencyPerBroker)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			myBroker := client.brokers[broker.ID()] // use block-local to prevent clobbering `broker` for Gs
 			go withRecover(func() { myBroker.Close() })
-			broker.Open(client.config.DefaultBrokerConf)
+			broker.Open(client.config.ConcurrencyPerBroker)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
@@ -430,32 +373,4 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		ret = append(ret, topic)
 	}
 	return ret, nil
-}
-
-// NewClientConfig creates a new ClientConfig instance with sensible defaults
-func NewClientConfig() *ClientConfig {
-	return &ClientConfig{
-		MetadataRetries: 3,
-		WaitForElection: 250 * time.Millisecond,
-	}
-}
-
-// Validate checks a ClientConfig instance. This will return a
-// ConfigurationError if the specified values don't make sense.
-func (config *ClientConfig) Validate() error {
-	if config.MetadataRetries <= 0 {
-		return ConfigurationError("Invalid MetadataRetries. Try 10")
-	}
-
-	if config.WaitForElection <= time.Duration(0) {
-		return ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
-	}
-
-	if config.DefaultBrokerConf != nil {
-		if err := config.DefaultBrokerConf.Validate(); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

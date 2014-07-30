@@ -8,20 +8,6 @@ import (
 
 const TestMessage = "ABC THE MESSAGE"
 
-func defaultProducerConfig() *ProducerConfig {
-	config := NewProducerConfig()
-	config.MaxBufferTime = 1000000 * time.Millisecond             // don't flush based on time
-	config.MaxBufferedBytes = uint32((len(TestMessage) * 10) - 1) // flush after 10 messages
-	return config
-}
-
-func TestDefaultProducerConfigValidates(t *testing.T) {
-	config := NewProducerConfig()
-	if err := config.Validate(); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestSimpleProducer(t *testing.T) {
 
 	mb1 := NewMockBroker(t, 1)
@@ -30,7 +16,7 @@ func TestSimpleProducer(t *testing.T) {
 	defer mb2.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
@@ -38,15 +24,17 @@ func TestSimpleProducer(t *testing.T) {
 	pr.AddTopicPartition("my_topic", 0, NoError)
 	mb2.Returns(pr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	producer, err := NewProducer(client, defaultProducerConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush once, after the 10th message.
+		MaxBufferedBytes: uint32((len(TestMessage) * 10) - 1),
+	})
 	defer producer.Close()
 
 	// flush only on 10th and final message
@@ -64,7 +52,7 @@ func TestSimpleSyncProducer(t *testing.T) {
 	defer mb2.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mdr.AddTopicPartition("my_topic", 1, 2)
 	mb1.Returns(mdr)
 
@@ -75,15 +63,17 @@ func TestSimpleSyncProducer(t *testing.T) {
 		mb2.Returns(pr)
 	}
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	producer, err := NewProducer(client, defaultProducerConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush once, after the 10th message.
+		MaxBufferedBytes: uint32((len(TestMessage) * 10) - 1),
+	})
 	defer producer.Close()
 
 	for i := 0; i < 10; i++ {
@@ -99,7 +89,7 @@ func TestMultipleFlushes(t *testing.T) {
 	defer mb2.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
 	mdr.AddTopicPartition("my_topic", 0, 2)
 	mb1.Returns(mdr)
 
@@ -109,18 +99,17 @@ func TestMultipleFlushes(t *testing.T) {
 	mb2.Returns(pr)
 	mb2.Returns(pr) // yes, twice.
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	config := defaultProducerConfig()
-	// So that we flush after the 2nd message.
-	config.MaxBufferedBytes = uint32((len(TestMessage) * 5) - 1)
-	producer, err := NewProducer(client, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush once, after the 5th message.
+		MaxBufferedBytes: uint32((len(TestMessage) * 5) - 1),
+	})
 	defer producer.Close()
 
 	returns := []int{0, 0, 0, 0, 1, 0, 0, 0, 0, 1}
@@ -139,8 +128,8 @@ func TestMultipleProducer(t *testing.T) {
 	defer mb3.Close()
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
-	mdr.AddBroker(mb3.Addr(), mb3.BrokerID())
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
 	mdr.AddTopicPartition("topic_a", 0, 2)
 	mdr.AddTopicPartition("topic_b", 0, 3)
 	mdr.AddTopicPartition("topic_c", 0, 3)
@@ -155,15 +144,17 @@ func TestMultipleProducer(t *testing.T) {
 	pr2.AddTopicPartition("topic_c", 0, NoError)
 	mb3.Returns(pr2)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	producer, err := NewProducer(client, defaultProducerConfig())
-	if err != nil {
-		t.Fatal(err)
-	}
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush once, after the 10th message.
+		MaxBufferedBytes: uint32((len(TestMessage) * 10) - 1),
+	})
 	defer producer.Close()
 
 	// flush only on 10th and final message
@@ -197,8 +188,8 @@ func TestFailureRetry(t *testing.T) {
 	mb3 := NewMockBroker(t, 3)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
-	mdr.AddBroker(mb3.Addr(), mb3.BrokerID())
+	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
 	mdr.AddTopicPartition("topic_a", 0, 2)
 	mdr.AddTopicPartition("topic_b", 0, 3)
 	mdr.AddTopicPartition("topic_c", 0, 3)
@@ -225,7 +216,7 @@ func TestFailureRetry(t *testing.T) {
 	// isn't quite as random as claimed, though, it seems. Maybe because
 	// the same random seed is used each time?
 	mdr2 := new(MetadataResponse)
-	mdr2.AddBroker(mb3.Addr(), mb3.BrokerID())
+	mdr2.AddBroker(mb3.Addr(), int32(mb3.BrokerID()))
 	mdr2.AddTopicPartition("topic_b", 0, 3)
 	mb2.Returns(mdr2)
 
@@ -242,13 +233,18 @@ func TestFailureRetry(t *testing.T) {
 	/* 	AddTopicPartition("topic_c", 0, 1, NoError). */
 	/* 	AddTopicPartition("topic_b", 0, 1, NoError) */
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
+	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, defaultProducerConfig())
+	producer, err := NewProducer(client, &ProducerConfig{
+		RequiredAcks:  WaitForLocal,
+		MaxBufferTime: 1000000, // "never"
+		// So that we flush after the 2nd message.
+		MaxBufferedBytes: uint32((len(TestMessage) * 2) - 1),
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +305,7 @@ func assertNoMessages(t *testing.T, ch chan error) {
 }
 
 func ExampleProducer() {
-	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
+	client, err := NewClient("client_id", []string{"localhost:9092"}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
 	if err != nil {
 		panic(err)
 	} else {
@@ -317,7 +313,7 @@ func ExampleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewProducer(client, nil)
+	producer, err := NewProducer(client, &ProducerConfig{RequiredAcks: WaitForLocal})
 	if err != nil {
 		panic(err)
 	}
@@ -328,37 +324,6 @@ func ExampleProducer() {
 		panic(err)
 	} else {
 		fmt.Println("> message sent")
-	}
-}
-
-func ExampleAsyncProducer() {
-	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
-	if err != nil {
-		panic(err)
-	} else {
-		fmt.Println("> connected")
-	}
-	defer client.Close()
-
-	producer, err := NewProducer(client, nil)
-	if err != nil {
-		panic(err)
-	}
-	defer producer.Close()
-
-	go func() {
-		for err := range producer.Errors() {
-			panic(err)
-		}
-	}()
-
-	for {
-		err = producer.QueueMessage("my_topic", nil, StringEncoder("testing 123"))
-		if err != nil {
-			panic(err)
-		} else {
-			fmt.Println("> message sent")
-		}
 	}
 }
 
