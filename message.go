@@ -27,6 +27,7 @@ type Message struct {
 	Codec CompressionCodec // codec used to compress the message contents
 	Key   []byte           // the message key, may be nil
 	Value []byte           // the message contents
+	Set   *MessageSet      // the message set a message might wrap
 
 	compressedCache []byte
 }
@@ -61,7 +62,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionSnappy:
-			tmp, err := snappy.Encode(nil, m.Value)
+			tmp, err := SnappyEncode(m.Value)
 			if err != nil {
 				return err
 			}
@@ -121,18 +122,18 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if err != nil {
 			return err
 		}
-		m.Value, err = ioutil.ReadAll(reader)
-		if err != nil {
+		if m.Value, err = ioutil.ReadAll(reader); err != nil {
 			return err
 		}
+		return m.decodeSet()
 	case CompressionSnappy:
 		if m.Value == nil {
 			return DecodingError{Info: "Snappy compression specified, but no data to uncompress"}
 		}
-		m.Value, err = snappy.Decode(nil, m.Value)
-		if err != nil {
+		if m.Value, err = SnappyDecode(m.Value); err != nil {
 			return err
 		}
+		return m.decodeSet()
 	default:
 		return DecodingError{Info: "Invalid compression specified"}
 	}
@@ -143,4 +144,11 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	}
 
 	return nil
+}
+
+// decodes a message set from a previousy encoded bulk-message
+func (m *Message) decodeSet() (err error) {
+	pd := realDecoder{raw: m.Value}
+	m.Set = &MessageSet{}
+	return m.Set.decode(&pd)
 }

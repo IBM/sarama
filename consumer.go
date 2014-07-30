@@ -1,5 +1,9 @@
 package sarama
 
+import (
+	"time"
+)
+
 // OffsetMethod is passed in ConsumerConfig to tell the consumer how to determine the starting offset.
 type OffsetMethod int
 
@@ -17,34 +21,36 @@ const (
 
 // ConsumerConfig is used to pass multiple configuration options to NewConsumer.
 type ConsumerConfig struct {
-	// The default (maximum) amount of data to fetch from the broker in each request. The default of 0 is treated as 1024 bytes.
+	// The default (maximum) amount of data to fetch from the broker in each request. The default is 32768 bytes.
 	DefaultFetchSize int32
 	// The minimum amount of data to fetch in a request - the broker will wait until at least this many bytes are available.
-	// The default of 0 is treated as 'at least one' to prevent the consumer from spinning when no messages are available.
+	// The default is 1, as 0 causes the consumer to spin when no messages are available.
 	MinFetchSize int32
 	// The maximum permittable message size - messages larger than this will return MessageTooLarge. The default of 0 is
 	// treated as no limit.
 	MaxMessageSize int32
-	// The maximum amount of time (in ms) the broker will wait for MinFetchSize bytes to become available before it
-	// returns fewer than that anyways. The default of 0 causes Kafka to return immediately, which is rarely desirable
-	// as it causes the Consumer to spin when no events are available. 100-500ms is a reasonable range for most cases.
-	MaxWaitTime int32
+	// The maximum amount of time the broker will wait for MinFetchSize bytes to become available before it
+	// returns fewer than that anyways. The default is 250ms, since 0 causes the consumer to spin when no events are available.
+	// 100-500ms is a reasonable range for most cases. Kafka only supports precision up to milliseconds; nanoseconds will be truncated.
+	MaxWaitTime time.Duration
 
 	// The method used to determine at which offset to begin consuming messages.
 	OffsetMethod OffsetMethod
 	// Interpreted differently according to the value of OffsetMethod.
 	OffsetValue int64
 
-	// The number of events to buffer in the Events channel. Setting this can let the
-	// consumer continue fetching messages in the background while local code consumes events,
-	// greatly improving throughput.
+	// The number of events to buffer in the Events channel. Having this non-zero permits the
+	// consumer to continue fetching messages in the background while client code consumes events,
+	// greatly improving throughput. The default is 16.
 	EventBufferSize int
 }
 
 // ConsumerEvent is what is provided to the user when an event occurs. It is either an error (in which case Err is non-nil) or
-// a message (in which case Err is nil and the other fields are all set).
+// a message (in which case Err is nil and Offset, Key, and Value are set). Topic and Partition are always set.
 type ConsumerEvent struct {
 	Key, Value []byte
+	Topic      string
+	Partition  int32
 	Offset     int64
 	Err        error
 }
@@ -69,34 +75,18 @@ type Consumer struct {
 // NewConsumer creates a new consumer attached to the given client. It will read messages from the given topic and partition, as
 // part of the named consumer group.
 func NewConsumer(client *Client, topic string, partition int32, group string, config *ConsumerConfig) (*Consumer, error) {
+	// Check that we are not dealing with a closed Client before processing
+	// any other arguments
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	if config == nil {
-		config = new(ConsumerConfig)
+		config = NewConsumerConfig()
 	}
 
-	if config.DefaultFetchSize < 0 {
-		return nil, ConfigurationError("Invalid DefaultFetchSize")
-	} else if config.DefaultFetchSize == 0 {
-		config.DefaultFetchSize = 1024
-	}
-
-	if config.MinFetchSize < 0 {
-		return nil, ConfigurationError("Invalid MinFetchSize")
-	} else if config.MinFetchSize == 0 {
-		config.MinFetchSize = 1
-	}
-
-	if config.MaxMessageSize < 0 {
-		return nil, ConfigurationError("Invalid MaxMessageSize")
-	}
-
-	if config.MaxWaitTime <= 0 {
-		return nil, ConfigurationError("Invalid MaxWaitTime")
-	} else if config.MaxWaitTime < 100 {
-		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
-	}
-
-	if config.EventBufferSize < 0 {
-		return nil, ConfigurationError("Invalid EventBufferSize")
+	if err := config.Validate(); err != nil {
+		return nil, err
 	}
 
 	if topic == "" {
@@ -172,12 +162,9 @@ func (c *Consumer) sendError(err error) bool {
 		close(c.events)
 		close(c.done)
 		return false
-	case c.events <- &ConsumerEvent{Err: err}:
+	case c.events <- &ConsumerEvent{Err: err, Topic: c.topic, Partition: c.partition}:
 		return true
 	}
-
-	// For backward compatibility with go1.0
-	return true
 }
 
 func (c *Consumer) fetchMessages() {
@@ -187,7 +174,7 @@ func (c *Consumer) fetchMessages() {
 	for {
 		request := new(FetchRequest)
 		request.MinBytes = c.config.MinFetchSize
-		request.MaxWaitTime = c.config.MaxWaitTime
+		request.MaxWaitTime = int32(c.config.MaxWaitTime / time.Millisecond)
 		request.AddBlock(c.topic, c.partition, c.offset, fetchSize)
 
 		response, err := c.broker.Fetch(c.client.id, request)
@@ -277,23 +264,33 @@ func (c *Consumer) fetchMessages() {
 		}
 
 		for _, msgBlock := range block.MsgSet.Messages {
-			select {
-			case <-c.stopper:
-				close(c.events)
-				close(c.done)
-				return
-			case c.events <- &ConsumerEvent{Key: msgBlock.Msg.Key, Value: msgBlock.Msg.Value, Offset: msgBlock.Offset}:
-				c.offset++
+			for _, msg := range msgBlock.Messages() {
+
+				event := &ConsumerEvent{Topic: c.topic, Partition: c.partition}
+				if msg.Offset != c.offset {
+					event.Err = IncompleteResponse
+				} else {
+					event.Key = msg.Msg.Key
+					event.Value = msg.Msg.Value
+					event.Offset = msg.Offset
+					c.offset++
+				}
+
+				select {
+				case <-c.stopper:
+					close(c.events)
+					close(c.done)
+					return
+				case c.events <- event:
+				}
 			}
 		}
 	}
 }
 
 func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
-	request := &OffsetRequest{}
-	request.AddBlock(c.topic, c.partition, where, 1)
+	offset, err := c.client.GetOffset(c.topic, c.partition, where)
 
-	response, err := c.broker.GetAvailableOffsets(c.client.id, request)
 	switch err {
 	case nil:
 		break
@@ -303,40 +300,68 @@ func (c *Consumer) getOffset(where OffsetTime, retry bool) (int64, error) {
 		if !retry {
 			return -1, err
 		}
-		Logger.Printf("Unexpected error processing OffsetRequest; disconnecting broker %s: %s\n", c.broker.addr, err)
-		c.client.disconnectBroker(c.broker)
-		c.broker, err = c.client.Leader(c.topic, c.partition)
-		if err != nil {
-			return -1, err
+
+		switch err.(type) {
+		case KError:
+			switch err {
+			case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
+				err = c.client.RefreshTopicMetadata(c.topic)
+				if err != nil {
+					return -1, err
+				}
+			default:
+				Logger.Printf("Unexpected error processing OffsetRequest; disconnecting broker %s: %s\n", c.broker.addr, err)
+				c.client.disconnectBroker(c.broker)
+
+				broker, brokerErr := c.client.Leader(c.topic, c.partition)
+				if brokerErr != nil {
+					return -1, brokerErr
+				}
+				c.broker = broker
+			}
+			return c.getOffset(where, false)
 		}
-		return c.getOffset(where, false)
+		return -1, err
+	}
+	return offset, nil
+}
+
+// NewConsumerConfig creates a ConsumerConfig instance with sane defaults.
+func NewConsumerConfig() *ConsumerConfig {
+	return &ConsumerConfig{
+		DefaultFetchSize: 32768,
+		MinFetchSize:     1,
+		MaxWaitTime:      250 * time.Millisecond,
+		EventBufferSize:  16,
+	}
+}
+
+// Validate checks a ConsumerConfig instance. It will return a
+// ConfigurationError if the specified value doesn't make sense.
+func (config *ConsumerConfig) Validate() error {
+	if config.DefaultFetchSize <= 0 {
+		return ConfigurationError("Invalid DefaultFetchSize")
 	}
 
-	block := response.GetBlock(c.topic, c.partition)
-	if block == nil {
-		return -1, IncompleteResponse
+	if config.MinFetchSize <= 0 {
+		return ConfigurationError("Invalid MinFetchSize")
 	}
 
-	switch block.Err {
-	case NoError:
-		if len(block.Offsets) < 1 {
-			return -1, IncompleteResponse
-		}
-		return block.Offsets[0], nil
-	case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
-		if !retry {
-			return -1, block.Err
-		}
-		err = c.client.RefreshTopicMetadata(c.topic)
-		if err != nil {
-			return -1, err
-		}
-		c.broker, err = c.client.Leader(c.topic, c.partition)
-		if err != nil {
-			return -1, err
-		}
-		return c.getOffset(where, false)
+	if config.MaxMessageSize < 0 {
+		return ConfigurationError("Invalid MaxMessageSize")
 	}
 
-	return -1, block.Err
+	if config.MaxWaitTime < 1*time.Millisecond {
+		return ConfigurationError("Invalid MaxWaitTime, it needs to be at least 1ms")
+	} else if config.MaxWaitTime < 100*time.Millisecond {
+		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
+	} else if config.MaxWaitTime%time.Millisecond != 0 {
+		Logger.Println("ConsumerConfig.MaxWaitTime only supports millisecond precision; nanoseconds will be truncated.")
+	}
+
+	if config.EventBufferSize < 0 {
+		return ConfigurationError("Invalid EventBufferSize")
+	}
+
+	return nil
 }

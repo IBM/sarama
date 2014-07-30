@@ -2,8 +2,14 @@ package sarama
 
 import (
 	"testing"
-	"time"
 )
+
+func TestDefaultClientConfigValidates(t *testing.T) {
+	config := NewClientConfig()
+	if err := config.Validate(); err != nil {
+		t.Error(err)
+	}
+}
 
 func TestSimpleClient(t *testing.T) {
 
@@ -11,7 +17,7 @@ func TestSimpleClient(t *testing.T) {
 
 	mb.Returns(new(MetadataResponse))
 
-	client, err := NewClient("client_id", []string{mb.Addr()}, &ClientConfig{MetadataRetries: 10, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("client_id", []string{mb.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,10 +31,10 @@ func TestClientExtraBrokers(t *testing.T) {
 	mb2 := NewMockBroker(t, 2)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb2.Addr(), int32(mb2.BrokerID()))
+	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
 	mb1.Returns(mdr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 10, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,11 +49,11 @@ func TestClientMetadata(t *testing.T) {
 	mb5 := NewMockBroker(t, 5)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb5.Addr(), int32(mb5.BrokerID()))
-	mdr.AddTopicPartition("my_topic", 0, int32(mb5.BrokerID()))
+	mdr.AddBroker(mb5.Addr(), mb5.BrokerID())
+	mdr.AddTopicPartition("my_topic", 0, mb5.BrokerID())
 	mb1.Returns(mdr)
 
-	client, err := NewClient("client_id", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 10, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,14 +88,14 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	mb5 := NewMockBroker(t, 5)
 
 	mdr := new(MetadataResponse)
-	mdr.AddBroker(mb5.Addr(), int32(mb5.BrokerID()))
+	mdr.AddBroker(mb5.Addr(), mb5.BrokerID())
 	mb1.Returns(mdr)
 
 	mdr2 := new(MetadataResponse)
-	mdr2.AddTopicPartition("my_topic", 0xb, int32(mb5.BrokerID()))
+	mdr2.AddTopicPartition("my_topic", 0xb, mb5.BrokerID())
 	mb5.Returns(mdr2)
 
-	client, err := NewClient("clientID", []string{mb1.Addr()}, &ClientConfig{MetadataRetries: 1, WaitForElection: 250 * time.Millisecond})
+	client, err := NewClient("clientID", []string{mb1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,13 +6,51 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 )
+
+// BrokerConfig is used to pass multiple configuration options to Broker.Open.
+type BrokerConfig struct {
+	MaxOpenRequests int           // How many outstanding requests the broker is allowed to have before blocking attempts to send.
+	DialTimeout     time.Duration // How long to wait for the initial connection to succeed before timing out and returning an error.
+	ReadTimeout     time.Duration // How long to wait for a response before timing out and returning an error.
+	WriteTimeout    time.Duration // How long to wait for a transmit to succeed before timing out and returning an error.
+}
+
+// NewBrokerConfig returns a new broker configuration with sane defaults.
+func NewBrokerConfig() *BrokerConfig {
+	return &BrokerConfig{
+		MaxOpenRequests: 4,
+		DialTimeout:     1 * time.Minute,
+		ReadTimeout:     1 * time.Minute,
+		WriteTimeout:    1 * time.Minute,
+	}
+}
+
+// Validate checks a BrokerConfig instance. This will return a
+// ConfigurationError if the specified values don't make sense.
+func (config *BrokerConfig) Validate() error {
+	if config.MaxOpenRequests < 0 {
+		return ConfigurationError("Invalid MaxOpenRequests")
+	}
+
+	if config.ReadTimeout <= 0 {
+		return ConfigurationError("Invalid ReadTimeout")
+	}
+
+	if config.WriteTimeout <= 0 {
+		return ConfigurationError("Invalid WriteTimeout")
+	}
+
+	return nil
+}
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
 type Broker struct {
 	id   int32
 	addr string
 
+	conf          *BrokerConfig
 	correlationID int32
 	conn          net.Conn
 	connErr       error
@@ -37,10 +75,18 @@ func NewBroker(addr string) *Broker {
 // Open tries to connect to the Broker. It takes the broker lock synchronously, then spawns a goroutine which
 // connects and releases the lock. This means any subsequent operations on the broker will block waiting for
 // the connection to finish. To get the effect of a fully synchronous Open call, follow it by a call to Connected().
-// The only error Open will return directly is AlreadyConnected. The maxOpenRequests parameter determines how many
-// requests can be issued concurrently before future requests block. You generally will want at least one for each
-// topic-partition the broker will be interacting with concurrently.
-func (b *Broker) Open(maxOpenRequests int) error {
+// The only errors Open will return directly are ConfigurationError or AlreadyConnected. If conf is nil, the result of
+// NewBrokerConfig() is used.
+func (b *Broker) Open(conf *BrokerConfig) error {
+	if conf == nil {
+		conf = NewBrokerConfig()
+	}
+
+	err := conf.Validate()
+	if err != nil {
+		return err
+	}
+
 	b.lock.Lock()
 
 	if b.conn != nil {
@@ -53,17 +99,16 @@ func (b *Broker) Open(maxOpenRequests int) error {
 	go withRecover(func() {
 		defer b.lock.Unlock()
 
-		b.conn, b.connErr = net.Dial("tcp", b.addr)
+		b.conn, b.connErr = net.DialTimeout("tcp", b.addr, conf.DialTimeout)
 		if b.connErr != nil {
 			Logger.Printf("Failed to connect to broker %s\n", b.addr)
 			Logger.Println(b.connErr)
 			return
 		}
 
+		b.conf = conf
 		b.done = make(chan bool)
-
-		// permit a few outstanding requests before we block waiting for responses
-		b.responses = make(chan responsePromise, maxOpenRequests)
+		b.responses = make(chan responsePromise, b.conf.MaxOpenRequests)
 
 		Logger.Printf("Connected to broker %s\n", b.addr)
 		go withRecover(b.responseReceiver)
@@ -122,6 +167,18 @@ func (b *Broker) Addr() string {
 
 func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
+
+	err := b.sendAndReceive(clientID, request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) GetConsumerMetadata(clientID string, request *ConsumerMetadataRequest) (*ConsumerMetadataResponse, error) {
+	response := new(ConsumerMetadataResponse)
 
 	err := b.sendAndReceive(clientID, request, response)
 
@@ -215,6 +272,11 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 		return nil, err
 	}
 
+	err = b.conn.SetWriteDeadline(time.Now().Add(b.conf.WriteTimeout))
+	if err != nil {
+		return nil, err
+	}
+
 	_, err = b.conn.Write(buf)
 	if err != nil {
 		return nil, err
@@ -248,9 +310,6 @@ func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder
 	case err = <-promise.errors:
 		return err
 	}
-
-	// For backward compatibility with go1.0
-	return nil
 }
 
 func (b *Broker) decode(pd packetDecoder) (err error) {
@@ -300,7 +359,13 @@ func (b *Broker) encode(pe packetEncoder) (err error) {
 func (b *Broker) responseReceiver() {
 	header := make([]byte, 8)
 	for response := range b.responses {
-		_, err := io.ReadFull(b.conn, header)
+		err := b.conn.SetReadDeadline(time.Now().Add(b.conf.ReadTimeout))
+		if err != nil {
+			response.errors <- err
+			continue
+		}
+
+		_, err = io.ReadFull(b.conn, header)
 		if err != nil {
 			response.errors <- err
 			continue
@@ -313,13 +378,21 @@ func (b *Broker) responseReceiver() {
 			continue
 		}
 		if decodedHeader.correlationID != response.correlationID {
-			response.errors <- DecodingError{Info: "CorrelationID didn't match"}
+			// TODO if decoded ID < cur ID, discard until we catch up
+			// TODO if decoded ID > cur ID, save it so when cur ID catches up we have a response
+			response.errors <- DecodingError{
+				Info: fmt.Sprintf("CorrelationID didn't match, wanted %d, got %d", response.correlationID, decodedHeader.correlationID),
+			}
 			continue
 		}
 
 		buf := make([]byte, decodedHeader.length-4)
 		_, err = io.ReadFull(b.conn, buf)
 		if err != nil {
+			// XXX: the above ReadFull call inherits the same ReadDeadline set at the top of this loop, so it may
+			// fail with a timeout error. If this happens, our connection is permanently toast since we will no longer
+			// be aligned correctly on the stream (we'll be reading garbage Kafka headers from the middle of data).
+			// Can we/should we fail harder in that case?
 			response.errors <- err
 			continue
 		}
