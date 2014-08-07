@@ -63,7 +63,13 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
-	if err != nil {
+	switch err {
+	case nil:
+		break
+	case LeaderNotAvailable:
+		// indicates that maybe part of the cluster is down, but is not fatal to creating the client
+		Logger.Println(err)
+	default:
 		client.Close()
 		return nil, err
 	}
