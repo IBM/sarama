@@ -89,6 +89,7 @@ const (
 	NotLeaderForPartition           KError = 6
 	RequestTimedOut                 KError = 7
 	BrokerNotAvailable              KError = 8
+	ReplicaNotAvailable             KError = 9
 	MessageSizeTooLarge             KError = 10
 	StaleControllerEpochCode        KError = 11
 	OffsetMetadataTooLarge          KError = 12
@@ -121,6 +122,8 @@ func (err KError) Error() string {
 		return "kafka server: Request exceeded the user-specified time limit in the request."
 	case BrokerNotAvailable:
 		return "kafka server: Broker not available. Not a client facing error, we should never receive this!!!"
+	case ReplicaNotAvailable:
+		return "kafka server: Replica infomation not available, one or more brokers are down."
 	case MessageSizeTooLarge:
 		return "kafka server: Message was too large, server rejected it to avoid allocation error."
 	case StaleControllerEpochCode:
