@@ -13,3 +13,6 @@ before_install:
 - sleep 5
 - kafka/bin/kafka-topics.sh --create --partitions 1 --replication-factor 1 --topic single_partition --zookeeper localhost:2181
 - kafka/bin/kafka-topics.sh --create --partitions 2 --replication-factor 1 --topic multi_partition --zookeeper localhost:2181
+
+notifications:
+  flowdock: 15e08f7ed3a8fd2d89ddb36435301c1a
