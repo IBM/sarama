@@ -11,10 +11,17 @@ import (
 	"log"
 )
 
-// Logger is the instance of golang's log.Logger that Sarama writes connection
+// Logger is the instance of a StdLogger interface that Sarama writes connection
 // management events to. By default it is set to discard all log messages via ioutil.Discard,
 // but you can set it to redirect wherever you want.
-var Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
+var Logger StdLogger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
+
+// StdLogger is used to log error messages.
+type StdLogger interface {
+	Print(v ...interface{})
+	Printf(format string, v ...interface{})
+	Println(v ...interface{})
+}
 
 // PanicHandler is called for recovering from panics spawned internally to the library (and thus
 // not recoverable by the caller's goroutine). Defaults to nil, which means panics are not recovered.
