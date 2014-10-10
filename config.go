@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"crypto/tls"
+	"time"
+)
 
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
@@ -12,6 +15,11 @@ type Config struct {
 		DialTimeout  time.Duration // How long to wait for the initial connection to succeed before timing out and returning an error (default 30s).
 		ReadTimeout  time.Duration // How long to wait for a response before timing out and returning an error (default 30s).
 		WriteTimeout time.Duration // How long to wait for a transmit to succeed before timing out and returning an error (default 30s).
+
+		TLS struct {
+			Enable bool        // Whether or not to use TLS when connecting to the broker (defaults to false).
+			Config *tls.Config // The TLS configuration to use for secure connections if enabled (defaults to nil).
+		}
 	}
 
 	// Metadata is the namespace for metadata management properties used by the Client, and shared by the Producer/Consumer.
