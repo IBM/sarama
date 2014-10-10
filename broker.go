@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -73,7 +74,12 @@ func (b *Broker) Open(conf *Config) error {
 			KeepAlive: conf.Net.KeepAlive,
 		}
 
-		b.conn, b.connErr = dialer.Dial("tcp", b.addr)
+		if conf.Net.TLS.Enable {
+			b.conn, b.connErr = tls.DialWithDialer(&dialer, "tcp", b.addr, conf.Net.TLS.Config)
+		} else {
+			b.conn, b.connErr = dialer.Dial("tcp", b.addr)
+		}
+
 		if b.connErr != nil {
 			b.conn = nil
 			atomic.StoreInt32(&b.opened, 0)

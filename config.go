@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"crypto/tls"
+	"time"
+)
 
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
@@ -16,6 +19,13 @@ type Config struct {
 		// KeepAlive specifies the keep-alive period for an active network connection.
 		// If zero, keep-alives are disabled. (default is 0: disabled).
 		KeepAlive time.Duration
+
+		// NOTE: these config values have no compatibility guarantees; they may change when Kafka releases its
+		// official TLS support in version 0.9.
+		TLS struct {
+			Enable bool        // Whether or not to use TLS when connecting to the broker (defaults to false).
+			Config *tls.Config // The TLS configuration to use for secure connections if enabled (defaults to nil).
+		}
 	}
 
 	// Metadata is the namespace for metadata management properties used by the Client, and shared by the Producer/Consumer.
