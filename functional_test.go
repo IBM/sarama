@@ -60,7 +60,9 @@ func TestProducingMessages(t *testing.T) {
 	}
 	defer consumer.Close()
 
-	producer, err := NewProducer(client, nil)
+	producerConfig := NewProducerConfig()
+	producerConfig.Partitioner = &ConstantPartitioner{Constant: 0}
+	producer, err := NewProducer(client, producerConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
