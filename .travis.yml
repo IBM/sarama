@@ -4,15 +4,14 @@ go:
 - 1.2
 - 1.3
 
+env:
+  - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
+
 before_install:
-- wget http://apache.mirror.nexicom.net/kafka/0.8.1.1/kafka_2.10-0.8.1.1.tgz -O kafka.tgz
-- mkdir -p kafka && tar xzf kafka.tgz -C kafka --strip-components 1
-- nohup bash -c "cd kafka && bin/zookeeper-server-start.sh config/zookeeper.properties &"
-- sleep 5
-- nohup bash -c "cd kafka && bin/kafka-server-start.sh config/server.properties &"
-- sleep 5
-- kafka/bin/kafka-topics.sh --create --partitions 1 --replication-factor 1 --topic single_partition --zookeeper localhost:2181
-- kafka/bin/kafka-topics.sh --create --partitions 2 --replication-factor 1 --topic multi_partition --zookeeper localhost:2181
+- export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}
+- vagrant/install_cluster.sh
+- vagrant/boot_cluster.sh
+- vagrant/create_topics.sh
 
 notifications:
   flowdock: 15e08f7ed3a8fd2d89ddb36435301c1a
