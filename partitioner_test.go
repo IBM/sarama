@@ -72,3 +72,14 @@ func TestHashPartitioner(t *testing.T) {
 		assertPartitioningConsistent(t, partitioner, ByteEncoder(buf), 50)
 	}
 }
+
+func TestConstantPartitioner(t *testing.T) {
+	partitioner := &ConstantPartitioner{Constant: 0}
+
+	for i := 1; i < 50; i++ {
+		choice := partitioner.Partition(nil, 50)
+		if choice != 0 {
+			t.Error("Returned partition", choice, "instead of 0.")
+		}
+	}
+}

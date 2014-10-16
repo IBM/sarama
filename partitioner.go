@@ -84,3 +84,12 @@ func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
 	}
 	return hash % numPartitions
 }
+
+// ConstantPartitioner implements the Partitioner interface by just returning a constant value.
+type ConstantPartitioner struct {
+	Constant int32
+}
+
+func (p *ConstantPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+	return p.Constant
+}
