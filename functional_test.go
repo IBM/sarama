@@ -20,7 +20,7 @@ var (
 func init() {
 	kafkaAddr = os.Getenv("KAFKA_ADDR")
 	if kafkaAddr == "" {
-		kafkaAddr = "localhost:9092"
+		kafkaAddr = "localhost:6667"
 	}
 
 	c, err := net.Dial("tcp", kafkaAddr)
@@ -60,9 +60,7 @@ func TestProducingMessages(t *testing.T) {
 	}
 	defer consumer.Close()
 
-	producerConfig := NewProducerConfig()
-	producerConfig.Partitioner = &ConstantPartitioner{Constant: 0}
-	producer, err := NewProducer(client, producerConfig)
+	producer, err := NewProducer(client, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
