@@ -110,6 +110,8 @@ func (p *Producer) Errors() chan error {
 // it may otherwise leak memory. You must call this before calling Close on the
 // underlying client.
 func (p *Producer) Close() error {
+	p.m.RLock()
+	defer p.m.RUnlock()
 	for _, bp := range p.brokerProducers {
 		bp.Close()
 	}
