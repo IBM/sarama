@@ -724,6 +724,7 @@ func (p *Producer) unrefBrokerWorker(broker *Broker) {
 		worker.refs--
 		if worker.refs == 0 {
 			close(worker.input)
+			delete(p.brokers, broker)
 		}
 	}
 }
