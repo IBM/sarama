@@ -12,6 +12,6 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.network "private_network", ip: "192.168.100.67"
 
   config.vm.provider "vmware_fusion" do |v|
-    v.vmx["memsize"] = "2048"
+    v.vmx["memsize"] = "3072"
   end
 end
