@@ -9,7 +9,8 @@ type SimpleProducer struct {
 }
 
 // NewSimpleProducer creates a new SimpleProducer using the given client, topic and partitioner. If the
-// partitioner is nil, messages are partitioned randomly.
+// partitioner is nil, messages are partitioned by the hash of the key
+// (or randomly if there is no key).
 func NewSimpleProducer(client *Client, topic string, partitioner PartitionerConstructor) (*SimpleProducer, error) {
 	if topic == "" {
 		return nil, ConfigurationError("Empty topic")
