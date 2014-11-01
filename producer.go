@@ -15,7 +15,7 @@ type PartitionerConstructor func() Partitioner
 
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
-	Partitioner       PartitionerConstructor // Generates partitioners for choosing the partition to send messages to (defaults to random).
+	Partitioner       PartitionerConstructor // Generates partitioners for choosing the partition to send messages to (defaults to hash).
 	RequiredAcks      RequiredAcks           // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal).
 	Timeout           time.Duration          // The maximum duration the broker will wait the receipt of the number of RequiredAcks. This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated.
 	Compression       CompressionCodec       // The type of compression to use on messages (defaults to no compression).
@@ -30,7 +30,7 @@ type ProducerConfig struct {
 // NewProducerConfig creates a new ProducerConfig instance with sensible defaults.
 func NewProducerConfig() *ProducerConfig {
 	return &ProducerConfig{
-		Partitioner:     NewRandomPartitioner,
+		Partitioner:     NewHashPartitioner,
 		RequiredAcks:    WaitForLocal,
 		MaxMessageBytes: 1000000,
 	}
