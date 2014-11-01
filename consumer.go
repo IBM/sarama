@@ -267,7 +267,9 @@ func (c *Consumer) fetchMessages() {
 			for _, msg := range msgBlock.Messages() {
 
 				event := &ConsumerEvent{Topic: c.topic, Partition: c.partition}
-				if msg.Offset != c.offset {
+				if msg.Offset < c.offset {
+					continue
+				} else if msg.Offset > c.offset {
 					event.Err = IncompleteResponse
 				} else {
 					event.Key = msg.Msg.Key
