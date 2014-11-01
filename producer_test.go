@@ -165,7 +165,7 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	config := NewProducerConfig()
 	config.FlushMsgCount = 5
 	config.AckSuccesses = true
-	config.Partitioner = &RoundRobinPartitioner{}
+	config.Partitioner = NewRoundRobinPartitioner
 	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
