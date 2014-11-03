@@ -263,8 +263,8 @@ func (c *Consumer) fetchMessages() {
 			fetchSize = c.config.DefaultFetchSize
 		}
 
+		atLeastOne := false
 		for _, msgBlock := range block.MsgSet.Messages {
-			atLeastOne := false
 			prelude := true
 
 			for _, msg := range msgBlock.Messages() {
@@ -293,14 +293,15 @@ func (c *Consumer) fetchMessages() {
 				}
 			}
 
-			if !atLeastOne {
-				select {
-				case <-c.stopper:
-					close(c.events)
-					close(c.done)
-					return
-				case c.events <- &ConsumerEvent{Topic: c.topic, Partition: c.partition, Err: IncompleteResponse}:
-				}
+		}
+
+		if !atLeastOne {
+			select {
+			case <-c.stopper:
+				close(c.events)
+				close(c.done)
+				return
+			case c.events <- &ConsumerEvent{Topic: c.topic, Partition: c.partition, Err: IncompleteResponse}:
 			}
 		}
 	}
