@@ -257,6 +257,20 @@ func (client *Client) Closed() bool {
 	return client.brokers == nil
 }
 
+func (client *Client) fanoutMetadataRequest(topics []string) (*MetadataResponse, error) {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	fanout := newMetadataFanout()
+
+	for _, broker := range client.brokers {
+		b := broker
+		fanout.Fetch(b, client.id, &MetadataRequest{Topics: topics})
+	}
+	result := <-fanout.Get
+	return result.response, result.err
+}
+
 func (client *Client) refreshMetadata(topics []string, retries int) error {
 	// This function is a sort of central point for most functions that create new
 	// resources.  Check to see if we're dealing with a closed Client and error
@@ -274,35 +288,30 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 		}
 	}
 
-	for broker := client.any(); broker != nil; broker = client.any() {
-		Logger.Printf("Fetching metadata from broker %s\n", broker.addr)
-		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
-
-		switch err {
-		case nil:
-			// valid response, use it
-			retry, err := client.update(response)
-			switch {
-			case err != nil:
-				return err
-			case len(retry) == 0:
-				return nil
-			default:
-				if retries <= 0 {
-					return LeaderNotAvailable
-				}
-				Logger.Printf("Failed to fetch metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection/time.Millisecond, retries)
-				time.Sleep(client.config.WaitForElection) // wait for leader election
-				return client.refreshMetadata(retry, retries-1)
-			}
-		case EncodingError:
-			// didn't even send, return the error
+	response, err := client.fanoutMetadataRequest(topics)
+	switch err {
+	case nil:
+		// valid response, use it
+		retry, err := client.update(response)
+		switch {
+		case err != nil:
 			return err
+		case len(retry) == 0:
+			return nil
+		default:
+			if retries <= 0 {
+				return LeaderNotAvailable
+			}
+			Logger.Printf("Failed to fetch metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection/time.Millisecond, retries)
+			time.Sleep(client.config.WaitForElection) // wait for leader election
+			return client.refreshMetadata(retry, retries-1)
 		}
+	case EncodingError:
+		// didn't even send, return the error
+		return err
+	default:
+		// means all brokers are timedout... At what level should we disconnect a broker?
 
-		// some other error, remove that broker and try again
-		Logger.Println("Unexpected error from GetMetadata, closing broker:", err)
-		client.disconnectBroker(broker)
 	}
 
 	if retries > 0 {
