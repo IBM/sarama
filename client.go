@@ -311,16 +311,14 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 		return err
 	default:
 		// means all brokers are timedout... At what level should we disconnect a broker?
-
-	}
-
-	if retries > 0 {
-		Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
-		time.Sleep(client.config.WaitForElection)
-		client.resurrectDeadBrokers()
-		return client.refreshMetadata(topics, retries-1)
-	} else {
-		Logger.Printf("Out of available brokers.\n")
+		if retries > 0 {
+			Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
+			time.Sleep(client.config.WaitForElection)
+			client.resurrectDeadBrokers()
+			return client.refreshMetadata(topics, retries-1)
+		} else {
+			Logger.Printf("Out of available brokers.\n")
+		}
 	}
 
 	return OutOfBrokers
