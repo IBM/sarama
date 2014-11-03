@@ -20,7 +20,7 @@ type fanoutResult struct {
 }
 
 func newMetadataFanout() *metadataFanout {
-	f := &Fetcher{
+	f := &metadataFanout{
 		wg:             sync.WaitGroup{},
 		cleanupWaiting: sync.Once{},
 		initClose:      sync.Once{},
@@ -43,7 +43,7 @@ func newMetadataFanout() *metadataFanout {
 func (f *metadataFanout) Fetch(broker *Broker, clientId string, request *MetadataRequest) {
 	f.wg.Add(1)
 	f.cleanupWaiting.Do(func() { go f.waitAndCleanup(f.Done) })
-	go func(worker func() (string, error)) {
+	go func(worker *Broker) {
 		r, e := broker.GetMetadata(clientId, request)
 		select {
 		case <-f.closeChan:
@@ -53,7 +53,7 @@ func (f *metadataFanout) Fetch(broker *Broker, clientId string, request *Metadat
 			response: r,
 		}:
 		}
-	}(worker)
+	}(broker)
 }
 
 func (f *metadataFanout) waitAndCleanup(doneChan chan struct{}) {

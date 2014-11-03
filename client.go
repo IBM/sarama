@@ -263,10 +263,16 @@ func (client *Client) fanoutMetadataRequest(topics []string) (*MetadataResponse,
 
 	fanout := newMetadataFanout()
 
-	for _, broker := range client.brokers {
-		b := broker
-		fanout.Fetch(b, client.id, &MetadataRequest{Topics: topics})
+	if len(client.brokers) < 1 {
+		fanout.Fetch(client.extraBroker, client.id, &MetadataRequest{Topics: topics})
+	} else {
+		for _, broker := range client.brokers {
+			Logger.Printf("fanning out %v\n", broker)
+			b := broker
+			fanout.Fetch(b, client.id, &MetadataRequest{Topics: topics})
+		}
 	}
+
 	result := <-fanout.Get
 	return result.response, result.err
 }
@@ -302,7 +308,7 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 			if retries <= 0 {
 				return LeaderNotAvailable
 			}
-			Logger.Printf("Failed to fetch metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection/time.Millisecond, retries)
+			Logger.Printf("Failed to fetch metadata from brokers, waiting %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
 			time.Sleep(client.config.WaitForElection) // wait for leader election
 			return client.refreshMetadata(retry, retries-1)
 		}
