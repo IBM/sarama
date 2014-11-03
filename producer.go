@@ -10,9 +10,6 @@ func forceFlushThreshold() int {
 	return int(MaxRequestSize - (10 * 1024)) // 10KiB is safety room for misc. overhead, we might want to calculate this more precisely?
 }
 
-// PartitionerConstructor is the type for a function capable of constructing new Partitioners.
-type PartitionerConstructor func() Partitioner
-
 // ProducerConfig is used to pass multiple configuration options to NewProducer.
 type ProducerConfig struct {
 	Partitioner       PartitionerConstructor // Generates partitioners for choosing the partition to send messages to (defaults to hash).
