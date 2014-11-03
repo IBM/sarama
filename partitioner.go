@@ -14,6 +14,9 @@ type Partitioner interface {
 	Partition(key Encoder, numPartitions int32) int32
 }
 
+// PartitionerConstructor is the type for a function capable of constructing new Partitioners.
+type PartitionerConstructor func() Partitioner
+
 // RandomPartitioner implements the Partitioner interface by choosing a random partition each time.
 type RandomPartitioner struct {
 	generator *rand.Rand
