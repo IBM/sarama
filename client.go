@@ -348,17 +348,6 @@ func (client *Client) resurrectDeadBrokers() {
 	client.seedBroker.Open(client.config.DefaultBrokerConf)
 }
 
-func (client *Client) any() *Broker {
-	client.lock.RLock()
-	defer client.lock.RUnlock()
-
-	for _, broker := range client.brokers {
-		return broker
-	}
-
-	return client.seedBroker
-}
-
 func (client *Client) cachedLeader(topic string, partitionID int32) *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
