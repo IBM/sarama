@@ -19,6 +19,10 @@ type fanoutResult struct {
 	response *MetadataResponse
 }
 
+type metadataFetcher interface {
+	GetMetadata(string, *MetadataRequest) (*MetadataResponse, error)
+}
+
 func newMetadataFanout() *metadataFanout {
 	f := &metadataFanout{
 		wg:             sync.WaitGroup{},
@@ -35,16 +39,11 @@ func newMetadataFanout() *metadataFanout {
 }
 
 // Fetch is called by the thread initiating the fanout.
-// It "forks" and starts up the described worker.
-//
-// The Worker should implement its own timeout functionality
-//
-// TODO what should be the Format for the worker func?
-func (f *metadataFanout) Fetch(broker *Broker, clientId string, request *MetadataRequest) {
+func (f *metadataFanout) Fetch(broker metadataFetcher, clientId string, request *MetadataRequest) {
 	f.wg.Add(1)
 	f.cleanupWaiting.Do(func() { go f.waitAndCleanup(f.Done) })
-	go func(worker *Broker) {
-		r, e := broker.GetMetadata(clientId, request)
+	go func(worker metadataFetcher) {
+		r, e := worker.GetMetadata(clientId, request)
 		select {
 		case <-f.closeChan:
 			f.wg.Done()
