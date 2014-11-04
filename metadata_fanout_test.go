@@ -117,7 +117,7 @@ func TestMetadataFanoutAllErrored(t *testing.T) {
 	}
 	result := <-f.Get
 	if result.err == expected.err && metadataResponseIdsEqual(result.response, expected.response) {
-		t.Errorf("expected %+v but got %+v\n", expected.response.Brokers[0], result.response.Brokers[0])
+		t.Errorf("expected %+v but got %+v\n", expected, result)
 	}
 	<-f.Done
 }
