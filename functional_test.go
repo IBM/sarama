@@ -79,7 +79,7 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 
 	consumerConfig := NewConsumerConfig()
 	consumerConfig.OffsetMethod = OffsetMethodNewest
@@ -88,7 +88,7 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer consumer.Close()
+	defer safeClose(t, consumer)
 
 	config.AckSuccesses = true
 	producer, err := NewProducer(client, config)
@@ -118,7 +118,10 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 			t.Fatal(ret.Err)
 		}
 	}
-	producer.Close()
+	err = producer.Close()
+	if err != nil {
+		t.Error(err)
+	}
 
 	events := consumer.Events()
 	for i := 1; i <= TestBatchSize; i++ {

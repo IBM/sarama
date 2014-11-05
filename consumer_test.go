@@ -33,13 +33,13 @@ func TestSimpleConsumer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 
 	consumer, err := NewConsumer(client, "my_topic", 0, "my_consumer_group", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer consumer.Close()
+	defer safeClose(t, consumer)
 	defer mb1.Close()
 	defer mb2.Close()
 
@@ -69,7 +69,7 @@ func TestConsumerRawOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 
 	config := NewConsumerConfig()
 	config.OffsetMethod = OffsetMethodManual
@@ -78,7 +78,7 @@ func TestConsumerRawOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer consumer.Close()
+	defer safeClose(t, consumer)
 
 	defer mb1.Close()
 	defer mb2.Close()
@@ -106,7 +106,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 
 	config := NewConsumerConfig()
 	config.OffsetMethod = OffsetMethodNewest
@@ -114,7 +114,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer consumer.Close()
+	defer safeClose(t, consumer)
 
 	defer mb2.Close()
 	defer mb1.Close()

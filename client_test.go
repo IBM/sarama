@@ -1,8 +1,16 @@
 package sarama
 
 import (
+	"io"
 	"testing"
 )
+
+func safeClose(t *testing.T, c io.Closer) {
+	err := c.Close()
+	if err != nil {
+		t.Error(err)
+	}
+}
 
 func TestDefaultClientConfigValidates(t *testing.T) {
 	config := NewClientConfig()
@@ -21,7 +29,7 @@ func TestSimpleClient(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 	defer mb.Close()
 }
 
@@ -38,7 +46,7 @@ func TestClientSeedBrokers(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 	defer mb1.Close()
 	defer mb2.Close()
 }
@@ -57,7 +65,7 @@ func TestClientMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 	defer mb1.Close()
 	defer mb5.Close()
 
@@ -99,7 +107,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 	defer mb1.Close()
 	defer mb5.Close()
 
