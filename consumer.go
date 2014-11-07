@@ -263,17 +263,25 @@ func (c *Consumer) fetchMessages() {
 			fetchSize = c.config.DefaultFetchSize
 		}
 
+		atLeastOne := false
 		for _, msgBlock := range block.MsgSet.Messages {
+			prelude := true
+
 			for _, msg := range msgBlock.Messages() {
+				if prelude && msg.Offset < c.offset {
+					continue
+				}
+				prelude = false
 
 				event := &ConsumerEvent{Topic: c.topic, Partition: c.partition}
-				if msg.Offset != c.offset {
-					event.Err = IncompleteResponse
-				} else {
+				if msg.Offset == c.offset {
+					atLeastOne = true
 					event.Key = msg.Msg.Key
 					event.Value = msg.Msg.Value
 					event.Offset = msg.Offset
 					c.offset++
+				} else {
+					event.Err = IncompleteResponse
 				}
 
 				select {
@@ -283,6 +291,17 @@ func (c *Consumer) fetchMessages() {
 					return
 				case c.events <- event:
 				}
+			}
+
+		}
+
+		if !atLeastOne {
+			select {
+			case <-c.stopper:
+				close(c.events)
+				close(c.done)
+				return
+			case c.events <- &ConsumerEvent{Topic: c.topic, Partition: c.partition, Err: IncompleteResponse}:
 			}
 		}
 	}
