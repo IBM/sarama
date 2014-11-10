@@ -8,10 +8,11 @@ import (
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
-	MetadataRetries            int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection            time.Duration // How long to wait for leader election to finish between retries.
-	DefaultBrokerConf          *BrokerConfig // Default configuration for broker connections created by this client.
-	BackgroundRefreshFrequency time.Duration // How frequently the client will refresh the cluster metadata in the background. Defaults to 10 minutes. Set to 0 to disable.
+	MetadataRetries               int           // How many times to retry a metadata request when a partition is in the middle of leader election.
+	WaitForElection               time.Duration // How long to wait for leader election to finish between retries.
+	DefaultBrokerConf             *BrokerConfig // Default configuration for broker connections created by this client.
+	BackgroundRefreshFrequency    time.Duration // How frequently the client will refresh the cluster metadata in the background. Defaults to 10 minutes. Set to 0 to disable.
+	MetadataConcurrentConnections int           // How many brokers should we ask for metadata at a time? Defaults to 1. Must be >0
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -261,19 +262,19 @@ func (client *Client) fanoutMetadataRequest(topics []string) (*MetadataResponse,
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	fanout := newMetadataFanout()
+	fanout := newMetadataFanout(client.config.MetadataConcurrentConnections)
 
 	if len(client.brokers) < 1 {
 		fanout.Fetch(client.extraBroker, client.id, &MetadataRequest{Topics: topics})
 	} else {
 		for _, broker := range client.brokers {
-			Logger.Printf("fanning out %v\n", broker)
+			Logger.Printf("Fanning out %v\n", broker)
 			b := broker
 			fanout.Fetch(b, client.id, &MetadataRequest{Topics: topics})
 		}
 	}
 
-	result := <-fanout.Get
+	result := <-fanout.GetResult
 	return result.response, result.err
 }
 
@@ -468,9 +469,10 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 // NewClientConfig creates a new ClientConfig instance with sensible defaults
 func NewClientConfig() *ClientConfig {
 	return &ClientConfig{
-		MetadataRetries:            3,
-		WaitForElection:            250 * time.Millisecond,
-		BackgroundRefreshFrequency: 10 * time.Minute,
+		MetadataRetries:               3,
+		WaitForElection:               250 * time.Millisecond,
+		BackgroundRefreshFrequency:    10 * time.Minute,
+		MetadataConcurrentConnections: 1,
 	}
 }
 
@@ -493,6 +495,10 @@ func (config *ClientConfig) Validate() error {
 
 	if config.BackgroundRefreshFrequency < time.Duration(0) {
 		return ConfigurationError("Invalid BackgroundRefreshFrequency.")
+	}
+
+	if config.MetadataConcurrentConnections < 1 {
+		return ConfigurationError("Invalid MetadataConcurrentConnections. Try 1 or higher.")
 	}
 
 	return nil
