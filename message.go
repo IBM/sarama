@@ -56,8 +56,12 @@ func (m *Message) encode(pe packetEncoder) error {
 		case CompressionGZIP:
 			var buf bytes.Buffer
 			writer := gzip.NewWriter(&buf)
-			writer.Write(m.Value)
-			writer.Close()
+			if _, err = writer.Write(m.Value); err != nil {
+				return err
+			}
+			if err = writer.Close(); err != nil {
+				return err
+			}
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionSnappy:
@@ -72,8 +76,7 @@ func (m *Message) encode(pe packetEncoder) error {
 		}
 	}
 
-	err = pe.putBytes(payload)
-	if err != nil {
+	if err = pe.putBytes(payload); err != nil {
 		return err
 	}
 

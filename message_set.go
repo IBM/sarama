@@ -25,24 +25,20 @@ func (msb *MessageBlock) encode(pe packetEncoder) error {
 }
 
 func (msb *MessageBlock) decode(pd packetDecoder) (err error) {
-	msb.Offset, err = pd.getInt64()
-	if err != nil {
+	if msb.Offset, err = pd.getInt64(); err != nil {
 		return err
 	}
 
-	pd.push(&lengthField{})
-	if err != nil {
+	if err = pd.push(&lengthField{}); err != nil {
 		return err
 	}
 
 	msb.Msg = new(Message)
-	err = msb.Msg.decode(pd)
-	if err != nil {
+	if err = msb.Msg.decode(pd); err != nil {
 		return err
 	}
 
-	err = pd.pop()
-	if err != nil {
+	if err = pd.pop(); err != nil {
 		return err
 	}
 

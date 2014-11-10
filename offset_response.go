@@ -98,11 +98,17 @@ func (r *OffsetResponse) encode(pe packetEncoder) (err error) {
 	}
 
 	for topic, partitions := range r.Blocks {
-		pe.putString(topic)
-		pe.putArrayLength(len(partitions))
+		if err = pe.putString(topic); err != nil {
+			return err
+		}
+		if err = pe.putArrayLength(len(partitions)); err != nil {
+			return err
+		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			block.encode(pe)
+			if err = block.encode(pe); err != nil {
+				return err
+			}
 		}
 	}
 

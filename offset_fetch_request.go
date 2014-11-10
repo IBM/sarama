@@ -5,21 +5,20 @@ type OffsetFetchRequest struct {
 	partitions    map[string][]int32
 }
 
-func (r *OffsetFetchRequest) encode(pe packetEncoder) error {
-	err := pe.putString(r.ConsumerGroup)
-	if err != nil {
+func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
+	if err = pe.putString(r.ConsumerGroup); err != nil {
 		return err
 	}
-	err = pe.putArrayLength(len(r.partitions))
-	if err != nil {
+	if err = pe.putArrayLength(len(r.partitions)); err != nil {
 		return err
 	}
 	for topic, partitions := range r.partitions {
-		err = pe.putString(topic)
-		if err != nil {
+		if err = pe.putString(topic); err != nil {
 			return err
 		}
-		pe.putInt32Array(partitions)
+		if err = pe.putInt32Array(partitions); err != nil {
+			return err
+		}
 	}
 	return nil
 }
