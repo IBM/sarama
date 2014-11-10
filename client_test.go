@@ -25,7 +25,7 @@ func TestSimpleClient(t *testing.T) {
 	defer mb.Close()
 }
 
-func TestClientExtraBrokers(t *testing.T) {
+func TestClientSeedBrokers(t *testing.T) {
 
 	mb1 := NewMockBroker(t, 1)
 	mb2 := NewMockBroker(t, 2)
