@@ -35,9 +35,13 @@ func NewSimpleProducer(client *Client, topic string, partitioner PartitionerCons
 func (sp *SimpleProducer) SendMessage(key, value Encoder) error {
 	sp.producer.Input() <- &MessageToSend{Topic: sp.topic, Key: key, Value: value}
 
-	result := <-sp.producer.Errors() // we always get something because AckSuccesses is true
-
-	return result.Err
+	// we always get one or the other because AckSuccesses is true
+	select {
+	case err := <-sp.producer.Errors():
+		return err.Err
+	case <-sp.producer.Successes():
+		return nil
+	}
 }
 
 // Close shuts down the producer and flushes any messages it may have buffered. You must call this function before

@@ -85,9 +85,10 @@ func TestProducer(t *testing.T) {
 		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	for i := 0; i < 10; i++ {
-		msg := <-producer.Errors()
-		if msg.Err != nil {
-			t.Error(err)
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case <-producer.Successes():
 		}
 	}
 }
@@ -129,9 +130,10 @@ func TestProducerMultipleFlushes(t *testing.T) {
 			producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 		}
 		for i := 0; i < 5; i++ {
-			msg := <-producer.Errors()
-			if msg.Err != nil {
-				t.Error(err)
+			select {
+			case msg := <-producer.Errors():
+				t.Error(msg.Err)
+			case <-producer.Successes():
 			}
 		}
 	}
@@ -180,9 +182,10 @@ func TestProducerMultipleBrokers(t *testing.T) {
 		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	for i := 0; i < 10; i++ {
-		msg := <-producer.Errors()
-		if msg.Err != nil {
-			t.Error(err)
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case <-producer.Successes():
 		}
 	}
 }
@@ -231,9 +234,10 @@ func TestProducerFailureRetry(t *testing.T) {
 	response4.AddTopicPartition("my_topic", 0, NoError)
 	broker3.Returns(response4)
 	for i := 0; i < 10; i++ {
-		msg := <-producer.Errors()
-		if msg.Err != nil {
-			t.Error(err)
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case <-producer.Successes():
 		}
 	}
 
@@ -242,9 +246,10 @@ func TestProducerFailureRetry(t *testing.T) {
 	}
 	broker3.Returns(response4)
 	for i := 0; i < 10; i++ {
-		msg := <-producer.Errors()
-		if msg.Err != nil {
-			t.Error(err)
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case <-producer.Successes():
 		}
 	}
 }
@@ -269,7 +274,7 @@ func ExampleProducer() {
 		case producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder("testing 123")}:
 			fmt.Println("> message queued")
 		case err := <-producer.Errors():
-			panic(err)
+			panic(err.Err)
 		}
 	}
 }

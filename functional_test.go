@@ -103,19 +103,17 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 		case producer.Input() <- msg:
 			i++
 		case ret := <-producer.Errors():
-			if ret.Err == nil {
-				expectedResponses--
-			} else {
-				t.Fatal(ret.Err)
-			}
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
 		}
 	}
 	for expectedResponses > 0 {
-		ret := <-producer.Errors()
-		if ret.Err == nil {
-			expectedResponses--
-		} else {
+		select {
+		case ret := <-producer.Errors():
 			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
 		}
 	}
 	err = producer.Close()
