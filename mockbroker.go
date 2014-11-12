@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"runtime"
 	"strconv"
 )
 
@@ -104,6 +105,7 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		if _, err = conn.Write(response); err != nil {
 			return b.serverError(err, conn)
 		}
+
 	}
 	if err = conn.Close(); err != nil {
 		return b.serverError(err, nil)
@@ -116,6 +118,9 @@ func (b *MockBroker) serverLoop() (ok bool) {
 }
 
 func (b *MockBroker) serverError(err error, conn net.Conn) bool {
+	buf := make([]byte, 1024)
+	n := runtime.Stack(buf, false)
+	Logger.Println(buf[:n])
 	b.t.Error(err)
 	if conn != nil {
 		conn.Close()

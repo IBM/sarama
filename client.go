@@ -232,7 +232,7 @@ func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTim
 func (client *Client) disconnectBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
-	Logger.Printf("Disconnecting Broker %d\n", broker.ID())
+	Logger.Printf("Disconnecting Broker %d %s\n", broker.ID(), broker.Addr())
 
 	client.deadBrokerAddrs[broker.addr] = struct{}{}
 
@@ -264,17 +264,21 @@ func (client *Client) fanoutMetadataRequest(topics []string) (*MetadataResponse,
 
 	fanout := newMetadataFanout(client.config.MetadataConcurrentConnections)
 
-	if len(client.brokers) < 1 {
-		fanout.Fetch(client.extraBroker, client.id, &MetadataRequest{Topics: topics})
+	if len(client.brokers) < 1 && client.seedBroker != nil {
+		Logger.Printf("Fanning out %v\n", client.seedBroker)
+		fanout.Fetch(client.seedBroker, client.id, &MetadataRequest{Topics: topics})
 	} else {
 		for _, broker := range client.brokers {
 			Logger.Printf("Fanning out %v\n", broker)
-			b := broker
-			fanout.Fetch(b, client.id, &MetadataRequest{Topics: topics})
+			fanout.Fetch(broker, client.id, &MetadataRequest{Topics: topics})
 		}
 	}
 
+	go fanout.WaitAndCleanup()
 	result := <-fanout.GetResult
+	if result == nil {
+		return nil, OutOfBrokers
+	}
 	return result.response, result.err
 }
 
@@ -317,8 +321,17 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 		// didn't even send, return the error
 		return err
 	default:
-		// means all brokers are timedout... At what level should we disconnect a broker?
-		if retries > 0 {
+		client.lock.RLock()
+		shouldTryNextSeedBroker := len(client.brokers) < 1 && client.seedBroker != nil
+		client.lock.RUnlock()
+
+		if retries > 0 && shouldTryNextSeedBroker {
+			// We are getting broker information and our first seed errored on metadata connect.
+			// Retry on the next seed.
+			client.disconnectBroker(client.seedBroker)
+			return client.refreshMetadata(topics, retries-1)
+		} else if retries > 0 {
+			// means all brokers are timedout... At what level should we disconnect a broker?
 			Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
 			time.Sleep(client.config.WaitForElection)
 			client.resurrectDeadBrokers()

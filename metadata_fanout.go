@@ -3,12 +3,10 @@ package sarama
 import "sync"
 
 type metadataFanout struct {
-	wg             sync.WaitGroup
-	cleanupWaiting sync.Once
-	initClose      sync.Once
-	results        chan *fanoutResult
-	closer         chan struct{}
-	throttle       chan struct{}
+	wg       sync.WaitGroup
+	results  chan *fanoutResult
+	closer   chan struct{}
+	throttle chan struct{}
 
 	GetResult chan *fanoutResult // Stores the first non-error result from the metadata fanout.
 	Done      chan struct{}      // optional channel to notify outside when clean up is complete.
@@ -26,12 +24,9 @@ type metadataFetcher interface {
 
 func newMetadataFanout(maxConcurrentConnections int) *metadataFanout {
 	f := &metadataFanout{
-		wg:             sync.WaitGroup{},
-		cleanupWaiting: sync.Once{},
-		initClose:      sync.Once{},
-		closer:         make(chan struct{}),
-		results:        make(chan *fanoutResult, 1),
-		throttle:       make(chan struct{}, maxConcurrentConnections),
+		closer:   make(chan struct{}),
+		results:  make(chan *fanoutResult, 1),
+		throttle: make(chan struct{}, maxConcurrentConnections),
 
 		GetResult: make(chan *fanoutResult),
 		Done:      make(chan struct{}),
@@ -43,7 +38,6 @@ func newMetadataFanout(maxConcurrentConnections int) *metadataFanout {
 // Fetch is called by the thread initiating the fanout.
 func (f *metadataFanout) Fetch(broker metadataFetcher, clientId string, request *MetadataRequest) {
 	f.wg.Add(1)
-	f.cleanupWaiting.Do(func() { go f.waitAndCleanup(f.Done) })
 	go func(worker metadataFetcher) {
 		// Wait until throttle allows us to continue or someone else closes our channel
 		var checkout struct{}
@@ -54,21 +48,29 @@ func (f *metadataFanout) Fetch(broker metadataFetcher, clientId string, request 
 		case f.throttle <- checkout:
 		}
 
+		// Since the above select block can potentially choose the second case even if f.closer is closed
+		// we double check that case here. See https://goo.gl/lqydfp
 		select {
 		case <-f.closer:
 			f.wg.Done()
 			return
 		default:
-			r, e := worker.GetMetadata(clientId, request)
-			f.results <- &fanoutResult{
-				err:      e,
-				response: r,
-			}
+		}
+
+		r, e := worker.GetMetadata(clientId, request)
+		select {
+		case <-f.closer:
+			f.wg.Done()
+			return
+		case f.results <- &fanoutResult{
+			err:      e,
+			response: r,
+		}:
 		}
 	}(broker)
 }
 
-func (f *metadataFanout) waitAndCleanup(doneChan chan struct{}) {
+func (f *metadataFanout) WaitAndCleanup() {
 	// Wait until all workers have returned or a successful result has come
 	// and workers can shutdown
 	f.wg.Wait()
@@ -82,16 +84,16 @@ func (f *metadataFanout) waitAndCleanup(doneChan chan struct{}) {
 // If no valid result is found it emits the last failing result.
 func (f *metadataFanout) Listen() {
 	var lastResult *fanoutResult
+	goodResultFound := false
 	for r := range f.results {
-		f.wg.Done()
 		lastResult = r
-		if r.err == nil {
-			f.initClose.Do(func() {
-				close(f.closer)
-				f.GetResult <- r
-			})
+		if r.err == nil && !goodResultFound {
+			close(f.closer)
+			f.GetResult <- r
+			goodResultFound = true
 		}
 		<-f.throttle
+		f.wg.Done()
 	}
 	select {
 	case <-f.closer:

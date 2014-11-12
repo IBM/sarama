@@ -86,10 +86,9 @@ func TestMetadataFanout(t *testing.T) {
 		},
 	}
 	for _, fetch := range fetchers {
-		func(ff metadataFetcher) {
-			f.Fetch(ff, "id1", &MetadataRequest{Topics: []string{"topics"}})
-		}(fetch)
+		f.Fetch(fetch, "id1", &MetadataRequest{Topics: []string{"topics"}})
 	}
+	go f.WaitAndCleanup()
 	result := <-f.GetResult
 	if result.err == expected.err && metadataResponseIdsEqual(result.response, expected.response) {
 		t.Errorf("expected %+v but got %+v\n", expected, result)
@@ -130,10 +129,9 @@ func TestMetadataFanoutAllErrored(t *testing.T) {
 		},
 	}
 	for _, fetch := range fetchers {
-		func(ff metadataFetcher) {
-			f.Fetch(ff, "id1", &MetadataRequest{Topics: []string{"topics"}})
-		}(fetch)
+		f.Fetch(fetch, "id1", &MetadataRequest{Topics: []string{"topics"}})
 	}
+	go f.WaitAndCleanup()
 	result := <-f.GetResult
 	if result.err == expected.err && metadataResponseIdsEqual(result.response, expected.response) {
 		t.Errorf("expected %+v but got %+v\n", expected, result)
@@ -173,10 +171,9 @@ func TestMetadataFanoutSingleConnection(t *testing.T) {
 		},
 	}
 	for _, fetch := range fetchers {
-		func(ff metadataFetcher) {
-			f.Fetch(ff, "id1", &MetadataRequest{Topics: []string{"topics"}})
-		}(fetch)
+		f.Fetch(fetch, "id1", &MetadataRequest{Topics: []string{"topics"}})
 	}
+	go f.WaitAndCleanup()
 	result := <-f.GetResult
 	if result.err == expected.err && metadataResponseIdsEqual(result.response, expected.response) {
 		t.Errorf("expected %+v but got %+v\n", expected, result)
