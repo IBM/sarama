@@ -142,7 +142,9 @@ func (b *Broker) Close() (err error) {
 		return NotConnected
 	}
 
-	close(b.responses)
+	if b.responses != nil {
+		close(b.responses)
+	}
 	<-b.done
 
 	err = b.conn.Close()
@@ -259,10 +261,9 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if b.conn == nil {
-		if b.connErr != nil {
-			return nil, b.connErr
-		}
+	if b.connErr != nil {
+		return nil, b.connErr
+	} else if b.conn == nil {
 		return nil, NotConnected
 	}
 
