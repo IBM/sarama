@@ -10,12 +10,12 @@ import (
 var snappyMagic = []byte{130, 83, 78, 65, 80, 80, 89, 0}
 
 // SnappyEncode encodes binary data
-func SnappyEncode(src []byte) ([]byte, error) {
+func snappyEncode(src []byte) ([]byte, error) {
 	return snappy.Encode(nil, src)
 }
 
 // SnappyDecode decodes snappy data
-func SnappyDecode(src []byte) ([]byte, error) {
+func snappyDecode(src []byte) ([]byte, error) {
 	if bytes.Equal(src[:8], snappyMagic) {
 		pos := uint32(16)
 		max := uint32(len(src))

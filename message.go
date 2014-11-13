@@ -65,7 +65,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionSnappy:
-			tmp, err := SnappyEncode(m.Value)
+			tmp, err := snappyEncode(m.Value)
 			if err != nil {
 				return err
 			}
@@ -132,7 +132,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if m.Value == nil {
 			return DecodingError{Info: "Snappy compression specified, but no data to uncompress"}
 		}
-		if m.Value, err = SnappyDecode(m.Value); err != nil {
+		if m.Value, err = snappyDecode(m.Value); err != nil {
 			return err
 		}
 		return m.decodeSet()
