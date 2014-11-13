@@ -42,14 +42,44 @@ func checkKafkaAvailability(t *testing.T) {
 	}
 }
 
-func TestProducingMessages(t *testing.T) {
+func TestFuncProducing(t *testing.T) {
+	config := NewProducerConfig()
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingGzip(t *testing.T) {
+	config := NewProducerConfig()
+	config.Compression = CompressionGZIP
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingSnappy(t *testing.T) {
+	config := NewProducerConfig()
+	config.Compression = CompressionSnappy
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingNoResponse(t *testing.T) {
+	config := NewProducerConfig()
+	config.RequiredAcks = NoResponse
+	testProducingMessages(t, config)
+}
+
+func TestFuncProducingFlushing(t *testing.T) {
+	config := NewProducerConfig()
+	config.FlushMsgCount = TestBatchSize / 8
+	config.FlushFrequency = 250 * time.Millisecond
+	testProducingMessages(t, config)
+}
+
+func testProducingMessages(t *testing.T, config *ProducerConfig) {
 	checkKafkaAvailability(t)
 
 	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer client.Close()
+	defer safeClose(t, client)
 
 	consumerConfig := NewConsumerConfig()
 	consumerConfig.OffsetMethod = OffsetMethodNewest
@@ -58,20 +88,38 @@ func TestProducingMessages(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer consumer.Close()
+	defer safeClose(t, consumer)
 
-	producer, err := NewProducer(client, nil)
+	config.AckSuccesses = true
+	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for i := 1; i <= TestBatchSize; i++ {
-		err = producer.SendMessage("single_partition", nil, StringEncoder(fmt.Sprintf("testing %d", i)))
-		if err != nil {
-			t.Fatal(err)
+	expectedResponses := TestBatchSize
+	for i := 1; i <= TestBatchSize; {
+		msg := &MessageToSend{Topic: "single_partition", Key: nil, Value: StringEncoder(fmt.Sprintf("testing %d", i))}
+		select {
+		case producer.Input() <- msg:
+			i++
+		case ret := <-producer.Errors():
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
 		}
 	}
-	producer.Close()
+	for expectedResponses > 0 {
+		select {
+		case ret := <-producer.Errors():
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
+		}
+	}
+	err = producer.Close()
+	if err != nil {
+		t.Error(err)
+	}
 
 	events := consumer.Events()
 	for i := 1; i <= TestBatchSize; i++ {

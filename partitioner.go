@@ -4,7 +4,6 @@ import (
 	"hash"
 	"hash/fnv"
 	"math/rand"
-	"sync"
 	"time"
 )
 
@@ -15,33 +14,34 @@ type Partitioner interface {
 	Partition(key Encoder, numPartitions int32) int32
 }
 
+// PartitionerConstructor is the type for a function capable of constructing new Partitioners.
+type PartitionerConstructor func() Partitioner
+
 // RandomPartitioner implements the Partitioner interface by choosing a random partition each time.
 type RandomPartitioner struct {
 	generator *rand.Rand
-	m         sync.Mutex
 }
 
-func NewRandomPartitioner() *RandomPartitioner {
+func NewRandomPartitioner() Partitioner {
 	p := new(RandomPartitioner)
 	p.generator = rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
 	return p
 }
 
 func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
-	p.m.Lock()
-	defer p.m.Unlock()
 	return int32(p.generator.Intn(int(numPartitions)))
 }
 
 // RoundRobinPartitioner implements the Partitioner interface by walking through the available partitions one at a time.
 type RoundRobinPartitioner struct {
 	partition int32
-	m         sync.Mutex
+}
+
+func NewRoundRobinPartitioner() Partitioner {
+	return &RoundRobinPartitioner{}
 }
 
 func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int32 {
-	p.m.Lock()
-	defer p.m.Unlock()
 	if p.partition >= numPartitions {
 		p.partition = 0
 	}
@@ -54,12 +54,11 @@ func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int3
 // is chosen. Otherwise the FNV-1a hash of the encoded bytes is used modulus the number of partitions. This ensures that messages
 // with the same key always end up on the same partition.
 type HashPartitioner struct {
-	random *RandomPartitioner
+	random Partitioner
 	hasher hash.Hash32
-	m      sync.Mutex
 }
 
-func NewHashPartitioner() *HashPartitioner {
+func NewHashPartitioner() Partitioner {
 	p := new(HashPartitioner)
 	p.random = NewRandomPartitioner()
 	p.hasher = fnv.New32a()
@@ -67,8 +66,6 @@ func NewHashPartitioner() *HashPartitioner {
 }
 
 func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
-	p.m.Lock()
-	defer p.m.Unlock()
 	if key == nil {
 		return p.random.Partition(key, numPartitions)
 	}
