@@ -8,10 +8,11 @@ import (
 
 // ClientConfig is used to pass multiple configuration options to NewClient.
 type ClientConfig struct {
-	MetadataRetries            int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection            time.Duration // How long to wait for leader election to finish between retries.
-	DefaultBrokerConf          *BrokerConfig // Default configuration for broker connections created by this client.
-	BackgroundRefreshFrequency time.Duration // How frequently the client will refresh the cluster metadata in the background. Defaults to 10 minutes. Set to 0 to disable.
+	MetadataRetries               int           // How many times to retry a metadata request when a partition is in the middle of leader election.
+	WaitForElection               time.Duration // How long to wait for leader election to finish between retries.
+	DefaultBrokerConf             *BrokerConfig // Default configuration for broker connections created by this client.
+	BackgroundRefreshFrequency    time.Duration // How frequently the client will refresh the cluster metadata in the background. Defaults to 10 minutes. Set to 0 to disable.
+	MetadataConcurrentConnections int           // How many brokers should we ask for metadata at a time? Defaults to 1. Must be >0
 }
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -231,7 +232,7 @@ func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTim
 func (client *Client) disconnectBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
-	Logger.Printf("Disconnecting Broker %d\n", broker.ID())
+	Logger.Printf("Disconnecting Broker %d %s\n", broker.ID(), broker.Addr())
 
 	client.deadBrokerAddrs[broker.addr] = struct{}{}
 
@@ -257,6 +258,30 @@ func (client *Client) Closed() bool {
 	return client.brokers == nil
 }
 
+func (client *Client) fanoutMetadataRequest(topics []string) (*MetadataResponse, error) {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	fanout := newMetadataFanout(client.config.MetadataConcurrentConnections)
+
+	if len(client.brokers) < 1 && client.seedBroker != nil {
+		Logger.Printf("Fanning out %v\n", client.seedBroker)
+		fanout.Fetch(client.seedBroker, client.id, &MetadataRequest{Topics: topics})
+	} else {
+		for _, broker := range client.brokers {
+			Logger.Printf("Fanning out %v\n", broker)
+			fanout.Fetch(broker, client.id, &MetadataRequest{Topics: topics})
+		}
+	}
+
+	go fanout.WaitAndCleanup()
+	result := <-fanout.GetResult
+	if result == nil {
+		return nil, OutOfBrokers
+	}
+	return result.response, result.err
+}
+
 func (client *Client) refreshMetadata(topics []string, retries int) error {
 	// This function is a sort of central point for most functions that create new
 	// resources.  Check to see if we're dealing with a closed Client and error
@@ -274,44 +299,46 @@ func (client *Client) refreshMetadata(topics []string, retries int) error {
 		}
 	}
 
-	for broker := client.any(); broker != nil; broker = client.any() {
-		Logger.Printf("Fetching metadata from broker %s\n", broker.addr)
-		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
-
-		switch err {
-		case nil:
-			// valid response, use it
-			retry, err := client.update(response)
-			switch {
-			case err != nil:
-				return err
-			case len(retry) == 0:
-				return nil
-			default:
-				if retries <= 0 {
-					return LeaderNotAvailable
-				}
-				Logger.Printf("Failed to fetch metadata from broker %s, waiting %dms... (%d retries remaining)\n", broker.addr, client.config.WaitForElection/time.Millisecond, retries)
-				time.Sleep(client.config.WaitForElection) // wait for leader election
-				return client.refreshMetadata(retry, retries-1)
-			}
-		case EncodingError:
-			// didn't even send, return the error
+	response, err := client.fanoutMetadataRequest(topics)
+	switch err {
+	case nil:
+		// valid response, use it
+		retry, err := client.update(response)
+		switch {
+		case err != nil:
 			return err
+		case len(retry) == 0:
+			return nil
+		default:
+			if retries <= 0 {
+				return LeaderNotAvailable
+			}
+			Logger.Printf("Failed to fetch metadata from brokers, waiting %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
+			time.Sleep(client.config.WaitForElection) // wait for leader election
+			return client.refreshMetadata(retry, retries-1)
 		}
+	case EncodingError:
+		// didn't even send, return the error
+		return err
+	default:
+		client.lock.RLock()
+		shouldTryNextSeedBroker := len(client.brokers) < 1 && client.seedBroker != nil
+		client.lock.RUnlock()
 
-		// some other error, remove that broker and try again
-		Logger.Println("Unexpected error from GetMetadata, closing broker:", err)
-		client.disconnectBroker(broker)
-	}
-
-	if retries > 0 {
-		Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
-		time.Sleep(client.config.WaitForElection)
-		client.resurrectDeadBrokers()
-		return client.refreshMetadata(topics, retries-1)
-	} else {
-		Logger.Printf("Out of available brokers.\n")
+		if retries > 0 && shouldTryNextSeedBroker {
+			// We are getting broker information and our first seed errored on metadata connect.
+			// Retry on the next seed.
+			client.disconnectBroker(client.seedBroker)
+			return client.refreshMetadata(topics, retries-1)
+		} else if retries > 0 {
+			// means all brokers are timedout... At what level should we disconnect a broker?
+			Logger.Printf("Out of available brokers. Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retries)
+			time.Sleep(client.config.WaitForElection)
+			client.resurrectDeadBrokers()
+			return client.refreshMetadata(topics, retries-1)
+		} else {
+			Logger.Printf("Out of available brokers.\n")
+		}
 	}
 
 	return OutOfBrokers
@@ -333,17 +360,6 @@ func (client *Client) resurrectDeadBrokers() {
 
 	client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
 	client.seedBroker.Open(client.config.DefaultBrokerConf)
-}
-
-func (client *Client) any() *Broker {
-	client.lock.RLock()
-	defer client.lock.RUnlock()
-
-	for _, broker := range client.brokers {
-		return broker
-	}
-
-	return client.seedBroker
 }
 
 func (client *Client) cachedLeader(topic string, partitionID int32) *Broker {
@@ -466,9 +482,10 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 // NewClientConfig creates a new ClientConfig instance with sensible defaults
 func NewClientConfig() *ClientConfig {
 	return &ClientConfig{
-		MetadataRetries:            3,
-		WaitForElection:            250 * time.Millisecond,
-		BackgroundRefreshFrequency: 10 * time.Minute,
+		MetadataRetries:               3,
+		WaitForElection:               250 * time.Millisecond,
+		BackgroundRefreshFrequency:    10 * time.Minute,
+		MetadataConcurrentConnections: 1,
 	}
 }
 
@@ -491,6 +508,10 @@ func (config *ClientConfig) Validate() error {
 
 	if config.BackgroundRefreshFrequency < time.Duration(0) {
 		return ConfigurationError("Invalid BackgroundRefreshFrequency.")
+	}
+
+	if config.MetadataConcurrentConnections < 1 {
+		return ConfigurationError("Invalid MetadataConcurrentConnections. Try 1 or higher.")
 	}
 
 	return nil

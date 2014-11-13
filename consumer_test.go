@@ -52,7 +52,6 @@ func TestSimpleConsumer(t *testing.T) {
 			t.Error("Incorrect message offset!")
 		}
 	}
-
 }
 
 func TestConsumerRawOffset(t *testing.T) {

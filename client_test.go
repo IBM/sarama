@@ -1,8 +1,6 @@
 package sarama
 
-import (
-	"testing"
-)
+import "testing"
 
 func TestDefaultClientConfigValidates(t *testing.T) {
 	config := NewClientConfig()
@@ -12,7 +10,6 @@ func TestDefaultClientConfigValidates(t *testing.T) {
 }
 
 func TestSimpleClient(t *testing.T) {
-
 	mb := NewMockBroker(t, 1)
 
 	mb.Returns(new(MetadataResponse))
