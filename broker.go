@@ -101,6 +101,7 @@ func (b *Broker) Open(conf *BrokerConfig) error {
 
 		b.conn, b.connErr = net.DialTimeout("tcp", b.addr, conf.DialTimeout)
 		if b.connErr != nil {
+			b.conn = nil
 			Logger.Printf("Failed to connect to broker %s\n", b.addr)
 			Logger.Println(b.connErr)
 			return
