@@ -681,19 +681,17 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*MessageToSend) *Pr
 
 func (p *Producer) returnErrors(batch []*MessageToSend, err error) {
 	for _, msg := range batch {
-		if msg == nil {
-			continue
+		if msg != nil {
+			p.errors <- &ProduceError{Msg: msg, Err: err}
 		}
-		p.errors <- &ProduceError{Msg: msg, Err: err}
 	}
 }
 
 func (p *Producer) returnSuccesses(batch []*MessageToSend) {
 	for _, msg := range batch {
-		if msg == nil {
-			continue
+		if msg != nil {
+			p.successes <- msg
 		}
-		p.successes <- msg
 	}
 }
 
