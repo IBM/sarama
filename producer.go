@@ -208,15 +208,15 @@ func (p *Producer) Input() chan<- *MessageToSend {
 // it may otherwise leak memory. You must call this before calling Close on the
 // underlying client.
 func (p *Producer) Close() error {
-	go func() {
+	go withRecover(func() {
 		p.input <- &MessageToSend{flags: shutdown}
-	}()
+	})
 
 	if p.config.AckSuccesses {
-		go func() {
+		go withRecover(func() {
 			for _ = range p.successes {
 			}
-		}()
+		})
 	}
 
 	var errors ProduceErrors
