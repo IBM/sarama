@@ -212,6 +212,13 @@ func (p *Producer) Close() error {
 		p.input <- &MessageToSend{flags: shutdown}
 	}()
 
+	if p.config.AckSuccesses {
+		go func() {
+			for _ = range p.successes {
+			}
+		}()
+	}
+
 	var errors ProduceErrors
 	for event := range p.errors {
 		errors = append(errors, event)
