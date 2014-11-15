@@ -74,7 +74,10 @@ func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
 		return p.random.Partition(key, numPartitions)
 	}
 	p.hasher.Reset()
-	p.hasher.Write(bytes)
+	_, err = p.hasher.Write(bytes)
+	if err != nil {
+		return p.random.Partition(key, numPartitions)
+	}
 	hash := int32(p.hasher.Sum32())
 	if hash < 0 {
 		hash = -hash

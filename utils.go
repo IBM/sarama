@@ -1,5 +1,7 @@
 package sarama
 
+import "io"
+
 // make []int32 sortable so we can sort partition numbers
 type int32Slice []int32
 
@@ -25,6 +27,15 @@ func withRecover(fn func()) {
 	}()
 
 	fn()
+}
+
+func safeAsyncClose(c io.Closer) {
+	tmp := c // local var prevents clobbering in goroutine
+	go withRecover(func() {
+		if err := tmp.Close(); err != nil {
+			Logger.Println("Error closing", tmp, ":", err)
+		}
+	})
 }
 
 // Encoder is a simple interface for any type that can be encoded as an array of bytes

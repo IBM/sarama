@@ -99,14 +99,13 @@ func (client *Client) Close() error {
 	Logger.Println("Closing Client")
 
 	for _, broker := range client.brokers {
-		myBroker := broker // NB: block-local prevents clobbering
-		go withRecover(func() { myBroker.Close() })
+		safeAsyncClose(broker)
 	}
 	client.brokers = nil
 	client.leaders = nil
 
 	if client.seedBroker != nil {
-		go withRecover(func() { client.seedBroker.Close() })
+		safeAsyncClose(client.seedBroker)
 	}
 
 	return nil
@@ -249,8 +248,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		delete(client.brokers, broker.ID())
 	}
 
-	myBroker := broker // NB: block-local prevents clobbering
-	go withRecover(func() { myBroker.Close() })
+	safeAsyncClose(broker)
 }
 
 func (client *Client) Closed() bool {
@@ -415,8 +413,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
-			myBroker := client.brokers[broker.ID()] // use block-local to prevent clobbering `broker` for Gs
-			go withRecover(func() { myBroker.Close() })
+			safeAsyncClose(client.brokers[broker.ID()])
 			broker.Open(client.config.DefaultBrokerConf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
