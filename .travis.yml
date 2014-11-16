@@ -12,6 +12,7 @@ before_install:
 - vagrant/install_cluster.sh
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
+- go install -a -race regexp
 
 script:
 - go test -v -race ./...
