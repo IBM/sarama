@@ -12,6 +12,7 @@ import (
 type TestState interface {
 	Error(args ...interface{})
 	Fatal(args ...interface{})
+	Errorf(format string, args ...interface{})
 	Fatalf(format string, args ...interface{})
 }
 
@@ -32,7 +33,6 @@ type MockBroker struct {
 	expectations chan encoder
 	listener     net.Listener
 	t            TestState
-	expecting    encoder
 }
 
 func (b *MockBroker) BrokerID() int32 {
@@ -47,15 +47,9 @@ func (b *MockBroker) Addr() string {
 	return b.listener.Addr().String()
 }
 
-type rawExpectation []byte
-
-func (r rawExpectation) ResponseBytes() []byte {
-	return r
-}
-
 func (b *MockBroker) Close() {
-	if b.expecting != nil {
-		b.t.Fatalf("Not all expectations were satisfied in mockBroker with ID=%d! Still waiting on %#v", b.BrokerID(), b.expecting)
+	if len(b.expectations) > 0 {
+		b.t.Errorf("Not all expectations were satisfied in mockBroker with ID=%d! Still waiting on %d", b.BrokerID(), len(b.expectations))
 	}
 	close(b.expectations)
 	<-b.stopper
@@ -74,9 +68,7 @@ func (b *MockBroker) serverLoop() (ok bool) {
 	reqHeader := make([]byte, 4)
 	resHeader := make([]byte, 8)
 	for expectation := range b.expectations {
-		b.expecting = expectation
 		_, err = io.ReadFull(conn, reqHeader)
-		b.expecting = nil
 		if err != nil {
 			return b.serverError(err, conn)
 		}
