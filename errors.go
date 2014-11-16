@@ -62,20 +62,6 @@ func (err ConfigurationError) Error() string {
 	return "kafka: Invalid Configuration: " + string(err)
 }
 
-// DroppedMessagesError is returned from a producer when messages weren't able to be successfully delivered to a broker.
-type DroppedMessagesError struct {
-	DroppedMessages int
-	Err             error
-}
-
-func (err DroppedMessagesError) Error() string {
-	if err.Err != nil {
-		return fmt.Sprintf("kafka: Dropped %d messages: %s", err.DroppedMessages, err.Err.Error())
-	} else {
-		return fmt.Sprintf("kafka: Dropped %d messages", err.DroppedMessages)
-	}
-}
-
 // KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
