@@ -169,8 +169,7 @@ func (m *MessageToSend) byteSize() int {
 }
 
 // ProduceError is the type of error generated when the producer fails to deliver a message.
-// It contains the original MessageToSend as well as the actual error value. If the AckSuccesses configuration
-// value is set to true then every message sent generates a ProduceError, but successes will have a nil Err field.
+// It contains the original MessageToSend as well as the actual error value.
 type ProduceError struct {
 	Msg *MessageToSend
 	Err error
