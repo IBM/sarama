@@ -194,8 +194,6 @@ func TestProducerFailureRetry(t *testing.T) {
 	broker1 := NewMockBroker(t, 1)
 	broker2 := NewMockBroker(t, 2)
 	broker3 := NewMockBroker(t, 3)
-	defer broker1.Close()
-	defer broker3.Close()
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
@@ -206,7 +204,6 @@ func TestProducerFailureRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, client)
 
 	config := NewProducerConfig()
 	config.FlushMsgCount = 10
@@ -215,7 +212,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, producer)
+	broker1.Close()
 
 	for i := 0; i < 10; i++ {
 		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
@@ -223,12 +220,11 @@ func TestProducerFailureRetry(t *testing.T) {
 	response2 := new(ProduceResponse)
 	response2.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
 	broker2.Returns(response2)
-	broker2.Close()
 
 	response3 := new(MetadataResponse)
 	response3.AddBroker(broker3.Addr(), broker3.BrokerID())
 	response3.AddTopicPartition("my_topic", 0, broker3.BrokerID())
-	broker1.Returns(response3)
+	broker2.Returns(response3)
 
 	response4 := new(ProduceResponse)
 	response4.AddTopicPartition("my_topic", 0, NoError)
@@ -240,6 +236,7 @@ func TestProducerFailureRetry(t *testing.T) {
 		case <-producer.Successes():
 		}
 	}
+	broker2.Close()
 
 	for i := 0; i < 10; i++ {
 		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
@@ -252,6 +249,10 @@ func TestProducerFailureRetry(t *testing.T) {
 		case <-producer.Successes():
 		}
 	}
+
+	broker3.Close()
+	safeClose(t, producer)
+	safeClose(t, client)
 }
 
 func ExampleProducer() {
