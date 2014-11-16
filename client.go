@@ -63,7 +63,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		brokers:         make(map[int32]*Broker),
 		leaders:         make(map[string]map[int32]int32),
 	}
-	client.seedBroker.Open(config.DefaultBrokerConf)
+	_ = client.seedBroker.Open(config.DefaultBrokerConf)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
@@ -74,7 +74,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		// indicates that maybe part of the cluster is down, but is not fatal to creating the client
 		Logger.Println(err)
 	default:
-		client.Close()
+		_ = client.Close()
 		return nil, err
 	}
 	go withRecover(client.backgroundMetadataUpdater)
@@ -242,7 +242,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		client.seedBrokerAddrs = client.seedBrokerAddrs[1:]
 		if len(client.seedBrokerAddrs) > 0 {
 			client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
-			client.seedBroker.Open(client.config.DefaultBrokerConf)
+			_ = client.seedBroker.Open(client.config.DefaultBrokerConf)
 		} else {
 			client.seedBroker = nil
 		}
@@ -334,7 +334,7 @@ func (client *Client) resurrectDeadBrokers() {
 	client.deadBrokerAddrs = make(map[string]struct{})
 
 	client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
-	client.seedBroker.Open(client.config.DefaultBrokerConf)
+	_ = client.seedBroker.Open(client.config.DefaultBrokerConf)
 }
 
 func (client *Client) any() *Broker {
@@ -414,12 +414,12 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			broker.Open(client.config.DefaultBrokerConf)
+			_ = broker.Open(client.config.DefaultBrokerConf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			safeAsyncClose(client.brokers[broker.ID()])
-			broker.Open(client.config.DefaultBrokerConf)
+			_ = broker.Open(client.config.DefaultBrokerConf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
