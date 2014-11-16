@@ -13,5 +13,8 @@ before_install:
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
 
+script:
+- go test -v -race ./...
+
 notifications:
   flowdock: 15e08f7ed3a8fd2d89ddb36435301c1a
