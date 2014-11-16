@@ -110,9 +110,9 @@ func (b *MockBroker) serverLoop() (ok bool) {
 func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 	b.t.Error(err)
 	if conn != nil {
-		conn.Close()
+		_ = conn.Close()
 	}
-	b.listener.Close()
+	_ = b.listener.Close()
 	return false
 }
 
