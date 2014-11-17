@@ -74,7 +74,7 @@ func TestProducer(t *testing.T) {
 
 	config := NewProducerConfig()
 	config.FlushMsgCount = 10
-	config.AckSuccesses = true
+	promise := make(chan error)
 	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
@@ -82,13 +82,16 @@ func TestProducer(t *testing.T) {
 	defer safeClose(t, producer)
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Promise: promise}
 	}
 	for i := 0; i < 10; i++ {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+		case err := <-promise:
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 }
@@ -118,7 +121,7 @@ func TestProducerMultipleFlushes(t *testing.T) {
 
 	config := NewProducerConfig()
 	config.FlushMsgCount = 5
-	config.AckSuccesses = true
+	promise := make(chan error)
 	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
@@ -127,13 +130,16 @@ func TestProducerMultipleFlushes(t *testing.T) {
 
 	for flush := 0; flush < 3; flush++ {
 		for i := 0; i < 5; i++ {
-			producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+			producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Promise: promise}
 		}
 		for i := 0; i < 5; i++ {
 			select {
 			case msg := <-producer.Errors():
 				t.Error(msg.Err)
-			case <-producer.Successes():
+			case err := <-promise:
+				if err != nil {
+					t.Error(err)
+				}
 			}
 		}
 	}
@@ -170,7 +176,7 @@ func TestProducerMultipleBrokers(t *testing.T) {
 
 	config := NewProducerConfig()
 	config.FlushMsgCount = 5
-	config.AckSuccesses = true
+	promise := make(chan error)
 	config.Partitioner = NewRoundRobinPartitioner
 	producer, err := NewProducer(client, config)
 	if err != nil {
@@ -179,13 +185,16 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	defer safeClose(t, producer)
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Promise: promise}
 	}
 	for i := 0; i < 10; i++ {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+		case err := <-promise:
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 }
@@ -207,7 +216,7 @@ func TestProducerFailureRetry(t *testing.T) {
 
 	config := NewProducerConfig()
 	config.FlushMsgCount = 10
-	config.AckSuccesses = true
+	promise := make(chan error)
 	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
@@ -215,7 +224,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	broker1.Close()
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Promise: promise}
 	}
 	response2 := new(ProduceResponse)
 	response2.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
@@ -233,20 +242,26 @@ func TestProducerFailureRetry(t *testing.T) {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+		case err := <-promise:
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 	broker2.Close()
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Promise: promise}
 	}
 	broker3.Returns(response4)
 	for i := 0; i < 10; i++ {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+		case err := <-promise:
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}
 

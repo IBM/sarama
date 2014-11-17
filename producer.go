@@ -19,7 +19,6 @@ type ProducerConfig struct {
 	FlushMsgCount     int                    // The number of messages needed to trigger a flush.
 	FlushFrequency    time.Duration          // If this amount of time elapses without a flush, one will be queued.
 	FlushByteCount    int                    // If this many bytes of messages are accumulated, a flush will be triggered.
-	AckSuccesses      bool                   // If enabled, successfully delivered messages will be returned on the Successes channel.
 	MaxMessageBytes   int                    // The maximum permitted size of a message (defaults to 1000000)
 	ChannelBufferSize int                    // The size of the buffers of the channels between the different goroutines. Defaults to 0 (unbuffered).
 }
@@ -84,8 +83,8 @@ type Producer struct {
 	client *Client
 	config ProducerConfig
 
-	errors                    chan *ProduceError
-	input, successes, retries chan *MessageToSend
+	errors         chan *ProduceError
+	input, retries chan *MessageToSend
 
 	brokers    map[*Broker]*brokerWorker
 	brokerLock sync.Mutex
@@ -108,13 +107,12 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	}
 
 	p := &Producer{
-		client:    client,
-		config:    *config,
-		errors:    make(chan *ProduceError),
-		input:     make(chan *MessageToSend),
-		successes: make(chan *MessageToSend),
-		retries:   make(chan *MessageToSend),
-		brokers:   make(map[*Broker]*brokerWorker),
+		client:  client,
+		config:  *config,
+		errors:  make(chan *ProduceError),
+		input:   make(chan *MessageToSend),
+		retries: make(chan *MessageToSend),
+		brokers: make(map[*Broker]*brokerWorker),
 	}
 
 	// launch our singleton dispatchers
@@ -138,6 +136,7 @@ const (
 type MessageToSend struct {
 	Topic      string
 	Key, Value Encoder
+	Promise    chan<- error
 
 	// these are filled in by the producer as the message is processed
 	offset    int64
@@ -190,13 +189,6 @@ func (p *Producer) Errors() <-chan *ProduceError {
 	return p.errors
 }
 
-// Successes is the success output channel back to the user when AckSuccesses is configured.
-// If AckSuccesses is true, you MUST read from this channel or the Producer will deadlock.
-// It is suggested that you send and read messages together in a single select statement.
-func (p *Producer) Successes() <-chan *MessageToSend {
-	return p.successes
-}
-
 // Input is the input channel for the user to write messages to that they wish to send.
 func (p *Producer) Input() chan<- *MessageToSend {
 	return p.input
@@ -211,19 +203,10 @@ func (p *Producer) Close() error {
 		p.input <- &MessageToSend{flags: shutdown}
 	})
 
-	if p.config.AckSuccesses {
-		go withRecover(func() {
-			for _ = range p.successes {
-			}
-		})
-	}
-
 	var errors ProduceErrors
 	for event := range p.errors {
 		errors = append(errors, event)
 	}
-
-	close(p.successes)
 
 	if len(errors) > 0 {
 		return errors
@@ -256,7 +239,7 @@ func (p *Producer) topicDispatcher() {
 		if (p.config.Compression == CompressionNone && msg.Value != nil && msg.Value.Length() > p.config.MaxMessageBytes) ||
 			(msg.byteSize() > p.config.MaxMessageBytes) {
 
-			p.errors <- &ProduceError{Msg: msg, Err: MessageSizeTooLarge}
+			p.returnError(msg, MessageSizeTooLarge)
 			continue
 		}
 
@@ -280,7 +263,7 @@ func (p *Producer) topicDispatcher() {
 	p.retries <- &MessageToSend{flags: shutdown}
 
 	for msg := range p.input {
-		p.errors <- &ProduceError{Msg: msg, Err: ShuttingDown}
+		p.returnError(msg, ShuttingDown)
 	}
 
 	close(p.errors)
@@ -295,7 +278,7 @@ func (p *Producer) partitionDispatcher(topic string, input chan *MessageToSend) 
 		if msg.flags&retried == 0 {
 			err := p.assignPartition(partitioner, msg)
 			if err != nil {
-				p.errors <- &ProduceError{Msg: msg, Err: err}
+				p.returnError(msg, err)
 				continue
 			}
 		}
@@ -379,14 +362,14 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *M
 			if backlog != nil {
 				err = p.client.RefreshTopicMetadata(topic)
 				if err != nil {
-					p.errors <- &ProduceError{Msg: msg, Err: err}
+					p.returnError(msg, err)
 					continue
 				}
 			}
 
 			leader, err = p.client.Leader(topic, partition)
 			if err != nil {
-				p.errors <- &ProduceError{Msg: msg, Err: err}
+				p.returnError(msg, err)
 				continue
 			}
 
@@ -516,8 +499,10 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
-			if p.config.AckSuccesses {
-				p.returnSuccesses(batch)
+			for _, msg := range batch {
+				if msg != nil && msg.Promise != nil {
+					msg.Promise <- nil
+				}
 			}
 			continue
 		}
@@ -536,11 +521,11 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 				switch block.Err {
 				case NoError:
 					// All the messages for this topic-partition were delivered successfully!
-					if p.config.AckSuccesses {
-						for i := range msgs {
-							msgs[i].offset = block.Offset + int64(i)
+					for i, msg := range msgs {
+						if msg != nil && msg.Promise != nil {
+							msg.offset = block.Offset + int64(i)
+							msg.Promise <- nil
 						}
-						p.returnSuccesses(msgs)
 					}
 				case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 					Logger.Printf("producer/flusher state change to [retrying] on %s/%d because %v\n",
@@ -644,13 +629,13 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*MessageToSend) *Pr
 				var err error
 				if msg.Key != nil {
 					if keyBytes, err = msg.Key.Encode(); err != nil {
-						p.errors <- &ProduceError{Msg: msg, Err: err}
+						p.returnError(msg, err)
 						continue
 					}
 				}
 				if msg.Value != nil {
 					if valBytes, err = msg.Value.Encode(); err != nil {
-						p.errors <- &ProduceError{Msg: msg, Err: err}
+						p.returnError(msg, err)
 						continue
 					}
 				}
@@ -695,15 +680,7 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*MessageToSend) *Pr
 func (p *Producer) returnErrors(batch []*MessageToSend, err error) {
 	for _, msg := range batch {
 		if msg != nil {
-			p.errors <- &ProduceError{Msg: msg, Err: err}
-		}
-	}
-}
-
-func (p *Producer) returnSuccesses(batch []*MessageToSend) {
-	for _, msg := range batch {
-		if msg != nil {
-			p.successes <- msg
+			p.returnError(msg, err)
 		}
 	}
 }
@@ -714,7 +691,7 @@ func (p *Producer) retryMessages(batch []*MessageToSend, err error) {
 			continue
 		}
 		if msg.flags&retried == retried {
-			p.errors <- &ProduceError{Msg: msg, Err: err}
+			p.returnError(msg, err)
 		} else {
 			msg.flags |= retried
 			p.retries <- msg
@@ -760,5 +737,13 @@ func (p *Producer) unrefBrokerWorker(broker *Broker) {
 			close(worker.input)
 			delete(p.brokers, broker)
 		}
+	}
+}
+
+func (p *Producer) returnError(msg *MessageToSend, err error) {
+	if msg.Promise != nil {
+		msg.Promise <- err
+	} else {
+		p.errors <- &ProduceError{Msg: msg, Err: MessageSizeTooLarge}
 	}
 }
