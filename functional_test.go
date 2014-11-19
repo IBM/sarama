@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"testing"
 	"time"
 )
@@ -70,6 +71,47 @@ func TestFuncProducingFlushing(t *testing.T) {
 	config.FlushMsgCount = TestBatchSize / 8
 	config.FlushFrequency = 250 * time.Millisecond
 	testProducingMessages(t, config)
+}
+
+func TestFuncMultiPartitionProduce(t *testing.T) {
+	checkKafkaAvailability(t)
+	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, client)
+
+	config := NewProducerConfig()
+	config.FlushFrequency = 50 * time.Millisecond
+	config.FlushMsgCount = 200
+	config.ChannelBufferSize = 20
+	config.AckSuccesses = true
+	producer, err := NewProducer(client, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(TestBatchSize)
+
+	for i := 1; i <= TestBatchSize; i++ {
+
+		go func(i int, w *sync.WaitGroup) {
+			defer w.Done()
+			msg := &MessageToSend{Topic: "multi_partition", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
+			producer.Input() <- msg
+			select {
+			case ret := <-producer.Errors():
+				t.Fatal(ret.Err)
+			case <-producer.Successes():
+			}
+		}(i, &wg)
+	}
+
+	wg.Wait()
+	if err := producer.Close(); err != nil {
+		t.Error(err)
+	}
 }
 
 func testProducingMessages(t *testing.T, config *ProducerConfig) {
