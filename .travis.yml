@@ -4,7 +4,7 @@ go:
 - 1.3
 
 env:
-  - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
+- KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
 
 before_install:
 - export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}
@@ -12,9 +12,11 @@ before_install:
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
 - go install -a -race regexp # Fix for go 1.2
+- go get code.google.com/p/go.tools/cmd/vet
 
 script:
 - go test -v -race ./...
+- go vet ./...
 - if [[ -n $(go fmt ./...) ]]; then echo "Please run go fmt on your code." && exit 1; fi
 
 notifications:
