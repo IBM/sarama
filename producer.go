@@ -264,7 +264,8 @@ func (p *Producer) topicDispatcher() {
 		if handler == nil {
 			p.retries <- &MessageToSend{flags: ref}
 			newHandler := make(chan *MessageToSend, p.config.ChannelBufferSize)
-			go withRecover(func() { p.partitionDispatcher(msg.Topic, newHandler) })
+			topic := msg.Topic // block local because go's closure semantics suck
+			go withRecover(func() { p.partitionDispatcher(topic, newHandler) })
 			handler = newHandler
 			handlers[msg.Topic] = handler
 		}
@@ -303,7 +304,9 @@ func (p *Producer) partitionDispatcher(topic string, input chan *MessageToSend) 
 		if handler == nil {
 			p.retries <- &MessageToSend{flags: ref}
 			newHandler := make(chan *MessageToSend, p.config.ChannelBufferSize)
-			go withRecover(func() { p.leaderDispatcher(msg.Topic, msg.partition, newHandler) })
+			topic := msg.Topic         // block local because go's closure semantics suck
+			partition := msg.partition // block local because go's closure semantics suck
+			go withRecover(func() { p.leaderDispatcher(topic, partition, newHandler) })
 			handler = newHandler
 			handlers[msg.partition] = handler
 		}
