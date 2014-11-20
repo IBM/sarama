@@ -55,10 +55,12 @@ func TestClientMetadata(t *testing.T) {
 
 	mb1 := NewMockBroker(t, 1)
 	mb5 := NewMockBroker(t, 5)
+	replicas := []int32{3, 1, 5}
+	isr := []int32{5, 1}
 
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb5.Addr(), mb5.BrokerID())
-	mdr.AddTopicPartition("my_topic", 0, mb5.BrokerID())
+	mdr.AddTopicPartition("my_topic", 0, mb5.BrokerID(), replicas, isr)
 	mb1.Returns(mdr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
@@ -89,6 +91,26 @@ func TestClientMetadata(t *testing.T) {
 	} else if tst.ID() != 5 {
 		t.Error("Leader for my_topic had incorrect ID.")
 	}
+
+	replicas, err = client.Replicas("my_topic", 0)
+	if err != nil {
+		t.Error(err)
+	} else if replicas[0] != 1 {
+		t.Error("Incorrect (or unsorted) replica")
+	} else if replicas[1] != 3 {
+		t.Error("Incorrect (or unsorted) replica")
+	} else if replicas[2] != 5 {
+		t.Error("Incorrect (or unsorted) replica")
+	}
+
+	isr, err = client.ReplicasInSync("my_topic", 0)
+	if err != nil {
+		t.Error(err)
+	} else if isr[0] != 1 {
+		t.Error("Incorrect (or unsorted) isr")
+	} else if isr[1] != 5 {
+		t.Error("Incorrect (or unsorted) isr")
+	}
 }
 
 func TestClientRefreshBehaviour(t *testing.T) {
@@ -100,7 +122,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	mb1.Returns(mdr)
 
 	mdr2 := new(MetadataResponse)
-	mdr2.AddTopicPartition("my_topic", 0xb, mb5.BrokerID())
+	mdr2.AddTopicPartition("my_topic", 0xb, mb5.BrokerID(), nil, nil)
 	mb5.Returns(mdr2)
 
 	client, err := NewClient("clientID", []string{mb1.Addr()}, nil)

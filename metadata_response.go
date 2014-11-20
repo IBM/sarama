@@ -182,7 +182,7 @@ func (m *MetadataResponse) AddBroker(addr string, id int32) {
 	m.Brokers = append(m.Brokers, &Broker{id: id, addr: addr})
 }
 
-func (m *MetadataResponse) AddTopicPartition(topic string, partition, brokerID int32) {
+func (m *MetadataResponse) AddTopicPartition(topic string, partition, brokerID int32, replicas, isr []int32) {
 	var match *TopicMetadata
 
 	for _, tm := range m.Topics {
@@ -214,5 +214,7 @@ foundTopic:
 foundPartition:
 
 	pmatch.Leader = brokerID
+	pmatch.Replicas = replicas
+	pmatch.Isr = isr
 
 }
