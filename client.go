@@ -163,7 +163,7 @@ func (client *Client) Topics() ([]string, error) {
 	return ret, nil
 }
 
-func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error) {
+func (client *Client) getMetadata(topic string, partitionID int32) (*PartitionMetadata, error) {
 	metadata := client.cachedMetadata(topic, partitionID)
 
 	if metadata == nil {
@@ -176,24 +176,26 @@ func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error)
 
 	if metadata == nil {
 		return nil, UnknownTopicOrPartition
+	}
+
+	return metadata, nil
+}
+
+func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error) {
+	metadata, err := client.getMetadata(topic, partitionID)
+
+	if err != nil {
+		return nil, err
 	}
 
 	return dupeAndSort(metadata.Replicas), nil
 }
 
 func (client *Client) ReplicasInSync(topic string, partitionID int32) ([]int32, error) {
-	metadata := client.cachedMetadata(topic, partitionID)
+	metadata, err := client.getMetadata(topic, partitionID)
 
-	if metadata == nil {
-		err := client.RefreshTopicMetadata(topic)
-		if err != nil {
-			return nil, err
-		}
-		metadata = client.cachedMetadata(topic, partitionID)
-	}
-
-	if metadata == nil {
-		return nil, UnknownTopicOrPartition
+	if err != nil {
+		return nil, err
 	}
 
 	return dupeAndSort(metadata.Isr), nil
