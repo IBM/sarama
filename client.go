@@ -30,9 +30,9 @@ type Client struct {
 	seedBroker      *Broker
 	deadBrokerAddrs map[string]struct{}
 
-	brokers map[int32]*Broker          // maps broker ids to brokers
-	leaders map[string]map[int32]int32 // maps topics to partition ids to broker ids
-	lock    sync.RWMutex               // protects access to the maps, only one since they're always written together
+	brokers  map[int32]*Broker                       // maps broker ids to brokers
+	metadata map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
+	lock     sync.RWMutex                            // protects access to the maps, only one since they're always written together
 }
 
 // NewClient creates a new Client with the given client ID. It connects to one of the given broker addresses
@@ -61,7 +61,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		seedBroker:      NewBroker(addrs[0]),
 		deadBrokerAddrs: make(map[string]struct{}),
 		brokers:         make(map[int32]*Broker),
-		leaders:         make(map[string]map[int32]int32),
+		metadata:        make(map[string]map[int32]*PartitionMetadata),
 	}
 	_ = client.seedBroker.Open(config.DefaultBrokerConf)
 
@@ -104,7 +104,7 @@ func (client *Client) Close() error {
 		safeAsyncClose(broker)
 	}
 	client.brokers = nil
-	client.leaders = nil
+	client.metadata = nil
 
 	if client.seedBroker != nil {
 		safeAsyncClose(client.seedBroker)
@@ -155,12 +155,48 @@ func (client *Client) Topics() ([]string, error) {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	ret := make([]string, 0, len(client.leaders))
-	for topic := range client.leaders {
+	ret := make([]string, 0, len(client.metadata))
+	for topic := range client.metadata {
 		ret = append(ret, topic)
 	}
 
 	return ret, nil
+}
+
+func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error) {
+	metadata := client.cachedMetadata(topic, partitionID)
+
+	if metadata == nil {
+		err := client.RefreshTopicMetadata(topic)
+		if err != nil {
+			return nil, err
+		}
+		metadata = client.cachedMetadata(topic, partitionID)
+	}
+
+	if metadata == nil {
+		return nil, UnknownTopicOrPartition
+	}
+
+	return dupeAndSort(metadata.Replicas), nil
+}
+
+func (client *Client) ReplicasInSync(topic string, partitionID int32) ([]int32, error) {
+	metadata := client.cachedMetadata(topic, partitionID)
+
+	if metadata == nil {
+		err := client.RefreshTopicMetadata(topic)
+		if err != nil {
+			return nil, err
+		}
+		metadata = client.cachedMetadata(topic, partitionID)
+	}
+
+	if metadata == nil {
+		return nil, UnknownTopicOrPartition
+	}
+
+	return dupeAndSort(metadata.Isr), nil
 }
 
 // Leader returns the broker object that is the leader of the current topic/partition, as
@@ -352,12 +388,24 @@ func (client *Client) cachedLeader(topic string, partitionID int32) *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	partitions := client.leaders[topic]
+	partitions := client.metadata[topic]
 	if partitions != nil {
-		leader, ok := partitions[partitionID]
+		metadata, ok := partitions[partitionID]
 		if ok {
-			return client.brokers[leader]
+			return client.brokers[metadata.Leader]
 		}
+	}
+
+	return nil
+}
+
+func (client *Client) cachedMetadata(topic string, partitionID int32) *PartitionMetadata {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	partitions := client.metadata[topic]
+	if partitions != nil {
+		return partitions[partitionID]
 	}
 
 	return nil
@@ -367,7 +415,7 @@ func (client *Client) cachedPartitions(topic string) []int32 {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	partitions := client.leaders[topic]
+	partitions := client.metadata[topic]
 	if partitions == nil {
 		return nil
 	}
@@ -436,22 +484,22 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		default:
 			return nil, topic.Err
 		}
-		client.leaders[topic.Name] = make(map[int32]int32, len(topic.Partitions))
+		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
 			switch partition.Err {
 			case LeaderNotAvailable:
 				toRetry[topic.Name] = true
-				delete(client.leaders[topic.Name], partition.ID)
+				delete(client.metadata[topic.Name], partition.ID)
 			case NoError:
 				broker := client.brokers[partition.Leader]
 				if _, present := client.deadBrokerAddrs[broker.Addr()]; present {
 					if connected, _ := broker.Connected(); !connected {
 						toRetry[topic.Name] = true
-						delete(client.leaders[topic.Name], partition.ID)
+						delete(client.metadata[topic.Name], partition.ID)
 						continue
 					}
 				}
-				client.leaders[topic.Name][partition.ID] = partition.Leader
+				client.metadata[topic.Name][partition.ID] = partition
 			default:
 				return nil, partition.Err
 			}
