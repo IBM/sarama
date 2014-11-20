@@ -2,6 +2,7 @@ language: go
 go:
 - 1.2
 - 1.3
+- tip
 
 env:
 - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
@@ -12,7 +13,8 @@ before_install:
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
 - go install -a -race regexp # Fix for go 1.2
-- go get code.google.com/p/go.tools/cmd/vet
+- go get code.google.com/p/go.tools/cmd/vet || true # Fix for go 1.2
+- go get golang.org/x/tools/cmd/vet
 - go get github.com/kisielk/errcheck
 
 script:
@@ -23,3 +25,9 @@ script:
 
 notifications:
   flowdock: 15e08f7ed3a8fd2d89ddb36435301c1a
+
+matrix:
+  allow_failures:
+    - go: tip
+
+sudo: false
