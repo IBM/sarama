@@ -27,6 +27,6 @@ notifications:
 
 matrix:
   allow_failures:
-    go: tip
+    - go: tip
 
 sudo: false
