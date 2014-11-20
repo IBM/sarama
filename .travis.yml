@@ -13,7 +13,7 @@ before_install:
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
 - go install -a -race regexp # Fix for go 1.2
-- go get code.google.com/p/go.tools/cmd/vet
+- go get golang.org/x/tools/cmd/vet
 - go get github.com/kisielk/errcheck
 
 script:
@@ -28,3 +28,5 @@ notifications:
 matrix:
   allow_failures:
     go: tip
+
+sudo: false
