@@ -6,12 +6,18 @@ import (
 )
 
 func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Encoder, numPartitions int32) {
-	choice := partitioner.Partition(key, numPartitions)
+	choice, err := partitioner.Partition(key, numPartitions)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
 	if choice < 0 || choice >= numPartitions {
 		t.Error(partitioner, "returned partition", choice, "outside of range for", key)
 	}
 	for i := 1; i < 50; i++ {
-		newChoice := partitioner.Partition(key, numPartitions)
+		newChoice, err := partitioner.Partition(key, numPartitions)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
 		if newChoice != choice {
 			t.Error(partitioner, "returned partition", newChoice, "inconsistent with", choice, ".")
 		}
@@ -21,13 +27,19 @@ func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Enc
 func TestRandomPartitioner(t *testing.T) {
 	partitioner := NewRandomPartitioner()
 
-	choice := partitioner.Partition(nil, 1)
+	choice, err := partitioner.Partition(nil, 1)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
 	if choice != 0 {
 		t.Error("Returned non-zero partition when only one available.")
 	}
 
 	for i := 1; i < 50; i++ {
-		choice := partitioner.Partition(nil, 50)
+		choice, err := partitioner.Partition(nil, 50)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
 		if choice < 0 || choice >= 50 {
 			t.Error("Returned partition", choice, "outside of range.")
 		}
@@ -37,14 +49,20 @@ func TestRandomPartitioner(t *testing.T) {
 func TestRoundRobinPartitioner(t *testing.T) {
 	partitioner := RoundRobinPartitioner{}
 
-	choice := partitioner.Partition(nil, 1)
+	choice, err := partitioner.Partition(nil, 1)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
 	if choice != 0 {
 		t.Error("Returned non-zero partition when only one available.")
 	}
 
 	var i int32
 	for i = 1; i < 50; i++ {
-		choice := partitioner.Partition(nil, 7)
+		choice, err := partitioner.Partition(nil, 7)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
 		if choice != i%7 {
 			t.Error("Returned partition", choice, "expecting", i%7)
 		}
@@ -54,13 +72,19 @@ func TestRoundRobinPartitioner(t *testing.T) {
 func TestHashPartitioner(t *testing.T) {
 	partitioner := NewHashPartitioner()
 
-	choice := partitioner.Partition(nil, 1)
+	choice, err := partitioner.Partition(nil, 1)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
 	if choice != 0 {
 		t.Error("Returned non-zero partition when only one available.")
 	}
 
 	for i := 1; i < 50; i++ {
-		choice := partitioner.Partition(nil, 50)
+		choice, err := partitioner.Partition(nil, 50)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
 		if choice < 0 || choice >= 50 {
 			t.Error("Returned partition", choice, "outside of range for nil key.")
 		}
@@ -74,10 +98,14 @@ func TestHashPartitioner(t *testing.T) {
 }
 
 func TestConstantPartitioner(t *testing.T) {
-	partitioner := &ConstantPartitioner{Constant: 0}
+	var partitioner Partitioner
+	partitioner = &ConstantPartitioner{Constant: 0}
 
 	for i := 1; i < 50; i++ {
-		choice := partitioner.Partition(nil, 50)
+		choice, err := partitioner.Partition(nil, 50)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
 		if choice != 0 {
 			t.Error("Returned partition", choice, "instead of 0.")
 		}

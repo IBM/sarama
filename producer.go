@@ -617,7 +617,15 @@ func (p *Producer) retryHandler() {
 // utility functions
 
 func (p *Producer) assignPartition(partitioner Partitioner, msg *MessageToSend) error {
-	partitions, err := p.client.Partitions(msg.Topic)
+	var partitions []int32
+	var err error
+
+	if partitioner.RequiresConsistency() {
+		partitions, err = p.client.Partitions(msg.Topic)
+	} else {
+		partitions, err = p.client.WritablePartitions(msg.Topic)
+	}
+
 	if err != nil {
 		return err
 	}
@@ -628,9 +636,11 @@ func (p *Producer) assignPartition(partitioner Partitioner, msg *MessageToSend) 
 		return LeaderNotAvailable
 	}
 
-	choice := partitioner.Partition(msg.Key, numPartitions)
+	choice, err := partitioner.Partition(msg.Key, numPartitions)
 
-	if choice < 0 || choice >= numPartitions {
+	if err != nil {
+		return err
+	} else if choice < 0 || choice >= numPartitions {
 		return InvalidPartition
 	}
 
