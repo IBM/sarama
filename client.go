@@ -115,14 +115,39 @@ func (client *Client) Close() error {
 	return nil
 }
 
-// Partitions returns the sorted list of available partition IDs for the given topic.
+// Partitions returns the sorted list of all partition IDs for the given topic.
 func (client *Client) Partitions(topic string) ([]int32, error) {
 	// Check to see whether the client is closed
 	if client.Closed() {
 		return nil, ClosedClient
 	}
 
-	partitions := client.cachedPartitions(topic)
+	partitions := client.cachedPartitions(topic, false)
+
+	if len(partitions) == 0 {
+		err := client.RefreshTopicMetadata(topic)
+		if err != nil {
+			return nil, err
+		}
+		partitions = client.cachedPartitions(topic, false)
+	}
+
+	if partitions == nil {
+		return nil, UnknownTopicOrPartition
+	}
+
+	return partitions, nil
+}
+
+// WritablePartitions returns the sorted list of all writable partition IDs for the given topic,
+// where "writable" means "having a valid leader accepting writes".
+func (client *Client) WritablePartitions(topic string) ([]int32, error) {
+	// Check to see whether the client is closed
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
+	partitions := client.cachedPartitions(topic, true)
 
 	// len==0 catches when it's nil (no such topic) and the odd case when every single
 	// partition is undergoing leader election simultaneously. Callers have to be able to handle
@@ -135,7 +160,7 @@ func (client *Client) Partitions(topic string) ([]int32, error) {
 		if err != nil {
 			return nil, err
 		}
-		partitions = client.cachedPartitions(topic)
+		partitions = client.cachedPartitions(topic, true)
 	}
 
 	if partitions == nil {
@@ -182,6 +207,10 @@ func (client *Client) getMetadata(topic string, partitionID int32) (*PartitionMe
 }
 
 func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error) {
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	metadata, err := client.getMetadata(topic, partitionID)
 
 	if err != nil {
@@ -195,6 +224,10 @@ func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error)
 }
 
 func (client *Client) ReplicasInSync(topic string, partitionID int32) ([]int32, error) {
+	if client.Closed() {
+		return nil, ClosedClient
+	}
+
 	metadata, err := client.getMetadata(topic, partitionID)
 
 	if err != nil {
@@ -418,7 +451,7 @@ func (client *Client) cachedMetadata(topic string, partitionID int32) *Partition
 	return nil
 }
 
-func (client *Client) cachedPartitions(topic string) []int32 {
+func (client *Client) cachedPartitions(topic string, onlyWritable bool) []int32 {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
@@ -428,8 +461,11 @@ func (client *Client) cachedPartitions(topic string) []int32 {
 	}
 
 	ret := make([]int32, 0, len(partitions))
-	for id := range partitions {
-		ret = append(ret, id)
+	for _, partition := range partitions {
+		if onlyWritable && partition.Err == LeaderNotAvailable {
+			continue
+		}
+		ret = append(ret, partition.ID)
 	}
 
 	sort.Sort(int32Slice(ret))
@@ -529,12 +565,12 @@ func NewClientConfig() *ClientConfig {
 // Validate checks a ClientConfig instance. This will return a
 // ConfigurationError if the specified values don't make sense.
 func (config *ClientConfig) Validate() error {
-	if config.MetadataRetries <= 0 {
-		return ConfigurationError("Invalid MetadataRetries. Try 10")
+	if config.MetadataRetries < 0 {
+		return ConfigurationError("Invalid MetadataRetries")
 	}
 
 	if config.WaitForElection <= time.Duration(0) {
-		return ConfigurationError("Invalid WaitForElection. Try 250*time.Millisecond")
+		return ConfigurationError("Invalid WaitForElection")
 	}
 
 	if config.DefaultBrokerConf != nil {
