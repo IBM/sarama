@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 )
 
@@ -17,8 +18,6 @@ func TestDefaultProducerConfigValidates(t *testing.T) {
 func TestSimpleProducer(t *testing.T) {
 	broker1 := NewMockBroker(t, 1)
 	broker2 := NewMockBroker(t, 2)
-	defer broker1.Close()
-	defer broker2.Close()
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
@@ -35,13 +34,11 @@ func TestSimpleProducer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, client)
 
 	producer, err := NewSimpleProducer(client, "my_topic", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, producer)
 
 	for i := 0; i < 10; i++ {
 		err = producer.SendMessage(nil, StringEncoder(TestMessage))
@@ -49,6 +46,55 @@ func TestSimpleProducer(t *testing.T) {
 			t.Error(err)
 		}
 	}
+
+	safeClose(t, producer)
+	safeClose(t, client)
+	broker2.Close()
+	broker1.Close()
+}
+
+func TestConcurrentSimpleProducer(t *testing.T) {
+	broker1 := NewMockBroker(t, 1)
+	broker2 := NewMockBroker(t, 2)
+
+	response1 := new(MetadataResponse)
+	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
+	response1.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	broker1.Returns(response1)
+
+	response2 := new(ProduceResponse)
+	response2.AddTopicPartition("my_topic", 0, NoError)
+	broker2.Returns(response2)
+	broker2.Returns(response2)
+
+	client, err := NewClient("client_id", []string{broker1.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	producer, err := NewSimpleProducer(client, "my_topic", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	wg := sync.WaitGroup{}
+
+	for i := 0; i < 100; i++ {
+		wg.Add(1)
+		go func() {
+			err := producer.SendMessage(nil, StringEncoder(TestMessage))
+			if err != nil {
+				t.Error(err)
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
+
+	safeClose(t, producer)
+	safeClose(t, client)
+	broker2.Close()
+	broker1.Close()
 }
 
 func TestProducer(t *testing.T) {
