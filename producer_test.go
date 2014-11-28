@@ -88,7 +88,13 @@ func TestProducer(t *testing.T) {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
 		}
 	}
 }
@@ -133,7 +139,13 @@ func TestProducerMultipleFlushes(t *testing.T) {
 			select {
 			case msg := <-producer.Errors():
 				t.Error(msg.Err)
-			case <-producer.Successes():
+				if msg.Msg.flags != 0 {
+					t.Error("Message had flags set")
+				}
+			case msg := <-producer.Successes():
+				if msg.flags != 0 {
+					t.Error("Message had flags set")
+				}
 			}
 		}
 	}
@@ -185,7 +197,13 @@ func TestProducerMultipleBrokers(t *testing.T) {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
 		}
 	}
 }
@@ -233,7 +251,13 @@ func TestProducerFailureRetry(t *testing.T) {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
 		}
 	}
 	broker2.Close()
@@ -246,7 +270,13 @@ func TestProducerFailureRetry(t *testing.T) {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
-		case <-producer.Successes():
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
 		}
 	}
 
