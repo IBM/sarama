@@ -128,6 +128,23 @@ func (fr *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseB
 	return fr.Blocks[topic][partition]
 }
 
+func (fr *FetchResponse) AddError(topic string, partition int32, err KError) {
+	if fr.Blocks == nil {
+		fr.Blocks = make(map[string]map[int32]*FetchResponseBlock)
+	}
+	partitions, ok := fr.Blocks[topic]
+	if !ok {
+		partitions = make(map[int32]*FetchResponseBlock)
+		fr.Blocks[topic] = partitions
+	}
+	frb, ok := partitions[partition]
+	if !ok {
+		frb = new(FetchResponseBlock)
+		partitions[partition] = frb
+	}
+	frb.Err = err
+}
+
 func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
 	if fr.Blocks == nil {
 		fr.Blocks = make(map[string]map[int32]*FetchResponseBlock)
