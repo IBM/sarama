@@ -133,7 +133,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 
 	mdr2 := new(MetadataResponse)
 	mdr2.AddTopicPartition("my_topic", 0xb, mb5.BrokerID(), nil, nil, NoError)
-	mb5.Returns(mdr2)
+	mb1.Returns(mdr2)
 
 	client, err := NewClient("clientID", []string{mb1.Addr()}, nil)
 	if err != nil {
