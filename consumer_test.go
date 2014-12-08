@@ -19,7 +19,7 @@ func TestSimpleConsumer(t *testing.T) {
 
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
-	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil, NoError)
 	mb1.Returns(mdr)
 
 	for i := 0; i < 10; i++ {
@@ -62,7 +62,7 @@ func TestConsumerRawOffset(t *testing.T) {
 
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
-	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil, NoError)
 	mb1.Returns(mdr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
@@ -95,7 +95,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
-	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil, NoError)
 	mb1.Returns(mdr)
 
 	or := new(OffsetResponse)
@@ -130,7 +130,7 @@ func TestConsumerPrelude(t *testing.T) {
 
 	mdr := new(MetadataResponse)
 	mdr.AddBroker(mb2.Addr(), mb2.BrokerID())
-	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	mdr.AddTopicPartition("my_topic", 0, 2, nil, nil, NoError)
 	mb1.Returns(mdr)
 
 	fr := new(FetchResponse)

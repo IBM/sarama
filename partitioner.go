@@ -11,7 +11,12 @@ import (
 // decides to which partition to send the message. RandomPartitioner, RoundRobinPartitioner and HashPartitioner are provided
 // as simple default implementations.
 type Partitioner interface {
-	Partition(key Encoder, numPartitions int32) int32
+	Partition(key Encoder, numPartitions int32) (int32, error) // Partition takes the key and partition count and chooses a partition
+
+	// RequiresConsistency indicates to the user of the partitioner whether the mapping of key->partition is consistent or not.
+	// Specifically, if a partitioner requires consistency then it must be allowed to choose from all partitions (even ones known to
+	// be unavailable), and its choice must be respected by the caller. The obvious example is the HashPartitioner.
+	RequiresConsistency() bool
 }
 
 // PartitionerConstructor is the type for a function capable of constructing new Partitioners.
@@ -28,8 +33,12 @@ func NewRandomPartitioner() Partitioner {
 	return p
 }
 
-func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) int32 {
-	return int32(p.generator.Intn(int(numPartitions)))
+func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+	return int32(p.generator.Intn(int(numPartitions))), nil
+}
+
+func (p *RandomPartitioner) RequiresConsistency() bool {
+	return false
 }
 
 // RoundRobinPartitioner implements the Partitioner interface by walking through the available partitions one at a time.
@@ -41,13 +50,17 @@ func NewRoundRobinPartitioner() Partitioner {
 	return &RoundRobinPartitioner{}
 }
 
-func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
 	if p.partition >= numPartitions {
 		p.partition = 0
 	}
 	ret := p.partition
 	p.partition++
-	return ret
+	return ret, nil
+}
+
+func (p *RoundRobinPartitioner) RequiresConsistency() bool {
+	return false
 }
 
 // HashPartitioner implements the Partitioner interface. If the key is nil, or fails to encode, then a random partition
@@ -65,24 +78,28 @@ func NewHashPartitioner() Partitioner {
 	return p
 }
 
-func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) int32 {
+func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
 	if key == nil {
 		return p.random.Partition(key, numPartitions)
 	}
 	bytes, err := key.Encode()
 	if err != nil {
-		return p.random.Partition(key, numPartitions)
+		return -1, err
 	}
 	p.hasher.Reset()
 	_, err = p.hasher.Write(bytes)
 	if err != nil {
-		return p.random.Partition(key, numPartitions)
+		return -1, err
 	}
 	hash := int32(p.hasher.Sum32())
 	if hash < 0 {
 		hash = -hash
 	}
-	return hash % numPartitions
+	return hash % numPartitions, nil
+}
+
+func (p *HashPartitioner) RequiresConsistency() bool {
+	return true
 }
 
 // ConstantPartitioner implements the Partitioner interface by just returning a constant value.
@@ -90,6 +107,10 @@ type ConstantPartitioner struct {
 	Constant int32
 }
 
-func (p *ConstantPartitioner) Partition(key Encoder, numPartitions int32) int32 {
-	return p.Constant
+func (p *ConstantPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+	return p.Constant, nil
+}
+
+func (p *ConstantPartitioner) RequiresConsistency() bool {
+	return true
 }

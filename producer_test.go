@@ -21,7 +21,7 @@ func TestSimpleProducer(t *testing.T) {
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
-	response1.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	response1.AddTopicPartition("my_topic", 0, 2, nil, nil, NoError)
 	broker1.Returns(response1)
 
 	response2 := new(ProduceResponse)
@@ -59,7 +59,7 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
-	response1.AddTopicPartition("my_topic", 0, 2, nil, nil)
+	response1.AddTopicPartition("my_topic", 0, 2, nil, nil, NoError)
 	broker1.Returns(response1)
 
 	response2 := new(ProduceResponse)
@@ -105,7 +105,7 @@ func TestProducer(t *testing.T) {
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
-	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil)
+	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil, NoError)
 	broker1.Returns(response1)
 
 	response2 := new(ProduceResponse)
@@ -153,7 +153,7 @@ func TestProducerMultipleFlushes(t *testing.T) {
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
-	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil)
+	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil, NoError)
 	broker1.Returns(response1)
 
 	response2 := new(ProduceResponse)
@@ -208,8 +208,8 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
 	response1.AddBroker(broker3.Addr(), broker3.BrokerID())
-	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil)
-	response1.AddTopicPartition("my_topic", 1, broker3.BrokerID(), nil, nil)
+	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil, NoError)
+	response1.AddTopicPartition("my_topic", 1, broker3.BrokerID(), nil, nil, NoError)
 	broker1.Returns(response1)
 
 	response2 := new(ProduceResponse)
@@ -261,7 +261,7 @@ func TestProducerFailureRetry(t *testing.T) {
 
 	response1 := new(MetadataResponse)
 	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
-	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil)
+	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil, NoError)
 	broker1.Returns(response1)
 
 	client, err := NewClient("client_id", []string{broker1.Addr()}, nil)
@@ -287,7 +287,7 @@ func TestProducerFailureRetry(t *testing.T) {
 
 	response3 := new(MetadataResponse)
 	response3.AddBroker(broker3.Addr(), broker3.BrokerID())
-	response3.AddTopicPartition("my_topic", 0, broker3.BrokerID(), nil, nil)
+	response3.AddTopicPartition("my_topic", 0, broker3.BrokerID(), nil, nil, NoError)
 	broker2.Returns(response3)
 
 	response4 := new(ProduceResponse)
