@@ -5,6 +5,8 @@ import (
 	"sort"
 )
 
+type none struct{}
+
 // make []int32 sortable so we can sort partition numbers
 type int32Slice []int32
 
