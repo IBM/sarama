@@ -18,9 +18,9 @@ type ProducerConfig struct {
 	RequiredAcks      RequiredAcks           // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal).
 	Timeout           time.Duration          // The maximum duration the broker will wait the receipt of the number of RequiredAcks. This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated.
 	Compression       CompressionCodec       // The type of compression to use on messages (defaults to no compression).
-	FlushMsgCount     int                    // The number of messages needed to trigger a flush.
-	FlushFrequency    time.Duration          // If this amount of time elapses without a flush, one will be queued.
-	FlushByteCount    int                    // If this many bytes of messages are accumulated, a flush will be triggered.
+	FlushMsgCount     int                    // The number of messages needed to trigger a flush. This is a minimum, not an upper limit (use MaxMessagesPerReq for that).
+	FlushFrequency    time.Duration          // If this amount of time elapses without a flush, one will be queued. This is a minimum, not an upper limit.
+	FlushByteCount    int                    // If this many bytes of messages are accumulated, a flush will be triggered. This is a minimum, not an upper limit.
 	AckSuccesses      bool                   // If enabled, successfully delivered messages will be returned on the Successes channel.
 	MaxMessageBytes   int                    // The maximum permitted size of a message (defaults to 1000000)
 	MaxMessagesPerReq int                    // The maximum number of messages the producer will send in a single broker request. Defaults to 0 for unlimited. The global setting MaxRequestSize still applies.
