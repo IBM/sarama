@@ -96,7 +96,7 @@ func (config *ProducerConfig) Validate() error {
 		return ConfigurationError("Invalid RetryBackoff")
 	}
 
-	if config.MaxRetries < 0 || config.MaxRetries > 1 {
+	if config.MaxRetries < 0 {
 		return ConfigurationError("Invalid MaxRetries")
 	}
 
