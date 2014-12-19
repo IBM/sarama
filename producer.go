@@ -75,8 +75,8 @@ func (config *ProducerConfig) Validate() error {
 		Logger.Println("ProducerConfig.MaxMessageBytes too close to MaxRequestSize; it will be ignored.")
 	}
 
-	if config.MaxMessagesPerReq < 0 {
-		return ConfigurationError("Invalid MaxMessagesPerReq")
+	if config.MaxMessagesPerReq < 0 || (config.MaxMessagesPerReq > 0 && config.MaxMessagesPerReq < config.FlushMsgCount) {
+		return ConfigurationError("Invalid MaxMessagesPerReq, must be non-negative and >= FlushMsgCount if set")
 	}
 
 	if config.RetryBackoff < 0 {
