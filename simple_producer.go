@@ -14,15 +14,17 @@ type spExpect struct {
 	result chan error
 }
 
-// NewSimpleProducer creates a new SimpleProducer using the given client, topic and partitioner. If the
-// partitioner is nil, messages are partitioned by the hash of the key
-// (or randomly if there is no key).
-func NewSimpleProducer(client *Client, topic string, partitioner PartitionerConstructor) (*SimpleProducer, error) {
+// NewSimpleProducerWithConfig is the same as NewSimpleProducer, except it
+// includes the option to set certain configuration parameters on the
+// underlying producer
+func NewSimpleProducerWithConfig(client *Client, topic string, partitioner PartitionerConstructor, config *ProducerConfig) (*SimpleProducer, error) {
 	if topic == "" {
 		return nil, ConfigurationError("Empty topic")
 	}
 
-	config := NewProducerConfig()
+	if config == nil {
+		config = NewProducerConfig()
+	}
 	config.AckSuccesses = true
 	if partitioner != nil {
 		config.Partitioner = partitioner
@@ -43,6 +45,14 @@ func NewSimpleProducer(client *Client, topic string, partitioner PartitionerCons
 	go withRecover(sp.matchResponses)
 
 	return sp, nil
+
+}
+
+// NewSimpleProducer creates a new SimpleProducer using the given client, topic and partitioner. If the
+// partitioner is nil, messages are partitioned by the hash of the key
+// (or randomly if there is no key).
+func NewSimpleProducer(client *Client, topic string, partitioner PartitionerConstructor) (*SimpleProducer, error) {
+	return NewSimpleProducerWithConfig(client, topic, partitioner, nil)
 }
 
 // SendMessage produces a message with the given key and value. To send strings as either key or value, see the StringEncoder type.
