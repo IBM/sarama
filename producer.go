@@ -43,6 +43,8 @@ func NewProducerConfig() *ProducerConfig {
 func (config *ProducerConfig) Validate() error {
 	if config.RequiredAcks < -1 {
 		return ConfigurationError("Invalid RequiredAcks")
+	} else if config.RequiredAcks > 1 {
+		Logger.Println("ProducerConfig.RequiredAcks > 1 is deprecated and will raise an exception with kafka >= 0.8.2.0.")
 	}
 
 	if config.Timeout < 0 {
