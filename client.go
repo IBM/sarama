@@ -431,10 +431,11 @@ func (client *Client) cachedLeader(topic string, partitionID int32) (*Broker, er
 	if partitions != nil {
 		metadata, ok := partitions[partitionID]
 		if ok {
-			if metadata.Err == LeaderNotAvailable {
-				return nil, metadata.Err
+			b := client.brokers[metadata.Leader]
+			if b == nil {
+				return nil, LeaderNotAvailable
 			}
-			return client.brokers[metadata.Leader], nil
+			return b, nil
 		}
 	}
 
