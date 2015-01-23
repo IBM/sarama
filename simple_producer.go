@@ -5,7 +5,6 @@ package sarama
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
 type SimpleProducer struct {
 	producer        *Producer
-	topic           string
 	newExpectations chan *spExpect
 }
 
@@ -14,19 +13,12 @@ type spExpect struct {
 	result chan error
 }
 
-// NewSimpleProducer creates a new SimpleProducer using the given client, topic and partitioner. If the
-// partitioner is nil, messages are partitioned by the hash of the key
-// (or randomly if there is no key).
-func NewSimpleProducer(client *Client, topic string, partitioner PartitionerConstructor) (*SimpleProducer, error) {
-	if topic == "" {
-		return nil, ConfigurationError("Empty topic")
+// NewSimpleProducer creates a new SimpleProducer using the given client  and configuration.
+func NewSimpleProducer(client *Client, config *ProducerConfig) (*SimpleProducer, error) {
+	if config == nil {
+		config = NewProducerConfig()
 	}
-
-	config := NewProducerConfig()
 	config.AckSuccesses = true
-	if partitioner != nil {
-		config.Partitioner = partitioner
-	}
 
 	prod, err := NewProducer(client, config)
 
@@ -36,7 +28,6 @@ func NewSimpleProducer(client *Client, topic string, partitioner PartitionerCons
 
 	sp := &SimpleProducer{
 		producer:        prod,
-		topic:           topic,
 		newExpectations: make(chan *spExpect), // this must be unbuffered
 	}
 
@@ -45,9 +36,9 @@ func NewSimpleProducer(client *Client, topic string, partitioner PartitionerCons
 	return sp, nil
 }
 
-// SendMessage produces a message with the given key and value. To send strings as either key or value, see the StringEncoder type.
-func (sp *SimpleProducer) SendMessage(key, value Encoder) error {
-	msg := &MessageToSend{Topic: sp.topic, Key: key, Value: value}
+// SendMessage produces a message to the given topic with the given key and value. To send strings as either key or value, see the StringEncoder type.
+func (sp *SimpleProducer) SendMessage(topic string, key, value Encoder) error {
+	msg := &MessageToSend{Topic: topic, Key: key, Value: value}
 	expectation := &spExpect{msg: msg, result: make(chan error)}
 	sp.newExpectations <- expectation
 	sp.producer.Input() <- msg
