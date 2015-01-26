@@ -35,13 +35,13 @@ func TestSimpleProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	producer, err := NewSimpleProducer(client, "my_topic", nil)
+	producer, err := NewSimpleProducer(client, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := 0; i < 10; i++ {
-		err = producer.SendMessage(nil, StringEncoder(TestMessage))
+		err = producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
 		if err != nil {
 			t.Error(err)
 		}
@@ -72,7 +72,7 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	producer, err := NewSimpleProducer(client, "my_topic", nil)
+	producer, err := NewSimpleProducer(client, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
-			err := producer.SendMessage(nil, StringEncoder(TestMessage))
+			err := producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
 			if err != nil {
 				t.Error(err)
 			}
@@ -365,14 +365,14 @@ func ExampleSimpleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewSimpleProducer(client, "my_topic", nil)
+	producer, err := NewSimpleProducer(client, nil)
 	if err != nil {
 		panic(err)
 	}
 	defer producer.Close()
 
 	for {
-		err = producer.SendMessage(nil, StringEncoder("testing 123"))
+		err = producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))
 		if err != nil {
 			panic(err)
 		} else {
