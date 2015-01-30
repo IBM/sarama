@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 // SimpleProducer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
 // and parses responses for errors. You must call Close() on a producer to avoid leaks, it may not be garbage-collected automatically when
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
@@ -42,7 +44,6 @@ func (sp *SimpleProducer) SendMessage(topic string, key, value Encoder) error {
 	expectation := &spExpect{msg: msg, result: make(chan error)}
 	sp.newExpectations <- expectation
 	sp.producer.Input() <- msg
-
 	return <-expectation.result
 }
 
@@ -50,6 +51,8 @@ func (sp *SimpleProducer) matchResponses() {
 	newExpectations := sp.newExpectations
 	unmatched := make(map[*MessageToSend]chan error)
 	unmatched[nil] = nil // prevent it from emptying entirely
+
+	retry := sp.producer.client.config.MetadataRetries
 
 	for len(unmatched) > 0 {
 		select {
@@ -61,9 +64,17 @@ func (sp *SimpleProducer) matchResponses() {
 			}
 			unmatched[expectation.msg] = expectation.result
 		case err := <-sp.producer.Errors():
+			if err.Err == LeaderNotAvailable && retry > 0 {
+				time.AfterFunc(sp.producer.config.RetryBackoff, func() {
+					sp.producer.Input() <- err.Msg
+				})
+				retry--
+				continue
+			}
 			unmatched[err.Msg] <- err.Err
 			delete(unmatched, err.Msg)
 		case msg := <-sp.producer.Successes():
+			retry = sp.producer.client.config.MetadataRetries
 			close(unmatched[msg])
 			delete(unmatched, msg)
 		}
