@@ -153,6 +153,7 @@ const (
 type MessageToSend struct {
 	Topic      string
 	Key, Value Encoder
+	Metadata   interface{}
 
 	// these are filled in by the producer as the message is processed
 	offset    int64
