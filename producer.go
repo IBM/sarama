@@ -151,8 +151,10 @@ const (
 
 // MessageToSend is the collection of elements passed to the Producer in order to send a message.
 type MessageToSend struct {
-	Topic      string
-	Key, Value Encoder
+	Topic    string      // The Kafka topic for this message
+	Key      Encoder     // The partitioning key for this message. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder
+	Value    Encoder     // The actual message to store in Kafka. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder
+	Metadata interface{} // This field is used to hold arbitrary data you wish to include so it will be available when receiving on the Successes and Errors channels.  Sarama completely ignores this field and is only to be used for pass-through data.
 
 	// these are filled in by the producer as the message is processed
 	offset    int64
