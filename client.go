@@ -528,7 +528,13 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 
 	var err error
 	for _, topic := range data.Topics {
-		if topic.Err != NoError {
+		switch topic.Err {
+		case NoError:
+			break
+		case LeaderNotAvailable:
+			toRetry[topic.Name] = true
+			continue
+		default:
 			err = topic.Err
 			continue
 		}
