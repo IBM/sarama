@@ -53,6 +53,10 @@ func (config *ProducerConfig) Validate() error {
 		Logger.Println("ProducerConfig.Timeout only supports millisecond resolution; nanoseconds will be truncated.")
 	}
 
+	if config.RequiredAcks == WaitForAll && config.Timeout == 0 {
+		return ConfigurationError("If you WaitForAll you must specify a non-zero timeout to wait.")
+	}
+
 	if config.FlushMsgCount < 0 {
 		return ConfigurationError("Invalid FlushMsgCount")
 	}
