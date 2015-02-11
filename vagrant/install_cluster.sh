@@ -2,7 +2,7 @@
 
 set -ex
 
-KAFKA_VERSION=0.8.1.1
+KAFKA_VERSION=0.8.2.0
 
 mkdir -p ${KAFKA_INSTALL_ROOT}
 if [ ! -f ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_VERSION}.tgz ]; then
