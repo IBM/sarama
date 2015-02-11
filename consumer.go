@@ -466,12 +466,9 @@ func (w *consumerWorker) doWork() {
 		for child, _ := range w.work {
 			block := response.GetBlock(child.topic, child.partition)
 			if block == nil {
-				// TODO should we be doing anything else here? The fact that we didn't get a block at all
-				// (not even one with an error) suggests that the broker is misbehaving, or perhaps something in the
-				// request/response pipeline is ending up malformed, so we could be better off aborting entirely...
-				// on the other hand that's a sucky choice if the other partition(s) in the response have real data.
-				// Hopefully this just never happens so it's a moot point :)
 				child.sendError(IncompleteResponse)
+				child.trigger <- none{}
+				delete(w.work, child)
 				continue
 			}
 
@@ -530,13 +527,13 @@ func (w *consumerWorker) handleResponse(child *PartitionConsumer, block *FetchRe
 	switch block.Err {
 	case NoError:
 		break
+	default:
+		child.sendError(block.Err)
+		fallthrough
 	case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
 		// doesn't belong to us, redispatch it
 		child.trigger <- none{}
 		delete(w.work, child)
-		return
-	default:
-		child.sendError(block.Err)
 		return
 	}
 
@@ -562,6 +559,7 @@ func (w *consumerWorker) handleResponse(child *PartitionConsumer, block *FetchRe
 	// we got messages, reset our fetch size in case it was increased for a previous request
 	child.fetchSize = child.config.DefaultFetchSize
 
+	incomplete := false
 	atLeastOne := false
 	prelude := true
 	for _, msgBlock := range block.MsgSet.Messages {
@@ -583,15 +581,15 @@ func (w *consumerWorker) handleResponse(child *PartitionConsumer, block *FetchRe
 				}
 				child.offset = msg.Offset + 1
 			} else {
-				// TODO as in doWork, should we handle this differently?
-				child.sendError(IncompleteResponse)
+				incomplete = true
 			}
 		}
 
 	}
 
-	if !atLeastOne {
-		// TODO as in doWork, should we handle this differently?
+	if incomplete || !atLeastOne {
 		child.sendError(IncompleteResponse)
+		child.trigger <- none{}
+		delete(w.work, child)
 	}
 }
