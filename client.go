@@ -549,6 +549,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 				broker := client.brokers[partition.Leader]
 				if _, present := client.deadBrokerAddrs[broker.Addr()]; present {
 					if connected, _ := broker.Connected(); !connected {
+						partition.Err = LeaderNotAvailable
 						toRetry[topic.Name] = true
 					}
 				}
