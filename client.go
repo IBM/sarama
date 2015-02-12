@@ -537,10 +537,8 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 			break
 		case LeaderNotAvailable:
 			toRetry[topic.Name] = true
-			continue
 		default:
 			err = topic.Err
-			continue
 		}
 
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
