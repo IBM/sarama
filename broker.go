@@ -91,8 +91,7 @@ func (b *Broker) Open(conf *BrokerConfig) error {
 
 	if b.conn != nil {
 		b.lock.Unlock()
-		Logger.Printf("Failed to connect to broker %s\n", b.addr)
-		Logger.Println(AlreadyConnected)
+		Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, AlreadyConnected)
 		return AlreadyConnected
 	}
 
@@ -101,8 +100,7 @@ func (b *Broker) Open(conf *BrokerConfig) error {
 
 		b.conn, b.connErr = net.DialTimeout("tcp", b.addr, conf.DialTimeout)
 		if b.connErr != nil {
-			Logger.Printf("Failed to connect to broker %s\n", b.addr)
-			Logger.Println(b.connErr)
+			Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, b.connErr)
 			return
 		}
 
@@ -133,8 +131,7 @@ func (b *Broker) Close() (err error) {
 		if err == nil {
 			Logger.Printf("Closed connection to broker %s\n", b.addr)
 		} else {
-			Logger.Printf("Failed to close connection to broker %s.\n", b.addr)
-			Logger.Println(err)
+			Logger.Printf("Failed to close connection to broker %s: %s\n", b.addr, err)
 		}
 	}()
 
