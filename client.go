@@ -360,6 +360,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 
 			if len(retry) > 0 {
 				if retriesRemaining <= 0 {
+					Logger.Println("Some partitions are leaderless, but we're out of retries")
 					return nil
 				}
 				Logger.Printf("Some partitions are leaderless, waiting %dms for election... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retriesRemaining)
