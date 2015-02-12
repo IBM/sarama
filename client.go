@@ -70,7 +70,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	switch err {
 	case nil:
 		break
-	case LeaderNotAvailable:
+	case LeaderNotAvailable, ReplicaNotAvailable:
 		// indicates that maybe part of the cluster is down, but is not fatal to creating the client
 		Logger.Println(err)
 	default:
