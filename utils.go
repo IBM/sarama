@@ -46,7 +46,7 @@ func safeAsyncClose(b *Broker) {
 	tmp := b // local var prevents clobbering in goroutine
 	go withRecover(func() {
 		if err := tmp.Close(); err != nil {
-			Logger.Println("Error closing", tmp, ":", err)
+			Logger.Println("Error closing broker", tmp.ID(), ":", err)
 		}
 	})
 }
