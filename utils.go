@@ -1,9 +1,6 @@
 package sarama
 
-import (
-	"io"
-	"sort"
-)
+import "sort"
 
 type none struct{}
 
@@ -45,8 +42,8 @@ func withRecover(fn func()) {
 	fn()
 }
 
-func safeAsyncClose(c io.Closer) {
-	tmp := c // local var prevents clobbering in goroutine
+func safeAsyncClose(b *Broker) {
+	tmp := b // local var prevents clobbering in goroutine
 	go withRecover(func() {
 		if err := tmp.Close(); err != nil {
 			Logger.Println("Error closing", tmp, ":", err)
