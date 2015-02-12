@@ -543,7 +543,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 			continue
 		default:
 			p.client.disconnectBroker(broker)
-			Logger.Println("producer/flusher/%d state change to [closing] because", broker.ID(), err)
+			Logger.Printf("producer/flusher/%d state change to [closing] because %s\n", broker.ID(), err)
 			closing = err
 			p.retryMessages(batch, err)
 			continue
@@ -591,7 +591,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 			}
 		}
 	}
-	Logger.Println("producer/flusher/%d shut down", broker.ID())
+	Logger.Printf("producer/flusher/%d shut down\n", broker.ID())
 	p.retries <- &MessageToSend{flags: unref}
 }
 
