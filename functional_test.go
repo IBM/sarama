@@ -43,6 +43,16 @@ func checkKafkaAvailability(t *testing.T) {
 	}
 }
 
+func TestFuncConnectionFailure(t *testing.T) {
+	config := NewClientConfig()
+	config.MetadataRetries = 1
+
+	_, err := NewClient("test", []string{"localhost:9000"}, config)
+	if err != OutOfBrokers {
+		t.Fatal("Expected returned error to be OutOfBrokers, but was: ", err)
+	}
+}
+
 func TestFuncProducing(t *testing.T) {
 	config := NewProducerConfig()
 	testProducingMessages(t, config)
