@@ -65,14 +65,15 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 	response2 := new(ProduceResponse)
 	response2.AddTopicPartition("my_topic", 0, NoError)
 	broker2.Returns(response2)
-	broker2.Returns(response2)
 
 	client, err := NewClient("client_id", []string{broker1.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	producer, err := NewSimpleProducer(client, nil)
+	config := NewProducerConfig()
+	config.FlushMsgCount = 100
+	producer, err := NewSimpleProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
 	}
