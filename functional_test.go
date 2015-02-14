@@ -131,16 +131,17 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, client)
 
-	consumerConfig := NewConsumerConfig()
-	consumerConfig.OffsetMethod = OffsetMethodNewest
-
-	consumer, err := NewConsumer(client, "single_partition", 0, "functional_test", consumerConfig)
+	master, err := NewConsumer(client, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, consumer)
+	consumerConfig := NewPartitionConsumerConfig()
+	consumerConfig.OffsetMethod = OffsetMethodNewest
+	consumer, err := master.ConsumePartition("single_partition", 0, consumerConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	config.AckSuccesses = true
 	producer, err := NewProducer(client, config)
@@ -168,10 +169,7 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 			expectedResponses--
 		}
 	}
-	err = producer.Close()
-	if err != nil {
-		t.Error(err)
-	}
+	safeClose(t, producer)
 
 	events := consumer.Events()
 	for i := 1; i <= TestBatchSize; i++ {
@@ -186,4 +184,6 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 		}
 
 	}
+	safeClose(t, consumer)
+	safeClose(t, client)
 }
