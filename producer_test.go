@@ -125,7 +125,7 @@ func TestProducer(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: i}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: i}
 	}
 	for i := 0; i < 10; i++ {
 		select {
@@ -180,7 +180,7 @@ func TestProducerMultipleFlushes(t *testing.T) {
 
 	for flush := 0; flush < 3; flush++ {
 		for i := 0; i < 5; i++ {
-			producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 		}
 		for i := 0; i < 5; i++ {
 			select {
@@ -238,7 +238,7 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	for i := 0; i < 10; i++ {
 		select {
@@ -286,7 +286,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	broker1.Close()
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	response2 := new(ProduceResponse)
 	response2.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
@@ -316,7 +316,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	broker2.Close()
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	broker3.Returns(response4)
 	for i := 0; i < 10; i++ {
@@ -355,7 +355,7 @@ func ExampleProducer() {
 
 	for {
 		select {
-		case producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder("testing 123")}:
+		case producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("testing 123")}:
 			fmt.Println("> message queued")
 		case err := <-producer.Errors():
 			panic(err.Err)

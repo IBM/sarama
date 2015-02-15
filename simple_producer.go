@@ -9,7 +9,7 @@ type SimpleProducer struct {
 }
 
 type spExpect struct {
-	msg    *MessageToSend
+	msg    *ProducerMessage
 	result chan error
 }
 
@@ -38,7 +38,7 @@ func NewSimpleProducer(client *Client, config *ProducerConfig) (*SimpleProducer,
 
 // SendMessage produces a message to the given topic with the given key and value. To send strings as either key or value, see the StringEncoder type.
 func (sp *SimpleProducer) SendMessage(topic string, key, value Encoder) error {
-	msg := &MessageToSend{Topic: topic, Key: key, Value: value}
+	msg := &ProducerMessage{Topic: topic, Key: key, Value: value}
 	expectation := &spExpect{msg: msg, result: make(chan error)}
 	sp.newExpectations <- expectation
 	sp.producer.Input() <- msg
@@ -48,7 +48,7 @@ func (sp *SimpleProducer) SendMessage(topic string, key, value Encoder) error {
 
 func (sp *SimpleProducer) matchResponses() {
 	newExpectations := sp.newExpectations
-	unmatched := make(map[*MessageToSend]chan error)
+	unmatched := make(map[*ProducerMessage]chan error)
 	unmatched[nil] = nil // prevent it from emptying entirely
 
 	for len(unmatched) > 0 {
