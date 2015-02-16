@@ -35,6 +35,7 @@ func NewProducerConfig() *ProducerConfig {
 		RequiredAcks:    WaitForLocal,
 		MaxMessageBytes: 1000000,
 		RetryBackoff:    250 * time.Millisecond,
+		Timeout:         10 * time.Second,
 	}
 }
 
