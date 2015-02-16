@@ -156,8 +156,8 @@ const (
 // ProducerMessage is the collection of elements passed to the Producer in order to send a message.
 type ProducerMessage struct {
 	Topic    string      // The Kafka topic for this message.
-	Key      Encoder     // The partitioning key for this message. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder.
-	Value    Encoder     // The actual message to store in Kafka. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder.
+	Key      []byte      // The partitioning key for this message.
+	Value    []byte      // The actual message to store in Kafka.
 	Metadata interface{} // This field is used to hold arbitrary data you wish to include so it will be available when receiving on the Successes and Errors channels.  Sarama completely ignores this field and is only to be used for pass-through data.
 
 	// these are filled in by the producer as the message is processed
@@ -181,10 +181,10 @@ func (m *ProducerMessage) Partition() int32 {
 func (m *ProducerMessage) byteSize() int {
 	size := 26 // the metadata overhead of CRC, flags, etc.
 	if m.Key != nil {
-		size += m.Key.Length()
+		size += len(m.Key)
 	}
 	if m.Value != nil {
-		size += m.Value.Length()
+		size += len(m.Value)
 	}
 	return size
 }
@@ -281,7 +281,7 @@ func (p *Producer) topicDispatcher() {
 			break
 		}
 
-		if (p.config.Compression == CompressionNone && msg.Value != nil && msg.Value.Length() > p.config.MaxMessageBytes) ||
+		if (p.config.Compression == CompressionNone && msg.Value != nil && len(msg.Value) > p.config.MaxMessageBytes) ||
 			(msg.byteSize() > p.config.MaxMessageBytes) {
 
 			p.returnError(msg, MessageSizeTooLarge)
@@ -697,21 +697,6 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 			setToSend := new(MessageSet)
 			setSize := 0
 			for _, msg := range msgSet {
-				var keyBytes, valBytes []byte
-				var err error
-				if msg.Key != nil {
-					if keyBytes, err = msg.Key.Encode(); err != nil {
-						p.returnError(msg, err)
-						continue
-					}
-				}
-				if msg.Value != nil {
-					if valBytes, err = msg.Value.Encode(); err != nil {
-						p.returnError(msg, err)
-						continue
-					}
-				}
-
 				if p.config.Compression != CompressionNone && setSize+msg.byteSize() > p.config.MaxMessageBytes {
 					// compression causes message-sets to be wrapped as single messages, which have tighter
 					// size requirements, so we have to respect those limits
@@ -726,7 +711,7 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 				}
 				setSize += msg.byteSize()
 
-				setToSend.addMessage(&Message{Codec: CompressionNone, Key: keyBytes, Value: valBytes})
+				setToSend.addMessage(&Message{Codec: CompressionNone, Key: msg.Key, Value: msg.Value})
 				empty = false
 			}
 
