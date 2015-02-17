@@ -544,16 +544,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
-			switch partition.Err {
-			case NoError:
-				broker := client.brokers[partition.Leader]
-				if _, present := client.deadBrokerAddrs[broker.Addr()]; present {
-					if connected, _ := broker.Connected(); !connected {
-						partition.Err = LeaderNotAvailable
-						toRetry[topic.Name] = true
-					}
-				}
-			case LeaderNotAvailable:
+			if partition.Err == LeaderNotAvailable {
 				toRetry[topic.Name] = true
 			}
 		}
