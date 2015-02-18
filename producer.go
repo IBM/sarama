@@ -27,7 +27,7 @@ type ProducerConfig struct {
 	AckSuccesses      bool                   // If enabled, successfully delivered messages will be returned on the Successes channel.
 	MaxMessageBytes   int                    // The maximum permitted size of a message (defaults to 1000000). Equivalent to the broker's `message.max.bytes`.
 	MaxMessagesPerReq int                    // The maximum number of messages the producer will send in a single broker request. Defaults to 0 for unlimited. The global setting MaxRequestSize still applies. Similar to `queue.buffering.max.messages` in the JVM producer.
-	ChannelBufferSize int                    // The size of the buffers of the channels between the different goroutines (defaults to 0, i.e. unbuffered).
+	ChannelBufferSize int                    // The size of the buffers of the channels between the different goroutines (defaults to 256).
 	RetryBackoff      time.Duration          // The amount of time to wait for the cluster to elect a new leader before processing retries (defaults to 250ms). Similar to the retry.backoff.ms setting of the JVM producer.
 	MaxRetries        int                    // The total number of times to retry sending a message. Currently only supports 0 or 1 (the default). Similar to the message.send.max.retries setting of the JVM producer.
 }
@@ -35,12 +35,13 @@ type ProducerConfig struct {
 // NewProducerConfig creates a new ProducerConfig instance with sensible defaults.
 func NewProducerConfig() *ProducerConfig {
 	return &ProducerConfig{
-		Partitioner:     NewHashPartitioner,
-		RequiredAcks:    WaitForLocal,
-		MaxMessageBytes: 1000000,
-		RetryBackoff:    250 * time.Millisecond,
-		Timeout:         10 * time.Second,
-		MaxRetries:      1,
+		Partitioner:       NewHashPartitioner,
+		RequiredAcks:      WaitForLocal,
+		MaxMessageBytes:   1000000,
+		ChannelBufferSize: 256,
+		RetryBackoff:      250 * time.Millisecond,
+		Timeout:           10 * time.Second,
+		MaxRetries:        1,
 	}
 }
 
