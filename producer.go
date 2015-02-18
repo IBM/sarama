@@ -438,6 +438,7 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *M
 		if output == nil {
 			if err := breaker.Run(doUpdate); err != nil {
 				p.returnError(msg, err)
+				time.Sleep(p.config.RetryBackoff)
 				continue
 			}
 			Logger.Printf("producer/leader selected broker %d on %s/%d\n", leader.ID(), topic, partition)
