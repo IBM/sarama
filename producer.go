@@ -372,6 +372,7 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *M
 		}
 
 		if _, err = leader.Connected(); err != nil {
+			p.client.disconnectBroker(leader)
 			return err
 		}
 
