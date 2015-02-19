@@ -101,9 +101,9 @@ func (config *PartitionConsumerConfig) Validate() error {
 	return nil
 }
 
-// ConsumerEvent is what is provided to the user when an event occurs. It is either an error (in which case Err is non-nil) or
+// ConsumerMessage is what is provided to the user when an event occurs. It is either an error (in which case Err is non-nil) or
 // a message (in which case Err is nil and Offset, Key, and Value are set). Topic and Partition are always set.
-type ConsumerEvent struct {
+type ConsumerMessage struct {
 	Key, Value []byte
 	Topic      string
 	Partition  int32
@@ -111,10 +111,10 @@ type ConsumerEvent struct {
 	Err        error
 }
 
-// ConsumeErrors is a type that wraps a batch of "ConsumerEvent"s and implements the Error interface.
+// ConsumeErrors is a type that wraps a batch of "ConsumerMessage"s and implements the Error interface.
 // It can be returned from the PartitionConsumer's Close methods to avoid the need to manually drain errors
 // when stopping.
-type ConsumeErrors []*ConsumerEvent
+type ConsumeErrors []*ConsumerMessage
 
 func (ce ConsumeErrors) Error() string {
 	return fmt.Sprintf("kafka: %d errors when consuming", len(ce))
@@ -171,7 +171,7 @@ func (c *Consumer) ConsumePartition(topic string, partition int32, config *Parti
 		config:    *config,
 		topic:     topic,
 		partition: partition,
-		events:    make(chan *ConsumerEvent, config.EventBufferSize),
+		events:    make(chan *ConsumerMessage, config.EventBufferSize),
 		trigger:   make(chan none, 1),
 		dying:     make(chan none),
 		fetchSize: config.DefaultFetchSize,
@@ -274,7 +274,7 @@ type PartitionConsumer struct {
 	partition int32
 
 	broker         *Broker
-	events         chan *ConsumerEvent
+	events         chan *ConsumerMessage
 	trigger, dying chan none
 
 	fetchSize int32
@@ -282,7 +282,7 @@ type PartitionConsumer struct {
 }
 
 func (child *PartitionConsumer) sendError(err error) {
-	child.events <- &ConsumerEvent{
+	child.events <- &ConsumerMessage{
 		Topic:     child.topic,
 		Partition: child.partition,
 		Err:       err,
@@ -362,7 +362,7 @@ func (child *PartitionConsumer) chooseStartingOffset() (err error) {
 }
 
 // Events returns the read channel for any events (messages or errors) that might be returned by the broker.
-func (child *PartitionConsumer) Events() <-chan *ConsumerEvent {
+func (child *PartitionConsumer) Events() <-chan *ConsumerMessage {
 	return child.events
 }
 
@@ -572,7 +572,7 @@ func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchRe
 
 			if msg.Offset >= child.offset {
 				atLeastOne = true
-				child.events <- &ConsumerEvent{
+				child.events <- &ConsumerMessage{
 					Topic:     child.topic,
 					Partition: child.partition,
 					Key:       msg.Msg.Key,

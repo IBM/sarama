@@ -145,7 +145,7 @@ func (fr *FetchResponse) AddError(topic string, partition int32, err KError) {
 	frb.Err = err
 }
 
-func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
+func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value []byte, offset int64) {
 	if fr.Blocks == nil {
 		fr.Blocks = make(map[string]map[int32]*FetchResponseBlock)
 	}
@@ -159,15 +159,8 @@ func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value En
 		frb = new(FetchResponseBlock)
 		partitions[partition] = frb
 	}
-	var kb []byte
-	var vb []byte
-	if key != nil {
-		kb, _ = key.Encode()
-	}
-	if value != nil {
-		vb, _ = value.Encode()
-	}
-	msg := &Message{Key: kb, Value: vb}
+
+	msg := &Message{Key: key, Value: value}
 	msgBlock := &MessageBlock{Msg: msg, Offset: offset}
 	frb.MsgSet.Messages = append(frb.MsgSet.Messages, msgBlock)
 }

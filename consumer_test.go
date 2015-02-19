@@ -32,7 +32,7 @@ func TestConsumerOffsetManual(t *testing.T) {
 
 	for i := 0; i <= 10; i++ {
 		fr := new(FetchResponse)
-		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i+1234))
+		fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(i+1234))
 		mb2.Returns(fr)
 	}
 
@@ -85,7 +85,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 	mb2.Returns(or)
 
 	fr := new(FetchResponse)
-	fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), 0x010101)
+	fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, 0x010101)
 	mb2.Returns(fr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
@@ -129,12 +129,12 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 	mb1.Returns(mdr)
 
 	fr := new(FetchResponse)
-	fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(1))
-	fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(3))
+	fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(1))
+	fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(3))
 	mb2.Returns(fr)
 
 	fr = new(FetchResponse)
-	fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(5))
+	fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(5))
 	mb2.Returns(fr)
 
 	client, err := NewClient("client_id", []string{mb1.Addr()}, nil)
@@ -222,7 +222,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	// generate broker responses
 	fr := new(FetchResponse)
 	for i := 0; i < 4; i++ {
-		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i))
+		fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(i))
 	}
 	mb2.Returns(fr)
 
@@ -238,20 +238,20 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 
 	fr = new(FetchResponse)
 	for i := 0; i < 5; i++ {
-		fr.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i))
+		fr.AddMessage("my_topic", 1, nil, []byte{0x00, 0x0E}, int64(i))
 	}
 	mb3.Returns(fr)
 
 	fr = new(FetchResponse)
 	for i := 0; i < 3; i++ {
-		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i+4))
-		fr.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i+5))
+		fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(i+4))
+		fr.AddMessage("my_topic", 1, nil, []byte{0x00, 0x0E}, int64(i+5))
 	}
 	mb3.Returns(fr)
 
 	fr = new(FetchResponse)
 	for i := 0; i < 3; i++ {
-		fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i+7))
+		fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(i+7))
 	}
 	fr.AddError("my_topic", 1, NotLeaderForPartition)
 	mb3.Returns(fr)
@@ -263,17 +263,17 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	time.Sleep(5 * time.Millisecond) // dumbest way to force a particular response ordering
 
 	fr = new(FetchResponse)
-	fr.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(8))
-	fr.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(9))
+	fr.AddMessage("my_topic", 1, nil, []byte{0x00, 0x0E}, int64(8))
+	fr.AddMessage("my_topic", 1, nil, []byte{0x00, 0x0E}, int64(9))
 	mb2.Returns(fr)
 
 	// cleanup
 	fr = new(FetchResponse)
-	fr.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(10))
+	fr.AddMessage("my_topic", 1, nil, []byte{0x00, 0x0E}, int64(10))
 	mb2.Returns(fr)
 
 	fr = new(FetchResponse)
-	fr.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(10))
+	fr.AddMessage("my_topic", 0, nil, []byte{0x00, 0x0E}, int64(10))
 	mb3.Returns(fr)
 
 	wg.Wait()

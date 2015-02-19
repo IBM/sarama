@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Encoder, numPartitions int32) {
+func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key []byte, numPartitions int32) {
 	choice, err := partitioner.Partition(key, numPartitions)
 	if err != nil {
 		t.Error(partitioner, err)
@@ -93,7 +93,7 @@ func TestHashPartitioner(t *testing.T) {
 	buf := make([]byte, 256)
 	for i := 1; i < 50; i++ {
 		rand.Read(buf)
-		assertPartitioningConsistent(t, partitioner, ByteEncoder(buf), 50)
+		assertPartitioningConsistent(t, partitioner, buf, 50)
 	}
 }
 

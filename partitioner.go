@@ -11,7 +11,7 @@ import (
 // decides to which partition to send the message. RandomPartitioner, RoundRobinPartitioner and HashPartitioner are provided
 // as simple default implementations.
 type Partitioner interface {
-	Partition(key Encoder, numPartitions int32) (int32, error) // Partition takes the key and partition count and chooses a partition
+	Partition(key []byte, numPartitions int32) (int32, error) // Partition takes the key and partition count and chooses a partition
 
 	// RequiresConsistency indicates to the user of the partitioner whether the mapping of key->partition is consistent or not.
 	// Specifically, if a partitioner requires consistency then it must be allowed to choose from all partitions (even ones known to
@@ -33,7 +33,7 @@ func NewRandomPartitioner() Partitioner {
 	return p
 }
 
-func (p *RandomPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+func (p *RandomPartitioner) Partition(key []byte, numPartitions int32) (int32, error) {
 	return int32(p.generator.Intn(int(numPartitions))), nil
 }
 
@@ -50,7 +50,7 @@ func NewRoundRobinPartitioner() Partitioner {
 	return &RoundRobinPartitioner{}
 }
 
-func (p *RoundRobinPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+func (p *RoundRobinPartitioner) Partition(key []byte, numPartitions int32) (int32, error) {
 	if p.partition >= numPartitions {
 		p.partition = 0
 	}
@@ -78,16 +78,12 @@ func NewHashPartitioner() Partitioner {
 	return p
 }
 
-func (p *HashPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+func (p *HashPartitioner) Partition(key []byte, numPartitions int32) (int32, error) {
 	if key == nil {
 		return p.random.Partition(key, numPartitions)
 	}
-	bytes, err := key.Encode()
-	if err != nil {
-		return -1, err
-	}
 	p.hasher.Reset()
-	_, err = p.hasher.Write(bytes)
+	_, err := p.hasher.Write(key)
 	if err != nil {
 		return -1, err
 	}
@@ -107,7 +103,7 @@ type ConstantPartitioner struct {
 	Constant int32
 }
 
-func (p *ConstantPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+func (p *ConstantPartitioner) Partition(key []byte, numPartitions int32) (int32, error) {
 	return p.Constant, nil
 }
 
