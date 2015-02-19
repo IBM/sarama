@@ -124,6 +124,12 @@ func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 // test framework and a channel of responses to use.  If an error occurs it is
 // simply logged to the TestState and the broker exits.
 func NewMockBroker(t TestState, brokerID int32) *MockBroker {
+	return NewMockBrokerAddr(t, brokerID, "localhost:0")
+}
+
+// NewMockBrokerAddr behaves like NewMockBroker but listens on the address you give
+// it rather than just some ephemeral port.
+func NewMockBrokerAddr(t TestState, brokerID int32, addr string) *MockBroker {
 	var err error
 
 	broker := &MockBroker{
@@ -133,7 +139,7 @@ func NewMockBroker(t TestState, brokerID int32) *MockBroker {
 		expectations: make(chan encoder, 512),
 	}
 
-	broker.listener, err = net.Listen("tcp", "localhost:0")
+	broker.listener, err = net.Listen("tcp", addr)
 	if err != nil {
 		t.Fatal(err)
 	}
