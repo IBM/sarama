@@ -279,6 +279,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	config := NewProducerConfig()
 	config.FlushMsgCount = 10
 	config.AckSuccesses = true
+	config.RetryBackoff = 0
 	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
@@ -357,6 +358,7 @@ func TestProducerBrokerBounce(t *testing.T) {
 	config := NewProducerConfig()
 	config.FlushMsgCount = 10
 	config.AckSuccesses = true
+	config.RetryBackoff = 0
 	producer, err := NewProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
