@@ -65,7 +65,11 @@ type Client struct {
 
 	brokers  map[int32]*Broker                       // maps broker ids to brokers
 	metadata map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
-	lock     sync.RWMutex                            // protects access to the maps, only one since they're always written together
+
+	// If the number of partitions is large, we can get some churn calling cachedPartitions,
+	// so the result is cached.  It is important to update this value whenever metadata is changed
+	cachedPartitionsResults map[string][maxPartitionIndex][]int32
+	lock                    sync.RWMutex // protects access to the maps, only one since they're always written together
 }
 
 // NewClient creates a new Client with the given client ID. It connects to one of the given broker addresses
@@ -87,14 +91,15 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	}
 
 	client := &Client{
-		id:              id,
-		config:          *config,
-		closer:          make(chan none),
-		seedBrokerAddrs: addrs,
-		seedBroker:      NewBroker(addrs[0]),
-		deadBrokerAddrs: make(map[string]none),
-		brokers:         make(map[int32]*Broker),
-		metadata:        make(map[string]map[int32]*PartitionMetadata),
+		id:                      id,
+		config:                  *config,
+		closer:                  make(chan none),
+		seedBrokerAddrs:         addrs,
+		seedBroker:              NewBroker(addrs[0]),
+		deadBrokerAddrs:         make(map[string]none),
+		brokers:                 make(map[int32]*Broker),
+		metadata:                make(map[string]map[int32]*PartitionMetadata),
+		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 	}
 	_ = client.seedBroker.Open(config.DefaultBrokerConf)
 
@@ -387,9 +392,15 @@ func (client *Client) any() *Broker {
 
 // private caching/lazy metadata helpers
 
+type partitionType int
+
 const (
-	allPartitions = iota
+	allPartitions partitionType = iota
 	writablePartitions
+	// If you add any more types, update the partition cache in update()
+
+	// Ensure this is the last partition type value
+	maxPartitionIndex
 )
 
 func (client *Client) getMetadata(topic string, partitionID int32) (*PartitionMetadata, error) {
@@ -422,11 +433,21 @@ func (client *Client) cachedMetadata(topic string, partitionID int32) *Partition
 	return nil
 }
 
-func (client *Client) cachedPartitions(topic string, partitionSet int) []int32 {
+func (client *Client) cachedPartitions(topic string, partitionSet partitionType) []int32 {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
+	partitions, exists := client.cachedPartitionsResults[topic]
+
+	if !exists {
+		return nil
+	}
+	return partitions[partitionSet]
+}
+
+func (client *Client) setPartitionCache(topic string, partitionSet partitionType) []int32 {
 	partitions := client.metadata[topic]
+
 	if partitions == nil {
 		return nil
 	}
@@ -584,12 +605,17 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		}
 
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
+		delete(client.cachedPartitionsResults, topic.Name)
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
 			if partition.Err == LeaderNotAvailable {
 				toRetry[topic.Name] = true
 			}
 		}
+		var partitionCache [maxPartitionIndex][]int32
+		partitionCache[allPartitions] = client.setPartitionCache(topic.Name, allPartitions)
+		partitionCache[writablePartitions] = client.setPartitionCache(topic.Name, writablePartitions)
+		client.cachedPartitionsResults[topic.Name] = partitionCache
 	}
 
 	if err != nil {
