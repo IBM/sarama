@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"time"
 )
 
 // TestState is a generic interface for a test state, implemented e.g. by testing.T
@@ -33,6 +34,11 @@ type MockBroker struct {
 	expectations chan encoder
 	listener     net.Listener
 	t            TestState
+	latency      time.Duration
+}
+
+func (b *MockBroker) SetLatency(latency time.Duration) {
+	b.latency = latency
 }
 
 func (b *MockBroker) BrokerID() int32 {
@@ -78,6 +84,10 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		}
 		if _, err = io.ReadFull(conn, body); err != nil {
 			return b.serverError(err, conn)
+		}
+
+		if b.latency > 0 {
+			time.Sleep(b.latency)
 		}
 
 		response, err := encode(expectation)
