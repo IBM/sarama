@@ -33,6 +33,44 @@ func TestSimpleClient(t *testing.T) {
 	defer mb.Close()
 }
 
+func TestCachedPartitions(t *testing.T) {
+	mb1 := NewMockBroker(t, 1)
+	mb5 := NewMockBroker(t, 5)
+	replicas := []int32{3, 1, 5}
+	isr := []int32{5, 1}
+
+	mdr := new(MetadataResponse)
+	mdr.AddBroker(mb5.Addr(), mb5.BrokerID())
+	mdr.AddTopicPartition("my_topic", 0, mb5.BrokerID(), replicas, isr, NoError)
+	mdr.AddTopicPartition("my_topic", 1, mb5.BrokerID(), replicas, isr, LeaderNotAvailable)
+	mb1.Returns(mdr)
+
+	config := NewClientConfig()
+	config.MetadataRetries = 0
+	client, err := NewClient("client_id", []string{mb1.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, client)
+	defer mb1.Close()
+	defer mb5.Close()
+
+	// Verify they aren't cached the same
+	allP := client.cachedPartitionsResults["my_topic"][allPartitions]
+	writeP := client.cachedPartitionsResults["my_topic"][writablePartitions]
+	if len(allP) == len(writeP) {
+		t.Fatal("Invalid lengths!")
+	}
+
+	tmp := client.cachedPartitionsResults["my_topic"]
+	// Verify we actually use the cache at all!
+	tmp[allPartitions] = []int32{1, 2, 3, 4}
+	client.cachedPartitionsResults["my_topic"] = tmp
+	if 4 != len(client.cachedPartitions("my_topic", allPartitions)) {
+		t.Fatal("Not using the cache!")
+	}
+}
+
 func TestClientSeedBrokers(t *testing.T) {
 
 	mb1 := NewMockBroker(t, 1)
