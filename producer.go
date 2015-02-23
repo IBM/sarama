@@ -443,6 +443,7 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *M
 					}
 
 				flushDone:
+					retryState[highWatermark].buf = nil
 					if retryState[highWatermark].expectChaser {
 						Logger.Printf("producer/leader state change to [retrying-%d] on %s/%d\n", highWatermark, topic, partition)
 						break
