@@ -394,6 +394,91 @@ func TestProducerBrokerBounce(t *testing.T) {
 	safeClose(t, client)
 }
 
+func TestProducerMultipleRetries(t *testing.T) {
+	broker1 := NewMockBroker(t, 1)
+	broker2 := NewMockBroker(t, 2)
+	broker3 := NewMockBroker(t, 3)
+
+	response1 := new(MetadataResponse)
+	response1.AddBroker(broker2.Addr(), broker2.BrokerID())
+	response1.AddTopicPartition("my_topic", 0, broker2.BrokerID(), nil, nil, NoError)
+	broker1.Returns(response1)
+
+	client, err := NewClient("client_id", []string{broker1.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewProducerConfig()
+	config.FlushMsgCount = 10
+	config.AckSuccesses = true
+	config.MaxRetries = 4
+	config.RetryBackoff = 0
+	producer, err := NewProducer(client, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+	response2 := new(ProduceResponse)
+	response2.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
+	broker2.Returns(response2)
+
+	response3 := new(MetadataResponse)
+	response3.AddBroker(broker3.Addr(), broker3.BrokerID())
+	response3.AddTopicPartition("my_topic", 0, broker3.BrokerID(), nil, nil, NoError)
+	broker1.Returns(response3)
+	broker3.Returns(response2)
+	broker1.Returns(response1)
+	broker2.Returns(response2)
+	broker1.Returns(response1)
+	broker2.Returns(response2)
+	broker1.Returns(response3)
+
+	response4 := new(ProduceResponse)
+	response4.AddTopicPartition("my_topic", 0, NoError)
+	broker3.Returns(response4)
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+	broker3.Returns(response4)
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		}
+	}
+
+	broker1.Close()
+	broker2.Close()
+	broker3.Close()
+	safeClose(t, producer)
+	safeClose(t, client)
+}
+
 func ExampleProducer() {
 	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
 	if err != nil {
