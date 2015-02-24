@@ -3,6 +3,7 @@ package sarama
 import (
 	"io"
 	"testing"
+	"time"
 )
 
 func safeClose(t *testing.T, c io.Closer) {
@@ -199,4 +200,69 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	leader.Close()
 	seedBroker.Close()
 	safeClose(t, client)
+}
+
+func TestSingleSlowBroker(t *testing.T) {
+	slowBroker1 := NewMockBroker(t, 1)
+	fastBroker2 := NewMockBroker(t, 2)
+
+	slowBroker1.SetLatency(1 * time.Second)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(slowBroker1.Addr(), slowBroker1.BrokerID())
+	metadataResponse.AddBroker(fastBroker2.Addr(), fastBroker2.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, fastBroker2.BrokerID(), []int32{fastBroker2.BrokerID()}, []int32{fastBroker2.BrokerID()}, NoError)
+
+	slowBroker1.Returns(metadataResponse) // will timeout
+	fastBroker2.Returns(metadataResponse)
+
+	config := NewClientConfig()
+	config.DefaultBrokerConf = NewBrokerConfig()
+	config.DefaultBrokerConf.ReadTimeout = 10 * time.Millisecond
+
+	client, err := NewClient("clientID", []string{slowBroker1.Addr(), fastBroker2.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	slowBroker1.Close()
+	fastBroker2.Close()
+
+	safeClose(t, client)
+}
+
+func TestSlowCluster(t *testing.T) {
+	slowBroker1 := NewMockBroker(t, 1)
+	slowBroker2 := NewMockBroker(t, 2)
+	slowBroker3 := NewMockBroker(t, 2)
+
+	slowBroker1.SetLatency(1 * time.Second)
+	slowBroker2.SetLatency(1 * time.Second)
+	slowBroker3.SetLatency(1 * time.Second)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(slowBroker1.Addr(), slowBroker1.BrokerID())
+	metadataResponse.AddBroker(slowBroker2.Addr(), slowBroker2.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, slowBroker2.BrokerID(), []int32{slowBroker2.BrokerID()}, []int32{slowBroker2.BrokerID()}, NoError)
+
+	slowBroker1.Returns(metadataResponse) // will timeout
+	slowBroker2.Returns(metadataResponse) // will timeout
+	slowBroker3.Returns(metadataResponse) // will timeout
+
+	config := NewClientConfig()
+	config.MetadataRetries = 3
+	config.WaitForElection = 1 * time.Millisecond
+	config.DefaultBrokerConf = NewBrokerConfig()
+	config.DefaultBrokerConf.ReadTimeout = 10 * time.Millisecond
+
+	_, err := NewClient("clientID", []string{slowBroker1.Addr(), slowBroker2.Addr(), slowBroker3.Addr()}, config)
+	if err != OutOfBrokers {
+		t.Fatal("Expected the client to fail due to OutOfBrokers, found: ", err)
+	}
+
+	slowBroker1.Close()
+	slowBroker2.Close()
+	slowBroker3.Close()
 }
