@@ -57,10 +57,7 @@ func TestConsumerOffsetManual(t *testing.T) {
 	seedBroker.Close()
 
 	for i := 0; i < 10; i++ {
-		event := <-consumer.Events()
-		if event.Err != nil {
-			t.Error(event.Err)
-		}
+		event := <-consumer.Messages()
 		if event.Offset != int64(i+1234) {
 			t.Error("Incorrect message offset!")
 		}
@@ -152,11 +149,8 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 	config.OffsetValue = 2
 	consumer, err := master.ConsumePartition("my_topic", 0, config)
 
-	event := <-consumer.Events()
-	if event.Err != nil {
-		t.Error(event.Err)
-	}
-	if event.Offset != 3 {
+	message := <-consumer.Messages()
+	if message.Offset != 3 {
 		t.Error("Incorrect message offset!")
 	}
 
@@ -204,14 +198,11 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 		wg.Add(1)
 		go func(partition int32, c *PartitionConsumer) {
 			for i := 0; i < 10; i++ {
-				event := <-consumer.Events()
-				if event.Err != nil {
-					t.Error(event.Err, i, partition)
+				message := <-consumer.Messages()
+				if message.Offset != int64(i) {
+					t.Error("Incorrect message offset!", i, partition, message.Offset)
 				}
-				if event.Offset != int64(i) {
-					t.Error("Incorrect message offset!", i, partition, event.Offset)
-				}
-				if event.Partition != partition {
+				if message.Partition != partition {
 					t.Error("Incorrect message partition!")
 				}
 			}
@@ -321,10 +312,9 @@ func ExampleConsumer() {
 consumerLoop:
 	for {
 		select {
-		case event := <-consumer.Events():
-			if event.Err != nil {
-				panic(event.Err)
-			}
+		case err := <-consumer.Errors():
+			panic(err)
+		case <-consumer.Messages():
 			msgCount++
 		case <-time.After(5 * time.Second):
 			fmt.Println("> timed out")
