@@ -26,10 +26,6 @@ var ErrAlreadyConnected = errors.New("kafka: broker already connected")
 // ErrNotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
 var ErrNotConnected = errors.New("kafka: broker not connected")
 
-// ErrPacketEncodingFailure is returned from a failure while encoding a Kafka packet. This can happen, for example,
-// if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
-var ErrPacketEncodingFailure = errors.New("kafka: Error while encoding packet")
-
 // ErrInsufficientData is returned when decoding and the packet is truncated. This can be expected
 // when requesting messages, since as an optimization the server is allowed to return a partial message at the end
 // of the message set.
@@ -39,18 +35,28 @@ var ErrInsufficientData = errors.New("kafka: Insufficient data to decode packet,
 // ErrShuttingDown is returned when a producer receives a message during shutdown.
 var ErrShuttingDown = errors.New("kafka: Message received by producer in process of shutting down")
 
-// DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
-// This can be a bad CRC or length field, or any other invalid value.
-type DecodingError struct {
+// ErrMessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
+var ErrMessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
+
+// PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
+// if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
+type PacketEncodingError struct {
 	Info string
 }
 
-func (err DecodingError) Error() string {
-	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
+func (err PacketEncodingError) Error() string {
+	return fmt.Sprintf("kafka: Error while encoding packet: %s", err.Info)
 }
 
-// ErrMessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
-var ErrMessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
+// PacketDecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
+// This can be a bad CRC or length field, or any other invalid value.
+type PacketDecodingError struct {
+	Info string
+}
+
+func (err PacketDecodingError) Error() string {
+	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
+}
 
 // ConfigurationError is the type of error returned from NewClient, NewProducer or NewConsumer when the specified
 // configuration is invalid.

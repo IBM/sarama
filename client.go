@@ -532,7 +532,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 		}
 		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
 
-		switch err {
+		switch err.(type) {
 		case nil:
 			// valid response, use it
 			retry, err := client.update(response)
@@ -548,7 +548,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 			}
 
 			return err
-		case ErrPacketEncodingFailure:
+		case PacketEncodingError:
 			// didn't even send, return the error
 			return err
 		default:

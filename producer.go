@@ -583,10 +583,10 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 
 		response, err := broker.Produce(p.client.id, request)
 
-		switch err {
+		switch err.(type) {
 		case nil:
 			break
-		case ErrPacketEncodingFailure:
+		case PacketEncodingError:
 			p.returnErrors(batch, err)
 			continue
 		default:
