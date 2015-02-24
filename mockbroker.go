@@ -41,10 +41,11 @@ type MockCluster map[int32]*MockBroker
 type callback func()
 
 type BrokerExpectation struct {
-	Response       encoder
-	Latency        time.Duration
-	BeforeCallback callback
-	AfterCallback  callback
+	Response           encoder
+	Latency            time.Duration
+	BeforeCallback     callback
+	AfterCallback      callback
+	IgnoreServerErrors bool
 }
 
 func (b *MockBroker) BrokerID() int32 {
@@ -75,21 +76,21 @@ func (b *MockBroker) serverLoop() (ok bool) {
 
 	defer close(b.stopper)
 	if conn, err = b.listener.Accept(); err != nil {
-		return b.serverError(err, conn)
+		return b.serverError(err, conn, false)
 	}
 	reqHeader := make([]byte, 4)
 	resHeader := make([]byte, 8)
 	for expectation := range b.expectations {
 		_, err = io.ReadFull(conn, reqHeader)
 		if err != nil {
-			return b.serverError(err, conn)
+			return b.serverError(err, conn, expectation.IgnoreServerErrors)
 		}
 		body := make([]byte, binary.BigEndian.Uint32(reqHeader))
 		if len(body) < 10 {
-			return b.serverError(errors.New("Kafka request too short."), conn)
+			return b.serverError(errors.New("Kafka request too short."), conn, false)
 		}
 		if _, err = io.ReadFull(conn, body); err != nil {
-			return b.serverError(err, conn)
+			return b.serverError(err, conn, expectation.IgnoreServerErrors)
 		}
 
 		if expectation.BeforeCallback != nil {
@@ -111,10 +112,10 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		binary.BigEndian.PutUint32(resHeader, uint32(len(response)+4))
 		binary.BigEndian.PutUint32(resHeader[4:], binary.BigEndian.Uint32(body[4:]))
 		if _, err = conn.Write(resHeader); err != nil {
-			return b.serverError(err, conn)
+			return b.serverError(err, conn, expectation.IgnoreServerErrors)
 		}
 		if _, err = conn.Write(response); err != nil {
-			return b.serverError(err, conn)
+			return b.serverError(err, conn, expectation.IgnoreServerErrors)
 		}
 
 		if expectation.AfterCallback != nil {
@@ -122,7 +123,7 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		}
 	}
 	if err = conn.Close(); err != nil {
-		return b.serverError(err, nil)
+		return b.serverError(err, nil, false)
 	}
 	if err = b.listener.Close(); err != nil {
 		b.t.Error(err)
@@ -131,15 +132,21 @@ func (b *MockBroker) serverLoop() (ok bool) {
 	return true
 }
 
-func (b *MockBroker) serverError(err error, conn net.Conn) bool {
-	b.t.Error(err)
+func (b *MockBroker) serverError(err error, conn net.Conn, ignoreErrors bool) bool {
+	if !ignoreErrors {
+		b.t.Error(err)
+	}
 	if conn != nil {
 		if err := conn.Close(); err != nil {
-			b.t.Error(err)
+			if !ignoreErrors {
+				b.t.Error(err)
+			}
 		}
 	}
 	if err := b.listener.Close(); err != nil {
-		b.t.Error(err)
+		if !ignoreErrors {
+			b.t.Error(err)
+		}
 	}
 	return false
 }

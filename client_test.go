@@ -212,8 +212,8 @@ func TestSingleSlowBroker(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, cluster[1].BrokerID(), []int32{cluster[1].BrokerID()}, []int32{cluster[1].BrokerID()}, NoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, cluster[2].BrokerID(), []int32{cluster[2].BrokerID()}, []int32{cluster[2].BrokerID()}, NoError)
 
-	cluster[1].Expects(&BrokerExpectation{Response: metadataResponse, Latency: 500 * time.Millisecond}) // will timeout
-	cluster[2].Expects(&BrokerExpectation{Response: metadataResponse})                                  // will succeed
+	cluster[1].Expects(&BrokerExpectation{Response: metadataResponse, Latency: 500 * time.Millisecond, IgnoreServerErrors: true}) // will timeout
+	cluster[2].Expects(&BrokerExpectation{Response: metadataResponse})                                                            // will succeed
 
 	config := NewClientConfig()
 	config.DefaultBrokerConf = NewBrokerConfig()
@@ -232,8 +232,9 @@ func TestSlowCluster(t *testing.T) {
 	defer cluster.Close()
 
 	slowMetadataResponse := &BrokerExpectation{
-		Response: new(MetadataResponse),
-		Latency:  500 * time.Millisecond,
+		Response:           new(MetadataResponse),
+		Latency:            500 * time.Millisecond,
+		IgnoreServerErrors: true,
 	}
 
 	cluster[1].Expects(slowMetadataResponse)
