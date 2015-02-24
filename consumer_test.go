@@ -366,6 +366,7 @@ func ExampleConsumerWithGoroutines() {
 
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for message := range consumer.Messages() {
 			fmt.Printf("Consumed message with offset %d", message.Offset)
 			msgCount++
@@ -374,8 +375,9 @@ func ExampleConsumerWithGoroutines() {
 
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for err := range consumer.Errors() {
-			panic(err)
+			fmt.Println(err)
 		}
 	}()
 
