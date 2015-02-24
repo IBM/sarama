@@ -101,8 +101,7 @@ func (config *PartitionConsumerConfig) Validate() error {
 	return nil
 }
 
-// ConsumerMessage is what is provided to the user when an event occurs. It is either an error (in which case Err is non-nil) or
-// a message (in which case Err is nil and Offset, Key, and Value are set). Topic and Partition are always set.
+// ConsumerMessage encapsulates a Kafka message returned by the consumer.
 type ConsumerMessage struct {
 	Key, Value []byte
 	Topic      string
@@ -110,6 +109,8 @@ type ConsumerMessage struct {
 	Offset     int64
 }
 
+// ConsumerError is what is provided to the user when an error occurs.
+// It wraps an error and includes the topic and partition.
 type ConsumerError struct {
 	Topic     string
 	Partition int32
@@ -120,7 +121,7 @@ func (ce ConsumerError) Error() string {
 	return fmt.Sprintf("kafka: error while consuming %s/%d: %s", ce.Topic, ce.Partition, ce.Err)
 }
 
-// ConsumeErrors is a type that wraps a batch of errors and implements the Error interface.
+// ConsumerErrors is a type that wraps a batch of errors and implements the Error interface.
 // It can be returned from the PartitionConsumer's Close methods to avoid the need to manually drain errors
 // when stopping.
 type ConsumerErrors []*ConsumerError
