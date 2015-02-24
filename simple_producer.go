@@ -35,7 +35,7 @@ func NewSimpleProducer(client *Client, config *ProducerConfig) (*SimpleProducer,
 // SendMessage produces a message to the given topic with the given key and value. To send strings as either key or value, see the StringEncoder type.
 func (sp *SimpleProducer) SendMessage(topic string, key, value Encoder) error {
 	expectation := make(chan error, 1)
-	msg := &MessageToSend{Topic: topic, Key: key, Value: value, Metadata: expectation}
+	msg := &ProducerMessage{Topic: topic, Key: key, Value: value, Metadata: expectation}
 	sp.producer.Input() <- msg
 	return <-expectation
 }
