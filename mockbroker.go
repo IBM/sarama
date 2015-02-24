@@ -36,6 +36,8 @@ type MockBroker struct {
 	t            TestState
 }
 
+type MockCluster map[int32]*MockBroker
+
 type callback func()
 
 type BrokerExpectation struct {
@@ -59,7 +61,7 @@ func (b *MockBroker) Addr() string {
 
 func (b *MockBroker) Close() {
 	if len(b.expectations) > 0 {
-		b.t.Errorf("Not all expectations were satisfied in mockBroker with ID=%d! Still waiting on %d", b.BrokerID(), len(b.expectations))
+		b.t.Errorf("Not all expectations were satisfied in mock broker with ID=%d! Still waiting on %d requests.", b.BrokerID(), len(b.expectations))
 	}
 	close(b.expectations)
 	<-b.stopper
@@ -140,6 +142,30 @@ func (b *MockBroker) serverError(err error, conn net.Conn) bool {
 		b.t.Error(err)
 	}
 	return false
+}
+
+// NewMockBroker launces a fake Kafka cluster consisting of a specified  number
+// of brokers.
+func NewMockCluster(t TestState, brokers int32) MockCluster {
+	cluster := make(MockCluster)
+	for i := int32(1); i <= brokers; i++ {
+		cluster[i] = NewMockBroker(t, i)
+	}
+	return cluster
+}
+
+func (mc MockCluster) Addr() []string {
+	addrs := make([]string, len(mc))
+	for _, broker := range mc {
+		addrs = append(addrs, broker.Addr())
+	}
+	return addrs
+}
+
+func (mc MockCluster) Close() {
+	for _, broker := range mc {
+		broker.Close()
+	}
 }
 
 // NewMockBroker launches a fake Kafka broker. It takes a TestState (e.g. *testing.T) as provided by the

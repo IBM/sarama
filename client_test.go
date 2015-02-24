@@ -203,59 +203,51 @@ func TestClientRefreshBehaviour(t *testing.T) {
 }
 
 func TestSingleSlowBroker(t *testing.T) {
-	slowBroker1 := NewMockBroker(t, 1)
-	fastBroker2 := NewMockBroker(t, 2)
+	cluster := NewMockCluster(t, 2)
+	defer cluster.Close()
 
 	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(slowBroker1.Addr(), slowBroker1.BrokerID())
-	metadataResponse.AddBroker(fastBroker2.Addr(), fastBroker2.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, fastBroker2.BrokerID(), []int32{fastBroker2.BrokerID()}, []int32{fastBroker2.BrokerID()}, NoError)
+	metadataResponse.AddBroker(cluster[1].Addr(), cluster[1].BrokerID())
+	metadataResponse.AddBroker(cluster[2].Addr(), cluster[2].BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, cluster[1].BrokerID(), []int32{cluster[1].BrokerID()}, []int32{cluster[1].BrokerID()}, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, cluster[2].BrokerID(), []int32{cluster[2].BrokerID()}, []int32{cluster[2].BrokerID()}, NoError)
 
-	slowBroker1.Expects(&BrokerExpectation{Response: metadataResponse, Latency: 100 * time.Millisecond}) // will timeout
-	fastBroker2.Expects(&BrokerExpectation{Response: metadataResponse})                                  // will succeed
+	cluster[1].Expects(&BrokerExpectation{Response: metadataResponse, Latency: 500 * time.Millisecond}) // will timeout
+	cluster[2].Expects(&BrokerExpectation{Response: metadataResponse})                                  // will succeed
 
 	config := NewClientConfig()
 	config.DefaultBrokerConf = NewBrokerConfig()
-	config.DefaultBrokerConf.ReadTimeout = 10 * time.Millisecond
+	config.DefaultBrokerConf.ReadTimeout = 100 * time.Millisecond
 
-	client, err := NewClient("clientID", []string{slowBroker1.Addr(), fastBroker2.Addr()}, config)
+	client, err := NewClient("clientID", cluster.Addr(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	slowBroker1.Close()
-	fastBroker2.Close()
 
 	safeClose(t, client)
 }
 
 func TestSlowCluster(t *testing.T) {
-	slowBroker1 := NewMockBroker(t, 1)
-	slowBroker2 := NewMockBroker(t, 2)
-	slowBroker3 := NewMockBroker(t, 3)
+	cluster := NewMockCluster(t, 3)
+	defer cluster.Close()
 
 	slowMetadataResponse := &BrokerExpectation{
 		Response: new(MetadataResponse),
-		Latency:  100 * time.Millisecond,
+		Latency:  500 * time.Millisecond,
 	}
 
-	slowBroker1.Expects(slowMetadataResponse)
-	slowBroker2.Expects(slowMetadataResponse)
-	slowBroker3.Expects(slowMetadataResponse)
+	cluster[1].Expects(slowMetadataResponse)
+	cluster[2].Expects(slowMetadataResponse)
+	cluster[3].Expects(slowMetadataResponse)
 
 	config := NewClientConfig()
 	config.MetadataRetries = 3
 	config.WaitForElection = 1 * time.Millisecond
 	config.DefaultBrokerConf = NewBrokerConfig()
-	config.DefaultBrokerConf.ReadTimeout = 10 * time.Millisecond
+	config.DefaultBrokerConf.ReadTimeout = 100 * time.Millisecond
 
-	_, err := NewClient("clientID", []string{slowBroker1.Addr(), slowBroker2.Addr(), slowBroker3.Addr()}, config)
+	_, err := NewClient("clientID", cluster.Addr(), config)
 	if err != OutOfBrokers {
 		t.Error("Expected the client to fail due to OutOfBrokers, found: ", err)
 	}
-
-	slowBroker1.Close()
-	slowBroker2.Close()
-	slowBroker3.Close()
 }
