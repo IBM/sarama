@@ -559,6 +559,127 @@ func TestProducerMultipleRetries(t *testing.T) {
 	safeClose(t, client)
 }
 
+func TestProducerMultipleAsyncRetries(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader1 := NewMockBroker(t, 2)
+	leader2 := NewMockBroker(t, 3)
+
+	metadataLeader1 := new(MetadataResponse)
+	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
+	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, NoError)
+	seedBroker.Returns(metadataLeader1)
+
+	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewProducerConfig()
+	config.FlushMsgCount = 10
+	config.AckSuccesses = true
+	config.MaxRetries = 4
+	config.RetryBackoff = 0
+	producer, err := NewProducer(client, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 1"}
+	}
+	prodNotLeader := new(ProduceResponse)
+	prodNotLeader.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
+	leader1.Returns(prodNotLeader)
+
+	metadataLeader2 := new(MetadataResponse)
+	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
+	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, NoError)
+	seedBroker.Returns(metadataLeader2)
+	leader2.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader1)
+	leader1.Expects(&BrokerExpectation{
+		Response: prodNotLeader,
+		BeforeCallback: func() {
+			for i := 0; i < 10; i++ {
+				producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 2"}
+			}
+		},
+	})
+
+	seedBroker.Returns(metadataLeader1)
+	leader1.Returns(prodNotLeader)
+	seedBroker.Expects(&BrokerExpectation{
+		Response: metadataLeader2,
+		BeforeCallback: func() {
+			for i := 0; i < 10; i++ {
+				producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 3"}
+			}
+		},
+	})
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, NoError)
+	leader2.Returns(prodSuccess) // batch 1
+	leader2.Returns(prodSuccess) // batch 2 & batch 3
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+			if msg.Metadata.(string) != "Batch 1" {
+				t.Error("Expected batch 1")
+			}
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+			if msg.Metadata.(string) != "Batch 2" {
+				t.Error("Expected batch 2")
+			}
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+			if msg.Metadata.(string) != "Batch 3" {
+				t.Error("Expected batch 3")
+			}
+		}
+	}
+
+	seedBroker.Close()
+	leader1.Close()
+	leader2.Close()
+	closeProducer(t, producer)
+	safeClose(t, client)
+}
+
 func ExampleProducer() {
 	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
 	if err != nil {

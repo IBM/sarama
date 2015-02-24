@@ -31,14 +31,18 @@ type MockBroker struct {
 	brokerID     int32
 	port         int32
 	stopper      chan bool
-	expectations chan encoder
+	expectations chan *BrokerExpectation
 	listener     net.Listener
 	t            TestState
-	latency      time.Duration
 }
 
-func (b *MockBroker) SetLatency(latency time.Duration) {
-	b.latency = latency
+type callback func()
+
+type BrokerExpectation struct {
+	Response       encoder
+	Latency        time.Duration
+	BeforeCallback callback
+	AfterCallback  callback
 }
 
 func (b *MockBroker) BrokerID() int32 {
@@ -86,11 +90,15 @@ func (b *MockBroker) serverLoop() (ok bool) {
 			return b.serverError(err, conn)
 		}
 
-		if b.latency > 0 {
-			time.Sleep(b.latency)
+		if expectation.BeforeCallback != nil {
+			expectation.BeforeCallback()
 		}
 
-		response, err := encode(expectation)
+		if expectation.Latency > 0 {
+			time.Sleep(expectation.Latency)
+		}
+
+		response, err := encode(expectation.Response)
 		if err != nil {
 			return false
 		}
@@ -105,6 +113,10 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		}
 		if _, err = conn.Write(response); err != nil {
 			return b.serverError(err, conn)
+		}
+
+		if expectation.AfterCallback != nil {
+			expectation.AfterCallback()
 		}
 	}
 	if err = conn.Close(); err != nil {
@@ -146,7 +158,7 @@ func NewMockBrokerAddr(t TestState, brokerID int32, addr string) *MockBroker {
 		stopper:      make(chan bool),
 		t:            t,
 		brokerID:     brokerID,
-		expectations: make(chan encoder, 512),
+		expectations: make(chan *BrokerExpectation, 512),
 	}
 
 	broker.listener, err = net.Listen("tcp", addr)
@@ -168,6 +180,25 @@ func NewMockBrokerAddr(t TestState, brokerID int32, addr string) *MockBroker {
 	return broker
 }
 
-func (b *MockBroker) Returns(e encoder) {
-	b.expectations <- e
+func (b *MockBroker) Returns(response encoder) {
+	b.expectations <- &BrokerExpectation{Response: response}
+}
+
+func (b *MockBroker) Expects(expectation *BrokerExpectation) {
+	b.expectations <- expectation
+}
+
+func (e *BrokerExpectation) WithLatency(latency time.Duration) *BrokerExpectation {
+	e.Latency = latency
+	return e
+}
+
+func (e *BrokerExpectation) Before(callback callback) *BrokerExpectation {
+	e.BeforeCallback = callback
+	return e
+}
+
+func (e *BrokerExpectation) After(callback callback) *BrokerExpectation {
+	e.AfterCallback = callback
+	return e
 }

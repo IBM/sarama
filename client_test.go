@@ -206,16 +206,14 @@ func TestSingleSlowBroker(t *testing.T) {
 	slowBroker1 := NewMockBroker(t, 1)
 	fastBroker2 := NewMockBroker(t, 2)
 
-	slowBroker1.SetLatency(1 * time.Second)
-
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(slowBroker1.Addr(), slowBroker1.BrokerID())
 	metadataResponse.AddBroker(fastBroker2.Addr(), fastBroker2.BrokerID())
 	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, fastBroker2.BrokerID(), []int32{fastBroker2.BrokerID()}, []int32{fastBroker2.BrokerID()}, NoError)
 
-	slowBroker1.Returns(metadataResponse) // will timeout
-	fastBroker2.Returns(metadataResponse)
+	slowBroker1.Expects(&BrokerExpectation{Response: metadataResponse, Latency: 1 * time.Second}) // will timeout
+	fastBroker2.Expects(&BrokerExpectation{Response: metadataResponse})                           // will succeed
 
 	config := NewClientConfig()
 	config.DefaultBrokerConf = NewBrokerConfig()
@@ -237,19 +235,16 @@ func TestSlowCluster(t *testing.T) {
 	slowBroker2 := NewMockBroker(t, 2)
 	slowBroker3 := NewMockBroker(t, 2)
 
-	slowBroker1.SetLatency(1 * time.Second)
-	slowBroker2.SetLatency(1 * time.Second)
-	slowBroker3.SetLatency(1 * time.Second)
-
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(slowBroker1.Addr(), slowBroker1.BrokerID())
 	metadataResponse.AddBroker(slowBroker2.Addr(), slowBroker2.BrokerID())
 	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, slowBroker2.BrokerID(), []int32{slowBroker2.BrokerID()}, []int32{slowBroker2.BrokerID()}, NoError)
 
-	slowBroker1.Returns(metadataResponse) // will timeout
-	slowBroker2.Returns(metadataResponse) // will timeout
-	slowBroker3.Returns(metadataResponse) // will timeout
+	slowMetadataResponse := &BrokerExpectation{Response: metadataResponse, Latency: 1 * time.Second}
+	slowBroker1.Expects(slowMetadataResponse)
+	slowBroker2.Expects(slowMetadataResponse)
+	slowBroker3.Expects(slowMetadataResponse)
 
 	config := NewClientConfig()
 	config.MetadataRetries = 3
