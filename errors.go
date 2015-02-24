@@ -10,15 +10,15 @@ import (
 var OutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
 
 // ClosedClient is the error returned when a method is called on a client that has been closed.
-var ClosedClient = errors.New("kafka: Tried to use a client that was closed.")
+var ClosedClient = errors.New("kafka: Tried to use a client that was closed")
 
 // IncompleteResponse is the error returned when the server returns a syntactically valid response, but it does
 // not contain the expected information.
-var IncompleteResponse = errors.New("kafka: Response did not contain all the expected topic/partition blocks.")
+var IncompleteResponse = errors.New("kafka: Response did not contain all the expected topic/partition blocks")
 
 // InvalidPartition is the error returned when a partitioner returns an invalid partition index
 // (meaning one outside of the range [0...numPartitions-1]).
-var InvalidPartition = errors.New("kafka: Partitioner returned an invalid partition index.")
+var InvalidPartition = errors.New("kafka: Partitioner returned an invalid partition index")
 
 // AlreadyConnected is the error returned when calling Open() on a Broker that is already connected.
 var AlreadyConnected = errors.New("kafka: broker: already connected")
@@ -28,15 +28,15 @@ var NotConnected = errors.New("kafka: broker: not connected")
 
 // EncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
-var EncodingError = errors.New("kafka: Error while encoding packet.")
+var EncodingError = errors.New("kafka: Error while encoding packet")
 
 // InsufficientData is returned when decoding and the packet is truncated. This can be expected
 // when requesting messages, since as an optimization the server is allowed to return a partial message at the end
 // of the message set.
-var InsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected.")
+var InsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected")
 
 // ShuttingDown is returned when a producer receives a message during shutdown.
-var ShuttingDown = errors.New("kafka: Message received by producer in process of shutting down.")
+var ShuttingDown = errors.New("kafka: Message received by producer in process of shutting down")
 
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
