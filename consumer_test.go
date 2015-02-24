@@ -27,7 +27,7 @@ func TestConsumerOffsetManual(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	for i := 0; i <= 10; i++ {
@@ -77,7 +77,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	offsetResponse := new(OffsetResponse)
@@ -125,7 +125,7 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	fetchResponse := new(FetchResponse)
@@ -175,8 +175,8 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader0.Addr(), leader0.BrokerID())
 	metadataResponse.AddBroker(leader1.Addr(), leader1.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader0.BrokerID(), nil, nil, NoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader0.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	// launch test goroutines
@@ -229,13 +229,13 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 
 	// leader0 says no longer leader of partition 0
 	fetchResponse = new(FetchResponse)
-	fetchResponse.AddError("my_topic", 0, NotLeaderForPartition)
+	fetchResponse.AddError("my_topic", 0, ErrNotLeaderForPartition)
 	leader0.Returns(fetchResponse)
 
 	// metadata assigns both partitions to leader1
 	metadataResponse = new(MetadataResponse)
-	metadataResponse.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, NoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 	time.Sleep(5 * time.Millisecond) // dumbest way to force a particular response ordering
 
@@ -259,13 +259,13 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i+7))
 	}
-	fetchResponse.AddError("my_topic", 1, NotLeaderForPartition)
+	fetchResponse.AddError("my_topic", 1, ErrNotLeaderForPartition)
 	leader1.Returns(fetchResponse)
 
 	// metadata assigns 0 to leader1 and 1 to leader0
 	metadataResponse = new(MetadataResponse)
-	metadataResponse.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, NoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, leader0.BrokerID(), nil, nil, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader0.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 	time.Sleep(5 * time.Millisecond) // dumbest way to force a particular response ordering
 

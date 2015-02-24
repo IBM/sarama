@@ -295,7 +295,7 @@ func (p *Producer) topicDispatcher() {
 		if (p.config.Compression == CompressionNone && msg.Value != nil && msg.Value.Length() > p.config.MaxMessageBytes) ||
 			(msg.byteSize() > p.config.MaxMessageBytes) {
 
-			p.returnError(msg, MessageSizeTooLarge)
+			p.returnError(msg, ErrMessageSizeTooLarge)
 			continue
 		}
 
@@ -617,7 +617,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 				}
 
 				switch block.Err {
-				case NoError:
+				case ErrNoError:
 					// All the messages for this topic-partition were delivered successfully!
 					if p.config.AckSuccesses {
 						for i := range msgs {
@@ -625,7 +625,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 						}
 						p.returnSuccesses(msgs)
 					}
-				case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable, RequestTimedOut:
+				case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable, ErrRequestTimedOut:
 					Logger.Printf("producer/flusher/%d state change to [retrying] on %s/%d because %v\n",
 						broker.ID(), topic, partition, block.Err)
 					if currentRetries[topic] == nil {
@@ -710,7 +710,7 @@ func (p *Producer) assignPartition(partitioner Partitioner, msg *MessageToSend) 
 	numPartitions := int32(len(partitions))
 
 	if numPartitions == 0 {
-		return LeaderNotAvailable
+		return ErrLeaderNotAvailable
 	}
 
 	choice, err := partitioner.Partition(msg.Key, numPartitions)

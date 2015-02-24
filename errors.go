@@ -66,62 +66,62 @@ type KError int16
 
 // Numeric error codes returned by the Kafka server.
 const (
-	NoError                         KError = 0
-	Unknown                         KError = -1
-	OffsetOutOfRange                KError = 1
-	InvalidMessage                  KError = 2
-	UnknownTopicOrPartition         KError = 3
-	InvalidMessageSize              KError = 4
-	LeaderNotAvailable              KError = 5
-	NotLeaderForPartition           KError = 6
-	RequestTimedOut                 KError = 7
-	BrokerNotAvailable              KError = 8
-	ReplicaNotAvailable             KError = 9
-	MessageSizeTooLarge             KError = 10
-	StaleControllerEpochCode        KError = 11
-	OffsetMetadataTooLarge          KError = 12
-	OffsetsLoadInProgress           KError = 14
-	ConsumerCoordinatorNotAvailable KError = 15
-	NotCoordinatorForConsumer       KError = 16
+	ErrNoError                         KError = 0
+	ErrUnknown                         KError = -1
+	ErrOffsetOutOfRange                KError = 1
+	ErrInvalidMessage                  KError = 2
+	ErrUnknownTopicOrPartition         KError = 3
+	ErrInvalidMessageSize              KError = 4
+	ErrLeaderNotAvailable              KError = 5
+	ErrNotLeaderForPartition           KError = 6
+	ErrRequestTimedOut                 KError = 7
+	ErrBrokerNotAvailable              KError = 8
+	ErrReplicaNotAvailable             KError = 9
+	ErrMessageSizeTooLarge             KError = 10
+	ErrStaleControllerEpochCode        KError = 11
+	ErrOffsetMetadataTooLarge          KError = 12
+	ErrOffsetsLoadInProgress           KError = 14
+	ErrConsumerCoordinatorNotAvailable KError = 15
+	ErrNotCoordinatorForConsumer       KError = 16
 )
 
 func (err KError) Error() string {
 	// Error messages stolen/adapted from
 	// https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
 	switch err {
-	case NoError:
+	case ErrNoError:
 		return "kafka server: Not an error, why are you printing me?"
-	case Unknown:
+	case ErrUnknown:
 		return "kafka server: Unexpected (unknown?) server error."
-	case OffsetOutOfRange:
+	case ErrOffsetOutOfRange:
 		return "kafka server: The requested offset is outside the range of offsets maintained by the server for the given topic/partition."
-	case InvalidMessage:
+	case ErrInvalidMessage:
 		return "kafka server: Message contents does not match its CRC."
-	case UnknownTopicOrPartition:
+	case ErrUnknownTopicOrPartition:
 		return "kafka server: Request was for a topic or partition that does not exist on this broker."
-	case InvalidMessageSize:
+	case ErrInvalidMessageSize:
 		return "kafka server: The message has a negative size."
-	case LeaderNotAvailable:
+	case ErrLeaderNotAvailable:
 		return "kafka server: In the middle of a leadership election, there is currently no leader for this partition and hence it is unavailable for writes."
-	case NotLeaderForPartition:
+	case ErrNotLeaderForPartition:
 		return "kafka server: Tried to send a message to a replica that is not the leader for some partition. Your metadata is out of date."
-	case RequestTimedOut:
+	case ErrRequestTimedOut:
 		return "kafka server: Request exceeded the user-specified time limit in the request."
-	case BrokerNotAvailable:
+	case ErrBrokerNotAvailable:
 		return "kafka server: Broker not available. Not a client facing error, we should never receive this!!!"
-	case ReplicaNotAvailable:
+	case ErrReplicaNotAvailable:
 		return "kafka server: Replica infomation not available, one or more brokers are down."
-	case MessageSizeTooLarge:
+	case ErrMessageSizeTooLarge:
 		return "kafka server: Message was too large, server rejected it to avoid allocation error."
-	case StaleControllerEpochCode:
+	case ErrStaleControllerEpochCode:
 		return "kafka server: StaleControllerEpochCode (internal error code for broker-to-broker communication)."
-	case OffsetMetadataTooLarge:
+	case ErrOffsetMetadataTooLarge:
 		return "kafka server: Specified a string larger than the configured maximum for offset metadata."
-	case OffsetsLoadInProgress:
+	case ErrOffsetsLoadInProgress:
 		return "kafka server: The broker is still loading offsets after a leader change for that offset's topic partition."
-	case ConsumerCoordinatorNotAvailable:
+	case ErrConsumerCoordinatorNotAvailable:
 		return "kafka server: Offset's topic has not yet been created."
-	case NotCoordinatorForConsumer:
+	case ErrNotCoordinatorForConsumer:
 		return "kafka server: Request was for a consumer group that is not coordinated by this broker."
 	}
 

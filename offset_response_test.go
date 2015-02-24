@@ -47,7 +47,7 @@ func TestNormalOffsetResponse(t *testing.T) {
 		t.Fatal("Decoding produced", len(response.Blocks["z"]), "partitions for topic 'z' where there was one.")
 	}
 
-	if response.Blocks["z"][2].Err != NoError {
+	if response.Blocks["z"][2].Err != ErrNoError {
 		t.Fatal("Decoding produced invalid error for topic z partition 2.")
 	}
 

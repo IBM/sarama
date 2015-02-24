@@ -54,7 +54,7 @@ func TestOneMessageFetchResponse(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != OffsetOutOfRange {
+	if block.Err != ErrOffsetOutOfRange {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {

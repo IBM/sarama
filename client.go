@@ -108,7 +108,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 	switch err {
 	case nil:
 		break
-	case LeaderNotAvailable, ReplicaNotAvailable:
+	case ErrLeaderNotAvailable, ErrReplicaNotAvailable:
 		// indicates that maybe part of the cluster is down, but is not fatal to creating the client
 		Logger.Println(err)
 	default:
@@ -194,7 +194,7 @@ func (client *Client) Partitions(topic string) ([]int32, error) {
 	}
 
 	if partitions == nil {
-		return nil, UnknownTopicOrPartition
+		return nil, ErrUnknownTopicOrPartition
 	}
 
 	return partitions, nil
@@ -213,7 +213,7 @@ func (client *Client) WritablePartitions(topic string) ([]int32, error) {
 	// len==0 catches when it's nil (no such topic) and the odd case when every single
 	// partition is undergoing leader election simultaneously. Callers have to be able to handle
 	// this function returning an empty slice (which is a valid return value) but catching it
-	// here the first time (note we *don't* catch it below where we return UnknownTopicOrPartition) triggers
+	// here the first time (note we *don't* catch it below where we return ErrUnknownTopicOrPartition) triggers
 	// a metadata refresh as a nicety so callers can just try again and don't have to manually
 	// trigger a refresh (otherwise they'd just keep getting a stale cached copy).
 	if len(partitions) == 0 {
@@ -225,7 +225,7 @@ func (client *Client) WritablePartitions(topic string) ([]int32, error) {
 	}
 
 	if partitions == nil {
-		return nil, UnknownTopicOrPartition
+		return nil, ErrUnknownTopicOrPartition
 	}
 
 	return partitions, nil
@@ -243,7 +243,7 @@ func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error)
 		return nil, err
 	}
 
-	if metadata.Err == ReplicaNotAvailable {
+	if metadata.Err == ErrReplicaNotAvailable {
 		return nil, metadata.Err
 	}
 	return dupeAndSort(metadata.Replicas), nil
@@ -263,7 +263,7 @@ func (client *Client) ReplicasInSync(topic string, partitionID int32) ([]int32, 
 		return nil, err
 	}
 
-	if metadata.Err == ReplicaNotAvailable {
+	if metadata.Err == ErrReplicaNotAvailable {
 		return nil, metadata.Err
 	}
 	return dupeAndSort(metadata.Isr), nil
@@ -317,11 +317,11 @@ func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTim
 	if block == nil {
 		return -1, ErrIncompleteResponse
 	}
-	if block.Err != NoError {
+	if block.Err != ErrNoError {
 		return -1, block.Err
 	}
 	if len(block.Offsets) != 1 {
-		return -1, OffsetOutOfRange
+		return -1, ErrOffsetOutOfRange
 	}
 
 	return block.Offsets[0], nil
@@ -415,7 +415,7 @@ func (client *Client) getMetadata(topic string, partitionID int32) (*PartitionMe
 	}
 
 	if metadata == nil {
-		return nil, UnknownTopicOrPartition
+		return nil, ErrUnknownTopicOrPartition
 	}
 
 	return metadata, nil
@@ -454,7 +454,7 @@ func (client *Client) setPartitionCache(topic string, partitionSet partitionType
 
 	ret := make([]int32, 0, len(partitions))
 	for _, partition := range partitions {
-		if partitionSet == writablePartitions && partition.Err == LeaderNotAvailable {
+		if partitionSet == writablePartitions && partition.Err == ErrLeaderNotAvailable {
 			continue
 		}
 		ret = append(ret, partition.ID)
@@ -472,18 +472,18 @@ func (client *Client) cachedLeader(topic string, partitionID int32) (*Broker, er
 	if partitions != nil {
 		metadata, ok := partitions[partitionID]
 		if ok {
-			if metadata.Err == LeaderNotAvailable {
-				return nil, LeaderNotAvailable
+			if metadata.Err == ErrLeaderNotAvailable {
+				return nil, ErrLeaderNotAvailable
 			}
 			b := client.brokers[metadata.Leader]
 			if b == nil {
-				return nil, LeaderNotAvailable
+				return nil, ErrLeaderNotAvailable
 			}
 			return b, nil
 		}
 	}
 
-	return nil, UnknownTopicOrPartition
+	return nil, ErrUnknownTopicOrPartition
 }
 
 // core metadata update logic
@@ -520,7 +520,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 	// off to Kafka. See: https://github.com/Shopify/sarama/pull/38#issuecomment-26362310
 	for _, topic := range topics {
 		if len(topic) == 0 {
-			return UnknownTopicOrPartition
+			return ErrUnknownTopicOrPartition
 		}
 	}
 
@@ -570,7 +570,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 	return ErrOutOfBrokers
 }
 
-// if no fatal error, returns a list of topics that need retrying due to LeaderNotAvailable
+// if no fatal error, returns a list of topics that need retrying due to ErrLeaderNotAvailable
 func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
@@ -600,9 +600,9 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	var err error
 	for _, topic := range data.Topics {
 		switch topic.Err {
-		case NoError:
+		case ErrNoError:
 			break
-		case LeaderNotAvailable:
+		case ErrLeaderNotAvailable:
 			toRetry[topic.Name] = true
 		default:
 			err = topic.Err
@@ -612,7 +612,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		delete(client.cachedPartitionsResults, topic.Name)
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
-			if partition.Err == LeaderNotAvailable {
+			if partition.Err == ErrLeaderNotAvailable {
 				toRetry[topic.Name] = true
 			}
 		}

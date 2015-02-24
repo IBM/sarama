@@ -525,12 +525,12 @@ func (w *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 
 func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchResponseBlock) {
 	switch block.Err {
-	case NoError:
+	case ErrNoError:
 		break
 	default:
 		child.sendError(block.Err)
 		fallthrough
-	case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable:
+	case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable:
 		// doesn't belong to us, redispatch it
 		child.trigger <- none{}
 		delete(w.subscriptions, child)
