@@ -28,13 +28,13 @@ type StdLogger interface {
 var PanicHandler func(interface{})
 
 // MaxRequestSize is the maximum size (in bytes) of any request that Sarama will attempt to send. Trying
-// to send a request larger than this will result in an EncodingError. The default of 100 MiB is aligned
+// to send a request larger than this will result in an PacketEncodingError. The default of 100 MiB is aligned
 // with Kafka's default `socket.request.max.bytes`, which is the largest request the broker will attempt
 // to process.
 var MaxRequestSize uint32 = 100 * 1024 * 1024
 
 // MaxResponseSize is the maximum size (in bytes) of any response that Sarama will attempt to parse. If
-// a broker returns a response message larger than this value, Sarama will return a DecodingError. The
+// a broker returns a response message larger than this value, Sarama will return a PacketDecodingError. The
 // default of 100 MiB is aligned with Kafka's default `socket.request.max.bytes`, which is the largest
 // request the broker will attempt to process.
 var MaxResponseSize int32 = 100 * 1024 * 1024

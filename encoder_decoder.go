@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // Encoder is the interface that wraps the basic Encode method.
 // Anything implementing Encoder can be turned into bytes using Kafka's encoding rules.
 type encoder interface {
@@ -21,7 +23,7 @@ func encode(in encoder) ([]byte, error) {
 	}
 
 	if prepEnc.length < 0 || uint32(prepEnc.length) > MaxRequestSize {
-		return nil, EncodingError
+		return nil, PacketEncodingError{fmt.Sprintf("Invalid request size: %d", prepEnc.length)}
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length)
@@ -53,7 +55,7 @@ func decode(buf []byte, in decoder) error {
 	}
 
 	if helper.off != len(buf) {
-		return DecodingError{Info: "Length was invalid"}
+		return PacketDecodingError{"Length was invalid"}
 	}
 
 	return nil

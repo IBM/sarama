@@ -28,7 +28,7 @@ func (c *crc32Field) check(curOffset int, buf []byte) error {
 	crc := crc32.ChecksumIEEE(buf[c.startOffset+4 : curOffset])
 
 	if crc != binary.BigEndian.Uint32(buf[c.startOffset:]) {
-		return DecodingError{Info: "CRC didn't match"}
+		return PacketDecodingError{"CRC didn't match"}
 	}
 
 	return nil

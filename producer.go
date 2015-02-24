@@ -126,7 +126,7 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	// Check that we are not dealing with a closed Client before processing
 	// any other arguments
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	if config == nil {
@@ -295,7 +295,7 @@ func (p *Producer) topicDispatcher() {
 		if (p.config.Compression == CompressionNone && msg.Value != nil && msg.Value.Length() > p.config.MaxMessageBytes) ||
 			(msg.byteSize() > p.config.MaxMessageBytes) {
 
-			p.returnError(msg, MessageSizeTooLarge)
+			p.returnError(msg, ErrMessageSizeTooLarge)
 			continue
 		}
 
@@ -319,7 +319,7 @@ func (p *Producer) topicDispatcher() {
 	p.retries <- &MessageToSend{flags: shutdown}
 
 	for msg := range p.input {
-		p.returnError(msg, ShuttingDown)
+		p.returnError(msg, ErrShuttingDown)
 	}
 
 	close(p.errors)
@@ -583,10 +583,10 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 
 		response, err := broker.Produce(p.client.id, request)
 
-		switch err {
+		switch err.(type) {
 		case nil:
 			break
-		case EncodingError:
+		case PacketEncodingError:
 			p.returnErrors(batch, err)
 			continue
 		default:
@@ -612,12 +612,12 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 
 				block := response.GetBlock(topic, partition)
 				if block == nil {
-					p.returnErrors(msgs, IncompleteResponse)
+					p.returnErrors(msgs, ErrIncompleteResponse)
 					continue
 				}
 
 				switch block.Err {
-				case NoError:
+				case ErrNoError:
 					// All the messages for this topic-partition were delivered successfully!
 					if p.config.AckSuccesses {
 						for i := range msgs {
@@ -625,7 +625,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 						}
 						p.returnSuccesses(msgs)
 					}
-				case UnknownTopicOrPartition, NotLeaderForPartition, LeaderNotAvailable, RequestTimedOut:
+				case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable, ErrRequestTimedOut:
 					Logger.Printf("producer/flusher/%d state change to [retrying] on %s/%d because %v\n",
 						broker.ID(), topic, partition, block.Err)
 					if currentRetries[topic] == nil {
@@ -710,7 +710,7 @@ func (p *Producer) assignPartition(partitioner Partitioner, msg *MessageToSend) 
 	numPartitions := int32(len(partitions))
 
 	if numPartitions == 0 {
-		return LeaderNotAvailable
+		return ErrLeaderNotAvailable
 	}
 
 	choice, err := partitioner.Partition(msg.Key, numPartitions)
@@ -718,7 +718,7 @@ func (p *Producer) assignPartition(partitioner Partitioner, msg *MessageToSend) 
 	if err != nil {
 		return err
 	} else if choice < 0 || choice >= numPartitions {
-		return InvalidPartition
+		return ErrInvalidPartition
 	}
 
 	msg.partition = partitions[choice]

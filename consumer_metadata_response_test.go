@@ -21,7 +21,7 @@ func TestConsumerMetadataResponseError(t *testing.T) {
 
 	testDecodable(t, "error", &response, consumerMetadataResponseError)
 
-	if response.Err != OffsetsLoadInProgress {
+	if response.Err != ErrOffsetsLoadInProgress {
 		t.Error("Decoding produced incorrect error value.")
 	}
 
@@ -43,7 +43,7 @@ func TestConsumerMetadataResponseSuccess(t *testing.T) {
 
 	testDecodable(t, "success", &response, consumerMetadataResponseSuccess)
 
-	if response.Err != NoError {
+	if response.Err != ErrNoError {
 		t.Error("Decoding produced error value where there was none.")
 	}
 

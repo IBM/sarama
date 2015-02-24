@@ -16,7 +16,7 @@ type realDecoder struct {
 func (rd *realDecoder) getInt8() (int8, error) {
 	if rd.remaining() < 1 {
 		rd.off = len(rd.raw)
-		return -1, InsufficientData
+		return -1, ErrInsufficientData
 	}
 	tmp := int8(rd.raw[rd.off])
 	rd.off += binary.Size(tmp)
@@ -26,7 +26,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 func (rd *realDecoder) getInt16() (int16, error) {
 	if rd.remaining() < 2 {
 		rd.off = len(rd.raw)
-		return -1, InsufficientData
+		return -1, ErrInsufficientData
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
 	rd.off += binary.Size(tmp)
@@ -36,7 +36,7 @@ func (rd *realDecoder) getInt16() (int16, error) {
 func (rd *realDecoder) getInt32() (int32, error) {
 	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
-		return -1, InsufficientData
+		return -1, ErrInsufficientData
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += binary.Size(tmp)
@@ -46,7 +46,7 @@ func (rd *realDecoder) getInt32() (int32, error) {
 func (rd *realDecoder) getInt64() (int64, error) {
 	if rd.remaining() < 8 {
 		rd.off = len(rd.raw)
-		return -1, InsufficientData
+		return -1, ErrInsufficientData
 	}
 	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
 	rd.off += binary.Size(tmp)
@@ -56,15 +56,15 @@ func (rd *realDecoder) getInt64() (int64, error) {
 func (rd *realDecoder) getArrayLength() (int, error) {
 	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
-		return -1, InsufficientData
+		return -1, ErrInsufficientData
 	}
 	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 	if tmp > rd.remaining() {
 		rd.off = len(rd.raw)
-		return -1, InsufficientData
+		return -1, ErrInsufficientData
 	} else if tmp > 2*math.MaxUint16 {
-		return -1, DecodingError{Info: "getArrayLength failed: Invalid array length"}
+		return -1, PacketDecodingError{"getArrayLength failed: Invalid array length"}
 	}
 	return tmp, nil
 }
@@ -82,14 +82,14 @@ func (rd *realDecoder) getBytes() ([]byte, error) {
 
 	switch {
 	case n < -1:
-		return nil, DecodingError{Info: "getBytes failed"}
+		return nil, PacketDecodingError{"getBytes failed: Invalid length"}
 	case n == -1:
 		return nil, nil
 	case n == 0:
 		return make([]byte, 0), nil
 	case n > rd.remaining():
 		rd.off = len(rd.raw)
-		return nil, InsufficientData
+		return nil, ErrInsufficientData
 	}
 
 	tmpStr := rd.raw[rd.off : rd.off+n]
@@ -108,14 +108,14 @@ func (rd *realDecoder) getString() (string, error) {
 
 	switch {
 	case n < -1:
-		return "", DecodingError{Info: "getString failed"}
+		return "", PacketDecodingError{"getString failed: invalid length"}
 	case n == -1:
 		return "", nil
 	case n == 0:
 		return "", nil
 	case n > rd.remaining():
 		rd.off = len(rd.raw)
-		return "", InsufficientData
+		return "", ErrInsufficientData
 	}
 
 	tmpStr := string(rd.raw[rd.off : rd.off+n])
@@ -126,14 +126,14 @@ func (rd *realDecoder) getString() (string, error) {
 func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
-		return nil, InsufficientData
+		return nil, ErrInsufficientData
 	}
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
 	if rd.remaining() < 4*n {
 		rd.off = len(rd.raw)
-		return nil, InsufficientData
+		return nil, ErrInsufficientData
 	}
 
 	if n == 0 {
@@ -141,7 +141,7 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	}
 
 	if n < 0 {
-		return nil, DecodingError{Info: "getInt32Array failed"}
+		return nil, PacketDecodingError{"getInt32Array failed: invalid length"}
 	}
 
 	ret := make([]int32, n)
@@ -155,14 +155,14 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 func (rd *realDecoder) getInt64Array() ([]int64, error) {
 	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
-		return nil, InsufficientData
+		return nil, ErrInsufficientData
 	}
 	n := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
 	rd.off += 4
 
 	if rd.remaining() < 8*n {
 		rd.off = len(rd.raw)
-		return nil, InsufficientData
+		return nil, ErrInsufficientData
 	}
 
 	if n == 0 {
@@ -170,7 +170,7 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 	}
 
 	if n < 0 {
-		return nil, DecodingError{Info: "getInt64Array failed"}
+		return nil, PacketDecodingError{"getInt64Array failed: invalid length"}
 	}
 
 	ret := make([]int64, n)
@@ -190,7 +190,7 @@ func (rd *realDecoder) remaining() int {
 func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
 	if length > rd.remaining() {
 		rd.off = len(rd.raw)
-		return nil, InsufficientData
+		return nil, ErrInsufficientData
 	}
 
 	start := rd.off
@@ -206,7 +206,7 @@ func (rd *realDecoder) push(in pushDecoder) error {
 	reserve := in.reserveLength()
 	if rd.remaining() < reserve {
 		rd.off = len(rd.raw)
-		return InsufficientData
+		return ErrInsufficientData
 	}
 
 	rd.stack = append(rd.stack, in)

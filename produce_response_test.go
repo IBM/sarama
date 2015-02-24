@@ -46,7 +46,7 @@ func TestProduceResponse(t *testing.T) {
 	if block == nil {
 		t.Error("Decoding did not produce a block for bar/1")
 	} else {
-		if block.Err != NoError {
+		if block.Err != ErrNoError {
 			t.Error("Decoding failed for bar/1/Err, got:", int16(block.Err))
 		}
 		if block.Offset != 0xFF {
@@ -57,7 +57,7 @@ func TestProduceResponse(t *testing.T) {
 	if block == nil {
 		t.Error("Decoding did not produce a block for bar/2")
 	} else {
-		if block.Err != InvalidMessage {
+		if block.Err != ErrInvalidMessage {
 			t.Error("Decoding failed for bar/2/Err, got:", int16(block.Err))
 		}
 		if block.Offset != 0 {
