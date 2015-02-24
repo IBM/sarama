@@ -62,7 +62,7 @@ func (config *ConsumerConfig) Validate() error {
 type PartitionConsumerConfig struct {
 	// The default (maximum) amount of data to fetch from the broker in each request. The default is 32768 bytes.
 	DefaultFetchSize int32
-	// The maximum permittable message size - messages larger than this will return MessageTooLarge. The default of 0 is
+	// The maximum permittable message size - messages larger than this will return ErrMessageTooLarge. The default of 0 is
 	// treated as no limit.
 	MaxMessageSize int32
 	// The method used to determine at which offset to begin consuming messages. The default is to start at the most recent message.
@@ -134,7 +134,7 @@ type Consumer struct {
 func NewConsumer(client *Client, config *ConsumerConfig) (*Consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	if config == nil {
@@ -466,7 +466,7 @@ func (w *brokerConsumer) subscriptionConsumer() {
 		for child := range w.subscriptions {
 			block := response.GetBlock(child.topic, child.partition)
 			if block == nil {
-				child.sendError(IncompleteResponse)
+				child.sendError(ErrIncompleteResponse)
 				child.trigger <- none{}
 				delete(w.subscriptions, child)
 				continue
@@ -543,7 +543,7 @@ func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchRe
 		if block.MsgSet.PartialTrailingMessage {
 			if child.config.MaxMessageSize > 0 && child.fetchSize == child.config.MaxMessageSize {
 				// we can't ask for more data, we've hit the configured limit
-				child.sendError(MessageTooLarge)
+				child.sendError(ErrMessageTooLarge)
 				child.offset++ // skip this one so we can keep processing future messages
 			} else {
 				child.fetchSize *= 2
@@ -588,7 +588,7 @@ func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchRe
 	}
 
 	if incomplete || !atLeastOne {
-		child.sendError(IncompleteResponse)
+		child.sendError(ErrIncompleteResponse)
 		child.trigger <- none{}
 		delete(w.subscriptions, child)
 	}

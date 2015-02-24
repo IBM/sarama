@@ -5,38 +5,39 @@ import (
 	"fmt"
 )
 
-// OutOfBrokers is the error returned when the client has run out of brokers to talk to because all of them errored
+// ErrOutOfBrokers is the error returned when the client has run out of brokers to talk to because all of them errored
 // or otherwise failed to respond.
-var OutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
+var ErrOutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
 
-// ClosedClient is the error returned when a method is called on a client that has been closed.
-var ClosedClient = errors.New("kafka: Tried to use a client that was closed")
+// ErrClosedClient is the error returned when a method is called on a client that has been closed.
+var ErrClosedClient = errors.New("kafka: Tried to use a client that was closed")
 
-// IncompleteResponse is the error returned when the server returns a syntactically valid response, but it does
+// ErrIncompleteResponse is the error returned when the server returns a syntactically valid response, but it does
 // not contain the expected information.
-var IncompleteResponse = errors.New("kafka: Response did not contain all the expected topic/partition blocks")
+var ErrIncompleteResponse = errors.New("kafka: Response did not contain all the expected topic/partition blocks")
 
-// InvalidPartition is the error returned when a partitioner returns an invalid partition index
+// ErrInvalidPartition is the error returned when a partitioner returns an invalid partition index
 // (meaning one outside of the range [0...numPartitions-1]).
-var InvalidPartition = errors.New("kafka: Partitioner returned an invalid partition index")
+var ErrInvalidPartition = errors.New("kafka: Partitioner returned an invalid partition index")
 
-// AlreadyConnected is the error returned when calling Open() on a Broker that is already connected.
-var AlreadyConnected = errors.New("kafka: broker: already connected")
+// ErrAlreadyConnected is the error returned when calling Open() on a Broker that is already connected.
+var ErrAlreadyConnected = errors.New("kafka: broker already connected")
 
-// NotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
-var NotConnected = errors.New("kafka: broker: not connected")
+// ErrNotConnected is the error returned when trying to send or call Close() on a Broker that is not connected.
+var ErrNotConnected = errors.New("kafka: broker not connected")
 
-// EncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
+// ErrPacketEncodingFailure is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
-var EncodingError = errors.New("kafka: Error while encoding packet")
+var ErrPacketEncodingFailure = errors.New("kafka: Error while encoding packet")
 
-// InsufficientData is returned when decoding and the packet is truncated. This can be expected
+// ErrInsufficientData is returned when decoding and the packet is truncated. This can be expected
 // when requesting messages, since as an optimization the server is allowed to return a partial message at the end
 // of the message set.
-var InsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected")
 
-// ShuttingDown is returned when a producer receives a message during shutdown.
-var ShuttingDown = errors.New("kafka: Message received by producer in process of shutting down")
+var ErrInsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected")
+
+// ErrShuttingDown is returned when a producer receives a message during shutdown.
+var ErrShuttingDown = errors.New("kafka: Message received by producer in process of shutting down")
 
 // DecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
 // This can be a bad CRC or length field, or any other invalid value.
@@ -48,8 +49,8 @@ func (err DecodingError) Error() string {
 	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
 }
 
-// MessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
-var MessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
+// ErrMessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
+var ErrMessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
 
 // ConfigurationError is the type of error returned from NewClient, NewProducer or NewConsumer when the specified
 // configuration is invalid.

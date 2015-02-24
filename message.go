@@ -72,7 +72,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = tmp
 			payload = m.compressedCache
 		default:
-			return EncodingError
+			return ErrPacketEncodingFailure
 		}
 	}
 

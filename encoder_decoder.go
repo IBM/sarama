@@ -21,7 +21,7 @@ func encode(in encoder) ([]byte, error) {
 	}
 
 	if prepEnc.length < 0 || uint32(prepEnc.length) > MaxRequestSize {
-		return nil, EncodingError
+		return nil, ErrPacketEncodingFailure
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length)

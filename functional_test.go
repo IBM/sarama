@@ -48,8 +48,8 @@ func TestFuncConnectionFailure(t *testing.T) {
 	config.MetadataRetries = 1
 
 	_, err := NewClient("test", []string{"localhost:9000"}, config)
-	if err != OutOfBrokers {
-		t.Fatal("Expected returned error to be OutOfBrokers, but was: ", err)
+	if err != ErrOutOfBrokers {
+		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
 	}
 }
 

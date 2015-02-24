@@ -126,7 +126,7 @@ func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
 	// Check that we are not dealing with a closed Client before processing
 	// any other arguments
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	if config == nil {
@@ -319,7 +319,7 @@ func (p *Producer) topicDispatcher() {
 	p.retries <- &MessageToSend{flags: shutdown}
 
 	for msg := range p.input {
-		p.returnError(msg, ShuttingDown)
+		p.returnError(msg, ErrShuttingDown)
 	}
 
 	close(p.errors)
@@ -586,7 +586,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 		switch err {
 		case nil:
 			break
-		case EncodingError:
+		case ErrPacketEncodingFailure:
 			p.returnErrors(batch, err)
 			continue
 		default:
@@ -612,7 +612,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*MessageToSend) {
 
 				block := response.GetBlock(topic, partition)
 				if block == nil {
-					p.returnErrors(msgs, IncompleteResponse)
+					p.returnErrors(msgs, ErrIncompleteResponse)
 					continue
 				}
 
@@ -718,7 +718,7 @@ func (p *Producer) assignPartition(partitioner Partitioner, msg *MessageToSend) 
 	if err != nil {
 		return err
 	} else if choice < 0 || choice >= numPartitions {
-		return InvalidPartition
+		return ErrInvalidPartition
 	}
 
 	msg.partition = partitions[choice]

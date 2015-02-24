@@ -97,8 +97,8 @@ func (b *Broker) Open(conf *BrokerConfig) error {
 
 	if b.conn != nil {
 		b.lock.Unlock()
-		Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, AlreadyConnected)
-		return AlreadyConnected
+		Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, ErrAlreadyConnected)
+		return ErrAlreadyConnected
 	}
 
 	go withRecover(func() {
@@ -143,7 +143,7 @@ func (b *Broker) Close() (err error) {
 	}()
 
 	if b.conn == nil {
-		return NotConnected
+		return ErrNotConnected
 	}
 
 	close(b.responses)
@@ -267,7 +267,7 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 		if b.connErr != nil {
 			return nil, b.connErr
 		}
-		return nil, NotConnected
+		return nil, ErrNotConnected
 	}
 
 	fullRequest := request{b.correlationID, clientID, req}

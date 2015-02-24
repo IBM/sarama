@@ -131,7 +131,7 @@ func (client *Client) Close() error {
 		// Chances are this is being called from a defer() and the error will go unobserved
 		// so we go ahead and log the event in this case.
 		Logger.Printf("Close() called on already closed client")
-		return ClosedClient
+		return ErrClosedClient
 	}
 
 	client.lock.Lock()
@@ -162,7 +162,7 @@ func (client *Client) Closed() bool {
 func (client *Client) Topics() ([]string, error) {
 	// Check to see whether the client is closed
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	client.lock.RLock()
@@ -180,7 +180,7 @@ func (client *Client) Topics() ([]string, error) {
 func (client *Client) Partitions(topic string) ([]int32, error) {
 	// Check to see whether the client is closed
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	partitions := client.cachedPartitions(topic, allPartitions)
@@ -205,7 +205,7 @@ func (client *Client) Partitions(topic string) ([]int32, error) {
 func (client *Client) WritablePartitions(topic string) ([]int32, error) {
 	// Check to see whether the client is closed
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	partitions := client.cachedPartitions(topic, writablePartitions)
@@ -234,7 +234,7 @@ func (client *Client) WritablePartitions(topic string) ([]int32, error) {
 // Replicas returns the set of all replica IDs for the given partition.
 func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error) {
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	metadata, err := client.getMetadata(topic, partitionID)
@@ -254,7 +254,7 @@ func (client *Client) Replicas(topic string, partitionID int32) ([]int32, error)
 // This method should be considered effectively deprecated.
 func (client *Client) ReplicasInSync(topic string, partitionID int32) ([]int32, error) {
 	if client.Closed() {
-		return nil, ClosedClient
+		return nil, ErrClosedClient
 	}
 
 	metadata, err := client.getMetadata(topic, partitionID)
@@ -315,7 +315,7 @@ func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTim
 
 	block := response.GetBlock(topic, partitionID)
 	if block == nil {
-		return -1, IncompleteResponse
+		return -1, ErrIncompleteResponse
 	}
 	if block.Err != NoError {
 		return -1, block.Err
@@ -512,7 +512,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 	// resources.  Check to see if we're dealing with a closed Client and error
 	// out immediately if so.
 	if client.Closed() {
-		return ClosedClient
+		return ErrClosedClient
 	}
 
 	// Kafka will throw exceptions on an empty topic and not return a proper
@@ -548,7 +548,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 			}
 
 			return err
-		case EncodingError:
+		case ErrPacketEncodingFailure:
 			// didn't even send, return the error
 			return err
 		default:
@@ -567,7 +567,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 		return client.refreshMetadata(topics, retriesRemaining-1)
 	}
 
-	return OutOfBrokers
+	return ErrOutOfBrokers
 }
 
 // if no fatal error, returns a list of topics that need retrying due to LeaderNotAvailable
