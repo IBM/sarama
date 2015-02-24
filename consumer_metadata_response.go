@@ -2,7 +2,7 @@ package sarama
 
 type ConsumerMetadataResponse struct {
 	Err             KError
-	CoordinatorId   int32
+	CoordinatorID   int32
 	CoordinatorHost string
 	CoordinatorPort int32
 }
@@ -14,7 +14,7 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder) (err error) {
 	}
 	r.Err = KError(tmp)
 
-	r.CoordinatorId, err = pd.getInt32()
+	r.CoordinatorID, err = pd.getInt32()
 	if err != nil {
 		return err
 	}
