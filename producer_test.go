@@ -145,7 +145,7 @@ func TestProducer(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: i}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: i}
 	}
 	for i := 0; i < 10; i++ {
 		select {
@@ -200,7 +200,7 @@ func TestProducerMultipleFlushes(t *testing.T) {
 
 	for flush := 0; flush < 3; flush++ {
 		for i := 0; i < 5; i++ {
-			producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 		}
 		for i := 0; i < 5; i++ {
 			select {
@@ -258,7 +258,7 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	for i := 0; i < 10; i++ {
 		select {
@@ -307,7 +307,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	seedBroker.Close()
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	prodNotLeader := new(ProduceResponse)
 	prodNotLeader.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
@@ -337,7 +337,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	leader1.Close()
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader2.Returns(prodSuccess)
 	for i := 0; i < 10; i++ {
@@ -384,7 +384,7 @@ func TestProducerBrokerBounce(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader.Close()                               // producer should get EOF
 	leader = NewMockBrokerAddr(t, 2, leaderAddr) // start it up again right away for giggles
@@ -439,7 +439,7 @@ func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader1.Close()                     // producer should get EOF
 	seedBroker.Returns(metadataLeader1) // tell it to go to leader1 again even though it's still down
@@ -500,7 +500,7 @@ func TestProducerMultipleRetries(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	prodNotLeader := new(ProduceResponse)
 	prodNotLeader.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
@@ -535,7 +535,7 @@ func TestProducerMultipleRetries(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader2.Returns(prodSuccess)
 	for i := 0; i < 10; i++ {
@@ -576,7 +576,7 @@ func ExampleProducer() {
 
 	for {
 		select {
-		case producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder("testing 123")}:
+		case producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("testing 123")}:
 			fmt.Println("> message queued")
 		case err := <-producer.Errors():
 			panic(err.Err)
