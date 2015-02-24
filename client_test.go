@@ -212,8 +212,8 @@ func TestSingleSlowBroker(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, fastBroker2.BrokerID(), []int32{fastBroker2.BrokerID()}, []int32{fastBroker2.BrokerID()}, NoError)
 
-	slowBroker1.Expects(&BrokerExpectation{Response: metadataResponse, Latency: 1 * time.Second}) // will timeout
-	fastBroker2.Expects(&BrokerExpectation{Response: metadataResponse})                           // will succeed
+	slowBroker1.Expects(&BrokerExpectation{Response: metadataResponse, Latency: 100 * time.Millisecond}) // will timeout
+	fastBroker2.Expects(&BrokerExpectation{Response: metadataResponse})                                  // will succeed
 
 	config := NewClientConfig()
 	config.DefaultBrokerConf = NewBrokerConfig()
@@ -233,15 +233,13 @@ func TestSingleSlowBroker(t *testing.T) {
 func TestSlowCluster(t *testing.T) {
 	slowBroker1 := NewMockBroker(t, 1)
 	slowBroker2 := NewMockBroker(t, 2)
-	slowBroker3 := NewMockBroker(t, 2)
+	slowBroker3 := NewMockBroker(t, 3)
 
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(slowBroker1.Addr(), slowBroker1.BrokerID())
-	metadataResponse.AddBroker(slowBroker2.Addr(), slowBroker2.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, slowBroker1.BrokerID(), []int32{slowBroker1.BrokerID()}, []int32{slowBroker1.BrokerID()}, NoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, slowBroker2.BrokerID(), []int32{slowBroker2.BrokerID()}, []int32{slowBroker2.BrokerID()}, NoError)
+	slowMetadataResponse := &BrokerExpectation{
+		Response: new(MetadataResponse),
+		Latency:  100 * time.Millisecond,
+	}
 
-	slowMetadataResponse := &BrokerExpectation{Response: metadataResponse, Latency: 1 * time.Second}
 	slowBroker1.Expects(slowMetadataResponse)
 	slowBroker2.Expects(slowMetadataResponse)
 	slowBroker3.Expects(slowMetadataResponse)
@@ -254,7 +252,7 @@ func TestSlowCluster(t *testing.T) {
 
 	_, err := NewClient("clientID", []string{slowBroker1.Addr(), slowBroker2.Addr(), slowBroker3.Addr()}, config)
 	if err != OutOfBrokers {
-		t.Fatal("Expected the client to fail due to OutOfBrokers, found: ", err)
+		t.Error("Expected the client to fail due to OutOfBrokers, found: ", err)
 	}
 
 	slowBroker1.Close()
