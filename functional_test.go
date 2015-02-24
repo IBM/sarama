@@ -171,15 +171,17 @@ func testProducingMessages(t *testing.T, config *ProducerConfig) {
 	}
 	safeClose(t, producer)
 
-	events := consumer.Events()
 	for i := 1; i <= TestBatchSize; i++ {
 		select {
 		case <-time.After(10 * time.Second):
 			t.Fatal("Not received any more events in the last 10 seconds.")
 
-		case event := <-events:
-			if string(event.Value) != fmt.Sprintf("testing %d", i) {
-				t.Fatalf("Unexpected message with index %d: %s", i, event.Value)
+		case err := <-consumer.Errors():
+			t.Error(err)
+
+		case message := <-consumer.Messages():
+			if string(message.Value) != fmt.Sprintf("testing %d", i) {
+				t.Fatalf("Unexpected message with index %d: %s", i, message.Value)
 			}
 		}
 

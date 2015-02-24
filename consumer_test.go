@@ -57,12 +57,13 @@ func TestConsumerOffsetManual(t *testing.T) {
 	seedBroker.Close()
 
 	for i := 0; i < 10; i++ {
-		event := <-consumer.Events()
-		if event.Err != nil {
-			t.Error(event.Err)
-		}
-		if event.Offset != int64(i+1234) {
-			t.Error("Incorrect message offset!")
+		select {
+		case message := <-consumer.Messages():
+			if message.Offset != int64(i+1234) {
+				t.Error("Incorrect message offset!")
+			}
+		case err := <-consumer.Errors():
+			t.Error(err)
 		}
 	}
 
@@ -152,11 +153,8 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 	config.OffsetValue = 2
 	consumer, err := master.ConsumePartition("my_topic", 0, config)
 
-	event := <-consumer.Events()
-	if event.Err != nil {
-		t.Error(event.Err)
-	}
-	if event.Offset != 3 {
+	message := <-consumer.Messages()
+	if message.Offset != 3 {
 		t.Error("Incorrect message offset!")
 	}
 
@@ -201,17 +199,21 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+
+		go func(c *PartitionConsumer) {
+			for err := range c.Errors() {
+				t.Error(err)
+			}
+		}(consumer)
+
 		wg.Add(1)
 		go func(partition int32, c *PartitionConsumer) {
 			for i := 0; i < 10; i++ {
-				event := <-consumer.Events()
-				if event.Err != nil {
-					t.Error(event.Err, i, partition)
+				message := <-consumer.Messages()
+				if message.Offset != int64(i) {
+					t.Error("Incorrect message offset!", i, partition, message.Offset)
 				}
-				if event.Offset != int64(i) {
-					t.Error("Incorrect message offset!", i, partition, event.Offset)
-				}
-				if event.Partition != partition {
+				if message.Partition != partition {
 					t.Error("Incorrect message partition!")
 				}
 			}
@@ -292,7 +294,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	safeClose(t, client)
 }
 
-func ExampleConsumer() {
+func ExampleConsumerWithSelect() {
 	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
@@ -321,15 +323,64 @@ func ExampleConsumer() {
 consumerLoop:
 	for {
 		select {
-		case event := <-consumer.Events():
-			if event.Err != nil {
-				panic(event.Err)
-			}
+		case err := <-consumer.Errors():
+			panic(err)
+		case <-consumer.Messages():
 			msgCount++
 		case <-time.After(5 * time.Second):
 			fmt.Println("> timed out")
 			break consumerLoop
 		}
 	}
+	fmt.Println("Got", msgCount, "messages.")
+}
+
+func ExampleConsumerWithGoroutines() {
+	client, err := NewClient("my_client", []string{"localhost:9092"}, nil)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> connected")
+	}
+	defer client.Close()
+
+	master, err := NewConsumer(client, nil)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> master consumer ready")
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, nil)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> consumer ready")
+	}
+	defer consumer.Close()
+
+	var (
+		wg       sync.WaitGroup
+		msgCount int
+	)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for message := range consumer.Messages() {
+			fmt.Printf("Consumed message with offset %d", message.Offset)
+			msgCount++
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for err := range consumer.Errors() {
+			fmt.Println(err)
+		}
+	}()
+
+	wg.Wait()
 	fmt.Println("Got", msgCount, "messages.")
 }
