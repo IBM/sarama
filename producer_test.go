@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
 	"testing"
 )
@@ -559,7 +561,128 @@ func TestProducerMultipleRetries(t *testing.T) {
 	safeClose(t, client)
 }
 
-func ExampleProducer() {
+func TestProducerMultipleAsyncRetries(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader1 := NewMockBroker(t, 2)
+	leader2 := NewMockBroker(t, 3)
+
+	metadataLeader1 := new(MetadataResponse)
+	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
+	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataLeader1)
+
+	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewProducerConfig()
+	config.FlushMsgCount = 10
+	config.AckSuccesses = true
+	config.MaxRetries = 4
+	config.RetryBackoff = 0
+	producer, err := NewProducer(client, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 1"}
+	}
+	prodNotLeader := new(ProduceResponse)
+	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
+	leader1.Returns(prodNotLeader)
+
+	metadataLeader2 := new(MetadataResponse)
+	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
+	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataLeader2)
+	leader2.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader1)
+	leader1.Expects(&BrokerExpectation{
+		Response: prodNotLeader,
+		After: func() {
+			for i := 0; i < 10; i++ {
+				producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 2"}
+			}
+		},
+	})
+
+	seedBroker.Returns(metadataLeader1)
+	leader1.Returns(prodNotLeader)
+	seedBroker.Expects(&BrokerExpectation{
+		Before: func() {
+			for i := 0; i < 10; i++ {
+				producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 3"}
+			}
+		},
+		Response: metadataLeader2,
+	})
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader2.Returns(prodSuccess) // batch 1
+	leader2.Returns(prodSuccess) // batch 2 & batch 3
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+			if msg.Metadata.(string) != "Batch 1" {
+				t.Error("Expected batch 1")
+			}
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+			if msg.Metadata.(string) != "Batch 2" {
+				t.Error("Expected batch 2")
+			}
+		}
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+			if msg.Msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+		case msg := <-producer.Successes():
+			if msg.flags != 0 {
+				t.Error("Message had flags set")
+			}
+			if msg.Metadata.(string) != "Batch 3" {
+				t.Error("Expected batch 3")
+			}
+		}
+	}
+
+	seedBroker.Close()
+	leader1.Close()
+	leader2.Close()
+	closeProducer(t, producer)
+	safeClose(t, client)
+}
+
+func ExampleProducerUsingSelect() {
 	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
 	if err != nil {
 		panic(err)
@@ -581,6 +704,72 @@ func ExampleProducer() {
 		case err := <-producer.Errors():
 			panic(err.Err)
 		}
+	}
+}
+
+func ExampleProducerUsingGoroutines() {
+	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> connected")
+	}
+	defer client.Close()
+
+	config := NewProducerConfig()
+	config.AckSuccesses = true
+
+	producer, err := NewProducer(client, config)
+	if err != nil {
+		panic(err)
+	}
+	defer producer.Close()
+
+	var (
+		wg                         sync.WaitGroup
+		produced, failed, enqueued int
+	)
+
+	// handle messages that failed to produce
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for err := range producer.Errors() {
+			fmt.Println(err)
+			failed++
+		}
+	}()
+
+	// handle successfully produced messages
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for msg := range producer.Successes() {
+			fmt.Printf("Offset assigned to message: %d\n", msg.Offset())
+			produced++
+		}
+	}()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+
+	// Start producing messages
+ProducerLoop:
+	for {
+		msg := &ProducerMessage{Topic: "my_topic", Value: StringEncoder("testing 123")}
+		select {
+		case <-signals:
+			producer.AsyncClose()
+			break ProducerLoop
+		case producer.Input() <- msg:
+			enqueued++
+		}
+	}
+
+	wg.Wait()
+
+	if produced+failed != enqueued {
+		panic("The number of produced and failed messages should match the number of enqueued messages!")
 	}
 }
 
