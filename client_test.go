@@ -28,15 +28,14 @@ func TestSimpleClient(t *testing.T) {
 
 func TestCachedPartitions(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
-	leader := newMockBroker(t, 5)
 
 	replicas := []int32{3, 1, 5}
 	isr := []int32{5, 1}
 
 	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), replicas, isr, ErrNoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, ErrLeaderNotAvailable)
+	metadataResponse.AddBroker("localhost:12345", 2)
+	metadataResponse.AddTopicPartition("my_topic", 0, 2, replicas, isr, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, 2, replicas, isr, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
@@ -61,17 +60,15 @@ func TestCachedPartitions(t *testing.T) {
 		t.Fatal("Not using the cache!")
 	}
 
-	leader.Close()
 	seedBroker.Close()
 	safeClose(t, client)
 }
 
 func TestClientSeedBrokers(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
-	discoveredBroker := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(discoveredBroker.Addr(), discoveredBroker.BrokerID())
+	metadataResponse.AddBroker("localhost:12345", 2)
 	seedBroker.Returns(metadataResponse)
 
 	client, err := NewClient([]string{seedBroker.Addr()}, nil)
@@ -79,7 +76,6 @@ func TestClientSeedBrokers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	discoveredBroker.Close()
 	seedBroker.Close()
 	safeClose(t, client)
 }
