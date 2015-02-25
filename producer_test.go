@@ -566,7 +566,7 @@ func TestProducerMultipleAsyncRetries(t *testing.T) {
 
 	metadataLeader1 := new(MetadataResponse)
 	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
-	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, NoError)
+	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
 	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
@@ -585,23 +585,23 @@ func TestProducerMultipleAsyncRetries(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 1"}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 1"}
 	}
 	prodNotLeader := new(ProduceResponse)
-	prodNotLeader.AddTopicPartition("my_topic", 0, NotLeaderForPartition)
+	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
 	leader1.Returns(prodNotLeader)
 
 	metadataLeader2 := new(MetadataResponse)
 	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
-	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, NoError)
+	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader2)
 	leader2.Returns(prodNotLeader)
 	seedBroker.Returns(metadataLeader1)
 	leader1.Expects(&BrokerExpectation{
 		Response: prodNotLeader,
-		BeforeCallback: func() {
+		After: func() {
 			for i := 0; i < 10; i++ {
-				producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 2"}
+				producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 2"}
 			}
 		},
 	})
@@ -609,16 +609,16 @@ func TestProducerMultipleAsyncRetries(t *testing.T) {
 	seedBroker.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
 	seedBroker.Expects(&BrokerExpectation{
-		Response: metadataLeader2,
-		BeforeCallback: func() {
+		Before: func() {
 			for i := 0; i < 10; i++ {
-				producer.Input() <- &MessageToSend{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 3"}
+				producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: "Batch 3"}
 			}
 		},
+		Response: metadataLeader2,
 	})
 
 	prodSuccess := new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, NoError)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader2.Returns(prodSuccess) // batch 1
 	leader2.Returns(prodSuccess) // batch 2 & batch 3
 

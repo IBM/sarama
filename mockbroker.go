@@ -40,12 +40,15 @@ type MockCluster map[int32]*MockBroker
 
 type callback func()
 
+// BrokerExpectation allos you to specify how the respond to a request the MockBroker will receive.
+// See MockBroker's Expects method to add expectation to a mockbroker.
 type BrokerExpectation struct {
-	Response           encoder
-	Latency            time.Duration
-	BeforeCallback     callback
-	AfterCallback      callback
-	IgnoreServerErrors bool
+	Before   callback      // Before will be called before sending the response after a request has been received
+	Latency  time.Duration // Latency before the response will be sent
+	Response encoder       // Response holds what will be sent back to the client
+	After    callback      // After will be called after the response has been sent to the client.
+
+	IgnoreConnectionErrors bool // IgnoreConnectionErrors should be set to true if connectivity issues while receiving the request or sending the response are to be expected.
 }
 
 func (b *MockBroker) BrokerID() int32 {
@@ -83,18 +86,18 @@ func (b *MockBroker) serverLoop() (ok bool) {
 	for expectation := range b.expectations {
 		_, err = io.ReadFull(conn, reqHeader)
 		if err != nil {
-			return b.serverError(err, conn, expectation.IgnoreServerErrors)
+			return b.serverError(err, conn, expectation.IgnoreConnectionErrors)
 		}
 		body := make([]byte, binary.BigEndian.Uint32(reqHeader))
 		if len(body) < 10 {
 			return b.serverError(errors.New("Kafka request too short."), conn, false)
 		}
 		if _, err = io.ReadFull(conn, body); err != nil {
-			return b.serverError(err, conn, expectation.IgnoreServerErrors)
+			return b.serverError(err, conn, expectation.IgnoreConnectionErrors)
 		}
 
-		if expectation.BeforeCallback != nil {
-			expectation.BeforeCallback()
+		if expectation.Before != nil {
+			expectation.Before()
 		}
 
 		if expectation.Latency > 0 {
@@ -112,14 +115,14 @@ func (b *MockBroker) serverLoop() (ok bool) {
 		binary.BigEndian.PutUint32(resHeader, uint32(len(response)+4))
 		binary.BigEndian.PutUint32(resHeader[4:], binary.BigEndian.Uint32(body[4:]))
 		if _, err = conn.Write(resHeader); err != nil {
-			return b.serverError(err, conn, expectation.IgnoreServerErrors)
+			return b.serverError(err, conn, expectation.IgnoreConnectionErrors)
 		}
 		if _, err = conn.Write(response); err != nil {
-			return b.serverError(err, conn, expectation.IgnoreServerErrors)
+			return b.serverError(err, conn, expectation.IgnoreConnectionErrors)
 		}
 
-		if expectation.AfterCallback != nil {
-			expectation.AfterCallback()
+		if expectation.After != nil {
+			expectation.After()
 		}
 	}
 	if err = conn.Close(); err != nil {
@@ -151,7 +154,7 @@ func (b *MockBroker) serverError(err error, conn net.Conn, ignoreErrors bool) bo
 	return false
 }
 
-// NewMockBroker launces a fake Kafka cluster consisting of a specified  number
+// NewMockBroker launces a fake Kafka cluster consisting of a specified number
 // of brokers.
 func NewMockCluster(t TestState, brokers int32) MockCluster {
 	cluster := make(MockCluster)
@@ -161,6 +164,7 @@ func NewMockCluster(t TestState, brokers int32) MockCluster {
 	return cluster
 }
 
+// Returns a list of broker addresses, that can be used to initialize a sarama.Client.
 func (mc MockCluster) Addr() []string {
 	addrs := make([]string, len(mc))
 	for _, broker := range mc {
@@ -169,6 +173,8 @@ func (mc MockCluster) Addr() []string {
 	return addrs
 }
 
+// Close closes all the MockBrockers in this cluster, which will validate whether all
+// the expectation that were set on the mock brokers are correctly resolved.
 func (mc MockCluster) Close() {
 	for _, broker := range mc {
 		broker.Close()
@@ -219,19 +225,4 @@ func (b *MockBroker) Returns(response encoder) {
 
 func (b *MockBroker) Expects(expectation *BrokerExpectation) {
 	b.expectations <- expectation
-}
-
-func (e *BrokerExpectation) WithLatency(latency time.Duration) *BrokerExpectation {
-	e.Latency = latency
-	return e
-}
-
-func (e *BrokerExpectation) Before(callback callback) *BrokerExpectation {
-	e.BeforeCallback = callback
-	return e
-}
-
-func (e *BrokerExpectation) After(callback callback) *BrokerExpectation {
-	e.AfterCallback = callback
-	return e
 }

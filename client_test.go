@@ -209,11 +209,11 @@ func TestSingleSlowBroker(t *testing.T) {
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(cluster[1].Addr(), cluster[1].BrokerID())
 	metadataResponse.AddBroker(cluster[2].Addr(), cluster[2].BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, cluster[1].BrokerID(), []int32{cluster[1].BrokerID()}, []int32{cluster[1].BrokerID()}, NoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, cluster[2].BrokerID(), []int32{cluster[2].BrokerID()}, []int32{cluster[2].BrokerID()}, NoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, cluster[1].BrokerID(), []int32{cluster[1].BrokerID()}, []int32{cluster[1].BrokerID()}, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, cluster[2].BrokerID(), []int32{cluster[2].BrokerID()}, []int32{cluster[2].BrokerID()}, ErrNoError)
 
-	cluster[1].Expects(&BrokerExpectation{Response: metadataResponse, Latency: 500 * time.Millisecond, IgnoreServerErrors: true}) // will timeout
-	cluster[2].Expects(&BrokerExpectation{Response: metadataResponse})                                                            // will succeed
+	cluster[1].Expects(&BrokerExpectation{Response: metadataResponse, Latency: 500 * time.Millisecond, IgnoreConnectionErrors: true}) // will timeout
+	cluster[2].Expects(&BrokerExpectation{Response: metadataResponse})                                                                // will succeed
 
 	config := NewClientConfig()
 	config.DefaultBrokerConf = NewBrokerConfig()
@@ -232,9 +232,9 @@ func TestSlowCluster(t *testing.T) {
 	defer cluster.Close()
 
 	slowMetadataResponse := &BrokerExpectation{
-		Response:           new(MetadataResponse),
-		Latency:            500 * time.Millisecond,
-		IgnoreServerErrors: true,
+		Response:               new(MetadataResponse),
+		Latency:                500 * time.Millisecond,
+		IgnoreConnectionErrors: true,
 	}
 
 	cluster[1].Expects(slowMetadataResponse)
@@ -248,7 +248,7 @@ func TestSlowCluster(t *testing.T) {
 	config.DefaultBrokerConf.ReadTimeout = 100 * time.Millisecond
 
 	_, err := NewClient("clientID", cluster.Addr(), config)
-	if err != OutOfBrokers {
+	if err != ErrOutOfBrokers {
 		t.Error("Expected the client to fail due to OutOfBrokers, found: ", err)
 	}
 }
