@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"sync"
 	"testing"
 )
@@ -680,7 +682,7 @@ func TestProducerMultipleAsyncRetries(t *testing.T) {
 	safeClose(t, client)
 }
 
-func ExampleProducer() {
+func ExampleProducerUsingSelect() {
 	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
 	if err != nil {
 		panic(err)
@@ -702,6 +704,72 @@ func ExampleProducer() {
 		case err := <-producer.Errors():
 			panic(err.Err)
 		}
+	}
+}
+
+func ExampleProducerUsingGoroutines() {
+	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("> connected")
+	}
+	defer client.Close()
+
+	config := NewProducerConfig()
+	config.AckSuccesses = true
+
+	producer, err := NewProducer(client, config)
+	if err != nil {
+		panic(err)
+	}
+	defer producer.Close()
+
+	var (
+		wg                         sync.WaitGroup
+		produced, failed, enqueued int
+	)
+
+	// handle messages that failed to produce
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for err := range producer.Errors() {
+			fmt.Println(err)
+			failed++
+		}
+	}()
+
+	// handle successfully produced messages
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for msg := range producer.Successes() {
+			fmt.Printf("Offset assigned to message: %d\n", msg.Offset())
+			produced++
+		}
+	}()
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+
+	// Start producing messages
+ProducerLoop:
+	for {
+		msg := &ProducerMessage{Topic: "my_topic", Value: StringEncoder("testing 123")}
+		select {
+		case <-signals:
+			producer.AsyncClose()
+			break ProducerLoop
+		case producer.Input() <- msg:
+			enqueued++
+		}
+	}
+
+	wg.Wait()
+
+	if produced+failed != enqueued {
+		panic("The number of produced and failed messages should match the number of enqueued messages!")
 	}
 }
 
