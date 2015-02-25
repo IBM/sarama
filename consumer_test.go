@@ -22,8 +22,8 @@ func TestDefaultPartitionConsumerConfigValidates(t *testing.T) {
 }
 
 func TestConsumerOffsetManual(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -73,8 +73,8 @@ func TestConsumerOffsetManual(t *testing.T) {
 }
 
 func TestConsumerLatestOffset(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -121,8 +121,8 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 	// for topics that are compressed and/or compacted (different things!) we have to be
 	// able to handle receiving offsets that are non-sequential (though still strictly increasing) and
 	// possibly starting prior to the actual value we requested
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -166,9 +166,9 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 
 func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	// initial setup
-	seedBroker := NewMockBroker(t, 1)
-	leader0 := NewMockBroker(t, 2)
-	leader1 := NewMockBroker(t, 3)
+	seedBroker := newMockBroker(t, 1)
+	leader0 := newMockBroker(t, 2)
+	leader1 := newMockBroker(t, 3)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader0.Addr(), leader0.BrokerID())

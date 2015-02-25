@@ -36,8 +36,8 @@ func TestDefaultProducerConfigValidates(t *testing.T) {
 }
 
 func TestSimpleProducer(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -74,8 +74,8 @@ func TestSimpleProducer(t *testing.T) {
 }
 
 func TestConcurrentSimpleProducer(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -119,8 +119,8 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 }
 
 func TestProducer(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -171,8 +171,8 @@ func TestProducer(t *testing.T) {
 }
 
 func TestProducerMultipleFlushes(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
@@ -224,9 +224,9 @@ func TestProducerMultipleFlushes(t *testing.T) {
 }
 
 func TestProducerMultipleBrokers(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader0 := NewMockBroker(t, 2)
-	leader1 := NewMockBroker(t, 3)
+	seedBroker := newMockBroker(t, 1)
+	leader0 := newMockBroker(t, 2)
+	leader1 := newMockBroker(t, 3)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader0.Addr(), leader0.BrokerID())
@@ -282,9 +282,9 @@ func TestProducerMultipleBrokers(t *testing.T) {
 }
 
 func TestProducerFailureRetry(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader1 := NewMockBroker(t, 2)
-	leader2 := NewMockBroker(t, 3)
+	seedBroker := newMockBroker(t, 1)
+	leader1 := newMockBroker(t, 2)
+	leader2 := newMockBroker(t, 3)
 
 	metadataLeader1 := new(MetadataResponse)
 	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
@@ -360,8 +360,8 @@ func TestProducerFailureRetry(t *testing.T) {
 }
 
 func TestProducerBrokerBounce(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
 	leaderAddr := leader.Addr()
 
 	metadataResponse := new(MetadataResponse)
@@ -387,7 +387,7 @@ func TestProducerBrokerBounce(t *testing.T) {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader.Close()                               // producer should get EOF
-	leader = NewMockBrokerAddr(t, 2, leaderAddr) // start it up again right away for giggles
+	leader = newMockBrokerAddr(t, 2, leaderAddr) // start it up again right away for giggles
 	seedBroker.Returns(metadataResponse)         // tell it to go to broker 2 again
 
 	prodSuccess := new(ProduceResponse)
@@ -414,9 +414,9 @@ func TestProducerBrokerBounce(t *testing.T) {
 }
 
 func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader1 := NewMockBroker(t, 2)
-	leader2 := NewMockBroker(t, 3)
+	seedBroker := newMockBroker(t, 1)
+	leader1 := newMockBroker(t, 2)
+	leader2 := newMockBroker(t, 3)
 
 	metadataLeader1 := new(MetadataResponse)
 	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
@@ -475,9 +475,9 @@ func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 }
 
 func TestProducerMultipleRetries(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader1 := NewMockBroker(t, 2)
-	leader2 := NewMockBroker(t, 3)
+	seedBroker := newMockBroker(t, 1)
+	leader1 := newMockBroker(t, 2)
+	leader2 := newMockBroker(t, 3)
 
 	metadataLeader1 := new(MetadataResponse)
 	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())

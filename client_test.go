@@ -20,7 +20,7 @@ func TestDefaultClientConfigValidates(t *testing.T) {
 }
 
 func TestSimpleClient(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
+	seedBroker := newMockBroker(t, 1)
 
 	seedBroker.Returns(new(MetadataResponse))
 
@@ -34,8 +34,8 @@ func TestSimpleClient(t *testing.T) {
 }
 
 func TestCachedPartitions(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 5)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 5)
 
 	replicas := []int32{3, 1, 5}
 	isr := []int32{5, 1}
@@ -74,8 +74,8 @@ func TestCachedPartitions(t *testing.T) {
 }
 
 func TestClientSeedBrokers(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	discoveredBroker := NewMockBroker(t, 2)
+	seedBroker := newMockBroker(t, 1)
+	discoveredBroker := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(discoveredBroker.Addr(), discoveredBroker.BrokerID())
@@ -92,8 +92,8 @@ func TestClientSeedBrokers(t *testing.T) {
 }
 
 func TestClientMetadata(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 5)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 5)
 
 	replicas := []int32{3, 1, 5}
 	isr := []int32{5, 1}
@@ -165,8 +165,8 @@ func TestClientMetadata(t *testing.T) {
 }
 
 func TestClientRefreshBehaviour(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 5)
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 5)
 
 	metadataResponse1 := new(MetadataResponse)
 	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
