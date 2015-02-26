@@ -35,39 +35,57 @@ func (ce ConsumerErrors) Error() string {
 	return fmt.Sprintf("kafka: %d errors while consuming", len(ce))
 }
 
-// Consumer manages PartitionConsumers which process Kafka messages from brokers.
+// Consumer manages PartitionConsumers which process Kafka messages from brokers. You MUST call Close()
+// on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
+// scope.
 type Consumer struct {
-	client *Client
-	conf   *Config
+	client    *Client
+	conf      *Config
+	ownClient bool
 
 	lock            sync.Mutex
 	children        map[string]map[int32]*PartitionConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
 }
 
-// NewConsumer creates a new consumer attached to the given client.
-func NewConsumer(client *Client, config *Config) (*Consumer, error) {
+// NewConsumer creates a new consumer using the given broker addresses and configuration.
+func NewConsumer(addrs []string, config *Config) (*Consumer, error) {
+	client, err := NewClient(addrs, config)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := NewConsumerFromClient(client)
+	if err != nil {
+		return nil, err
+	}
+	c.ownClient = true
+	return c, nil
+}
+
+// NewConsumerFromClient creates a new consumer using the given client.
+func NewConsumerFromClient(client *Client) (*Consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
 
-	if config == nil {
-		config = NewConfig()
-	}
-
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
 	c := &Consumer{
 		client:          client,
-		conf:            config,
+		conf:            client.conf,
 		children:        make(map[string]map[int32]*PartitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
 	}
 
 	return c, nil
+}
+
+// Close shuts down the consumer. It must be called after all child PartitionConsumers have already been closed.
+func (c *Consumer) Close() error {
+	if c.ownClient {
+		return c.client.Close()
+	}
+	return nil
 }
 
 const (

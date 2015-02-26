@@ -20,8 +20,9 @@ func forceFlushThreshold() int {
 // scope (this is in addition to calling Close on the underlying client, which
 // is still necessary).
 type Producer struct {
-	client *Client
-	conf   *Config
+	client    *Client
+	conf      *Config
+	ownClient bool
 
 	errors                    chan *ProducerError
 	input, successes, retries chan *ProducerMessage
@@ -30,25 +31,31 @@ type Producer struct {
 	brokerLock sync.Mutex
 }
 
-// NewProducer creates a new Producer using the given client.
-func NewProducer(client *Client, conf *Config) (*Producer, error) {
-	// Check that we are not dealing with a closed Client before processing
-	// any other arguments
+// NewProducer creates a new Producer using the given broker addresses and configuration.
+func NewProducer(addrs []string, conf *Config) (*Producer, error) {
+	client, err := NewClient(addrs, conf)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := NewProducerFromClient(client)
+	if err != nil {
+		return nil, err
+	}
+	p.ownClient = true
+	return p, nil
+}
+
+// NewProducerFromClient creates a new Producer using the given client.
+func NewProducerFromClient(client *Client) (*Producer, error) {
+	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
 
-	if conf == nil {
-		conf = NewConfig()
-	}
-
-	if err := conf.Validate(); err != nil {
-		return nil, err
-	}
-
 	p := &Producer{
 		client:    client,
-		conf:      conf,
+		conf:      client.conf,
 		errors:    make(chan *ProducerError),
 		input:     make(chan *ProducerMessage),
 		successes: make(chan *ProducerMessage),
@@ -235,6 +242,12 @@ func (p *Producer) topicDispatcher() {
 		p.returnError(msg, ErrShuttingDown)
 	}
 
+	if p.ownClient {
+		err := p.client.Close()
+		if err != nil {
+			p.errors <- &ProducerError{Err: err}
+		}
+	}
 	close(p.errors)
 	close(p.successes)
 }
