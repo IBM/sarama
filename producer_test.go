@@ -35,13 +35,13 @@ func TestDefaultProducerConfigValidates(t *testing.T) {
 	}
 }
 
-func TestSimpleProducer(t *testing.T) {
+func TestSyncProducer(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, 2, nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	prodSuccess := new(ProduceResponse)
@@ -55,13 +55,19 @@ func TestSimpleProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	producer, err := NewSimpleProducer(client, nil)
+	producer, err := NewSyncProducer(client, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for i := 0; i < 10; i++ {
-		err = producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
+		partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
+		if partition != 0 {
+			t.Error("Unexpected partition")
+		}
+		if offset != 0 {
+			t.Error("Unexpected offset")
+		}
 		if err != nil {
 			t.Error(err)
 		}
@@ -73,13 +79,13 @@ func TestSimpleProducer(t *testing.T) {
 	seedBroker.Close()
 }
 
-func TestConcurrentSimpleProducer(t *testing.T) {
+func TestConcurrentSyncProducer(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 	leader := newMockBroker(t, 2)
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, 2, nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	prodSuccess := new(ProduceResponse)
@@ -93,7 +99,7 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 
 	config := NewProducerConfig()
 	config.FlushMsgCount = 100
-	producer, err := NewSimpleProducer(client, config)
+	producer, err := NewSyncProducer(client, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +109,10 @@ func TestConcurrentSimpleProducer(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
-			err := producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
+			partition, _, err := producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
+			if partition != 0 {
+				t.Error("Unexpected partition")
+			}
 			if err != nil {
 				t.Error(err)
 			}
@@ -584,7 +593,7 @@ func ExampleProducer() {
 	}
 }
 
-func ExampleSimpleProducer() {
+func ExampleSyncProducer() {
 	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
 	if err != nil {
 		panic(err)
@@ -593,18 +602,18 @@ func ExampleSimpleProducer() {
 	}
 	defer client.Close()
 
-	producer, err := NewSimpleProducer(client, nil)
+	producer, err := NewSyncProducer(client, nil)
 	if err != nil {
 		panic(err)
 	}
 	defer producer.Close()
 
 	for {
-		err = producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))
+		partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))
 		if err != nil {
 			panic(err)
 		} else {
-			fmt.Println("> message sent")
+			fmt.Printf("> message sent to partition %d at offset %d\n", partition, offset)
 		}
 	}
 }
