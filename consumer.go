@@ -6,21 +6,6 @@ import (
 	"time"
 )
 
-// OffsetMethod is passed to ConsumePartition to tell the consumer how to determine the starting offset.
-type OffsetMethod int
-
-const (
-	// OffsetMethodNewest causes the consumer to start at the most recent available offset, as
-	// determined by querying the broker.
-	OffsetMethodNewest OffsetMethod = iota
-	// OffsetMethodOldest causes the consumer to start at the oldest available offset, as
-	// determined by querying the broker.
-	OffsetMethodOldest
-	// OffsetMethodManual causes the consumer to interpret the offset value as the
-	// offset at which to start, allowing the user to manually specify their desired starting offset.
-	OffsetMethodManual
-)
-
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
 type ConsumerMessage struct {
 	Key, Value []byte
@@ -85,9 +70,19 @@ func NewConsumer(client *Client, config *Config) (*Consumer, error) {
 	return c, nil
 }
 
-// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given configuration. It will
-// return an error if this Consumer is already consuming on the given topic/partition.
-func (c *Consumer) ConsumePartition(topic string, partition int32, method OffsetMethod, offset int64) (*PartitionConsumer, error) {
+const (
+	// OffsetNewest causes the consumer to start at the most recent available offset, as
+	// determined by querying the broker.
+	OffsetNewest int64 = -1
+	// OffsetOldest causes the consumer to start at the oldest available offset, as
+	// determined by querying the broker.
+	OffsetOldest int64 = -2
+)
+
+// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
+// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
+// literal offset, or OffsetNewest or OffsetOldest
+func (c *Consumer) ConsumePartition(topic string, partition int32, offset int64) (*PartitionConsumer, error) {
 	child := &PartitionConsumer{
 		consumer:  c,
 		conf:      c.conf,
@@ -100,7 +95,7 @@ func (c *Consumer) ConsumePartition(topic string, partition int32, method Offset
 		fetchSize: c.conf.Consumer.Fetch.Default,
 	}
 
-	if err := child.chooseStartingOffset(method, offset); err != nil {
+	if err := child.chooseStartingOffset(offset); err != nil {
 		return nil, err
 	}
 
@@ -265,22 +260,20 @@ func (child *PartitionConsumer) dispatch() error {
 	return nil
 }
 
-func (child *PartitionConsumer) chooseStartingOffset(method OffsetMethod, offset int64) (err error) {
+func (child *PartitionConsumer) chooseStartingOffset(offset int64) (err error) {
 	var where OffsetTime
 
-	switch method {
-	case OffsetMethodManual:
+	switch offset {
+	case OffsetNewest:
+		where = LatestOffsets
+	case OffsetOldest:
+		where = EarliestOffset
+	default:
 		if offset < 0 {
-			return ConfigurationError("offset must be >= 0 when the method is manual")
+			return ConfigurationError("Invalid offset")
 		}
 		child.offset = offset
 		return nil
-	case OffsetMethodNewest:
-		where = LatestOffsets
-	case OffsetMethodOldest:
-		where = EarliestOffset
-	default:
-		return ConfigurationError("Invalid OffsetMethod")
 	}
 
 	child.offset, err = child.consumer.client.GetOffset(child.topic, child.partition, where)

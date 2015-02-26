@@ -33,7 +33,7 @@ func TestConsumerOffsetManual(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	consumer, err := master.ConsumePartition("my_topic", 0, OffsetMethodManual, 1234)
+	consumer, err := master.ConsumePartition("my_topic", 0, 1234)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestConsumerLatestOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	consumer, err := master.ConsumePartition("my_topic", 0, OffsetMethodNewest, 0)
+	consumer, err := master.ConsumePartition("my_topic", 0, OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	consumer, err := master.ConsumePartition("my_topic", 0, OffsetMethodManual, 2)
+	consumer, err := master.ConsumePartition("my_topic", 0, 2)
 
 	message := <-consumer.Messages()
 	if message.Offset != 3 {
@@ -169,7 +169,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	// we expect to end up (eventually) consuming exactly ten messages on each partition
 	var wg sync.WaitGroup
 	for i := 0; i < 2; i++ {
-		consumer, err := master.ConsumePartition("my_topic", int32(i), OffsetMethodManual, 0)
+		consumer, err := master.ConsumePartition("my_topic", int32(i), 0)
 		if err != nil {
 			t.Error(err)
 		}
@@ -288,7 +288,7 @@ func ExampleConsumerWithSelect() {
 		fmt.Println("> master consumer ready")
 	}
 
-	consumer, err := master.ConsumePartition("my_topic", 0, OffsetMethodManual, 0)
+	consumer, err := master.ConsumePartition("my_topic", 0, 0)
 	if err != nil {
 		panic(err)
 	} else {
@@ -337,7 +337,7 @@ func ExampleConsumerWithGoroutines() {
 		fmt.Println("> master consumer ready")
 	}
 
-	consumer, err := master.ConsumePartition("my_topic", 0, OffsetMethodManual, 0)
+	consumer, err := master.ConsumePartition("my_topic", 0, 0)
 	if err != nil {
 		panic(err)
 	} else {
