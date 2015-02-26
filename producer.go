@@ -12,97 +12,6 @@ func forceFlushThreshold() int {
 	return int(MaxRequestSize - (10 * 1024)) // 10KiB is safety room for misc. overhead, we might want to calculate this more precisely?
 }
 
-// ProducerConfig is used to pass multiple configuration options to NewProducer.
-//
-// Some of these configuration settings match settings with the JVM producer, but some of
-// these are implementation specific and have no equivalent in the JVM producer.
-type ProducerConfig struct {
-	Partitioner       PartitionerConstructor // Generates partitioners for choosing the partition to send messages to (defaults to hash). Similar to the `partitioner.class` setting for the JVM producer.
-	RequiredAcks      RequiredAcks           // The level of acknowledgement reliability needed from the broker (defaults to WaitForLocal). Equivalent to the `request.required.acks` setting of the JVM producer.
-	Timeout           time.Duration          // The maximum duration the broker will wait the receipt of the number of RequiredAcks (defaults to 10 seconds). This is only relevant when RequiredAcks is set to WaitForAll or a number > 1. Only supports millisecond resolution, nanoseconds will be truncated. Equivalent to the JVM producer's `request.timeout.ms` setting.
-	Compression       CompressionCodec       // The type of compression to use on messages (defaults to no compression). Similar to `compression.codec` setting of the JVM producer.
-	FlushMsgCount     int                    // The number of messages needed to trigger a flush. This is a best effort; the number of messages may be more or less. Use `MaxMessagesPerReq` to set a hard upper limit.
-	FlushFrequency    time.Duration          // If this amount of time elapses without a flush, one will be queued. The frequency is a best effort, and the actual frequency can be more or less. Equivalent to `queue.buffering.max.ms` setting of JVM producer.
-	FlushByteCount    int                    // If this many bytes of messages are accumulated, a flush will be triggered. This is a best effort; the number of bytes may be more or less. Use the gloabl `sarama.MaxRequestSize` to set a hard upper limit.
-	AckSuccesses      bool                   // If enabled, successfully delivered messages will be returned on the Successes channel.
-	MaxMessageBytes   int                    // The maximum permitted size of a message (defaults to 1000000). Equivalent to the broker's `message.max.bytes`.
-	MaxMessagesPerReq int                    // The maximum number of messages the producer will send in a single broker request. Defaults to 0 for unlimited. The global setting MaxRequestSize still applies. Similar to `queue.buffering.max.messages` in the JVM producer.
-	ChannelBufferSize int                    // The size of the buffers of the channels between the different goroutines (defaults to 256).
-	RetryBackoff      time.Duration          // The amount of time to wait for the cluster to elect a new leader before processing retries (defaults to 100ms). Similar to the retry.backoff.ms setting of the JVM producer.
-	MaxRetries        int                    // The total number of times to retry sending a message (defaults to 3). Similar to the message.send.max.retries setting of the JVM producer.
-}
-
-// NewProducerConfig creates a new ProducerConfig instance with sensible defaults.
-func NewProducerConfig() *ProducerConfig {
-	return &ProducerConfig{
-		Partitioner:       NewHashPartitioner,
-		RequiredAcks:      WaitForLocal,
-		MaxMessageBytes:   1000000,
-		ChannelBufferSize: 256,
-		RetryBackoff:      100 * time.Millisecond,
-		Timeout:           10 * time.Second,
-		MaxRetries:        3,
-	}
-}
-
-// Validate checks a ProducerConfig instance. It will return a
-// ConfigurationError if the specified value doesn't make sense.
-func (config *ProducerConfig) Validate() error {
-	if config.RequiredAcks < -1 {
-		return ConfigurationError("Invalid RequiredAcks")
-	} else if config.RequiredAcks > 1 {
-		Logger.Println("ProducerConfig.RequiredAcks > 1 is deprecated and will raise an exception with kafka >= 0.8.2.0.")
-	}
-
-	if config.Timeout < 0 {
-		return ConfigurationError("Invalid Timeout")
-	} else if config.Timeout%time.Millisecond != 0 {
-		Logger.Println("ProducerConfig.Timeout only supports millisecond resolution; nanoseconds will be truncated.")
-	}
-
-	if config.RequiredAcks == WaitForAll && config.Timeout == 0 {
-		return ConfigurationError("If you WaitForAll you must specify a non-zero timeout to wait.")
-	}
-
-	if config.FlushMsgCount < 0 {
-		return ConfigurationError("Invalid FlushMsgCount")
-	}
-
-	if config.FlushByteCount < 0 {
-		return ConfigurationError("Invalid FlushByteCount")
-	} else if config.FlushByteCount >= forceFlushThreshold() {
-		Logger.Println("ProducerConfig.FlushByteCount too close to MaxRequestSize; it will be ignored.")
-	}
-
-	if config.FlushFrequency < 0 {
-		return ConfigurationError("Invalid FlushFrequency")
-	}
-
-	if config.Partitioner == nil {
-		return ConfigurationError("No partitioner set")
-	}
-
-	if config.MaxMessageBytes <= 0 {
-		return ConfigurationError("Invalid MaxMessageBytes")
-	} else if config.MaxMessageBytes >= forceFlushThreshold() {
-		Logger.Println("ProducerConfig.MaxMessageBytes too close to MaxRequestSize; it will be ignored.")
-	}
-
-	if config.MaxMessagesPerReq < 0 || (config.MaxMessagesPerReq > 0 && config.MaxMessagesPerReq < config.FlushMsgCount) {
-		return ConfigurationError("Invalid MaxMessagesPerReq, must be non-negative and >= FlushMsgCount if set")
-	}
-
-	if config.RetryBackoff < 0 {
-		return ConfigurationError("Invalid RetryBackoff")
-	}
-
-	if config.MaxRetries < 0 {
-		return ConfigurationError("Invalid MaxRetries")
-	}
-
-	return nil
-}
-
 // Producer publishes Kafka messages. It routes messages to the correct broker
 // for the provided topic-partition, refreshing metadata as appropriate, and
 // parses responses for errors. You must read from the Errors() channel or the
@@ -112,7 +21,7 @@ func (config *ProducerConfig) Validate() error {
 // is still necessary).
 type Producer struct {
 	client *Client
-	config ProducerConfig
+	conf   *Config
 
 	errors                    chan *ProducerError
 	input, successes, retries chan *ProducerMessage
@@ -122,24 +31,24 @@ type Producer struct {
 }
 
 // NewProducer creates a new Producer using the given client.
-func NewProducer(client *Client, config *ProducerConfig) (*Producer, error) {
+func NewProducer(client *Client, conf *Config) (*Producer, error) {
 	// Check that we are not dealing with a closed Client before processing
 	// any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
 
-	if config == nil {
-		config = NewProducerConfig()
+	if conf == nil {
+		conf = NewConfig()
 	}
 
-	if err := config.Validate(); err != nil {
+	if err := conf.Validate(); err != nil {
 		return nil, err
 	}
 
 	p := &Producer{
 		client:    client,
-		config:    *config,
+		conf:      conf,
 		errors:    make(chan *ProducerError),
 		input:     make(chan *ProducerMessage),
 		successes: make(chan *ProducerMessage),
@@ -226,7 +135,7 @@ func (p *Producer) Errors() <-chan *ProducerError {
 	return p.errors
 }
 
-// Successes is the success output channel back to the user when AckSuccesses is configured.
+// Successes is the success output channel back to the user when AckSuccesses is confured.
 // If AckSuccesses is true, you MUST read from this channel or the Producer will deadlock.
 // It is suggested that you send and read messages together in a single select statement.
 func (p *Producer) Successes() <-chan *ProducerMessage {
@@ -245,7 +154,7 @@ func (p *Producer) Input() chan<- *ProducerMessage {
 func (p *Producer) Close() error {
 	p.AsyncClose()
 
-	if p.config.AckSuccesses {
+	if p.conf.Producer.AckSuccesses {
 		go withRecover(func() {
 			for _ = range p.successes {
 			}
@@ -296,8 +205,8 @@ func (p *Producer) topicDispatcher() {
 			break
 		}
 
-		if (p.config.Compression == CompressionNone && msg.Value != nil && msg.Value.Length() > p.config.MaxMessageBytes) ||
-			(msg.byteSize() > p.config.MaxMessageBytes) {
+		if (p.conf.Producer.Compression == CompressionNone && msg.Value != nil && msg.Value.Length() > p.conf.Producer.MaxMessageBytes) ||
+			(msg.byteSize() > p.conf.Producer.MaxMessageBytes) {
 
 			p.returnError(msg, ErrMessageSizeTooLarge)
 			continue
@@ -306,7 +215,7 @@ func (p *Producer) topicDispatcher() {
 		handler := handlers[msg.Topic]
 		if handler == nil {
 			p.retries <- &ProducerMessage{flags: ref}
-			newHandler := make(chan *ProducerMessage, p.config.ChannelBufferSize)
+			newHandler := make(chan *ProducerMessage, p.conf.ChannelBufferSize)
 			topic := msg.Topic // block local because go's closure semantics suck
 			go withRecover(func() { p.partitionDispatcher(topic, newHandler) })
 			handler = newHandler
@@ -334,7 +243,7 @@ func (p *Producer) topicDispatcher() {
 // partitions messages, then dispatches them by partition
 func (p *Producer) partitionDispatcher(topic string, input chan *ProducerMessage) {
 	handlers := make(map[int32]chan *ProducerMessage)
-	partitioner := p.config.Partitioner()
+	partitioner := p.conf.Producer.Partitioner()
 
 	for msg := range input {
 		if msg.retries == 0 {
@@ -348,7 +257,7 @@ func (p *Producer) partitionDispatcher(topic string, input chan *ProducerMessage
 		handler := handlers[msg.partition]
 		if handler == nil {
 			p.retries <- &ProducerMessage{flags: ref}
-			newHandler := make(chan *ProducerMessage, p.config.ChannelBufferSize)
+			newHandler := make(chan *ProducerMessage, p.conf.ChannelBufferSize)
 			topic := msg.Topic         // block local because go's closure semantics suck
 			partition := msg.partition // block local because go's closure semantics suck
 			go withRecover(func() { p.leaderDispatcher(topic, partition, newHandler) })
@@ -401,7 +310,7 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *P
 	retryState := make([]struct {
 		buf          []*ProducerMessage
 		expectChaser bool
-	}, p.config.MaxRetries+1)
+	}, p.conf.Producer.Retry.Max+1)
 
 	for msg := range input {
 		if msg.retries > highWatermark {
@@ -414,7 +323,7 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *P
 			Logger.Printf("producer/leader abandoning broker %d on %s/%d\n", leader.ID(), topic, partition)
 			p.unrefBrokerProducer(leader)
 			output = nil
-			time.Sleep(p.config.RetryBackoff)
+			time.Sleep(p.conf.Producer.Retry.Backoff)
 		} else if highWatermark > 0 {
 			// we are retrying something (else highWatermark would be 0) but this message is not a *new* retry level
 			if msg.retries < highWatermark {
@@ -469,7 +378,7 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *P
 		if output == nil {
 			if err := breaker.Run(doUpdate); err != nil {
 				p.returnError(msg, err)
-				time.Sleep(p.config.RetryBackoff)
+				time.Sleep(p.conf.Producer.Retry.Backoff)
 				continue
 			}
 			Logger.Printf("producer/leader selected broker %d on %s/%d\n", leader.ID(), topic, partition)
@@ -488,8 +397,8 @@ func (p *Producer) leaderDispatcher(topic string, partition int32, input chan *P
 func (p *Producer) messageAggregator(broker *Broker, input chan *ProducerMessage) {
 	var ticker *time.Ticker
 	var timer <-chan time.Time
-	if p.config.FlushFrequency > 0 {
-		ticker = time.NewTicker(p.config.FlushFrequency)
+	if p.conf.Producer.Flush.Frequency > 0 {
+		ticker = time.NewTicker(p.conf.Producer.Flush.Frequency)
 		timer = ticker.C
 	}
 
@@ -508,8 +417,8 @@ func (p *Producer) messageAggregator(broker *Broker, input chan *ProducerMessage
 			}
 
 			if (bytesAccumulated+msg.byteSize() >= forceFlushThreshold()) ||
-				(p.config.Compression != CompressionNone && bytesAccumulated+msg.byteSize() >= p.config.MaxMessageBytes) ||
-				(p.config.MaxMessagesPerReq > 0 && len(buffer) >= p.config.MaxMessagesPerReq) {
+				(p.conf.Producer.Compression != CompressionNone && bytesAccumulated+msg.byteSize() >= p.conf.Producer.MaxMessageBytes) ||
+				(p.conf.Producer.Flush.MaxMessages > 0 && len(buffer) >= p.conf.Producer.Flush.MaxMessages) {
 				Logger.Println("producer/aggregator maximum request accumulated, forcing blocking flush")
 				flusher <- buffer
 				buffer = nil
@@ -520,8 +429,8 @@ func (p *Producer) messageAggregator(broker *Broker, input chan *ProducerMessage
 			buffer = append(buffer, msg)
 			bytesAccumulated += msg.byteSize()
 
-			if len(buffer) >= p.config.FlushMsgCount ||
-				(p.config.FlushByteCount > 0 && bytesAccumulated >= p.config.FlushByteCount) {
+			if len(buffer) >= p.conf.Producer.Flush.Messages ||
+				(p.conf.Producer.Flush.Bytes > 0 && bytesAccumulated >= p.conf.Producer.Flush.Bytes) {
 				doFlush = flusher
 			}
 		case <-timer:
@@ -603,7 +512,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
-			if p.config.AckSuccesses {
+			if p.conf.Producer.AckSuccesses {
 				p.returnSuccesses(batch)
 			}
 			continue
@@ -623,7 +532,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 				switch block.Err {
 				case ErrNoError:
 					// All the messages for this topic-partition were delivered successfully!
-					if p.config.AckSuccesses {
+					if p.conf.Producer.AckSuccesses {
 						for i := range msgs {
 							msgs[i].offset = block.Offset + int64(i)
 						}
@@ -733,7 +642,7 @@ func (p *Producer) assignPartition(partitioner Partitioner, msg *ProducerMessage
 
 func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *ProduceRequest {
 
-	req := &ProduceRequest{RequiredAcks: p.config.RequiredAcks, Timeout: int32(p.config.Timeout / time.Millisecond)}
+	req := &ProduceRequest{RequiredAcks: p.conf.Producer.RequiredAcks, Timeout: int32(p.conf.Producer.Timeout / time.Millisecond)}
 	empty := true
 
 	for topic, partitionSet := range batch {
@@ -756,7 +665,7 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 					}
 				}
 
-				if p.config.Compression != CompressionNone && setSize+msg.byteSize() > p.config.MaxMessageBytes {
+				if p.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > p.conf.Producer.MaxMessageBytes {
 					// compression causes message-sets to be wrapped as single messages, which have tighter
 					// size requirements, so we have to respect those limits
 					valBytes, err := encode(setToSend)
@@ -764,7 +673,7 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 						Logger.Println(err) // if this happens, it's basically our fault.
 						panic(err)
 					}
-					req.AddMessage(topic, partition, &Message{Codec: p.config.Compression, Key: nil, Value: valBytes})
+					req.AddMessage(topic, partition, &Message{Codec: p.conf.Producer.Compression, Key: nil, Value: valBytes})
 					setToSend = new(MessageSet)
 					setSize = 0
 				}
@@ -774,7 +683,7 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 				empty = false
 			}
 
-			if p.config.Compression == CompressionNone {
+			if p.conf.Producer.Compression == CompressionNone {
 				req.AddSet(topic, partition, setToSend)
 			} else {
 				valBytes, err := encode(setToSend)
@@ -782,7 +691,7 @@ func (p *Producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
 				}
-				req.AddMessage(topic, partition, &Message{Codec: p.config.Compression, Key: nil, Value: valBytes})
+				req.AddMessage(topic, partition, &Message{Codec: p.conf.Producer.Compression, Key: nil, Value: valBytes})
 			}
 		}
 	}
@@ -821,7 +730,7 @@ func (p *Producer) retryMessages(batch []*ProducerMessage, err error) {
 		if msg == nil {
 			continue
 		}
-		if msg.retries >= p.config.MaxRetries {
+		if msg.retries >= p.conf.Producer.Retry.Max {
 			p.returnError(msg, err)
 		} else {
 			msg.retries++

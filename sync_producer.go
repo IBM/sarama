@@ -10,12 +10,12 @@ type SyncProducer struct {
 	wg       sync.WaitGroup
 }
 
-// NewSyncProducer creates a new SyncProducer using the given client  and configuration.
-func NewSyncProducer(client *Client, config *ProducerConfig) (*SyncProducer, error) {
+// NewSyncProducer creates a new SyncProducer using the given client and configuration.
+func NewSyncProducer(client *Client, config *Config) (*SyncProducer, error) {
 	if config == nil {
-		config = NewProducerConfig()
+		config = NewConfig()
 	}
-	config.AckSuccesses = true
+	config.Producer.AckSuccesses = true
 
 	prod, err := NewProducer(client, config)
 

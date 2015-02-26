@@ -12,13 +12,6 @@ func safeClose(t *testing.T, c io.Closer) {
 	}
 }
 
-func TestDefaultClientConfigValidates(t *testing.T) {
-	config := NewClientConfig()
-	if err := config.Validate(); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestSimpleClient(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 
@@ -46,8 +39,8 @@ func TestCachedPartitions(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewClientConfig()
-	config.MetadataRetries = 0
+	config := NewConfig()
+	config.Metadata.Retries = 0
 	client, err := NewClient("client_id", []string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -104,8 +97,8 @@ func TestClientMetadata(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewClientConfig()
-	config.MetadataRetries = 0
+	config := NewConfig()
+	config.Metadata.Retries = 0
 	client, err := NewClient("client_id", []string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)

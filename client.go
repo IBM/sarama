@@ -6,54 +6,13 @@ import (
 	"time"
 )
 
-// ClientConfig is used to pass multiple configuration options to NewClient.
-type ClientConfig struct {
-	MetadataRetries            int           // How many times to retry a metadata request when a partition is in the middle of leader election.
-	WaitForElection            time.Duration // How long to wait for leader election to finish between retries.
-	DefaultBrokerConf          *BrokerConfig // Default configuration for broker connections created by this client.
-	BackgroundRefreshFrequency time.Duration // How frequently the client will refresh the cluster metadata in the background. Defaults to 10 minutes. Set to 0 to disable.
-}
-
-// NewClientConfig creates a new ClientConfig instance with sensible defaults
-func NewClientConfig() *ClientConfig {
-	return &ClientConfig{
-		MetadataRetries:            3,
-		WaitForElection:            250 * time.Millisecond,
-		BackgroundRefreshFrequency: 10 * time.Minute,
-	}
-}
-
-// Validate checks a ClientConfig instance. This will return a
-// ConfigurationError if the specified values don't make sense.
-func (config *ClientConfig) Validate() error {
-	if config.MetadataRetries < 0 {
-		return ConfigurationError("Invalid MetadataRetries, must be >= 0")
-	}
-
-	if config.WaitForElection <= time.Duration(0) {
-		return ConfigurationError("Invalid WaitForElection, must be > 0")
-	}
-
-	if config.DefaultBrokerConf != nil {
-		if err := config.DefaultBrokerConf.Validate(); err != nil {
-			return err
-		}
-	}
-
-	if config.BackgroundRefreshFrequency < time.Duration(0) {
-		return ConfigurationError("Invalid BackgroundRefreshFrequency, must be >= 0")
-	}
-
-	return nil
-}
-
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
 // You MUST call Close() on a client to avoid leaks, it will not be garbage-collected
 // automatically when it passes out of scope. A single client can be safely shared by
 // multiple concurrent Producers and Consumers.
 type Client struct {
 	id     string
-	config ClientConfig
+	conf   *Config
 	closer chan none
 
 	// the broker addresses given to us through the constructor are not guaranteed to be returned in
@@ -75,14 +34,14 @@ type Client struct {
 // NewClient creates a new Client with the given client ID. It connects to one of the given broker addresses
 // and uses that broker to automatically fetch metadata on the rest of the kafka cluster. If metadata cannot
 // be retrieved from any of the given broker addresses, the client is not created.
-func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error) {
+func NewClient(id string, addrs []string, conf *Config) (*Client, error) {
 	Logger.Println("Initializing new client")
 
-	if config == nil {
-		config = NewClientConfig()
+	if conf == nil {
+		conf = NewConfig()
 	}
 
-	if err := config.Validate(); err != nil {
+	if err := conf.Validate(); err != nil {
 		return nil, err
 	}
 
@@ -92,7 +51,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 
 	client := &Client{
 		id:                      id,
-		config:                  *config,
+		conf:                    conf,
 		closer:                  make(chan none),
 		seedBrokerAddrs:         addrs,
 		seedBroker:              NewBroker(addrs[0]),
@@ -101,7 +60,7 @@ func NewClient(id string, addrs []string, config *ClientConfig) (*Client, error)
 		metadata:                make(map[string]map[int32]*PartitionMetadata),
 		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 	}
-	_ = client.seedBroker.Open(config.DefaultBrokerConf)
+	_ = client.seedBroker.Open(conf)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshAllMetadata()
@@ -288,13 +247,13 @@ func (client *Client) Leader(topic string, partitionID int32) (*Broker, error) {
 // RefreshTopicMetadata takes a list of topics and queries the cluster to refresh the
 // available metadata for those topics.
 func (client *Client) RefreshTopicMetadata(topics ...string) error {
-	return client.refreshMetadata(topics, client.config.MetadataRetries)
+	return client.refreshMetadata(topics, client.conf.Metadata.Retries)
 }
 
 // RefreshAllMetadata queries the cluster to refresh the available metadata for all topics.
 func (client *Client) RefreshAllMetadata() error {
 	// Kafka refreshes all when you encode it an empty array...
-	return client.refreshMetadata(make([]string, 0), client.config.MetadataRetries)
+	return client.refreshMetadata(make([]string, 0), client.conf.Metadata.Retries)
 }
 
 // GetOffset queries the cluster to get the most recent available offset at the given
@@ -344,7 +303,7 @@ func (client *Client) disconnectBroker(broker *Broker) {
 		client.seedBrokerAddrs = client.seedBrokerAddrs[1:]
 		if len(client.seedBrokerAddrs) > 0 {
 			client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
-			_ = client.seedBroker.Open(client.config.DefaultBrokerConf)
+			_ = client.seedBroker.Open(client.conf)
 		} else {
 			client.seedBroker = nil
 		}
@@ -372,7 +331,7 @@ func (client *Client) resurrectDeadBrokers() {
 	client.deadBrokerAddrs = make(map[string]none)
 
 	client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
-	_ = client.seedBroker.Open(client.config.DefaultBrokerConf)
+	_ = client.seedBroker.Open(client.conf)
 }
 
 func (client *Client) any() *Broker {
@@ -489,11 +448,11 @@ func (client *Client) cachedLeader(topic string, partitionID int32) (*Broker, er
 // core metadata update logic
 
 func (client *Client) backgroundMetadataUpdater() {
-	if client.config.BackgroundRefreshFrequency == time.Duration(0) {
+	if client.conf.Metadata.RefreshFrequency == time.Duration(0) {
 		return
 	}
 
-	ticker := time.NewTicker(client.config.BackgroundRefreshFrequency)
+	ticker := time.NewTicker(client.conf.Metadata.RefreshFrequency)
 	for {
 		select {
 		case <-ticker.C:
@@ -542,8 +501,9 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 					Logger.Println("Some partitions are leaderless, but we're out of retries")
 					return nil
 				}
-				Logger.Printf("Some partitions are leaderless, waiting %dms for election... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retriesRemaining)
-				time.Sleep(client.config.WaitForElection) // wait for leader election
+				Logger.Printf("Some partitions are leaderless, waiting %dms for election... (%d retries remaining)\n",
+					client.conf.Metadata.WaitForElection/time.Millisecond, retriesRemaining)
+				time.Sleep(client.conf.Metadata.WaitForElection) // wait for leader election
 				return client.refreshMetadata(retry, retriesRemaining-1)
 			}
 
@@ -561,8 +521,9 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 	Logger.Println("Out of available brokers.")
 
 	if retriesRemaining > 0 {
-		Logger.Printf("Resurrecting dead brokers after %dms... (%d retries remaining)\n", client.config.WaitForElection/time.Millisecond, retriesRemaining)
-		time.Sleep(client.config.WaitForElection)
+		Logger.Printf("Resurrecting dead brokers after %dms... (%d retries remaining)\n",
+			client.conf.Metadata.WaitForElection/time.Millisecond, retriesRemaining)
+		time.Sleep(client.conf.Metadata.WaitForElection)
 		client.resurrectDeadBrokers()
 		return client.refreshMetadata(topics, retriesRemaining-1)
 	}
@@ -584,12 +545,12 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			_ = broker.Open(client.config.DefaultBrokerConf)
+			_ = broker.Open(client.conf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			safeAsyncClose(client.brokers[broker.ID()])
-			_ = broker.Open(client.config.DefaultBrokerConf)
+			_ = broker.Open(client.conf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
