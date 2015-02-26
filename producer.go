@@ -494,7 +494,7 @@ func (p *Producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 			continue
 		}
 
-		response, err := broker.Produce(p.client.id, request)
+		response, err := broker.Produce(request)
 
 		switch err.(type) {
 		case nil:

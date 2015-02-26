@@ -11,7 +11,6 @@ import (
 // automatically when it passes out of scope. A single client can be safely shared by
 // multiple concurrent Producers and Consumers.
 type Client struct {
-	id     string
 	conf   *Config
 	closer chan none
 
@@ -31,10 +30,10 @@ type Client struct {
 	lock                    sync.RWMutex // protects access to the maps, only one since they're always written together
 }
 
-// NewClient creates a new Client with the given client ID. It connects to one of the given broker addresses
+// NewClient creates a new Client. It connects to one of the given broker addresses
 // and uses that broker to automatically fetch metadata on the rest of the kafka cluster. If metadata cannot
 // be retrieved from any of the given broker addresses, the client is not created.
-func NewClient(id string, addrs []string, conf *Config) (*Client, error) {
+func NewClient(addrs []string, conf *Config) (*Client, error) {
 	Logger.Println("Initializing new client")
 
 	if conf == nil {
@@ -50,7 +49,6 @@ func NewClient(id string, addrs []string, conf *Config) (*Client, error) {
 	}
 
 	client := &Client{
-		id:                      id,
 		conf:                    conf,
 		closer:                  make(chan none),
 		seedBrokerAddrs:         addrs,
@@ -267,7 +265,7 @@ func (client *Client) GetOffset(topic string, partitionID int32, where OffsetTim
 	request := &OffsetRequest{}
 	request.AddBlock(topic, partitionID, where, 1)
 
-	response, err := broker.GetAvailableOffsets(client.id, request)
+	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {
 		return -1, err
 	}
@@ -489,7 +487,7 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 		} else {
 			Logger.Printf("Fetching metadata for all topics from broker %s\n", broker.addr)
 		}
-		response, err := broker.GetMetadata(client.id, &MetadataRequest{Topics: topics})
+		response, err := broker.GetMetadata(&MetadataRequest{Topics: topics})
 
 		switch err.(type) {
 		case nil:

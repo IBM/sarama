@@ -136,10 +136,10 @@ func (b *Broker) Addr() string {
 	return b.addr
 }
 
-func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*MetadataResponse, error) {
+func (b *Broker) GetMetadata(request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
 
-	err := b.sendAndReceive(clientID, request, response)
+	err := b.sendAndReceive(request, response)
 
 	if err != nil {
 		return nil, err
@@ -148,10 +148,10 @@ func (b *Broker) GetMetadata(clientID string, request *MetadataRequest) (*Metada
 	return response, nil
 }
 
-func (b *Broker) GetConsumerMetadata(clientID string, request *ConsumerMetadataRequest) (*ConsumerMetadataResponse, error) {
+func (b *Broker) GetConsumerMetadata(request *ConsumerMetadataRequest) (*ConsumerMetadataResponse, error) {
 	response := new(ConsumerMetadataResponse)
 
-	err := b.sendAndReceive(clientID, request, response)
+	err := b.sendAndReceive(request, response)
 
 	if err != nil {
 		return nil, err
@@ -160,10 +160,10 @@ func (b *Broker) GetConsumerMetadata(clientID string, request *ConsumerMetadataR
 	return response, nil
 }
 
-func (b *Broker) GetAvailableOffsets(clientID string, request *OffsetRequest) (*OffsetResponse, error) {
+func (b *Broker) GetAvailableOffsets(request *OffsetRequest) (*OffsetResponse, error) {
 	response := new(OffsetResponse)
 
-	err := b.sendAndReceive(clientID, request, response)
+	err := b.sendAndReceive(request, response)
 
 	if err != nil {
 		return nil, err
@@ -172,15 +172,15 @@ func (b *Broker) GetAvailableOffsets(clientID string, request *OffsetRequest) (*
 	return response, nil
 }
 
-func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResponse, error) {
+func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 	var response *ProduceResponse
 	var err error
 
 	if request.RequiredAcks == NoResponse {
-		err = b.sendAndReceive(clientID, request, nil)
+		err = b.sendAndReceive(request, nil)
 	} else {
 		response = new(ProduceResponse)
-		err = b.sendAndReceive(clientID, request, response)
+		err = b.sendAndReceive(request, response)
 	}
 
 	if err != nil {
@@ -190,10 +190,10 @@ func (b *Broker) Produce(clientID string, request *ProduceRequest) (*ProduceResp
 	return response, nil
 }
 
-func (b *Broker) Fetch(clientID string, request *FetchRequest) (*FetchResponse, error) {
+func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
 	response := new(FetchResponse)
 
-	err := b.sendAndReceive(clientID, request, response)
+	err := b.sendAndReceive(request, response)
 
 	if err != nil {
 		return nil, err
@@ -202,10 +202,10 @@ func (b *Broker) Fetch(clientID string, request *FetchRequest) (*FetchResponse, 
 	return response, nil
 }
 
-func (b *Broker) CommitOffset(clientID string, request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
+func (b *Broker) CommitOffset(request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
 	response := new(OffsetCommitResponse)
 
-	err := b.sendAndReceive(clientID, request, response)
+	err := b.sendAndReceive(request, response)
 
 	if err != nil {
 		return nil, err
@@ -214,10 +214,10 @@ func (b *Broker) CommitOffset(clientID string, request *OffsetCommitRequest) (*O
 	return response, nil
 }
 
-func (b *Broker) FetchOffset(clientID string, request *OffsetFetchRequest) (*OffsetFetchResponse, error) {
+func (b *Broker) FetchOffset(request *OffsetFetchRequest) (*OffsetFetchResponse, error) {
 	response := new(OffsetFetchResponse)
 
-	err := b.sendAndReceive(clientID, request, response)
+	err := b.sendAndReceive(request, response)
 
 	if err != nil {
 		return nil, err
@@ -226,7 +226,7 @@ func (b *Broker) FetchOffset(clientID string, request *OffsetFetchRequest) (*Off
 	return response, nil
 }
 
-func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool) (*responsePromise, error) {
+func (b *Broker) send(req requestEncoder, promiseResponse bool) (*responsePromise, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -237,7 +237,7 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 		return nil, ErrNotConnected
 	}
 
-	fullRequest := request{b.correlationID, clientID, req}
+	fullRequest := request{b.correlationID, b.conf.ClientID, req}
 	buf, err := encode(&fullRequest)
 	if err != nil {
 		return nil, err
@@ -264,8 +264,8 @@ func (b *Broker) send(clientID string, req requestEncoder, promiseResponse bool)
 	return &promise, nil
 }
 
-func (b *Broker) sendAndReceive(clientID string, req requestEncoder, res decoder) error {
-	promise, err := b.send(clientID, req, res != nil)
+func (b *Broker) sendAndReceive(req requestEncoder, res decoder) error {
+	promise, err := b.send(req, res != nil)
 
 	if err != nil {
 		return err

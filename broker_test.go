@@ -13,7 +13,7 @@ func ExampleBroker() error {
 	}
 
 	request := MetadataRequest{Topics: []string{"myTopic"}}
-	response, err := broker.GetMetadata("myClient", &request)
+	response, err := broker.GetMetadata(&request)
 	if err != nil {
 		_ = broker.Close()
 		return err
@@ -80,7 +80,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := MetadataRequest{}
-			response, err := broker.GetMetadata("clientID", &request)
+			response, err := broker.GetMetadata(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -92,7 +92,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 't', 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ConsumerMetadataRequest{}
-			response, err := broker.GetConsumerMetadata("clientID", &request)
+			response, err := broker.GetConsumerMetadata(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -105,7 +105,7 @@ var brokerTestTable = []struct {
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = NoResponse
-			response, err := broker.Produce("clientID", &request)
+			response, err := broker.Produce(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -118,7 +118,7 @@ var brokerTestTable = []struct {
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = WaitForLocal
-			response, err := broker.Produce("clientID", &request)
+			response, err := broker.Produce(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -130,7 +130,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := FetchRequest{}
-			response, err := broker.Fetch("clientID", &request)
+			response, err := broker.Fetch(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -142,7 +142,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetFetchRequest{}
-			response, err := broker.FetchOffset("clientID", &request)
+			response, err := broker.FetchOffset(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -154,7 +154,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetCommitRequest{}
-			response, err := broker.CommitOffset("clientID", &request)
+			response, err := broker.CommitOffset(&request)
 			if err != nil {
 				t.Error(err)
 			}
@@ -166,7 +166,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetRequest{}
-			response, err := broker.GetAvailableOffsets("clientID", &request)
+			response, err := broker.GetAvailableOffsets(&request)
 			if err != nil {
 				t.Error(err)
 			}

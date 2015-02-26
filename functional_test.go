@@ -47,7 +47,7 @@ func TestFuncConnectionFailure(t *testing.T) {
 	config := NewConfig()
 	config.Metadata.Retries = 1
 
-	_, err := NewClient("test", []string{"localhost:9000"}, config)
+	_, err := NewClient([]string{"localhost:9000"}, config)
 	if err != ErrOutOfBrokers {
 		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
 	}
@@ -85,7 +85,7 @@ func TestFuncProducingFlushing(t *testing.T) {
 
 func TestFuncMultiPartitionProduce(t *testing.T) {
 	checkKafkaAvailability(t)
-	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
+	client, err := NewClient([]string{kafkaAddr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 func testProducingMessages(t *testing.T, config *Config) {
 	checkKafkaAvailability(t)
 
-	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
+	client, err := NewClient([]string{kafkaAddr}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

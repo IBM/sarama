@@ -17,7 +17,7 @@ func TestSimpleClient(t *testing.T) {
 
 	seedBroker.Returns(new(MetadataResponse))
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +41,7 @@ func TestCachedPartitions(t *testing.T) {
 
 	config := NewConfig()
 	config.Metadata.Retries = 0
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, config)
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func TestClientSeedBrokers(t *testing.T) {
 	metadataResponse.AddBroker(discoveredBroker.Addr(), discoveredBroker.BrokerID())
 	seedBroker.Returns(metadataResponse)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestClientMetadata(t *testing.T) {
 
 	config := NewConfig()
 	config.Metadata.Retries = 0
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, config)
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
-	client, err := NewClient("clientID", []string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

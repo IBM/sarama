@@ -468,7 +468,7 @@ func (w *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
 	}
 
-	return w.broker.Fetch(w.consumer.client.id, request)
+	return w.broker.Fetch(request)
 }
 
 func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchResponseBlock) {

@@ -85,6 +85,9 @@ type Config struct {
 		MaxWaitTime time.Duration
 	}
 
+	// A user-provided string sent with every request to the brokers for logging, debugging, and auditing purposes.
+	// Defaults to "sarama", but you should probably set it to something specific to your application.
+	ClientID string
 	// The number of events to buffer in internal and external channels. This permits the producer and consumer to
 	// continue processing some messages in the background while user code is working, greatly improving throughput.
 	// Defaults to 256.
@@ -141,6 +144,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Consumer.MaxWaitTime%time.Millisecond != 0 {
 		Logger.Println("Consumer.MaxWaitTime only supports millisecond precision; nanoseconds will be truncated.")
+	}
+	if c.ClientID == "sarama" {
+		Logger.Println("ClientID is the default of 'sarama', you should consider setting it to something application-specific.")
 	}
 
 	// validate Net values
