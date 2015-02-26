@@ -6,16 +6,9 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"testing"
 	"time"
 )
-
-// testState is a generic interface for a test state, implemented e.g. by testing.T
-type testState interface {
-	Error(args ...interface{})
-	Fatal(args ...interface{})
-	Errorf(format string, args ...interface{})
-	Fatalf(format string, args ...interface{})
-}
 
 // mockBroker is a mock Kafka broker. It consists of a TCP server on a kernel-selected localhost port that
 // accepts a single connection. It reads Kafka requests from that connection and returns each response
@@ -33,7 +26,7 @@ type mockBroker struct {
 	stopper      chan bool
 	expectations chan encoder
 	listener     net.Listener
-	t            testState
+	t            *testing.T
 	latency      time.Duration
 }
 
@@ -130,16 +123,16 @@ func (b *mockBroker) serverError(err error, conn net.Conn) bool {
 	return false
 }
 
-// newMockBroker launches a fake Kafka broker. It takes a TestState (e.g. *testing.T) as provided by the
+// newMockBroker launches a fake Kafka broker. It takes a *testing.T as provided by the
 // test framework and a channel of responses to use.  If an error occurs it is
-// simply logged to the TestState and the broker exits.
-func newMockBroker(t testState, brokerID int32) *mockBroker {
+// simply logged to the *testing.T and the broker exits.
+func newMockBroker(t *testing.T, brokerID int32) *mockBroker {
 	return newMockBrokerAddr(t, brokerID, "localhost:0")
 }
 
 // newMockBrokerAddr behaves like newMockBroker but listens on the address you give
 // it rather than just some ephemeral port.
-func newMockBrokerAddr(t testState, brokerID int32, addr string) *mockBroker {
+func newMockBrokerAddr(t *testing.T, brokerID int32, addr string) *mockBroker {
 	var err error
 
 	broker := &mockBroker{
