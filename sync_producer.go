@@ -16,7 +16,7 @@ func NewSyncProducer(addrs []string, config *Config) (*SyncProducer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSyncProducerFromProducer(p), nil
+	return newSyncProducerFromProducer(p), nil
 }
 
 // NewSyncProducerFromClient creates a new SyncProducer using the given client.
@@ -25,11 +25,10 @@ func NewSyncProducerFromClient(client *Client) (*SyncProducer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewSyncProducerFromProducer(p), nil
+	return newSyncProducerFromProducer(p), nil
 }
 
-// NewSyncProducerFromProducer creates a new SyncProducer using the given producer as backing.
-func NewSyncProducerFromProducer(p *Producer) *SyncProducer {
+func newSyncProducerFromProducer(p *Producer) *SyncProducer {
 	p.conf.Producer.AckSuccesses = true
 	sp := &SyncProducer{producer: p}
 
