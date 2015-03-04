@@ -629,7 +629,8 @@ func (p *Producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 						}
 						p.returnSuccesses(msgs)
 					}
-				case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable, ErrRequestTimedOut:
+				case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable,
+					ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
 					Logger.Printf("producer/flusher/%d state change to [retrying] on %s/%d because %v\n",
 						broker.ID(), topic, partition, block.Err)
 					if currentRetries[topic] == nil {
