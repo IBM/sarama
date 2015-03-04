@@ -11,17 +11,17 @@ func ExampleBroker() error {
 	if err != nil {
 		return err
 	}
-	defer broker.Close()
 
 	request := MetadataRequest{Topics: []string{"myTopic"}}
 	response, err := broker.GetMetadata("myClient", &request)
 	if err != nil {
+		_ = broker.Close()
 		return err
 	}
 
 	fmt.Println("There are", len(response.Topics), "topics active in the cluster.")
 
-	return nil
+	return broker.Close()
 }
 
 type mockEncoder struct {
@@ -29,8 +29,7 @@ type mockEncoder struct {
 }
 
 func (m mockEncoder) encode(pe packetEncoder) error {
-	pe.putRawBytes(m.bytes)
-	return nil
+	return pe.putRawBytes(m.bytes)
 }
 
 func TestBrokerAccessors(t *testing.T) {

@@ -92,7 +92,9 @@ func TestHashPartitioner(t *testing.T) {
 
 	buf := make([]byte, 256)
 	for i := 1; i < 50; i++ {
-		rand.Read(buf)
+		if _, err := rand.Read(buf); err != nil {
+			t.Error(err)
+		}
 		assertPartitioningConsistent(t, partitioner, ByteEncoder(buf), 50)
 	}
 }

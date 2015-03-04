@@ -24,10 +24,10 @@ func init() {
 		kafkaAddr = "localhost:6667"
 	}
 
-	c, err := net.Dial("tcp", kafkaAddr)
-	if err == nil {
-		kafkaIsAvailable = true
-		c.Close()
+	if c, err := net.Dial("tcp", kafkaAddr); err == nil {
+		if err = c.Close(); err == nil {
+			kafkaIsAvailable = true
+		}
 	}
 
 	kafkaShouldBeAvailable = os.Getenv("CI") != ""
