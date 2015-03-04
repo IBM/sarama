@@ -575,13 +575,21 @@ func ExampleProducer() {
 	} else {
 		fmt.Println("> connected")
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	producer, err := NewProducer(client, nil)
 	if err != nil {
 		panic(err)
 	}
-	defer producer.Close()
+	defer func() {
+		if err := producer.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	for {
 		select {
@@ -600,13 +608,21 @@ func ExampleSyncProducer() {
 	} else {
 		fmt.Println("> connected")
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	producer, err := NewSyncProducer(client, nil)
 	if err != nil {
 		panic(err)
 	}
-	defer producer.Close()
+	defer func() {
+		if err := producer.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	for {
 		partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))

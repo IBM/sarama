@@ -301,7 +301,11 @@ func ExampleConsumerWithSelect() {
 	} else {
 		fmt.Println("> connected")
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	master, err := NewConsumer(client, nil)
 	if err != nil {
@@ -316,7 +320,11 @@ func ExampleConsumerWithSelect() {
 	} else {
 		fmt.Println("> consumer ready")
 	}
-	defer consumer.Close()
+	defer func() {
+		if err := consumer.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	msgCount := 0
 
@@ -342,7 +350,11 @@ func ExampleConsumerWithGoroutines() {
 	} else {
 		fmt.Println("> connected")
 	}
-	defer client.Close()
+	defer func() {
+		if err := client.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	master, err := NewConsumer(client, nil)
 	if err != nil {
@@ -357,7 +369,11 @@ func ExampleConsumerWithGoroutines() {
 	} else {
 		fmt.Println("> consumer ready")
 	}
-	defer consumer.Close()
+	defer func() {
+		if err := consumer.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	var (
 		wg       sync.WaitGroup
