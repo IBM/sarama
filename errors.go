@@ -89,6 +89,10 @@ const (
 	ErrOffsetsLoadInProgress           KError = 14
 	ErrConsumerCoordinatorNotAvailable KError = 15
 	ErrNotCoordinatorForConsumer       KError = 16
+	ErrInvalidTopic                    KError = 17
+	ErrMessageSetSizeTooLarge          KError = 18
+	ErrNotEnoughReplicas               KError = 19
+	ErrNotEnoughReplicasAfterAppend    KError = 20
 )
 
 func (err KError) Error() string {
@@ -129,6 +133,14 @@ func (err KError) Error() string {
 		return "kafka server: Offset's topic has not yet been created."
 	case ErrNotCoordinatorForConsumer:
 		return "kafka server: Request was for a consumer group that is not coordinated by this broker."
+	case ErrInvalidTopic:
+		return "kafka server: The request attempted to perform an operation on an invalid topic."
+	case ErrMessageSetSizeTooLarge:
+		return "kafka server: The request included message batch larger than the configured segment size on the server."
+	case ErrNotEnoughReplicas:
+		return "kafka server: Messages are rejected since there are fewer in-sync replicas than required."
+	case ErrNotEnoughReplicasAfterAppend:
+		return "kafka server: Messages are written to the log, but to fewer in-sync replicas than required."
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
