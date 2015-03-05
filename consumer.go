@@ -402,8 +402,8 @@ func (child *PartitionConsumer) AsyncClose() {
 	close(child.dying)
 }
 
-// Close stops the PartitionConsumer from fetching messages. It is required to call this function,
-// or AsyncCose before a consumer object passes out of scope, as it will otherwise leak memory. You must
+// Close stops the PartitionConsumer from fetching messages. It is required to call this function
+// (or AsyncClose) before a consumer object passes out of scope, as it will otherwise leak memory. You must
 // call this before calling Close on the underlying client.
 func (child *PartitionConsumer) Close() error {
 	child.AsyncClose()
