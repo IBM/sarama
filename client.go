@@ -245,13 +245,13 @@ func (client *Client) Leader(topic string, partitionID int32) (*Broker, error) {
 // RefreshTopicMetadata takes a list of topics and queries the cluster to refresh the
 // available metadata for those topics.
 func (client *Client) RefreshTopicMetadata(topics ...string) error {
-	return client.refreshMetadata(topics, client.conf.Metadata.Retries)
+	return client.refreshMetadata(topics, client.conf.Metadata.Retry.Max)
 }
 
 // RefreshAllMetadata queries the cluster to refresh the available metadata for all topics.
 func (client *Client) RefreshAllMetadata() error {
 	// Kafka refreshes all when you encode it an empty array...
-	return client.refreshMetadata(make([]string, 0), client.conf.Metadata.Retries)
+	return client.refreshMetadata(make([]string, 0), client.conf.Metadata.Retry.Max)
 }
 
 // GetOffset queries the cluster to get the most recent available offset at the given
@@ -500,8 +500,8 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 					return nil
 				}
 				Logger.Printf("Some partitions are leaderless, waiting %dms for election... (%d retries remaining)\n",
-					client.conf.Metadata.WaitForElection/time.Millisecond, retriesRemaining)
-				time.Sleep(client.conf.Metadata.WaitForElection) // wait for leader election
+					client.conf.Metadata.Retry.Backoff/time.Millisecond, retriesRemaining)
+				time.Sleep(client.conf.Metadata.Retry.Backoff) // wait for leader election
 				return client.refreshMetadata(retry, retriesRemaining-1)
 			}
 
@@ -520,8 +520,8 @@ func (client *Client) refreshMetadata(topics []string, retriesRemaining int) err
 
 	if retriesRemaining > 0 {
 		Logger.Printf("Resurrecting dead brokers after %dms... (%d retries remaining)\n",
-			client.conf.Metadata.WaitForElection/time.Millisecond, retriesRemaining)
-		time.Sleep(client.conf.Metadata.WaitForElection)
+			client.conf.Metadata.Retry.Backoff/time.Millisecond, retriesRemaining)
+		time.Sleep(client.conf.Metadata.Retry.Backoff)
 		client.resurrectDeadBrokers()
 		return client.refreshMetadata(topics, retriesRemaining-1)
 	}

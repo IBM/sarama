@@ -40,7 +40,7 @@ func TestCachedPartitions(t *testing.T) {
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
-	config.Metadata.Retries = 0
+	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func TestClientMetadata(t *testing.T) {
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
-	config.Metadata.Retries = 0
+	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)

@@ -45,7 +45,7 @@ func checkKafkaAvailability(t *testing.T) {
 
 func TestFuncConnectionFailure(t *testing.T) {
 	config := NewConfig()
-	config.Metadata.Retries = 1
+	config.Metadata.Retry.Max = 1
 
 	_, err := NewClient([]string{"localhost:9000"}, config)
 	if err != ErrOutOfBrokers {
