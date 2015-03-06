@@ -6,101 +6,6 @@ import (
 	"time"
 )
 
-// OffsetMethod is passed in ConsumerConfig to tell the consumer how to determine the starting offset.
-type OffsetMethod int
-
-const (
-	// OffsetMethodNewest causes the consumer to start at the most recent available offset, as
-	// determined by querying the broker.
-	OffsetMethodNewest OffsetMethod = iota
-	// OffsetMethodOldest causes the consumer to start at the oldest available offset, as
-	// determined by querying the broker.
-	OffsetMethodOldest
-	// OffsetMethodManual causes the consumer to interpret the OffsetValue in the ConsumerConfig as the
-	// offset at which to start, allowing the user to manually specify their desired starting offset.
-	OffsetMethodManual
-)
-
-// ConsumerConfig is used to pass multiple configuration options to NewConsumer.
-type ConsumerConfig struct {
-	// The minimum amount of data to fetch in a request - the broker will wait until at least this many bytes are available.
-	// The default is 1, as 0 causes the consumer to spin when no messages are available.
-	MinFetchSize int32
-	// The maximum amount of time the broker will wait for MinFetchSize bytes to become available before it
-	// returns fewer than that anyways. The default is 250ms, since 0 causes the consumer to spin when no events are available.
-	// 100-500ms is a reasonable range for most cases. Kafka only supports precision up to milliseconds; nanoseconds will be truncated.
-	MaxWaitTime time.Duration
-}
-
-// NewConsumerConfig creates a ConsumerConfig instance with sane defaults.
-func NewConsumerConfig() *ConsumerConfig {
-	return &ConsumerConfig{
-		MinFetchSize: 1,
-		MaxWaitTime:  250 * time.Millisecond,
-	}
-}
-
-// Validate checks a ConsumerConfig instance. It will return a
-// ConfigurationError if the specified value doesn't make sense.
-func (config *ConsumerConfig) Validate() error {
-	if config.MinFetchSize <= 0 {
-		return ConfigurationError("Invalid MinFetchSize")
-	}
-
-	if config.MaxWaitTime < 1*time.Millisecond {
-		return ConfigurationError("Invalid MaxWaitTime, it needs to be at least 1ms")
-	} else if config.MaxWaitTime < 100*time.Millisecond {
-		Logger.Println("ConsumerConfig.MaxWaitTime is very low, which can cause high CPU and network usage. See documentation for details.")
-	} else if config.MaxWaitTime%time.Millisecond != 0 {
-		Logger.Println("ConsumerConfig.MaxWaitTime only supports millisecond precision; nanoseconds will be truncated.")
-	}
-
-	return nil
-}
-
-// PartitionConsumerConfig is used to pass multiple configuration options to AddPartition
-type PartitionConsumerConfig struct {
-	// The default (maximum) amount of data to fetch from the broker in each request. The default is 32768 bytes.
-	DefaultFetchSize int32
-	// The maximum permittable message size - messages larger than this will return ErrMessageTooLarge. The default of 0 is
-	// treated as no limit.
-	MaxMessageSize int32
-	// The method used to determine at which offset to begin consuming messages. The default is to start at the most recent message.
-	OffsetMethod OffsetMethod
-	// Interpreted differently according to the value of OffsetMethod.
-	OffsetValue int64
-	// The number of events to buffer in the Messages and Errors channel. Having this non-zero permits the
-	// consumer to continue fetching messages in the background while client code consumes events,
-	// greatly improving throughput. The default is 64.
-	ChannelBufferSize int
-}
-
-// NewPartitionConsumerConfig creates a PartitionConsumerConfig with sane defaults.
-func NewPartitionConsumerConfig() *PartitionConsumerConfig {
-	return &PartitionConsumerConfig{
-		DefaultFetchSize:  32768,
-		ChannelBufferSize: 64,
-	}
-}
-
-// Validate checks a PartitionConsumerConfig instance. It will return a
-// ConfigurationError if the specified value doesn't make sense.
-func (config *PartitionConsumerConfig) Validate() error {
-	if config.DefaultFetchSize <= 0 {
-		return ConfigurationError("Invalid DefaultFetchSize")
-	}
-
-	if config.MaxMessageSize < 0 {
-		return ConfigurationError("Invalid MaxMessageSize")
-	}
-
-	if config.ChannelBufferSize < 0 {
-		return ConfigurationError("Invalid ChannelBufferSize")
-	}
-
-	return nil
-}
-
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
 type ConsumerMessage struct {
 	Key, Value []byte
@@ -130,34 +35,44 @@ func (ce ConsumerErrors) Error() string {
 	return fmt.Sprintf("kafka: %d errors while consuming", len(ce))
 }
 
-// Consumer manages PartitionConsumers which process Kafka messages from brokers.
+// Consumer manages PartitionConsumers which process Kafka messages from brokers. You MUST call Close()
+// on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
+// scope.
 type Consumer struct {
-	client *Client
-	config ConsumerConfig
+	client    *Client
+	conf      *Config
+	ownClient bool
 
 	lock            sync.Mutex
 	children        map[string]map[int32]*PartitionConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
 }
 
-// NewConsumer creates a new consumer attached to the given client.
-func NewConsumer(client *Client, config *ConsumerConfig) (*Consumer, error) {
+// NewConsumer creates a new consumer using the given broker addresses and configuration.
+func NewConsumer(addrs []string, config *Config) (*Consumer, error) {
+	client, err := NewClient(addrs, config)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := NewConsumerFromClient(client)
+	if err != nil {
+		return nil, err
+	}
+	c.ownClient = true
+	return c, nil
+}
+
+// NewConsumerFromClient creates a new consumer using the given client.
+func NewConsumerFromClient(client *Client) (*Consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
 
-	if config == nil {
-		config = NewConsumerConfig()
-	}
-
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
 	c := &Consumer{
 		client:          client,
-		config:          *config,
+		conf:            client.conf,
 		children:        make(map[string]map[int32]*PartitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
 	}
@@ -165,30 +80,40 @@ func NewConsumer(client *Client, config *ConsumerConfig) (*Consumer, error) {
 	return c, nil
 }
 
-// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given configuration. It will
-// return an error if this Consumer is already consuming on the given topic/partition.
-func (c *Consumer) ConsumePartition(topic string, partition int32, config *PartitionConsumerConfig) (*PartitionConsumer, error) {
-	if config == nil {
-		config = NewPartitionConsumerConfig()
+// Close shuts down the consumer. It must be called after all child PartitionConsumers have already been closed.
+func (c *Consumer) Close() error {
+	if c.ownClient {
+		return c.client.Close()
 	}
+	return nil
+}
 
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
+const (
+	// OffsetNewest causes the consumer to start at the most recent available offset, as
+	// determined by querying the broker.
+	OffsetNewest int64 = -1
+	// OffsetOldest causes the consumer to start at the oldest available offset, as
+	// determined by querying the broker.
+	OffsetOldest int64 = -2
+)
 
+// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
+// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
+// literal offset, or OffsetNewest or OffsetOldest
+func (c *Consumer) ConsumePartition(topic string, partition int32, offset int64) (*PartitionConsumer, error) {
 	child := &PartitionConsumer{
 		consumer:  c,
-		config:    *config,
+		conf:      c.conf,
 		topic:     topic,
 		partition: partition,
-		messages:  make(chan *ConsumerMessage, config.ChannelBufferSize),
-		errors:    make(chan *ConsumerError, config.ChannelBufferSize),
+		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
+		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
 		trigger:   make(chan none, 1),
 		dying:     make(chan none),
-		fetchSize: config.DefaultFetchSize,
+		fetchSize: c.conf.Consumer.Fetch.Default,
 	}
 
-	if err := child.chooseStartingOffset(); err != nil {
+	if err := child.chooseStartingOffset(offset); err != nil {
 		return nil, err
 	}
 
@@ -281,7 +206,7 @@ func (c *Consumer) unrefBrokerConsumer(broker *Broker) {
 // You have to read from both the Messages and Errors channels to prevent the consumer from locking eventually.
 type PartitionConsumer struct {
 	consumer  *Consumer
-	config    PartitionConsumerConfig
+	conf      *Config
 	topic     string
 	partition int32
 
@@ -353,22 +278,20 @@ func (child *PartitionConsumer) dispatch() error {
 	return nil
 }
 
-func (child *PartitionConsumer) chooseStartingOffset() (err error) {
+func (child *PartitionConsumer) chooseStartingOffset(offset int64) (err error) {
 	var where OffsetTime
 
-	switch child.config.OffsetMethod {
-	case OffsetMethodManual:
-		if child.config.OffsetValue < 0 {
-			return ConfigurationError("OffsetValue cannot be < 0 when OffsetMethod is MANUAL")
-		}
-		child.offset = child.config.OffsetValue
-		return nil
-	case OffsetMethodNewest:
+	switch offset {
+	case OffsetNewest:
 		where = LatestOffsets
-	case OffsetMethodOldest:
+	case OffsetOldest:
 		where = EarliestOffset
 	default:
-		return ConfigurationError("Invalid OffsetMethod")
+		if offset < 0 {
+			return ConfigurationError("Invalid offset")
+		}
+		child.offset = offset
+		return nil
 	}
 
 	child.offset, err = child.consumer.client.GetOffset(child.topic, child.partition, where)
@@ -548,15 +471,15 @@ func (w *brokerConsumer) abort(err error) {
 
 func (w *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
-		MinBytes:    w.consumer.config.MinFetchSize,
-		MaxWaitTime: int32(w.consumer.config.MaxWaitTime / time.Millisecond),
+		MinBytes:    w.consumer.conf.Consumer.Fetch.Min,
+		MaxWaitTime: int32(w.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
 	}
 
 	for child := range w.subscriptions {
 		request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
 	}
 
-	return w.broker.Fetch(w.consumer.client.id, request)
+	return w.broker.Fetch(request)
 }
 
 func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchResponseBlock) {
@@ -577,14 +500,14 @@ func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchRe
 		// We got no messages. If we got a trailing one then we need to ask for more data.
 		// Otherwise we just poll again and wait for one to be produced...
 		if block.MsgSet.PartialTrailingMessage {
-			if child.config.MaxMessageSize > 0 && child.fetchSize == child.config.MaxMessageSize {
+			if child.conf.Consumer.Fetch.Max > 0 && child.fetchSize == child.conf.Consumer.Fetch.Max {
 				// we can't ask for more data, we've hit the configured limit
 				child.sendError(ErrMessageTooLarge)
 				child.offset++ // skip this one so we can keep processing future messages
 			} else {
 				child.fetchSize *= 2
-				if child.config.MaxMessageSize > 0 && child.fetchSize > child.config.MaxMessageSize {
-					child.fetchSize = child.config.MaxMessageSize
+				if child.conf.Consumer.Fetch.Max > 0 && child.fetchSize > child.conf.Consumer.Fetch.Max {
+					child.fetchSize = child.conf.Consumer.Fetch.Max
 				}
 			}
 		}
@@ -593,7 +516,7 @@ func (w *brokerConsumer) handleResponse(child *PartitionConsumer, block *FetchRe
 	}
 
 	// we got messages, reset our fetch size in case it was increased for a previous request
-	child.fetchSize = child.config.DefaultFetchSize
+	child.fetchSize = child.conf.Consumer.Fetch.Default
 
 	incomplete := false
 	atLeastOne := false

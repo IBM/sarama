@@ -44,59 +44,54 @@ func checkKafkaAvailability(t *testing.T) {
 }
 
 func TestFuncConnectionFailure(t *testing.T) {
-	config := NewClientConfig()
-	config.MetadataRetries = 1
+	config := NewConfig()
+	config.Metadata.Retry.Max = 1
 
-	_, err := NewClient("test", []string{"localhost:9000"}, config)
+	_, err := NewClient([]string{"localhost:9000"}, config)
 	if err != ErrOutOfBrokers {
 		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
 	}
 }
 
 func TestFuncProducing(t *testing.T) {
-	config := NewProducerConfig()
+	config := NewConfig()
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingGzip(t *testing.T) {
-	config := NewProducerConfig()
-	config.Compression = CompressionGZIP
+	config := NewConfig()
+	config.Producer.Compression = CompressionGZIP
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingSnappy(t *testing.T) {
-	config := NewProducerConfig()
-	config.Compression = CompressionSnappy
+	config := NewConfig()
+	config.Producer.Compression = CompressionSnappy
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingNoResponse(t *testing.T) {
-	config := NewProducerConfig()
-	config.RequiredAcks = NoResponse
+	config := NewConfig()
+	config.Producer.RequiredAcks = NoResponse
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingFlushing(t *testing.T) {
-	config := NewProducerConfig()
-	config.FlushMsgCount = TestBatchSize / 8
-	config.FlushFrequency = 250 * time.Millisecond
+	config := NewConfig()
+	config.Producer.Flush.Messages = TestBatchSize / 8
+	config.Producer.Flush.Frequency = 250 * time.Millisecond
 	testProducingMessages(t, config)
 }
 
 func TestFuncMultiPartitionProduce(t *testing.T) {
 	checkKafkaAvailability(t)
-	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer safeClose(t, client)
 
-	config := NewProducerConfig()
-	config.FlushFrequency = 50 * time.Millisecond
-	config.FlushMsgCount = 200
+	config := NewConfig()
 	config.ChannelBufferSize = 20
-	config.AckSuccesses = true
-	producer, err := NewProducer(client, config)
+	config.Producer.Flush.Frequency = 50 * time.Millisecond
+	config.Producer.Flush.Messages = 200
+	config.Producer.AckSuccesses = true
+	producer, err := NewProducer([]string{kafkaAddr}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,27 +119,25 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	}
 }
 
-func testProducingMessages(t *testing.T, config *ProducerConfig) {
+func testProducingMessages(t *testing.T, config *Config) {
 	checkKafkaAvailability(t)
 
-	client, err := NewClient("functional_test", []string{kafkaAddr}, nil)
+	config.Producer.AckSuccesses = true
+	client, err := NewClient([]string{kafkaAddr}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	master, err := NewConsumer(client, nil)
+	master, err := NewConsumerFromClient(client)
 	if err != nil {
 		t.Fatal(err)
 	}
-	consumerConfig := NewPartitionConsumerConfig()
-	consumerConfig.OffsetMethod = OffsetMethodNewest
-	consumer, err := master.ConsumePartition("single_partition", 0, consumerConfig)
+	consumer, err := master.ConsumePartition("single_partition", 0, OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	config.AckSuccesses = true
-	producer, err := NewProducer(client, config)
+	producer, err := NewProducerFromClient(client)
 	if err != nil {
 		t.Fatal(err)
 	}

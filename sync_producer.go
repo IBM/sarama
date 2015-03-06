@@ -10,26 +10,33 @@ type SyncProducer struct {
 	wg       sync.WaitGroup
 }
 
-// NewSyncProducer creates a new SyncProducer using the given client  and configuration.
-func NewSyncProducer(client *Client, config *ProducerConfig) (*SyncProducer, error) {
-	if config == nil {
-		config = NewProducerConfig()
-	}
-	config.AckSuccesses = true
-
-	prod, err := NewProducer(client, config)
-
+// NewSyncProducer creates a new SyncProducer using the given broker addresses and configuration.
+func NewSyncProducer(addrs []string, config *Config) (*SyncProducer, error) {
+	p, err := NewProducer(addrs, config)
 	if err != nil {
 		return nil, err
 	}
+	return newSyncProducerFromProducer(p), nil
+}
 
-	sp := &SyncProducer{producer: prod}
+// NewSyncProducerFromClient creates a new SyncProducer using the given client.
+func NewSyncProducerFromClient(client *Client) (*SyncProducer, error) {
+	p, err := NewProducerFromClient(client)
+	if err != nil {
+		return nil, err
+	}
+	return newSyncProducerFromProducer(p), nil
+}
+
+func newSyncProducerFromProducer(p *Producer) *SyncProducer {
+	p.conf.Producer.AckSuccesses = true
+	sp := &SyncProducer{producer: p}
 
 	sp.wg.Add(2)
 	go withRecover(sp.handleSuccesses)
 	go withRecover(sp.handleErrors)
 
-	return sp, nil
+	return sp
 }
 
 // SendMessage produces a message to the given topic with the given key and value. To send strings as either key or value, see the StringEncoder type.

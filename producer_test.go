@@ -28,13 +28,6 @@ func closeProducer(t *testing.T, p *Producer) {
 	wg.Wait()
 }
 
-func TestDefaultProducerConfigValidates(t *testing.T) {
-	config := NewProducerConfig()
-	if err := config.Validate(); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestSyncProducer(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 	leader := newMockBroker(t, 2)
@@ -50,12 +43,7 @@ func TestSyncProducer(t *testing.T) {
 		leader.Returns(prodSuccess)
 	}
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	producer, err := NewSyncProducer(client, nil)
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +62,6 @@ func TestSyncProducer(t *testing.T) {
 	}
 
 	safeClose(t, producer)
-	safeClose(t, client)
 	leader.Close()
 	seedBroker.Close()
 }
@@ -92,14 +79,9 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 100
-	producer, err := NewSyncProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 100
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -122,7 +104,6 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	wg.Wait()
 
 	safeClose(t, producer)
-	safeClose(t, client)
 	leader.Close()
 	seedBroker.Close()
 }
@@ -140,15 +121,10 @@ func TestProducer(t *testing.T) {
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 10
-	config.AckSuccesses = true
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.AckSuccesses = true
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +150,6 @@ func TestProducer(t *testing.T) {
 	}
 
 	closeProducer(t, producer)
-	safeClose(t, client)
 	leader.Close()
 	seedBroker.Close()
 }
@@ -194,15 +169,10 @@ func TestProducerMultipleFlushes(t *testing.T) {
 	leader.Returns(prodSuccess)
 	leader.Returns(prodSuccess)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 5
-	config.AckSuccesses = true
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 5
+	config.Producer.AckSuccesses = true
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +197,6 @@ func TestProducerMultipleFlushes(t *testing.T) {
 	}
 
 	closeProducer(t, producer)
-	safeClose(t, client)
 	leader.Close()
 	seedBroker.Close()
 }
@@ -252,16 +221,11 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	prodResponse1.AddTopicPartition("my_topic", 1, ErrNoError)
 	leader1.Returns(prodResponse1)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 5
-	config.AckSuccesses = true
-	config.Partitioner = NewRoundRobinPartitioner
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 5
+	config.Producer.AckSuccesses = true
+	config.Producer.Partitioner = NewRoundRobinPartitioner
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +248,6 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	}
 
 	closeProducer(t, producer)
-	safeClose(t, client)
 	leader1.Close()
 	leader0.Close()
 	seedBroker.Close()
@@ -300,16 +263,11 @@ func TestProducerFailureRetry(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 10
-	config.AckSuccesses = true
-	config.RetryBackoff = 0
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.AckSuccesses = true
+	config.Producer.Retry.Backoff = 0
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -365,7 +323,6 @@ func TestProducerFailureRetry(t *testing.T) {
 
 	leader2.Close()
 	closeProducer(t, producer)
-	safeClose(t, client)
 }
 
 func TestProducerBrokerBounce(t *testing.T) {
@@ -378,16 +335,11 @@ func TestProducerBrokerBounce(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 10
-	config.AckSuccesses = true
-	config.RetryBackoff = 0
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.AckSuccesses = true
+	config.Producer.Retry.Backoff = 0
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -419,7 +371,6 @@ func TestProducerBrokerBounce(t *testing.T) {
 	leader.Close()
 
 	closeProducer(t, producer)
-	safeClose(t, client)
 }
 
 func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
@@ -432,17 +383,12 @@ func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 10
-	config.AckSuccesses = true
-	config.MaxRetries = 3
-	config.RetryBackoff = 0
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.AckSuccesses = true
+	config.Producer.Retry.Max = 3
+	config.Producer.Retry.Backoff = 0
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,7 +426,6 @@ func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 	leader2.Close()
 
 	closeProducer(t, producer)
-	safeClose(t, client)
 }
 
 func TestProducerMultipleRetries(t *testing.T) {
@@ -493,17 +438,12 @@ func TestProducerMultipleRetries(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	config := NewProducerConfig()
-	config.FlushMsgCount = 10
-	config.AckSuccesses = true
-	config.MaxRetries = 4
-	config.RetryBackoff = 0
-	producer, err := NewProducer(client, config)
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.AckSuccesses = true
+	config.Producer.Retry.Max = 4
+	config.Producer.Retry.Backoff = 0
+	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -565,23 +505,10 @@ func TestProducerMultipleRetries(t *testing.T) {
 	leader1.Close()
 	leader2.Close()
 	closeProducer(t, producer)
-	safeClose(t, client)
 }
 
 func ExampleProducer() {
-	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
-	if err != nil {
-		panic(err)
-	} else {
-		fmt.Println("> connected")
-	}
-	defer func() {
-		if err := client.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	producer, err := NewProducer(client, nil)
+	producer, err := NewProducer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -602,19 +529,7 @@ func ExampleProducer() {
 }
 
 func ExampleSyncProducer() {
-	client, err := NewClient("client_id", []string{"localhost:9092"}, NewClientConfig())
-	if err != nil {
-		panic(err)
-	} else {
-		fmt.Println("> connected")
-	}
-	defer func() {
-		if err := client.Close(); err != nil {
-			panic(err)
-		}
-	}()
-
-	producer, err := NewSyncProducer(client, nil)
+	producer, err := NewSyncProducer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
 	}

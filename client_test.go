@@ -12,19 +12,12 @@ func safeClose(t *testing.T, c io.Closer) {
 	}
 }
 
-func TestDefaultClientConfigValidates(t *testing.T) {
-	config := NewClientConfig()
-	if err := config.Validate(); err != nil {
-		t.Error(err)
-	}
-}
-
 func TestSimpleClient(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 
 	seedBroker.Returns(new(MetadataResponse))
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,9 +39,9 @@ func TestCachedPartitions(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewClientConfig()
-	config.MetadataRetries = 0
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, config)
+	config := NewConfig()
+	config.Metadata.Retry.Max = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +74,7 @@ func TestClientSeedBrokers(t *testing.T) {
 	metadataResponse.AddBroker(discoveredBroker.Addr(), discoveredBroker.BrokerID())
 	seedBroker.Returns(metadataResponse)
 
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,9 +97,9 @@ func TestClientMetadata(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewClientConfig()
-	config.MetadataRetries = 0
-	client, err := NewClient("client_id", []string{seedBroker.Addr()}, config)
+	config := NewConfig()
+	config.Metadata.Retry.Max = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +169,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
-	client, err := NewClient("clientID", []string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
