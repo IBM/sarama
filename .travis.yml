@@ -6,7 +6,11 @@ go:
 - tip
 
 env:
-- KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
+  global:
+  - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
+  matrix:
+  - KAFKA_VERSION=0.8.2.0
+  - KAFKA_VERSION=0.8.1.1
 
 before_install:
 - export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}

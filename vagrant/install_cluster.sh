@@ -2,8 +2,6 @@
 
 set -ex
 
-KAFKA_VERSION=0.8.2.0
-
 mkdir -p ${KAFKA_INSTALL_ROOT}
 if [ ! -f ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_VERSION}.tgz ]; then
     wget --quiet http://apache.mirror.gtcomm.net/kafka/${KAFKA_VERSION}/kafka_2.10-${KAFKA_VERSION}.tgz -O ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_VERSION}.tgz
