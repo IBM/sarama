@@ -10,7 +10,9 @@ Documentation is available via godoc at http://godoc.org/github.com/Shopify/sara
 
 There is a google group for Kafka client users and authors at https://groups.google.com/forum/#!forum/kafka-clients
 
-Sarama is compatible with Go 1.3, and 1.4.
+Sarama provides a "2 releases + 2 months" compatibility guarantee: we support the two latest releases of Kafka
+and Go, and we provide a two month grace period for older releases. This means we currently officially
+support Go 1.3 and 1.4, and Kafka 0.8.1 and 0.8.2.
 
 A word of warning: the API is not 100% stable. It won't change much (in particular the low-level
 Broker and Request/Response objects could *probably* be considered frozen) but there may be the occasional
