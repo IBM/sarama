@@ -243,7 +243,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	seedBroker.Close()
 }
 
-func ExampleConsumer_usingSelect() {
+func ExampleConsumer_select() {
 	master, err := NewConsumer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
@@ -285,7 +285,7 @@ consumerLoop:
 	fmt.Println("Got", msgCount, "messages.")
 }
 
-func ExampleConsumer_usingGoroutines() {
+func ExampleConsumer_goroutines() {
 	master, err := NewConsumer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
@@ -298,7 +298,7 @@ func ExampleConsumer_usingGoroutines() {
 		}
 	}()
 
-	consumer, err := master.ConsumePartition("my_topic", 0, 0)
+	consumer, err := master.ConsumePartition("my_topic", 0, OffsetOldest)
 	if err != nil {
 		panic(err)
 	} else {
