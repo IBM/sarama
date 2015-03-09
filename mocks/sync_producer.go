@@ -51,9 +51,13 @@ func (sp *SyncProducer) Close() error {
 }
 
 func (sp *SyncProducer) ExpectSendMessageAndSucceed() {
+	sp.l.Lock()
+	defer sp.l.Unlock()
 	sp.expectations = append(sp.expectations, &producerExpectation{Result: errProduceSuccess})
 }
 
 func (sp *SyncProducer) ExpectSendMessageAndFail(err error) {
+	sp.l.Lock()
+	defer sp.l.Unlock()
 	sp.expectations = append(sp.expectations, &producerExpectation{Result: err})
 }
