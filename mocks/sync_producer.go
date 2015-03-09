@@ -9,12 +9,9 @@ import (
 // Before you can use it, you have to set expectations on the mock SyncProducer
 // to tell it how to handle calls to SendMessage, so you can easily test success
 // and failure scenarios.
-//
-// NOTE: the SyncProducer type currently does not fall under the API stability
-// guarantee of Sarama as it is stiull considered experimental.
 type SyncProducer struct {
 	l            sync.Mutex
-	t            ExpectationViolationReporter
+	t            ErrorReporter
 	expectations []*producerExpectation
 	lastOffset   int64
 }
@@ -23,7 +20,7 @@ type SyncProducer struct {
 // be the *testing.T instance of your test method. An error will be written to it if
 // an expectation is violated. The config argument is currently unused, but is
 // maintained to be compatible with the async Producer.
-func NewSyncProducer(t ExpectationViolationReporter, config *sarama.Config) *SyncProducer {
+func NewSyncProducer(t ErrorReporter, config *sarama.Config) *SyncProducer {
 	return &SyncProducer{
 		t:            t,
 		expectations: make([]*producerExpectation, 0),
