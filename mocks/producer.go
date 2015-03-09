@@ -1,26 +1,10 @@
 package mocks
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/Shopify/sarama"
 )
-
-// A simple interafce that includes the testing.T methods we use to report
-// expectation violations when using the mock objects.
-type TestReporter interface {
-	Errorf(string, ...interface{})
-}
-
-var (
-	errProduceSuccess    error = nil
-	errOutOfExpectations       = errors.New("No more expectations set on mock producer")
-)
-
-type producerExpectation struct {
-	Result error
-}
 
 // Producer implements sarama's Producer interface for testing purposes.
 // Before you can send messages to it's Input channel, you have to set expectations
@@ -39,7 +23,7 @@ type Producer struct {
 // be the *testing.T instance of your test method. An error will be written to it if
 // an expectation is violated. The config argument is used to determine whether it
 // should ack successes on the Successes channel.
-func NewProducer(t TestReporter, config *sarama.Config) *Producer {
+func NewProducer(t ExpectationViolationReporter, config *sarama.Config) *Producer {
 	if config == nil {
 		config = sarama.NewConfig()
 	}

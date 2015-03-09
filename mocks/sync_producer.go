@@ -11,7 +11,7 @@ import (
 // and failure scenarios.
 type SyncProducer struct {
 	l            sync.Mutex
-	t            TestReporter
+	t            ExpectationViolationReporter
 	expectations []*producerExpectation
 	lastOffset   int64
 }
@@ -20,7 +20,7 @@ type SyncProducer struct {
 // be the *testing.T instance of your test method. An error will be written to it if
 // an expectation is violated. The config argument is currently unused, but is
 // maintained to be compatible with the async Producer.
-func NewSyncProducer(t TestReporter, config *sarama.Config) *SyncProducer {
+func NewSyncProducer(t ExpectationViolationReporter, config *sarama.Config) *SyncProducer {
 	return &SyncProducer{
 		t:            t,
 		expectations: make([]*producerExpectation, 0),
