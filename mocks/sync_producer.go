@@ -9,6 +9,9 @@ import (
 // Before you can use it, you have to set expectations on the mock SyncProducer
 // to tell it how to handle calls to SendMessage, so you can easily test success
 // and failure scenarios.
+//
+// NOTE: the SyncProducer type currently does not fall under the API stability
+// guarantee of Sarama as it is stiull considered experimental.
 type SyncProducer struct {
 	l            sync.Mutex
 	t            ExpectationViolationReporter

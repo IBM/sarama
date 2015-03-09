@@ -10,6 +10,9 @@ import (
 // Before you can send messages to it's Input channel, you have to set expectations
 // so it knows how to handle the input. This way you can easily test success and
 // failure scenarios.
+//
+// NOTE: the SyncProducer type currently does not fall under the API stability
+// guarantee of Sarama as it is stiull considered experimental.
 type Producer struct {
 	l            sync.Mutex
 	expectations []*producerExpectation
