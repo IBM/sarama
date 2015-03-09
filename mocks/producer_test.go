@@ -1,4 +1,4 @@
-package kafkamocks
+package mocks
 
 import (
 	"fmt"
@@ -19,24 +19,17 @@ func (trm *testReporterMock) Errorf(format string, args ...interface{}) {
 	trm.errors = append(trm.errors, fmt.Sprintf(format, args...))
 }
 
-func TestMockProducerImplementsKafkaProducer(t *testing.T) {
-	var mp interface{} = &MockProducer{}
-	if _, ok := mp.(KafkaProducer); !ok {
-		t.Error("MockProducer should implement the KafkaProducer interface.")
+func TestMockProducerImplementsProducerInterface(t *testing.T) {
+	var mp interface{} = &Producer{}
+	if _, ok := mp.(sarama.Producer); !ok {
+		t.Error("The mock producer should implement the sarama.Producer interface.")
 	}
 }
 
-func TestSaramaProducerImplementsKafkaProducer(t *testing.T) {
-	var sp interface{} = &sarama.Producer{}
-	if _, ok := sp.(KafkaProducer); !ok {
-		t.Error("sarama.Producer should implement the KafkaProducer interface.")
-	}
-}
-
-func TestReturnExpectationsToChannels(t *testing.T) {
+func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 	config := sarama.NewConfig()
 	config.Producer.AckSuccesses = true
-	mp := NewMockProducer(t, config)
+	mp := NewProducer(t, config)
 
 	mp.ExpectInputAndSucceed()
 	mp.ExpectInputAndSucceed()
@@ -65,9 +58,9 @@ func TestReturnExpectationsToChannels(t *testing.T) {
 	mp.Close()
 }
 
-func TestTooFewExpectations(t *testing.T) {
+func TestProducerWithTooFewExpectations(t *testing.T) {
 	trm := newTestReporterMock()
-	mp := NewMockProducer(trm, nil)
+	mp := NewProducer(trm, nil)
 	mp.ExpectInputAndSucceed()
 
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
@@ -80,9 +73,9 @@ func TestTooFewExpectations(t *testing.T) {
 	}
 }
 
-func TestTooManyExpectations(t *testing.T) {
+func TestProducerWithTooManyExpectations(t *testing.T) {
 	trm := newTestReporterMock()
-	mp := NewMockProducer(trm, nil)
+	mp := NewProducer(trm, nil)
 	mp.ExpectInputAndSucceed()
 	mp.ExpectInputAndFail(sarama.ErrOutOfBrokers)
 

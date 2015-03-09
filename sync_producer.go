@@ -6,7 +6,7 @@ import "sync"
 // and parses responses for errors. You must call Close() on a producer to avoid leaks, it may not be garbage-collected automatically when
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
 type SyncProducer struct {
-	producer *Producer
+	producer *producer
 	wg       sync.WaitGroup
 }
 
@@ -16,7 +16,7 @@ func NewSyncProducer(addrs []string, config *Config) (*SyncProducer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newSyncProducerFromProducer(p), nil
+	return newSyncProducerFromProducer(p.(*producer)), nil
 }
 
 // NewSyncProducerFromClient creates a new SyncProducer using the given client.
@@ -25,10 +25,10 @@ func NewSyncProducerFromClient(client *Client) (*SyncProducer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newSyncProducerFromProducer(p), nil
+	return newSyncProducerFromProducer(p.(*producer)), nil
 }
 
-func newSyncProducerFromProducer(p *Producer) *SyncProducer {
+func newSyncProducerFromProducer(p *producer) *SyncProducer {
 	p.conf.Producer.AckSuccesses = true
 	sp := &SyncProducer{producer: p}
 

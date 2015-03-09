@@ -1,4 +1,4 @@
-package kafkamocks
+package mocks
 
 import (
 	"errors"
@@ -10,38 +10,30 @@ type TestReporter interface {
 	Errorf(string, ...interface{})
 }
 
-type KafkaProducer interface {
-	AsyncClose()
-	Close() error
-	Input() chan<- *sarama.ProducerMessage
-	Successes() <-chan *sarama.ProducerMessage
-	Errors() <-chan *sarama.ProducerError
-}
-
 var (
 	errProduceSuccess    error = nil
-	errOutOfExpectations       = errors.New("No more expectations set on MockProducer")
+	errOutOfExpectations       = errors.New("No more expectations set on mock producer")
 )
 
-type MockProducerExpectation struct {
+type producerExpectation struct {
 	Result error
 }
 
-type MockProducer struct {
-	expectations []*MockProducerExpectation
+type Producer struct {
+	expectations []*producerExpectation
 	closed       chan struct{}
 	input        chan *sarama.ProducerMessage
 	successes    chan *sarama.ProducerMessage
 	errors       chan *sarama.ProducerError
 }
 
-func NewMockProducer(t TestReporter, config *sarama.Config) *MockProducer {
+func NewProducer(t TestReporter, config *sarama.Config) *Producer {
 	if config == nil {
 		config = sarama.NewConfig()
 	}
-	mp := &MockProducer{
+	mp := &Producer{
 		closed:       make(chan struct{}, 0),
-		expectations: make([]*MockProducerExpectation, 0),
+		expectations: make([]*producerExpectation, 0),
 		input:        make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
 		successes:    make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
 		errors:       make(chan *sarama.ProducerError, config.ChannelBufferSize),
@@ -80,34 +72,34 @@ func NewMockProducer(t TestReporter, config *sarama.Config) *MockProducer {
 
 // Implement KafkaProducer interface
 
-func (mp *MockProducer) AsyncClose() {
+func (mp *Producer) AsyncClose() {
 	close(mp.input)
 }
 
-func (mp *MockProducer) Close() error {
+func (mp *Producer) Close() error {
 	mp.AsyncClose()
 	<-mp.closed
 	return nil
 }
 
-func (mp *MockProducer) Input() chan<- *sarama.ProducerMessage {
+func (mp *Producer) Input() chan<- *sarama.ProducerMessage {
 	return mp.input
 }
 
-func (mp *MockProducer) Successes() <-chan *sarama.ProducerMessage {
+func (mp *Producer) Successes() <-chan *sarama.ProducerMessage {
 	return mp.successes
 }
 
-func (mp *MockProducer) Errors() <-chan *sarama.ProducerError {
+func (mp *Producer) Errors() <-chan *sarama.ProducerError {
 	return mp.errors
 }
 
 // Setting expectations
 
-func (mp *MockProducer) ExpectInputAndSucceed() {
-	mp.expectations = append(mp.expectations, &MockProducerExpectation{Result: errProduceSuccess})
+func (mp *Producer) ExpectInputAndSucceed() {
+	mp.expectations = append(mp.expectations, &producerExpectation{Result: errProduceSuccess})
 }
 
-func (mp *MockProducer) ExpectInputAndFail(err error) {
-	mp.expectations = append(mp.expectations, &MockProducerExpectation{Result: err})
+func (mp *Producer) ExpectInputAndFail(err error) {
+	mp.expectations = append(mp.expectations, &producerExpectation{Result: err})
 }

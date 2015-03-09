@@ -8,7 +8,7 @@ import (
 
 const TestMessage = "ABC THE MESSAGE"
 
-func closeProducer(t *testing.T, p *Producer) {
+func closeProducer(t *testing.T, p Producer) {
 	var wg sync.WaitGroup
 	p.AsyncClose()
 
