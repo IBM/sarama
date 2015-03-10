@@ -8,7 +8,7 @@ env:
   global:
   - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
   matrix:
-  - KAFKA_VERSION=0.8.2.0
+  - KAFKA_VERSION=0.8.2.1
   - KAFKA_VERSION=0.8.1.1
 
 before_install:
