@@ -5,16 +5,16 @@ import (
 	"testing"
 )
 
-func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, key Encoder, numPartitions int32) {
-	choice, err := partitioner.Partition(key, numPartitions)
+func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, message *ProducerMessage, numPartitions int32) {
+	choice, err := partitioner.Partition(message, numPartitions)
 	if err != nil {
 		t.Error(partitioner, err)
 	}
 	if choice < 0 || choice >= numPartitions {
-		t.Error(partitioner, "returned partition", choice, "outside of range for", key)
+		t.Error(partitioner, "returned partition", choice, "outside of range for", message)
 	}
 	for i := 1; i < 50; i++ {
-		newChoice, err := partitioner.Partition(key, numPartitions)
+		newChoice, err := partitioner.Partition(message, numPartitions)
 		if err != nil {
 			t.Error(partitioner, err)
 		}
@@ -72,7 +72,7 @@ func TestRoundRobinPartitioner(t *testing.T) {
 func TestHashPartitioner(t *testing.T) {
 	partitioner := NewHashPartitioner()
 
-	choice, err := partitioner.Partition(nil, 1)
+	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
 	if err != nil {
 		t.Error(partitioner, err)
 	}
@@ -81,7 +81,7 @@ func TestHashPartitioner(t *testing.T) {
 	}
 
 	for i := 1; i < 50; i++ {
-		choice, err := partitioner.Partition(nil, 50)
+		choice, err := partitioner.Partition(&ProducerMessage{}, 50)
 		if err != nil {
 			t.Error(partitioner, err)
 		}
@@ -95,6 +95,6 @@ func TestHashPartitioner(t *testing.T) {
 		if _, err := rand.Read(buf); err != nil {
 			t.Error(err)
 		}
-		assertPartitioningConsistent(t, partitioner, ByteEncoder(buf), 50)
+		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: ByteEncoder(buf)}, 50)
 	}
 }

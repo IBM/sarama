@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
-// Partitioner is anything that, given a Kafka message key and a number of partitions indexed [0...numPartitions-1],
+// Partitioner is anything that, given a Kafka message and a number of partitions indexed [0...numPartitions-1],
 // decides to which partition to send the message. RandomPartitioner, RoundRobinPartitioner and HashPartitioner are provided
 // as simple default implementations.
 type Partitioner interface {
-	Partition(key Encoder, numPartitions int32) (int32, error) // Partition takes the key and partition count and chooses a partition
+	Partition(message *ProducerMessage, numPartitions int32) (int32, error) // Partition takes a message and partition count and chooses a partition
 
 	// RequiresConsistency indicates to the user of the partitioner whether the mapping of key->partition is consistent or not.
 	// Specifically, if a partitioner requires consistency then it must be allowed to choose from all partitions (even ones known to
@@ -33,7 +33,7 @@ func NewRandomPartitioner() Partitioner {
 	return p
 }
 
-func (p *randomPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+func (p *randomPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
 	return int32(p.generator.Intn(int(numPartitions))), nil
 }
 
@@ -50,7 +50,7 @@ func NewRoundRobinPartitioner() Partitioner {
 	return &roundRobinPartitioner{}
 }
 
-func (p *roundRobinPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
+func (p *roundRobinPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
 	if p.partition >= numPartitions {
 		p.partition = 0
 	}
@@ -68,9 +68,10 @@ type hashPartitioner struct {
 	hasher hash.Hash32
 }
 
-// NewHashPartitioner returns a Partitioner which behaves as follows. If the key is nil, or fails to encode, then a random partition
-// is chosen. Otherwise the FNV-1a hash of the encoded bytes is used modulus the number of partitions. This ensures that messages
-// with the same key always end up on the same partition.
+// NewHashPartitioner returns a Partitioner which behaves as follows. If the message's key is nil, or fails to
+// encode, then a random partition is chosen. Otherwise the FNV-1a hash of the encoded bytes of the message key
+// is used, modulus the number of partitions. This ensures that messages with the same key always end up on the
+// same partition.
 func NewHashPartitioner() Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner()
@@ -78,11 +79,11 @@ func NewHashPartitioner() Partitioner {
 	return p
 }
 
-func (p *hashPartitioner) Partition(key Encoder, numPartitions int32) (int32, error) {
-	if key == nil {
-		return p.random.Partition(key, numPartitions)
+func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
+	if message.Key == nil {
+		return p.random.Partition(message, numPartitions)
 	}
-	bytes, err := key.Encode()
+	bytes, err := message.Key.Encode()
 	if err != nil {
 		return -1, err
 	}

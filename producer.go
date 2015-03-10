@@ -653,7 +653,7 @@ func (p *producer) assignPartition(partitioner Partitioner, msg *ProducerMessage
 		return ErrLeaderNotAvailable
 	}
 
-	choice, err := partitioner.Partition(msg.Key, numPartitions)
+	choice, err := partitioner.Partition(msg, numPartitions)
 
 	if err != nil {
 		return err
