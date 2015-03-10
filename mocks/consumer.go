@@ -128,6 +128,7 @@ type PartitionConsumer struct {
 	expectations            chan *consumerExpectation
 	messages                chan *sarama.ConsumerMessage
 	errors                  chan *sarama.ConsumerError
+	singleClose             sync.Once
 	consumed                bool
 	errorsShouldBeDrained   bool
 	messagesShouldBeDrained bool
@@ -166,7 +167,9 @@ func (pc *PartitionConsumer) handleExpectations() {
 
 // AsyncClose implements the AsyncClose method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) AsyncClose() {
-	close(pc.expectations)
+	pc.singleClose.Do(func() {
+		close(pc.expectations)
+	})
 }
 
 // Close implements the Close method from the sarama.PartitionConsumer interface. It will
@@ -233,25 +236,33 @@ func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 ///////////////////////////////////////////////////
 
 // YieldMessage will yield a messages Messages channel of this partition consumer
-// when it is consumed. The mock consumer will not verify whether this message
-// was consumed from the Messages channel, because there are legitimate reasons for
-// this not to happen.
+// when it is consumed. By default, the mock consumer will not verify whether this
+// message was consumed from the Messages channel, because there are legitimate
+// reasons forthis not to happen. ou can call ExpectMessagesDrainedOnClose so it will
+// verify that the channel is empty on close.
 func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) {
 	pc.expectations <- &consumerExpectation{Msg: msg}
 }
 
 // YieldError will yield an error on the Errors channel of this partition consumer
-// when it is consumed. The mock consumer will not verify whether this error was
+// when it is consumed. By default, the mock consumer will not verify whether this error was
 // consumed from the Errors channel, because there are legitimate reasons for this
-// not to happen.
+// not to happen. You can call ExpectErrorsDrainedOnClose so it will verify that
+// the channel is empty on close.
 func (pc *PartitionConsumer) YieldError(err error) {
 	pc.expectations <- &consumerExpectation{Err: err}
 }
 
-func (pc *PartitionConsumer) ExpectErrorsDrainedOnClose() {
-	pc.errorsShouldBeDrained = true
-}
-
+// ExpectMessagesDrainedOnClose sets an expectation on the partition consumer
+// that the messages channel will be fully drained when Close is called. If this
+// expectation is not met, an error is reported to the error reporter.
 func (pc *PartitionConsumer) ExpectMessagesDrainedOnClose() {
 	pc.messagesShouldBeDrained = true
+}
+
+// ExpectErrorsDrainedOnClose sets an expectation on the partition consumer
+// that the errors channel will be fully drained when Close is called. If this
+// expectation is not met, an error is reported to the error reporter.
+func (pc *PartitionConsumer) ExpectErrorsDrainedOnClose() {
+	pc.errorsShouldBeDrained = true
 }

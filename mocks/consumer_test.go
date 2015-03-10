@@ -119,3 +119,74 @@ func TestConsumerWithExpectationsOnUnconsumedPartition(t *testing.T) {
 		t.Errorf("Expected an expectation failure to be set on the error reporter.")
 	}
 }
+
+func TestConsumerWithWrongOffsetExpectation(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, nil)
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+
+	_, err := consumer.ConsumePartition("test", 0, sarama.OffsetNewest)
+	if err != nil {
+		t.Error("Did not expect error, found:", err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Errorf("Expected an expectation failure to be set on the error reporter.")
+	}
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestConsumerViolatesMessagesDrainedExpectation(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, nil)
+	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.ExpectMessagesDrainedOnClose()
+
+	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// consume first message, not second one
+	<-pc.Messages()
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Errorf("Expected an expectation failure to be set on the error reporter.")
+	}
+}
+
+func TestConsumerMeetsErrorsDrainedExpectation(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, nil)
+
+	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+	pcmock.YieldError(sarama.ErrInvalidMessage)
+	pcmock.YieldError(sarama.ErrInvalidMessage)
+	pcmock.ExpectErrorsDrainedOnClose()
+
+	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// consume first and second error,
+	<-pc.Errors()
+	<-pc.Errors()
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected ano expectation failures to be set on the error reporter.")
+	}
+}
