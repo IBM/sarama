@@ -15,6 +15,8 @@ package mocks
 
 import (
 	"errors"
+
+	"github.com/Shopify/sarama"
 )
 
 // A simple interface that includes the testing.T methods we use to report
@@ -25,9 +27,14 @@ type ErrorReporter interface {
 
 var (
 	errProduceSuccess    error = nil
-	errOutOfExpectations       = errors.New("No more expectations set on mock producer")
+	errOutOfExpectations       = errors.New("No more expectations set on mock")
 )
 
 type producerExpectation struct {
 	Result error
+}
+
+type consumerExpectation struct {
+	Err error
+	Msg *sarama.ConsumerMessage
 }
