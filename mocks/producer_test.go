@@ -55,7 +55,9 @@ func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 		t.Error("Expected message 3 to be returned as error")
 	}
 
-	mp.Close()
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestProducerWithTooFewExpectations(t *testing.T) {
@@ -66,7 +68,9 @@ func TestProducerWithTooFewExpectations(t *testing.T) {
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
 
-	mp.Close()
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
 
 	if len(trm.errors) != 1 {
 		t.Error("Expected to report an error")
@@ -80,7 +84,9 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 	mp.ExpectInputAndFail(sarama.ErrOutOfBrokers)
 
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
-	mp.Close()
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
 
 	if len(trm.errors) != 1 {
 		t.Error("Expected to report an error")

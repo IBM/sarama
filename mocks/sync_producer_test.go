@@ -15,7 +15,11 @@ func TestMockSyncProducerImplementsSyncProducerInterface(t *testing.T) {
 
 func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 	sp := NewSyncProducer(t, nil)
-	defer sp.Close()
+	defer func() {
+		if err := sp.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
 
 	sp.ExpectSendMessageAndSucceed()
 	sp.ExpectSendMessageAndSucceed()
@@ -47,7 +51,9 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 		t.Errorf("The third message should not have been produced successfully")
 	}
 
-	sp.Close()
+	if err := sp.Close(); err != nil {
+		t.Error(err)
+	}
 }
 
 func TestSyncProducerWithTooManyExpectations(t *testing.T) {
@@ -57,9 +63,13 @@ func TestSyncProducerWithTooManyExpectations(t *testing.T) {
 	sp.ExpectSendMessageAndSucceed()
 	sp.ExpectSendMessageAndFail(sarama.ErrOutOfBrokers)
 
-	sp.SendMessage("test", nil, sarama.StringEncoder("test"))
+	if _, _, err := sp.SendMessage("test", nil, sarama.StringEncoder("test")); err != nil {
+		t.Error("No error expected on first SendMessage call", err)
+	}
 
-	sp.Close()
+	if err := sp.Close(); err != nil {
+		t.Error(err)
+	}
 
 	if len(trm.errors) != 1 {
 		t.Error("Expected to report an error")
@@ -72,10 +82,16 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 	sp := NewSyncProducer(trm, nil)
 	sp.ExpectSendMessageAndSucceed()
 
-	sp.SendMessage("test", nil, sarama.StringEncoder("test"))
-	sp.SendMessage("test", nil, sarama.StringEncoder("test"))
+	if _, _, err := sp.SendMessage("test", nil, sarama.StringEncoder("test")); err != nil {
+		t.Error("No error expected on first SendMessage call", err)
+	}
+	if _, _, err := sp.SendMessage("test", nil, sarama.StringEncoder("test")); err != errOutOfExpectations {
+		t.Error("errOutOfExpectations expected on second SendMessage call, found:", err)
+	}
 
-	sp.Close()
+	if err := sp.Close(); err != nil {
+		t.Error(err)
+	}
 
 	if len(trm.errors) != 1 {
 		t.Error("Expected to report an error")
