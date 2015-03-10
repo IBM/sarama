@@ -545,7 +545,9 @@ ProducerLoop:
 }
 
 // This example shows how to use the producer with separate goroutines
-// reading from the Successes and Errors channels.
+// reading from the Successes and Errors channels. Note that in order
+// for the Successes channel to be populated, you have to set
+// config.Producer.AckSuccesses to true.
 func ExampleProducer_goroutines() {
 	config := NewConfig()
 	config.Producer.AckSuccesses = true
@@ -598,23 +600,22 @@ ProducerLoop:
 	log.Printf("Successfully produced: %d; errors: %d\n", successes, errors)
 }
 
+// This example shows the basic usage pattern of the SyncProducer.
 func ExampleSyncProducer() {
 	producer, err := NewSyncProducer([]string{"localhost:9092"}, nil)
 	if err != nil {
-		panic(err)
+		log.Fatalln(err)
 	}
 	defer func() {
 		if err := producer.Close(); err != nil {
-			panic(err)
+			log.Fatalln(err)
 		}
 	}()
 
-	for {
-		partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))
-		if err != nil {
-			panic(err)
-		} else {
-			log.Printf("> message sent to partition %d at offset %d\n", partition, offset)
-		}
+	partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))
+	if err != nil {
+		log.Printf("FAILED to send message: %s\n", err)
+	} else {
+		log.Printf("> message sent to partition %d at offset %d\n", partition, offset)
 	}
 }
