@@ -26,8 +26,9 @@ type ErrorReporter interface {
 }
 
 var (
-	errProduceSuccess    error = nil
-	errOutOfExpectations       = errors.New("No more expectations set on mock")
+	errProduceSuccess              error = nil
+	errOutOfExpectations                 = errors.New("No more expectations set on mock")
+	errPartitionConsumerNotStarted       = errors.New("The partition consumer was never started")
 )
 
 type producerExpectation struct {
