@@ -82,8 +82,8 @@ func TestConsumerLatestOffset(t *testing.T) {
 	safeClose(t, consumer)
 
 	// we deliver one message, so it should be one higher than we return in the OffsetResponse
-	if consumer.offset != 0x010102 {
-		t.Error("Latest offset not fetched correctly:", consumer.offset)
+	if consumer.(*partitionConsumer).offset != 0x010102 {
+		t.Error("Latest offset not fetched correctly:", consumer.(*partitionConsumer).offset)
 	}
 }
 
@@ -155,14 +155,14 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 			t.Error(err)
 		}
 
-		go func(c *PartitionConsumer) {
+		go func(c PartitionConsumer) {
 			for err := range c.Errors() {
 				t.Error(err)
 			}
 		}(consumer)
 
 		wg.Add(1)
-		go func(partition int32, c *PartitionConsumer) {
+		go func(partition int32, c PartitionConsumer) {
 			for i := 0; i < 10; i++ {
 				message := <-consumer.Messages()
 				if message.Offset != int64(i) {
