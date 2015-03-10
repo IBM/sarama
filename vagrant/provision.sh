@@ -7,7 +7,7 @@ yes | apt-get install default-jre
 
 export KAFKA_INSTALL_ROOT=/opt
 export KAFKA_HOSTNAME=192.168.100.67
-export KAFKA_VERSION=0.8.2.0
+export KAFKA_VERSION=0.8.2.1
 export REPOSITORY_ROOT=/vagrant
 
 sh /vagrant/vagrant/install_cluster.sh
