@@ -8,7 +8,7 @@ import (
 
 // Consumer implements sarama's Consumer interface for testing purposes.
 // Before you can start consuming from this consumer, you have to register
-// topic/partitions using OnPartition, and set expectations on them.
+// topic/partitions using ExpectConsumePartition, and set expectations on them.
 type Consumer struct {
 	l                  sync.Mutex
 	t                  ErrorReporter
@@ -37,8 +37,8 @@ func NewConsumer(t ErrorReporter, config *sarama.Config) *Consumer {
 ///////////////////////////////////////////////////
 
 // ConsumePartition implements the ConsumePartition method from the sarama.Consumer interface.
-// Before you can start consuming a partition, you have to set expectations on it using OnPartition.
-// You can only consume a partition once per consumer.
+// Before you can start consuming a partition, you have to set expectations on it using
+// ExpectConsumePartition. You can only consume a partition once per consumer.
 func (c *Consumer) ConsumePartition(topic string, partition int32, offset int64) (sarama.PartitionConsumer, error) {
 	c.l.Lock()
 	defer c.l.Unlock()
@@ -51,6 +51,10 @@ func (c *Consumer) ConsumePartition(topic string, partition int32, offset int64)
 	pc := c.partitionConsumers[topic][partition]
 	if pc.consumed {
 		return nil, sarama.ConfigurationError("The topic/partition is already being consumed")
+	}
+
+	if pc.offset != AnyOffset && pc.offset != offset {
+		c.t.Errorf("Unexpected offset when calling ConsumePartition for %s/%d. Expected %d, got %d.", topic, partition, pc.offset, offset)
 	}
 
 	pc.consumed = true
@@ -77,12 +81,13 @@ func (c *Consumer) Close() error {
 // Expectation API
 ///////////////////////////////////////////////////
 
-// OnPartition will register a topic/partition, so you can set expectations on it.
+// ExpectConsumePartition will register a topic/partition, so you can set expectations on it.
 // The registered PartitionConsumer will be returned, so you can set expectations
 // on it using method chanining. Once a topic/partition is registered, you are
 // expected to start consuming it using ConsumePartition. If that doesn't happen,
-// an error will be written to the error reporter once the mock consumer is closed.
-func (c *Consumer) OnPartition(topic string, partition int32) *PartitionConsumer {
+// an error will be written to the error reporter once the mock consumer is closed. It will
+// also expect that the
+func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset int64) *PartitionConsumer {
 	c.l.Lock()
 	defer c.l.Unlock()
 
@@ -95,6 +100,7 @@ func (c *Consumer) OnPartition(topic string, partition int32) *PartitionConsumer
 			t:            c.t,
 			topic:        topic,
 			partition:    partition,
+			offset:       offset,
 			expectations: make(chan *consumerExpectation, 1000),
 			messages:     make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
 			errors:       make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
@@ -110,18 +116,21 @@ func (c *Consumer) OnPartition(topic string, partition int32) *PartitionConsumer
 
 // PartitionConsumer implements sarama's PartitionConsumer interface for testing purposes.
 // It is returned by the mock Consumers ConsumePartitionMethod, but only if it is
-// registered first using the Consumer's OnPartition method. Before consuming the
-// Errors and Messages channel, you should set expectations on it using
-// ExpectMessage and ExpectError.
+// registered first using the Consumer's ExpectConsumePartition method. Before consuming the
+// Errors and Messages channel, you should specify what values will be provided on these
+// channels using YieldMessage and YieldError.
 type PartitionConsumer struct {
-	l            sync.Mutex
-	t            ErrorReporter
-	topic        string
-	partition    int32
-	expectations chan *consumerExpectation
-	messages     chan *sarama.ConsumerMessage
-	errors       chan *sarama.ConsumerError
-	consumed     bool
+	l                       sync.Mutex
+	t                       ErrorReporter
+	topic                   string
+	partition               int32
+	offset                  int64
+	expectations            chan *consumerExpectation
+	messages                chan *sarama.ConsumerMessage
+	errors                  chan *sarama.ConsumerError
+	consumed                bool
+	errorsShouldBeDrained   bool
+	messagesShouldBeDrained bool
 }
 
 func (pc *PartitionConsumer) handleExpectations() {
@@ -166,6 +175,14 @@ func (pc *PartitionConsumer) Close() error {
 	if !pc.consumed {
 		pc.t.Errorf("Expectations set on %s/%d, but no partition consumer was started.", pc.topic, pc.partition)
 		return errPartitionConsumerNotStarted
+	}
+
+	if pc.errorsShouldBeDrained && len(pc.errors) > 0 {
+		pc.t.Errorf("Expected the errors channel for %s/%d to be drained on close, but found %d errors.", pc.topic, pc.partition, len(pc.errors))
+	}
+
+	if pc.messagesShouldBeDrained && len(pc.messages) > 0 {
+		pc.t.Errorf("Expected the messages channel for %s/%d to be drained on close, but found %d messages.", pc.topic, pc.partition, len(pc.messages))
 	}
 
 	pc.AsyncClose()
@@ -215,18 +232,26 @@ func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 // Expectation API
 ///////////////////////////////////////////////////
 
-// ExpectMessage will make sure a message will be placed on the Messages channel
-// of this partition consumer. The mock consumer will not verify whether this message
+// YieldMessage will yield a messages Messages channel of this partition consumer
+// when it is consumed. The mock consumer will not verify whether this message
 // was consumed from the Messages channel, because there are legitimate reasons for
 // this not to happen.
-func (pc *PartitionConsumer) ExpectMessage(msg *sarama.ConsumerMessage) {
+func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) {
 	pc.expectations <- &consumerExpectation{Msg: msg}
 }
 
-// ExpectError will make sure an error will be placed on the Errors channel
-// of this partition consumer. The mock consumer will not verify whether this error
-// was consumed from the Errors channel, because there are legitimate reasons for
-// this not to happen.
-func (pc *PartitionConsumer) ExpectError(err error) {
+// YieldError will yield an error on the Errors channel of this partition consumer
+// when it is consumed. The mock consumer will not verify whether this error was
+// consumed from the Errors channel, because there are legitimate reasons for this
+// not to happen.
+func (pc *PartitionConsumer) YieldError(err error) {
 	pc.expectations <- &consumerExpectation{Err: err}
+}
+
+func (pc *PartitionConsumer) ExpectErrorsDrainedOnClose() {
+	pc.errorsShouldBeDrained = true
+}
+
+func (pc *PartitionConsumer) ExpectMessagesDrainedOnClose() {
+	pc.messagesShouldBeDrained = true
 }

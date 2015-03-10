@@ -31,6 +31,8 @@ var (
 	errPartitionConsumerNotStarted       = errors.New("The partition consumer was never started")
 )
 
+const AnyOffset int64 = -1000
+
 type producerExpectation struct {
 	Result error
 }

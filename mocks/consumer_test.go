@@ -26,10 +26,10 @@ func TestConsumerHandlesExpectations(t *testing.T) {
 		}
 	}()
 
-	consumer.OnPartition("test", 0).ExpectMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
-	consumer.OnPartition("test", 0).ExpectError(sarama.ErrOutOfBrokers)
-	consumer.OnPartition("test", 1).ExpectMessage(&sarama.ConsumerMessage{Value: []byte("hello world again")})
-	consumer.OnPartition("other", 0).ExpectMessage(&sarama.ConsumerMessage{Value: []byte("hello other")})
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
+	consumer.ExpectConsumePartition("test", 1, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world again")})
+	consumer.ExpectConsumePartition("other", 0, AnyOffset).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello other")})
 
 	pc_test0, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestConsumerHandlesExpectations(t *testing.T) {
 		t.Error("Message was not as expected:", test1_msg)
 	}
 
-	pc_other0, err := consumer.ConsumePartition("other", 0, sarama.OffsetOldest)
+	pc_other0, err := consumer.ConsumePartition("other", 0, sarama.OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -65,8 +65,8 @@ func TestConsumerHandlesExpectations(t *testing.T) {
 
 func TestConsumerReturnsNonconsumedErrorsOnClose(t *testing.T) {
 	consumer := NewConsumer(t, nil)
-	consumer.OnPartition("test", 0).ExpectError(sarama.ErrOutOfBrokers)
-	consumer.OnPartition("test", 0).ExpectError(sarama.ErrOutOfBrokers)
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
 
 	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
 	if err != nil {
@@ -109,7 +109,7 @@ func TestConsumerWithoutExpectationsOnPartition(t *testing.T) {
 func TestConsumerWithExpectationsOnUnconsumedPartition(t *testing.T) {
 	trm := newTestReporterMock()
 	consumer := NewConsumer(trm, nil)
-	consumer.OnPartition("test", 0).ExpectMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
 
 	if err := consumer.Close(); err != nil {
 		t.Error("No error expected on close, but found:", err)
