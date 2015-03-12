@@ -268,7 +268,7 @@ func (child *partitionConsumer) dispatcher() {
 		select {
 		case <-child.dying:
 			close(child.trigger)
-		default:
+		case <-time.After(child.conf.Consumer.Retry.Backoff):
 			if child.broker != nil {
 				child.consumer.unrefBrokerConsumer(child.broker)
 				child.broker = nil
@@ -277,13 +277,6 @@ func (child *partitionConsumer) dispatcher() {
 			if err := child.dispatch(); err != nil {
 				child.sendError(err)
 				child.trigger <- none{}
-
-				// there's no point in trying again *right* away
-				select {
-				case <-child.dying:
-					close(child.trigger)
-				case <-time.After(child.conf.Consumer.Retry.Backoff):
-				}
 			}
 		}
 	}

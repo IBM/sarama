@@ -142,7 +142,9 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	seedBroker.Returns(metadataResponse)
 
 	// launch test goroutines
-	master, err := NewConsumer([]string{seedBroker.Addr()}, nil)
+	config := NewConfig()
+	config.Consumer.Retry.Backoff = 0
+	master, err := NewConsumer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
