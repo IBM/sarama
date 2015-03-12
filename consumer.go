@@ -3,6 +3,7 @@ package sarama
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -255,6 +256,11 @@ type PartitionConsumer interface {
 	// errors are logged and not returned over this channel. If you want to implement any custom errpr
 	// handling, set your config's Consumer.Return.Errors setting to true, and read from this channel.
 	Errors() <-chan *ConsumerError
+
+	// HighWaterMarkOffset returns the high water mark offset of the partition, i.e. the offset that will
+	// be used for the next message that will be produced. You can use this to determine how far behind
+	// the processing is.
+	HighWaterMarkOffset() int64
 }
 
 type partitionConsumer struct {
@@ -268,8 +274,9 @@ type partitionConsumer struct {
 	errors         chan *ConsumerError
 	trigger, dying chan none
 
-	fetchSize int32
-	offset    int64
+	fetchSize           int32
+	offset              int64
+	highWaterMarkOffset int64
 }
 
 func (child *partitionConsumer) sendError(err error) {
@@ -391,6 +398,10 @@ func (child *partitionConsumer) Close() error {
 	return nil
 }
 
+func (child *partitionConsumer) HighWaterMarkOffset() int64 {
+	return atomic.LoadInt64(&child.highWaterMarkOffset)
+}
+
 func (child *partitionConsumer) handleResponse(response *FetchResponse) error {
 	block := response.GetBlock(child.topic, child.partition)
 	if block == nil {
@@ -422,6 +433,7 @@ func (child *partitionConsumer) handleResponse(response *FetchResponse) error {
 
 	// we got messages, reset our fetch size in case it was increased for a previous request
 	child.fetchSize = child.conf.Consumer.Fetch.Default
+	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
 	incomplete := false
 	atLeastOne := false
