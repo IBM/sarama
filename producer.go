@@ -37,13 +37,13 @@ type Producer interface {
 	Input() chan<- *ProducerMessage
 
 	// Successes is the success output channel back to the user when AckSuccesses is confured.
-	// If ReturnSuccesses is true, you MUST read from this channel or the Producer will deadlock.
+	// If Return.Successes is true, you MUST read from this channel or the Producer will deadlock.
 	// It is suggested that you send and read messages together in a single select statement.
 	Successes() <-chan *ProducerMessage
 
 	// Errors is the error output channel back to the user. You MUST read from this channel
 	// or the Producer will deadlock when the channel is full. Alternatively, you can set
-	// Producer.ReturnErrors in your config to false, which prevents errors to be returned.
+	// Producer.Return.Errors in your config to false, which prevents errors to be returned.
 	Errors() <-chan *ProducerError
 }
 
@@ -179,7 +179,7 @@ func (p *producer) Input() chan<- *ProducerMessage {
 func (p *producer) Close() error {
 	p.AsyncClose()
 
-	if p.conf.Producer.ReturnSuccesses {
+	if p.conf.Producer.Return.Successes {
 		go withRecover(func() {
 			for _ = range p.successes {
 			}
@@ -187,7 +187,7 @@ func (p *producer) Close() error {
 	}
 
 	var errors ProducerErrors
-	if p.conf.Producer.ReturnErrors {
+	if p.conf.Producer.Return.Errors {
 		for event := range p.errors {
 			errors = append(errors, event)
 		}
@@ -541,7 +541,7 @@ func (p *producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
-			if p.conf.Producer.ReturnSuccesses {
+			if p.conf.Producer.Return.Successes {
 				p.returnSuccesses(batch)
 			}
 			continue
@@ -561,7 +561,7 @@ func (p *producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 				switch block.Err {
 				case ErrNoError:
 					// All the messages for this topic-partition were delivered successfully!
-					if p.conf.Producer.ReturnSuccesses {
+					if p.conf.Producer.Return.Successes {
 						for i := range msgs {
 							msgs[i].offset = block.Offset + int64(i)
 						}
@@ -735,7 +735,7 @@ func (p *producer) returnError(msg *ProducerMessage, err error) {
 	msg.flags = 0
 	msg.retries = 0
 	pErr := &ProducerError{Msg: msg, Err: err}
-	if p.conf.Producer.ReturnErrors {
+	if p.conf.Producer.Return.Errors {
 		p.errors <- pErr
 	} else {
 		Logger.Println(pErr)

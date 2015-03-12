@@ -214,7 +214,7 @@ func (c *consumer) unrefBrokerConsumer(broker *Broker) {
 // The simplest way of using a PartitionCOnsumer is to loop over if Messages channel using a for/range
 // loop. The PartitionConsumer will under no circumstances stop by itself once it is started. It will
 // just keep retrying ig it encounters errors. By default, it just logs these errors to sarama.Logger;
-// if you want to handle errors yourself, set your config's Consumer.ReturnErrors to true, and read
+// if you want to handle errors yourself, set your config's Consumer.Return.Errors to true, and read
 // from the Errors channel as well, using a select statement or in a separate goroutine. Check out
 // the examples of Consumer to see examples of these different approaches.
 type PartitionConsumer interface {
@@ -236,7 +236,7 @@ type PartitionConsumer interface {
 
 	// Errors returns a read channel of errors that occured during consuming, if enabled. By default,
 	// errors are logged and not returned over this channel. If you want to implement any custom errpr
-	// handling, set your config's Consumer.ReturnErrors setting to true, and read from this channel.
+	// handling, set your config's Consumer.Return.Errors setting to true, and read from this channel.
 	Errors() <-chan *ConsumerError
 }
 
@@ -262,7 +262,7 @@ func (child *partitionConsumer) sendError(err error) {
 		Err:       err,
 	}
 
-	if child.conf.Consumer.ReturnErrors {
+	if child.conf.Consumer.Return.Errors {
 		child.errors <- cErr
 	} else {
 		Logger.Println(cErr)
