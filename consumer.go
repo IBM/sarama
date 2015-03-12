@@ -211,10 +211,12 @@ func (c *consumer) unrefBrokerConsumer(broker *Broker) {
 // it passes out of scope (this is in addition to calling Close on the underlying consumer's client,
 // which is still necessary).
 //
-// The PartitionConsumer will under no circumstances stop by itself once it is started. It will just
-// keep retrying ig it encounters errors. By defualt, it just logs these errors to sarama.Logger;
+// The simplest way of using a PartitionCOnsumer is to loop over if Messages channel using a for/range
+// loop. The PartitionConsumer will under no circumstances stop by itself once it is started. It will
+// just keep retrying ig it encounters errors. By default, it just logs these errors to sarama.Logger;
 // if you want to handle errors yourself, set your config's Consumer.ReturnErrors to true, and read
-// from the Errors channel.
+// from the Errors channel as well, using a select statement or in a separate goroutine. Check out
+// the examples of Consumer to see examples of these different approaches.
 type PartitionConsumer interface {
 
 	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately,

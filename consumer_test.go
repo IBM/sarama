@@ -292,7 +292,11 @@ func TestConsumerInterleavedClose(t *testing.T) {
 	seedBroker.Close()
 }
 
-func ExampleConsumer_simple_for_loop() {
+// This example has the simplest use case of the consumer. It simply
+// iterates over the messages channel using a for/range loop. Because
+// a producer never stopsunless requested, a signal handler is registered
+// so we can trigger a clean shutdown of the consumer.
+func ExampleConsumer_for_loop() {
 	master, err := NewConsumer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		log.Fatalln(err)
@@ -307,11 +311,6 @@ func ExampleConsumer_simple_for_loop() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer func() {
-		if err := consumer.Close(); err != nil {
-			log.Fatalln(err)
-		}
-	}()
 
 	go func() {
 		// By default, the consumer will always keep going, unless we tell it to stop.
@@ -334,7 +333,7 @@ func ExampleConsumer_simple_for_loop() {
 // dealing with the different channels.
 func ExampleConsumer_select() {
 	config := NewConfig()
-	config.Consumer.ReturnErrors = true // Handle errors manually instead of logging them.
+	config.Consumer.ReturnErrors = true // Handle errors manually instead of letting Sarama log them.
 
 	master, err := NewConsumer([]string{"localhost:9092"}, config)
 	if err != nil {
@@ -380,7 +379,7 @@ consumerLoop:
 // to read from the Messages and Errors channels.
 func ExampleConsumer_goroutines() {
 	config := NewConfig()
-	config.Consumer.ReturnErrors = true // Handle errors manually instead of logging them.
+	config.Consumer.ReturnErrors = true // Handle errors manually instead of letting Sarama log them.
 
 	master, err := NewConsumer([]string{"localhost:9092"}, config)
 	if err != nil {
