@@ -125,7 +125,7 @@ func TestProducer(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +173,7 @@ func TestProducerMultipleFlushes(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 5
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -225,7 +225,7 @@ func TestProducerMultipleBrokers(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 5
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewRoundRobinPartitioner
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -267,7 +267,7 @@ func TestProducerFailureRetry(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -339,7 +339,7 @@ func TestProducerBrokerBounce(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -387,7 +387,7 @@ func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 3
 	config.Producer.Retry.Backoff = 0
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
@@ -442,7 +442,7 @@ func TestProducerMultipleRetries(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
 	config.Producer.Retry.Backoff = 0
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
@@ -522,7 +522,7 @@ func TestProducerOutOfRetries(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	config.Producer.Retry.Max = 0
 	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
@@ -610,10 +610,10 @@ ProducerLoop:
 // This example shows how to use the producer with separate goroutines
 // reading from the Successes and Errors channels. Note that in order
 // for the Successes channel to be populated, you have to set
-// config.Producer.ReturnSuccesses to true.
+// config.Producer.Return.Successes to true.
 func ExampleProducer_goroutines() {
 	config := NewConfig()
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	producer, err := NewProducer([]string{"localhost:9092"}, config)
 	if err != nil {
 		panic(err)

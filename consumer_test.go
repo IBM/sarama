@@ -333,7 +333,7 @@ func ExampleConsumer_for_loop() {
 // dealing with the different channels.
 func ExampleConsumer_select() {
 	config := NewConfig()
-	config.Consumer.ReturnErrors = true // Handle errors manually instead of letting Sarama log them.
+	config.Consumer.Return.Errors = true // Handle errors manually instead of letting Sarama log them.
 
 	master, err := NewConsumer([]string{"localhost:9092"}, config)
 	if err != nil {
@@ -379,7 +379,7 @@ consumerLoop:
 // to read from the Messages and Errors channels.
 func ExampleConsumer_goroutines() {
 	config := NewConfig()
-	config.Consumer.ReturnErrors = true // Handle errors manually instead of letting Sarama log them.
+	config.Consumer.Return.Errors = true // Handle errors manually instead of letting Sarama log them.
 
 	master, err := NewConsumer([]string{"localhost:9092"}, config)
 	if err != nil {

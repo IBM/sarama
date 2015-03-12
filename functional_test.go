@@ -90,7 +90,7 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	config.ChannelBufferSize = 20
 	config.Producer.Flush.Frequency = 50 * time.Millisecond
 	config.Producer.Flush.Messages = 200
-	config.Producer.ReturnSuccesses = true
+	config.Producer.Return.Successes = true
 	producer, err := NewProducer([]string{kafkaAddr}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -122,8 +122,8 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 func testProducingMessages(t *testing.T, config *Config) {
 	checkKafkaAvailability(t)
 
-	config.Producer.ReturnSuccesses = true
-	config.Consumer.ReturnErrors = true
+	config.Producer.Return.Successes = true
+	config.Consumer.Return.Errors = true
 
 	client, err := NewClient([]string{kafkaAddr}, config)
 	if err != nil {
