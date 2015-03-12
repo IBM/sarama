@@ -209,7 +209,9 @@ func (c *consumer) unrefBrokerConsumer(broker *Broker) {
 // PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call Close()
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope (this is in addition to calling Close on the underlying consumer's client, which is still necessary).
-// You have to read from both the Messages and Errors channels to prevent the consumer from locking eventually.
+// Besides the Messages channel, you have to read from the Errors channels. Otherwise the consumer will
+// eventually lock as the channel fills up with errors. Alternatively, you can set Consumer.AckErrors in
+// your config to false to prevent errors from being reported.
 type PartitionConsumer interface {
 
 	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately,
@@ -228,10 +230,11 @@ type PartitionConsumer interface {
 	// You have to read this channel to prevent the consumer from deadlock. Under no circumstances,
 	// the partition consumer will shut down by itself. It will just wait until it is able to continue
 	// consuming messages. If you want to shut down your consumer, you will have trigger it yourself
-	// by consuming this channel and calling Close or AsyncClose when appropriate.
+	// by consuming this channel and calling Close or AsyncClose when appropriate. If you don't want to
+	// consume the errors channel, you can set Consumer.AckErrors to false in your configuration.
 	Errors() <-chan *ConsumerError
 
-	// Messages returns the read channel for the messages that are returned by the broker
+	// Messages returns the read channel for the messages that are returned by the broker.
 	Messages() <-chan *ConsumerMessage
 }
 
@@ -251,10 +254,12 @@ type partitionConsumer struct {
 }
 
 func (child *partitionConsumer) sendError(err error) {
-	child.errors <- &ConsumerError{
-		Topic:     child.topic,
-		Partition: child.partition,
-		Err:       err,
+	if child.conf.Consumer.AckErrors {
+		child.errors <- &ConsumerError{
+			Topic:     child.topic,
+			Partition: child.partition,
+			Err:       err,
+		}
 	}
 }
 
@@ -277,7 +282,7 @@ func (child *partitionConsumer) dispatcher() {
 				select {
 				case <-child.dying:
 					close(child.trigger)
-				case <-time.After(10 * time.Second):
+				case <-time.After(child.conf.Consumer.Retry.Backoff):
 				}
 			}
 		}

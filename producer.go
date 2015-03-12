@@ -41,8 +41,9 @@ type Producer interface {
 	// It is suggested that you send and read messages together in a single select statement.
 	Successes() <-chan *ProducerMessage
 
-	// Errors is the error output channel back to the user. You MUST read from this channel or the Producer will deadlock.
-	// It is suggested that you send messages and read errors together in a single select statement.
+	// Errors is the error output channel back to the user. You MUST read from this channel
+	// or the Producer will deadlock when the channel is full. Alternatively, you can set
+	// Producer.AckErrors in your config to false, which prevents errors to be reported.
 	Errors() <-chan *ProducerError
 }
 
@@ -257,7 +258,7 @@ func (p *producer) topicDispatcher() {
 
 	if p.ownClient {
 		err := p.client.Close()
-		if err != nil {
+		if err != nil && p.conf.Producer.AckErrors {
 			p.errors <- &ProducerError{Err: err}
 		}
 	}
@@ -731,7 +732,9 @@ func (p *producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 func (p *producer) returnError(msg *ProducerMessage, err error) {
 	msg.flags = 0
 	msg.retries = 0
-	p.errors <- &ProducerError{Msg: msg, Err: err}
+	if p.conf.Producer.AckErrors {
+		p.errors <- &ProducerError{Msg: msg, Err: err}
+	}
 }
 
 func (p *producer) returnErrors(batch []*ProducerMessage, err error) {
