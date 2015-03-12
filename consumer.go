@@ -207,9 +207,16 @@ func (c *consumer) unrefBrokerConsumer(broker *Broker) {
 // PartitionConsumer
 
 // PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call Close()
-// on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
-// scope (this is in addition to calling Close on the underlying consumer's client, which is still necessary).
-// You have to read from both the Messages and Errors channels to prevent the consumer from locking eventually.
+// or AsyncClose() on a consumer to avoid leaks, it will not be garbage-collected automatically when
+// it passes out of scope (this is in addition to calling Close on the underlying consumer's client,
+// which is still necessary).
+//
+// The simplest way of using a PartitionCOnsumer is to loop over if Messages channel using a for/range
+// loop. The PartitionConsumer will under no circumstances stop by itself once it is started. It will
+// just keep retrying ig it encounters errors. By default, it just logs these errors to sarama.Logger;
+// if you want to handle errors yourself, set your config's Consumer.ReturnErrors to true, and read
+// from the Errors channel as well, using a select statement or in a separate goroutine. Check out
+// the examples of Consumer to see examples of these different approaches.
 type PartitionConsumer interface {
 
 	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately,
@@ -224,15 +231,13 @@ type PartitionConsumer interface {
 	// call this before calling Close on the underlying client.
 	Close() error
 
-	// Errors returns the read channel for any errors that occurred while consuming the partition.
-	// You have to read this channel to prevent the consumer from deadlock. Under no circumstances,
-	// the partition consumer will shut down by itself. It will just wait until it is able to continue
-	// consuming messages. If you want to shut down your consumer, you will have trigger it yourself
-	// by consuming this channel and calling Close or AsyncClose when appropriate.
-	Errors() <-chan *ConsumerError
-
-	// Messages returns the read channel for the messages that are returned by the broker
+	// Messages returns the read channel for the messages that are returned by the broker.
 	Messages() <-chan *ConsumerMessage
+
+	// Errors returns a read channel of errors that occured during consuming, if enabled. By default,
+	// errors are logged and not returned over this channel. If you want to implement any custom errpr
+	// handling, set your config's Consumer.ReturnErrors setting to true, and read from this channel.
+	Errors() <-chan *ConsumerError
 }
 
 type partitionConsumer struct {
@@ -251,10 +256,16 @@ type partitionConsumer struct {
 }
 
 func (child *partitionConsumer) sendError(err error) {
-	child.errors <- &ConsumerError{
+	cErr := &ConsumerError{
 		Topic:     child.topic,
 		Partition: child.partition,
 		Err:       err,
+	}
+
+	if child.conf.Consumer.ReturnErrors {
+		child.errors <- cErr
+	} else {
+		Logger.Println(cErr)
 	}
 }
 
@@ -263,7 +274,7 @@ func (child *partitionConsumer) dispatcher() {
 		select {
 		case <-child.dying:
 			close(child.trigger)
-		default:
+		case <-time.After(child.conf.Consumer.Retry.Backoff):
 			if child.broker != nil {
 				child.consumer.unrefBrokerConsumer(child.broker)
 				child.broker = nil
@@ -272,13 +283,6 @@ func (child *partitionConsumer) dispatcher() {
 			if err := child.dispatch(); err != nil {
 				child.sendError(err)
 				child.trigger <- none{}
-
-				// there's no point in trying again *right* away
-				select {
-				case <-child.dying:
-					close(child.trigger)
-				case <-time.After(10 * time.Second):
-				}
 			}
 		}
 	}

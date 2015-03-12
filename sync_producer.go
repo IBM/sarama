@@ -40,7 +40,8 @@ func NewSyncProducerFromClient(client *Client) (SyncProducer, error) {
 }
 
 func newSyncProducerFromProducer(p *producer) *syncProducer {
-	p.conf.Producer.AckSuccesses = true
+	p.conf.Producer.ReturnSuccesses = true
+	p.conf.Producer.ReturnErrors = true
 	sp := &syncProducer{producer: p}
 
 	sp.wg.Add(2)

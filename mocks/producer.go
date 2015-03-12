@@ -52,11 +52,13 @@ func NewProducer(t ErrorReporter, config *sarama.Config) *Producer {
 				expectation := mp.expectations[0]
 				mp.expectations = mp.expectations[1:]
 				if expectation.Result == errProduceSuccess {
-					if config.Producer.AckSuccesses {
+					if config.Producer.ReturnSuccesses {
 						mp.successes <- msg
 					}
 				} else {
-					mp.errors <- &sarama.ProducerError{Err: expectation.Result, Msg: msg}
+					if config.Producer.ReturnErrors {
+						mp.errors <- &sarama.ProducerError{Err: expectation.Result, Msg: msg}
+					}
 				}
 			}
 			mp.l.Unlock()
@@ -119,7 +121,7 @@ func (mp *Producer) Errors() <-chan *sarama.ProducerError {
 
 // ExpectInputAndSucceed sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it is produced successfully,
-// i.e. it will make it available on the Successes channel if the Producer.AckSuccesses setting
+// i.e. it will make it available on the Successes channel if the Producer.ReturnSuccesses setting
 // is set to true.
 func (mp *Producer) ExpectInputAndSucceed() {
 	mp.l.Lock()
