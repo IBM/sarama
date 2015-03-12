@@ -28,7 +28,7 @@ func TestMockProducerImplementsProducerInterface(t *testing.T) {
 
 func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 	config := sarama.NewConfig()
-	config.Producer.AckSuccesses = true
+	config.Producer.ReturnSuccesses = true
 	mp := NewProducer(t, config)
 
 	mp.ExpectInputAndSucceed()

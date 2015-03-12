@@ -207,11 +207,14 @@ func (c *consumer) unrefBrokerConsumer(broker *Broker) {
 // PartitionConsumer
 
 // PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call Close()
-// on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
-// scope (this is in addition to calling Close on the underlying consumer's client, which is still necessary).
-// Besides the Messages channel, you have to read from the Errors channels. Otherwise the consumer will
-// eventually lock as the channel fills up with errors. Alternatively, you can set Consumer.AckErrors in
-// your config to false to prevent errors from being reported.
+// or AsyncClose() on a consumer to avoid leaks, it will not be garbage-collected automatically when
+// it passes out of scope (this is in addition to calling Close on the underlying consumer's client,
+// which is still necessary).
+//
+// The PartitionConsumer will under no circumstances stop by itself once it is started. It will just
+// keep retrying ig it encounters errors. By defualt, it just logs these errors to sarama.Logger;
+// if you want to handle errors yourself, set your config's Consumer.ReturnErrors to true, and read
+// from the Errors channel.
 type PartitionConsumer interface {
 
 	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately,
@@ -226,16 +229,13 @@ type PartitionConsumer interface {
 	// call this before calling Close on the underlying client.
 	Close() error
 
-	// Errors returns the read channel for any errors that occurred while consuming the partition.
-	// You have to read this channel to prevent the consumer from deadlock. Under no circumstances,
-	// the partition consumer will shut down by itself. It will just wait until it is able to continue
-	// consuming messages. If you want to shut down your consumer, you will have trigger it yourself
-	// by consuming this channel and calling Close or AsyncClose when appropriate. If you don't want to
-	// consume the errors channel, you can set Consumer.AckErrors to false in your configuration.
-	Errors() <-chan *ConsumerError
-
 	// Messages returns the read channel for the messages that are returned by the broker.
 	Messages() <-chan *ConsumerMessage
+
+	// Errors returns a read channel of errors that occured during consuming, if enabled. By default,
+	// errors are logged and not returned over this channel. If you want to implement any custom errpr
+	// handling, set your config's Consumer.ReturnErrors setting to true, and read from this channel.
+	Errors() <-chan *ConsumerError
 }
 
 type partitionConsumer struct {
@@ -254,12 +254,16 @@ type partitionConsumer struct {
 }
 
 func (child *partitionConsumer) sendError(err error) {
-	if child.conf.Consumer.AckErrors {
-		child.errors <- &ConsumerError{
-			Topic:     child.topic,
-			Partition: child.partition,
-			Err:       err,
-		}
+	cErr := &ConsumerError{
+		Topic:     child.topic,
+		Partition: child.partition,
+		Err:       err,
+	}
+
+	if child.conf.Consumer.ReturnErrors {
+		child.errors <- cErr
+	} else {
+		Logger.Println(cErr)
 	}
 }
 

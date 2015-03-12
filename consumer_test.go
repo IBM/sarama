@@ -292,10 +292,51 @@ func TestConsumerInterleavedClose(t *testing.T) {
 	seedBroker.Close()
 }
 
+func ExampleConsumer_simple_for_loop() {
+	master, err := NewConsumer([]string{"localhost:9092"}, nil)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer func() {
+		if err := master.Close(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	consumer, err := master.ConsumePartition("my_topic", 0, 0)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer func() {
+		if err := consumer.Close(); err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	go func() {
+		// By default, the consumer will always keep going, unless we tell it to stop.
+		// In this case, we capture the SIGINT signal so we can tell the consumer to stop
+		signals := make(chan os.Signal, 1)
+		signal.Notify(signals, os.Interrupt)
+		<-signals
+		consumer.AsyncClose()
+	}()
+
+	msgCount := 0
+	for message := range consumer.Messages() {
+		log.Println(string(message.Value))
+		msgCount++
+	}
+	log.Println("Processed", msgCount, "messages.")
+}
+
 // This example shows how to use a consumer with a select statement
 // dealing with the different channels.
 func ExampleConsumer_select() {
-	master, err := NewConsumer([]string{"localhost:9092"}, nil)
+	config := NewConfig()
+	config.Consumer.ReturnErrors = true // Handle errors manually instead of logging them.
+
+	master, err := NewConsumer([]string{"localhost:9092"}, config)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -338,7 +379,10 @@ consumerLoop:
 // This example shows how to use a consumer with different goroutines
 // to read from the Messages and Errors channels.
 func ExampleConsumer_goroutines() {
-	master, err := NewConsumer([]string{"localhost:9092"}, nil)
+	config := NewConfig()
+	config.Consumer.ReturnErrors = true // Handle errors manually instead of logging them.
+
+	master, err := NewConsumer([]string{"localhost:9092"}, config)
 	if err != nil {
 		log.Fatalln(err)
 	}

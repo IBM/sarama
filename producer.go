@@ -37,13 +37,13 @@ type Producer interface {
 	Input() chan<- *ProducerMessage
 
 	// Successes is the success output channel back to the user when AckSuccesses is confured.
-	// If AckSuccesses is true, you MUST read from this channel or the Producer will deadlock.
+	// If ReturnSuccesses is true, you MUST read from this channel or the Producer will deadlock.
 	// It is suggested that you send and read messages together in a single select statement.
 	Successes() <-chan *ProducerMessage
 
 	// Errors is the error output channel back to the user. You MUST read from this channel
 	// or the Producer will deadlock when the channel is full. Alternatively, you can set
-	// Producer.AckErrors in your config to false, which prevents errors to be reported.
+	// Producer.ReturnErrors in your config to false, which prevents errors to be returned.
 	Errors() <-chan *ProducerError
 }
 
@@ -179,7 +179,7 @@ func (p *producer) Input() chan<- *ProducerMessage {
 func (p *producer) Close() error {
 	p.AsyncClose()
 
-	if p.conf.Producer.AckSuccesses {
+	if p.conf.Producer.ReturnSuccesses {
 		go withRecover(func() {
 			for _ = range p.successes {
 			}
@@ -187,8 +187,10 @@ func (p *producer) Close() error {
 	}
 
 	var errors ProducerErrors
-	for event := range p.errors {
-		errors = append(errors, event)
+	if p.conf.Producer.ReturnErrors {
+		for event := range p.errors {
+			errors = append(errors, event)
+		}
 	}
 
 	if len(errors) > 0 {
@@ -258,8 +260,8 @@ func (p *producer) topicDispatcher() {
 
 	if p.ownClient {
 		err := p.client.Close()
-		if err != nil && p.conf.Producer.AckErrors {
-			p.errors <- &ProducerError{Err: err}
+		if err != nil {
+			Logger.Println("producer/shutdown failed to close the embedded client:", err)
 		}
 	}
 	close(p.errors)
@@ -539,7 +541,7 @@ func (p *producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
-			if p.conf.Producer.AckSuccesses {
+			if p.conf.Producer.ReturnSuccesses {
 				p.returnSuccesses(batch)
 			}
 			continue
@@ -559,7 +561,7 @@ func (p *producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 				switch block.Err {
 				case ErrNoError:
 					// All the messages for this topic-partition were delivered successfully!
-					if p.conf.Producer.AckSuccesses {
+					if p.conf.Producer.ReturnSuccesses {
 						for i := range msgs {
 							msgs[i].offset = block.Offset + int64(i)
 						}
@@ -732,8 +734,11 @@ func (p *producer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *
 func (p *producer) returnError(msg *ProducerMessage, err error) {
 	msg.flags = 0
 	msg.retries = 0
-	if p.conf.Producer.AckErrors {
-		p.errors <- &ProducerError{Msg: msg, Err: err}
+	pErr := &ProducerError{Msg: msg, Err: err}
+	if p.conf.Producer.ReturnErrors {
+		p.errors <- pErr
+	} else {
+		Logger.Println(pErr)
 	}
 }
 

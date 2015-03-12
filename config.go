@@ -42,9 +42,9 @@ type Config struct {
 		// Similar to the `partitioner.class` setting for the JVM producer.
 		Partitioner PartitionerConstructor
 		// If enabled, successfully delivered messages will be returned on the Successes channel (default disabled).
-		AckSuccesses bool
+		ReturnSuccesses bool
 		// If enabled, messages that failed to deliver will be returned on the Errors channel, including error (default enabled).
-		AckErrors bool
+		ReturnErrors bool
 
 		// The following config options control how often messages are batched up and sent to the broker. By default,
 		// messages are sent as fast as possible, and all messages received while the current batch is in-flight are placed
@@ -95,8 +95,8 @@ type Config struct {
 		// Equivalent to the JVM's `fetch.wait.max.ms`.
 		MaxWaitTime time.Duration
 
-		// If enabled, any errors that occured while consuming are returned on the Errors channel (default enabled).
-		AckErrors bool
+		// If enabled, any errors that occured while consuming are returned on the Errors channel (default disabled).
+		ReturnErrors bool
 	}
 
 	// A user-provided string sent with every request to the brokers for logging, debugging, and auditing purposes.
@@ -127,13 +127,13 @@ func NewConfig() *Config {
 	c.Producer.Partitioner = NewHashPartitioner
 	c.Producer.Retry.Max = 3
 	c.Producer.Retry.Backoff = 100 * time.Millisecond
-	c.Producer.AckErrors = true
+	c.Producer.ReturnErrors = true
 
 	c.Consumer.Fetch.Min = 1
 	c.Consumer.Fetch.Default = 32768
 	c.Consumer.Retry.Backoff = 2 * time.Second
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
-	c.Consumer.AckErrors = true
+	c.Consumer.ReturnErrors = false
 
 	c.ChannelBufferSize = 256
 
