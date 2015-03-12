@@ -561,7 +561,7 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 		switch topic.Err {
 		case ErrNoError:
 			break
-		case ErrLeaderNotAvailable:
+		case ErrLeaderNotAvailable, ErrUnknownTopicOrPartition:
 			toRetry[topic.Name] = true
 		default:
 			err = topic.Err
