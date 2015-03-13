@@ -43,8 +43,9 @@ type Client interface {
 	RefreshMetadata(topics ...string) error
 
 	// GetOffset queries the cluster to get the most recent available offset at the given
-	// time on the topic/partition combination.
-	GetOffset(topic string, partitionID int32, where OffsetTime) (int64, error)
+	// time on the topic/partition combination. Time should be OffsetOldest for the earliest available
+	// offset, OffsetNewest for the offset of the message that will be produced next, or a time.
+	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 
 	// Close shuts down all broker connections managed by this client. It is required to call this function before
 	// a client object passes out of scope, as it will otherwise leak memory. You must close any Producers or Consumers
@@ -281,14 +282,14 @@ func (client *client) RefreshMetadata(topics ...string) error {
 	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max)
 }
 
-func (client *client) GetOffset(topic string, partitionID int32, where OffsetTime) (int64, error) {
+func (client *client) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
 	broker, err := client.Leader(topic, partitionID)
 	if err != nil {
 		return -1, err
 	}
 
 	request := &OffsetRequest{}
-	request.AddBlock(topic, partitionID, where, 1)
+	request.AddBlock(topic, partitionID, time, 1)
 
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {

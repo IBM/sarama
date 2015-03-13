@@ -314,13 +314,11 @@ func (child *partitionConsumer) dispatch() error {
 }
 
 func (child *partitionConsumer) chooseStartingOffset(offset int64) (err error) {
-	var where OffsetTime
+	var time int64
 
 	switch offset {
-	case OffsetNewest:
-		where = LatestOffsets
-	case OffsetOldest:
-		where = EarliestOffset
+	case OffsetNewest, OffsetOldest:
+		time = offset
 	default:
 		if offset < 0 {
 			return ConfigurationError("Invalid offset")
@@ -329,7 +327,7 @@ func (child *partitionConsumer) chooseStartingOffset(offset int64) (err error) {
 		return nil
 	}
 
-	child.offset, err = child.consumer.client.GetOffset(child.topic, child.partition, where)
+	child.offset, err = child.consumer.client.GetOffset(child.topic, child.partition, time)
 	return err
 }
 
