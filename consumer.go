@@ -296,7 +296,7 @@ func (child *partitionConsumer) dispatcher() {
 }
 
 func (child *partitionConsumer) dispatch() error {
-	if err := child.consumer.client.RefreshTopicMetadata(child.topic); err != nil {
+	if err := child.consumer.client.RefreshMetadata(child.topic); err != nil {
 		return err
 	}
 
