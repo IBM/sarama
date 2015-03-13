@@ -32,11 +32,6 @@ type Client interface {
 	// Replicas returns the set of all replica IDs for the given partition.
 	Replicas(topic string, partitionID int32) ([]int32, error)
 
-	// ReplicasInSync returns the set of all in-sync replica IDs for the given partition.
-	// Note: kafka's metadata here is known to be stale in many cases, and should not generally be trusted.
-	// This method should be considered effectively deprecated.
-	ReplicasInSync(topic string, partitionID int32) ([]int32, error)
-
 	// RefreshMetadata takes a list of topics and queries the cluster to refresh the
 	// available metadata for those topics. If no topics are provided, it will refresh metadata
 	// for all topics.
@@ -244,23 +239,6 @@ func (client *client) Replicas(topic string, partitionID int32) ([]int32, error)
 		return nil, metadata.Err
 	}
 	return dupeAndSort(metadata.Replicas), nil
-}
-
-func (client *client) ReplicasInSync(topic string, partitionID int32) ([]int32, error) {
-	if client.Closed() {
-		return nil, ErrClosedClient
-	}
-
-	metadata, err := client.getMetadata(topic, partitionID)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if metadata.Err == ErrReplicaNotAvailable {
-		return nil, metadata.Err
-	}
-	return dupeAndSort(metadata.Isr), nil
 }
 
 func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
