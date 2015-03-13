@@ -312,7 +312,7 @@ func (p *producer) leaderDispatcher(topic string, partition int32, input chan *P
 
 	breaker := breaker.New(3, 1, 10*time.Second)
 	doUpdate := func() (err error) {
-		if err = p.client.RefreshTopicMetadata(topic); err != nil {
+		if err = p.client.RefreshMetadata(topic); err != nil {
 			return err
 		}
 
