@@ -48,7 +48,7 @@ type Producer interface {
 }
 
 type producer struct {
-	client    *Client
+	client    Client
 	conf      *Config
 	ownClient bool
 
@@ -75,7 +75,7 @@ func NewProducer(addrs []string, conf *Config) (Producer, error) {
 }
 
 // NewProducerFromClient creates a new Producer using the given client.
-func NewProducerFromClient(client *Client) (Producer, error) {
+func NewProducerFromClient(client Client) (Producer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -83,7 +83,7 @@ func NewProducerFromClient(client *Client) (Producer, error) {
 
 	p := &producer{
 		client:    client,
-		conf:      client.conf,
+		conf:      client.Config(),
 		errors:    make(chan *ProducerError),
 		input:     make(chan *ProducerMessage),
 		successes: make(chan *ProducerMessage),

@@ -49,7 +49,7 @@ type Consumer interface {
 }
 
 type consumer struct {
-	client    *Client
+	client    Client
 	conf      *Config
 	ownClient bool
 
@@ -74,7 +74,7 @@ func NewConsumer(addrs []string, config *Config) (Consumer, error) {
 }
 
 // NewConsumerFromClient creates a new consumer using the given client.
-func NewConsumerFromClient(client *Client) (Consumer, error) {
+func NewConsumerFromClient(client Client) (Consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -82,7 +82,7 @@ func NewConsumerFromClient(client *Client) (Consumer, error) {
 
 	c := &consumer{
 		client:          client,
-		conf:            client.conf,
+		conf:            client.Config(),
 		children:        make(map[string]map[int32]*partitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
 	}

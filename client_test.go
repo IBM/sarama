@@ -40,10 +40,11 @@ func TestCachedPartitions(t *testing.T) {
 
 	config := NewConfig()
 	config.Metadata.Retry.Max = 0
-	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	c, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
+	client := c.(*client)
 
 	// Verify they aren't cached the same
 	allP := client.cachedPartitionsResults["my_topic"][allPartitions]
@@ -165,10 +166,11 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	c, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
+	client := c.(*client)
 
 	parts, err := client.Partitions("my_topic")
 	if err != nil {

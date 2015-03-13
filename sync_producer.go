@@ -31,7 +31,7 @@ func NewSyncProducer(addrs []string, config *Config) (SyncProducer, error) {
 }
 
 // NewSyncProducerFromClient creates a new SyncProducer using the given client.
-func NewSyncProducerFromClient(client *Client) (SyncProducer, error) {
+func NewSyncProducerFromClient(client Client) (SyncProducer, error) {
 	p, err := NewProducerFromClient(client)
 	if err != nil {
 		return nil, err
