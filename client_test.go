@@ -140,15 +140,6 @@ func TestClientMetadata(t *testing.T) {
 		t.Error("Incorrect (or unsorted) replica")
 	}
 
-	isr, err = client.ReplicasInSync("my_topic", 0)
-	if err != nil {
-		t.Error(err)
-	} else if isr[0] != 1 {
-		t.Error("Incorrect (or unsorted) isr")
-	} else if isr[1] != 5 {
-		t.Error("Incorrect (or unsorted) isr")
-	}
-
 	leader.Close()
 	seedBroker.Close()
 	safeClose(t, client)
