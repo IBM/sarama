@@ -337,10 +337,12 @@ func (client *Client) any() *Broker {
 	defer client.lock.RUnlock()
 
 	if client.seedBroker != nil {
+		_ = client.seedBroker.Open(client.conf)
 		return client.seedBroker
 	}
 
 	for _, broker := range client.brokers {
+		_ = broker.Open(client.conf)
 		return broker
 	}
 
@@ -436,6 +438,7 @@ func (client *Client) cachedLeader(topic string, partitionID int32) (*Broker, er
 			if b == nil {
 				return nil, ErrLeaderNotAvailable
 			}
+			_ = b.Open(client.conf)
 			return b, nil
 		}
 	}
@@ -538,17 +541,12 @@ func (client *Client) update(data *MetadataResponse) ([]string, error) {
 	// - if it is a new ID, save it
 	// - if it is an existing ID, but the address we have is stale, discard the old one and save it
 	// - otherwise ignore it, replacing our existing one would just bounce the connection
-	// We asynchronously try to open connections to the new brokers. We don't care if they
-	// fail, since maybe that broker is unreachable but doesn't have a topic we care about.
-	// If it fails and we do care, whoever tries to use it will get the connection error.
 	for _, broker := range data.Brokers {
 		if client.brokers[broker.ID()] == nil {
-			_ = broker.Open(client.conf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 			safeAsyncClose(client.brokers[broker.ID()])
-			_ = broker.Open(client.conf)
 			client.brokers[broker.ID()] = broker
 			Logger.Printf("Replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
