@@ -1,5 +1,11 @@
 /*
-Package sarama provides client libraries for the Kafka 0.8 protocol. The Client, Producer and Consumer objects are the core of the high-level API. The Broker and Request/Response objects permit more precise control.
+Package sarama provides client libraries for the Kafka 0.8 protocol. The Producer object is the high-level
+API for producing messages asynchronously; the SyncProducer provides a blocking API for the same purpose.
+The Consumer object is the high-level API for consuming messages. The Client object provides metadata
+management functionality that is shared between the higher-level objects.
+
+For lower-level needs, the Broker and Request/Response objects permit precise control over each connection
+and message sent on the wire.
 
 The Request/Response objects and properties are mostly undocumented, as they line up exactly with the
 protocol fields documented by Kafka at https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
