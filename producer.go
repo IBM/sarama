@@ -532,9 +532,9 @@ func (p *producer) flusher(broker *Broker, input chan []*ProducerMessage) {
 			p.returnErrors(batch, err)
 			continue
 		default:
-			p.client.disconnectBroker(broker)
 			Logger.Printf("producer/flusher/%d state change to [closing] because %s\n", broker.ID(), err)
 			closing = err
+			_ = broker.Close()
 			p.retryMessages(batch, err)
 			continue
 		}

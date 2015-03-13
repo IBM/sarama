@@ -438,7 +438,7 @@ func (w *brokerConsumer) subscriptionConsumer() {
 		response, err := w.fetchNewMessages()
 
 		if err != nil {
-			Logger.Printf("Unexpected error processing FetchRequest; disconnecting broker %s: %s\n", w.broker.addr, err)
+			Logger.Printf("Unexpected error processing FetchRequest; disconnecting from broker %s: %s\n", w.broker.addr, err)
 			w.abort(err)
 			return
 		}
@@ -475,7 +475,6 @@ func (w *brokerConsumer) updateSubscriptionCache(newSubscriptions []*partitionCo
 
 func (w *brokerConsumer) abort(err error) {
 	_ = w.broker.Close() // we don't care about the error this might return, we already have one
-	w.consumer.client.disconnectBroker(w.broker)
 
 	for child := range w.subscriptions {
 		child.sendError(err)
