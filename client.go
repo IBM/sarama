@@ -38,8 +38,9 @@ type Client interface {
 	RefreshMetadata(topics ...string) error
 
 	// GetOffset queries the cluster to get the most recent available offset at the given
-	// time on the topic/partition combination.
-	GetOffset(topic string, partitionID int32, where OffsetTime) (int64, error)
+	// time on the topic/partition combination. Time should be OffsetOldest for the earliest available
+	// offset, OffsetNewest for the offset of the message that will be produced next, or a time.
+	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 
 	// Close shuts down all broker connections managed by this client. It is required to call this function before
 	// a client object passes out of scope, as it will otherwise leak memory. You must close any Producers or Consumers
@@ -49,6 +50,17 @@ type Client interface {
 	// Closed returns true if the client has already had Close called on it
 	Closed() bool
 }
+
+const (
+	// OffsetNewest stands for the log head offset, i.e. the offset that will be assigned to the next message
+	// that will be produced to the partition. You can send this to a client's GetOffset method to get this
+	// offset, or when calling ConsumePartition to start consuming new messages.
+	OffsetNewest int64 = -1
+	// OffsetOldest stands for the oldest offset available on the broker for a partition. You can send this
+	// to a client's GetOffset method to get this offset, or when calling ConsumePartition to start consuming
+	// from the oldest offset that is still available on the broker.
+	OffsetOldest int64 = -2
+)
 
 type client struct {
 	conf   *Config
@@ -259,14 +271,14 @@ func (client *client) RefreshMetadata(topics ...string) error {
 	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max)
 }
 
-func (client *client) GetOffset(topic string, partitionID int32, where OffsetTime) (int64, error) {
+func (client *client) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
 	broker, err := client.Leader(topic, partitionID)
 	if err != nil {
 		return -1, err
 	}
 
 	request := &OffsetRequest{}
-	request.AddBlock(topic, partitionID, where, 1)
+	request.AddBlock(topic, partitionID, time, 1)
 
 	response, err := broker.GetAvailableOffsets(request)
 	if err != nil {

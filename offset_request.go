@@ -1,19 +1,7 @@
 package sarama
 
-// OffsetTime is used in Offset Requests to ask for all messages before a certain time. Any positive int64
-// value will be interpreted as milliseconds, or use the special constants defined here.
-type OffsetTime int64
-
-const (
-	// LatestOffsets askes for the latest offsets.
-	LatestOffsets OffsetTime = -1
-	// EarliestOffset askes for the earliest available offset. Note that because offsets are pulled in descending order,
-	// asking for the earliest offset will always return you a single element.
-	EarliestOffset OffsetTime = -2
-)
-
 type offsetRequestBlock struct {
-	time       OffsetTime
+	time       int64
 	maxOffsets int32
 }
 
@@ -61,7 +49,7 @@ func (r *OffsetRequest) version() int16 {
 	return 0
 }
 
-func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time OffsetTime, maxOffsets int32) {
+func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
 	}
