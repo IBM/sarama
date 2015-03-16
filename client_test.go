@@ -177,7 +177,6 @@ func TestClientRefreshBehaviour(t *testing.T) {
 		t.Error("Leader for my_topic had incorrect ID.")
 	}
 
-	client.disconnectBroker(tst)
 	leader.Close()
 	seedBroker.Close()
 	safeClose(t, client)
