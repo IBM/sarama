@@ -10,7 +10,7 @@ import (
 
 const TestMessage = "ABC THE MESSAGE"
 
-func closeProducer(t *testing.T, p Producer) {
+func closeProducer(t *testing.T, p AsyncProducer) {
 	var wg sync.WaitGroup
 	p.AsyncClose()
 
@@ -126,7 +126,7 @@ func TestProducer(t *testing.T) {
 	config := NewConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,7 +174,7 @@ func TestProducerMultipleFlushes(t *testing.T) {
 	config := NewConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +227,7 @@ func TestProducerMultipleBrokers(t *testing.T) {
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewRoundRobinPartitioner
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -269,7 +269,7 @@ func TestProducerFailureRetry(t *testing.T) {
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +341,7 @@ func TestProducerBrokerBounce(t *testing.T) {
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +390,7 @@ func TestProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 3
 	config.Producer.Retry.Backoff = 0
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -445,7 +445,7 @@ func TestProducerMultipleRetries(t *testing.T) {
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
 	config.Producer.Retry.Backoff = 0
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -525,7 +525,7 @@ func TestProducerOutOfRetries(t *testing.T) {
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	config.Producer.Retry.Max = 0
-	producer, err := NewProducer([]string{seedBroker.Addr()}, config)
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -575,7 +575,7 @@ func TestProducerOutOfRetries(t *testing.T) {
 // This example shows how to use the producer while simultaneously
 // reading the Errors channel to know about any failures.
 func ExampleProducer_select() {
-	producer, err := NewProducer([]string{"localhost:9092"}, nil)
+	producer, err := NewAsyncProducer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -614,7 +614,7 @@ ProducerLoop:
 func ExampleProducer_goroutines() {
 	config := NewConfig()
 	config.Producer.Return.Successes = true
-	producer, err := NewProducer([]string{"localhost:9092"}, config)
+	producer, err := NewAsyncProducer([]string{"localhost:9092"}, config)
 	if err != nil {
 		panic(err)
 	}

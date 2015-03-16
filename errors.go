@@ -58,7 +58,7 @@ func (err PacketDecodingError) Error() string {
 	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
 }
 
-// ConfigurationError is the type of error returned from NewClient, NewProducer or NewConsumer when the specified
+// ConfigurationError is the type of error returned from NewClient, NewAsyncProducer or NewConsumer when the specified
 // configuration is invalid.
 type ConfigurationError string
 
