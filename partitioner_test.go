@@ -98,3 +98,25 @@ func TestHashPartitioner(t *testing.T) {
 		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: ByteEncoder(buf)}, 50)
 	}
 }
+
+func TestManualPartitioner(t *testing.T) {
+	partitioner := NewManualPartitioner()
+
+	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
+	if choice != 0 {
+		t.Error("Returned non-zero partition when only one available.")
+	}
+
+	for i := int32(1); i < 50; i++ {
+		choice, err := partitioner.Partition(&ProducerMessage{Partition: i}, 50)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
+		if choice != i {
+			t.Error("Returned partition not the same as the input partition")
+		}
+	}
+}
