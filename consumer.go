@@ -97,15 +97,6 @@ func (c *consumer) Close() error {
 	return nil
 }
 
-const (
-	// OffsetNewest causes the consumer to start at the most recent available offset, as
-	// determined by querying the broker.
-	OffsetNewest int64 = -1
-	// OffsetOldest causes the consumer to start at the oldest available offset, as
-	// determined by querying the broker.
-	OffsetOldest int64 = -2
-)
-
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
 	child := &partitionConsumer{
 		consumer:  c,
