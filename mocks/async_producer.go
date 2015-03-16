@@ -18,6 +18,7 @@ type AsyncProducer struct {
 	input        chan *sarama.ProducerMessage
 	successes    chan *sarama.ProducerMessage
 	errors       chan *sarama.ProducerError
+	lastOffset   int64
 }
 
 // NewAsyncProducer instantiates a new Producer mock. The t argument should
@@ -52,7 +53,9 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 				expectation := mp.expectations[0]
 				mp.expectations = mp.expectations[1:]
 				if expectation.Result == errProduceSuccess {
+					mp.lastOffset++
 					if config.Producer.Return.Successes {
+						msg.Offset = mp.lastOffset
 						mp.successes <- msg
 					}
 				} else {

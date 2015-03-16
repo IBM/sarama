@@ -109,28 +109,18 @@ const (
 
 // ProducerMessage is the collection of elements passed to the Producer in order to send a message.
 type ProducerMessage struct {
-	Topic    string      // The Kafka topic for this message.
-	Key      Encoder     // The partitioning key for this message. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder.
-	Value    Encoder     // The actual message to store in Kafka. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder.
+	Topic string  // The Kafka topic for this message.
+	Key   Encoder // The partitioning key for this message. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder.
+	Value Encoder // The actual message to store in Kafka. It must implement the Encoder interface. Pre-existing Encoders include StringEncoder and ByteEncoder.
+
+	// These are filled in by the producer as the message is processed
+	Offset    int64 // Offset is the offset of the message stored on the broker. This is only guaranteed to be defined if the message was successfully delivered and RequiredAcks is not NoResponse.
+	Partition int32 // Partition is the partition that the message was sent to. This is only guaranteed to be defined if the message was successfully delivered.
+
 	Metadata interface{} // This field is used to hold arbitrary data you wish to include so it will be available when receiving on the Successes and Errors channels.  Sarama completely ignores this field and is only to be used for pass-through data.
 
-	// these are filled in by the producer as the message is processed
-	offset    int64
-	partition int32
-	retries   int
-	flags     flagSet
-}
-
-// Offset is the offset of the message stored on the broker. This is only guaranteed to be defined if
-// the message was successfully delivered and RequiredAcks is not NoResponse.
-func (m *ProducerMessage) Offset() int64 {
-	return m.offset
-}
-
-// Partition is the partition that the message was sent to. This is only guaranteed to be defined if
-// the message was successfully delivered.
-func (m *ProducerMessage) Partition() int32 {
-	return m.partition
+	retries int
+	flags   flagSet
 }
 
 func (m *ProducerMessage) byteSize() int {
@@ -283,15 +273,15 @@ func (p *asyncProducer) partitionDispatcher(topic string, input chan *ProducerMe
 			}
 		}
 
-		handler := handlers[msg.partition]
+		handler := handlers[msg.Partition]
 		if handler == nil {
 			p.retries <- &ProducerMessage{flags: ref}
 			newHandler := make(chan *ProducerMessage, p.conf.ChannelBufferSize)
 			topic := msg.Topic         // block local because go's closure semantics suck
-			partition := msg.partition // block local because go's closure semantics suck
+			partition := msg.Partition // block local because go's closure semantics suck
 			go withRecover(func() { p.leaderDispatcher(topic, partition, newHandler) })
 			handler = newHandler
-			handlers[msg.partition] = handler
+			handlers[msg.Partition] = handler
 		}
 
 		handler <- msg
@@ -348,7 +338,7 @@ func (p *asyncProducer) leaderDispatcher(topic string, partition int32, input ch
 			highWatermark = msg.retries
 			Logger.Printf("producer/leader state change to [retrying-%d] on %s/%d\n", highWatermark, topic, partition)
 			retryState[msg.retries].expectChaser = true
-			output <- &ProducerMessage{Topic: topic, partition: partition, flags: chaser, retries: msg.retries - 1}
+			output <- &ProducerMessage{Topic: topic, Partition: partition, flags: chaser, retries: msg.retries - 1}
 			Logger.Printf("producer/leader abandoning broker %d on %s/%d\n", leader.ID(), topic, partition)
 			p.unrefBrokerProducer(leader)
 			output = nil
@@ -497,14 +487,14 @@ func (p *asyncProducer) flusher(broker *Broker, input chan []*ProducerMessage) {
 		// group messages by topic/partition
 		msgSets := make(map[string]map[int32][]*ProducerMessage)
 		for i, msg := range batch {
-			if currentRetries[msg.Topic] != nil && currentRetries[msg.Topic][msg.partition] != nil {
+			if currentRetries[msg.Topic] != nil && currentRetries[msg.Topic][msg.Partition] != nil {
 				if msg.flags&chaser == chaser {
 					// we can start processing this topic/partition again
 					Logger.Printf("producer/flusher/%d state change to [normal] on %s/%d\n",
-						broker.ID(), msg.Topic, msg.partition)
-					currentRetries[msg.Topic][msg.partition] = nil
+						broker.ID(), msg.Topic, msg.Partition)
+					currentRetries[msg.Topic][msg.Partition] = nil
 				}
-				p.retryMessages([]*ProducerMessage{msg}, currentRetries[msg.Topic][msg.partition])
+				p.retryMessages([]*ProducerMessage{msg}, currentRetries[msg.Topic][msg.Partition])
 				batch[i] = nil // to prevent it being returned/retried twice
 				continue
 			}
@@ -515,7 +505,7 @@ func (p *asyncProducer) flusher(broker *Broker, input chan []*ProducerMessage) {
 				msgSets[msg.Topic] = partitionSet
 			}
 
-			partitionSet[msg.partition] = append(partitionSet[msg.partition], msg)
+			partitionSet[msg.Partition] = append(partitionSet[msg.Partition], msg)
 		}
 
 		request := p.buildRequest(msgSets)
@@ -563,7 +553,7 @@ func (p *asyncProducer) flusher(broker *Broker, input chan []*ProducerMessage) {
 					// All the messages for this topic-partition were delivered successfully!
 					if p.conf.Producer.Return.Successes {
 						for i := range msgs {
-							msgs[i].offset = block.Offset + int64(i)
+							msgs[i].Offset = block.Offset + int64(i)
 						}
 						p.returnSuccesses(msgs)
 					}
@@ -664,7 +654,7 @@ func (p *asyncProducer) assignPartition(partitioner Partitioner, msg *ProducerMe
 		return ErrInvalidPartition
 	}
 
-	msg.partition = partitions[choice]
+	msg.Partition = partitions[choice]
 
 	return nil
 }

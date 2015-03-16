@@ -56,8 +56,8 @@ func (sp *syncProducer) SendMessage(topic string, key, value Encoder) (partition
 	msg := &ProducerMessage{Topic: topic, Key: key, Value: value, Metadata: expectation}
 	sp.producer.Input() <- msg
 	err = <-expectation
-	partition = msg.Partition()
-	offset = msg.Offset()
+	partition = msg.Partition
+	offset = msg.Offset
 	return
 }
 
