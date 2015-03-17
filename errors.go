@@ -10,15 +10,15 @@ import (
 var ErrOutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
 
 // ErrClosedClient is the error returned when a method is called on a client that has been closed.
-var ErrClosedClient = errors.New("kafka: Tried to use a client that was closed")
+var ErrClosedClient = errors.New("kafka: tried to use a client that was closed")
 
 // ErrIncompleteResponse is the error returned when the server returns a syntactically valid response, but it does
 // not contain the expected information.
-var ErrIncompleteResponse = errors.New("kafka: Response did not contain all the expected topic/partition blocks")
+var ErrIncompleteResponse = errors.New("kafka: response did not contain all the expected topic/partition blocks")
 
 // ErrInvalidPartition is the error returned when a partitioner returns an invalid partition index
 // (meaning one outside of the range [0...numPartitions-1]).
-var ErrInvalidPartition = errors.New("kafka: Partitioner returned an invalid partition index")
+var ErrInvalidPartition = errors.New("kafka: partitioner returned an invalid partition index")
 
 // ErrAlreadyConnected is the error returned when calling Open() on a Broker that is already connected or connecting.
 var ErrAlreadyConnected = errors.New("kafka: broker connection already initiated")
@@ -29,13 +29,13 @@ var ErrNotConnected = errors.New("kafka: broker not connected")
 // ErrInsufficientData is returned when decoding and the packet is truncated. This can be expected
 // when requesting messages, since as an optimization the server is allowed to return a partial message at the end
 // of the message set.
-var ErrInsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected")
+var ErrInsufficientData = errors.New("kafka: insufficient data to decode packet, more bytes expected")
 
 // ErrShuttingDown is returned when a producer receives a message during shutdown.
-var ErrShuttingDown = errors.New("kafka: Message received by producer in process of shutting down")
+var ErrShuttingDown = errors.New("kafka: message received by producer in process of shutting down")
 
-// ErrMessageTooLarge is returned when the next message to consume is larger than the configured MaxFetchSize
-var ErrMessageTooLarge = errors.New("kafka: Message is larger than MaxFetchSize")
+// ErrMessageTooLarge is returned when the next message to consume is larger than the configured Consumer.Fetch.Max
+var ErrMessageTooLarge = errors.New("kafka: message is larger than Consumer.Fetch.Max")
 
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
