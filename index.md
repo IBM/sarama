@@ -12,7 +12,7 @@ and 1.4, and Kafka 0.8.1 and 0.8.2.
 
 Sarama follows semantic versioning and provides API stability via the gopkg.in
 service. You can import a version with a guaranteed stable API via [`import
-gopkg.in/Shopify/sarama.v1`](http://gopkg.in/Shopify/sarama.v1).
+"gopkg.in/Shopify/sarama.v1"`](http://gopkg.in/Shopify/sarama.v1).
 
 Other related links:
 
