@@ -6,9 +6,11 @@ import "sync"
 // and parses responses for errors. You must call Close() on a producer to avoid leaks, it may not be garbage-collected automatically when
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
 type SyncProducer interface {
-	// SendMessage produces a message to the given topic with the given key and value. To send strings as either key or value, see the StringEncoder type.
-	// It returns the partition and offset of the successfully-produced message, or the error (if any).
-	SendMessage(topic string, key, value Encoder) (partition int32, offset int64, err error)
+
+	// SendMessage produces a given message, and returns only when it either has succeeded or failed to produce.
+	// It will return the partition and the offset of the produced message, or an error if the message
+	// failed to produce.
+	SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error)
 
 	// Close shuts down the producer and flushes any messages it may have buffered. You must call this function before
 	// a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
@@ -51,14 +53,21 @@ func newSyncProducerFromAsyncProducer(p *asyncProducer) *syncProducer {
 	return sp
 }
 
-func (sp *syncProducer) SendMessage(topic string, key, value Encoder) (partition int32, offset int64, err error) {
+func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error) {
+	oldMetadata := msg.Metadata
+	defer func() {
+		msg.Metadata = oldMetadata
+	}()
+
 	expectation := make(chan error, 1)
-	msg := &ProducerMessage{Topic: topic, Key: key, Value: value, Metadata: expectation}
+	msg.Metadata = expectation
 	sp.producer.Input() <- msg
-	err = <-expectation
-	partition = msg.Partition
-	offset = msg.Offset
-	return
+
+	if err := <-expectation; err != nil {
+		return -1, -1, err
+	} else {
+		return msg.Partition, msg.Offset, nil
+	}
 }
 
 func (sp *syncProducer) handleSuccesses() {
