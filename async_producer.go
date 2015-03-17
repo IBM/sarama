@@ -262,7 +262,7 @@ func (p *asyncProducer) topicDispatcher() {
 // partitions messages, then dispatches them by partition
 func (p *asyncProducer) partitionDispatcher(topic string, input chan *ProducerMessage) {
 	handlers := make(map[int32]chan *ProducerMessage)
-	partitioner := p.conf.Producer.Partitioner()
+	partitioner := p.conf.Producer.Partitioner(topic)
 
 	for msg := range input {
 		if msg.retries == 0 {
