@@ -424,6 +424,11 @@ func (p *asyncProducer) messageAggregator(broker *Broker, input chan *ProducerMe
 	var buffer []*ProducerMessage
 	var doFlush chan []*ProducerMessage
 	var bytesAccumulated int
+	var defaultFlush bool
+
+	if p.conf.Producer.Flush.Frequency == 0 && p.conf.Producer.Flush.Bytes == 0 && p.conf.Producer.Flush.Messages == 0 {
+		defaultFlush = true
+	}
 
 	flusher := make(chan []*ProducerMessage)
 	go withRecover(func() { p.flusher(broker, flusher) })
@@ -448,7 +453,8 @@ func (p *asyncProducer) messageAggregator(broker *Broker, input chan *ProducerMe
 			buffer = append(buffer, msg)
 			bytesAccumulated += msg.byteSize()
 
-			if len(buffer) >= p.conf.Producer.Flush.Messages ||
+			if defaultFlush ||
+				(p.conf.Producer.Flush.Messages > 0 && len(buffer) >= p.conf.Producer.Flush.Messages) ||
 				(p.conf.Producer.Flush.Bytes > 0 && bytesAccumulated >= p.conf.Producer.Flush.Bytes) {
 				doFlush = flusher
 			}
