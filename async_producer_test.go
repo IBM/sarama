@@ -574,7 +574,7 @@ func TestProducerOutOfRetries(t *testing.T) {
 
 // This example shows how to use the producer while simultaneously
 // reading the Errors channel to know about any failures.
-func ExampleProducer_select() {
+func ExampleAsyncProducer_select() {
 	producer, err := NewAsyncProducer([]string{"localhost:9092"}, nil)
 	if err != nil {
 		panic(err)
@@ -611,7 +611,7 @@ ProducerLoop:
 // reading from the Successes and Errors channels. Note that in order
 // for the Successes channel to be populated, you have to set
 // config.Producer.Return.Successes to true.
-func ExampleProducer_goroutines() {
+func ExampleAsyncProducer_goroutines() {
 	config := NewConfig()
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{"localhost:9092"}, config)
