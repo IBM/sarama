@@ -25,7 +25,7 @@ func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, message
 }
 
 func TestRandomPartitioner(t *testing.T) {
-	partitioner := NewRandomPartitioner()
+	partitioner := NewRandomPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(nil, 1)
 	if err != nil {
@@ -47,7 +47,7 @@ func TestRandomPartitioner(t *testing.T) {
 }
 
 func TestRoundRobinPartitioner(t *testing.T) {
-	partitioner := NewRoundRobinPartitioner()
+	partitioner := NewRoundRobinPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(nil, 1)
 	if err != nil {
@@ -70,7 +70,7 @@ func TestRoundRobinPartitioner(t *testing.T) {
 }
 
 func TestHashPartitioner(t *testing.T) {
-	partitioner := NewHashPartitioner()
+	partitioner := NewHashPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
 	if err != nil {
@@ -100,7 +100,7 @@ func TestHashPartitioner(t *testing.T) {
 }
 
 func TestManualPartitioner(t *testing.T) {
-	partitioner := NewManualPartitioner()
+	partitioner := NewManualPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
 	if err != nil {

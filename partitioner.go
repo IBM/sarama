@@ -20,13 +20,13 @@ type Partitioner interface {
 }
 
 // PartitionerConstructor is the type for a function capable of constructing new Partitioners.
-type PartitionerConstructor func() Partitioner
+type PartitionerConstructor func(topic string) Partitioner
 
 type manualPartitioner struct{}
 
 // NewManualPartitioner returns a Partitioner which uses the partition manually set in the provided
 // ProducerMessage's Partition field as the partition to produce to.
-func NewManualPartitioner() Partitioner {
+func NewManualPartitioner(topic string) Partitioner {
 	return new(manualPartitioner)
 }
 
@@ -43,7 +43,7 @@ type randomPartitioner struct {
 }
 
 // NewRandomPartitioner returns a Partitioner which chooses a random partition each time.
-func NewRandomPartitioner() Partitioner {
+func NewRandomPartitioner(topic string) Partitioner {
 	p := new(randomPartitioner)
 	p.generator = rand.New(rand.NewSource(time.Now().UTC().UnixNano()))
 	return p
@@ -62,7 +62,7 @@ type roundRobinPartitioner struct {
 }
 
 // NewRoundRobinPartitioner returns a Partitioner which walks through the available partitions one at a time.
-func NewRoundRobinPartitioner() Partitioner {
+func NewRoundRobinPartitioner(topic string) Partitioner {
 	return &roundRobinPartitioner{}
 }
 
@@ -88,9 +88,9 @@ type hashPartitioner struct {
 // encode, then a random partition is chosen. Otherwise the FNV-1a hash of the encoded bytes of the message key
 // is used, modulus the number of partitions. This ensures that messages with the same key always end up on the
 // same partition.
-func NewHashPartitioner() Partitioner {
+func NewHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
-	p.random = NewRandomPartitioner()
+	p.random = NewRandomPartitioner(topic)
 	p.hasher = fnv.New32a()
 	return p
 }
