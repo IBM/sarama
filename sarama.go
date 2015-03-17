@@ -1,5 +1,5 @@
 /*
-Package sarama provides client libraries for the Kafka 0.8 protocol. The Producer object is the high-level
+Package sarama provides client libraries for the Kafka 0.8 protocol. The AsyncProducer object is the high-level
 API for producing messages asynchronously; the SyncProducer provides a blocking API for the same purpose.
 The Consumer object is the high-level API for consuming messages. The Client object provides metadata
 management functionality that is shared between the higher-level objects.

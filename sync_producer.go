@@ -17,29 +17,29 @@ type SyncProducer interface {
 }
 
 type syncProducer struct {
-	producer *producer
+	producer *asyncProducer
 	wg       sync.WaitGroup
 }
 
 // NewSyncProducer creates a new SyncProducer using the given broker addresses and configuration.
 func NewSyncProducer(addrs []string, config *Config) (SyncProducer, error) {
-	p, err := NewProducer(addrs, config)
+	p, err := NewAsyncProducer(addrs, config)
 	if err != nil {
 		return nil, err
 	}
-	return newSyncProducerFromProducer(p.(*producer)), nil
+	return newSyncProducerFromAsyncProducer(p.(*asyncProducer)), nil
 }
 
 // NewSyncProducerFromClient creates a new SyncProducer using the given client.
 func NewSyncProducerFromClient(client Client) (SyncProducer, error) {
-	p, err := NewProducerFromClient(client)
+	p, err := NewAsyncProducerFromClient(client)
 	if err != nil {
 		return nil, err
 	}
-	return newSyncProducerFromProducer(p.(*producer)), nil
+	return newSyncProducerFromAsyncProducer(p.(*asyncProducer)), nil
 }
 
-func newSyncProducerFromProducer(p *producer) *syncProducer {
+func newSyncProducerFromAsyncProducer(p *asyncProducer) *syncProducer {
 	p.conf.Producer.Return.Successes = true
 	p.conf.Producer.Return.Errors = true
 	sp := &syncProducer{producer: p}
@@ -56,8 +56,8 @@ func (sp *syncProducer) SendMessage(topic string, key, value Encoder) (partition
 	msg := &ProducerMessage{Topic: topic, Key: key, Value: value, Metadata: expectation}
 	sp.producer.Input() <- msg
 	err = <-expectation
-	partition = msg.Partition()
-	offset = msg.Offset()
+	partition = msg.Partition
+	offset = msg.Offset
 	return
 }
 

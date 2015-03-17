@@ -19,9 +19,9 @@ func (trm *testReporterMock) Errorf(format string, args ...interface{}) {
 	trm.errors = append(trm.errors, fmt.Sprintf(format, args...))
 }
 
-func TestMockProducerImplementsProducerInterface(t *testing.T) {
-	var mp interface{} = &Producer{}
-	if _, ok := mp.(sarama.Producer); !ok {
+func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
+	var mp interface{} = &AsyncProducer{}
+	if _, ok := mp.(sarama.AsyncProducer); !ok {
 		t.Error("The mock producer should implement the sarama.Producer interface.")
 	}
 }
@@ -29,7 +29,7 @@ func TestMockProducerImplementsProducerInterface(t *testing.T) {
 func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 	config := sarama.NewConfig()
 	config.Producer.Return.Successes = true
-	mp := NewProducer(t, config)
+	mp := NewAsyncProducer(t, config)
 
 	mp.ExpectInputAndSucceed()
 	mp.ExpectInputAndSucceed()
@@ -62,7 +62,7 @@ func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 
 func TestProducerWithTooFewExpectations(t *testing.T) {
 	trm := newTestReporterMock()
-	mp := NewProducer(trm, nil)
+	mp := NewAsyncProducer(trm, nil)
 	mp.ExpectInputAndSucceed()
 
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
@@ -79,7 +79,7 @@ func TestProducerWithTooFewExpectations(t *testing.T) {
 
 func TestProducerWithTooManyExpectations(t *testing.T) {
 	trm := newTestReporterMock()
-	mp := NewProducer(trm, nil)
+	mp := NewAsyncProducer(trm, nil)
 	mp.ExpectInputAndSucceed()
 	mp.ExpectInputAndFail(sarama.ErrOutOfBrokers)
 

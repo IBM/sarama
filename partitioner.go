@@ -22,6 +22,22 @@ type Partitioner interface {
 // PartitionerConstructor is the type for a function capable of constructing new Partitioners.
 type PartitionerConstructor func() Partitioner
 
+type manualPartitioner struct{}
+
+// NewManualPartitioner returns a Partitioner which uses the partition manually set in the provided
+// ProducerMessage's Partition field as the partition to produce to.
+func NewManualPartitioner() Partitioner {
+	return new(manualPartitioner)
+}
+
+func (p *manualPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
+	return message.Partition, nil
+}
+
+func (p *manualPartitioner) RequiresConsistency() bool {
+	return true
+}
+
 type randomPartitioner struct {
 	generator *rand.Rand
 }
