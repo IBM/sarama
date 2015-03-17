@@ -180,3 +180,19 @@ func ExamplePartitioner_manual() {
 
 	log.Printf("Produced message to partition %d with offset %d", partition, offset)
 }
+
+// This example shows how to set a different partitioner depending on the topic.
+func ExamplePartitioner_per_topic() {
+	config := NewConfig()
+	config.Producer.Partitioner = func(topic string) Partitioner {
+		switch topic {
+		case "access_log", "error_log":
+			return NewRandomPartitioner(topic)
+
+		default:
+			return NewHashPartitioner(topic)
+		}
+	}
+
+	// ...
+}
