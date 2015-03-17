@@ -199,13 +199,12 @@ func (c *consumer) unrefBrokerConsumer(broker *Broker) {
 // PartitionConsumer
 
 // PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call Close()
-// or AsyncClose() on a consumer to avoid leaks, it will not be garbage-collected automatically when
-// it passes out of scope (this is in addition to calling Close on the underlying consumer's client,
-// which is still necessary).
+// or AsyncClose() on a PartitionConsumer to avoid leaks, it will not be garbage-collected automatically
+// when it passes out of scope.
 //
-// The simplest way of using a PartitionCOnsumer is to loop over if Messages channel using a for/range
-// loop. The PartitionConsumer will under no circumstances stop by itself once it is started. It will
-// just keep retrying ig it encounters errors. By default, it just logs these errors to sarama.Logger;
+// The simplest way of using a PartitionConsumer is to loop over its Messages channel using a for/range
+// loop. The PartitionConsumer will under no circumstances stop by itself once it is started, it will
+// just keep retrying if it encounters errors. By default, it logs these errors to sarama.Logger;
 // if you want to handle errors yourself, set your config's Consumer.Return.Errors to true, and read
 // from the Errors channel as well, using a select statement or in a separate goroutine. Check out
 // the examples of Consumer to see examples of these different approaches.
