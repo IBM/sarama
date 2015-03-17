@@ -29,7 +29,6 @@ var ErrNotConnected = errors.New("kafka: broker not connected")
 // ErrInsufficientData is returned when decoding and the packet is truncated. This can be expected
 // when requesting messages, since as an optimization the server is allowed to return a partial message at the end
 // of the message set.
-
 var ErrInsufficientData = errors.New("kafka: Insufficient data to decode packet, more bytes expected")
 
 // ErrShuttingDown is returned when a producer receives a message during shutdown.
