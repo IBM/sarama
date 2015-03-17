@@ -25,28 +25,26 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 	sp.ExpectSendMessageAndSucceed()
 	sp.ExpectSendMessageAndFail(sarama.ErrOutOfBrokers)
 
-	var (
-		offset int64
-		err    error
-	)
+	var err error
 
-	_, offset, err = sp.SendMessage("test", nil, sarama.StringEncoder("test"))
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	err = sp.SendMessage(msg)
 	if err != nil {
 		t.Errorf("The first message should have been produced successfully, but got %s", err)
 	}
-	if offset != 1 {
-		t.Errorf("The first message should have been assigned offset 1, but got %d", offset)
+	if msg.Offset != 1 {
+		t.Errorf("The first message should have been assigned offset 1, but got %d", msg.Offset)
 	}
 
-	_, offset, err = sp.SendMessage("test", nil, sarama.StringEncoder("test"))
+	err = sp.SendMessage(msg)
 	if err != nil {
 		t.Errorf("The second message should have been produced successfully, but got %s", err)
 	}
-	if offset != 2 {
-		t.Errorf("The second message should have been assigned offset 2, but got %d", offset)
+	if msg.Offset != 2 {
+		t.Errorf("The second message should have been assigned offset 2, but got %d", msg.Offset)
 	}
 
-	_, offset, err = sp.SendMessage("test", nil, sarama.StringEncoder("test"))
+	err = sp.SendMessage(msg)
 	if err != sarama.ErrOutOfBrokers {
 		t.Errorf("The third message should not have been produced successfully")
 	}
@@ -63,7 +61,8 @@ func TestSyncProducerWithTooManyExpectations(t *testing.T) {
 	sp.ExpectSendMessageAndSucceed()
 	sp.ExpectSendMessageAndFail(sarama.ErrOutOfBrokers)
 
-	if _, _, err := sp.SendMessage("test", nil, sarama.StringEncoder("test")); err != nil {
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if err := sp.SendMessage(msg); err != nil {
 		t.Error("No error expected on first SendMessage call", err)
 	}
 
@@ -82,10 +81,11 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 	sp := NewSyncProducer(trm, nil)
 	sp.ExpectSendMessageAndSucceed()
 
-	if _, _, err := sp.SendMessage("test", nil, sarama.StringEncoder("test")); err != nil {
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if err := sp.SendMessage(msg); err != nil {
 		t.Error("No error expected on first SendMessage call", err)
 	}
-	if _, _, err := sp.SendMessage("test", nil, sarama.StringEncoder("test")); err != errOutOfExpectations {
+	if err := sp.SendMessage(msg); err != errOutOfExpectations {
 		t.Error("errOutOfExpectations expected on second SendMessage call, found:", err)
 	}
 

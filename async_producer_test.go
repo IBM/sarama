@@ -51,12 +51,22 @@ func TestSyncProducer(t *testing.T) {
 	}
 
 	for i := 0; i < 10; i++ {
-		partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
-		if partition != 0 {
+		msg := &ProducerMessage{
+			Topic:    "my_topic",
+			Value:    StringEncoder(TestMessage),
+			Metadata: "test",
+		}
+
+		err := producer.SendMessage(msg)
+
+		if msg.Partition != 0 {
 			t.Error("Unexpected partition")
 		}
-		if offset != 0 {
+		if msg.Offset != 0 {
 			t.Error("Unexpected offset")
+		}
+		if str, ok := msg.Metadata.(string); !ok || str != "test" {
+			t.Error("Unexpected metadata")
 		}
 		if err != nil {
 			t.Error(err)
@@ -93,8 +103,9 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		wg.Add(1)
 		go func() {
-			partition, _, err := producer.SendMessage("my_topic", nil, StringEncoder(TestMessage))
-			if partition != 0 {
+			msg := &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+			err := producer.SendMessage(msg)
+			if msg.Partition != 0 {
 				t.Error("Unexpected partition")
 			}
 			if err != nil {
@@ -675,10 +686,11 @@ func ExampleSyncProducer() {
 		}
 	}()
 
-	partition, offset, err := producer.SendMessage("my_topic", nil, StringEncoder("testing 123"))
+	msg := &ProducerMessage{Topic: "my_topic", Value: StringEncoder("testing 123")}
+	err = producer.SendMessage(msg)
 	if err != nil {
 		log.Printf("FAILED to send message: %s\n", err)
 	} else {
-		log.Printf("> message sent to partition %d at offset %d\n", partition, offset)
+		log.Printf("> message sent to partition %d at offset %d\n", msg.Partition, msg.Offset)
 	}
 }

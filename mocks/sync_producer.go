@@ -35,7 +35,7 @@ func NewSyncProducer(t ErrorReporter, config *sarama.Config) *SyncProducer {
 // You have to set expectations on the mock producer before calling SendMessage, so it knows
 // how to handle them. If there is no more remaining expectations when SendMessage is called,
 // the mock producer will write an error to the test state object.
-func (sp *SyncProducer) SendMessage(topic string, key, value sarama.Encoder) (partition int32, offset int64, err error) {
+func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) error {
 	sp.l.Lock()
 	defer sp.l.Unlock()
 
@@ -45,13 +45,14 @@ func (sp *SyncProducer) SendMessage(topic string, key, value sarama.Encoder) (pa
 
 		if expectation.Result == errProduceSuccess {
 			sp.lastOffset++
-			return 0, sp.lastOffset, nil
+			msg.Offset = sp.lastOffset
+			return nil
 		} else {
-			return -1, -1, expectation.Result
+			return expectation.Result
 		}
 	} else {
 		sp.t.Errorf("No more expectation set on this mock producer to handle the input message.")
-		return -1, -1, errOutOfExpectations
+		return errOutOfExpectations
 	}
 }
 
