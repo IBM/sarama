@@ -22,7 +22,7 @@ func encode(in encoder) ([]byte, error) {
 		return nil, err
 	}
 
-	if prepEnc.length < 0 || uint32(prepEnc.length) > MaxRequestSize {
+	if prepEnc.length < 0 || prepEnc.length > int(MaxRequestSize) {
 		return nil, PacketEncodingError{fmt.Sprintf("Invalid request size: %d", prepEnc.length)}
 	}
 
