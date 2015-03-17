@@ -73,7 +73,8 @@ func NewConsumer(addrs []string, config *Config) (Consumer, error) {
 	return c, nil
 }
 
-// NewConsumerFromClient creates a new consumer using the given client.
+// NewConsumerFromClient creates a new consumer using the given client. It is still
+// necessary to call Close() on the underlying client when shutting down this consumer.
 func NewConsumerFromClient(client Client) (Consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {

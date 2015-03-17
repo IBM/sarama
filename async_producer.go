@@ -17,8 +17,7 @@ func forceFlushThreshold() int {
 // and parses responses for errors. You must read from the Errors() channel or the
 // producer will deadlock. You must call Close() or AsyncClose() on a producer to avoid
 // leaks: it will not be garbage-collected automatically when it passes out of
-// scope (this is in addition to calling Close on the underlying client, which
-// is still necessary).
+// scope.
 type AsyncProducer interface {
 
 	// AsyncClose triggers a shutdown of the producer, flushing any messages it may have
@@ -74,7 +73,8 @@ func NewAsyncProducer(addrs []string, conf *Config) (AsyncProducer, error) {
 	return p, nil
 }
 
-// NewAsyncProducerFromClient creates a new Producer using the given client.
+// NewAsyncProducerFromClient creates a new Producer using the given client. It is still
+// necessary to call Close() on the underlying client when shutting down this producer.
 func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {

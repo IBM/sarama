@@ -4,7 +4,7 @@ import "sync"
 
 // SyncProducer publishes Kafka messages. It routes messages to the correct broker, refreshing metadata as appropriate,
 // and parses responses for errors. You must call Close() on a producer to avoid leaks, it may not be garbage-collected automatically when
-// it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
+// it passes out of scope.
 type SyncProducer interface {
 
 	// SendMessage produces a given message, and returns only when it either has succeeded or failed to produce.
@@ -32,7 +32,8 @@ func NewSyncProducer(addrs []string, config *Config) (SyncProducer, error) {
 	return newSyncProducerFromAsyncProducer(p.(*asyncProducer)), nil
 }
 
-// NewSyncProducerFromClient creates a new SyncProducer using the given client.
+// NewSyncProducerFromClient creates a new SyncProducer using the given client. It is still
+// necessary to call Close() on the underlying client when shutting down this producer.
 func NewSyncProducerFromClient(client Client) (SyncProducer, error) {
 	p, err := NewAsyncProducerFromClient(client)
 	if err != nil {
