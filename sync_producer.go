@@ -7,9 +7,10 @@ import "sync"
 // it passes out of scope (this is in addition to calling Close on the underlying client, which is still necessary).
 type SyncProducer interface {
 
-	// SendMessage produces a given message, and returns when it has succeeded or failed.
-	// It will set the OPartition and Offset fields for a successfully produced message.
-	SendMessage(*ProducerMessage) error
+	// SendMessage produces a given message, and returns only when it either has succeeded or failed to produce.
+	// It will return the partition and the offset of the produced message, or an error if the message
+	// failed to produce.
+	SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error)
 
 	// Close shuts down the producer and flushes any messages it may have buffered. You must call this function before
 	// a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
@@ -52,7 +53,7 @@ func newSyncProducerFromAsyncProducer(p *asyncProducer) *syncProducer {
 	return sp
 }
 
-func (sp *syncProducer) SendMessage(msg *ProducerMessage) error {
+func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error) {
 	oldMetadata := msg.Metadata
 	defer func() {
 		msg.Metadata = oldMetadata
@@ -61,7 +62,12 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) error {
 	expectation := make(chan error, 1)
 	msg.Metadata = expectation
 	sp.producer.Input() <- msg
-	return <-expectation
+
+	if err := <-expectation; err != nil {
+		return -1, -1, err
+	} else {
+		return msg.Partition, msg.Offset, nil
+	}
 }
 
 func (sp *syncProducer) handleSuccesses() {
