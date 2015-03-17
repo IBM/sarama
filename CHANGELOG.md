@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.0.0 (2015-04-17)
+#### Version 1.0.0 (2015-03-17)
 
 Version 1.0.0 is the first tagged version, and is almost a complete rewrite. The primary differences with previous untagged versions are:
 
