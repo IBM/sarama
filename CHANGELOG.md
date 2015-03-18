@@ -1,5 +1,11 @@
 # Changelog
 
+#### Unreleased
+
+Bug Fixes:
+ - Fix the producer's internal reference counting in certain unusual scenarios
+   ([#367](https://github.com/Shopify/sarama/pull/367)).
+
 #### Version 1.0.0 (2015-03-17)
 
 Version 1.0.0 is the first tagged version, and is almost a complete rewrite. The primary differences with previous untagged versions are:
