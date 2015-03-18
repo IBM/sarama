@@ -6,6 +6,7 @@ go:
 
 env:
   global:
+  - KAFKA_PEERS="localhost:6667,localhost:6668,localhost:6669,localhost:6670,localhost:6671"
   - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
   matrix:
   - KAFKA_VERSION=0.8.1.1
