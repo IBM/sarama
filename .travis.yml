@@ -6,7 +6,9 @@ go:
 
 env:
   global:
-  - KAFKA_INSTALL_ROOT=/home/travis/kafka KAFKA_HOSTNAME=localhost
+  - KAFKA_PEERS=localhost:6667,localhost:6668,localhost:6669,localhost:6670,localhost:6671
+  - KAFKA_INSTALL_ROOT=/home/travis/kafka
+  - KAFKA_HOSTNAME=localhost
   matrix:
   - KAFKA_VERSION=0.8.1.1
   - KAFKA_VERSION=0.8.2.1
@@ -16,17 +18,16 @@ before_install:
 - vagrant/install_cluster.sh
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
-- go get golang.org/x/tools/cmd/vet
-- go get github.com/kisielk/errcheck
+
+
+install:
+- make install_dependencies
 
 script:
-- go test -v -race ./...
-- go vet ./...
-- errcheck github.com/Shopify/sarama/...
-- if [[ -n $(go fmt ./...) ]]; then echo "Please run go fmt on your code." && exit 1; fi
-
-notifications:
-  flowdock: 15e08f7ed3a8fd2d89ddb36435301c1a
+- make test
+- make vet
+- make errcheck
+- make fmt
 
 matrix:
   allow_failures:
