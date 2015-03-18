@@ -492,6 +492,75 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 	safeClose(t, producer)
 }
 
+func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
+	leaderAddr := leader.Addr()
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leaderAddr, leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Retry.Max = 1
+	config.Producer.Partitioner = NewRoundRobinPartitioner
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// prime partition 0
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+	select {
+	case msg := <-producer.Errors():
+		t.Error(msg.Err)
+	case <-producer.Successes():
+	}
+
+	// prime partition 1
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	prodSuccess = new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 1, ErrNoError)
+	leader.Returns(prodSuccess)
+	select {
+	case msg := <-producer.Errors():
+		t.Error(msg.Err)
+	case <-producer.Successes():
+	}
+
+	// reboot the broker (the producer will get EOF on its existing connection)
+	leader.Close()
+	leader = newMockBrokerAddr(t, 2, leaderAddr)
+
+	// send another message on partition 0 to trigger the EOF and retry
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+
+	// tell partition 0 to go to that broker again
+	seedBroker.Returns(metadataResponse)
+
+	// succeed this time
+	prodSuccess = new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+	select {
+	case msg := <-producer.Errors():
+		t.Error(msg.Err)
+	case <-producer.Successes():
+	}
+
+	// shutdown
+	closeProducer(t, producer)
+	seedBroker.Close()
+	leader.Close()
+}
+
 // This example shows how to use the producer while simultaneously
 // reading the Errors channel to know about any failures.
 func ExampleAsyncProducer_select() {
