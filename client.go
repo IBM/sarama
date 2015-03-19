@@ -492,7 +492,7 @@ func (client *client) tryRefreshMetadata(topics []string, retriesRemaining int) 
 		switch err.(type) {
 		case nil:
 			// valid response, use it
-			retry, err := client.update(response)
+			retry, err := client.updateMetadata(response)
 
 			if len(retry) > 0 {
 				if retriesRemaining <= 0 {
@@ -531,7 +531,7 @@ func (client *client) tryRefreshMetadata(topics []string, retriesRemaining int) 
 }
 
 // if no fatal error, returns a list of topics that need retrying due to ErrLeaderNotAvailable
-func (client *client) update(data *MetadataResponse) ([]string, error) {
+func (client *client) updateMetadata(data *MetadataResponse) ([]string, error) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
@@ -554,23 +554,37 @@ func (client *client) update(data *MetadataResponse) ([]string, error) {
 
 	var err error
 	for _, topic := range data.Topics {
+
+		delete(client.metadata, topic.Name)
+		delete(client.cachedPartitionsResults, topic.Name)
+
 		switch topic.Err {
 		case ErrNoError:
 			break
-		case ErrLeaderNotAvailable, ErrUnknownTopicOrPartition:
-			toRetry[topic.Name] = true
-		default:
+		case ErrInvalidTopic: // don't retry, don't store partial results
 			err = topic.Err
+			continue
+		case ErrUnknownTopicOrPartition: // retry, do not store partial partition results
+			err = topic.Err
+			toRetry[topic.Name] = true
+			continue
+		case ErrLeaderNotAvailable: // retry, but store partiial partition results
+			toRetry[topic.Name] = true
+			break
+		default: // don't retry, don't store partial results
+			Logger.Printf("Unexpected topic-level metadata error: %s", topic.Err)
+			err = topic.Err
+			continue
 		}
 
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
-		delete(client.cachedPartitionsResults, topic.Name)
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
 			if partition.Err == ErrLeaderNotAvailable {
 				toRetry[topic.Name] = true
 			}
 		}
+
 		var partitionCache [maxPartitionIndex][]int32
 		partitionCache[allPartitions] = client.setPartitionCache(topic.Name, allPartitions)
 		partitionCache[writablePartitions] = client.setPartitionCache(topic.Name, writablePartitions)

@@ -182,25 +182,31 @@ func (m *MetadataResponse) AddBroker(addr string, id int32) {
 	m.Brokers = append(m.Brokers, &Broker{id: id, addr: addr})
 }
 
-func (m *MetadataResponse) AddTopicPartition(topic string, partition, brokerID int32, replicas, isr []int32, err KError) {
-	var match *TopicMetadata
+func (m *MetadataResponse) AddTopic(topic string, err KError) *TopicMetadata {
+	var tmatch *TopicMetadata
 
 	for _, tm := range m.Topics {
 		if tm.Name == topic {
-			match = tm
+			tmatch = tm
 			goto foundTopic
 		}
 	}
 
-	match = new(TopicMetadata)
-	match.Name = topic
-	m.Topics = append(m.Topics, match)
+	tmatch = new(TopicMetadata)
+	tmatch.Name = topic
+	m.Topics = append(m.Topics, tmatch)
 
 foundTopic:
 
+	tmatch.Err = err
+	return tmatch
+}
+
+func (m *MetadataResponse) AddTopicPartition(topic string, partition, brokerID int32, replicas, isr []int32, err KError) {
+	tmatch := m.AddTopic(topic, ErrNoError)
 	var pmatch *PartitionMetadata
 
-	for _, pm := range match.Partitions {
+	for _, pm := range tmatch.Partitions {
 		if pm.ID == partition {
 			pmatch = pm
 			goto foundPartition
@@ -209,7 +215,7 @@ foundTopic:
 
 	pmatch = new(PartitionMetadata)
 	pmatch.ID = partition
-	match.Partitions = append(match.Partitions, pmatch)
+	tmatch.Partitions = append(tmatch.Partitions, pmatch)
 
 foundPartition:
 

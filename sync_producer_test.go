@@ -97,6 +97,36 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestSyncProducerToNonExistingTopic(t *testing.T) {
+	broker := newMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, ErrNoError)
+	broker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.Metadata.Retry.Max = 0
+	config.Producer.Retry.Max = 0
+
+	producer, err := NewSyncProducer([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadataResponse = new(MetadataResponse)
+	metadataResponse.AddTopic("unknown", ErrUnknownTopicOrPartition)
+	broker.Returns(metadataResponse)
+
+	_, _, err = producer.SendMessage(&ProducerMessage{Topic: "unknown"})
+	if err != ErrUnknownTopicOrPartition {
+		t.Error("Uxpected ErrUnknownTopicOrPartition, found:", err)
+	}
+
+	safeClose(t, producer)
+	broker.Close()
+}
+
 // This example shows the basic usage pattern of the SyncProducer.
 func ExampleSyncProducer() {
 	producer, err := NewSyncProducer([]string{"localhost:9092"}, nil)

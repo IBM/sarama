@@ -124,6 +124,25 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	}
 }
 
+func TestProducingToInvalidTopic(t *testing.T) {
+	checkKafkaAvailability(t)
+
+	producer, err := NewSyncProducer(kafkaBrokers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrInvalidTopic {
+		t.Log("Expected ErrInvalidTopic, found", err)
+	}
+
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrInvalidTopic {
+		t.Log("Expected ErrInvalidTopic, found", err)
+	}
+
+	safeClose(t, producer)
+}
+
 func testProducingMessages(t *testing.T, config *Config) {
 	checkKafkaAvailability(t)
 

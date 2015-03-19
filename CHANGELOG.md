@@ -9,6 +9,9 @@ Bug Fixes:
    ([#369](https://github.com/Shopify/sarama/pull/369)).
  - Fix a condition where the producer's internal control messages could have
    gotten stuck ([#368](https://github.com/Shopify/sarama/pull/368)).
+ - Fix an issue where invalid partition lists would be cached when asking for
+   metadata for a non-existing topic ([#372](https://github.com/Shopify/sarama/pull/372)).
+
 
 #### Version 1.0.0 (2015-03-17)
 
