@@ -2,6 +2,11 @@
 
 #### Unreleased
 
+Improvements:
+ - Wrap the producer's partitioner call in a circuit-breaker so that repeatedly
+   broken topics don't choke throughput
+   ([#373](https://github.com/Shopify/sarama/pull/373)).
+
 Bug Fixes:
  - Fix the producer's internal reference counting in certain unusual scenarios
    ([#367](https://github.com/Shopify/sarama/pull/367)).
