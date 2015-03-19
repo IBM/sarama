@@ -265,10 +265,13 @@ func (p *asyncProducer) topicDispatcher() {
 func (p *asyncProducer) partitionDispatcher(topic string, input chan *ProducerMessage) {
 	handlers := make(map[int32]chan *ProducerMessage)
 	partitioner := p.conf.Producer.Partitioner(topic)
+	breaker := breaker.New(3, 1, 10*time.Second)
 
 	for msg := range input {
 		if msg.retries == 0 {
-			err := p.assignPartition(partitioner, msg)
+			err := breaker.Run(func() error {
+				return p.assignPartition(partitioner, msg)
+			})
 			if err != nil {
 				p.returnError(msg, err)
 				continue
