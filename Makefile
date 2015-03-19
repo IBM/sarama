@@ -10,7 +10,7 @@ errcheck:
 	errcheck github.com/Shopify/sarama/...
 
 fmt:
-	@if [[ -n $$(go fmt ./...) ]]; then echo 'Please run go fmt on your code.' && exit 1; fi
+	@if [ -n "$$(go fmt ./...)" ]; then echo 'Please run go fmt on your code.' && exit 1; fi
 
 install_dependencies: install_errcheck install_go_vet get
 
