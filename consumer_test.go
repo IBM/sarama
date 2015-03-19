@@ -297,6 +297,95 @@ func TestConsumerInterleavedClose(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestConsumerBounceWithReferenceOpen(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
+	leaderAddr := leader.Addr()
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.Consumer.Return.Errors = true
+	config.Consumer.Retry.Backoff = 0
+	config.ChannelBufferSize = 0
+	master, err := NewConsumer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c0, err := master.ConsumePartition("my_topic", 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	c1, err := master.ConsumePartition("my_topic", 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fetchResponse := new(FetchResponse)
+	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
+	fetchResponse.AddError("my_topic", 1, ErrNoError)
+	leader.Returns(fetchResponse)
+	<-c0.Messages()
+
+	fetchResponse = new(FetchResponse)
+	fetchResponse.AddError("my_topic", 0, ErrNoError)
+	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
+	leader.Returns(fetchResponse)
+	<-c1.Messages()
+
+	leader.Close()
+	leader = newMockBrokerAddr(t, 2, leaderAddr)
+
+	// unblock one of the two (it doesn't matter which)
+	select {
+	case <-c0.Errors():
+	case <-c1.Errors():
+	}
+	// send it back to the same broker
+	seedBroker.Returns(metadataResponse)
+
+	fetchResponse = new(FetchResponse)
+	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(1))
+	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(1))
+	leader.Returns(fetchResponse)
+
+	time.Sleep(5 * time.Millisecond)
+
+	// unblock the other one
+	select {
+	case <-c0.Errors():
+	case <-c1.Errors():
+	}
+	// send it back to the same broker
+	seedBroker.Returns(metadataResponse)
+
+	select {
+	case <-c0.Messages():
+	case <-c1.Messages():
+	}
+
+	leader.Close()
+	seedBroker.Close()
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		_ = c0.Close()
+		wg.Done()
+	}()
+	go func() {
+		_ = c1.Close()
+		wg.Done()
+	}()
+	wg.Wait()
+	safeClose(t, master)
+}
+
 // This example has the simplest use case of the consumer. It simply
 // iterates over the messages channel using a for/range loop. Because
 // a producer never stopsunless requested, a signal handler is registered
