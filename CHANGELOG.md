@@ -5,6 +5,8 @@
 Bug Fixes:
  - Fix the producer's internal reference counting in certain unusual scenarios
    ([#367](https://github.com/Shopify/sarama/pull/367)).
+ - Fix a condition where the producer's internal control messages could have
+   gotten stuck ([#368](https://github.com/Shopify/sarama/pull/368)).
 
 #### Version 1.0.0 (2015-03-17)
 

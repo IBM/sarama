@@ -463,6 +463,68 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 	leader.Close()
 }
 
+func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.Producer.Flush.Messages = 5
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Retry.Max = 1
+	config.Producer.Partitioner = NewManualPartitioner
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// prime partitions
+	for p := int32(0); p < 2; p++ {
+		for i := 0; i < 5; i++ {
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: p}
+		}
+		prodSuccess := new(ProduceResponse)
+		prodSuccess.AddTopicPartition("my_topic", p, ErrNoError)
+		leader.Returns(prodSuccess)
+		expectSuccesses(t, producer, 5)
+	}
+
+	// send more messages on partition 0
+	for i := 0; i < 5; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 0}
+	}
+	prodNotLeader := new(ProduceResponse)
+	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
+	leader.Returns(prodNotLeader)
+
+	// tell partition 0 to go to that broker again
+	seedBroker.Returns(metadataResponse)
+
+	// succeed this time
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+	expectSuccesses(t, producer, 5)
+
+	// put five more through
+	for i := 0; i < 5; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 0}
+	}
+	leader.Returns(prodSuccess)
+	expectSuccesses(t, producer, 5)
+
+	// shutdown
+	closeProducer(t, producer)
+	seedBroker.Close()
+	leader.Close()
+}
+
 // This example shows how to use the producer while simultaneously
 // reading the Errors channel to know about any failures.
 func ExampleAsyncProducer_select() {
