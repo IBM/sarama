@@ -65,6 +65,60 @@ func TestCachedPartitions(t *testing.T) {
 	safeClose(t, client)
 }
 
+func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+
+	replicas := []int32{seedBroker.BrokerID()}
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 1, replicas[0], replicas, replicas, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 2, replicas[0], replicas, replicas, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.Metadata.Retry.Max = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadataResponse = new(MetadataResponse)
+	metadataResponse.AddTopic("unknown", ErrUnknownTopicOrPartition)
+	seedBroker.Returns(metadataResponse)
+
+	partitions, err := client.Partitions("unknown")
+
+	if err != ErrUnknownTopicOrPartition {
+		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
+	}
+	if partitions != nil {
+		t.Errorf("Should return nil as partition list, found %v", partitions)
+	}
+
+	// Should still use the cache of a known topic
+	partitions, err = client.Partitions("my_topic")
+	if err != nil {
+		t.Errorf("Expected no error, found %v", err)
+	}
+
+	metadataResponse = new(MetadataResponse)
+	metadataResponse.AddTopic("unknown", ErrUnknownTopicOrPartition)
+	seedBroker.Returns(metadataResponse)
+
+	// Should not use cache for unknown topic
+	partitions, err = client.Partitions("unknown")
+	if err != ErrUnknownTopicOrPartition {
+		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
+	}
+	if partitions != nil {
+		t.Errorf("Should return nil as partition list, found %v", partitions)
+	}
+
+	seedBroker.Close()
+	safeClose(t, client)
+}
+
 func TestClientSeedBrokers(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 
