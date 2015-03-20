@@ -199,7 +199,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
-	time.Sleep(5 * time.Millisecond) // dumbest way to force a particular response ordering
+	time.Sleep(50 * time.Millisecond) // dumbest way to force a particular response ordering
 
 	// leader1 provides five messages on partition 1
 	fetchResponse = new(FetchResponse)
@@ -229,7 +229,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, leader0.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
-	time.Sleep(5 * time.Millisecond) // dumbest way to force a particular response ordering
+	time.Sleep(50 * time.Millisecond) // dumbest way to force a particular response ordering
 
 	// leader0 provides two messages on partition 1
 	fetchResponse = new(FetchResponse)
