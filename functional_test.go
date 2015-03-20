@@ -30,7 +30,7 @@ func init() {
 	}
 	kafkaBrokers = strings.Split(kafkaPeers, ",")
 
-	if c, err := net.Dial("tcp", kafkaBrokers[0]); err == nil {
+	if c, err := net.DialTimeout("tcp", kafkaBrokers[0], 5*time.Second); err == nil {
 		if err = c.Close(); err == nil {
 			kafkaIsAvailable = true
 		}
