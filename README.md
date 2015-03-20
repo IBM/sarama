@@ -11,6 +11,7 @@ Sarama is an MIT-licensed Go client library for Apache Kafka 0.8 (and later).
 - API documentation and example are available via godoc at https://godoc.org/github.com/Shopify/sarama.
 - Mocks for testing are available in the [mocks](./mocks) subpackage.
 - The [examples](./examples) directory contains more elaborate example applications.
+- The [tools](./tools) directory contains command line tools that can be useful for testing, diagnostics, and instrumentation.
 - There is a google group for Kafka client users and authors at https://groups.google.com/forum/#!forum/kafka-clients
 
 ### Compatibility and API stability
