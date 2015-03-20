@@ -497,7 +497,7 @@ func (client *client) tryRefreshMetadata(topics []string, retriesRemaining int) 
 			if len(retry) > 0 {
 				if retriesRemaining <= 0 {
 					Logger.Println("Some partitions are leaderless, but we're out of retries")
-					return nil
+					return err
 				}
 				Logger.Printf("Some partitions are leaderless, waiting %dms for election... (%d retries remaining)\n",
 					client.conf.Metadata.Retry.Backoff/time.Millisecond, retriesRemaining)
@@ -591,13 +591,9 @@ func (client *client) updateMetadata(data *MetadataResponse) ([]string, error) {
 		client.cachedPartitionsResults[topic.Name] = partitionCache
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	ret := make([]string, 0, len(toRetry))
 	for topic := range toRetry {
 		ret = append(ret, topic)
 	}
-	return ret, nil
+	return ret, err
 }
