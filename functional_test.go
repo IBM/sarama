@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -36,6 +37,10 @@ func init() {
 	}
 
 	kafkaShouldBeAvailable = os.Getenv("CI") != ""
+
+	if os.Getenv("DEBUG") == "true" {
+		Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	}
 }
 
 func checkKafkaAvailability(t *testing.T) {
