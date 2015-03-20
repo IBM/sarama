@@ -1,6 +1,6 @@
 # Changelog
 
-#### Unreleased
+#### Version 1.1.0 (2015-03-20)
 
 Improvements:
  - Wrap the producer's partitioner call in a circuit-breaker so that repeatedly
