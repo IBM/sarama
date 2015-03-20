@@ -192,9 +192,9 @@ func (c *Config) Validate() error {
 	switch {
 	case c.Metadata.Retry.Max < 0:
 		return ConfigurationError("Invalid Metadata.Retry.Max, must be >= 0")
-	case c.Metadata.Retry.Backoff <= time.Duration(0):
-		return ConfigurationError("Invalid Metadata.Retry.Backoff, must be > 0")
-	case c.Metadata.RefreshFrequency < time.Duration(0):
+	case c.Metadata.Retry.Backoff < 0:
+		return ConfigurationError("Invalid Metadata.Retry.Backoff, must be >= 0")
+	case c.Metadata.RefreshFrequency < 0:
 		return ConfigurationError("Invalid Metadata.RefreshFrequency, must be >= 0")
 	}
 

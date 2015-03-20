@@ -206,7 +206,8 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker.Returns(metadataResponse1)
 
 	config := NewConfig()
-	config.Metadata.Retry.Max = 0
+	config.Metadata.Retry.Max = 1
+	config.Metadata.Retry.Backoff = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -215,6 +216,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	metadataUnknownTopic := new(MetadataResponse)
 	metadataUnknownTopic.AddTopic("new_topic", ErrUnknownTopicOrPartition)
 	seedBroker.Returns(metadataUnknownTopic)
+	seedBroker.Returns(metadataUnknownTopic)
 
 	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
 		t.Error("ErrUnknownTopicOrPartition expected, got", err)
@@ -222,6 +224,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 
 	// If we are asking for the leader of a partition of the non-existing topic.
 	// we will request metadata again.
+	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
 	if _, err = client.Leader("new_topic", 1); err != ErrUnknownTopicOrPartition {
