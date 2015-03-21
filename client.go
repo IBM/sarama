@@ -4,6 +4,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/eapache/go-resiliency/batcher"
 )
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -63,8 +65,9 @@ const (
 )
 
 type client struct {
-	conf   *Config
-	closer chan none
+	conf            *Config
+	closer          chan none
+	metadataUpdater *batcher.Batcher
 
 	// the broker addresses given to us through the constructor are not guaranteed to be returned in
 	// the cluster metadata (I *think* it only returns brokers who are currently leading partitions?)
@@ -110,6 +113,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		metadata:                make(map[string]map[int32]*PartitionMetadata),
 		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 	}
+	client.metadataUpdater = batcher.New(conf.Metadata.BatchDelay, client.refreshMetadataBatch)
 	_ = client.seedBroker.Open(conf)
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
@@ -289,7 +293,7 @@ func (client *client) RefreshMetadata(topics ...string) error {
 		}
 	}
 
-	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max)
+	return client.metadataUpdater.Run(topics)
 }
 
 func (client *client) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
@@ -478,6 +482,29 @@ func (client *client) backgroundMetadataUpdater() {
 			return
 		}
 	}
+}
+
+func (client *client) refreshMetadataBatch(args []interface{}) error {
+	var topics []string
+	var uniq = make(map[string]none)
+
+	// construct a slice of all the unique topic names to refresh
+	for _, arg := range args {
+		arg := arg.([]string)
+		if len(arg) == 0 {
+			// if any caller just asked for all topics, that dominates
+			topics = nil
+			break
+		}
+		for _, topic := range arg {
+			if _, exists := uniq[topic]; !exists {
+				uniq[topic] = none{}
+				topics = append(topics, topic)
+			}
+		}
+	}
+
+	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max)
 }
 
 func (client *client) tryRefreshMetadata(topics []string, retriesRemaining int) error {

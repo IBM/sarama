@@ -23,6 +23,9 @@ type Config struct {
 		// How frequently to refresh the cluster metadata in the background. Defaults to 10 minutes.
 		// Set to 0 to disable. Similar to `topic.metadata.refresh.interval.ms` in the JVM version.
 		RefreshFrequency time.Duration
+		// How long to wait for other metadata requests to come in before actually making the request.
+		// Waiting can batch requests more efficiently, but introduces latency (default 0).
+		BatchDelay time.Duration
 	}
 
 	// Producer is the namespace for configuration related to producing messages, used by the Producer.
@@ -196,6 +199,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Invalid Metadata.Retry.Backoff, must be >= 0")
 	case c.Metadata.RefreshFrequency < 0:
 		return ConfigurationError("Invalid Metadata.RefreshFrequency, must be >= 0")
+	case c.Metadata.BatchDelay < time.Duration(0):
+		return ConfigurationError("Invalid Metadata.BatchDelay, must be >= 0")
 	}
 
 	// validate the Producer values
