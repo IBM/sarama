@@ -14,12 +14,12 @@ on the standard output.
 
     # It will pick up a KAFKA_PEERS environment variable
     export KAFKA_PEERS=kafka1:9092,kafka2:9092,kafka3:9092
-    kafka-console-producer -topic=test -partition=4
+    kafka-console-partitionconsumer -topic=test -partition=4
 
     # You can specify the offset you want to start at. It can be either
     # `oldest`, `newest`, or a specific offset number
-    kafka-console-producer -topic=test -partition=3 -offset=oldest
-    kafka-console-producer -topic=test -partition=2 -offset=1337
+    kafka-console-partitionconsumer -topic=test -partition=3 -offset=oldest
+    kafka-console-partitionconsumer -topic=test -partition=2 -offset=1337
 
     # Display all command line options
-    kafka-console-producer -help
+    kafka-console-partitionconsumer -help
