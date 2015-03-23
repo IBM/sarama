@@ -38,6 +38,11 @@ func (ce ConsumerErrors) Error() string {
 // Consumer manages PartitionConsumers which process Kafka messages from brokers. You MUST call Close()
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
+//
+// A Consumer can only consume every topic/partition once simultaneously. If you want to consume the same
+// partition more than once, you'll need to instantiate multiple consumers. You can construct a Client,
+// and then instantiate consumers with NewConsumerFromClient, in which case it will share the connections
+// to the brokers.
 type Consumer interface {
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
 	// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
