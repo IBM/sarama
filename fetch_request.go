@@ -1,11 +1,13 @@
 package sarama
 
 type fetchRequestBlock struct {
+	partition   int32
 	fetchOffset int64
 	maxBytes    int32
 }
 
 func (f *fetchRequestBlock) encode(pe packetEncoder) error {
+	pe.putInt32(f.partition)
 	pe.putInt64(f.fetchOffset)
 	pe.putInt32(f.maxBytes)
 	return nil
@@ -14,7 +16,7 @@ func (f *fetchRequestBlock) encode(pe packetEncoder) error {
 type FetchRequest struct {
 	MaxWaitTime int32
 	MinBytes    int32
-	blocks      map[string]map[int32]*fetchRequestBlock
+	blocks      map[string][]*fetchRequestBlock
 }
 
 func (f *FetchRequest) encode(pe packetEncoder) (err error) {
@@ -34,8 +36,7 @@ func (f *FetchRequest) encode(pe packetEncoder) (err error) {
 		if err != nil {
 			return err
 		}
-		for partition, block := range blocks {
-			pe.putInt32(partition)
+		for _, block := range blocks {
 			err = block.encode(pe)
 			if err != nil {
 				return err
@@ -55,16 +56,13 @@ func (f *FetchRequest) version() int16 {
 
 func (f *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
 	if f.blocks == nil {
-		f.blocks = make(map[string]map[int32]*fetchRequestBlock)
-	}
-
-	if f.blocks[topic] == nil {
-		f.blocks[topic] = make(map[int32]*fetchRequestBlock)
+		f.blocks = make(map[string][]*fetchRequestBlock)
 	}
 
 	tmp := new(fetchRequestBlock)
+	tmp.partition = partitionID
 	tmp.maxBytes = maxBytes
 	tmp.fetchOffset = fetchOffset
 
-	f.blocks[topic][partitionID] = tmp
+	f.blocks[topic] = append(f.blocks[topic], tmp)
 }

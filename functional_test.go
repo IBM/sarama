@@ -190,6 +190,31 @@ func TestProducingToInvalidTopic(t *testing.T) {
 	safeClose(t, producer)
 }
 
+func TestFetchRequestTwoOffsets(t *testing.T) {
+	checkKafkaAvailability(t)
+
+	client, err := NewClient(kafkaBrokers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	broker, err := client.Leader("single_partition", 0)
+	if err != nil {
+		t.Error(err)
+	}
+
+	req := new(FetchRequest)
+	for i := 0; i < 5; i++ {
+		req.AddBlock("single_partition", 0, int64(i*10), 1000)
+	}
+	res, err := broker.Fetch(req)
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(res)
+
+	safeClose(t, client)
+}
+
 func testProducingMessages(t *testing.T, config *Config) {
 	checkKafkaAvailability(t)
 

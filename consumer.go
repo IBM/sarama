@@ -39,9 +39,8 @@ func (ce ConsumerErrors) Error() string {
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
 type Consumer interface {
-	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
-	// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
-	// literal offset, or OffsetNewest or OffsetOldest
+	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset.
+	// Offset can be a literal offset, or OffsetNewest or OffsetOldest.
 	ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error)
 
 	// Close shuts down the consumer. It must be called after all child PartitionConsumers have already been closed.
@@ -54,7 +53,6 @@ type consumer struct {
 	ownClient bool
 
 	lock            sync.Mutex
-	children        map[string]map[int32]*partitionConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
 }
 
@@ -84,7 +82,6 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 	c := &consumer{
 		client:          client,
 		conf:            client.Config(),
-		children:        make(map[string]map[int32]*partitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
 	}
 
@@ -121,41 +118,12 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 		return nil, err
 	}
 
-	if err := c.addChild(child); err != nil {
-		return nil, err
-	}
-
 	go withRecover(child.dispatcher)
 
 	child.broker = c.refBrokerConsumer(leader)
 	child.broker.input <- child
 
 	return child, nil
-}
-
-func (c *consumer) addChild(child *partitionConsumer) error {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	topicChildren := c.children[child.topic]
-	if topicChildren == nil {
-		topicChildren = make(map[int32]*partitionConsumer)
-		c.children[child.topic] = topicChildren
-	}
-
-	if topicChildren[child.partition] != nil {
-		return ConfigurationError("That topic/partition is already being consumed")
-	}
-
-	topicChildren[child.partition] = child
-	return nil
-}
-
-func (c *consumer) removeChild(child *partitionConsumer) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	delete(c.children[child.topic], child.partition)
 }
 
 func (c *consumer) refBrokerConsumer(broker *Broker) *brokerConsumer {
@@ -289,7 +257,6 @@ func (child *partitionConsumer) dispatcher() {
 	if child.broker != nil {
 		child.consumer.unrefBrokerConsumer(child.broker)
 	}
-	child.consumer.removeChild(child)
 	close(child.messages)
 	close(child.errors)
 }
