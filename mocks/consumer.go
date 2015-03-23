@@ -147,13 +147,16 @@ func (pc *PartitionConsumer) handleExpectations() {
 				Err:       ex.Err,
 			}
 		} else {
-			offset++
-
 			ex.Msg.Topic = pc.topic
 			ex.Msg.Partition = pc.partition
-			ex.Msg.Offset = offset
+			if ex.Msg.Offset > offset {
+				offset = ex.Msg.Offset
+			} else {
+				ex.Msg.Offset = offset
+			}
 
 			pc.messages <- ex.Msg
+			offset++
 		}
 	}
 
