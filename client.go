@@ -69,9 +69,8 @@ type client struct {
 	// the broker addresses given to us through the constructor are not guaranteed to be returned in
 	// the cluster metadata (I *think* it only returns brokers who are currently leading partitions?)
 	// so we store them separately
-	seedBrokerAddrs []string
-	seedBroker      *Broker
-	deadBrokerAddrs map[string]none
+	seedBrokers []*Broker
+	deadSeeds   []*Broker
 
 	brokers  map[int32]*Broker                       // maps broker ids to brokers
 	metadata map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
@@ -103,14 +102,13 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 	client := &client{
 		conf:                    conf,
 		closer:                  make(chan none),
-		seedBrokerAddrs:         addrs,
-		seedBroker:              NewBroker(addrs[0]),
-		deadBrokerAddrs:         make(map[string]none),
 		brokers:                 make(map[int32]*Broker),
 		metadata:                make(map[string]map[int32]*PartitionMetadata),
 		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 	}
-	_ = client.seedBroker.Open(conf)
+	for _, addr := range addrs {
+		client.seedBrokers = append(client.seedBrokers, NewBroker(addr))
+	}
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
 	err := client.RefreshMetadata()
@@ -151,12 +149,13 @@ func (client *client) Close() error {
 	for _, broker := range client.brokers {
 		safeAsyncClose(broker)
 	}
+
+	for _, broker := range client.seedBrokers {
+		safeAsyncClose(broker)
+	}
+
 	client.brokers = nil
 	client.metadata = nil
-
-	if client.seedBroker != nil {
-		safeAsyncClose(client.seedBroker)
-	}
 
 	close(client.closer)
 
@@ -326,16 +325,9 @@ func (client *client) disconnectBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
-	client.deadBrokerAddrs[broker.addr] = none{}
-
-	if broker == client.seedBroker {
-		client.seedBrokerAddrs = client.seedBrokerAddrs[1:]
-		if len(client.seedBrokerAddrs) > 0 {
-			client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
-			_ = client.seedBroker.Open(client.conf)
-		} else {
-			client.seedBroker = nil
-		}
+	if len(client.seedBrokers) > 0 && broker == client.seedBrokers[0] {
+		client.deadSeeds = append(client.deadSeeds, broker)
+		client.seedBrokers = client.seedBrokers[1:]
 	} else {
 		// we do this so that our loop in `tryRefreshMetadata` doesn't go on forever,
 		// but we really shouldn't have to; once that loop is made better this case can be
@@ -349,29 +341,20 @@ func (client *client) resurrectDeadBrokers() {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
-	for _, addr := range client.seedBrokerAddrs {
-		client.deadBrokerAddrs[addr] = none{}
-	}
-
-	client.seedBrokerAddrs = []string{}
-	for addr := range client.deadBrokerAddrs {
-		client.seedBrokerAddrs = append(client.seedBrokerAddrs, addr)
-	}
-	client.deadBrokerAddrs = make(map[string]none)
-
-	client.seedBroker = NewBroker(client.seedBrokerAddrs[0])
-	_ = client.seedBroker.Open(client.conf)
+	client.seedBrokers = append(client.seedBrokers, client.deadSeeds...)
+	client.deadSeeds = nil
 }
 
 func (client *client) any() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	if client.seedBroker != nil {
-		_ = client.seedBroker.Open(client.conf)
-		return client.seedBroker
+	if len(client.seedBrokers) > 0 {
+		_ = client.seedBrokers[0].Open(client.conf)
+		return client.seedBrokers[0]
 	}
 
+	// not guaranteed to be random *or* deterministic
 	for _, broker := range client.brokers {
 		_ = broker.Open(client.conf)
 		return broker
