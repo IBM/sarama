@@ -46,9 +46,9 @@ func TestConsumerOffsetManual(t *testing.T) {
 		}
 	}
 
+	leader.Close()
 	safeClose(t, consumer)
 	safeClose(t, master)
-	leader.Close()
 }
 
 func TestConsumerLatestOffset(t *testing.T) {
@@ -237,26 +237,14 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(9))
 	leader0.Returns(fetchResponse)
 
-	// leader0 provides last message  on partition 1
-	fetchResponse = new(FetchResponse)
-	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(10))
-	leader0.Returns(fetchResponse)
-
-	// leader1 provides last message  on partition 0
-	fetchResponse = new(FetchResponse)
-	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(10))
-	leader1.Returns(fetchResponse)
-
-	wg.Wait()
 	leader1.Close()
 	leader0.Close()
 	seedBroker.Close()
+	wg.Wait()
 	safeClose(t, master)
 }
 
 func TestConsumerInterleavedClose(t *testing.T) {
-	t.Skip("Enable once bug #325 is fixed.")
-
 	seedBroker := newMockBroker(t, 1)
 	leader := newMockBroker(t, 2)
 
@@ -278,15 +266,15 @@ func TestConsumerInterleavedClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fetchResponse := new(FetchResponse)
-	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
-	leader.Returns(fetchResponse)
-
 	c1, err := master.ConsumePartition("my_topic", 1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	time.Sleep(50 * time.Millisecond)
+
+	fetchResponse := new(FetchResponse)
+	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
 	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
 	leader.Returns(fetchResponse)
 
