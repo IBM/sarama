@@ -4,6 +4,7 @@ type FetchResponseBlock struct {
 	Err                 KError
 	HighWaterMarkOffset int64
 	MsgSet              MessageSet
+	Next                *FetchResponseBlock
 }
 
 func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
@@ -79,6 +80,9 @@ func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
 			err = block.decode(pd)
 			if err != nil {
 				return err
+			}
+			if _, exists := fr.Blocks[name][id]; exists {
+				block.Next = fr.Blocks[name][id]
 			}
 			fr.Blocks[name][id] = block
 		}
