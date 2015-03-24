@@ -1,5 +1,17 @@
 # Changelog
 
+#### Unreleased
+
+Improvements:
+ - The producer's behaviour when `Flush.Frequency` is set is now more intuitive
+   ([#389](https://github.com/Shopify/sarama/pull/389)).
+ - The consumer produces much more useful logging output when leadership
+   changes ([#385](https://github.com/Shopify/sarama/pull/385)).
+
+Bug Fixes:
+ - The OffsetCommitRequest message now correctly implements both possible
+   API versions ([#390](https://github.com/Shopify/sarama/pull/390)).
+
 #### Version 1.1.0 (2015-03-20)
 
 Improvements:
