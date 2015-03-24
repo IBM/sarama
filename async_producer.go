@@ -421,17 +421,13 @@ func (p *asyncProducer) leaderDispatcher(topic string, partition int32, input ch
 // groups messages together into appropriately-sized batches for sending to the broker
 // based on https://godoc.org/github.com/eapache/channels#BatchingChannel
 func (p *asyncProducer) messageAggregator(broker *Broker, input chan *ProducerMessage) {
-	var ticker *time.Ticker
-	var timer <-chan time.Time
-	if p.conf.Producer.Flush.Frequency > 0 {
-		ticker = time.NewTicker(p.conf.Producer.Flush.Frequency)
-		timer = ticker.C
-	}
-
-	var buffer []*ProducerMessage
-	var doFlush chan []*ProducerMessage
-	var bytesAccumulated int
-	var defaultFlush bool
+	var (
+		timer            <-chan time.Time
+		buffer           []*ProducerMessage
+		doFlush          chan []*ProducerMessage
+		bytesAccumulated int
+		defaultFlush     bool
+	)
 
 	if p.conf.Producer.Flush.Frequency == 0 && p.conf.Producer.Flush.Bytes == 0 && p.conf.Producer.Flush.Messages == 0 {
 		defaultFlush = true
@@ -454,6 +450,7 @@ func (p *asyncProducer) messageAggregator(broker *Broker, input chan *ProducerMe
 				flusher <- buffer
 				buffer = nil
 				doFlush = nil
+				timer = nil
 				bytesAccumulated = 0
 			}
 
@@ -465,20 +462,20 @@ func (p *asyncProducer) messageAggregator(broker *Broker, input chan *ProducerMe
 				(p.conf.Producer.Flush.Messages > 0 && len(buffer) >= p.conf.Producer.Flush.Messages) ||
 				(p.conf.Producer.Flush.Bytes > 0 && bytesAccumulated >= p.conf.Producer.Flush.Bytes) {
 				doFlush = flusher
+			} else if p.conf.Producer.Flush.Frequency > 0 && timer == nil {
+				timer = time.After(p.conf.Producer.Flush.Frequency)
 			}
 		case <-timer:
 			doFlush = flusher
 		case doFlush <- buffer:
 			buffer = nil
 			doFlush = nil
+			timer = nil
 			bytesAccumulated = 0
 		}
 	}
 
 shutdown:
-	if ticker != nil {
-		ticker.Stop()
-	}
 	if len(buffer) > 0 {
 		flusher <- buffer
 	}
