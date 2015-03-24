@@ -11,7 +11,16 @@ var (
 		0x00, 0x06, 'f', 'o', 'o', 'b', 'a', 'r',
 		0x00, 0x00, 0x00, 0x00}
 
-	offsetCommitRequestOneBlock = []byte{
+	offsetCommitRequestOneBlockV0 = []byte{
+		0x00, 0x06, 'f', 'o', 'o', 'b', 'a', 'r',
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x05, 't', 'o', 'p', 'i', 'c',
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x52, 0x21,
+		0x00, 0x00, 0x00, 0x00, 0xDE, 0xAD, 0xBE, 0xEF,
+		0x00, 0x08, 'm', 'e', 't', 'a', 'd', 'a', 't', 'a'}
+
+	offsetCommitRequestOneBlockV1 = []byte{
 		0x00, 0x06, 'f', 'o', 'o', 'b', 'a', 'r',
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x05, 't', 'o', 'p', 'i', 'c',
@@ -30,5 +39,8 @@ func TestOffsetCommitRequest(t *testing.T) {
 	testEncodable(t, "no blocks", request, offsetCommitRequestNoBlocks)
 
 	request.AddBlock("topic", 0x5221, 0xDEADBEEF, ReceiveTime, "metadata")
-	testEncodable(t, "one block", request, offsetCommitRequestOneBlock)
+	testEncodable(t, "one block", request, offsetCommitRequestOneBlockV0)
+
+	request.Version = 1
+	testEncodable(t, "one block", request, offsetCommitRequestOneBlockV1)
 }
