@@ -2,7 +2,6 @@ package sarama
 
 import (
 	"io"
-	"sync"
 	"testing"
 )
 
@@ -326,50 +325,58 @@ func TestClientRefreshBehaviour(t *testing.T) {
 }
 
 func TestClientResurrectDeadSeeds(t *testing.T) {
-	seed1 := newMockBroker(t, 1)
-	seed2 := newMockBroker(t, 2)
-	seed3 := newMockBroker(t, 3)
-	addr1 := seed1.Addr()
-	addr2 := seed2.Addr()
-	addr3 := seed3.Addr()
+	seeds := []*mockBroker{
+		newMockBroker(t, 1),
+		newMockBroker(t, 2),
+	}
+	addrs := []string{
+		seeds[0].Addr(),
+		seeds[1].Addr(),
+	}
 
 	emptyMetadata := new(MetadataResponse)
-	seed1.Returns(emptyMetadata)
+	seeds[0].Returns(emptyMetadata)
+	seeds[1].Returns(emptyMetadata)
 
 	conf := NewConfig()
 	conf.Metadata.Retry.Backoff = 0
-	c, err := NewClient([]string{addr1, addr2, addr3}, conf)
+	c, err := NewClient(addrs, conf)
 	if err != nil {
 		t.Fatal(err)
 	}
 	client := c.(*client)
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		if err := client.RefreshMetadata(); err != nil {
-			t.Error(err)
-		}
-		wg.Done()
-	}()
-	seed1.Close()
-	seed2.Close()
-
-	seed1 = newMockBrokerAddr(t, 1, addr1)
-	seed2 = newMockBrokerAddr(t, 2, addr2)
-
-	seed3.Close()
-
-	seed1.Close()
-	seed2.Returns(emptyMetadata)
-
-	wg.Wait()
-
-	if len(client.seedBrokers) != 2 {
-		t.Error("incorrect number of live seeds")
+	var firstSeed, secondSeed int
+	if client.curSeed.Addr() == seeds[0].Addr() {
+		firstSeed = 0
+		secondSeed = 1
+	} else {
+		firstSeed = 1
+		secondSeed = 0
 	}
-	if len(client.deadSeeds) != 1 {
-		t.Error("incorrect number of dead seeds")
+
+	seeds[firstSeed].Close()
+	if err := client.RefreshMetadata(); err != nil {
+		t.Error(err)
+	}
+
+	seeds[secondSeed].Close()
+	client.deadSeeds[0] = client.curSeed // cheat hard to make the test predictable
+
+	seeds[secondSeed] = newMockBrokerAddr(t, 1, addrs[secondSeed])
+	seeds[secondSeed].Returns(emptyMetadata)
+
+	if err := client.RefreshMetadata(); err != nil {
+		t.Error(err)
+	}
+
+	seeds[secondSeed].Close()
+
+	if len(client.seedBrokers) != 1 {
+		t.Error("incorrect number of spare seeds ", len(client.seedBrokers))
+	}
+	if len(client.deadSeeds) != 0 {
+		t.Error("incorrect number of dead seeds ", len(client.deadSeeds))
 	}
 
 	safeClose(t, c)
