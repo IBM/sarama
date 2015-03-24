@@ -1,6 +1,8 @@
-#/bin/sh
+#!/bin/sh
 
 set -ex
+
+vagrant/run_toxiproxy.sh &
 
 for i in 1 2 3 4 5; do
     KAFKA_PORT=`expr $i + 6666`

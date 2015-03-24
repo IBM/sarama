@@ -1,6 +1,11 @@
-#/bin/sh
+#!/bin/sh
 
 set -ex
+
+stop toxiproxy || true
+cp ${REPOSITORY_ROOT}/vagrant/toxiproxy.conf /etc/init/toxiproxy.conf
+cp ${REPOSITORY_ROOT}/vagrant/run_toxiproxy.sh ${KAFKA_INSTALL_ROOT}/
+start toxiproxy
 
 for i in 1 2 3 4 5; do
     ZK_PORT=`expr $i + 2180`
