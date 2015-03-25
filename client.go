@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -64,11 +65,13 @@ const (
 
 type client struct {
 	conf   *Config
+	rand   *rand.Rand
 	closer chan none
 
 	// the broker addresses given to us through the constructor are not guaranteed to be returned in
 	// the cluster metadata (I *think* it only returns brokers who are currently leading partitions?)
 	// so we store them separately
+	curSeed     *Broker
 	seedBrokers []*Broker
 	deadSeeds   []*Broker
 
@@ -101,6 +104,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 
 	client := &client{
 		conf:                    conf,
+		rand:                    rand.New(rand.NewSource(time.Now().UTC().UnixNano())),
 		closer:                  make(chan none),
 		brokers:                 make(map[int32]*Broker),
 		metadata:                make(map[string]map[int32]*PartitionMetadata),
@@ -325,9 +329,9 @@ func (client *client) disconnectBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
-	if len(client.seedBrokers) > 0 && broker == client.seedBrokers[0] {
+	if broker == client.curSeed {
 		client.deadSeeds = append(client.deadSeeds, broker)
-		client.seedBrokers = client.seedBrokers[1:]
+		client.curSeed = nil
 	} else {
 		// we do this so that our loop in `tryRefreshMetadata` doesn't go on forever,
 		// but we really shouldn't have to; once that loop is made better this case can be
@@ -349,9 +353,18 @@ func (client *client) any() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	if len(client.seedBrokers) > 0 {
-		_ = client.seedBrokers[0].Open(client.conf)
-		return client.seedBrokers[0]
+	if client.curSeed == nil && len(client.seedBrokers) > 0 {
+		i := client.rand.Intn(len(client.seedBrokers))
+		client.curSeed = client.seedBrokers[i]
+		if i > 0 {
+			client.seedBrokers[i] = client.seedBrokers[0]
+		}
+		client.seedBrokers = client.seedBrokers[1:]
+	}
+
+	if client.curSeed != nil {
+		_ = client.curSeed.Open(client.conf)
+		return client.curSeed
 	}
 
 	// not guaranteed to be random *or* deterministic
