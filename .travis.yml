@@ -1,12 +1,12 @@
 language: go
 go:
-- 1.3
-- 1.4
+- 1.3.3
+- 1.4.2
 - tip
 
 env:
   global:
-  - KAFKA_PEERS=localhost:6667,localhost:6668,localhost:6669,localhost:6670,localhost:6671
+  - KAFKA_PEERS=localhost:9091,localhost:9092,localhost:9093,localhost:9094,localhost:9095
   - KAFKA_INSTALL_ROOT=/home/travis/kafka
   - KAFKA_HOSTNAME=localhost
   matrix:
