@@ -13,10 +13,10 @@ wget -S --post-data='{"name":"zk3", "upstream":"localhost:21803", "listen":"0.0.
 wget -S --post-data='{"name":"zk4", "upstream":"localhost:21804", "listen":"0.0.0.0:2184"}' localhost:8474/proxies
 wget -S --post-data='{"name":"zk5", "upstream":"localhost:21805", "listen":"0.0.0.0:2185"}' localhost:8474/proxies
 
-wget -S --post-data='{"name":"kafka1", "upstream":"localhost:26667", "listen":"0.0.0.0:6667"}' localhost:8474/proxies
-wget -S --post-data='{"name":"kafka2", "upstream":"localhost:26668", "listen":"0.0.0.0:6668"}' localhost:8474/proxies
-wget -S --post-data='{"name":"kafka3", "upstream":"localhost:26669", "listen":"0.0.0.0:6669"}' localhost:8474/proxies
-wget -S --post-data='{"name":"kafka4", "upstream":"localhost:26670", "listen":"0.0.0.0:6670"}' localhost:8474/proxies
-wget -S --post-data='{"name":"kafka5", "upstream":"localhost:26671", "listen":"0.0.0.0:6671"}' localhost:8474/proxies
+wget -S --post-data='{"name":"kafka1", "upstream":"localhost:29091", "listen":"0.0.0.0:9091"}' localhost:8474/proxies
+wget -S --post-data='{"name":"kafka2", "upstream":"localhost:29092", "listen":"0.0.0.0:9092"}' localhost:8474/proxies
+wget -S --post-data='{"name":"kafka3", "upstream":"localhost:29093", "listen":"0.0.0.0:9093"}' localhost:8474/proxies
+wget -S --post-data='{"name":"kafka4", "upstream":"localhost:29094", "listen":"0.0.0.0:9094"}' localhost:8474/proxies
+wget -S --post-data='{"name":"kafka5", "upstream":"localhost:29095", "listen":"0.0.0.0:9095"}' localhost:8474/proxies
 
 wait $PID

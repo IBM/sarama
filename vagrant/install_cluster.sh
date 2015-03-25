@@ -16,8 +16,8 @@ fi
 for i in 1 2 3 4 5; do
     ZK_PORT=`expr $i + 2180`
     ZK_PORT_REAL=`expr $i + 21800`
-    KAFKA_PORT=`expr $i + 6666`
-    KAFKA_PORT_REAL=`expr $i + 26666`
+    KAFKA_PORT=`expr $i + 9090`
+    KAFKA_PORT_REAL=`expr $i + 29090`
 
     # unpack kafka
     mkdir -p ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_PORT}

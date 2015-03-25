@@ -9,7 +9,7 @@ start toxiproxy
 
 for i in 1 2 3 4 5; do
     ZK_PORT=`expr $i + 2180`
-    KAFKA_PORT=`expr $i + 6666`
+    KAFKA_PORT=`expr $i + 9090`
 
     stop zookeeper-${ZK_PORT} || true
 
