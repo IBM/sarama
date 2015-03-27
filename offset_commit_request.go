@@ -13,44 +13,71 @@ type offsetCommitRequestBlock struct {
 
 func (r *offsetCommitRequestBlock) encode(pe packetEncoder, version int16) error {
 	pe.putInt64(r.offset)
-	if version >= 1 {
+	if version == 1 {
 		pe.putInt64(r.timestamp)
+	} else if r.timestamp != 0 {
+		Logger.Println("Non-zero timestamp specified for OffsetCommitRequest not v1, it will be ignored")
 	}
+
 	return pe.putString(r.metadata)
 }
 
 type OffsetCommitRequest struct {
-	ConsumerGroup string
-	Version       int16 // 0 (0.8.1 and later) or 1 (0.8.2 and later, includes timestamp field)
-	blocks        map[string]map[int32]*offsetCommitRequestBlock
+	ConsumerGroup           string
+	ConsumerGroupGeneration int32  // v1 or later
+	ConsumerID              string // v1 or later
+	RetentionTime           int64  // v2 or later
+
+	// Version can be:
+	// - 0 (kafka 0.8.1 and later)
+	// - 1 (kafka 0.8.2 and later)
+	// - 2 (kafka 0.8.3 and later)
+	Version int16
+	blocks  map[string]map[int32]*offsetCommitRequestBlock
 }
 
 func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
-	if r.Version < 0 || r.Version > 1 {
+	if r.Version < 0 || r.Version > 2 {
 		return PacketEncodingError{"invalid or unsupported OffsetCommitRequest version field"}
 	}
 
-	err := pe.putString(r.ConsumerGroup)
-	if err != nil {
+	if err := pe.putString(r.ConsumerGroup); err != nil {
 		return err
 	}
-	err = pe.putArrayLength(len(r.blocks))
-	if err != nil {
+
+	if r.Version >= 1 {
+		pe.putInt32(r.ConsumerGroupGeneration)
+		if err := pe.putString(r.ConsumerID); err != nil {
+			return err
+		}
+	} else {
+		if r.ConsumerGroupGeneration != 0 {
+			Logger.Println("Non-zero ConsumerGroupGeneration specified for OffsetCommitRequest v0, it will be ignored")
+		}
+		if r.ConsumerID != "" {
+			Logger.Println("Non-empty ConsumerID specified for OffsetCommitRequest v0, it will be ignored")
+		}
+	}
+
+	if r.Version >= 2 {
+		pe.putInt64(r.RetentionTime)
+	} else if r.RetentionTime != 0 {
+		Logger.Println("Non-zero RetentionTime specified for OffsetCommitRequest version <2, it will be ignored")
+	}
+
+	if err := pe.putArrayLength(len(r.blocks)); err != nil {
 		return err
 	}
 	for topic, partitions := range r.blocks {
-		err = pe.putString(topic)
-		if err != nil {
+		if err := pe.putString(topic); err != nil {
 			return err
 		}
-		err = pe.putArrayLength(len(partitions))
-		if err != nil {
+		if err := pe.putArrayLength(len(partitions)); err != nil {
 			return err
 		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			err = block.encode(pe, r.Version)
-			if err != nil {
+			if err := block.encode(pe, r.Version); err != nil {
 				return err
 			}
 		}
@@ -73,10 +100,6 @@ func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset i
 
 	if r.blocks[topic] == nil {
 		r.blocks[topic] = make(map[int32]*offsetCommitRequestBlock)
-	}
-
-	if r.Version == 0 && timestamp != 0 {
-		Logger.Println("Non-zero timestamp specified for OffsetCommitRequest v0, it will be ignored")
 	}
 
 	r.blocks[topic][partitionID] = &offsetCommitRequestBlock{offset, timestamp, metadata}
