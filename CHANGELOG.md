@@ -9,8 +9,9 @@ Improvements:
    changes ([#385](https://github.com/Shopify/sarama/pull/385)).
 
 Bug Fixes:
- - The OffsetCommitRequest message now correctly implements both possible
-   API versions ([#390](https://github.com/Shopify/sarama/pull/390)).
+ - The OffsetCommitRequest message now correctly implements all three possible
+   API versions ([#390](https://github.com/Shopify/sarama/pull/390),
+   [#400](https://github.com/Shopify/sarama/pull/400)).
 
 #### Version 1.1.0 (2015-03-20)
 
