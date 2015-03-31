@@ -10,6 +10,7 @@ env:
   - TOXIPROXY_ADDR=http://localhost:8474
   - KAFKA_INSTALL_ROOT=/home/travis/kafka
   - KAFKA_HOSTNAME=localhost
+  - DEBUG=true
   matrix:
   - KAFKA_VERSION=0.8.1.1
   - KAFKA_VERSION=0.8.2.1

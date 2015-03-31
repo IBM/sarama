@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"log"
+	"math/rand"
 	"net"
 	"os"
 	"strconv"
@@ -25,6 +26,17 @@ var (
 )
 
 func init() {
+	if os.Getenv("DEBUG") == "true" {
+		Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	}
+
+	seed := time.Now().UTC().UnixNano()
+	if tmp := os.Getenv("TEST_SEED"); tmp != "" {
+		seed, _ = strconv.ParseInt(tmp, 0, 64)
+	}
+	Logger.Println("Using random seed:", seed)
+	rand.Seed(seed)
+
 	proxyAddr := os.Getenv("TOXIPROXY_ADDR")
 	if proxyAddr == "" {
 		proxyAddr = VagrantToxiproxy
@@ -44,10 +56,6 @@ func init() {
 	}
 
 	kafkaShouldBeAvailable = os.Getenv("CI") != ""
-
-	if os.Getenv("DEBUG") == "true" {
-		Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
-	}
 }
 
 func checkKafkaAvailability(t *testing.T) {
