@@ -8,9 +8,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	toxiproxy "github.com/Shopify/toxiproxy/client"
 )
 
 const (
+	VagrantToxiproxy      = "http://192.168.100.67:8474"
 	VagrantKafkaPeers     = "192.168.100.67:9091,192.168.100.67:9092,192.168.100.67:9093,192.168.100.67:9094,192.168.100.67:9095"
 	VagrantZookeeperPeers = "192.168.100.67:2181,192.168.100.67:2182,192.168.100.67:2183,192.168.100.67:2184,192.168.100.67:2185"
 )
@@ -18,9 +21,16 @@ const (
 var (
 	kafkaIsAvailable, kafkaShouldBeAvailable bool
 	kafkaBrokers                             []string
+	proxy                                    *toxiproxy.Client
 )
 
 func init() {
+	proxyAddr := os.Getenv("TOXIPROXY_ADDR")
+	if proxyAddr == "" {
+		proxyAddr = VagrantToxiproxy
+	}
+	proxy = toxiproxy.NewClient(proxyAddr)
+
 	kafkaPeers := os.Getenv("KAFKA_PEERS")
 	if kafkaPeers == "" {
 		kafkaPeers = VagrantKafkaPeers
