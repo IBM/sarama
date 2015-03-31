@@ -20,9 +20,13 @@ const (
 )
 
 var (
-	kafkaIsAvailable, kafkaShouldBeAvailable bool
-	kafkaBrokers                             []string
-	proxy                                    *toxiproxy.Client
+	kafkaAvailable, kafkaRequired bool
+	kafkaBrokers                  []string
+
+	proxyClient  *toxiproxy.Client
+	Proxies      map[string]*toxiproxy.Proxy
+	ZKProxies    = []string{"zk1", "zk2", "zk3", "zk4", "zk5"}
+	KafkaProxies = []string{"kafka1", "kafka2", "kafka3", "kafka4", "kafka5"}
 )
 
 func init() {
@@ -41,7 +45,7 @@ func init() {
 	if proxyAddr == "" {
 		proxyAddr = VagrantToxiproxy
 	}
-	proxy = toxiproxy.NewClient(proxyAddr)
+	proxyClient = toxiproxy.NewClient(proxyAddr)
 
 	kafkaPeers := os.Getenv("KAFKA_PEERS")
 	if kafkaPeers == "" {
@@ -51,16 +55,16 @@ func init() {
 
 	if c, err := net.DialTimeout("tcp", kafkaBrokers[0], 5*time.Second); err == nil {
 		if err = c.Close(); err == nil {
-			kafkaIsAvailable = true
+			kafkaAvailable = true
 		}
 	}
 
-	kafkaShouldBeAvailable = os.Getenv("CI") != ""
+	kafkaRequired = os.Getenv("CI") != ""
 }
 
 func checkKafkaAvailability(t testing.TB) {
-	if !kafkaIsAvailable {
-		if kafkaShouldBeAvailable {
+	if !kafkaAvailable {
+		if kafkaRequired {
 			t.Fatalf("Kafka broker is not available on %s. Set KAFKA_PEERS to connect to Kafka on a different location.", kafkaBrokers[0])
 		} else {
 			t.Skipf("Kafka broker is not available on %s. Set KAFKA_PEERS to connect to Kafka on a different location.", kafkaBrokers[0])
@@ -79,6 +83,37 @@ func checkKafkaVersion(t testing.TB, requiredVersion string) {
 			t.Skipf("Kafka version %s is required for this test; you have %s. Skipping...", requiredVersion, kafkaVersion)
 		}
 	}
+}
+
+func resetProxies(t testing.TB) {
+	if err := proxyClient.ResetState(); err != nil {
+		t.Error(err)
+	}
+	Proxies = nil
+}
+
+func fetchProxies(t testing.TB) {
+	var err error
+	Proxies, err = proxyClient.Proxies()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func SaveProxy(t *testing.T, px string) {
+	if err := Proxies[px].Save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func setupFunctionalTest(t testing.TB) {
+	checkKafkaAvailability(t)
+	resetProxies(t)
+	fetchProxies(t)
+}
+
+func teardownFunctionalTest(t testing.TB) {
+	resetProxies(t)
 }
 
 type kafkaVersion []int

@@ -6,7 +6,8 @@ import (
 )
 
 func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	consumer, err := NewConsumer(kafkaBrokers, nil)
 	if err != nil {
@@ -25,7 +26,8 @@ func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
 }
 
 func TestConsumerHighWaterMarkOffset(t *testing.T) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	p, err := NewSyncProducer(kafkaBrokers, nil)
 	if err != nil {
