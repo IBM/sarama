@@ -39,57 +39,6 @@ func TestFuncProducingFlushing(t *testing.T) {
 	testProducingMessages(t, config)
 }
 
-func TestFuncMultiPartitionProduce(t *testing.T) {
-	checkKafkaAvailability(t)
-
-	config := NewConfig()
-	config.ChannelBufferSize = 20
-	config.Producer.Flush.Frequency = 50 * time.Millisecond
-	config.Producer.Flush.Messages = 200
-	config.Producer.Return.Successes = true
-	producer, err := NewSyncProducer(kafkaBrokers, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(TestBatchSize)
-
-	for i := 1; i <= TestBatchSize; i++ {
-		go func(i int) {
-			defer wg.Done()
-			msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
-			if _, _, err := producer.SendMessage(msg); err != nil {
-				t.Error(i, err)
-			}
-		}(i)
-	}
-
-	wg.Wait()
-	if err := producer.Close(); err != nil {
-		t.Error(err)
-	}
-}
-
-func TestFuncProducingToInvalidTopic(t *testing.T) {
-	checkKafkaAvailability(t)
-
-	producer, err := NewSyncProducer(kafkaBrokers, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
-		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
-	}
-
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
-		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
-	}
-
-	safeClose(t, producer)
-}
-
 func testProducingMessages(t *testing.T, config *Config) {
 	checkKafkaAvailability(t)
 
@@ -154,6 +103,57 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, consumer)
 	safeClose(t, client)
+}
+
+func TestFuncMultiPartitionProduce(t *testing.T) {
+	checkKafkaAvailability(t)
+
+	config := NewConfig()
+	config.ChannelBufferSize = 20
+	config.Producer.Flush.Frequency = 50 * time.Millisecond
+	config.Producer.Flush.Messages = 200
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer(kafkaBrokers, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(TestBatchSize)
+
+	for i := 1; i <= TestBatchSize; i++ {
+		go func(i int) {
+			defer wg.Done()
+			msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
+			if _, _, err := producer.SendMessage(msg); err != nil {
+				t.Error(i, err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	if err := producer.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestFuncProducingToInvalidTopic(t *testing.T) {
+	checkKafkaAvailability(t)
+
+	producer, err := NewSyncProducer(kafkaBrokers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
+		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
+	}
+
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
+		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
+	}
+
+	safeClose(t, producer)
 }
 
 // Benchmarks
