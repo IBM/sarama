@@ -1,6 +1,10 @@
 package sarama
 
-import "sort"
+import (
+	"net"
+	"sort"
+	"time"
+)
 
 type none struct{}
 
@@ -86,4 +90,15 @@ func (b ByteEncoder) Encode() ([]byte, error) {
 
 func (b ByteEncoder) Length() int {
 	return len(b)
+}
+
+//DialWithTiming is exactly like net.DialTimeout from the net package, but adds support for tcp keepalives
+//  Some cloud providers, like google compute engine, kill idle connections after a few mins.  Adding the keepalive
+//  keeps the connection open.
+func DialWithTiming(network, address string, timeout time.Duration, keepalive time.Duration) (net.Conn, error) {
+	d := net.Dialer{
+		Timeout:   timeout,
+		KeepAlive: keepalive,
+	}
+	return d.Dial(network, address)
 }

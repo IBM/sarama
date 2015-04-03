@@ -12,6 +12,11 @@ type Config struct {
 		DialTimeout  time.Duration // How long to wait for the initial connection to succeed before timing out and returning an error (default 30s).
 		ReadTimeout  time.Duration // How long to wait for a response before timing out and returning an error (default 30s).
 		WriteTimeout time.Duration // How long to wait for a transmit to succeed before timing out and returning an error (default 30s).
+
+		// KeepAlive specifies the keep-alive period for an active
+		// network connection.
+		// If zero, keep-alives are not enabled.
+		KeepAlive time.Duration
 	}
 
 	// Metadata is the namespace for metadata management properties used by the Client, and shared by the Producer/Consumer.
@@ -126,6 +131,7 @@ func NewConfig() *Config {
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
+	c.Net.KeepAlive = 0 * time.Second
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond

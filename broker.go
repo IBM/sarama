@@ -68,7 +68,7 @@ func (b *Broker) Open(conf *Config) error {
 	go withRecover(func() {
 		defer b.lock.Unlock()
 
-		b.conn, b.connErr = net.DialTimeout("tcp", b.addr, conf.Net.DialTimeout)
+		b.conn, b.connErr = DialWithTiming("tcp", b.addr, conf.Net.DialTimeout, conf.Net.KeepAlive)
 		if b.connErr != nil {
 			b.conn = nil
 			atomic.StoreInt32(&b.opened, 0)
