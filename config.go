@@ -13,8 +13,7 @@ type Config struct {
 		ReadTimeout  time.Duration // How long to wait for a response before timing out and returning an error (default 30s).
 		WriteTimeout time.Duration // How long to wait for a transmit to succeed before timing out and returning an error (default 30s).
 
-		// KeepAlive specifies the keep-alive period for an active
-		// network connection.
+		// KeepAlive specifies the keep-alive period for an active network connection.
 		// If zero, keep-alives are not enabled.
 		KeepAlive time.Duration
 	}
