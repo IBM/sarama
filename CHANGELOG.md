@@ -5,6 +5,9 @@
 Improvements:
  - The producer's behaviour when `Flush.Frequency` is set is now more intuitive
    ([#389](https://github.com/Shopify/sarama/pull/389)).
+ - The producer is now somewhat more memory-efficient during and after retrying
+   messages due to an improved queue implementation
+   ([#396](https://github.com/Shopify/sarama/pull/396)).
  - The consumer produces much more useful logging output when leadership
    changes ([#385](https://github.com/Shopify/sarama/pull/385)).
 
