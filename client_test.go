@@ -4,7 +4,6 @@ import (
 	"io"
 	"sync"
 	"testing"
-	"time"
 )
 
 func safeClose(t *testing.T, c io.Closer) {
@@ -79,7 +78,6 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
-	config.Net.KeepAlive = 12 * time.Millisecond
 	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
