@@ -190,6 +190,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Invalid Net.ReadTimeout, must be > 0")
 	case c.Net.WriteTimeout <= 0:
 		return ConfigurationError("Invalid Net.WriteTimeout, must be > 0")
+	case c.Net.KeepAlive < 0:
+		return ConfigurationError("Invalid Net.KeepAlive, must be > 0")
 	}
 
 	// validate the Metadata values
