@@ -14,7 +14,7 @@ type Config struct {
 		WriteTimeout time.Duration // How long to wait for a transmit to succeed before timing out and returning an error (default 30s).
 
 		// KeepAlive specifies the keep-alive period for an active network connection.
-		// If zero, keep-alives are not enabled.
+		// If zero, keep-alives are disabled. (default is 0: disabled).
 		KeepAlive time.Duration
 	}
 
@@ -130,7 +130,6 @@ func NewConfig() *Config {
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
-	c.Net.KeepAlive = 0 * time.Second
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
