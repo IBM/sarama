@@ -12,6 +12,10 @@ type Config struct {
 		DialTimeout  time.Duration // How long to wait for the initial connection to succeed before timing out and returning an error (default 30s).
 		ReadTimeout  time.Duration // How long to wait for a response before timing out and returning an error (default 30s).
 		WriteTimeout time.Duration // How long to wait for a transmit to succeed before timing out and returning an error (default 30s).
+
+		// KeepAlive specifies the keep-alive period for an active network connection.
+		// If zero, keep-alives are disabled. (default is 0: disabled).
+		KeepAlive time.Duration
 	}
 
 	// Metadata is the namespace for metadata management properties used by the Client, and shared by the Producer/Consumer.
@@ -186,6 +190,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Invalid Net.ReadTimeout, must be > 0")
 	case c.Net.WriteTimeout <= 0:
 		return ConfigurationError("Invalid Net.WriteTimeout, must be > 0")
+	case c.Net.KeepAlive < 0:
+		return ConfigurationError("Invalid Net.KeepAlive, must be >= 0")
 	}
 
 	// validate the Metadata values

@@ -10,6 +10,7 @@ Improvements:
    ([#396](https://github.com/Shopify/sarama/pull/396)).
  - The consumer produces much more useful logging output when leadership
    changes ([#385](https://github.com/Shopify/sarama/pull/385)).
+ - Added support for tcp keepalives ([#407](https://github.com/Shopify/sarama/issues/407)).
 
 Bug Fixes:
  - The OffsetCommitRequest message now correctly implements all three possible
