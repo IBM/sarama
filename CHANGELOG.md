@@ -10,7 +10,11 @@ Improvements:
    ([#396](https://github.com/Shopify/sarama/pull/396)).
  - The consumer produces much more useful logging output when leadership
    changes ([#385](https://github.com/Shopify/sarama/pull/385)).
- - Added support for tcp keepalives ([#407](https://github.com/Shopify/sarama/issues/407)).
+ - The client's `GetOffset` method will now automatically refresh metadata and
+   retry once in the event of stale information or similar
+   ([#394](https://github.com/Shopify/sarama/pull/394)).
+ - Broker connections now have support for using TCP keepalives
+   ([#407](https://github.com/Shopify/sarama/issues/407)).
 
 Bug Fixes:
  - The OffsetCommitRequest message now correctly implements all three possible
