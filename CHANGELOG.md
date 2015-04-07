@@ -1,6 +1,6 @@
 # Changelog
 
-#### Unreleased
+#### Version 1.2.0 (2015-04-07)
 
 Improvements:
  - The producer's behaviour when `Flush.Frequency` is set is now more intuitive
