@@ -200,6 +200,54 @@ func TestClientMetadata(t *testing.T) {
 	safeClose(t, client)
 }
 
+func TestClientGetOffset(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
+	leaderAddr := leader.Addr()
+
+	metadata := new(MetadataResponse)
+	metadata.AddTopicPartition("foo", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadata.AddBroker(leaderAddr, leader.BrokerID())
+	seedBroker.Returns(metadata)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offsetResponse := new(OffsetResponse)
+	offsetResponse.AddTopicPartition("foo", 0, 123)
+	leader.Returns(offsetResponse)
+
+	offset, err := client.GetOffset("foo", 0, OffsetNewest)
+	if err != nil {
+		t.Error(err)
+	}
+	if offset != 123 {
+		t.Error("Unexpected offset, got ", offset)
+	}
+
+	leader.Close()
+	seedBroker.Returns(metadata)
+
+	leader = newMockBrokerAddr(t, 2, leaderAddr)
+	offsetResponse = new(OffsetResponse)
+	offsetResponse.AddTopicPartition("foo", 0, 456)
+	leader.Returns(offsetResponse)
+
+	offset, err = client.GetOffset("foo", 0, OffsetNewest)
+	if err != nil {
+		t.Error(err)
+	}
+	if offset != 456 {
+		t.Error("Unexpected offset, got ", offset)
+	}
+
+	seedBroker.Close()
+	leader.Close()
+	safeClose(t, client)
+}
+
 func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 

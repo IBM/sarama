@@ -292,31 +292,16 @@ func (client *client) RefreshMetadata(topics ...string) error {
 }
 
 func (client *client) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
-	broker, err := client.Leader(topic, partitionID)
+	offset, err := client.getOffset(topic, partitionID, time)
+
 	if err != nil {
-		return -1, err
+		if err := client.RefreshMetadata(topic); err != nil {
+			return -1, err
+		}
+		return client.getOffset(topic, partitionID, time)
 	}
 
-	request := &OffsetRequest{}
-	request.AddBlock(topic, partitionID, time, 1)
-
-	response, err := broker.GetAvailableOffsets(request)
-	if err != nil {
-		return -1, err
-	}
-
-	block := response.GetBlock(topic, partitionID)
-	if block == nil {
-		return -1, ErrIncompleteResponse
-	}
-	if block.Err != ErrNoError {
-		return -1, block.Err
-	}
-	if len(block.Offsets) != 1 {
-		return -1, ErrOffsetOutOfRange
-	}
-
-	return block.Offsets[0], nil
+	return offset, err
 }
 
 // private broker management helpers
@@ -440,6 +425,36 @@ func (client *client) cachedLeader(topic string, partitionID int32) (*Broker, er
 	}
 
 	return nil, ErrUnknownTopicOrPartition
+}
+
+func (client *client) getOffset(topic string, partitionID int32, time int64) (int64, error) {
+	broker, err := client.Leader(topic, partitionID)
+	if err != nil {
+		return -1, err
+	}
+
+	request := &OffsetRequest{}
+	request.AddBlock(topic, partitionID, time, 1)
+
+	response, err := broker.GetAvailableOffsets(request)
+	if err != nil {
+		_ = broker.Close()
+		return -1, err
+	}
+
+	block := response.GetBlock(topic, partitionID)
+	if block == nil {
+		_ = broker.Close()
+		return -1, ErrIncompleteResponse
+	}
+	if block.Err != ErrNoError {
+		return -1, block.Err
+	}
+	if len(block.Offsets) != 1 {
+		return -1, ErrOffsetOutOfRange
+	}
+
+	return block.Offsets[0], nil
 }
 
 // core metadata update logic
