@@ -41,3 +41,18 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder) (err error) {
 
 	return nil
 }
+
+func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
+
+	pe.putInt16(int16(r.Err))
+
+	pe.putInt32(r.CoordinatorID)
+
+	if err := pe.putString(r.CoordinatorHost); err != nil {
+		return err
+	}
+
+	pe.putInt32(r.CoordinatorPort)
+
+	return nil
+}
