@@ -85,7 +85,11 @@ func (b *Broker) Open(conf *Config) error {
 		b.done = make(chan bool)
 		b.responses = make(chan responsePromise, b.conf.Net.MaxOpenRequests-1)
 
-		Logger.Printf("Connected to broker %s\n", b.addr)
+		if b.id >= 0 {
+			Logger.Printf("Connected to broker at %s (registered as #%d)\n", b.addr, b.id)
+		} else {
+			Logger.Printf("Connected to broker at %s (unregistered)\n", b.addr)
+		}
 		go withRecover(b.responseReceiver)
 	})
 
