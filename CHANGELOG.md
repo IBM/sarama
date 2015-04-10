@@ -1,5 +1,13 @@
 # Changelog
 
+#### Unreleased
+
+Improvements:
+ - ConsumerMetadataResponses now automatically create a Broker object out of the
+   ID/address/port combination for the Coordinator; accessing the fields
+   individually has been deprecated
+   ([#413](https://github.com/Shopify/sarama/pull/413)).
+
 #### Version 1.2.0 (2015-04-07)
 
 Improvements:
