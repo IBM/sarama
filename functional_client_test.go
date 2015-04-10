@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -52,6 +53,29 @@ func TestFuncClientMetadata(t *testing.T) {
 	}
 	if len(partitions) != 1 {
 		t.Errorf("Expected single_partition topic to have 1 partitions, found %v", partitions)
+	}
+
+	safeClose(t, client)
+}
+
+func TestFuncClientCoordinator(t *testing.T) {
+	checkKafkaVersion(t, "0.8.2")
+	checkKafkaAvailability(t)
+
+	client, err := NewClient(kafkaBrokers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		broker, err := client.Coordinator(fmt.Sprintf("another_new_consumer_group_%d", i))
+		if err != nil {
+			t.Error(err)
+		}
+
+		if connected, err := broker.Connected(); !connected || err != nil {
+			t.Errorf("Expected to coordinator %s broker to be properly connected.", broker.Addr())
+		}
 	}
 
 	safeClose(t, client)

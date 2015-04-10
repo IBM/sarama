@@ -422,3 +422,135 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 
 	safeClose(t, c)
 }
+
+func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	staleCoordinator := newMockBroker(t, 2)
+	freshCoordinator := newMockBroker(t, 3)
+
+	replicas := []int32{staleCoordinator.BrokerID(), freshCoordinator.BrokerID()}
+	metadataResponse1 := new(MetadataResponse)
+	metadataResponse1.AddBroker(staleCoordinator.Addr(), staleCoordinator.BrokerID())
+	metadataResponse1.AddBroker(freshCoordinator.Addr(), freshCoordinator.BrokerID())
+	metadataResponse1.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, ErrNoError)
+	seedBroker.Returns(metadataResponse1)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coordinatorResponse1 := new(ConsumerMetadataResponse)
+	coordinatorResponse1.Err = ErrConsumerCoordinatorNotAvailable
+	seedBroker.Returns(coordinatorResponse1)
+
+	coordinatorResponse2 := new(ConsumerMetadataResponse)
+	coordinatorResponse2.CoordinatorID = staleCoordinator.BrokerID()
+	coordinatorResponse2.CoordinatorHost = "127.0.0.1"
+	coordinatorResponse2.CoordinatorPort = staleCoordinator.Port()
+
+	seedBroker.Returns(coordinatorResponse2)
+
+	broker, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if staleCoordinator.Addr() != broker.Addr() {
+		t.Errorf("Expected coordinator to have address %s, found %s", staleCoordinator.Addr(), broker.Addr())
+	}
+
+	if staleCoordinator.BrokerID() != broker.ID() {
+		t.Errorf("Expected coordinator to have ID %d, found %d", staleCoordinator.BrokerID(), broker.ID())
+	}
+
+	// Grab the cached value
+	broker2, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if broker2.Addr() != broker.Addr() {
+		t.Errorf("Expected the coordinator to be the same, but found %s vs. %s", broker2.Addr(), broker.Addr())
+	}
+
+	coordinatorResponse3 := new(ConsumerMetadataResponse)
+	coordinatorResponse3.CoordinatorID = freshCoordinator.BrokerID()
+	coordinatorResponse3.CoordinatorHost = "127.0.0.1"
+	coordinatorResponse3.CoordinatorPort = freshCoordinator.Port()
+
+	seedBroker.Returns(coordinatorResponse3)
+
+	// Refresh the locally cahced value because it's stale
+	if err := client.RefreshCoordinator("my_group"); err != nil {
+		t.Error(err)
+	}
+
+	// Grab the fresh value
+	broker3, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if broker3.Addr() != freshCoordinator.Addr() {
+		t.Errorf("Expected the freshCoordinator to be returned, but found %s.", broker3.Addr())
+	}
+
+	freshCoordinator.Close()
+	staleCoordinator.Close()
+	seedBroker.Close()
+	safeClose(t, client)
+}
+
+func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	coordinator := newMockBroker(t, 2)
+
+	metadataResponse1 := new(MetadataResponse)
+	seedBroker.Returns(metadataResponse1)
+
+	config := NewConfig()
+	config.Metadata.Retry.Max = 1
+	config.Metadata.Retry.Backoff = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coordinatorResponse1 := new(ConsumerMetadataResponse)
+	coordinatorResponse1.Err = ErrConsumerCoordinatorNotAvailable
+	seedBroker.Returns(coordinatorResponse1)
+
+	metadataResponse2 := new(MetadataResponse)
+	metadataResponse2.AddTopic("__consumer_offsets", ErrUnknownTopicOrPartition)
+	seedBroker.Returns(metadataResponse2)
+
+	replicas := []int32{coordinator.BrokerID()}
+	metadataResponse3 := new(MetadataResponse)
+	metadataResponse3.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, ErrNoError)
+	seedBroker.Returns(metadataResponse3)
+
+	coordinatorResponse2 := new(ConsumerMetadataResponse)
+	coordinatorResponse2.CoordinatorID = coordinator.BrokerID()
+	coordinatorResponse2.CoordinatorHost = "127.0.0.1"
+	coordinatorResponse2.CoordinatorPort = coordinator.Port()
+
+	seedBroker.Returns(coordinatorResponse2)
+
+	broker, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if coordinator.Addr() != broker.Addr() {
+		t.Errorf("Expected coordinator to have address %s, found %s", coordinator.Addr(), broker.Addr())
+	}
+
+	if coordinator.BrokerID() != broker.ID() {
+		t.Errorf("Expected coordinator to have ID %d, found %d", coordinator.BrokerID(), broker.ID())
+	}
+
+	coordinator.Close()
+	seedBroker.Close()
+	safeClose(t, client)
+}
