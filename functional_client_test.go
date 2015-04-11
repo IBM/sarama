@@ -80,3 +80,32 @@ func TestFuncClientCoordinator(t *testing.T) {
 
 	safeClose(t, client)
 }
+
+func TestFuncClientOffsetManagement(t *testing.T) {
+	checkKafkaVersion(t, "0.8.2")
+	checkKafkaAvailability(t)
+
+	c, err := NewClient(kafkaBrokers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := c.(*client).CommitOffset("testing_123", "multi_partition", 1, 123, "Hello world"); err != nil {
+		t.Fatal(err)
+	}
+
+	offset, metadata, err := c.(*client).FetchOffset("testing_123", "multi_partition", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if offset != 123 {
+		t.Error("Expected offset 123, got", offset)
+	}
+
+	if metadata != "Hello world" {
+		t.Errorf("Expected metadata 'Hello world', got '%s'", metadata)
+	}
+
+	safeClose(t, c)
+}
