@@ -599,7 +599,7 @@ func (client *client) updateMetadata(data *MetadataResponse) ([]string, error) {
 		client.registerBroker(broker)
 	}
 
-	toRetry := make(map[string]bool)
+	toRetry := make(map[string]none)
 
 	var err error
 	for _, topic := range data.Topics {
@@ -615,10 +615,10 @@ func (client *client) updateMetadata(data *MetadataResponse) ([]string, error) {
 			continue
 		case ErrUnknownTopicOrPartition: // retry, do not store partial partition results
 			err = topic.Err
-			toRetry[topic.Name] = true
+			toRetry[topic.Name] = none{}
 			continue
 		case ErrLeaderNotAvailable: // retry, but store partiial partition results
-			toRetry[topic.Name] = true
+			toRetry[topic.Name] = none{}
 			break
 		default: // don't retry, don't store partial results
 			Logger.Printf("Unexpected topic-level metadata error: %s", topic.Err)
@@ -630,7 +630,7 @@ func (client *client) updateMetadata(data *MetadataResponse) ([]string, error) {
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
 			if partition.Err == ErrLeaderNotAvailable {
-				toRetry[topic.Name] = true
+				toRetry[topic.Name] = none{}
 			}
 		}
 
