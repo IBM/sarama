@@ -313,22 +313,28 @@ func (child *partitionConsumer) dispatch() error {
 	return nil
 }
 
-func (child *partitionConsumer) chooseStartingOffset(offset int64) (err error) {
-	var time int64
-
-	switch offset {
-	case OffsetNewest, OffsetOldest:
-		time = offset
-	default:
-		if offset < 0 {
-			return ConfigurationError("Invalid offset")
-		}
-		child.offset = offset
-		return nil
+func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
+	newestOffset, err := child.consumer.client.GetOffset(child.topic, child.partition, OffsetNewest)
+	if err != nil {
+		return err
+	}
+	oldestOffset, err := child.consumer.client.GetOffset(child.topic, child.partition, OffsetOldest)
+	if err != nil {
+		return err
 	}
 
-	child.offset, err = child.consumer.client.GetOffset(child.topic, child.partition, time)
-	return err
+	switch {
+	case offset == OffsetNewest:
+		child.offset = newestOffset
+	case offset == OffsetOldest:
+		child.offset = oldestOffset
+	case offset >= oldestOffset && offset <= newestOffset:
+		child.offset = offset
+	default:
+		return ErrOffsetOutOfRange
+	}
+
+	return nil
 }
 
 func (child *partitionConsumer) Messages() <-chan *ConsumerMessage {
