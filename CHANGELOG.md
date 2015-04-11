@@ -2,6 +2,14 @@
 
 #### Unreleased
 
+New Features:
+ - The client now tracks consumer group coordinators using
+   ConsumerMetadataRequests similar to how it tracks partition leadership using
+   regular MetadataRequests ([#411](https://github.com/Shopify/sarama/pull/411)).
+   This adds two methods to the client API:
+   - `Coordinator(consumerGroup string) (*Broker, error)`
+   - `RefreshCoordinator(consumerGroup string) error`
+
 Improvements:
  - ConsumerMetadataResponses now automatically create a Broker object out of the
    ID/address/port combination for the Coordinator; accessing the fields
