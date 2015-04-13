@@ -106,7 +106,7 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 		partition: partition,
 		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
 		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
-		trigger:   make(chan none, 1),
+		trigger:   make(chan *FetchResponse, 1),
 		dying:     make(chan none),
 		fetchSize: c.conf.Consumer.Fetch.Default,
 	}
@@ -162,25 +162,15 @@ func (c *consumer) refBrokerConsumer(broker *Broker) *brokerConsumer {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	brokerWorker := c.brokerConsumers[broker]
-	if brokerWorker == nil {
-		brokerWorker = &brokerConsumer{
-			consumer:         c,
-			broker:           broker,
-			input:            make(chan *partitionConsumer),
-			newSubscriptions: make(chan []*partitionConsumer),
-			wait:             make(chan none),
-			subscriptions:    make(map[*partitionConsumer]none),
-			refs:             0,
-		}
-		go withRecover(brokerWorker.subscriptionManager)
-		go withRecover(brokerWorker.subscriptionConsumer)
-		c.brokerConsumers[broker] = brokerWorker
+	bc := c.brokerConsumers[broker]
+	if bc == nil {
+		bc = c.newBrokerConsumer(broker)
+		c.brokerConsumers[broker] = bc
 	}
 
-	brokerWorker.refs++
+	bc.refs++
 
-	return brokerWorker
+	return bc
 }
 
 func (c *consumer) unrefBrokerConsumer(brokerWorker *brokerConsumer) {
@@ -245,10 +235,11 @@ type partitionConsumer struct {
 	topic     string
 	partition int32
 
-	broker         *brokerConsumer
-	messages       chan *ConsumerMessage
-	errors         chan *ConsumerError
-	trigger, dying chan none
+	broker   *brokerConsumer
+	messages chan *ConsumerMessage
+	errors   chan *ConsumerError
+	trigger  chan *FetchResponse
+	dying    chan none
 
 	fetchSize int32
 	offset    int64
@@ -269,7 +260,22 @@ func (child *partitionConsumer) sendError(err error) {
 }
 
 func (child *partitionConsumer) dispatcher() {
-	for _ = range child.trigger {
+	for response := range child.trigger {
+		if response != nil {
+			err := child.handleResponse(response)
+			switch err {
+			case nil:
+				child.broker.acks <- nil
+				continue
+			case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable:
+				// these three are not fatal errors, but do require redispatching
+				child.broker.acks <- child
+			default:
+				child.sendError(err)
+				child.broker.acks <- child
+			}
+		}
+
 		select {
 		case <-child.dying:
 			close(child.trigger)
@@ -282,7 +288,7 @@ func (child *partitionConsumer) dispatcher() {
 			Logger.Printf("consumer/%s/%d finding new broker\n", child.topic, child.partition)
 			if err := child.dispatch(); err != nil {
 				child.sendError(err)
-				child.trigger <- none{}
+				child.trigger <- nil
 			}
 		}
 	}
@@ -438,11 +444,27 @@ func (child *partitionConsumer) handleResponse(response *FetchResponse) error {
 type brokerConsumer struct {
 	consumer         *consumer
 	broker           *Broker
-	input            chan *partitionConsumer
+	input, acks      chan *partitionConsumer
 	newSubscriptions chan []*partitionConsumer
 	wait             chan none
 	subscriptions    map[*partitionConsumer]none
 	refs             int
+}
+
+func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
+	bc := &brokerConsumer{
+		consumer:         c,
+		broker:           broker,
+		input:            make(chan *partitionConsumer),
+		acks:             make(chan *partitionConsumer),
+		newSubscriptions: make(chan []*partitionConsumer),
+		wait:             make(chan none),
+		subscriptions:    make(map[*partitionConsumer]none),
+		refs:             0,
+	}
+	go withRecover(bc.subscriptionManager)
+	go withRecover(bc.subscriptionConsumer)
+	return bc
 }
 
 func (w *brokerConsumer) subscriptionManager() {
@@ -508,17 +530,13 @@ func (w *brokerConsumer) subscriptionConsumer() {
 		}
 
 		for child := range w.subscriptions {
-			if err := child.handleResponse(response); err != nil {
-				switch err {
-				default:
-					child.sendError(err)
-					fallthrough
-				case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable:
-					// these three are not fatal errors, but do require redispatching
-					child.trigger <- none{}
-					delete(w.subscriptions, child)
-					Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because %s\n", w.broker.ID(), child.topic, child.partition, err)
-				}
+			child.trigger <- response
+		}
+		expected := len(w.subscriptions)
+		for i := 0; i < expected; i++ {
+			if child := <-w.acks; child != nil {
+				delete(w.subscriptions, child)
+				Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d\n", w.broker.ID(), child.topic, child.partition)
 			}
 		}
 	}
@@ -548,13 +566,13 @@ func (w *brokerConsumer) abort(err error) {
 
 	for child := range w.subscriptions {
 		child.sendError(err)
-		child.trigger <- none{}
+		child.trigger <- nil
 	}
 
 	for newSubscription := range w.newSubscriptions {
 		for _, child := range newSubscription {
 			child.sendError(err)
-			child.trigger <- none{}
+			child.trigger <- nil
 		}
 	}
 }

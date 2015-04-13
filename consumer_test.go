@@ -18,13 +18,15 @@ func TestConsumerOffsetManual(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	for i := 0; i <= 10; i++ {
+	for i := 0; i < 10; i++ {
 		fetchResponse := new(FetchResponse)
 		fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(i+1234))
 		leader.Returns(fetchResponse)
 	}
 
-	master, err := NewConsumer([]string{seedBroker.Addr()}, nil)
+	config := NewConfig()
+	config.Consumer.Return.Errors = true
+	master, err := NewConsumer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,6 +178,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 				if message.Partition != partition {
 					t.Error("Incorrect message partition!")
 				}
+				Logger.Println(partition, i)
 			}
 			safeClose(t, consumer)
 			wg.Done()
@@ -237,26 +240,16 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(9))
 	leader0.Returns(fetchResponse)
 
-	// leader0 provides last message  on partition 1
-	fetchResponse = new(FetchResponse)
-	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(10))
-	leader0.Returns(fetchResponse)
-
-	// leader1 provides last message  on partition 0
-	fetchResponse = new(FetchResponse)
-	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(10))
-	leader1.Returns(fetchResponse)
-
-	wg.Wait()
 	leader1.Close()
 	leader0.Close()
 	seedBroker.Close()
+
+	wg.Wait()
+
 	safeClose(t, master)
 }
 
 func TestConsumerInterleavedClose(t *testing.T) {
-	t.Skip("Enable once bug #325 is fixed.")
-
 	seedBroker := newMockBroker(t, 1)
 	leader := newMockBroker(t, 2)
 
@@ -278,16 +271,22 @@ func TestConsumerInterleavedClose(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	fetchResponse := new(FetchResponse)
-	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
-	leader.Returns(fetchResponse)
+	time.Sleep(50 * time.Millisecond)
 
 	c1, err := master.ConsumePartition("my_topic", 1, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
+	fetchResponse := new(FetchResponse)
+	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), 0)
+	leader.Returns(fetchResponse)
+
+	<-c0.Messages()
+
+	fetchResponse = new(FetchResponse)
+	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), 1)
+	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), 0)
 	leader.Returns(fetchResponse)
 
 	safeClose(t, c1)
