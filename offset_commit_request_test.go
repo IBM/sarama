@@ -54,28 +54,37 @@ var (
 		0x00, 0x08, 'm', 'e', 't', 'a', 'd', 'a', 't', 'a'}
 )
 
-func TestOffsetCommitRequest(t *testing.T) {
+func TestOffsetCommitRequestV0(t *testing.T) {
 	request := new(OffsetCommitRequest)
-
+	request.Version = 0
 	request.ConsumerGroup = "foobar"
 	testEncodable(t, "no blocks v0", request, offsetCommitRequestNoBlocksV0)
 
-	request.ConsumerGroupGeneration = 0x1122
+	request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, "metadata")
+	testEncodable(t, "one block v0", request, offsetCommitRequestOneBlockV0)
+}
+
+func TestOffsetCommitRequestV1(t *testing.T) {
+	request := new(OffsetCommitRequest)
+	request.ConsumerGroup = "foobar"
 	request.ConsumerID = "cons"
+	request.ConsumerGroupGeneration = 0x1122
 	request.Version = 1
 	testEncodable(t, "no blocks v1", request, offsetCommitRequestNoBlocksV1)
 
+	request.AddBlock("topic", 0x5221, 0xDEADBEEF, ReceiveTime, "metadata")
+	testEncodable(t, "one block v1", request, offsetCommitRequestOneBlockV1)
+}
+
+func TestOffsetCommitRequestV2(t *testing.T) {
+	request := new(OffsetCommitRequest)
+	request.ConsumerGroup = "foobar"
+	request.ConsumerID = "cons"
+	request.ConsumerGroupGeneration = 0x1122
 	request.RetentionTime = 0x4433
 	request.Version = 2
 	testEncodable(t, "no blocks v2", request, offsetCommitRequestNoBlocksV2)
 
-	request.AddBlock("topic", 0x5221, 0xDEADBEEF, ReceiveTime, "metadata")
-	request.Version = 0
-	testEncodable(t, "one block v0", request, offsetCommitRequestOneBlockV0)
-
-	request.Version = 1
-	testEncodable(t, "one block v1", request, offsetCommitRequestOneBlockV1)
-
-	request.Version = 2
+	request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, "metadata")
 	testEncodable(t, "one block v2", request, offsetCommitRequestOneBlockV2)
 }
