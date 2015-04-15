@@ -4,6 +4,7 @@ import (
 	"io"
 	"sync"
 	"testing"
+	"time"
 )
 
 func safeClose(t *testing.T, c io.Closer) {
@@ -553,4 +554,46 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 	coordinator.Close()
 	seedBroker.Close()
 	safeClose(t, client)
+}
+
+func TestClientAutorefreshShutdownRace(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	seedBroker.Returns(metadataResponse)
+
+	conf := NewConfig()
+	conf.Metadata.RefreshFrequency = 100 * time.Millisecond
+	client, err := NewClient([]string{seedBroker.Addr()}, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the background refresh to kick in
+	time.Sleep(110 * time.Millisecond)
+
+	done := make(chan none)
+	go func() {
+		// Close the client
+		if err := client.Close(); err != nil {
+			t.Fatal(err)
+		}
+		close(done)
+	}()
+
+	// Wait for the Close to kick in
+	time.Sleep(10 * time.Millisecond)
+
+	// Then return some metadata to the still-running background thread
+	leader := newMockBroker(t, 2)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("foo", 0, leader.BrokerID(), []int32{2}, []int32{2}, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	<-done
+
+	seedBroker.Close()
+
+	// give the update time to happen so we get a panic if it's still running (which it shouldn't)
+	time.Sleep(10 * time.Millisecond)
 }
