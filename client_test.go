@@ -387,6 +387,7 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 
 	conf := NewConfig()
 	conf.Metadata.Retry.Backoff = 0
+	conf.Metadata.RefreshFrequency = 0
 	c, err := NewClient([]string{addr1, addr2, addr3}, conf)
 	if err != nil {
 		t.Fatal(err)
