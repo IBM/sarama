@@ -16,6 +16,11 @@ Improvements:
    individually has been deprecated
    ([#413](https://github.com/Shopify/sarama/pull/413)).
 
+Bug Fixes:
+ - Fix a rare race condition in the client's background metadata refresher if
+   it happens to be activated while the client is being closed
+   ([#422](https://github.com/Shopify/sarama/pull/422)).
+
 #### Version 1.2.0 (2015-04-07)
 
 Improvements:
