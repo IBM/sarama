@@ -20,7 +20,7 @@ Improvements:
    ([#418](https://github.com/Shopify/sarama/pull/418))
    and they will automatically shut down if the offset falls out of range
    ([#424](https://github.com/Shopify/sarama/pull/424)).
- - Small performance improvment in encoding and decoding protocol messages
+ - Small performance improvement in encoding and decoding protocol messages
    ([#427](https://github.com/Shopify/sarama/pull/427)).
 
 Bug Fixes:
