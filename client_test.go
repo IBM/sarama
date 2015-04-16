@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func safeClose(t *testing.T, c io.Closer) {
+func safeClose(t testing.TB, c io.Closer) {
 	err := c.Close()
 	if err != nil {
 		t.Error(err)

@@ -58,7 +58,7 @@ func init() {
 	kafkaShouldBeAvailable = os.Getenv("CI") != ""
 }
 
-func checkKafkaAvailability(t *testing.T) {
+func checkKafkaAvailability(t testing.TB) {
 	if !kafkaIsAvailable {
 		if kafkaShouldBeAvailable {
 			t.Fatalf("Kafka broker is not available on %s. Set KAFKA_PEERS to connect to Kafka on a different location.", kafkaBrokers[0])
@@ -68,7 +68,7 @@ func checkKafkaAvailability(t *testing.T) {
 	}
 }
 
-func checkKafkaVersion(t *testing.T, requiredVersion string) {
+func checkKafkaVersion(t testing.TB, requiredVersion string) {
 	kafkaVersion := os.Getenv("KAFKA_VERSION")
 	if kafkaVersion == "" {
 		t.Logf("No KAFKA_VERSION set. This tests requires Kafka version %s or higher. Continuing...", requiredVersion)

@@ -155,3 +155,45 @@ func testProducingMessages(t *testing.T, config *Config) {
 	safeClose(t, consumer)
 	safeClose(t, client)
 }
+
+// Benchmarks
+
+func BenchmarkProducerSmall(b *testing.B) {
+	benchmarkProducer(b, nil, "test.64", ByteEncoder(make([]byte, 128)))
+}
+func BenchmarkProducerMedium(b *testing.B) {
+	benchmarkProducer(b, nil, "test.64", ByteEncoder(make([]byte, 1024)))
+}
+func BenchmarkProducerLarge(b *testing.B) {
+	benchmarkProducer(b, nil, "test.64", ByteEncoder(make([]byte, 8192)))
+}
+func BenchmarkProducerSmallSinglePartition(b *testing.B) {
+	benchmarkProducer(b, nil, "test.1", ByteEncoder(make([]byte, 128)))
+}
+func BenchmarkProducerMediumSnappy(b *testing.B) {
+	conf := NewConfig()
+	conf.Producer.Compression = CompressionSnappy
+	benchmarkProducer(b, conf, "test.1", ByteEncoder(make([]byte, 1024)))
+}
+
+func benchmarkProducer(b *testing.B, conf *Config, topic string, value Encoder) {
+	checkKafkaAvailability(b)
+
+	producer, err := NewAsyncProducer(kafkaBrokers, conf)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	b.ResetTimer()
+
+	for i := 1; i <= b.N; {
+		msg := &ProducerMessage{Topic: topic, Key: StringEncoder(fmt.Sprintf("%d", i)), Value: value}
+		select {
+		case producer.Input() <- msg:
+			i++
+		case ret := <-producer.Errors():
+			b.Fatal(ret.Err)
+		}
+	}
+	safeClose(b, producer)
+}
