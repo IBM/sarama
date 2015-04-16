@@ -19,7 +19,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 		return -1, ErrInsufficientData
 	}
 	tmp := int8(rd.raw[rd.off])
-	rd.off += binary.Size(tmp)
+	rd.off += 1
 	return tmp, nil
 }
 
@@ -29,7 +29,7 @@ func (rd *realDecoder) getInt16() (int16, error) {
 		return -1, ErrInsufficientData
 	}
 	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
-	rd.off += binary.Size(tmp)
+	rd.off += 2
 	return tmp, nil
 }
 
@@ -39,7 +39,7 @@ func (rd *realDecoder) getInt32() (int32, error) {
 		return -1, ErrInsufficientData
 	}
 	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
-	rd.off += binary.Size(tmp)
+	rd.off += 4
 	return tmp, nil
 }
 
@@ -49,7 +49,7 @@ func (rd *realDecoder) getInt64() (int64, error) {
 		return -1, ErrInsufficientData
 	}
 	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
-	rd.off += binary.Size(tmp)
+	rd.off += 8
 	return tmp, nil
 }
 
@@ -147,7 +147,7 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	ret := make([]int32, n)
 	for i := range ret {
 		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
-		rd.off += binary.Size(ret[i])
+		rd.off += 4
 	}
 	return ret, nil
 }
@@ -176,7 +176,7 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 	ret := make([]int64, n)
 	for i := range ret {
 		ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
-		rd.off += binary.Size(ret[i])
+		rd.off += 8
 	}
 	return ret, nil
 }
