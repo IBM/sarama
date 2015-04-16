@@ -39,20 +39,20 @@ func TestFuncClientMetadata(t *testing.T) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
-	partitions, err := client.Partitions("multi_partition")
+	partitions, err := client.Partitions("test.4")
 	if err != nil {
 		t.Error(err)
 	}
-	if len(partitions) != 2 {
-		t.Errorf("Expected multi_partition topic to have 2 partitions, found %v", partitions)
+	if len(partitions) != 4 {
+		t.Errorf("Expected test.4 topic to have 4 partitions, found %v", partitions)
 	}
 
-	partitions, err = client.Partitions("single_partition")
+	partitions, err = client.Partitions("test.1")
 	if err != nil {
 		t.Error(err)
 	}
 	if len(partitions) != 1 {
-		t.Errorf("Expected single_partition topic to have 1 partitions, found %v", partitions)
+		t.Errorf("Expected test.1 topic to have 1 partitions, found %v", partitions)
 	}
 
 	safeClose(t, client)

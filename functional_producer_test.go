@@ -58,7 +58,7 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	for i := 1; i <= TestBatchSize; i++ {
 		go func(i int) {
 			defer wg.Done()
-			msg := &ProducerMessage{Topic: "multi_partition", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
+			msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
 			if _, _, err := producer.SendMessage(msg); err != nil {
 				t.Error(i, err)
 			}
@@ -105,7 +105,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	consumer, err := master.ConsumePartition("single_partition", 0, OffsetNewest)
+	consumer, err := master.ConsumePartition("test.1", 0, OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 
 	expectedResponses := TestBatchSize
 	for i := 1; i <= TestBatchSize; {
-		msg := &ProducerMessage{Topic: "single_partition", Key: nil, Value: StringEncoder(fmt.Sprintf("testing %d", i))}
+		msg := &ProducerMessage{Topic: "test.1", Key: nil, Value: StringEncoder(fmt.Sprintf("testing %d", i))}
 		select {
 		case producer.Input() <- msg:
 			i++
