@@ -15,6 +15,11 @@ Improvements:
    ID/address/port combination for the Coordinator; accessing the fields
    individually has been deprecated
    ([#413](https://github.com/Shopify/sarama/pull/413)).
+ - Much improved handling of `OffsetOutOfRange` errors in the consumer.
+   Consumers will fail to start if the provided offset is out of range
+   ([#418](https://github.com/Shopify/sarama/pull/418))
+   and they will automatically shut down if the offset falls out of range
+   ([#424](https://github.com/Shopify/sarama/pull/424)).
 
 Bug Fixes:
  - Fix a rare race condition in the client's background metadata refresher if
