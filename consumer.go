@@ -516,6 +516,11 @@ func (w *brokerConsumer) subscriptionConsumer() {
 		for child := range w.subscriptions {
 			if err := child.handleResponse(response); err != nil {
 				switch err {
+				case ErrOffsetOutOfRange:
+					// there's no point in retrying this it will just fail the same way again
+					// so shut it down and force the user to choose what to do
+					child.AsyncClose()
+					fallthrough
 				default:
 					child.sendError(err)
 					fallthrough

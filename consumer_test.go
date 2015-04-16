@@ -101,6 +101,46 @@ func TestConsumerLatestOffset(t *testing.T) {
 	}
 }
 
+func TestConsumerShutsDownOutOfRange(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	offsetResponseNewest := new(OffsetResponse)
+	offsetResponseNewest.AddTopicPartition("my_topic", 0, 1234)
+	leader.Returns(offsetResponseNewest)
+
+	offsetResponseOldest := new(OffsetResponse)
+	offsetResponseOldest.AddTopicPartition("my_topic", 0, 0)
+	leader.Returns(offsetResponseOldest)
+
+	fetchResponse := new(FetchResponse)
+	fetchResponse.AddError("my_topic", 0, ErrOffsetOutOfRange)
+	leader.Returns(fetchResponse)
+
+	master, err := NewConsumer([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seedBroker.Close()
+
+	consumer, err := master.ConsumePartition("my_topic", 0, 101)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := <-consumer.Messages(); ok {
+		t.Error("Expected the consumer to shut down")
+	}
+
+	leader.Close()
+	safeClose(t, master)
+}
+
 func TestConsumerFunnyOffsets(t *testing.T) {
 	// for topics that are compressed and/or compacted (different things!) we have to be
 	// able to handle receiving offsets that are non-sequential (though still strictly increasing) and
