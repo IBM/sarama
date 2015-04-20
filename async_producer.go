@@ -20,18 +20,13 @@ func forceFlushThreshold() int {
 // leaks: it will not be garbage-collected automatically when it passes out of
 // scope.
 type AsyncProducer interface {
+	Client
 
 	// AsyncClose triggers a shutdown of the producer, flushing any messages it may have
 	// buffered. The shutdown has completed when both the Errors and Successes channels
 	// have been closed. When calling AsyncClose, you *must* continue to read from those
 	// channels in order to drain the results of any messages in flight.
 	AsyncClose()
-
-	// Close shuts down the producer and flushes any messages it may have buffered.
-	// You must call this function before a producer object passes out of scope, as
-	// it may otherwise leak memory. You must call this before calling Close on the
-	// underlying client.
-	Close() error
 
 	// Input is the input channel for the user to write messages to that they wish to send.
 	Input() chan<- *ProducerMessage
@@ -48,7 +43,7 @@ type AsyncProducer interface {
 }
 
 type asyncProducer struct {
-	client    Client
+	Client
 	conf      *Config
 	ownClient bool
 
@@ -84,7 +79,7 @@ func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 	}
 
 	p := &asyncProducer{
-		client:     client,
+		Client:     client,
 		conf:       client.Config(),
 		errors:     make(chan *ProducerError),
 		input:      make(chan *ProducerMessage),
@@ -252,7 +247,7 @@ func (p *asyncProducer) topicDispatcher() {
 	}
 
 	if p.ownClient {
-		err := p.client.Close()
+		err := p.Client.Close()
 		if err != nil {
 			Logger.Println("producer/shutdown failed to close the embedded client:", err)
 		}
@@ -308,11 +303,11 @@ func (p *asyncProducer) leaderDispatcher(topic string, partition int32, input ch
 
 	breaker := breaker.New(3, 1, 10*time.Second)
 	doUpdate := func() (err error) {
-		if err = p.client.RefreshMetadata(topic); err != nil {
+		if err = p.RefreshMetadata(topic); err != nil {
 			return err
 		}
 
-		if leader, err = p.client.Leader(topic, partition); err != nil {
+		if leader, err = p.Leader(topic, partition); err != nil {
 			return err
 		}
 
@@ -322,7 +317,7 @@ func (p *asyncProducer) leaderDispatcher(topic string, partition int32, input ch
 
 	// try to prefetch the leader; if this doesn't work, we'll do a proper breaker-protected refresh-and-fetch
 	// on the first message
-	leader, _ = p.client.Leader(topic, partition)
+	leader, _ = p.Leader(topic, partition)
 	if leader != nil {
 		output = p.getBrokerProducer(leader)
 	}
@@ -646,9 +641,9 @@ func (p *asyncProducer) assignPartition(partitioner Partitioner, msg *ProducerMe
 	var err error
 
 	if partitioner.RequiresConsistency() {
-		partitions, err = p.client.Partitions(msg.Topic)
+		partitions, err = p.Partitions(msg.Topic)
 	} else {
-		partitions, err = p.client.WritablePartitions(msg.Topic)
+		partitions, err = p.WritablePartitions(msg.Topic)
 	}
 
 	if err != nil {

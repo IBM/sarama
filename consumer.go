@@ -39,17 +39,16 @@ func (ce ConsumerErrors) Error() string {
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
 type Consumer interface {
+	Client
+
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
 	// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
 	// literal offset, or OffsetNewest or OffsetOldest
 	ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error)
-
-	// Close shuts down the consumer. It must be called after all child PartitionConsumers have already been closed.
-	Close() error
 }
 
 type consumer struct {
-	client    Client
+	Client
 	conf      *Config
 	ownClient bool
 
@@ -82,7 +81,7 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 	}
 
 	c := &consumer{
-		client:          client,
+		Client:          client,
 		conf:            client.Config(),
 		children:        make(map[string]map[int32]*partitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
@@ -93,7 +92,7 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 
 func (c *consumer) Close() error {
 	if c.ownClient {
-		return c.client.Close()
+		return c.Client.Close()
 	}
 	return nil
 }
@@ -117,7 +116,7 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 
 	var leader *Broker
 	var err error
-	if leader, err = c.client.Leader(child.topic, child.partition); err != nil {
+	if leader, err = c.Leader(child.topic, child.partition); err != nil {
 		return nil, err
 	}
 
@@ -297,13 +296,13 @@ func (child *partitionConsumer) dispatcher() {
 }
 
 func (child *partitionConsumer) dispatch() error {
-	if err := child.consumer.client.RefreshMetadata(child.topic); err != nil {
+	if err := child.consumer.RefreshMetadata(child.topic); err != nil {
 		return err
 	}
 
 	var leader *Broker
 	var err error
-	if leader, err = child.consumer.client.Leader(child.topic, child.partition); err != nil {
+	if leader, err = child.consumer.Leader(child.topic, child.partition); err != nil {
 		return err
 	}
 
@@ -315,11 +314,11 @@ func (child *partitionConsumer) dispatch() error {
 }
 
 func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
-	newestOffset, err := child.consumer.client.GetOffset(child.topic, child.partition, OffsetNewest)
+	newestOffset, err := child.consumer.GetOffset(child.topic, child.partition, OffsetNewest)
 	if err != nil {
 		return err
 	}
-	oldestOffset, err := child.consumer.client.GetOffset(child.topic, child.partition, OffsetOldest)
+	oldestOffset, err := child.consumer.GetOffset(child.topic, child.partition, OffsetOldest)
 	if err != nil {
 		return err
 	}
