@@ -39,6 +39,15 @@ func (ce ConsumerErrors) Error() string {
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
 type Consumer interface {
+
+	// Topics returns the set of available topics as retrieved from the cluster metadata.
+	// This method is the same as Client.Topics(), and is provided for convenience.
+	Topics() ([]string, error)
+
+	// Partitions returns the sorted list of all partition IDs for the given topic.
+	// This method is the same as Client.Pertitions(), and is provided for convenience.
+	Partitions(topic string) ([]int32, error)
+
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
 	// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
 	// literal offset, or OffsetNewest or OffsetOldest
@@ -96,6 +105,14 @@ func (c *consumer) Close() error {
 		return c.client.Close()
 	}
 	return nil
+}
+
+func (c *consumer) Topics() ([]string, error) {
+	return c.client.Topics()
+}
+
+func (c *consumer) Partitions(topic string) ([]int32, error) {
+	return c.client.Partitions(topic)
 }
 
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
