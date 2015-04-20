@@ -14,6 +14,7 @@ type Consumer struct {
 	t                  ErrorReporter
 	config             *sarama.Config
 	partitionConsumers map[string]map[int32]*PartitionConsumer
+	metadata           map[string][]int32
 }
 
 // NewConsumer returns a new mock Consumer instance. The t argument should
@@ -62,6 +63,39 @@ func (c *Consumer) ConsumePartition(topic string, partition int32, offset int64)
 	return pc, nil
 }
 
+// Topics returns a list of topics, as registered with SetMetadata
+func (c *Consumer) Topics() ([]string, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	if c.metadata == nil {
+		c.t.Errorf("Unexpected call to Topics. Initialize the mock's topic metadata with SetMetadata.")
+		return nil, sarama.ErrOutOfBrokers
+	}
+
+	var result []string
+	for topic, _ := range c.metadata {
+		result = append(result, topic)
+	}
+	return result, nil
+}
+
+// Partitions returns the list of parititons for the given topic, as registered with SetMetadata
+func (c *Consumer) Partitions(topic string) ([]int32, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	if c.metadata == nil {
+		c.t.Errorf("Unexpected call to Partitions. Initialize the mock's topic metadata with SetMetadata.")
+		return nil, sarama.ErrOutOfBrokers
+	}
+	if c.metadata[topic] == nil {
+		return nil, sarama.ErrUnknownTopicOrPartition
+	}
+
+	return c.metadata[topic], nil
+}
+
 // Close implements the Close method from the sarama.Consumer interface. It will close
 // all registered PartitionConsumer instances.
 func (c *Consumer) Close() error {
@@ -80,6 +114,15 @@ func (c *Consumer) Close() error {
 ///////////////////////////////////////////////////
 // Expectation API
 ///////////////////////////////////////////////////
+
+// SetMetadata sets the clusters topic/partition metadata,
+// which will be returned by Topics() and Partitions().
+func (c *Consumer) SetTopicMetadata(metadata map[string][]int32) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	c.metadata = metadata
+}
 
 // ExpectConsumePartition will register a topic/partition, so you can set expectations on it.
 // The registered PartitionConsumer will be returned, so you can set expectations

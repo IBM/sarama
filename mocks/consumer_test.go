@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/Shopify/sarama"
@@ -187,6 +188,62 @@ func TestConsumerMeetsErrorsDrainedExpectation(t *testing.T) {
 	}
 
 	if len(trm.errors) != 0 {
-		t.Errorf("Expected ano expectation failures to be set on the error reporter.")
+		t.Errorf("Expected no expectation failures to be set on the error reporter.")
+	}
+}
+
+func TestConsumerTopicMetadata(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, nil)
+
+	consumer.SetTopicMetadata(map[string][]int32{
+		"test1": []int32{0, 1, 2, 3},
+		"test2": []int32{0, 1, 2, 3, 4, 5, 6, 7},
+	})
+
+	topics, err := consumer.Topics()
+	if err != nil {
+		t.Error(t)
+	}
+
+	sortedTopics := sort.StringSlice(topics)
+	sortedTopics.Sort()
+	if len(sortedTopics) != 2 || sortedTopics[0] != "test1" || sortedTopics[1] != "test2" {
+		t.Error("Unexpected topics returned:", sortedTopics)
+	}
+
+	partitions1, err := consumer.Partitions("test1")
+	if err != nil {
+		t.Error(t)
+	}
+
+	if len(partitions1) != 4 {
+		t.Error("Unexpected partitions returned:", len(partitions1))
+	}
+
+	partitions2, err := consumer.Partitions("test2")
+	if err != nil {
+		t.Error(t)
+	}
+
+	if len(partitions2) != 8 {
+		t.Error("Unexpected partitions returned:", len(partitions2))
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected no expectation failures to be set on the error reporter.")
+	}
+}
+
+func TestConsumerUnexpectedTopicMetadata(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, nil)
+
+	if _, err := consumer.Topics(); err != sarama.ErrOutOfBrokers {
+		t.Error("Expected sarama.ErrOutOfBrokers, found", err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Errorf("Expected an expectation failure to be set on the error reporter.")
 	}
 }
