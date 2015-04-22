@@ -1,0 +1,15 @@
+<html>
+<head>
+  <title>Kafka SSE streamer</title>
+  <script type="text/javascript">
+    var source = new EventSource("/{{.Topic}}/{{.Partition}}.sse");
+    source.onmessage = function(event) {
+      document.getElementById("sse-stream").innerHTML += event.data + "\n";
+    };
+  </script>
+</head>
+<body>
+  <h1>SSE stream for {{.Topic}}/{{.Partition}}</h1>
+  <pre id="sse-stream"></pre>
+</body>
+</html>
