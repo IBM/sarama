@@ -36,7 +36,7 @@ type AsyncProducer interface {
 	// Input is the input channel for the user to write messages to that they wish to send.
 	Input() chan<- *ProducerMessage
 
-	// Successes is the success output channel back to the user when AckSuccesses is confured.
+	// Successes is the success output channel back to the user when AckSuccesses is enabled.
 	// If Return.Successes is true, you MUST read from this channel or the Producer will deadlock.
 	// It is suggested that you send and read messages together in a single select statement.
 	Successes() <-chan *ProducerMessage
