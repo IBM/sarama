@@ -15,6 +15,11 @@ Improvements:
    useful, and slightly less verbose
    ([#429](https://github.com/Shopify/sarama/pull/429)).
 
+Bug Fixes:
+ - The producer now correctly manages its state if retries occur when it is
+   shutting down, fixing several instances of confusing behaviour and at least
+   one potential deadlock ([#419](https://github.com/Shopify/sarama/pull/419)).
+
 #### Version 1.3.0 (2015-04-16)
 
 New Features:
