@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/Shopify/sarama"
 )
@@ -175,13 +176,13 @@ type PartitionConsumer struct {
 	consumed                bool
 	errorsShouldBeDrained   bool
 	messagesShouldBeDrained bool
+	highWaterMarkOffset     int64
 }
 
 func (pc *PartitionConsumer) handleExpectations() {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
-	var offset int64
 	for ex := range pc.expectations {
 		if ex.Err != nil {
 			pc.errors <- &sarama.ConsumerError{
@@ -190,11 +191,11 @@ func (pc *PartitionConsumer) handleExpectations() {
 				Err:       ex.Err,
 			}
 		} else {
-			offset++
+			atomic.AddInt64(&pc.highWaterMarkOffset, 1)
 
 			ex.Msg.Topic = pc.topic
 			ex.Msg.Partition = pc.partition
-			ex.Msg.Offset = offset
+			ex.Msg.Offset = atomic.LoadInt64(&pc.highWaterMarkOffset)
 
 			pc.messages <- ex.Msg
 		}
@@ -272,6 +273,10 @@ func (pc *PartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 // Messages implements the Messages method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return pc.messages
+}
+
+func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
+	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
 }
 
 ///////////////////////////////////////////////////
