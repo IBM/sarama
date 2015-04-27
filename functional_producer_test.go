@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -39,59 +40,9 @@ func TestFuncProducingFlushing(t *testing.T) {
 	testProducingMessages(t, config)
 }
 
-func TestFuncMultiPartitionProduce(t *testing.T) {
-	checkKafkaAvailability(t)
-
-	config := NewConfig()
-	config.ChannelBufferSize = 20
-	config.Producer.Flush.Frequency = 50 * time.Millisecond
-	config.Producer.Flush.Messages = 200
-	config.Producer.Return.Successes = true
-	producer, err := NewSyncProducer(kafkaBrokers, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(TestBatchSize)
-
-	for i := 1; i <= TestBatchSize; i++ {
-		go func(i int) {
-			defer wg.Done()
-			msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
-			if _, _, err := producer.SendMessage(msg); err != nil {
-				t.Error(i, err)
-			}
-		}(i)
-	}
-
-	wg.Wait()
-	if err := producer.Close(); err != nil {
-		t.Error(err)
-	}
-}
-
-func TestFuncProducingToInvalidTopic(t *testing.T) {
-	checkKafkaAvailability(t)
-
-	producer, err := NewSyncProducer(kafkaBrokers, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
-		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
-	}
-
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
-		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
-	}
-
-	safeClose(t, producer)
-}
-
 func testProducingMessages(t *testing.T, config *Config) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
@@ -154,6 +105,121 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, consumer)
 	safeClose(t, client)
+}
+
+func TestFuncMultiPartitionProduce(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewConfig()
+	config.ChannelBufferSize = 20
+	config.Producer.Flush.Frequency = 50 * time.Millisecond
+	config.Producer.Flush.Messages = 200
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer(kafkaBrokers, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(TestBatchSize)
+
+	for i := 1; i <= TestBatchSize; i++ {
+		go func(i int) {
+			defer wg.Done()
+			msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("hur %d", i))}
+			if _, _, err := producer.SendMessage(msg); err != nil {
+				t.Error(i, err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	if err := producer.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestFuncProducingToInvalidTopic(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	producer, err := NewSyncProducer(kafkaBrokers, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
+		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
+	}
+
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
+		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
+	}
+
+	safeClose(t, producer)
+}
+
+func TestReliableProducing(t *testing.T) {
+	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+
+	config := NewConfig()
+	config.Producer.Return.Successes = true
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Timeout = 5 * time.Second
+	config.Producer.Retry.Backoff = 2 * time.Second
+	config.Producer.Retry.Max = 5
+	producer, err := NewAsyncProducer(kafkaBrokers, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	disabledCount := 0
+	expectedResponses := 8 * TestBatchSize
+	for i := expectedResponses; i >= 0; {
+		msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("testing %d", i))}
+		select {
+		case producer.Input() <- msg:
+			i--
+
+			if i%TestBatchSize == 0 {
+				if disabledCount == 0 || (disabledCount < 2 && randBool()) {
+					zk := ZKProxies[rand.Intn(len(ZKProxies))]
+					for Proxies[zk].Enabled == false {
+						zk = ZKProxies[rand.Intn(len(ZKProxies))]
+					}
+					Proxies[zk].Enabled = false
+					SaveProxy(t, zk)
+					disabledCount++
+					Logger.Println(zk, "disabled")
+				} else if randBool() {
+					zk := ZKProxies[rand.Intn(len(ZKProxies))]
+					for Proxies[zk].Enabled == true {
+						zk = ZKProxies[rand.Intn(len(ZKProxies))]
+					}
+					Proxies[zk].Enabled = true
+					SaveProxy(t, zk)
+					disabledCount--
+					Logger.Println(zk, "enabled")
+				}
+			}
+			time.Sleep(3 * time.Millisecond)
+		case ret := <-producer.Errors():
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
+		}
+	}
+	for expectedResponses > 0 {
+		select {
+		case ret := <-producer.Errors():
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
+		}
+	}
+	safeClose(t, producer)
 }
 
 // Benchmarks

@@ -7,17 +7,24 @@ import (
 )
 
 func TestFuncConnectionFailure(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	Proxies["kafka1"].Enabled = false
+	SaveProxy(t, "kafka1")
+
 	config := NewConfig()
 	config.Metadata.Retry.Max = 1
 
-	_, err := NewClient([]string{"localhost:9000"}, config)
+	_, err := NewClient([]string{kafkaBrokers[0]}, config)
 	if err != ErrOutOfBrokers {
 		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
 	}
 }
 
 func TestFuncClientMetadata(t *testing.T) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	config := NewConfig()
 	config.Metadata.Retry.Max = 1
