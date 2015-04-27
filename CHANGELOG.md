@@ -1,5 +1,20 @@
 # Changelog
 
+#### Unreleased
+
+New Features:
+ - The consumer now implements `Topics()` and `Partitions()` methods to enable
+   users to dynamically choose what topics/partitions to consume without
+   instantiating a full client
+   ([#431](https://github.com/Shopify/sarama/pull/431)).
+ - The partition-consumer now exposes the high water mark offset value returned
+   by the broker ([#339](https://github.com/Shopify/sarama/pull/339)).
+
+Improvements:
+ - The producer's logging during retry scenarios is more consistent, more
+   useful, and slightly less verbose
+   ([#429](https://github.com/Shopify/sarama/pull/429)).
+
 #### Version 1.3.0 (2015-04-16)
 
 New Features:
