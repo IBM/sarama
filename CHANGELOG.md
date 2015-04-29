@@ -19,6 +19,9 @@ Bug Fixes:
  - The producer now correctly manages its state if retries occur when it is
    shutting down, fixing several instances of confusing behaviour and at least
    one potential deadlock ([#419](https://github.com/Shopify/sarama/pull/419)).
+ - The consumer now handles messages for different partitions asynchronously,
+   making it much more resilient to specific user code ordering
+   ([#325](https://github.com/Shopify/sarama/pull/325)).
 
 #### Version 1.3.0 (2015-04-16)
 
