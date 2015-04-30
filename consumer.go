@@ -39,6 +39,10 @@ func (ce ConsumerErrors) Error() string {
 // Consumer manages PartitionConsumers which process Kafka messages from brokers. You MUST call Close()
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
+//
+// Sarama's Consumer type does not currently support automatic consumer group rebalancing and offset tracking,
+// however the https://github.com/wvanbergen/kafka library builds on Sarama to add this support. We plan
+// to properly integrate this functionality at a later date.
 type Consumer interface {
 
 	// Topics returns the set of available topics as retrieved from the cluster metadata.
