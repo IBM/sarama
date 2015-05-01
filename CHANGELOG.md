@@ -1,6 +1,6 @@
 # Changelog
 
-#### Unreleased
+#### Version 1.4.0 (2015-05-01)
 
 New Features:
  - The consumer now implements `Topics()` and `Partitions()` methods to enable
