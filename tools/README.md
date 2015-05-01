@@ -4,4 +4,5 @@ This folder contains applications that are useful for exploration of your Kafka 
 Some of these tools mirror tools that ship with Kafka, but these tools won't require installing the JVM to function.
 
 - [kafka-console-producer](./kafka-console-producer): a command line tool to produce a single message to your Kafka custer.
-- [kafka-console-partitionconsumer](./kafka-console-producer): a command line tool to consume a single partition of a topic on your Kafka cluster.
+- [kafka-console-partitionconsumer](./kafka-console-partitionconsumer): a command line tool to consume a single partition of a topic on your Kafka cluster.
+- [kafka-console-topicconsumer](./kafka-console-topicconsumer): a command line tool to consume all partition of a topic on your Kafka cluster.
