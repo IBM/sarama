@@ -21,4 +21,4 @@ install_go_vet:
 	go get golang.org/x/tools/cmd/vet
 
 get:
-	go get -t
+	go get -t ./...
