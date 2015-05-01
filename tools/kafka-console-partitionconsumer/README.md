@@ -5,7 +5,7 @@ on the standard output.
 
 ### Installation
 
-    go install github.com/Shopify/sarama/tools/kafka-console-partitionconsumer
+    go get github.com/Shopify/sarama/tools/kafka-console-partitionconsumer
 
 ### Usage
 

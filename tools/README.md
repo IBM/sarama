@@ -6,3 +6,5 @@ Some of these tools mirror tools that ship with Kafka, but these tools won't req
 - [kafka-console-producer](./kafka-console-producer): a command line tool to produce a single message to your Kafka custer.
 - [kafka-console-partitionconsumer](./kafka-console-partitionconsumer): a command line tool to consume a single partition of a topic on your Kafka cluster.
 - [kafka-console-topicconsumer](./kafka-console-topicconsumer): a command line tool to consume all partition of a topic on your Kafka cluster.
+
+To install all tools, run `go get github.com/Shopify/sarama/tools/...`

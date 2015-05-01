@@ -4,7 +4,7 @@ A simple command line tool to produce a single message to Kafka.
 
 ### Installation
 
-    go install github.com/Shopify/sarama/tools/kafka-console-producer
+    go get github.com/Shopify/sarama/tools/kafka-console-producer
 
 
 ### Usage

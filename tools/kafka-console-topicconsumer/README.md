@@ -5,7 +5,7 @@ on the standard output.
 
 ### Installation
 
-    go install github.com/Shopify/sarama/tools/kafka-console-topicconsumer
+    go get github.com/Shopify/sarama/tools/kafka-console-topicconsumer
 
 ### Usage
 
