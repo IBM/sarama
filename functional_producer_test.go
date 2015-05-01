@@ -40,7 +40,8 @@ func TestFuncProducingFlushing(t *testing.T) {
 }
 
 func TestFuncMultiPartitionProduce(t *testing.T) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	config := NewConfig()
 	config.ChannelBufferSize = 20
@@ -72,7 +73,8 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 }
 
 func TestFuncProducingToInvalidTopic(t *testing.T) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	producer, err := NewSyncProducer(kafkaBrokers, nil)
 	if err != nil {
@@ -91,7 +93,8 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 }
 
 func testProducingMessages(t *testing.T, config *Config) {
-	checkKafkaAvailability(t)
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
 
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
@@ -177,7 +180,8 @@ func BenchmarkProducerMediumSnappy(b *testing.B) {
 }
 
 func benchmarkProducer(b *testing.B, conf *Config, topic string, value Encoder) {
-	checkKafkaAvailability(b)
+	setupFunctionalTest(b)
+	defer teardownFunctionalTest(b)
 
 	producer, err := NewAsyncProducer(kafkaBrokers, conf)
 	if err != nil {

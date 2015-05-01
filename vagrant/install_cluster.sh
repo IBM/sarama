@@ -2,7 +2,7 @@
 
 set -ex
 
-TOXIPROXY_VERSION=1.0.1
+TOXIPROXY_VERSION=1.0.3
 
 mkdir -p ${KAFKA_INSTALL_ROOT}
 if [ ! -f ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_VERSION}.tgz ]; then
