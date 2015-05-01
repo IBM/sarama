@@ -8,7 +8,7 @@ New Features:
    instantiating a full client
    ([#431](https://github.com/Shopify/sarama/pull/431)).
  - The partition-consumer now exposes the high water mark offset value returned
-   by the broker ([#339](https://github.com/Shopify/sarama/pull/339)).
+   by the broker via the `HighWaterMarkOffset()` method ([#339](https://github.com/Shopify/sarama/pull/339)).
  - Added a `kafka-console-consumer` tool capable of handling multiple
    partitions, and deprecated the now-obsolete `kafka-console-partitionConsumer`
    ([#439](https://github.com/Shopify/sarama/pull/439),
