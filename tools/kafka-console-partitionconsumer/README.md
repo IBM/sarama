@@ -1,5 +1,8 @@
 # kafka-console-partitionconsumer
 
+NOTE: this tool is deprecated in favour of the more general and more powerful
+`kafka-console-consumer`.
+
 A simple command line tool to consume a partition of a topic and print the messages
 on the standard output.
 
