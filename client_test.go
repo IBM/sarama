@@ -375,6 +375,21 @@ func TestClientRefreshBehaviour(t *testing.T) {
 }
 
 func TestClientResurrectDeadSeeds(t *testing.T) {
+	initialSeed := newMockBroker(t, 0)
+	emptyMetadata := new(MetadataResponse)
+	initialSeed.Returns(emptyMetadata)
+
+	conf := NewConfig()
+	conf.Metadata.Retry.Backoff = 0
+	conf.Metadata.RefreshFrequency = 0
+	c, err := NewClient([]string{initialSeed.Addr()}, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialSeed.Close()
+
+	client := c.(*client)
+
 	seed1 := newMockBroker(t, 1)
 	seed2 := newMockBroker(t, 2)
 	seed3 := newMockBroker(t, 3)
@@ -382,17 +397,10 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 	addr2 := seed2.Addr()
 	addr3 := seed3.Addr()
 
-	emptyMetadata := new(MetadataResponse)
-	seed1.Returns(emptyMetadata)
-
-	conf := NewConfig()
-	conf.Metadata.Retry.Backoff = 0
-	conf.Metadata.RefreshFrequency = 0
-	c, err := NewClient([]string{addr1, addr2, addr3}, conf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	client := c.(*client)
+	// Overwrite the seed brokers with a fixed ordering to make this test deterministic.
+	safeClose(t, client.seedBrokers[0])
+	client.seedBrokers = []*Broker{NewBroker(addr1), NewBroker(addr2), NewBroker(addr3)}
+	client.deadSeeds = []*Broker{}
 
 	wg := sync.WaitGroup{}
 	wg.Add(1)

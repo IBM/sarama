@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -117,8 +118,10 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 		coordinators:            make(map[string]int32),
 	}
-	for _, addr := range addrs {
-		client.seedBrokers = append(client.seedBrokers, NewBroker(addr))
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for _, index := range random.Perm(len(addrs)) {
+		client.seedBrokers = append(client.seedBrokers, NewBroker(addrs[index]))
 	}
 
 	// do an initial fetch of all cluster metadata by specifing an empty list of topics
