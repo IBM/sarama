@@ -14,6 +14,9 @@ Improvements:
  - The producer's logging during retry scenarios is more consistent, more
    useful, and slightly less verbose
    ([#429](https://github.com/Shopify/sarama/pull/429)).
+ - The client now shuffles its initial list of seed brokers in order to prevent
+   thundering herd on the first broker in the list
+   ([#441](https://github.com/Shopify/sarama/pull/441)).
 
 Bug Fixes:
  - The producer now correctly manages its state if retries occur when it is
