@@ -2,8 +2,9 @@ package sarama
 
 import (
 	"bytes"
-	"code.google.com/p/snappy-go/snappy"
 	"encoding/binary"
+
+	"code.google.com/p/snappy-go/snappy"
 )
 
 var snappyMagic = []byte{130, 83, 78, 65, 80, 80, 89, 0}
@@ -25,13 +26,13 @@ func snappyDecode(src []byte) ([]byte, error) {
 		)
 		for pos < max {
 			size := binary.BigEndian.Uint32(src[pos : pos+4])
-			pos = pos + 4
+			pos += 4
 
 			chunk, err = snappy.Decode(chunk, src[pos:pos+size])
 			if err != nil {
 				return nil, err
 			}
-			pos = pos + size
+			pos += size
 			dst = append(dst, chunk...)
 		}
 		return dst, nil
