@@ -1,5 +1,11 @@
 # Changelog
 
+#### Unreleased
+
+Improvements:
+ - Optimizations when decoding snappy messages, thanks to John Potocny
+   ([#446](https://github.com/Shopify/sarama/pull/446)).
+
 #### Version 1.4.0 (2015-05-01)
 
 New Features:
