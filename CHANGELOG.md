@@ -7,8 +7,9 @@ Improvements:
    ([#446](https://github.com/Shopify/sarama/pull/446)).
 
 Bug Fixes:
- - Fix a hypothetical race condition on producer shutdown
-   ([#450](https://github.com/Shopify/sarama/pull/450)).
+ - Fix hypothetical race conditions on producer shutdown
+   ([#450](https://github.com/Shopify/sarama/pull/450)),
+   ([#451](https://github.com/Shopify/sarama/pull/451)).
 
 #### Version 1.4.0 (2015-05-01)
 
