@@ -45,9 +45,11 @@ type Client interface {
 
 	// Coordinator returns the coordinating broker for a consumer group. It will return a locally cached
 	// value if it's available. You can call RefreshCoordinator to update the cached value.
+	// This function only works on Kafka 0.8.2 and higher.
 	Coordinator(consumerGroup string) (*Broker, error)
 
 	// RefreshCoordinator retrieves the coordinator for a consumer group and stores it in local cache.
+	// This function only works on Kafka 0.8.2 and higher.
 	RefreshCoordinator(consumerGroup string) error
 
 	// Close shuts down all broker connections managed by this client. It is required to call this function before
