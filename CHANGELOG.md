@@ -1,6 +1,6 @@
 # Changelog
 
-#### Unreleased
+#### Version 1.4.1 (2015-05-25)
 
 Improvements:
  - Optimizations when decoding snappy messages, thanks to John Potocny
