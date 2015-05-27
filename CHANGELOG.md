@@ -1,5 +1,11 @@
 # Changelog
 
+#### Version 1.4.2 (2015-05-27)
+
+Bug Fixes:
+ - Update the import path for snappy-go, it has moved from google code to github
+   ([#456](https://github.com/Shopify/sarama/pull/456)).
+
 #### Version 1.4.1 (2015-05-25)
 
 Improvements:
