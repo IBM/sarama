@@ -194,8 +194,11 @@ func TestConsumerFunnyOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	message := <-consumer.Messages()
-	if message.Offset != 3 {
+	if message := <-consumer.Messages(); message.Offset != 3 {
+		t.Error("Incorrect message offset!")
+	}
+
+	if message := <-consumer.Messages(); message.Offset != 5 {
 		t.Error("Incorrect message offset!")
 	}
 
