@@ -24,3 +24,6 @@ for i in 1 2 3 4 5; do
 
     start zookeeper-${ZK_PORT}
 done
+
+# Wait for the last kafka node to finish booting
+while ! nc -q 1 localhost 29095 </dev/null; do echo "Waiting"; sleep 1; done
