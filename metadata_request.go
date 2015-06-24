@@ -19,6 +19,26 @@ func (mr *MetadataRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
+func (mr *MetadataRequest) decode(pd packetDecoder) error {
+	topicCount, err := pd.getArrayLength()
+	if err != nil {
+		return err
+	}
+	if topicCount == 0 {
+		return nil
+	}
+
+	mr.Topics = make([]string, topicCount)
+	for i := range mr.Topics {
+		topic, err := pd.getString()
+		if err != nil {
+			return err
+		}
+		mr.Topics[i] = topic
+	}
+	return nil
+}
+
 func (mr *MetadataRequest) key() int16 {
 	return 3
 }

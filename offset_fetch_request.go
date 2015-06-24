@@ -28,6 +28,32 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 	return nil
 }
 
+func (r *OffsetFetchRequest) decode(pd packetDecoder) (err error) {
+	if r.ConsumerGroup, err = pd.getString(); err != nil {
+		return err
+	}
+	partitionCount, err := pd.getArrayLength()
+	if err != nil {
+		return err
+	}
+	if partitionCount == 0 {
+		return nil
+	}
+	r.partitions = make(map[string][]int32)
+	for i := 0; i < partitionCount; i++ {
+		topic, err := pd.getString()
+		if err != nil {
+			return err
+		}
+		partitions, err := pd.getInt32Array()
+		if err != nil {
+			return err
+		}
+		r.partitions[topic] = partitions
+	}
+	return nil
+}
+
 func (r *OffsetFetchRequest) key() int16 {
 	return 9
 }

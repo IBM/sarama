@@ -11,6 +11,16 @@ func (r *offsetRequestBlock) encode(pe packetEncoder) error {
 	return nil
 }
 
+func (r *offsetRequestBlock) decode(pd packetDecoder) (err error) {
+	if r.time, err = pd.getInt64(); err != nil {
+		return err
+	}
+	if r.maxOffsets, err = pd.getInt32(); err != nil {
+		return err
+	}
+	return nil
+}
+
 type OffsetRequest struct {
 	blocks map[string]map[int32]*offsetRequestBlock
 }
@@ -32,10 +42,47 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			err = block.encode(pe)
+			if err = block.encode(pe); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (r *OffsetRequest) decode(pd packetDecoder) error {
+	// Ignore replica ID
+	if _, err := pd.getInt32(); err != nil {
+		return err
+	}
+	blockCount, err := pd.getArrayLength()
+	if err != nil {
+		return err
+	}
+	if blockCount == 0 {
+		return nil
+	}
+	r.blocks = make(map[string]map[int32]*offsetRequestBlock)
+	for i := 0; i < blockCount; i++ {
+		topic, err := pd.getString()
+		if err != nil {
+			return err
+		}
+		partitionCount, err := pd.getArrayLength()
+		if err != nil {
+			return err
+		}
+		r.blocks[topic] = make(map[int32]*offsetRequestBlock)
+		for j := 0; j < partitionCount; j++ {
+			partition, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
+			block := &offsetRequestBlock{}
+			if err := block.decode(pd); err != nil {
+				return err
+			}
+			r.blocks[topic][partition] = block
 		}
 	}
 	return nil

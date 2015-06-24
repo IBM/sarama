@@ -21,11 +21,11 @@ var (
 
 func TestOffsetFetchRequest(t *testing.T) {
 	request := new(OffsetFetchRequest)
-	testEncodable(t, "no group, no partitions", request, offsetFetchRequestNoGroupNoPartitions)
+	testRequest(t, "no group, no partitions", request, offsetFetchRequestNoGroupNoPartitions)
 
 	request.ConsumerGroup = "blah"
-	testEncodable(t, "no partitions", request, offsetFetchRequestNoPartitions)
+	testRequest(t, "no partitions", request, offsetFetchRequestNoPartitions)
 
 	request.AddPartition("topicTheFirst", 0x4F4F4F4F)
-	testEncodable(t, "one partition", request, offsetFetchRequestOnePartition)
+	testRequest(t, "one partition", request, offsetFetchRequestOnePartition)
 }
