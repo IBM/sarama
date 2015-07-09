@@ -2,7 +2,7 @@ package sarama
 
 import (
 	"bytes"
-	"code.google.com/p/snappy-go/snappy"
+	"github.com/golang/snappy/snappy"
 	"encoding/binary"
 )
 
