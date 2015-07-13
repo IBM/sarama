@@ -12,8 +12,8 @@ var (
 
 func TestConsumerMetadataRequest(t *testing.T) {
 	request := new(ConsumerMetadataRequest)
-	testEncodable(t, "empty string", request, consumerMetadataRequestEmpty)
+	testRequest(t, "empty string", request, consumerMetadataRequestEmpty)
 
 	request.ConsumerGroup = "foobar"
-	testEncodable(t, "with string", request, consumerMetadataRequestString)
+	testRequest(t, "with string", request, consumerMetadataRequestString)
 }

@@ -11,6 +11,16 @@ func (f *fetchRequestBlock) encode(pe packetEncoder) error {
 	return nil
 }
 
+func (f *fetchRequestBlock) decode(pd packetDecoder) (err error) {
+	if f.fetchOffset, err = pd.getInt64(); err != nil {
+		return err
+	}
+	if f.maxBytes, err = pd.getInt32(); err != nil {
+		return err
+	}
+	return nil
+}
+
 type FetchRequest struct {
 	MaxWaitTime int32
 	MinBytes    int32
@@ -40,6 +50,49 @@ func (f *FetchRequest) encode(pe packetEncoder) (err error) {
 			if err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (f *FetchRequest) decode(pd packetDecoder) (err error) {
+	if _, err = pd.getInt32(); err != nil {
+		return err
+	}
+	if f.MaxWaitTime, err = pd.getInt32(); err != nil {
+		return err
+	}
+	if f.MinBytes, err = pd.getInt32(); err != nil {
+		return err
+	}
+	topicCount, err := pd.getArrayLength()
+	if err != nil {
+		return err
+	}
+	if topicCount == 0 {
+		return nil
+	}
+	f.blocks = make(map[string]map[int32]*fetchRequestBlock)
+	for i := 0; i < topicCount; i++ {
+		topic, err := pd.getString()
+		if err != nil {
+			return err
+		}
+		partitionCount, err := pd.getArrayLength()
+		if err != nil {
+			return err
+		}
+		f.blocks[topic] = make(map[int32]*fetchRequestBlock)
+		for j := 0; j < partitionCount; j++ {
+			partition, err := pd.getInt32()
+			if err != nil {
+				return err
+			}
+			fetchBlock := &fetchRequestBlock{}
+			if err = fetchBlock.decode(pd); err != nil {
+				return nil
+			}
+			f.blocks[topic][partition] = fetchBlock
 		}
 	}
 	return nil

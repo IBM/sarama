@@ -22,6 +22,19 @@ func (r *offsetCommitRequestBlock) encode(pe packetEncoder, version int16) error
 	return pe.putString(r.metadata)
 }
 
+func (r *offsetCommitRequestBlock) decode(pd packetDecoder, version int16) (err error) {
+	if r.offset, err = pd.getInt64(); err != nil {
+		return err
+	}
+	if version == 1 {
+		if r.timestamp, err = pd.getInt64(); err != nil {
+			return err
+		}
+	}
+	r.metadata, err = pd.getString()
+	return err
+}
+
 type OffsetCommitRequest struct {
 	ConsumerGroup           string
 	ConsumerGroupGeneration int32  // v1 or later
@@ -80,6 +93,59 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 			if err := block.encode(pe, r.Version); err != nil {
 				return err
 			}
+		}
+	}
+	return nil
+}
+
+func (r *OffsetCommitRequest) decode(pd packetDecoder) (err error) {
+	if r.ConsumerGroup, err = pd.getString(); err != nil {
+		return err
+	}
+
+	if r.Version >= 1 {
+		if r.ConsumerGroupGeneration, err = pd.getInt32(); err != nil {
+			return err
+		}
+		if r.ConsumerID, err = pd.getString(); err != nil {
+			return err
+		}
+	}
+
+	if r.Version >= 2 {
+		if r.RetentionTime, err = pd.getInt64(); err != nil {
+			return err
+		}
+	}
+
+	topicCount, err := pd.getArrayLength()
+	if err != nil {
+		return err
+	}
+	if topicCount == 0 {
+		return nil
+	}
+	r.blocks = make(map[string]map[int32]*offsetCommitRequestBlock)
+	for i := 0; i < topicCount; i++ {
+		topic, err := pd.getString()
+		if err != nil {
+			return err
+		}
+		partitionCount, err := pd.getArrayLength()
+		if err != nil {
+			return err
+		}
+		r.blocks[topic] = make(map[int32]*offsetCommitRequestBlock)
+		for j := 0; j < partitionCount; j++ {
+			partition, err := pd.getInt32()
+			if err != nil {
+				return err
+			}
+			block := &offsetCommitRequestBlock{}
+			if err := block.decode(pd, r.Version); err != nil {
+				return err
+			}
+			r.blocks[topic][partition] = block
 		}
 	}
 	return nil

@@ -19,11 +19,11 @@ var (
 
 func TestMetadataRequest(t *testing.T) {
 	request := new(MetadataRequest)
-	testEncodable(t, "no topics", request, metadataRequestNoTopics)
+	testRequest(t, "no topics", request, metadataRequestNoTopics)
 
 	request.Topics = []string{"topic1"}
-	testEncodable(t, "one topic", request, metadataRequestOneTopic)
+	testRequest(t, "one topic", request, metadataRequestOneTopic)
 
 	request.Topics = []string{"foo", "bar", "baz"}
-	testEncodable(t, "three topics", request, metadataRequestThreeTopics)
+	testRequest(t, "three topics", request, metadataRequestThreeTopics)
 }

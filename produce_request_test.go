@@ -36,12 +36,12 @@ var (
 
 func TestProduceRequest(t *testing.T) {
 	request := new(ProduceRequest)
-	testEncodable(t, "empty", request, produceRequestEmpty)
+	testRequest(t, "empty", request, produceRequestEmpty)
 
 	request.RequiredAcks = 0x123
 	request.Timeout = 0x444
-	testEncodable(t, "header", request, produceRequestHeader)
+	testRequest(t, "header", request, produceRequestHeader)
 
 	request.AddMessage("topic", 0xAD, &Message{Codec: CompressionNone, Key: nil, Value: []byte{0x00, 0xEE}})
-	testEncodable(t, "one message", request, produceRequestOneMessage)
+	testRequest(t, "one message", request, produceRequestOneMessage)
 }
