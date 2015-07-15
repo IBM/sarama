@@ -390,6 +390,7 @@ func TestConsumerInterleavedClose(t *testing.T) {
 	fetchResponse.AddMessage("my_topic", 0, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(1))
 	fetchResponse.AddMessage("my_topic", 1, nil, ByteEncoder([]byte{0x00, 0x0E}), int64(0))
 	leader.Returns(fetchResponse)
+	leader.Returns(fetchResponse)
 
 	safeClose(t, c1)
 	safeClose(t, c0)
