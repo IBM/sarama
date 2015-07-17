@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/golang/snappy/snappy"
+	"github.com/golang/snappy"
 )
 
 var snappyMagic = []byte{130, 83, 78, 65, 80, 80, 89, 0}
 
 // SnappyEncode encodes binary data
 func snappyEncode(src []byte) ([]byte, error) {
-	return snappy.Encode(nil, src)
+	return snappy.Encode(nil, src), nil
 }
 
 // SnappyDecode decodes snappy data
