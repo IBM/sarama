@@ -1,5 +1,15 @@
 # Changelog
 
+#### Version 1.4.3 (2015-07-21)
+
+Bug Fixes:
+ - Don't include the partitioner in the producer's "fetch partitions"
+   circuit-breaker ([#466](https://github.com/Shopify/sarama/pull/466)).
+ - Don't retry messages until the broker is closed when abandoning a broker in
+   the producer ([#468](https://github.com/Shopify/sarama/pull/468)).
+ - Update the import path for snappy-go, it has moved again and the API has
+   changed slightly ([#486](https://github.com/Shopify/sarama/pull/486)).
+
 #### Version 1.4.2 (2015-05-27)
 
 Bug Fixes:
