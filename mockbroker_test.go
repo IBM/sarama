@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"strconv"
 	"sync"
 	"testing"
@@ -59,6 +60,17 @@ func (b *mockBroker) SetHandler(handler requestHandlerFunc) {
 	b.handlerMux.Lock()
 	b.handler = handler
 	b.handlerMux.Unlock()
+}
+
+func (b *mockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
+	b.SetHandler(func(req *request) (res encoder) {
+		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
+		mockResponse := handlerMap[reqTypeName]
+		if mockResponse == nil {
+			return nil
+		}
+		return mockResponse.For(req.body)
+	})
 }
 
 func (b *mockBroker) BrokerID() int32 {
@@ -139,7 +151,11 @@ func (b *mockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 		}
 
 		res := b.requestHandler()(req)
-		Logger.Printf("*** mockbroker/%d/%d: served %+v -> %+v", b.brokerID, idx, req, res)
+		if res == nil {
+			Logger.Printf("*** mockbroker/%d/%d: ignored %v", b.brokerID, idx, req)
+			continue
+		}
+		Logger.Printf("*** mockbroker/%d/%d: served %v -> %v", b.brokerID, idx, req, res)
 
 		encodedRes, err := encode(res)
 		if err != nil {
