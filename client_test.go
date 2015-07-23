@@ -2,10 +2,12 @@ package sarama
 
 import (
 	"io"
+	"sync"
 	"testing"
+	"time"
 )
 
-func safeClose(t *testing.T, c io.Closer) {
+func safeClose(t testing.TB, c io.Closer) {
 	err := c.Close()
 	if err != nil {
 		t.Error(err)
@@ -199,6 +201,54 @@ func TestClientMetadata(t *testing.T) {
 	safeClose(t, client)
 }
 
+func TestClientGetOffset(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	leader := newMockBroker(t, 2)
+	leaderAddr := leader.Addr()
+
+	metadata := new(MetadataResponse)
+	metadata.AddTopicPartition("foo", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadata.AddBroker(leaderAddr, leader.BrokerID())
+	seedBroker.Returns(metadata)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offsetResponse := new(OffsetResponse)
+	offsetResponse.AddTopicPartition("foo", 0, 123)
+	leader.Returns(offsetResponse)
+
+	offset, err := client.GetOffset("foo", 0, OffsetNewest)
+	if err != nil {
+		t.Error(err)
+	}
+	if offset != 123 {
+		t.Error("Unexpected offset, got ", offset)
+	}
+
+	leader.Close()
+	seedBroker.Returns(metadata)
+
+	leader = newMockBrokerAddr(t, 2, leaderAddr)
+	offsetResponse = new(OffsetResponse)
+	offsetResponse.AddTopicPartition("foo", 0, 456)
+	leader.Returns(offsetResponse)
+
+	offset, err = client.GetOffset("foo", 0, OffsetNewest)
+	if err != nil {
+		t.Error(err)
+	}
+	if offset != 456 {
+		t.Error("Unexpected offset, got ", offset)
+	}
+
+	seedBroker.Close()
+	leader.Close()
+	safeClose(t, client)
+}
+
 func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker := newMockBroker(t, 1)
 
@@ -300,11 +350,10 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
-	c, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	client := c.(*client)
 
 	parts, err := client.Partitions("my_topic")
 	if err != nil {
@@ -323,4 +372,237 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	leader.Close()
 	seedBroker.Close()
 	safeClose(t, client)
+}
+
+func TestClientResurrectDeadSeeds(t *testing.T) {
+	initialSeed := newMockBroker(t, 0)
+	emptyMetadata := new(MetadataResponse)
+	initialSeed.Returns(emptyMetadata)
+
+	conf := NewConfig()
+	conf.Metadata.Retry.Backoff = 0
+	conf.Metadata.RefreshFrequency = 0
+	c, err := NewClient([]string{initialSeed.Addr()}, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialSeed.Close()
+
+	client := c.(*client)
+
+	seed1 := newMockBroker(t, 1)
+	seed2 := newMockBroker(t, 2)
+	seed3 := newMockBroker(t, 3)
+	addr1 := seed1.Addr()
+	addr2 := seed2.Addr()
+	addr3 := seed3.Addr()
+
+	// Overwrite the seed brokers with a fixed ordering to make this test deterministic.
+	safeClose(t, client.seedBrokers[0])
+	client.seedBrokers = []*Broker{NewBroker(addr1), NewBroker(addr2), NewBroker(addr3)}
+	client.deadSeeds = []*Broker{}
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		if err := client.RefreshMetadata(); err != nil {
+			t.Error(err)
+		}
+		wg.Done()
+	}()
+	seed1.Close()
+	seed2.Close()
+
+	seed1 = newMockBrokerAddr(t, 1, addr1)
+	seed2 = newMockBrokerAddr(t, 2, addr2)
+
+	seed3.Close()
+
+	seed1.Close()
+	seed2.Returns(emptyMetadata)
+
+	wg.Wait()
+
+	if len(client.seedBrokers) != 2 {
+		t.Error("incorrect number of live seeds")
+	}
+	if len(client.deadSeeds) != 1 {
+		t.Error("incorrect number of dead seeds")
+	}
+
+	safeClose(t, c)
+}
+
+func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	staleCoordinator := newMockBroker(t, 2)
+	freshCoordinator := newMockBroker(t, 3)
+
+	replicas := []int32{staleCoordinator.BrokerID(), freshCoordinator.BrokerID()}
+	metadataResponse1 := new(MetadataResponse)
+	metadataResponse1.AddBroker(staleCoordinator.Addr(), staleCoordinator.BrokerID())
+	metadataResponse1.AddBroker(freshCoordinator.Addr(), freshCoordinator.BrokerID())
+	metadataResponse1.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, ErrNoError)
+	seedBroker.Returns(metadataResponse1)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coordinatorResponse1 := new(ConsumerMetadataResponse)
+	coordinatorResponse1.Err = ErrConsumerCoordinatorNotAvailable
+	seedBroker.Returns(coordinatorResponse1)
+
+	coordinatorResponse2 := new(ConsumerMetadataResponse)
+	coordinatorResponse2.CoordinatorID = staleCoordinator.BrokerID()
+	coordinatorResponse2.CoordinatorHost = "127.0.0.1"
+	coordinatorResponse2.CoordinatorPort = staleCoordinator.Port()
+
+	seedBroker.Returns(coordinatorResponse2)
+
+	broker, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if staleCoordinator.Addr() != broker.Addr() {
+		t.Errorf("Expected coordinator to have address %s, found %s", staleCoordinator.Addr(), broker.Addr())
+	}
+
+	if staleCoordinator.BrokerID() != broker.ID() {
+		t.Errorf("Expected coordinator to have ID %d, found %d", staleCoordinator.BrokerID(), broker.ID())
+	}
+
+	// Grab the cached value
+	broker2, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if broker2.Addr() != broker.Addr() {
+		t.Errorf("Expected the coordinator to be the same, but found %s vs. %s", broker2.Addr(), broker.Addr())
+	}
+
+	coordinatorResponse3 := new(ConsumerMetadataResponse)
+	coordinatorResponse3.CoordinatorID = freshCoordinator.BrokerID()
+	coordinatorResponse3.CoordinatorHost = "127.0.0.1"
+	coordinatorResponse3.CoordinatorPort = freshCoordinator.Port()
+
+	seedBroker.Returns(coordinatorResponse3)
+
+	// Refresh the locally cahced value because it's stale
+	if err := client.RefreshCoordinator("my_group"); err != nil {
+		t.Error(err)
+	}
+
+	// Grab the fresh value
+	broker3, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if broker3.Addr() != freshCoordinator.Addr() {
+		t.Errorf("Expected the freshCoordinator to be returned, but found %s.", broker3.Addr())
+	}
+
+	freshCoordinator.Close()
+	staleCoordinator.Close()
+	seedBroker.Close()
+	safeClose(t, client)
+}
+
+func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+	coordinator := newMockBroker(t, 2)
+
+	metadataResponse1 := new(MetadataResponse)
+	seedBroker.Returns(metadataResponse1)
+
+	config := NewConfig()
+	config.Metadata.Retry.Max = 1
+	config.Metadata.Retry.Backoff = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	coordinatorResponse1 := new(ConsumerMetadataResponse)
+	coordinatorResponse1.Err = ErrConsumerCoordinatorNotAvailable
+	seedBroker.Returns(coordinatorResponse1)
+
+	metadataResponse2 := new(MetadataResponse)
+	metadataResponse2.AddTopic("__consumer_offsets", ErrUnknownTopicOrPartition)
+	seedBroker.Returns(metadataResponse2)
+
+	replicas := []int32{coordinator.BrokerID()}
+	metadataResponse3 := new(MetadataResponse)
+	metadataResponse3.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, ErrNoError)
+	seedBroker.Returns(metadataResponse3)
+
+	coordinatorResponse2 := new(ConsumerMetadataResponse)
+	coordinatorResponse2.CoordinatorID = coordinator.BrokerID()
+	coordinatorResponse2.CoordinatorHost = "127.0.0.1"
+	coordinatorResponse2.CoordinatorPort = coordinator.Port()
+
+	seedBroker.Returns(coordinatorResponse2)
+
+	broker, err := client.Coordinator("my_group")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if coordinator.Addr() != broker.Addr() {
+		t.Errorf("Expected coordinator to have address %s, found %s", coordinator.Addr(), broker.Addr())
+	}
+
+	if coordinator.BrokerID() != broker.ID() {
+		t.Errorf("Expected coordinator to have ID %d, found %d", coordinator.BrokerID(), broker.ID())
+	}
+
+	coordinator.Close()
+	seedBroker.Close()
+	safeClose(t, client)
+}
+
+func TestClientAutorefreshShutdownRace(t *testing.T) {
+	seedBroker := newMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	seedBroker.Returns(metadataResponse)
+
+	conf := NewConfig()
+	conf.Metadata.RefreshFrequency = 100 * time.Millisecond
+	client, err := NewClient([]string{seedBroker.Addr()}, conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for the background refresh to kick in
+	time.Sleep(110 * time.Millisecond)
+
+	done := make(chan none)
+	go func() {
+		// Close the client
+		if err := client.Close(); err != nil {
+			t.Fatal(err)
+		}
+		close(done)
+	}()
+
+	// Wait for the Close to kick in
+	time.Sleep(10 * time.Millisecond)
+
+	// Then return some metadata to the still-running background thread
+	leader := newMockBroker(t, 2)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("foo", 0, leader.BrokerID(), []int32{2}, []int32{2}, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	<-done
+
+	seedBroker.Close()
+
+	// give the update time to happen so we get a panic if it's still running (which it shouldn't)
+	time.Sleep(10 * time.Millisecond)
 }

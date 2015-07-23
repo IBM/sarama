@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"sync"
+	"sync/atomic"
 
 	"github.com/Shopify/sarama"
 )
@@ -14,6 +15,7 @@ type Consumer struct {
 	t                  ErrorReporter
 	config             *sarama.Config
 	partitionConsumers map[string]map[int32]*PartitionConsumer
+	metadata           map[string][]int32
 }
 
 // NewConsumer returns a new mock Consumer instance. The t argument should
@@ -62,6 +64,39 @@ func (c *Consumer) ConsumePartition(topic string, partition int32, offset int64)
 	return pc, nil
 }
 
+// Topics returns a list of topics, as registered with SetMetadata
+func (c *Consumer) Topics() ([]string, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	if c.metadata == nil {
+		c.t.Errorf("Unexpected call to Topics. Initialize the mock's topic metadata with SetMetadata.")
+		return nil, sarama.ErrOutOfBrokers
+	}
+
+	var result []string
+	for topic, _ := range c.metadata {
+		result = append(result, topic)
+	}
+	return result, nil
+}
+
+// Partitions returns the list of parititons for the given topic, as registered with SetMetadata
+func (c *Consumer) Partitions(topic string) ([]int32, error) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	if c.metadata == nil {
+		c.t.Errorf("Unexpected call to Partitions. Initialize the mock's topic metadata with SetMetadata.")
+		return nil, sarama.ErrOutOfBrokers
+	}
+	if c.metadata[topic] == nil {
+		return nil, sarama.ErrUnknownTopicOrPartition
+	}
+
+	return c.metadata[topic], nil
+}
+
 // Close implements the Close method from the sarama.Consumer interface. It will close
 // all registered PartitionConsumer instances.
 func (c *Consumer) Close() error {
@@ -80,6 +115,15 @@ func (c *Consumer) Close() error {
 ///////////////////////////////////////////////////
 // Expectation API
 ///////////////////////////////////////////////////
+
+// SetMetadata sets the clusters topic/partition metadata,
+// which will be returned by Topics() and Partitions().
+func (c *Consumer) SetTopicMetadata(metadata map[string][]int32) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	c.metadata = metadata
+}
 
 // ExpectConsumePartition will register a topic/partition, so you can set expectations on it.
 // The registered PartitionConsumer will be returned, so you can set expectations
@@ -132,13 +176,13 @@ type PartitionConsumer struct {
 	consumed                bool
 	errorsShouldBeDrained   bool
 	messagesShouldBeDrained bool
+	highWaterMarkOffset     int64
 }
 
 func (pc *PartitionConsumer) handleExpectations() {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
-	var offset int64
 	for ex := range pc.expectations {
 		if ex.Err != nil {
 			pc.errors <- &sarama.ConsumerError{
@@ -147,11 +191,11 @@ func (pc *PartitionConsumer) handleExpectations() {
 				Err:       ex.Err,
 			}
 		} else {
-			offset++
+			atomic.AddInt64(&pc.highWaterMarkOffset, 1)
 
 			ex.Msg.Topic = pc.topic
 			ex.Msg.Partition = pc.partition
-			ex.Msg.Offset = offset
+			ex.Msg.Offset = atomic.LoadInt64(&pc.highWaterMarkOffset)
 
 			pc.messages <- ex.Msg
 		}
@@ -229,6 +273,10 @@ func (pc *PartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 // Messages implements the Messages method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return pc.messages
+}
+
+func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
+	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
 }
 
 ///////////////////////////////////////////////////

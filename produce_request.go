@@ -54,6 +54,56 @@ func (p *ProduceRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
+func (p *ProduceRequest) decode(pd packetDecoder) error {
+	requiredAcks, err := pd.getInt16()
+	if err != nil {
+		return err
+	}
+	p.RequiredAcks = RequiredAcks(requiredAcks)
+	if p.Timeout, err = pd.getInt32(); err != nil {
+		return err
+	}
+	topicCount, err := pd.getArrayLength()
+	if err != nil {
+		return err
+	}
+	if topicCount == 0 {
+		return nil
+	}
+	p.msgSets = make(map[string]map[int32]*MessageSet)
+	for i := 0; i < topicCount; i++ {
+		topic, err := pd.getString()
+		if err != nil {
+			return err
+		}
+		partitionCount, err := pd.getArrayLength()
+		if err != nil {
+			return err
+		}
+		p.msgSets[topic] = make(map[int32]*MessageSet)
+		for j := 0; j < partitionCount; j++ {
+			partition, err := pd.getInt32()
+			if err != nil {
+				return err
+			}
+			messageSetSize, err := pd.getInt32()
+			if err != nil {
+				return err
+			}
+			if messageSetSize == 0 {
+				continue
+			}
+			msgSet := &MessageSet{}
+			err = msgSet.decode(pd)
+			if err != nil {
+				return err
+			}
+			p.msgSets[topic][partition] = msgSet
+		}
+	}
+	return nil
+}
+
 func (p *ProduceRequest) key() int16 {
 	return 0
 }

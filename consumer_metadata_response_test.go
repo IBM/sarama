@@ -58,4 +58,12 @@ func TestConsumerMetadataResponseSuccess(t *testing.T) {
 	if response.CoordinatorPort != 0xCCDD {
 		t.Error("Decoding produced incorrect coordinator port.")
 	}
+
+	if response.Coordinator.ID() != 0xAB {
+		t.Error("Decoding produced incorrect coordinator ID.")
+	}
+
+	if response.Coordinator.Addr() != "foo:52445" {
+		t.Error("Decoding produced incorrect coordinator address.")
+	}
 }

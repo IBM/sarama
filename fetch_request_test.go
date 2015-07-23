@@ -21,14 +21,14 @@ var (
 
 func TestFetchRequest(t *testing.T) {
 	request := new(FetchRequest)
-	testEncodable(t, "no blocks", request, fetchRequestNoBlocks)
+	testRequest(t, "no blocks", request, fetchRequestNoBlocks)
 
 	request.MaxWaitTime = 0x20
 	request.MinBytes = 0xEF
-	testEncodable(t, "with properties", request, fetchRequestWithProperties)
+	testRequest(t, "with properties", request, fetchRequestWithProperties)
 
 	request.MaxWaitTime = 0
 	request.MinBytes = 0
 	request.AddBlock("topic", 0x12, 0x34, 0x56)
-	testEncodable(t, "one block", request, fetchRequestOneBlock)
+	testRequest(t, "one block", request, fetchRequestOneBlock)
 }

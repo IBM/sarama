@@ -9,15 +9,15 @@ type encoder interface {
 }
 
 // Encode takes an Encoder and turns it into bytes.
-func encode(in encoder) ([]byte, error) {
-	if in == nil {
+func encode(e encoder) ([]byte, error) {
+	if e == nil {
 		return nil, nil
 	}
 
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 
-	err := in.encode(&prepEnc)
+	err := e.encode(&prepEnc)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func encode(in encoder) ([]byte, error) {
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length)
-	err = in.encode(&realEnc)
+	err = e.encode(&realEnc)
 	if err != nil {
 		return nil, err
 	}

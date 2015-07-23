@@ -19,8 +19,8 @@ var (
 
 func TestOffsetRequest(t *testing.T) {
 	request := new(OffsetRequest)
-	testEncodable(t, "no blocks", request, offsetRequestNoBlocks)
+	testRequest(t, "no blocks", request, offsetRequestNoBlocks)
 
 	request.AddBlock("foo", 4, 1, 2)
-	testEncodable(t, "one block", request, offsetRequestOneBlock)
+	testRequest(t, "one block", request, offsetRequestOneBlock)
 }

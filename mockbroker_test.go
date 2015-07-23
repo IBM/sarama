@@ -146,6 +146,7 @@ func newMockBrokerAddr(t *testing.T, brokerID int32, addr string) *mockBroker {
 	if err != nil {
 		t.Fatal(err)
 	}
+	Logger.Printf("mockbroker/%d listening on %s\n", brokerID, broker.listener.Addr().String())
 	_, portStr, err := net.SplitHostPort(broker.listener.Addr().String())
 	if err != nil {
 		t.Fatal(err)

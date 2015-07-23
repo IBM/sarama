@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 )
@@ -13,19 +12,19 @@ type prepEncoder struct {
 // primitives
 
 func (pe *prepEncoder) putInt8(in int8) {
-	pe.length += binary.Size(in)
+	pe.length += 1
 }
 
 func (pe *prepEncoder) putInt16(in int16) {
-	pe.length += binary.Size(in)
+	pe.length += 2
 }
 
 func (pe *prepEncoder) putInt32(in int32) {
-	pe.length += binary.Size(in)
+	pe.length += 4
 }
 
 func (pe *prepEncoder) putInt64(in int64) {
-	pe.length += binary.Size(in)
+	pe.length += 8
 }
 
 func (pe *prepEncoder) putArrayLength(in int) error {
