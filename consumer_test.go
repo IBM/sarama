@@ -447,13 +447,13 @@ func TestConsumerBounceWithReferenceOpen(t *testing.T) {
 	}
 
 	//redirect partition 1 back to main leader
-	fetchResponse := new(FetchResponse)
-	fetchResponse.AddError("my_topic", 1, ErrNotLeaderForPartition)
-	tmp.Returns(fetchResponse)
 	metadataResponse = new(MetadataResponse)
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
+	fetchResponse := new(FetchResponse)
+	fetchResponse.AddError("my_topic", 1, ErrNotLeaderForPartition)
+	tmp.Returns(fetchResponse)
 	time.Sleep(5 * time.Millisecond)
 
 	// now send one message to each partition to make sure everything is primed
@@ -493,10 +493,6 @@ func TestConsumerBounceWithReferenceOpen(t *testing.T) {
 	case <-c0.Errors():
 	case <-c1.Errors():
 	}
-	// send it back to the same broker
-	seedBroker.Returns(metadataResponse)
-
-	time.Sleep(5 * time.Millisecond)
 
 	select {
 	case <-c0.Messages():

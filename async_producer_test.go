@@ -285,7 +285,10 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	closeProducer(t, producer)
 }
 
+// If a Kafka broker becomes unavailable and then returns back in service, then
+// producer reconnects to it and continues sending messages.
 func TestAsyncProducerBrokerBounce(t *testing.T) {
+	// Given
 	seedBroker := newMockBroker(t, 1)
 	leader := newMockBroker(t, 2)
 	leaderAddr := leader.Addr()
@@ -295,30 +298,34 @@ func TestAsyncProducerBrokerBounce(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+
 	config := NewConfig()
-	config.Producer.Flush.Messages = 10
+	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	leader.Returns(prodSuccess)
+	expectResults(t, producer, 1, 0)
 
-	for i := 0; i < 10; i++ {
-		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
-	}
+	// When: a broker connection gets reset by a broker (network glitch, restart, you name it).
 	leader.Close()                               // producer should get EOF
 	leader = newMockBrokerAddr(t, 2, leaderAddr) // start it up again right away for giggles
 	seedBroker.Returns(metadataResponse)         // tell it to go to broker 2 again
 
-	prodSuccess := new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	// Then: a produced message goes through the new broker connection.
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	leader.Returns(prodSuccess)
-	expectResults(t, producer, 10, 0)
-	seedBroker.Close()
-	leader.Close()
+	expectResults(t, producer, 1, 0)
 
 	closeProducer(t, producer)
+	seedBroker.Close()
+	leader.Close()
 }
 
 func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
