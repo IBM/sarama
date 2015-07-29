@@ -70,7 +70,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = tmp
 			payload = m.compressedCache
 		default:
-			return PacketEncodingError{fmt.Sprintf("Unsupported compression codec: %d", m.Codec)}
+			return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", m.Codec)}
 		}
 	}
 
@@ -92,7 +92,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if format != messageFormat {
-		return PacketDecodingError{"Unexpected messageFormat"}
+		return PacketDecodingError{"unexpected messageFormat"}
 	}
 
 	attribute, err := pd.getInt8()
@@ -135,7 +135,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		}
 		return m.decodeSet()
 	default:
-		return PacketDecodingError{fmt.Sprintf("Invalid compression specified: %d", m.Codec)}
+		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", m.Codec)}
 	}
 
 	err = pd.pop()

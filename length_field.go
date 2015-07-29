@@ -22,7 +22,7 @@ func (l *lengthField) run(curOffset int, buf []byte) error {
 
 func (l *lengthField) check(curOffset int, buf []byte) error {
 	if uint32(curOffset-l.startOffset-4) != binary.BigEndian.Uint32(buf[l.startOffset:]) {
-		return PacketDecodingError{"Lengthfield check failed"}
+		return PacketDecodingError{"length field invalid"}
 	}
 
 	return nil

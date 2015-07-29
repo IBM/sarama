@@ -23,7 +23,7 @@ func encode(e encoder) ([]byte, error) {
 	}
 
 	if prepEnc.length < 0 || prepEnc.length > int(MaxRequestSize) {
-		return nil, PacketEncodingError{fmt.Sprintf("Invalid request size: %d", prepEnc.length)}
+		return nil, PacketEncodingError{fmt.Sprintf("invalid request size (%d)", prepEnc.length)}
 	}
 
 	realEnc.raw = make([]byte, prepEnc.length)
@@ -55,7 +55,7 @@ func decode(buf []byte, in decoder) error {
 	}
 
 	if helper.off != len(buf) {
-		return PacketDecodingError{"Length was invalid"}
+		return PacketDecodingError{"invalid length"}
 	}
 
 	return nil

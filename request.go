@@ -51,7 +51,7 @@ func (r *request) decode(pd packetDecoder) (err error) {
 
 	r.body = allocateBody(key, version)
 	if r.body == nil {
-		return PacketDecodingError{fmt.Sprintf("Unknown request key: %d", key)}
+		return PacketDecodingError{fmt.Sprintf("unknown request key (%d)", key)}
 	}
 	return r.body.decode(pd)
 }
@@ -64,7 +64,7 @@ func decodeRequest(r io.Reader) (req *request, err error) {
 
 	length := int32(binary.BigEndian.Uint32(lengthBytes))
 	if length <= 4 || length > MaxRequestSize {
-		return nil, PacketDecodingError{fmt.Sprintf("Message of length %d too large or too small", length)}
+		return nil, PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", length)}
 	}
 
 	encodedReq := make([]byte, length)

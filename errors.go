@@ -7,7 +7,7 @@ import (
 
 // ErrOutOfBrokers is the error returned when the client has run out of brokers to talk to because all of them errored
 // or otherwise failed to respond.
-var ErrOutOfBrokers = errors.New("kafka: Client has run out of available brokers to talk to. Is your cluster reachable?")
+var ErrOutOfBrokers = errors.New("kafka: client has run out of available brokers to talk to (Is your cluster reachable?)")
 
 // ErrClosedClient is the error returned when a method is called on a client that has been closed.
 var ErrClosedClient = errors.New("kafka: tried to use a client that was closed")
@@ -44,7 +44,7 @@ type PacketEncodingError struct {
 }
 
 func (err PacketEncodingError) Error() string {
-	return fmt.Sprintf("kafka: Error while encoding packet: %s", err.Info)
+	return fmt.Sprintf("kafka: error encoding packet: %s", err.Info)
 }
 
 // PacketDecodingError is returned when there was an error (other than truncated data) decoding the Kafka broker's response.
@@ -54,7 +54,7 @@ type PacketDecodingError struct {
 }
 
 func (err PacketDecodingError) Error() string {
-	return fmt.Sprintf("kafka: Error while decoding packet: %s", err.Info)
+	return fmt.Sprintf("kafka: error decoding packet: %s", err.Info)
 }
 
 // ConfigurationError is the type of error returned from a constructor (e.g. NewClient, or NewConsumer)
@@ -62,7 +62,7 @@ func (err PacketDecodingError) Error() string {
 type ConfigurationError string
 
 func (err ConfigurationError) Error() string {
-	return "kafka: Invalid Configuration: " + string(err)
+	return "kafka: invalid configuration (" + string(err) + ")"
 }
 
 // KError is the type of error that can be returned directly by the Kafka broker.

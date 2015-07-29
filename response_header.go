@@ -13,7 +13,7 @@ func (r *responseHeader) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if r.length <= 4 || r.length > MaxResponseSize {
-		return PacketDecodingError{fmt.Sprintf("Message of length %d too large or too small", r.length)}
+		return PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", r.length)}
 	}
 
 	r.correlationID, err = pd.getInt32()
