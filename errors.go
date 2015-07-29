@@ -62,7 +62,7 @@ func (err PacketDecodingError) Error() string {
 type ConfigurationError string
 
 func (err ConfigurationError) Error() string {
-	return "kafka: Invalid Configuration: " + string(err)
+	return "kafka: invalid configuration (" + string(err) + ")"
 }
 
 // KError is the type of error that can be returned directly by the Kafka broker.
