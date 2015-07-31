@@ -17,53 +17,19 @@ var (
 )
 
 func TestConsumerMetadataResponseError(t *testing.T) {
-	response := ConsumerMetadataResponse{}
-
-	testDecodable(t, "error", &response, consumerMetadataResponseError)
-
-	if response.Err != ErrOffsetsLoadInProgress {
-		t.Error("Decoding produced incorrect error value.")
-	}
-
-	if response.CoordinatorID != 0 {
-		t.Error("Decoding produced incorrect ID.")
-	}
-
-	if len(response.CoordinatorHost) != 0 {
-		t.Error("Decoding produced incorrect host.")
-	}
-
-	if response.CoordinatorPort != 0 {
-		t.Error("Decoding produced incorrect port.")
-	}
+	response := ConsumerMetadataResponse{Err: ErrOffsetsLoadInProgress}
+	testResponse(t, "error", &response, consumerMetadataResponseError)
 }
 
 func TestConsumerMetadataResponseSuccess(t *testing.T) {
-	response := ConsumerMetadataResponse{}
-
-	testDecodable(t, "success", &response, consumerMetadataResponseSuccess)
-
-	if response.Err != ErrNoError {
-		t.Error("Decoding produced error value where there was none.")
+	broker := NewBroker("foo:52445")
+	broker.id = 0xAB
+	response := ConsumerMetadataResponse{
+		Coordinator:     broker,
+		CoordinatorID:   0xAB,
+		CoordinatorHost: "foo",
+		CoordinatorPort: 0xCCDD,
+		Err:             ErrNoError,
 	}
-
-	if response.CoordinatorID != 0xAB {
-		t.Error("Decoding produced incorrect coordinator ID.")
-	}
-
-	if response.CoordinatorHost != "foo" {
-		t.Error("Decoding produced incorrect coordinator host.")
-	}
-
-	if response.CoordinatorPort != 0xCCDD {
-		t.Error("Decoding produced incorrect coordinator port.")
-	}
-
-	if response.Coordinator.ID() != 0xAB {
-		t.Error("Decoding produced incorrect coordinator ID.")
-	}
-
-	if response.Coordinator.Addr() != "foo:52445" {
-		t.Error("Decoding produced incorrect coordinator address.")
-	}
+	testResponse(t, "success", &response, consumerMetadataResponseSuccess)
 }
