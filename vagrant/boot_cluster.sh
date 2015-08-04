@@ -3,7 +3,7 @@
 set -ex
 
 # Launch and wait for toxiproxy
-vagrant/run_toxiproxy.sh &
+${REPOSITORY_ROOT}/vagrant/run_toxiproxy.sh &
 while ! nc -q 1 localhost 2181 </dev/null; do echo "Waiting"; sleep 1; done
 while ! nc -q 1 localhost 9092 </dev/null; do echo "Waiting"; sleep 1; done
 
