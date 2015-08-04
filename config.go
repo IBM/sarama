@@ -105,6 +105,11 @@ type Config struct {
 		// Equivalent to the JVM's `fetch.wait.max.ms`.
 		MaxWaitTime time.Duration
 
+		// The maximum amount of time the consumer expects a message takes to process for the user. If writing to the Messages channel
+		// takes longer than this, that partition will stop fetching more messages until it can proceed again. Note that, since the
+		// Messages channel is buffered, the actual grace time is (MaxProcessingTime * ChanneBufferSize). Defaults to 100ms.
+		MaxProcessingTime time.Duration
+
 		// Return specifies what channels will be populated. If they are set to true, you must read from
 		// them to prevent deadlock.
 		Return struct {
@@ -147,6 +152,7 @@ func NewConfig() *Config {
 	c.Consumer.Fetch.Default = 32768
 	c.Consumer.Retry.Backoff = 2 * time.Second
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
+	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
 
 	c.ChannelBufferSize = 256
@@ -239,7 +245,9 @@ func (c *Config) Validate() error {
 	case c.Consumer.Fetch.Max < 0:
 		return ConfigurationError("Consumer.Fetch.Max must be >= 0")
 	case c.Consumer.MaxWaitTime < 1*time.Millisecond:
-		return ConfigurationError("Consumer.MaxWaitTime must be > 1ms")
+		return ConfigurationError("Consumer.MaxWaitTime must be >= 1ms")
+	case c.Consumer.MaxProcessingTime <= 0:
+		return ConfigurationError("Consumer.MaxProcessingTime must be > 0")
 	case c.Consumer.Retry.Backoff < 0:
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
 	}
