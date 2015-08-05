@@ -20,8 +20,8 @@ var (
 	addr      = flag.String("addr", ":8080", "The address to bind to")
 	brokers   = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The Kafka brokers to connect to, as a comma separated list")
 	verbose   = flag.Bool("verbose", false, "Turn on Sarama logging")
-	cert_file = flag.String("certificate", "", "The certificate file for client authentication")
-	key_file  = flag.String("key", "", "The key file for client authentication")
+	cert_file = flag.String("certificate", "", "The optional certificate file for client authentication")
+	key_file  = flag.String("key", "", "The optional key file for client authentication")
 	ca_file   = flag.String("ca", "", "The optional certificate authority file for TLS client authentication")
 )
 
