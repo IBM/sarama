@@ -69,12 +69,13 @@ func (b *Broker) Open(conf *Config) error {
 	go withRecover(func() {
 		defer b.lock.Unlock()
 
-		dialer := &net.Dialer{
-			Timeout: conf.Net.DialTimeout,
+		dialer := net.Dialer{
+			Timeout:   conf.Net.DialTimeout,
+			KeepAlive: conf.Net.KeepAlive,
 		}
 
 		if conf.Net.TLS.Enable {
-			b.conn, b.connErr = tls.DialWithDialer(dialer, "tcp", b.addr, conf.Net.TLS.Config)
+			b.conn, b.connErr = tls.DialWithDialer(&dialer, "tcp", b.addr, conf.Net.TLS.Config)
 		} else {
 			b.conn, b.connErr = dialer.Dial("tcp", b.addr)
 		}
