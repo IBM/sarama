@@ -1,5 +1,24 @@
 # Changelog
 
+#### Version 1.5.0 (unreleased)
+
+New Features:
+ - TLS-encrypted network connections are now supported. This feature is subject
+   to change when Kafka releases built-in TLS support, but for now this is
+   enough to work with TLS-terminating proxies
+   ([#154](https://github.com/Shopify/sarama/pull/154)).
+
+Improvements:
+ - The consumer will not block if a single partition is not drained by the user;
+   all other partitions will continue to consume normally
+   ([#485](https://github.com/Shopify/sarama/pull/485)).
+ - Formatting of error strings has been much improved
+   ([#495](https://github.com/Shopify/sarama/pull/495)).
+
+Bug Fixes:
+ - Fix a potential deadlock in the consumer on shutdown
+   ([#475](https://github.com/Shopify/sarama/pull/475)).
+
 #### Version 1.4.3 (2015-07-21)
 
 Bug Fixes:
