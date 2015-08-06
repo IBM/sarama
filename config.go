@@ -16,6 +16,8 @@ type Config struct {
 		ReadTimeout  time.Duration // How long to wait for a response before timing out and returning an error (default 30s).
 		WriteTimeout time.Duration // How long to wait for a transmit to succeed before timing out and returning an error (default 30s).
 
+		// NOTE: these config values have no compatibility guarantees; they may change when Kafka releases its
+		// official TLS support in version 0.9.
 		TLS struct {
 			Enable bool        // Whether or not to use TLS when connecting to the broker (defaults to false).
 			Config *tls.Config // The TLS configuration to use for secure connections if enabled (defaults to nil).
@@ -172,6 +174,9 @@ func NewConfig() *Config {
 // ConfigurationError if the specified values don't make sense.
 func (c *Config) Validate() error {
 	// some configuration values should be warned on but not fail completely, do those first
+	if c.Net.TLS.Enable == false && c.Net.TLS.Config != nil {
+		Logger.Println("Net.TLS is disabled but a non-nil configuration was provided.")
+	}
 	if c.Producer.RequiredAcks > 1 {
 		Logger.Println("Producer.RequiredAcks > 1 is deprecated and will raise an exception with kafka >= 0.8.2.0.")
 	}
