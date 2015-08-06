@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	expectationTimeout = 250 * time.Millisecond
+	expectationTimeout = 500 * time.Millisecond
 )
 
 type requestHandlerFunc func(req *request) (res encoder)
