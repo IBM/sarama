@@ -141,6 +141,7 @@ type partitionOffsetManager struct {
 	offset   int64
 	metadata string
 	dirty    bool
+	clean    chan none
 	broker   *brokerOffsetManager
 
 	errors    chan *ConsumerError
@@ -153,6 +154,7 @@ func (om *offsetManager) newPartitionOffsetManager(topic string, partition int32
 		parent:    om,
 		topic:     topic,
 		partition: partition,
+		clean:     make(chan none),
 		errors:    make(chan *ConsumerError, om.conf.ChannelBufferSize),
 		rebalance: make(chan none, 1),
 		dying:     make(chan none),
@@ -288,6 +290,11 @@ func (pom *partitionOffsetManager) updateCommitted(offset int64, metadata string
 
 	if pom.offset == offset && pom.metadata == metadata {
 		pom.dirty = false
+
+		select {
+		case pom.clean <- none{}:
+		default:
+		}
 	}
 }
 
@@ -299,7 +306,17 @@ func (pom *partitionOffsetManager) Offset() (int64, string) {
 }
 
 func (pom *partitionOffsetManager) AsyncClose() {
-	close(pom.dying)
+	go func() {
+		pom.lock.Lock()
+		dirty := pom.dirty
+		pom.lock.Unlock()
+
+		if dirty {
+			<-pom.clean
+		}
+
+		close(pom.dying)
+	}()
 }
 
 func (pom *partitionOffsetManager) Close() error {
