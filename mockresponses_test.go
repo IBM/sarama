@@ -363,19 +363,3 @@ func (mr *mockOffsetFetchResponse) For(reqBody decoder) encoder {
 	}
 	return res
 }
-
-//func (mr *mockOffsetFetchResponse) getOffset(group, topic string, partition int32) *OffsetFetchResponseBlock {
-//	topics := mr.offsets[group]
-//	if topics == nil {
-//		return nil
-//	}
-//	partitions := topics[topic]
-//	if partitions == nil {
-//		return nil
-//	}
-//	block, ok := partitions[partition]
-//	if !ok {
-//		return nil
-//	}
-//	return block
-//}
