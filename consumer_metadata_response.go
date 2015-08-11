@@ -20,10 +20,14 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder) (err error) {
 	}
 	r.Err = KError(tmp)
 
-	r.Coordinator = new(Broker)
-	if err := r.Coordinator.decode(pd); err != nil {
+	coordinator := new(Broker)
+	if err := coordinator.decode(pd); err != nil {
 		return err
 	}
+	if coordinator.addr == ":0" {
+		return nil
+	}
+	r.Coordinator = coordinator
 
 	// this can all go away in 2.0, but we have to fill in deprecated fields to maintain
 	// backwards compatibility
@@ -43,16 +47,27 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder) (err error) {
 }
 
 func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
-
 	pe.putInt16(int16(r.Err))
-
+	if r.Coordinator != nil {
+		host, portstr, err := net.SplitHostPort(r.Coordinator.Addr())
+		if err != nil {
+			return err
+		}
+		port, err := strconv.ParseInt(portstr, 10, 32)
+		if err != nil {
+			return err
+		}
+		pe.putInt32(r.Coordinator.ID())
+		if err := pe.putString(host); err != nil {
+			return err
+		}
+		pe.putInt32(int32(port))
+		return nil
+	}
 	pe.putInt32(r.CoordinatorID)
-
 	if err := pe.putString(r.CoordinatorHost); err != nil {
 		return err
 	}
-
 	pe.putInt32(r.CoordinatorPort)
-
 	return nil
 }
