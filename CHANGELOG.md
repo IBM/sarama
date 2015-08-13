@@ -14,6 +14,8 @@ Improvements:
    ([#485](https://github.com/Shopify/sarama/pull/485)).
  - Formatting of error strings has been much improved
    ([#495](https://github.com/Shopify/sarama/pull/495)).
+ - Internal refactoring of the producer for code cleanliness and to enable
+   future work ([#300](https://github.com/Shopify/sarama/pull/300)).
 
 Bug Fixes:
  - Fix a potential deadlock in the consumer on shutdown
