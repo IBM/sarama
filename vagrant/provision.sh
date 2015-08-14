@@ -5,6 +5,7 @@ set -ex
 apt-get update
 yes | apt-get install default-jre
 
+export TOXIPROXY_VERSION=1.0.3
 export KAFKA_INSTALL_ROOT=/opt
 export KAFKA_HOSTNAME=192.168.100.67
 export KAFKA_VERSION=0.8.2.1

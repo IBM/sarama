@@ -6,6 +6,7 @@ go:
 env:
   global:
   - KAFKA_PEERS=localhost:9091,localhost:9092,localhost:9093,localhost:9094,localhost:9095
+  - TOXIPROXY_VERSION=1.0.3
   - TOXIPROXY_ADDR=http://localhost:8474
   - KAFKA_INSTALL_ROOT=/home/travis/kafka
   - KAFKA_HOSTNAME=localhost
