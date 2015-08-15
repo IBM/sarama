@@ -243,7 +243,7 @@ func (pom *partitionOffsetManager) fetchInitialOffset(retries int) error {
 		return nil
 	case ErrNotCoordinatorForConsumer:
 		if retries <= 0 {
-			return err
+			return block.Err
 		}
 		if err := pom.selectBroker(); err != nil {
 			return err
@@ -251,12 +251,12 @@ func (pom *partitionOffsetManager) fetchInitialOffset(retries int) error {
 		return pom.fetchInitialOffset(retries - 1)
 	case ErrOffsetsLoadInProgress:
 		if retries <= 0 {
-			return err
+			return block.Err
 		}
 		time.Sleep(pom.parent.conf.Metadata.Retry.Backoff)
 		return pom.fetchInitialOffset(retries - 1)
 	default:
-		return err
+		return block.Err
 	}
 }
 
