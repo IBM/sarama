@@ -396,6 +396,10 @@ func (bom *brokerOffsetManager) flushToBroker() {
 	}
 
 	for s := range bom.subscriptions {
+		if request.blocks[s.topic] == nil || request.blocks[s.topic][s.partition] == nil {
+			continue
+		}
+
 		var err KError
 		var ok bool
 
