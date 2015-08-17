@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.5.0 (unreleased)
+#### Version 1.5.0 (2015-08-17)
 
 New Features:
  - TLS-encrypted network connections are now supported. This feature is subject
