@@ -188,11 +188,11 @@ func (c *Config) Validate() error {
 	if c.Producer.RequiredAcks > 1 {
 		Logger.Println("Producer.RequiredAcks > 1 is deprecated and will raise an exception with kafka >= 0.8.2.0.")
 	}
-	if c.Producer.MaxMessageBytes >= forceFlushThreshold() {
-		Logger.Println("Producer.MaxMessageBytes is too close to MaxRequestSize; it will be ignored.")
+	if c.Producer.MaxMessageBytes >= int(MaxRequestSize) {
+		Logger.Println("Producer.MaxMessageBytes is larger than MaxRequestSize; it will be ignored.")
 	}
-	if c.Producer.Flush.Bytes >= forceFlushThreshold() {
-		Logger.Println("Producer.Flush.Bytes is too close to MaxRequestSize; it will be ignored.")
+	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
+		Logger.Println("Producer.Flush.Bytes is larger than MaxRequestSize; it will be ignored.")
 	}
 	if c.Producer.Timeout%time.Millisecond != 0 {
 		Logger.Println("Producer.Timeout only supports millisecond resolution; nanoseconds will be truncated.")
