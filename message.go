@@ -65,7 +65,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionSnappy:
-			tmp, err := snappyEncode(m.Value)
+			tmp := snappyEncode(m.Value)
 			if err != nil {
 				return err
 			}
