@@ -108,12 +108,15 @@ func (om *offsetManager) abandonBroker(bom *brokerOffsetManager) {
 // on a partition offset manager to avoid leaks, it will not be garbage-collected automatically when it passes
 // out of scope.
 type PartitionOffsetManager interface {
-	// Offset returns the current offset and metadata according to the manager; this value has not necessarily
-	// been flushed to the cluster yet.
+	// Offset returns the last offset that was marked as processed and associated metadata according to the manager;
+	// this value has not necessarily been flushed to the cluster yet. If you want to resume a partition consumer
+	// from where it left off, remember that you have to increment the offset by one so the partition consumer will
+	// start at the next message. This prevents the last committed message from being processed twice.
 	Offset() (int64, string)
 
-	// SetOffset sets the current offset and metadata according to the manager; this value (or a subsequent update)
-	// will eventually be flushed to the cluster based on configuration.
+	// SetOffset sets the offset and metadata according to the manager; this value (or a subsequent update)
+	// will eventually be flushed to the cluster based on configuration. You should only set the offset of
+	// messages that have been completely processed.
 	SetOffset(offset int64, metadata string)
 
 	// Errors returns a read channel of errors that occur during offset management, if enabled. By default,
