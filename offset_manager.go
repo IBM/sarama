@@ -12,6 +12,11 @@ type OffsetManager interface {
 	// ManagePartition creates a PartitionOffsetManager on the given topic/partition. It will
 	// return an error if this OffsetManager is already managing the given topic/partition.
 	ManagePartition(topic string, partition int32) (PartitionOffsetManager, error)
+
+	// Close stops the OffsetManager from managing offsets. It is required to call this function
+	// before an OffsetManager object passes out of scope, as it will otherwise
+	// leak memory. You must call this after all the PartitionOffsetManagers are closed.
+	Close() error
 }
 
 type offsetManager struct {
@@ -64,6 +69,10 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 
 	topicManagers[partition] = pom
 	return pom, nil
+}
+
+func (om *offsetManager) Close() error {
+	return nil
 }
 
 func (om *offsetManager) refBrokerOffsetManager(broker *Broker) *brokerOffsetManager {
