@@ -124,6 +124,7 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	coordinator.Close()
 	newCoordinator.Close()
 	safeClose(t, pom)
+	safeClose(t, om)
 	safeClose(t, testClient)
 }
 
@@ -157,6 +158,7 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	broker.Close()
 	coordinator.Close()
 	safeClose(t, pom)
+	safeClose(t, om)
 	safeClose(t, testClient)
 }
 
@@ -173,6 +175,7 @@ func TestPartitionOffsetManagerOffset(t *testing.T) {
 	}
 
 	safeClose(t, pom)
+	safeClose(t, om)
 	broker.Close()
 	coordinator.Close()
 	safeClose(t, testClient)
@@ -197,6 +200,7 @@ func TestPartitionOffsetManagerSetOffset(t *testing.T) {
 	}
 
 	safeClose(t, pom)
+	safeClose(t, om)
 	safeClose(t, testClient)
 	broker.Close()
 	coordinator.Close()
@@ -271,6 +275,7 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	broker.Close()
 	coordinator.Close()
 	newCoordinator.Close()
+	safeClose(t, om)
 	safeClose(t, testClient)
 }
 
@@ -298,6 +303,7 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 	pom.SetOffset(100, "modified_meta")
 
 	safeClose(t, pom)
+	safeClose(t, om)
 	broker.Close()
 	safeClose(t, testClient)
 }
