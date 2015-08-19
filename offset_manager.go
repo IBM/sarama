@@ -117,27 +117,33 @@ func (om *offsetManager) abandonBroker(bom *brokerOffsetManager) {
 // on a partition offset manager to avoid leaks, it will not be garbage-collected automatically when it passes
 // out of scope.
 type PartitionOffsetManager interface {
-	// Offset returns the last offset that was marked as processed and associated metadata according to the manager;
-	// this value has not necessarily been flushed to the cluster yet. If you want to resume a partition consumer
-	// from where it left off, remember that you have to increment the offset by one so the partition consumer will
-	// start at the next message. This prevents the last committed message from being processed twice.
-	Offset() (int64, string)
+	// NextOffset returns the next offset that should be consumed for the managed partition, accompanied
+	// by metadata which can be used to reconstruct the state of the partition consumer when it resumes.
+	// NextOffset() will return `config.Consumer.Offsets.Initial` and an empty metadata string if no
+	// offset was committed for this partition yet.
+	NextOffset() (int64, string)
 
-	// SetOffset sets the offset and metadata according to the manager; this value (or a subsequent update)
-	// will eventually be flushed to the cluster based on configuration. You should only set the offset of
-	// messages that have been completely processed.
-	SetOffset(offset int64, metadata string)
+	// MarkOffset marks the provided offset as processed, alongside a metadata string that represents
+	// the state of the partition consumer at that point in time. The metadata string can be used by
+	// another consumer to restore that state, so it can resume consumption.
+	//
+	// Note: calling MarkOffset does not necessarily commit the offset to the backend store immediately
+	// for efficiency reasons, and it may never be committed if your application crashes. This means that
+	// you may end up processing the same message twice, and your processing should ideally be idempotent.
+	MarkOffset(offset int64, metadata string)
 
 	// Errors returns a read channel of errors that occur during offset management, if enabled. By default,
 	// errors are logged and not returned over this channel. If you want to implement any custom error
 	// handling, set your config's Consumer.Return.Errors setting to true, and read from this channel.
 	Errors() <-chan *ConsumerError
+
 	// AsyncClose initiates a shutdown of the PartitionOffsetManager. This method will return immediately,
 	// after which you should wait until the 'errors' channel has been drained and closed.
 	// It is required to call this function, or Close before a consumer object passes out of scope,
 	// as it will otherwise leak memory.  You must call this before calling Close on the underlying
 	// client.
 	AsyncClose()
+
 	// Close stops the PartitionOffsetManager from managing offsets. It is required to call this function
 	// (or AsyncClose) before a PartitionOffsetManager object passes out of scope, as it will otherwise
 	// leak memory. You must call this before calling Close on the underlying client.
@@ -290,7 +296,7 @@ func (pom *partitionOffsetManager) Errors() <-chan *ConsumerError {
 	return pom.errors
 }
 
-func (pom *partitionOffsetManager) SetOffset(offset int64, metadata string) {
+func (pom *partitionOffsetManager) MarkOffset(offset int64, metadata string) {
 	pom.lock.Lock()
 	defer pom.lock.Unlock()
 
@@ -313,11 +319,15 @@ func (pom *partitionOffsetManager) updateCommitted(offset int64, metadata string
 	}
 }
 
-func (pom *partitionOffsetManager) Offset() (int64, string) {
+func (pom *partitionOffsetManager) NextOffset() (int64, string) {
 	pom.lock.Lock()
 	defer pom.lock.Unlock()
 
-	return pom.offset, pom.metadata
+	if pom.offset >= 0 {
+		return pom.offset + 1, pom.metadata
+	} else {
+		return pom.parent.conf.Consumer.Offsets.Initial, ""
+	}
 }
 
 func (pom *partitionOffsetManager) AsyncClose() {
