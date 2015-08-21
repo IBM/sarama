@@ -132,6 +132,10 @@ type Config struct {
 		Offsets struct {
 			// How frequently to commit updated offsets. Defaults to 10s.
 			CommitInterval time.Duration
+
+			// The initial offset to use if no offset was previously committed. Should be OffsetNewest or OffsetOldest.
+			// Defaults to OffsetNewest.
+			Initial int64
 		}
 	}
 
@@ -172,6 +176,7 @@ func NewConfig() *Config {
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.CommitInterval = 10 * time.Second
+	c.Consumer.Offsets.Initial = OffsetNewest
 
 	c.ChannelBufferSize = 256
 
@@ -273,6 +278,9 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
 	case c.Consumer.Offsets.CommitInterval <= 0:
 		return ConfigurationError("Consumer.Offsets.CommitInterval must be > 0")
+	case c.Consumer.Offsets.Initial != OffsetOldest && c.Consumer.Offsets.Initial != OffsetNewest:
+		return ConfigurationError("Consumer.Offsets.Initial must be OffsetOldest or OffsetNewest")
+
 	}
 
 	// validate misc shared values

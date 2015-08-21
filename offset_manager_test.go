@@ -42,13 +42,13 @@ func initOffsetManager(t *testing.T) (om OffsetManager,
 }
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
-	coordinator *mockBroker) PartitionOffsetManager {
+	coordinator *mockBroker, initialOffset int64, metadata string) PartitionOffsetManager {
 
 	fetchResponse := new(OffsetFetchResponse)
 	fetchResponse.AddBlock("my_topic", 0, &OffsetFetchResponseBlock{
 		Err:      ErrNoError,
-		Offset:   5,
-		Metadata: "test_meta",
+		Offset:   initialOffset,
+		Metadata: metadata,
 	})
 	coordinator.Returns(fetchResponse)
 
@@ -162,12 +162,34 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	safeClose(t, testClient)
 }
 
-func TestPartitionOffsetManagerOffset(t *testing.T) {
+func TestPartitionOffsetManagerInitialOffset(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
-	pom := initPartitionOffsetManager(t, om, coordinator)
+	testClient.Config().Consumer.Offsets.Initial = OffsetOldest
 
-	offset, meta := pom.Offset()
-	if offset != 5 {
+	// Kafka returns -1 if no offset has been stored for this partition yet.
+	pom := initPartitionOffsetManager(t, om, coordinator, -1, "")
+
+	offset, meta := pom.NextOffset()
+	if offset != OffsetOldest {
+		t.Errorf("Expected offset 5. Actual: %v", offset)
+	}
+	if meta != "" {
+		t.Errorf("Expected metadata to be empty. Actual: %q", meta)
+	}
+
+	safeClose(t, pom)
+	safeClose(t, om)
+	broker.Close()
+	coordinator.Close()
+	safeClose(t, testClient)
+}
+
+func TestPartitionOffsetManagerNextOffset(t *testing.T) {
+	om, testClient, broker, coordinator := initOffsetManager(t)
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "test_meta")
+
+	offset, meta := pom.NextOffset()
+	if offset != 6 {
 		t.Errorf("Expected offset 5. Actual: %v", offset)
 	}
 	if meta != "test_meta" {
@@ -181,18 +203,18 @@ func TestPartitionOffsetManagerOffset(t *testing.T) {
 	safeClose(t, testClient)
 }
 
-func TestPartitionOffsetManagerSetOffset(t *testing.T) {
+func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
-	pom := initPartitionOffsetManager(t, om, coordinator)
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
 	ocResponse := new(OffsetCommitResponse)
 	ocResponse.AddError("my_topic", 0, ErrNoError)
 	coordinator.Returns(ocResponse)
 
-	pom.SetOffset(100, "modified_meta")
-	offset, meta := pom.Offset()
+	pom.MarkOffset(100, "modified_meta")
+	offset, meta := pom.NextOffset()
 
-	if offset != 100 {
+	if offset != 101 {
 		t.Errorf("Expected offset 100. Actual: %v", offset)
 	}
 	if meta != "modified_meta" {
@@ -208,7 +230,7 @@ func TestPartitionOffsetManagerSetOffset(t *testing.T) {
 
 func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
-	pom := initPartitionOffsetManager(t, om, coordinator)
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
 
 	// Error on one partition
 	ocResponse := new(OffsetCommitResponse)
@@ -265,7 +287,7 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	ocResponse5.AddError("my_topic", 0, ErrNoError)
 	newCoordinator.Returns(ocResponse5)
 
-	pom.SetOffset(100, "modified_meta")
+	pom.MarkOffset(100, "modified_meta")
 
 	err := pom.Close()
 	if err != nil {
@@ -282,7 +304,7 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 // Test of recovery from abort
 func TestAbortPartitionOffsetManager(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
-	pom := initPartitionOffsetManager(t, om, coordinator)
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
 
 	// this triggers an error in the CommitOffset request,
 	// which leads to the abort call
@@ -300,7 +322,7 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 	ocResponse.AddError("my_topic", 0, ErrNoError)
 	newCoordinator.Returns(ocResponse)
 
-	pom.SetOffset(100, "modified_meta")
+	pom.MarkOffset(100, "modified_meta")
 
 	safeClose(t, pom)
 	safeClose(t, om)
