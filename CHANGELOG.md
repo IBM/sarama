@@ -1,5 +1,14 @@
 # Changelog
 
+#### Version 1.6.0 (unreleased)
+
+New Features:
+ - Implementation of a consumer offset manager using the APIs introduced in
+   Kafka 0.8.2. The API is designed mainly for integration into a future
+   high-level consumer, not for direct use, although it is *possible* to use it
+   directly.
+   ([#461](https://github.com/Shopify/sarama/pull/461)).
+
 #### Version 1.5.0 (2015-08-17)
 
 New Features:
