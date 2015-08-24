@@ -126,6 +126,17 @@ type Config struct {
 			// If enabled, any errors that occured while consuming are returned on the Errors channel (default disabled).
 			Errors bool
 		}
+
+		// Offsets specifies configuration for how and when to commit consumed offsets. This currently requires the
+		// manual use of an OffsetManager but will eventually be automated.
+		Offsets struct {
+			// How frequently to commit updated offsets. Defaults to 10s.
+			CommitInterval time.Duration
+
+			// The initial offset to use if no offset was previously committed. Should be OffsetNewest or OffsetOldest.
+			// Defaults to OffsetNewest.
+			Initial int64
+		}
 	}
 
 	// A user-provided string sent with every request to the brokers for logging, debugging, and auditing purposes.
@@ -164,6 +175,8 @@ func NewConfig() *Config {
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
+	c.Consumer.Offsets.CommitInterval = 10 * time.Second
+	c.Consumer.Offsets.Initial = OffsetNewest
 
 	c.ChannelBufferSize = 256
 
@@ -263,6 +276,11 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.MaxProcessingTime must be > 0")
 	case c.Consumer.Retry.Backoff < 0:
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
+	case c.Consumer.Offsets.CommitInterval <= 0:
+		return ConfigurationError("Consumer.Offsets.CommitInterval must be > 0")
+	case c.Consumer.Offsets.Initial != OffsetOldest && c.Consumer.Offsets.Initial != OffsetNewest:
+		return ConfigurationError("Consumer.Offsets.Initial must be OffsetOldest or OffsetNewest")
+
 	}
 
 	// validate misc shared values
