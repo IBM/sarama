@@ -130,7 +130,7 @@ type Config struct {
 		// Offsets specifies configuration for how and when to commit consumed offsets. This currently requires the
 		// manual use of an OffsetManager but will eventually be automated.
 		Offsets struct {
-			// How frequently to commit updated offsets. Defaults to 10s.
+			// How frequently to commit updated offsets. Defaults to 1s.
 			CommitInterval time.Duration
 
 			// The initial offset to use if no offset was previously committed. Should be OffsetNewest or OffsetOldest.
@@ -175,7 +175,7 @@ func NewConfig() *Config {
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
-	c.Consumer.Offsets.CommitInterval = 10 * time.Second
+	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 
 	c.ChannelBufferSize = 256
