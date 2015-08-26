@@ -312,7 +312,10 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	b.addr = fmt.Sprint(host, ":", port)
+	b.addr = net.JoinHostPort(host, fmt.Sprint(port))
+	if _, _, err := net.SplitHostPort(b.addr); err != nil {
+		return err
+	}
 
 	return nil
 }
