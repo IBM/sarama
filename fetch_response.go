@@ -22,6 +22,9 @@ func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
+	if msgSetSize < 0 {
+		return PacketDecodingError{"invalid message set size"}
+	}
 
 	msgSetDecoder, err := pd.getSubset(int(msgSetSize))
 	if err != nil {
