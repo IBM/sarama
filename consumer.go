@@ -51,7 +51,7 @@ type Consumer interface {
 	Topics() ([]string, error)
 
 	// Partitions returns the sorted list of all partition IDs for the given topic.
-	// This method is the same as Client.Pertitions(), and is provided for convenience.
+	// This method is the same as Client.Partitions(), and is provided for convenience.
 	Partitions(topic string) ([]int32, error)
 
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
