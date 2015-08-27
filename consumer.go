@@ -250,7 +250,7 @@ type PartitionConsumer interface {
 	Messages() <-chan *ConsumerMessage
 
 	// Errors returns a read channel of errors that occured during consuming, if enabled. By default,
-	// errors are logged and not returned over this channel. If you want to implement any custom errpr
+	// errors are logged and not returned over this channel. If you want to implement any custom error
 	// handling, set your config's Consumer.Return.Errors setting to true, and read from this channel.
 	Errors() <-chan *ConsumerError
 
