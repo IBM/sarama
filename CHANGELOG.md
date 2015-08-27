@@ -9,6 +9,11 @@ New Features:
    directly.
    ([#461](https://github.com/Shopify/sarama/pull/461)).
 
+Bug Fixes:
+ - Make protocol decoding more robust against some malformed packets generated
+   by go-fuzz ([#523](https://github.com/Shopify/sarama/pull/523),
+   [#525](https://github.com/Shopify/sarama/pull/525)).
+
 #### Version 1.5.0 (2015-08-17)
 
 New Features:
