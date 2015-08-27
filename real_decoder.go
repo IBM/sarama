@@ -188,7 +188,9 @@ func (rd *realDecoder) remaining() int {
 }
 
 func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
-	if length > rd.remaining() {
+	if length < 0 {
+		return nil, PacketDecodingError{"invalid subset size"}
+	} else if length > rd.remaining() {
 		rd.off = len(rd.raw)
 		return nil, ErrInsufficientData
 	}

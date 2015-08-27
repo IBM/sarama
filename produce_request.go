@@ -90,9 +90,6 @@ func (p *ProduceRequest) decode(pd packetDecoder) error {
 			if err != nil {
 				return err
 			}
-			if messageSetSize == 0 {
-				continue
-			}
 			msgSetDecoder, err := pd.getSubset(int(messageSetSize))
 			if err != nil {
 				return err
