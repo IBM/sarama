@@ -9,10 +9,16 @@ New Features:
    directly.
    ([#461](https://github.com/Shopify/sarama/pull/461)).
 
+Improvements:
+ - CRC32 calculation is much faster on machines with SSE4.2 instructions,
+   removing a major hotspot from most profiles
+   ([#255](https://github.com/Shopify/sarama/pull/255)).
+
 Bug Fixes:
  - Make protocol decoding more robust against some malformed packets generated
    by go-fuzz ([#523](https://github.com/Shopify/sarama/pull/523),
-   [#525](https://github.com/Shopify/sarama/pull/525)).
+   [#525](https://github.com/Shopify/sarama/pull/525)) or found in other ways
+   ([#528](https://github.com/Shopify/sarama/pull/528)).
 
 #### Version 1.5.0 (2015-08-17)
 
