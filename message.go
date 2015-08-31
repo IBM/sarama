@@ -125,7 +125,9 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if m.Value, err = ioutil.ReadAll(reader); err != nil {
 			return err
 		}
-		return m.decodeSet()
+		if err := m.decodeSet(); err != nil {
+			return err
+		}
 	case CompressionSnappy:
 		if m.Value == nil {
 			return PacketDecodingError{"Snappy compression specified, but no data to uncompress"}
@@ -133,17 +135,14 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if m.Value, err = snappyDecode(m.Value); err != nil {
 			return err
 		}
-		return m.decodeSet()
+		if err := m.decodeSet(); err != nil {
+			return err
+		}
 	default:
 		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", m.Codec)}
 	}
 
-	err = pd.pop()
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return pd.pop()
 }
 
 // decodes a message set from a previousy encoded bulk-message
