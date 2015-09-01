@@ -19,6 +19,8 @@ Bug Fixes:
    by go-fuzz ([#523](https://github.com/Shopify/sarama/pull/523),
    [#525](https://github.com/Shopify/sarama/pull/525)) or found in other ways
    ([#528](https://github.com/Shopify/sarama/pull/528)).
+ - Fix a potential race condition panic in the consumer on shutdown
+   ([#529](https://github.com/Shopify/sarama/pull/529)).
 
 #### Version 1.5.0 (2015-08-17)
 
