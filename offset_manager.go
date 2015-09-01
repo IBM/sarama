@@ -476,7 +476,7 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 	for s := range bom.subscriptions {
 		s.lock.Lock()
 		if s.dirty {
-			r.AddBlock(s.topic, s.partition, s.offset, 0, s.metadata)
+			r.AddBlock(s.topic, s.partition, s.offset, ReceiveTime, s.metadata)
 		}
 		s.lock.Unlock()
 	}
