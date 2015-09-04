@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.6.0 (unreleased)
+#### Version 1.6.0 (2015-09-04)
 
 New Features:
  - Implementation of a consumer offset manager using the APIs introduced in
