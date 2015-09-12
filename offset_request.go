@@ -1,37 +1,37 @@
 package sarama
 
-type offsetRequestBlock struct {
-	time       int64
-	maxOffsets int32
+type OffsetRequestBlock struct {
+	Time       int64
+	MaxOffsets int32
 }
 
-func (r *offsetRequestBlock) encode(pe packetEncoder) error {
-	pe.putInt64(int64(r.time))
-	pe.putInt32(r.maxOffsets)
+func (r *OffsetRequestBlock) encode(pe packetEncoder) error {
+	pe.putInt64(int64(r.Time))
+	pe.putInt32(r.MaxOffsets)
 	return nil
 }
 
-func (r *offsetRequestBlock) decode(pd packetDecoder) (err error) {
-	if r.time, err = pd.getInt64(); err != nil {
+func (r *OffsetRequestBlock) decode(pd packetDecoder) (err error) {
+	if r.Time, err = pd.getInt64(); err != nil {
 		return err
 	}
-	if r.maxOffsets, err = pd.getInt32(); err != nil {
+	if r.MaxOffsets, err = pd.getInt32(); err != nil {
 		return err
 	}
 	return nil
 }
 
 type OffsetRequest struct {
-	blocks map[string]map[int32]*offsetRequestBlock
+	Blocks map[string]map[int32]*OffsetRequestBlock
 }
 
 func (r *OffsetRequest) encode(pe packetEncoder) error {
 	pe.putInt32(-1) // replica ID is always -1 for clients
-	err := pe.putArrayLength(len(r.blocks))
+	err := pe.putArrayLength(len(r.Blocks))
 	if err != nil {
 		return err
 	}
-	for topic, partitions := range r.blocks {
+	for topic, partitions := range r.Blocks {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -62,7 +62,7 @@ func (r *OffsetRequest) decode(pd packetDecoder) error {
 	if blockCount == 0 {
 		return nil
 	}
-	r.blocks = make(map[string]map[int32]*offsetRequestBlock)
+	r.Blocks = make(map[string]map[int32]*OffsetRequestBlock)
 	for i := 0; i < blockCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -72,17 +72,17 @@ func (r *OffsetRequest) decode(pd packetDecoder) error {
 		if err != nil {
 			return err
 		}
-		r.blocks[topic] = make(map[int32]*offsetRequestBlock)
+		r.Blocks[topic] = make(map[int32]*OffsetRequestBlock)
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
-			block := &offsetRequestBlock{}
+			block := &OffsetRequestBlock{}
 			if err := block.decode(pd); err != nil {
 				return err
 			}
-			r.blocks[topic][partition] = block
+			r.Blocks[topic][partition] = block
 		}
 	}
 	return nil
@@ -97,17 +97,17 @@ func (r *OffsetRequest) version() int16 {
 }
 
 func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {
-	if r.blocks == nil {
-		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
+	if r.Blocks == nil {
+		r.Blocks = make(map[string]map[int32]*OffsetRequestBlock)
 	}
 
-	if r.blocks[topic] == nil {
-		r.blocks[topic] = make(map[int32]*offsetRequestBlock)
+	if r.Blocks[topic] == nil {
+		r.Blocks[topic] = make(map[int32]*OffsetRequestBlock)
 	}
 
-	tmp := new(offsetRequestBlock)
-	tmp.time = time
-	tmp.maxOffsets = maxOffsets
+	tmp := new(OffsetRequestBlock)
+	tmp.Time = time
+	tmp.MaxOffsets = maxOffsets
 
-	r.blocks[topic][partitionID] = tmp
+	r.Blocks[topic][partitionID] = tmp
 }

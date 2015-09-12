@@ -19,17 +19,17 @@ const (
 type ProduceRequest struct {
 	RequiredAcks RequiredAcks
 	Timeout      int32
-	msgSets      map[string]map[int32]*MessageSet
+	MsgSets      map[string]map[int32]*MessageSet
 }
 
 func (p *ProduceRequest) encode(pe packetEncoder) error {
 	pe.putInt16(int16(p.RequiredAcks))
 	pe.putInt32(p.Timeout)
-	err := pe.putArrayLength(len(p.msgSets))
+	err := pe.putArrayLength(len(p.MsgSets))
 	if err != nil {
 		return err
 	}
-	for topic, partitions := range p.msgSets {
+	for topic, partitions := range p.MsgSets {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func (p *ProduceRequest) decode(pd packetDecoder) error {
 	if topicCount == 0 {
 		return nil
 	}
-	p.msgSets = make(map[string]map[int32]*MessageSet)
+	p.MsgSets = make(map[string]map[int32]*MessageSet)
 	for i := 0; i < topicCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -80,7 +80,7 @@ func (p *ProduceRequest) decode(pd packetDecoder) error {
 		if err != nil {
 			return err
 		}
-		p.msgSets[topic] = make(map[int32]*MessageSet)
+		p.MsgSets[topic] = make(map[int32]*MessageSet)
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
 			if err != nil {
@@ -99,7 +99,7 @@ func (p *ProduceRequest) decode(pd packetDecoder) error {
 			if err != nil {
 				return err
 			}
-			p.msgSets[topic][partition] = msgSet
+			p.MsgSets[topic][partition] = msgSet
 		}
 	}
 	return nil
@@ -114,32 +114,32 @@ func (p *ProduceRequest) version() int16 {
 }
 
 func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
-	if p.msgSets == nil {
-		p.msgSets = make(map[string]map[int32]*MessageSet)
+	if p.MsgSets == nil {
+		p.MsgSets = make(map[string]map[int32]*MessageSet)
 	}
 
-	if p.msgSets[topic] == nil {
-		p.msgSets[topic] = make(map[int32]*MessageSet)
+	if p.MsgSets[topic] == nil {
+		p.MsgSets[topic] = make(map[int32]*MessageSet)
 	}
 
-	set := p.msgSets[topic][partition]
+	set := p.MsgSets[topic][partition]
 
 	if set == nil {
 		set = new(MessageSet)
-		p.msgSets[topic][partition] = set
+		p.MsgSets[topic][partition] = set
 	}
 
 	set.addMessage(msg)
 }
 
 func (p *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
-	if p.msgSets == nil {
-		p.msgSets = make(map[string]map[int32]*MessageSet)
+	if p.MsgSets == nil {
+		p.MsgSets = make(map[string]map[int32]*MessageSet)
 	}
 
-	if p.msgSets[topic] == nil {
-		p.msgSets[topic] = make(map[int32]*MessageSet)
+	if p.MsgSets[topic] == nil {
+		p.MsgSets[topic] = make(map[int32]*MessageSet)
 	}
 
-	p.msgSets[topic][partition] = set
+	p.MsgSets[topic][partition] = set
 }

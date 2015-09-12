@@ -1,21 +1,21 @@
 package sarama
 
-type fetchRequestBlock struct {
-	fetchOffset int64
-	maxBytes    int32
+type FetchRequestBlock struct {
+	FetchOffset int64
+	MaxBytes    int32
 }
 
-func (f *fetchRequestBlock) encode(pe packetEncoder) error {
-	pe.putInt64(f.fetchOffset)
-	pe.putInt32(f.maxBytes)
+func (f *FetchRequestBlock) encode(pe packetEncoder) error {
+	pe.putInt64(f.FetchOffset)
+	pe.putInt32(f.MaxBytes)
 	return nil
 }
 
-func (f *fetchRequestBlock) decode(pd packetDecoder) (err error) {
-	if f.fetchOffset, err = pd.getInt64(); err != nil {
+func (f *FetchRequestBlock) decode(pd packetDecoder) (err error) {
+	if f.FetchOffset, err = pd.getInt64(); err != nil {
 		return err
 	}
-	if f.maxBytes, err = pd.getInt32(); err != nil {
+	if f.MaxBytes, err = pd.getInt32(); err != nil {
 		return err
 	}
 	return nil
@@ -24,27 +24,27 @@ func (f *fetchRequestBlock) decode(pd packetDecoder) (err error) {
 type FetchRequest struct {
 	MaxWaitTime int32
 	MinBytes    int32
-	blocks      map[string]map[int32]*fetchRequestBlock
+	Blocks      map[string]map[int32]*FetchRequestBlock
 }
 
 func (f *FetchRequest) encode(pe packetEncoder) (err error) {
 	pe.putInt32(-1) // replica ID is always -1 for clients
 	pe.putInt32(f.MaxWaitTime)
 	pe.putInt32(f.MinBytes)
-	err = pe.putArrayLength(len(f.blocks))
+	err = pe.putArrayLength(len(f.Blocks))
 	if err != nil {
 		return err
 	}
-	for topic, blocks := range f.blocks {
+	for topic, Blocks := range f.Blocks {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
 		}
-		err = pe.putArrayLength(len(blocks))
+		err = pe.putArrayLength(len(Blocks))
 		if err != nil {
 			return err
 		}
-		for partition, block := range blocks {
+		for partition, block := range Blocks {
 			pe.putInt32(partition)
 			err = block.encode(pe)
 			if err != nil {
@@ -72,7 +72,7 @@ func (f *FetchRequest) decode(pd packetDecoder) (err error) {
 	if topicCount == 0 {
 		return nil
 	}
-	f.blocks = make(map[string]map[int32]*fetchRequestBlock)
+	f.Blocks = make(map[string]map[int32]*FetchRequestBlock)
 	for i := 0; i < topicCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -82,17 +82,17 @@ func (f *FetchRequest) decode(pd packetDecoder) (err error) {
 		if err != nil {
 			return err
 		}
-		f.blocks[topic] = make(map[int32]*fetchRequestBlock)
+		f.Blocks[topic] = make(map[int32]*FetchRequestBlock)
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
-			fetchBlock := &fetchRequestBlock{}
+			fetchBlock := &FetchRequestBlock{}
 			if err = fetchBlock.decode(pd); err != nil {
 				return nil
 			}
-			f.blocks[topic][partition] = fetchBlock
+			f.Blocks[topic][partition] = fetchBlock
 		}
 	}
 	return nil
@@ -107,17 +107,17 @@ func (f *FetchRequest) version() int16 {
 }
 
 func (f *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
-	if f.blocks == nil {
-		f.blocks = make(map[string]map[int32]*fetchRequestBlock)
+	if f.Blocks == nil {
+		f.Blocks = make(map[string]map[int32]*FetchRequestBlock)
 	}
 
-	if f.blocks[topic] == nil {
-		f.blocks[topic] = make(map[int32]*fetchRequestBlock)
+	if f.Blocks[topic] == nil {
+		f.Blocks[topic] = make(map[int32]*FetchRequestBlock)
 	}
 
-	tmp := new(fetchRequestBlock)
-	tmp.maxBytes = maxBytes
-	tmp.fetchOffset = fetchOffset
+	tmp := new(FetchRequestBlock)
+	tmp.MaxBytes = maxBytes
+	tmp.FetchOffset = fetchOffset
 
-	f.blocks[topic][partitionID] = tmp
+	f.Blocks[topic][partitionID] = tmp
 }
