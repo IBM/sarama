@@ -46,7 +46,7 @@ func (s *Server) handleConn(conn net.Conn) {
 		req, err := decodeRequest(conn)
 		if err != nil {
 			Logger.Println(err)
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 
@@ -70,20 +70,20 @@ func (s *Server) handleConn(conn net.Conn) {
 			}
 		default:
 			Logger.Println("Unhandled request type")
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 
 		if responseBody == nil {
 			Logger.Println("nil response, aborting connection")
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 
 		responseBuf, err := encode(responseBody)
 		if err != nil {
 			Logger.Println(err)
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 
@@ -93,19 +93,19 @@ func (s *Server) handleConn(conn net.Conn) {
 		})
 		if err != nil {
 			Logger.Println(err)
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 
 		if _, err := conn.Write(responseHeader); err != nil {
 			Logger.Println(err)
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 
 		if _, err := conn.Write(responseBuf); err != nil {
 			Logger.Println(err)
-			conn.Close()
+			Logger.Println(conn.Close())
 			return
 		}
 	}
