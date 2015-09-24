@@ -5,23 +5,25 @@ import (
 	"testing"
 )
 
-func ExampleBroker() error {
+func ExampleBroker() {
 	broker := NewBroker("localhost:9092")
 	err := broker.Open(nil)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	request := MetadataRequest{Topics: []string{"myTopic"}}
 	response, err := broker.GetMetadata(&request)
 	if err != nil {
 		_ = broker.Close()
-		return err
+		panic(err)
 	}
 
 	fmt.Println("There are", len(response.Topics), "topics active in the cluster.")
 
-	return broker.Close()
+	if err = broker.Close(); err != nil {
+		panic(err)
+	}
 }
 
 type mockEncoder struct {
