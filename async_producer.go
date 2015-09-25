@@ -36,8 +36,8 @@ type AsyncProducer interface {
 
 	// Successes is the success output channel back to the user when AckSuccesses is
 	// enabled. If Return.Successes is true, you MUST read from this channel or the
-	// Producer will deadlock. It is suggested that you send and read messages together
-	// in a single select statement.
+	// Producer will deadlock. It is suggested that you send and read messages
+	// together in a single select statement.
 	Successes() <-chan *ProducerMessage
 
 	// Errors is the error output channel back to the user. You MUST read from this

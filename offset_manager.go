@@ -14,10 +14,10 @@ type OffsetManager interface {
 	// topic/partition.
 	ManagePartition(topic string, partition int32) (PartitionOffsetManager, error)
 
-	// Close stops the OffsetManager from managing offsets. It is required to call this
-	// function before an OffsetManager object passes out of scope, as it will
-	// otherwise leak memory. You must call this after all the PartitionOffsetManagers
-	// are closed.
+	// Close stops the OffsetManager from managing offsets. It is required to call
+	// this function before an OffsetManager object passes out of scope, as it
+	// will otherwise leak memory. You must call this after all the
+	// PartitionOffsetManagers are closed.
 	Close() error
 }
 

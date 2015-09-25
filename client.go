@@ -22,8 +22,9 @@ type Client interface {
 	// Partitions returns the sorted list of all partition IDs for the given topic.
 	Partitions(topic string) ([]int32, error)
 
-	// WritablePartitions returns the sorted list of all writable partition IDs for the
-	// given topic, where "writable" means "having a valid leader accepting writes".
+	// WritablePartitions returns the sorted list of all writable partition IDs for
+	// the given topic, where "writable" means "having a valid leader accepting
+	// writes".
 	WritablePartitions(topic string) ([]int32, error)
 
 	// Leader returns the broker object that is the leader of the current
@@ -44,9 +45,10 @@ type Client interface {
 	// will be produced next, or a time.
 	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 
-	// Coordinator returns the coordinating broker for a consumer group. It will return
-	// a locally cached value if it's available. You can call RefreshCoordinator to
-	// update the cached value. This function only works on Kafka 0.8.2 and higher.
+	// Coordinator returns the coordinating broker for a consumer group. It will
+	// return a locally cached value if it's available. You can call
+	// RefreshCoordinator to update the cached value. This function only works on
+	// Kafka 0.8.2 and higher.
 	Coordinator(consumerGroup string) (*Broker, error)
 
 	// RefreshCoordinator retrieves the coordinator for a consumer group and stores it
@@ -64,13 +66,15 @@ type Client interface {
 }
 
 const (
-	// OffsetNewest stands for the log head offset, i.e. the offset that will be assigned to the next message
-	// that will be produced to the partition. You can send this to a client's GetOffset method to get this
-	// offset, or when calling ConsumePartition to start consuming new messages.
+	// OffsetNewest stands for the log head offset, i.e. the offset that will be
+	// assigned to the next message that will be produced to the partition. You
+	// can send this to a client's GetOffset method to get this offset, or when
+	// calling ConsumePartition to start consuming new messages.
 	OffsetNewest int64 = -1
-	// OffsetOldest stands for the oldest offset available on the broker for a partition. You can send this
-	// to a client's GetOffset method to get this offset, or when calling ConsumePartition to start consuming
-	// from the oldest offset that is still available on the broker.
+	// OffsetOldest stands for the oldest offset available on the broker for a
+	// partition. You can send this to a client's GetOffset method to get this
+	// offset, or when calling ConsumePartition to start consuming from the
+	// oldest offset that is still available on the broker.
 	OffsetOldest int64 = -2
 )
 

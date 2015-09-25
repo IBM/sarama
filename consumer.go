@@ -244,10 +244,10 @@ type PartitionConsumer interface {
 	// leak memory. You must call this before calling Close on the underlying client.
 	AsyncClose()
 
-	// Close stops the PartitionConsumer from fetching messages. It is required to call
-	// this function (or AsyncClose) before a consumer object passes out of scope, as
-	// it will otherwise leak memory. You must call this before calling Close on the
-	// underlying client.
+	// Close stops the PartitionConsumer from fetching messages. It is required to
+	// call this function (or AsyncClose) before a consumer object passes out of
+	// scope, as it will otherwise leak memory. You must call this before calling
+	// Close on the underlying client.
 	Close() error
 
 	// Messages returns the read channel for the messages that are returned by
