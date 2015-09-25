@@ -7,14 +7,15 @@ import "sync"
 // it passes out of scope.
 type SyncProducer interface {
 
-	// SendMessage produces a given message, and returns only when it either has succeeded or failed to produce.
-	// It will return the partition and the offset of the produced message, or an error if the message
-	// failed to produce.
+	// SendMessage produces a given message, and returns only when it either has
+	// succeeded or failed to produce. It will return the partition and the offset
+	// of the produced message, or an error if the message failed to produce.
 	SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error)
 
-	// Close shuts down the producer and flushes any messages it may have buffered. You must call this function before
-	// a producer object passes out of scope, as it may otherwise leak memory. You must call this before calling Close
-	// on the underlying client.
+	// Close shuts down the producer and flushes any messages it may have buffered.
+	// You must call this function before a producer object passes out of scope, as
+	// it may otherwise leak memory. You must call this before calling Close on the
+	// underlying client.
 	Close() error
 }
 

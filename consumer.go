@@ -46,20 +46,23 @@ func (ce ConsumerErrors) Error() string {
 // to properly integrate this functionality at a later date.
 type Consumer interface {
 
-	// Topics returns the set of available topics as retrieved from the cluster metadata.
-	// This method is the same as Client.Topics(), and is provided for convenience.
+	// Topics returns the set of available topics as retrieved from the cluster
+	// metadata. This method is the same as Client.Topics(), and is provided for
+	// convenience.
 	Topics() ([]string, error)
 
 	// Partitions returns the sorted list of all partition IDs for the given topic.
 	// This method is the same as Client.Partitions(), and is provided for convenience.
 	Partitions(topic string) ([]int32, error)
 
-	// ConsumePartition creates a PartitionConsumer on the given topic/partition with the given offset. It will
-	// return an error if this Consumer is already consuming on the given topic/partition. Offset can be a
-	// literal offset, or OffsetNewest or OffsetOldest
+	// ConsumePartition creates a PartitionConsumer on the given topic/partition with
+	// the given offset. It will return an error if this Consumer is already consuming
+	// on the given topic/partition. Offset can be a literal offset, or OffsetNewest
+	// or OffsetOldest
 	ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error)
 
-	// Close shuts down the consumer. It must be called after all child PartitionConsumers have already been closed.
+	// Close shuts down the consumer. It must be called after all child
+	// PartitionConsumers have already been closed.
 	Close() error
 }
 
@@ -234,29 +237,32 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 // or a separate goroutine. Check out the Consumer examples to see implementations of these different approaches.
 type PartitionConsumer interface {
 
-	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately,
-	// after which you should wait until the 'messages' and 'errors' channel are drained.
-	// It is required to call this function, or Close before a consumer object passes out of scope,
-	// as it will otherwise leak memory.  You must call this before calling Close on the underlying
-	// client.
+	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will
+	// return immediately, after which you should wait until the 'messages' and
+	// 'errors' channel are drained. It is required to call this function, or
+	// Close before a consumer object passes out of scope, as it will otherwise
+	// leak memory. You must call this before calling Close on the underlying client.
 	AsyncClose()
 
-	// Close stops the PartitionConsumer from fetching messages. It is required to call this function
-	// (or AsyncClose) before a consumer object passes out of scope, as it will otherwise leak memory. You must
-	// call this before calling Close on the underlying client.
+	// Close stops the PartitionConsumer from fetching messages. It is required to call
+	// this function (or AsyncClose) before a consumer object passes out of scope, as
+	// it will otherwise leak memory. You must call this before calling Close on the
+	// underlying client.
 	Close() error
 
-	// Messages returns the read channel for the messages that are returned by the broker.
+	// Messages returns the read channel for the messages that are returned by
+	// the broker.
 	Messages() <-chan *ConsumerMessage
 
-	// Errors returns a read channel of errors that occured during consuming, if enabled. By default,
-	// errors are logged and not returned over this channel. If you want to implement any custom error
-	// handling, set your config's Consumer.Return.Errors setting to true, and read from this channel.
+	// Errors returns a read channel of errors that occured during consuming, if
+	// enabled. By default, errors are logged and not returned over this channel.
+	// If you want to implement any custom error handling, set your config's
+	// Consumer.Return.Errors setting to true, and read from this channel.
 	Errors() <-chan *ConsumerError
 
-	// HighWaterMarkOffset returns the high water mark offset of the partition, i.e. the offset that will
-	// be used for the next message that will be produced. You can use this to determine how far behind
-	// the processing is.
+	// HighWaterMarkOffset returns the high water mark offset of the partition,
+	// i.e. the offset that will be used for the next message that will be produced.
+	// You can use this to determine how far behind the processing is.
 	HighWaterMarkOffset() int64
 }
 

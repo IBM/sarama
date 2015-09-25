@@ -11,11 +11,14 @@ import (
 // decides to which partition to send the message. RandomPartitioner, RoundRobinPartitioner and HashPartitioner are provided
 // as simple default implementations.
 type Partitioner interface {
-	Partition(message *ProducerMessage, numPartitions int32) (int32, error) // Partition takes a message and partition count and chooses a partition
+	// Partition takes a message and partition count and chooses a partition
+	Partition(message *ProducerMessage, numPartitions int32) (int32, error)
 
-	// RequiresConsistency indicates to the user of the partitioner whether the mapping of key->partition is consistent or not.
-	// Specifically, if a partitioner requires consistency then it must be allowed to choose from all partitions (even ones known to
-	// be unavailable), and its choice must be respected by the caller. The obvious example is the HashPartitioner.
+	// RequiresConsistency indicates to the user of the partitioner whether the mapping
+	// of key->partition is consistent or not. Specifically, if a partitioner requires
+	// consistency then it must be allowed to choose from all partitions (even ones
+	// known to be unavailable), and its choice must be respected by the caller. The
+	// obvious example is the HashPartitioner.
 	RequiresConsistency() bool
 }
 

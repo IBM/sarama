@@ -12,49 +12,51 @@ import (
 // automatically when it passes out of scope. A single client can be safely shared by
 // multiple concurrent Producers and Consumers.
 type Client interface {
-	// Config returns the Config struct of the client. This struct should not be altered after it
-	// has been created.
+	// Config returns the Config struct of the client. This struct should not be
+	// altered after it has been created.
 	Config() *Config
 
-	// Topics returns the set of available topics as retrieved from the cluster metadata.
+	// Topics returns the set of available topics as retrieved from cluster metadata.
 	Topics() ([]string, error)
 
 	// Partitions returns the sorted list of all partition IDs for the given topic.
 	Partitions(topic string) ([]int32, error)
 
-	// WritablePartitions returns the sorted list of all writable partition IDs for the given topic,
-	// where "writable" means "having a valid leader accepting writes".
+	// WritablePartitions returns the sorted list of all writable partition IDs for the
+	// given topic, where "writable" means "having a valid leader accepting writes".
 	WritablePartitions(topic string) ([]int32, error)
 
-	// Leader returns the broker object that is the leader of the current topic/partition, as
-	// determined by querying the cluster metadata.
+	// Leader returns the broker object that is the leader of the current
+	// topic/partition, as determined by querying the cluster metadata.
 	Leader(topic string, partitionID int32) (*Broker, error)
 
 	// Replicas returns the set of all replica IDs for the given partition.
 	Replicas(topic string, partitionID int32) ([]int32, error)
 
 	// RefreshMetadata takes a list of topics and queries the cluster to refresh the
-	// available metadata for those topics. If no topics are provided, it will refresh metadata
-	// for all topics.
+	// available metadata for those topics. If no topics are provided, it will refresh
+	// metadata for all topics.
 	RefreshMetadata(topics ...string) error
 
-	// GetOffset queries the cluster to get the most recent available offset at the given
-	// time on the topic/partition combination. Time should be OffsetOldest for the earliest available
-	// offset, OffsetNewest for the offset of the message that will be produced next, or a time.
+	// GetOffset queries the cluster to get the most recent available offset at the
+	// given time on the topic/partition combination. Time should be OffsetOldest for
+	// the earliest available offset, OffsetNewest for the offset of the message that
+	// will be produced next, or a time.
 	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 
-	// Coordinator returns the coordinating broker for a consumer group. It will return a locally cached
-	// value if it's available. You can call RefreshCoordinator to update the cached value.
-	// This function only works on Kafka 0.8.2 and higher.
+	// Coordinator returns the coordinating broker for a consumer group. It will return
+	// a locally cached value if it's available. You can call RefreshCoordinator to
+	// update the cached value. This function only works on Kafka 0.8.2 and higher.
 	Coordinator(consumerGroup string) (*Broker, error)
 
-	// RefreshCoordinator retrieves the coordinator for a consumer group and stores it in local cache.
-	// This function only works on Kafka 0.8.2 and higher.
+	// RefreshCoordinator retrieves the coordinator for a consumer group and stores it
+	// in local cache. This function only works on Kafka 0.8.2 and higher.
 	RefreshCoordinator(consumerGroup string) error
 
-	// Close shuts down all broker connections managed by this client. It is required to call this function before
-	// a client object passes out of scope, as it will otherwise leak memory. You must close any Producers or Consumers
-	// using a client before you close the client.
+	// Close shuts down all broker connections managed by this client. It is required
+	// to call this function before a client object passes out of scope, as it will
+	// otherwise leak memory. You must close any Producers or Consumers using a client
+	// before you close the client.
 	Close() error
 
 	// Closed returns true if the client has already had Close called on it
