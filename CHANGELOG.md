@@ -1,5 +1,11 @@
 # Changelog
 
+#### Version 1.6.1 (2015-09-25)
+
+Bug Fixes:
+ - Fix panic that could occur if a user-supplied message value failed to encode
+   ([#449](https://github.com/Shopify/sarama/pull/449)).
+
 #### Version 1.6.0 (2015-09-04)
 
 New Features:
