@@ -659,20 +659,26 @@ func (f *flusher) run() {
 		case nil:
 			break
 		case PacketEncodingError:
-			f.parent.returnErrors(batch, err)
+			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+				f.parent.returnErrors(msgs, err)
+			})
 			continue
 		default:
 			Logger.Printf("producer/flusher/%d state change to [closing] because %s\n", f.broker.ID(), err)
 			f.parent.abandonBrokerConnection(f.broker)
 			_ = f.broker.Close()
 			closing = err
-			f.parent.retryMessages(batch, err)
+			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+				f.parent.retryMessages(msgs, err)
+			})
 			continue
 		}
 
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
-			f.parent.returnSuccesses(batch)
+			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+				f.parent.returnSuccesses(msgs)
+			})
 			continue
 		}
 
@@ -689,12 +695,11 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 	var err error
 	set := newProduceSet(f.parent.conf)
 
-	for i, msg := range batch {
+	for _, msg := range batch {
 
 		if f.currentRetries[msg.Topic] != nil && f.currentRetries[msg.Topic][msg.Partition] != nil {
 			// we're currently retrying this partition so we need to filter out this message
 			f.parent.retryMessages([]*ProducerMessage{msg}, f.currentRetries[msg.Topic][msg.Partition])
-			batch[i] = nil
 
 			if msg.flags&chaser == chaser {
 				// ...but now we can start processing future messages again
@@ -709,7 +714,6 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 		if msg.Key != nil {
 			if msg.keyCache, err = msg.Key.Encode(); err != nil {
 				f.parent.returnError(msg, err)
-				batch[i] = nil
 				continue
 			}
 		}
@@ -717,7 +721,6 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 		if msg.Value != nil {
 			if msg.valueCache, err = msg.Value.Encode(); err != nil {
 				f.parent.returnError(msg, err)
-				batch[i] = nil
 				continue
 			}
 		}
