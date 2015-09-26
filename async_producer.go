@@ -811,28 +811,6 @@ func (ps *produceSet) add(msg *ProducerMessage) {
 	partitionSet[msg.Partition] = append(partitionSet[msg.Partition], msg)
 }
 
-// utility functions
-
-func (p *asyncProducer) shutdown() {
-	Logger.Println("Producer shutting down.")
-	p.inFlight.Add(1)
-	p.input <- &ProducerMessage{flags: shutdown}
-
-	p.inFlight.Wait()
-
-	if p.ownClient {
-		err := p.client.Close()
-		if err != nil {
-			Logger.Println("producer/shutdown failed to close the embedded client:", err)
-		}
-	}
-
-	close(p.input)
-	close(p.retries)
-	close(p.errors)
-	close(p.successes)
-}
-
 func (ps *produceSet) buildRequest() *ProduceRequest {
 
 	req := &ProduceRequest{RequiredAcks: ps.conf.Producer.RequiredAcks, Timeout: int32(ps.conf.Producer.Timeout / time.Millisecond)}
@@ -878,6 +856,28 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		return nil
 	}
 	return req
+}
+
+// utility functions
+
+func (p *asyncProducer) shutdown() {
+	Logger.Println("Producer shutting down.")
+	p.inFlight.Add(1)
+	p.input <- &ProducerMessage{flags: shutdown}
+
+	p.inFlight.Wait()
+
+	if p.ownClient {
+		err := p.client.Close()
+		if err != nil {
+			Logger.Println("producer/shutdown failed to close the embedded client:", err)
+		}
+	}
+
+	close(p.input)
+	close(p.retries)
+	close(p.errors)
+	close(p.successes)
 }
 
 func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
