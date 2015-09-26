@@ -676,7 +676,11 @@ func (f *flusher) run() {
 			continue
 		}
 
-		f.parseResponse(set, response)
+		// we iterate through the blocks in the request set, not the response, so that we notice
+		// if the response is missing a block completely
+		set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+			f.parseBlock(topic, partition, msgs, response)
+		})
 	}
 	Logger.Printf("producer/flusher/%d shut down\n", f.broker.ID())
 }
@@ -724,39 +728,33 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 	return set
 }
 
-func (f *flusher) parseResponse(set *produceSet, response *ProduceResponse) {
-	// we iterate through the blocks in the request set, not the response, so that we notice
-	// if the response is missing a block completely
-	for topic, partitionSet := range set.msgs {
-		for partition, msgs := range partitionSet {
-			block := response.GetBlock(topic, partition)
-			if block == nil {
-				f.parent.returnErrors(msgs, ErrIncompleteResponse)
-				continue
-			}
+func (f *flusher) parseBlock(topic string, partition int32, msgs []*ProducerMessage, response *ProduceResponse) {
+	block := response.GetBlock(topic, partition)
+	if block == nil {
+		f.parent.returnErrors(msgs, ErrIncompleteResponse)
+		return
+	}
 
-			switch block.Err {
-			// Success
-			case ErrNoError:
-				for i := range msgs {
-					msgs[i].Offset = block.Offset + int64(i)
-				}
-				f.parent.returnSuccesses(msgs)
-			// Retriable errors
-			case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable,
-				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
-				Logger.Printf("producer/flusher/%d state change to [retrying] on %s/%d because %v\n",
-					f.broker.ID(), topic, partition, block.Err)
-				if f.currentRetries[topic] == nil {
-					f.currentRetries[topic] = make(map[int32]error)
-				}
-				f.currentRetries[topic][partition] = block.Err
-				f.parent.retryMessages(msgs, block.Err)
-			// Other non-retriable errors
-			default:
-				f.parent.returnErrors(msgs, block.Err)
-			}
+	switch block.Err {
+	// Success
+	case ErrNoError:
+		for i := range msgs {
+			msgs[i].Offset = block.Offset + int64(i)
 		}
+		f.parent.returnSuccesses(msgs)
+	// Retriable errors
+	case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable,
+		ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
+		Logger.Printf("producer/flusher/%d state change to [retrying] on %s/%d because %v\n",
+			f.broker.ID(), topic, partition, block.Err)
+		if f.currentRetries[topic] == nil {
+			f.currentRetries[topic] = make(map[int32]error)
+		}
+		f.currentRetries[topic][partition] = block.Err
+		f.parent.retryMessages(msgs, block.Err)
+		// Other non-retriable errors
+	default:
+		f.parent.returnErrors(msgs, block.Err)
 	}
 }
 
@@ -856,6 +854,14 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		return nil
 	}
 	return req
+}
+
+func (ps *produceSet) eachPartition(cb func(topic string, partition int32, msgs []*ProducerMessage)) {
+	for topic, partitionSet := range ps.msgs {
+		for partition, msgs := range partitionSet {
+			cb(topic, partition, msgs)
+		}
+	}
 }
 
 // utility functions
