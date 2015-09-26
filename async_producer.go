@@ -647,8 +647,8 @@ func (f *flusher) run() {
 			continue
 		}
 
-		msgSets := f.groupAndFilter(batch)
-		request := f.parent.buildRequest(msgSets)
+		set := f.groupAndFilter(batch)
+		request := set.buildRequest()
 		if request == nil {
 			continue
 		}
@@ -676,14 +676,14 @@ func (f *flusher) run() {
 			continue
 		}
 
-		f.parseResponse(msgSets, response)
+		f.parseResponse(set, response)
 	}
 	Logger.Printf("producer/flusher/%d shut down\n", f.broker.ID())
 }
 
-func (f *flusher) groupAndFilter(batch []*ProducerMessage) map[string]map[int32][]*ProducerMessage {
+func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 	var err error
-	msgSets := make(map[string]map[int32][]*ProducerMessage)
+	set := newProduceSet(f.parent.conf)
 
 	for i, msg := range batch {
 
@@ -718,22 +718,16 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) map[string]map[int32]
 			}
 		}
 
-		partitionSet := msgSets[msg.Topic]
-		if partitionSet == nil {
-			partitionSet = make(map[int32][]*ProducerMessage)
-			msgSets[msg.Topic] = partitionSet
-		}
-
-		partitionSet[msg.Partition] = append(partitionSet[msg.Partition], msg)
+		set.add(msg)
 	}
 
-	return msgSets
+	return set
 }
 
-func (f *flusher) parseResponse(msgSets map[string]map[int32][]*ProducerMessage, response *ProduceResponse) {
+func (f *flusher) parseResponse(set *produceSet, response *ProduceResponse) {
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
-	for topic, partitionSet := range msgSets {
+	for topic, partitionSet := range set.msgs {
 		for partition, msgs := range partitionSet {
 			block := response.GetBlock(topic, partition)
 			if block == nil {
@@ -793,6 +787,30 @@ func (p *asyncProducer) retryHandler() {
 	}
 }
 
+// produceSet
+
+type produceSet struct {
+	msgs map[string]map[int32][]*ProducerMessage
+	conf *Config
+}
+
+func newProduceSet(conf *Config) *produceSet {
+	return &produceSet{
+		msgs: make(map[string]map[int32][]*ProducerMessage),
+		conf: conf,
+	}
+}
+
+func (ps *produceSet) add(msg *ProducerMessage) {
+	partitionSet := ps.msgs[msg.Topic]
+	if partitionSet == nil {
+		partitionSet = make(map[int32][]*ProducerMessage)
+		ps.msgs[msg.Topic] = partitionSet
+	}
+
+	partitionSet[msg.Partition] = append(partitionSet[msg.Partition], msg)
+}
+
 // utility functions
 
 func (p *asyncProducer) shutdown() {
@@ -815,17 +833,17 @@ func (p *asyncProducer) shutdown() {
 	close(p.successes)
 }
 
-func (p *asyncProducer) buildRequest(batch map[string]map[int32][]*ProducerMessage) *ProduceRequest {
+func (ps *produceSet) buildRequest() *ProduceRequest {
 
-	req := &ProduceRequest{RequiredAcks: p.conf.Producer.RequiredAcks, Timeout: int32(p.conf.Producer.Timeout / time.Millisecond)}
+	req := &ProduceRequest{RequiredAcks: ps.conf.Producer.RequiredAcks, Timeout: int32(ps.conf.Producer.Timeout / time.Millisecond)}
 	empty := true
 
-	for topic, partitionSet := range batch {
+	for topic, partitionSet := range ps.msgs {
 		for partition, msgSet := range partitionSet {
 			setToSend := new(MessageSet)
 			setSize := 0
 			for _, msg := range msgSet {
-				if p.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > p.conf.Producer.MaxMessageBytes {
+				if ps.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > ps.conf.Producer.MaxMessageBytes {
 					// compression causes message-sets to be wrapped as single messages, which have tighter
 					// size requirements, so we have to respect those limits
 					valBytes, err := encode(setToSend)
@@ -833,7 +851,7 @@ func (p *asyncProducer) buildRequest(batch map[string]map[int32][]*ProducerMessa
 						Logger.Println(err) // if this happens, it's basically our fault.
 						panic(err)
 					}
-					req.AddMessage(topic, partition, &Message{Codec: p.conf.Producer.Compression, Key: nil, Value: valBytes})
+					req.AddMessage(topic, partition, &Message{Codec: ps.conf.Producer.Compression, Key: nil, Value: valBytes})
 					setToSend = new(MessageSet)
 					setSize = 0
 				}
@@ -843,7 +861,7 @@ func (p *asyncProducer) buildRequest(batch map[string]map[int32][]*ProducerMessa
 				empty = false
 			}
 
-			if p.conf.Producer.Compression == CompressionNone {
+			if ps.conf.Producer.Compression == CompressionNone {
 				req.AddSet(topic, partition, setToSend)
 			} else {
 				valBytes, err := encode(setToSend)
@@ -851,7 +869,7 @@ func (p *asyncProducer) buildRequest(batch map[string]map[int32][]*ProducerMessa
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
 				}
-				req.AddMessage(topic, partition, &Message{Codec: p.conf.Producer.Compression, Key: nil, Value: valBytes})
+				req.AddMessage(topic, partition, &Message{Codec: ps.conf.Producer.Compression, Key: nil, Value: valBytes})
 			}
 		}
 	}
