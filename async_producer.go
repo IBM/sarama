@@ -681,9 +681,11 @@ func (f *flusher) parseBlock(topic string, partition int32, msgs []*ProducerMess
 	switch block.Err {
 	// Success
 	case ErrNoError:
-		for i := range msgs {
-			if msgs[i] != nil {
-				msgs[i].Offset = block.Offset + int64(i) // FIXME: offsets wrong now
+		i := 0
+		for _, msg := range msgs {
+			if msg != nil {
+				msg.Offset = block.Offset + int64(i)
+				i++
 			}
 		}
 		f.parent.returnSuccesses(msgs)
