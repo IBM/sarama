@@ -567,38 +567,14 @@ func (bp *brokerProducer) run() {
 				goto shutdown
 			}
 
-			if bp.closing != nil {
-				bp.parent.retryMessages([]*ProducerMessage{msg}, bp.closing)
-				continue
-			}
-
-			if bp.currentRetries[msg.Topic] != nil && bp.currentRetries[msg.Topic][msg.Partition] != nil {
-				// we're currently retrying this partition so we need to filter out this message
-				bp.parent.retryMessages([]*ProducerMessage{msg}, bp.currentRetries[msg.Topic][msg.Partition])
-
-				if msg.flags&chaser == chaser {
-					// ...but now we can start processing future messages again
-					Logger.Printf("producer/broker/%d state change to [normal] on %s/%d\n",
-						bp.broker.ID(), msg.Topic, msg.Partition)
-					delete(bp.currentRetries[msg.Topic], msg.Partition)
-				}
-
+			if reason := bp.retryReason(msg); reason != nil {
+				bp.parent.retryMessages([]*ProducerMessage{msg}, reason)
 				continue
 			}
 
 			if bp.buffer.wouldOverflow(msg) {
 				Logger.Printf("producer/broker/%d maximum request accumulated, forcing blocking flush\n", bp.broker.ID())
-				if bp.pending != nil {
-					select {
-					case response := <-bp.responses:
-						bp.handleResponse(response)
-					case err := <-bp.errors:
-						bp.handleError(err)
-					}
-
-				}
-				bp.output <- bp.buffer
-				bp.rollOver()
+				bp.flush()
 				output = nil
 			}
 
@@ -622,6 +598,35 @@ func (bp *brokerProducer) run() {
 	}
 
 shutdown:
+	if !bp.buffer.empty() {
+		bp.flush()
+	}
+	bp.wait()
+	close(bp.output)
+
+	Logger.Printf("producer/broker/%d shut down\n", bp.broker.ID())
+}
+
+func (bp *brokerProducer) retryReason(msg *ProducerMessage) error {
+	if bp.closing != nil {
+		return bp.closing
+	}
+
+	if bp.currentRetries[msg.Topic] != nil {
+		err := bp.currentRetries[msg.Topic][msg.Partition]
+		if err != nil && msg.flags&chaser == chaser {
+			// we're currently retrying this partition so we need to filter out this message
+			// but now we can start processing future messages again
+			Logger.Printf("producer/broker/%d state change to [normal] on %s/%d\n",
+				bp.broker.ID(), msg.Topic, msg.Partition)
+			delete(bp.currentRetries[msg.Topic], msg.Partition)
+		}
+		return err
+	}
+	return nil
+}
+
+func (bp *brokerProducer) wait() {
 	if bp.pending != nil {
 		select {
 		case response := <-bp.responses:
@@ -629,20 +634,14 @@ shutdown:
 		case err := <-bp.errors:
 			bp.handleError(err)
 		}
-	}
-	if !bp.buffer.empty() {
-		bp.output <- bp.buffer
-		bp.rollOver()
-		select {
-		case response := <-bp.responses:
-			bp.handleResponse(response)
-		case err := <-bp.errors:
-			bp.handleError(err)
-		}
-	}
-	close(bp.output)
 
-	Logger.Printf("producer/broker/%d shut down\n", bp.broker.ID())
+	}
+}
+
+func (bp *brokerProducer) flush() {
+	bp.wait()
+	bp.output <- bp.buffer
+	bp.rollOver()
 }
 
 func (bp *brokerProducer) rollOver() {
