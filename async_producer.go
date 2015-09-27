@@ -512,13 +512,14 @@ func (pp *partitionProducer) updateLeader() error {
 // one per broker, constructs both an aggregator and a flusher
 func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessage {
 	input := make(chan *ProducerMessage)
-	bridge := make(chan []*ProducerMessage)
+	bridge := make(chan *produceSet)
 
 	a := &aggregator{
 		parent: p,
 		broker: broker,
 		input:  input,
 		output: bridge,
+		buffer: newProduceSet(p.conf),
 	}
 	go withRecover(a.run)
 
@@ -539,15 +540,16 @@ type aggregator struct {
 	parent *asyncProducer
 	broker *Broker
 	input  <-chan *ProducerMessage
-	output chan<- []*ProducerMessage
+	output chan<- *produceSet
 
-	buffer      []*ProducerMessage
+	buffer      *produceSet
 	bufferBytes int
+	bufferCount int
 	timer       <-chan time.Time
 }
 
 func (a *aggregator) run() {
-	var output chan<- []*ProducerMessage
+	var output chan<- *produceSet
 
 	for {
 		select {
@@ -563,8 +565,9 @@ func (a *aggregator) run() {
 				output = nil
 			}
 
-			a.buffer = append(a.buffer, msg)
+			a.buffer.add(msg)
 			a.bufferBytes += msg.byteSize()
+			a.bufferCount++
 
 			if a.readyToFlush(msg) {
 				output = a.output
@@ -580,7 +583,7 @@ func (a *aggregator) run() {
 	}
 
 shutdown:
-	if len(a.buffer) > 0 {
+	if a.bufferCount > 0 {
 		a.output <- a.buffer
 	}
 	close(a.output)
@@ -595,7 +598,7 @@ func (a *aggregator) wouldOverflow(msg *ProducerMessage) bool {
 	case a.parent.conf.Producer.Compression != CompressionNone && a.bufferBytes+msg.byteSize() >= a.parent.conf.Producer.MaxMessageBytes:
 		return true
 	// Would we overflow simply in number of messages?
-	case a.parent.conf.Producer.Flush.MaxMessages > 0 && len(a.buffer) >= a.parent.conf.Producer.Flush.MaxMessages:
+	case a.parent.conf.Producer.Flush.MaxMessages > 0 && a.bufferCount >= a.parent.conf.Producer.Flush.MaxMessages:
 		return true
 	default:
 		return false
@@ -611,7 +614,7 @@ func (a *aggregator) readyToFlush(msg *ProducerMessage) bool {
 	case msg.flags&chaser == chaser:
 		return true
 	// If we've  passed the message trigger-point
-	case a.parent.conf.Producer.Flush.Messages > 0 && len(a.buffer) >= a.parent.conf.Producer.Flush.Messages:
+	case a.parent.conf.Producer.Flush.Messages > 0 && a.bufferCount >= a.parent.conf.Producer.Flush.Messages:
 		return true
 	// If we've  passed the byte trigger-point
 	case a.parent.conf.Producer.Flush.Bytes > 0 && a.bufferBytes >= a.parent.conf.Producer.Flush.Bytes:
@@ -623,15 +626,16 @@ func (a *aggregator) readyToFlush(msg *ProducerMessage) bool {
 
 func (a *aggregator) reset() {
 	a.timer = nil
-	a.buffer = nil
+	a.buffer = newProduceSet(a.parent.conf)
 	a.bufferBytes = 0
+	a.bufferCount = 0
 }
 
 // takes a batch at a time from the aggregator and sends to the broker
 type flusher struct {
 	parent *asyncProducer
 	broker *Broker
-	input  <-chan []*ProducerMessage
+	input  <-chan *produceSet
 
 	currentRetries map[string]map[int32]error
 }
@@ -641,13 +645,15 @@ func (f *flusher) run() {
 
 	Logger.Printf("producer/flusher/%d starting up\n", f.broker.ID())
 
-	for batch := range f.input {
+	for set := range f.input {
 		if closing != nil {
-			f.parent.retryMessages(batch, closing)
+			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+				f.parent.retryMessages(msgs, closing)
+			})
 			continue
 		}
 
-		set := f.groupAndFilter(batch)
+		set.eachPartition(f.filter)
 		request := set.buildRequest()
 		if request == nil {
 			continue
@@ -691,15 +697,15 @@ func (f *flusher) run() {
 	Logger.Printf("producer/flusher/%d shut down\n", f.broker.ID())
 }
 
-func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
+func (f *flusher) filter(topic string, partition int32, batch []*ProducerMessage) {
 	var err error
-	set := newProduceSet(f.parent.conf)
 
-	for _, msg := range batch {
+	for i, msg := range batch {
 
 		if f.currentRetries[msg.Topic] != nil && f.currentRetries[msg.Topic][msg.Partition] != nil {
 			// we're currently retrying this partition so we need to filter out this message
 			f.parent.retryMessages([]*ProducerMessage{msg}, f.currentRetries[msg.Topic][msg.Partition])
+			batch[i] = nil
 
 			if msg.flags&chaser == chaser {
 				// ...but now we can start processing future messages again
@@ -714,6 +720,7 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 		if msg.Key != nil {
 			if msg.keyCache, err = msg.Key.Encode(); err != nil {
 				f.parent.returnError(msg, err)
+				batch[i] = nil
 				continue
 			}
 		}
@@ -721,14 +728,11 @@ func (f *flusher) groupAndFilter(batch []*ProducerMessage) *produceSet {
 		if msg.Value != nil {
 			if msg.valueCache, err = msg.Value.Encode(); err != nil {
 				f.parent.returnError(msg, err)
+				batch[i] = nil
 				continue
 			}
 		}
-
-		set.add(msg)
 	}
-
-	return set
 }
 
 func (f *flusher) parseBlock(topic string, partition int32, msgs []*ProducerMessage, response *ProduceResponse) {
@@ -742,7 +746,9 @@ func (f *flusher) parseBlock(topic string, partition int32, msgs []*ProducerMess
 	// Success
 	case ErrNoError:
 		for i := range msgs {
-			msgs[i].Offset = block.Offset + int64(i)
+			if msgs[i] != nil {
+				msgs[i].Offset = block.Offset + int64(i) // FIXME: offsets wrong now
+			}
 		}
 		f.parent.returnSuccesses(msgs)
 	// Retriable errors
@@ -822,6 +828,9 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 			setToSend := new(MessageSet)
 			setSize := 0
 			for _, msg := range msgSet {
+				if msg == nil {
+					continue
+				}
 				if ps.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > ps.conf.Producer.MaxMessageBytes {
 					// compression causes message-sets to be wrapped as single messages, which have tighter
 					// size requirements, so we have to respect those limits
