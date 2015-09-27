@@ -507,15 +507,21 @@ func (pp *partitionProducer) updateLeader() error {
 
 // one per broker, constructs both an aggregator and a flusher
 func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessage {
-	input := make(chan *ProducerMessage)
-	bridge := make(chan *produceSet)
+	var (
+		input     = make(chan *ProducerMessage)
+		bridge    = make(chan *produceSet)
+		responses = make(chan *ProduceResponse)
+		errors    = make(chan error)
+	)
 
 	a := &aggregator{
-		parent: p,
-		broker: broker,
-		input:  input,
-		output: bridge,
-		buffer: newProduceSet(p),
+		parent:    p,
+		broker:    broker,
+		input:     input,
+		output:    bridge,
+		responses: responses,
+		errors:    errors,
+		buffer:    newProduceSet(p),
 	}
 	go withRecover(a.run)
 
@@ -523,6 +529,8 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 		parent:         p,
 		broker:         broker,
 		input:          bridge,
+		responses:      responses,
+		errors:         errors,
 		currentRetries: make(map[string]map[int32]error),
 	}
 	go withRecover(f.run)
@@ -536,7 +544,10 @@ type aggregator struct {
 	parent *asyncProducer
 	broker *Broker
 	input  <-chan *ProducerMessage
-	output chan<- *produceSet
+
+	output    chan<- *produceSet
+	responses <-chan *ProduceResponse
+	errors    <-chan error
 
 	buffer *produceSet
 	timer  <-chan time.Time
@@ -554,7 +565,14 @@ func (a *aggregator) run() {
 
 			if a.buffer.wouldOverflow(msg) {
 				Logger.Printf("producer/aggregator/%d maximum request accumulated, forcing blocking flush\n", a.broker.ID())
-				a.output <- a.buffer
+				for a.buffer != nil {
+					select {
+					case a.output <- a.buffer:
+						a.buffer = nil
+					case <-a.responses:
+					case <-a.errors:
+					}
+				}
 				a.reset()
 				output = nil
 			}
@@ -571,12 +589,25 @@ func (a *aggregator) run() {
 		case output <- a.buffer:
 			a.reset()
 			output = nil
+		case <-a.responses:
+		case <-a.errors:
 		}
 	}
 
 shutdown:
 	if !a.buffer.empty() {
-		a.output <- a.buffer
+		for a.buffer != nil {
+			select {
+			case a.output <- a.buffer:
+				a.buffer = nil
+			case <-a.responses:
+			case <-a.errors:
+			}
+		}
+		select {
+		case <-a.responses:
+		case <-a.errors:
+		}
 	}
 	close(a.output)
 }
@@ -588,9 +619,11 @@ func (a *aggregator) reset() {
 
 // takes a batch at a time from the aggregator and sends to the broker
 type flusher struct {
-	parent *asyncProducer
-	broker *Broker
-	input  <-chan *produceSet
+	parent    *asyncProducer
+	broker    *Broker
+	input     <-chan *produceSet
+	responses chan<- *ProduceResponse
+	errors    chan<- error
 
 	currentRetries map[string]map[int32]error
 }
@@ -605,12 +638,14 @@ func (f *flusher) run() {
 			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 				f.parent.retryMessages(msgs, closing)
 			})
+			f.errors <- closing
 			continue
 		}
 
 		set.eachPartition(f.filter)
 		request := set.buildRequest()
 		if request == nil {
+			f.errors <- nil
 			continue
 		}
 
@@ -623,6 +658,7 @@ func (f *flusher) run() {
 			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 				f.parent.returnErrors(msgs, err)
 			})
+			f.errors <- err
 			continue
 		default:
 			Logger.Printf("producer/flusher/%d state change to [closing] because %s\n", f.broker.ID(), err)
@@ -632,9 +668,11 @@ func (f *flusher) run() {
 			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 				f.parent.retryMessages(msgs, err)
 			})
+			f.errors <- err
 			continue
 		}
 
+		f.responses <- response
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
 			set.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
