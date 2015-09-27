@@ -580,7 +580,10 @@ func (bp *brokerProducer) run() {
 				output = nil
 			}
 
-			bp.buffer.add(msg)
+			if err := bp.buffer.add(msg); err != nil {
+				bp.parent.returnError(msg, err)
+				continue
+			}
 
 			if bp.buffer.readyToFlush(msg) {
 				output = bp.output
@@ -793,21 +796,19 @@ func newProduceSet(parent *asyncProducer) *produceSet {
 	}
 }
 
-func (ps *produceSet) add(msg *ProducerMessage) {
+func (ps *produceSet) add(msg *ProducerMessage) error {
 	var err error
 	var key, val []byte
 
 	if msg.Key != nil {
 		if key, err = msg.Key.Encode(); err != nil {
-			ps.parent.returnError(msg, err)
-			return
+			return err
 		}
 	}
 
 	if msg.Value != nil {
 		if val, err = msg.Value.Encode(); err != nil {
-			ps.parent.returnError(msg, err)
-			return
+			return err
 		}
 	}
 
@@ -830,6 +831,8 @@ func (ps *produceSet) add(msg *ProducerMessage) {
 	set.bufferBytes += size
 	ps.bufferBytes += size
 	ps.bufferCount++
+
+	return nil
 }
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
