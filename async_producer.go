@@ -507,13 +507,12 @@ func (pp *partitionProducer) updateLeader() error {
 	})
 }
 
-// one per broker, constructs both an aggregator and a flusher
+// one per broker; also constructs an associated flusher
 func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessage {
 	var (
 		input     = make(chan *ProducerMessage)
 		bridge    = make(chan *produceSet)
-		responses = make(chan *ProduceResponse)
-		errors    = make(chan error)
+		responses = make(chan *brokerProducerResponse)
 	)
 
 	a := &brokerProducer{
@@ -522,7 +521,6 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 		input:          input,
 		output:         bridge,
 		responses:      responses,
-		errors:         errors,
 		buffer:         newProduceSet(p),
 		currentRetries: make(map[string]map[int32]error),
 	}
@@ -533,26 +531,30 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 		broker:    broker,
 		input:     bridge,
 		responses: responses,
-		errors:    errors,
 	}
 	go withRecover(f.run)
 
 	return input
 }
 
+type brokerProducerResponse struct {
+	set *produceSet
+	err error
+	res *ProduceResponse
+}
+
 // groups messages together into appropriately-sized batches for sending to the broker
+// handles state related to retries etc
 type brokerProducer struct {
 	parent *asyncProducer
 	broker *Broker
-	input  <-chan *ProducerMessage
 
+	input     <-chan *ProducerMessage
 	output    chan<- *produceSet
-	responses <-chan *ProduceResponse
-	errors    <-chan error
+	responses <-chan *brokerProducerResponse
 
-	buffer  *produceSet
-	pending *produceSet
-	timer   <-chan time.Time
+	buffer *produceSet
+	timer  <-chan time.Time
 
 	closing        error
 	currentRetries map[string]map[int32]error
@@ -597,8 +599,6 @@ func (bp *brokerProducer) run() {
 			output = nil
 		case response := <-bp.responses:
 			bp.handleResponse(response)
-		case err := <-bp.errors:
-			bp.handleError(err)
 		}
 	}
 
@@ -606,8 +606,10 @@ shutdown:
 	if !bp.buffer.empty() {
 		bp.flush()
 	}
-	bp.wait()
 	close(bp.output)
+	for response := range bp.responses {
+		bp.handleResponse(response)
+	}
 
 	Logger.Printf("producer/broker/%d shut down\n", bp.broker.ID())
 }
@@ -631,35 +633,35 @@ func (bp *brokerProducer) retryReason(msg *ProducerMessage) error {
 	return nil
 }
 
-func (bp *brokerProducer) wait() {
-	if bp.pending == nil {
-		return
-	}
-
-	select {
-	case response := <-bp.responses:
-		bp.handleResponse(response)
-	case err := <-bp.errors:
-		bp.handleError(err)
-	}
-}
-
 func (bp *brokerProducer) flush() {
-	bp.wait()
-	bp.output <- bp.buffer
-	bp.rollOver()
+	for {
+		select {
+		case response := <-bp.responses:
+			bp.handleResponse(response)
+		case bp.output <- bp.buffer:
+			bp.rollOver()
+			return
+		}
+	}
 }
 
 func (bp *brokerProducer) rollOver() {
 	bp.timer = nil
-	bp.pending = bp.buffer
 	bp.buffer = newProduceSet(bp.parent)
 }
 
-func (bp *brokerProducer) handleResponse(response *ProduceResponse) {
+func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
+	if response.err != nil {
+		bp.handleError(response.set, response.err)
+	} else {
+		bp.handleSuccess(response.set, response.res)
+	}
+}
+
+func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceResponse) {
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
-	bp.pending.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+	sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
 			bp.parent.returnSuccesses(msgs)
@@ -694,14 +696,12 @@ func (bp *brokerProducer) handleResponse(response *ProduceResponse) {
 			bp.parent.returnErrors(msgs, block.Err)
 		}
 	})
-
-	bp.pending = nil
 }
 
-func (bp *brokerProducer) handleError(err error) {
+func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 	switch err.(type) {
 	case PacketEncodingError:
-		bp.pending.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+		sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 			bp.parent.returnErrors(msgs, err)
 		})
 	default:
@@ -709,21 +709,18 @@ func (bp *brokerProducer) handleError(err error) {
 		bp.parent.abandonBrokerConnection(bp.broker)
 		_ = bp.broker.Close()
 		bp.closing = err
-		bp.pending.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+		sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 			bp.parent.retryMessages(msgs, err)
 		})
 	}
-
-	bp.pending = nil
 }
 
-// takes a set at a time from the brokerProducer and sends to the broker
+// very minimal, takes a set at a time from the brokerProducer and sends to the broker
 type flusher struct {
 	parent    *asyncProducer
 	broker    *Broker
 	input     <-chan *produceSet
-	responses chan<- *ProduceResponse
-	errors    chan<- error
+	responses chan<- *brokerProducerResponse
 }
 
 func (f *flusher) run() {
@@ -732,12 +729,13 @@ func (f *flusher) run() {
 
 		response, err := f.broker.Produce(request)
 
-		if err != nil {
-			f.errors <- err
-		} else {
-			f.responses <- response
+		f.responses <- &brokerProducerResponse{
+			set: set,
+			err: err,
+			res: response,
 		}
 	}
+	close(f.responses)
 }
 
 // singleton
