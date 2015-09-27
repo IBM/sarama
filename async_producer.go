@@ -840,7 +840,11 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 			if ps.parent.conf.Producer.Compression == CompressionNone {
 				req.AddSet(topic, partition, set.setToSend)
 			} else {
-				valBytes, err := encode(set.setToSend)
+				// When compression is enabled, the entire set for each partition is compressed
+				// and sent as the payload of a single fake "message" with the appropriate codec
+				// set and no key. When the server sees a message with a compression codec, it
+				// decompresses the payload and treats the result as its message set.
+				payload, err := encode(set.setToSend)
 				if err != nil {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
@@ -848,7 +852,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				req.AddMessage(topic, partition, &Message{
 					Codec: ps.parent.conf.Producer.Compression,
 					Key:   nil,
-					Value: valBytes,
+					Value: payload,
 				})
 			}
 		}
