@@ -944,17 +944,12 @@ func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
 
 func (p *asyncProducer) returnErrors(batch []*ProducerMessage, err error) {
 	for _, msg := range batch {
-		if msg != nil {
-			p.returnError(msg, err)
-		}
+		p.returnError(msg, err)
 	}
 }
 
 func (p *asyncProducer) returnSuccesses(batch []*ProducerMessage) {
 	for _, msg := range batch {
-		if msg == nil {
-			continue
-		}
 		if p.conf.Producer.Return.Successes {
 			msg.clear()
 			p.successes <- msg
@@ -965,9 +960,6 @@ func (p *asyncProducer) returnSuccesses(batch []*ProducerMessage) {
 
 func (p *asyncProducer) retryMessages(batch []*ProducerMessage, err error) {
 	for _, msg := range batch {
-		if msg == nil {
-			continue
-		}
 		if msg.retries >= p.conf.Producer.Retry.Max {
 			p.returnError(msg, err)
 		} else {
