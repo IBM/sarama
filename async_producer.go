@@ -585,7 +585,7 @@ func (bp *brokerProducer) run() {
 				continue
 			}
 
-			if bp.buffer.readyToFlush(msg) {
+			if bp.buffer.readyToFlush() {
 				output = bp.output
 			} else if bp.parent.conf.Producer.Flush.Frequency > 0 && bp.timer == nil {
 				bp.timer = time.After(bp.parent.conf.Producer.Flush.Frequency)
@@ -879,7 +879,7 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 	}
 }
 
-func (ps *produceSet) readyToFlush(msg *ProducerMessage) bool {
+func (ps *produceSet) readyToFlush() bool {
 	switch {
 	// If all three config values are 0, we always flush as-fast-as-possible
 	case ps.parent.conf.Producer.Flush.Frequency == 0 && ps.parent.conf.Producer.Flush.Bytes == 0 && ps.parent.conf.Producer.Flush.Messages == 0:
