@@ -702,8 +702,6 @@ func (bp *brokerProducer) handleResponse(response *ProduceResponse) {
 
 func (bp *brokerProducer) handleError(err error) {
 	switch err.(type) {
-	case nil:
-		break
 	case PacketEncodingError:
 		bp.pending.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 			bp.parent.returnErrors(msgs, err)
@@ -731,10 +729,6 @@ type flusher struct {
 func (f *flusher) run() {
 	for set := range f.input {
 		request := set.buildRequest()
-		if request == nil {
-			f.errors <- nil
-			continue
-		}
 
 		response, err := f.broker.Produce(request)
 
@@ -836,10 +830,6 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 }
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
-	if ps.empty() {
-		return nil
-	}
-
 	req := &ProduceRequest{
 		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
 		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
