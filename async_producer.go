@@ -553,8 +553,9 @@ type brokerProducer struct {
 	output    chan<- *produceSet
 	responses <-chan *brokerProducerResponse
 
-	buffer *produceSet
-	timer  <-chan time.Time
+	buffer     *produceSet
+	timer      <-chan time.Time
+	timerFired bool
 
 	closing        error
 	currentRetries map[string]map[int32]error
@@ -571,15 +572,24 @@ func (bp *brokerProducer) run() {
 				goto shutdown
 			}
 
-			if bp.buffer.wouldOverflow(msg) {
-				Logger.Printf("producer/broker/%d maximum request accumulated, forcing blocking flush\n", bp.broker.ID())
-				bp.flush()
-				output = nil
+			if reason := bp.needsRetry(msg); reason != nil {
+				bp.parent.retryMessage(msg, reason)
+
+				if bp.closing == nil && msg.flags&chaser == chaser {
+					// we were retrying this partition but we can start processing again
+					delete(bp.currentRetries[msg.Topic], msg.Partition)
+					Logger.Printf("producer/broker/%d state change to [normal] on %s/%d\n",
+						bp.broker.ID(), msg.Topic, msg.Partition)
+				}
+
+				continue
 			}
 
-			if reason := bp.retryReason(msg); reason != nil {
-				bp.parent.retryMessage(msg, reason)
-				continue
+			if bp.buffer.wouldOverflow(msg) {
+				if err := bp.waitForSpace(msg); err != nil {
+					bp.parent.retryMessage(msg, err)
+					continue
+				}
 			}
 
 			if err := bp.buffer.add(msg); err != nil {
@@ -587,29 +597,32 @@ func (bp *brokerProducer) run() {
 				continue
 			}
 
-			if bp.buffer.readyToFlush() {
-				output = bp.output
-			} else if bp.parent.conf.Producer.Flush.Frequency > 0 && bp.timer == nil {
+			if bp.parent.conf.Producer.Flush.Frequency > 0 && bp.timer == nil {
 				bp.timer = time.After(bp.parent.conf.Producer.Flush.Frequency)
 			}
 		case <-bp.timer:
-			output = bp.output
+			bp.timerFired = true
 		case output <- bp.buffer:
 			bp.rollOver()
-			output = nil
 		case response := <-bp.responses:
 			bp.handleResponse(response)
-			if bp.buffer.empty() {
-				// this can happen if the response was an error
-				output = nil
-				bp.timer = nil
-			}
+		}
+
+		if bp.timerFired || bp.buffer.readyToFlush() {
+			output = bp.output
+		} else {
+			output = nil
 		}
 	}
 
 shutdown:
-	if !bp.buffer.empty() {
-		bp.flush()
+	for !bp.buffer.empty() {
+		select {
+		case response := <-bp.responses:
+			bp.handleResponse(response)
+		case bp.output <- bp.buffer:
+			bp.rollOver()
+		}
 	}
 	close(bp.output)
 	for response := range bp.responses {
@@ -619,42 +632,41 @@ shutdown:
 	Logger.Printf("producer/broker/%d shut down\n", bp.broker.ID())
 }
 
-func (bp *brokerProducer) retryReason(msg *ProducerMessage) error {
+func (bp *brokerProducer) needsRetry(msg *ProducerMessage) error {
 	if bp.closing != nil {
 		return bp.closing
 	}
 
-	if bp.currentRetries[msg.Topic] != nil {
-		err := bp.currentRetries[msg.Topic][msg.Partition]
-		if err != nil && msg.flags&chaser == chaser {
-			// we were retrying this partition but we can start processing again
-			Logger.Printf("producer/broker/%d state change to [normal] on %s/%d\n",
-				bp.broker.ID(), msg.Topic, msg.Partition)
-			delete(bp.currentRetries[msg.Topic], msg.Partition)
-		}
-		return err
+	if bp.currentRetries[msg.Topic] == nil {
+		return nil
 	}
 
-	return nil
+	return bp.currentRetries[msg.Topic][msg.Partition]
 }
 
-func (bp *brokerProducer) flush() {
+func (bp *brokerProducer) waitForSpace(msg *ProducerMessage) error {
+	Logger.Printf("producer/broker/%d maximum request accumulated, waiting for space\n", bp.broker.ID())
+
 	for {
 		select {
 		case response := <-bp.responses:
 			bp.handleResponse(response)
-			if bp.buffer.empty() {
-				return // this can happen if the response was an error
+			// handling a response can change our state, so re-check some things
+			if reason := bp.needsRetry(msg); reason != nil {
+				return reason
+			} else if !bp.buffer.wouldOverflow(msg) {
+				return nil
 			}
 		case bp.output <- bp.buffer:
 			bp.rollOver()
-			return
+			return nil
 		}
 	}
 }
 
 func (bp *brokerProducer) rollOver() {
 	bp.timer = nil
+	bp.timerFired = false
 	bp.buffer = newProduceSet(bp.parent)
 }
 
@@ -663,6 +675,10 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 		bp.handleError(response.set, response.err)
 	} else {
 		bp.handleSuccess(response.set, response.res)
+	}
+
+	if bp.buffer.empty() {
+		bp.rollOver() // this can happen if the response invalidated our buffer
 	}
 }
 
@@ -914,6 +930,9 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 
 func (ps *produceSet) readyToFlush() bool {
 	switch {
+	// If we don't have any messages, nothing else matters
+	case ps.empty():
+		return false
 	// If all three config values are 0, we always flush as-fast-as-possible
 	case ps.parent.conf.Producer.Flush.Frequency == 0 && ps.parent.conf.Producer.Flush.Bytes == 0 && ps.parent.conf.Producer.Flush.Messages == 0:
 		return true
