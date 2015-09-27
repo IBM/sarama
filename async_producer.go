@@ -571,15 +571,15 @@ func (bp *brokerProducer) run() {
 				goto shutdown
 			}
 
-			if reason := bp.retryReason(msg); reason != nil {
-				bp.parent.retryMessage(msg, reason)
-				continue
-			}
-
 			if bp.buffer.wouldOverflow(msg) {
 				Logger.Printf("producer/broker/%d maximum request accumulated, forcing blocking flush\n", bp.broker.ID())
 				bp.flush()
 				output = nil
+			}
+
+			if reason := bp.retryReason(msg); reason != nil {
+				bp.parent.retryMessage(msg, reason)
+				continue
 			}
 
 			if err := bp.buffer.add(msg); err != nil {
@@ -599,6 +599,11 @@ func (bp *brokerProducer) run() {
 			output = nil
 		case response := <-bp.responses:
 			bp.handleResponse(response)
+			if bp.buffer.empty() {
+				// this can happen if the response was an error
+				output = nil
+				bp.timer = nil
+			}
 		}
 	}
 
@@ -638,6 +643,9 @@ func (bp *brokerProducer) flush() {
 		select {
 		case response := <-bp.responses:
 			bp.handleResponse(response)
+			if bp.buffer.empty() {
+				return // this can happen if the response was an error
+			}
 		case bp.output <- bp.buffer:
 			bp.rollOver()
 			return
@@ -691,6 +699,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 			}
 			bp.currentRetries[topic][partition] = block.Err
 			bp.parent.retryMessages(msgs, block.Err)
+			bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
 		// Other non-retriable errors
 		default:
 			bp.parent.returnErrors(msgs, block.Err)
@@ -712,6 +721,10 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		sent.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
 			bp.parent.retryMessages(msgs, err)
 		})
+		bp.buffer.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
+			bp.parent.retryMessages(msgs, err)
+		})
+		bp.rollOver()
 	}
 }
 
@@ -865,6 +878,20 @@ func (ps *produceSet) eachPartition(cb func(topic string, partition int32, msgs 
 			cb(topic, partition, set.msgs)
 		}
 	}
+}
+
+func (ps *produceSet) dropPartition(topic string, partition int32) []*ProducerMessage {
+	if ps.msgs[topic] == nil {
+		return nil
+	}
+	set := ps.msgs[topic][partition]
+	if set == nil {
+		return nil
+	}
+	ps.bufferBytes -= set.bufferBytes
+	ps.bufferCount -= len(set.msgs)
+	delete(ps.msgs[topic], partition)
+	return set.msgs
 }
 
 func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
