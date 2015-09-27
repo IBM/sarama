@@ -137,8 +137,6 @@ type ProducerMessage struct {
 
 	retries int
 	flags   flagSet
-
-	keyCache, valueCache []byte
 }
 
 func (m *ProducerMessage) byteSize() int {
@@ -155,8 +153,6 @@ func (m *ProducerMessage) byteSize() int {
 func (m *ProducerMessage) clear() {
 	m.flags = 0
 	m.retries = 0
-	m.keyCache = nil
-	m.valueCache = nil
 }
 
 // ProducerError is the type of error generated when the producer fails to deliver a message.
@@ -519,7 +515,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 		broker: broker,
 		input:  input,
 		output: bridge,
-		buffer: newProduceSet(p.conf),
+		buffer: newProduceSet(p),
 	}
 	go withRecover(a.run)
 
@@ -587,7 +583,7 @@ shutdown:
 
 func (a *aggregator) reset() {
 	a.timer = nil
-	a.buffer = newProduceSet(a.parent.conf)
+	a.buffer = newProduceSet(a.parent)
 }
 
 // takes a batch at a time from the aggregator and sends to the broker
@@ -657,10 +653,7 @@ func (f *flusher) run() {
 }
 
 func (f *flusher) filter(topic string, partition int32, batch []*ProducerMessage) {
-	var err error
-
 	for i, msg := range batch {
-
 		if f.currentRetries[msg.Topic] != nil && f.currentRetries[msg.Topic][msg.Partition] != nil {
 			// we're currently retrying this partition so we need to filter out this message
 			f.parent.retryMessages([]*ProducerMessage{msg}, f.currentRetries[msg.Topic][msg.Partition])
@@ -674,22 +667,6 @@ func (f *flusher) filter(topic string, partition int32, batch []*ProducerMessage
 			}
 
 			continue
-		}
-
-		if msg.Key != nil {
-			if msg.keyCache, err = msg.Key.Encode(); err != nil {
-				f.parent.returnError(msg, err)
-				batch[i] = nil
-				continue
-			}
-		}
-
-		if msg.Value != nil {
-			if msg.valueCache, err = msg.Value.Encode(); err != nil {
-				f.parent.returnError(msg, err)
-				batch[i] = nil
-				continue
-			}
 		}
 	}
 }
@@ -756,17 +733,17 @@ func (p *asyncProducer) retryHandler() {
 // produceSet
 
 type produceSet struct {
-	msgs map[string]map[int32][]*ProducerMessage
-	conf *Config
+	msgs   map[string]map[int32][]*ProducerMessage
+	parent *asyncProducer
 
 	bufferBytes int
 	bufferCount int
 }
 
-func newProduceSet(conf *Config) *produceSet {
+func newProduceSet(parent *asyncProducer) *produceSet {
 	return &produceSet{
-		msgs: make(map[string]map[int32][]*ProducerMessage),
-		conf: conf,
+		msgs:   make(map[string]map[int32][]*ProducerMessage),
+		parent: parent,
 	}
 }
 
@@ -785,18 +762,35 @@ func (ps *produceSet) add(msg *ProducerMessage) {
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
 
-	req := &ProduceRequest{RequiredAcks: ps.conf.Producer.RequiredAcks, Timeout: int32(ps.conf.Producer.Timeout / time.Millisecond)}
+	req := &ProduceRequest{RequiredAcks: ps.parent.conf.Producer.RequiredAcks, Timeout: int32(ps.parent.conf.Producer.Timeout / time.Millisecond)}
 	empty := true
 
 	for topic, partitionSet := range ps.msgs {
 		for partition, msgSet := range partitionSet {
 			setToSend := new(MessageSet)
 			setSize := 0
-			for _, msg := range msgSet {
+			for i, msg := range msgSet {
 				if msg == nil {
 					continue
 				}
-				if ps.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > ps.conf.Producer.MaxMessageBytes {
+				var err error
+				var key, val []byte
+				if msg.Key != nil {
+					if key, err = msg.Key.Encode(); err != nil {
+						ps.parent.returnError(msg, err)
+						msgSet[i] = nil
+						continue
+					}
+				}
+
+				if msg.Value != nil {
+					if val, err = msg.Value.Encode(); err != nil {
+						ps.parent.returnError(msg, err)
+						msgSet[i] = nil
+						continue
+					}
+				}
+				if ps.parent.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > ps.parent.conf.Producer.MaxMessageBytes {
 					// compression causes message-sets to be wrapped as single messages, which have tighter
 					// size requirements, so we have to respect those limits
 					valBytes, err := encode(setToSend)
@@ -804,17 +798,17 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 						Logger.Println(err) // if this happens, it's basically our fault.
 						panic(err)
 					}
-					req.AddMessage(topic, partition, &Message{Codec: ps.conf.Producer.Compression, Key: nil, Value: valBytes})
+					req.AddMessage(topic, partition, &Message{Codec: ps.parent.conf.Producer.Compression, Key: nil, Value: valBytes})
 					setToSend = new(MessageSet)
 					setSize = 0
 				}
 				setSize += msg.byteSize()
 
-				setToSend.addMessage(&Message{Codec: CompressionNone, Key: msg.keyCache, Value: msg.valueCache})
+				setToSend.addMessage(&Message{Codec: CompressionNone, Key: key, Value: val})
 				empty = false
 			}
 
-			if ps.conf.Producer.Compression == CompressionNone {
+			if ps.parent.conf.Producer.Compression == CompressionNone {
 				req.AddSet(topic, partition, setToSend)
 			} else {
 				valBytes, err := encode(setToSend)
@@ -822,7 +816,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
 				}
-				req.AddMessage(topic, partition, &Message{Codec: ps.conf.Producer.Compression, Key: nil, Value: valBytes})
+				req.AddMessage(topic, partition, &Message{Codec: ps.parent.conf.Producer.Compression, Key: nil, Value: valBytes})
 			}
 		}
 	}
@@ -847,10 +841,10 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 	case ps.bufferBytes+msg.byteSize() >= int(MaxRequestSize-(10*1024)):
 		return true
 	// Would we overflow the size-limit of a compressed message-batch?
-	case ps.conf.Producer.Compression != CompressionNone && ps.bufferBytes+msg.byteSize() >= ps.conf.Producer.MaxMessageBytes:
+	case ps.parent.conf.Producer.Compression != CompressionNone && ps.bufferBytes+msg.byteSize() >= ps.parent.conf.Producer.MaxMessageBytes:
 		return true
 	// Would we overflow simply in number of messages?
-	case ps.conf.Producer.Flush.MaxMessages > 0 && ps.bufferCount >= ps.conf.Producer.Flush.MaxMessages:
+	case ps.parent.conf.Producer.Flush.MaxMessages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.MaxMessages:
 		return true
 	default:
 		return false
@@ -860,16 +854,16 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 func (ps *produceSet) readyToFlush(msg *ProducerMessage) bool {
 	switch {
 	// If all three config values are 0, we always flush as-fast-as-possible
-	case ps.conf.Producer.Flush.Frequency == 0 && ps.conf.Producer.Flush.Bytes == 0 && ps.conf.Producer.Flush.Messages == 0:
+	case ps.parent.conf.Producer.Flush.Frequency == 0 && ps.parent.conf.Producer.Flush.Bytes == 0 && ps.parent.conf.Producer.Flush.Messages == 0:
 		return true
 	// If the messages is a chaser we must flush to maintain the state-machine
 	case msg.flags&chaser == chaser:
 		return true
 	// If we've passed the message trigger-point
-	case ps.conf.Producer.Flush.Messages > 0 && ps.bufferCount >= ps.conf.Producer.Flush.Messages:
+	case ps.parent.conf.Producer.Flush.Messages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.Messages:
 		return true
 	// If we've passed the byte trigger-point
-	case ps.conf.Producer.Flush.Bytes > 0 && ps.bufferBytes >= ps.conf.Producer.Flush.Bytes:
+	case ps.parent.conf.Producer.Flush.Bytes > 0 && ps.bufferBytes >= ps.parent.conf.Producer.Flush.Bytes:
 		return true
 	default:
 		return false
