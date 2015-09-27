@@ -542,10 +542,8 @@ type aggregator struct {
 	input  <-chan *ProducerMessage
 	output chan<- *produceSet
 
-	buffer      *produceSet
-	bufferBytes int
-	bufferCount int
-	timer       <-chan time.Time
+	buffer *produceSet
+	timer  <-chan time.Time
 }
 
 func (a *aggregator) run() {
@@ -558,7 +556,7 @@ func (a *aggregator) run() {
 				goto shutdown
 			}
 
-			if a.wouldOverflow(msg) {
+			if a.buffer.wouldOverflow(msg) {
 				Logger.Printf("producer/aggregator/%d maximum request accumulated, forcing blocking flush\n", a.broker.ID())
 				a.output <- a.buffer
 				a.reset()
@@ -566,10 +564,8 @@ func (a *aggregator) run() {
 			}
 
 			a.buffer.add(msg)
-			a.bufferBytes += msg.byteSize()
-			a.bufferCount++
 
-			if a.readyToFlush(msg) {
+			if a.buffer.readyToFlush(msg) {
 				output = a.output
 			} else if a.parent.conf.Producer.Flush.Frequency > 0 && a.timer == nil {
 				a.timer = time.After(a.parent.conf.Producer.Flush.Frequency)
@@ -583,52 +579,15 @@ func (a *aggregator) run() {
 	}
 
 shutdown:
-	if a.bufferCount > 0 {
+	if !a.buffer.empty() {
 		a.output <- a.buffer
 	}
 	close(a.output)
 }
 
-func (a *aggregator) wouldOverflow(msg *ProducerMessage) bool {
-	switch {
-	// Would we overflow our maximum possible size-on-the-wire? 10KiB is arbitrary overhead for safety.
-	case a.bufferBytes+msg.byteSize() >= int(MaxRequestSize-(10*1024)):
-		return true
-	// Would we overflow the size-limit of a compressed message-batch?
-	case a.parent.conf.Producer.Compression != CompressionNone && a.bufferBytes+msg.byteSize() >= a.parent.conf.Producer.MaxMessageBytes:
-		return true
-	// Would we overflow simply in number of messages?
-	case a.parent.conf.Producer.Flush.MaxMessages > 0 && a.bufferCount >= a.parent.conf.Producer.Flush.MaxMessages:
-		return true
-	default:
-		return false
-	}
-}
-
-func (a *aggregator) readyToFlush(msg *ProducerMessage) bool {
-	switch {
-	// If all three config values are 0, we always flush as-fast-as-possible
-	case a.parent.conf.Producer.Flush.Frequency == 0 && a.parent.conf.Producer.Flush.Bytes == 0 && a.parent.conf.Producer.Flush.Messages == 0:
-		return true
-	// If the messages is a chaser we must flush to maintain the state-machine
-	case msg.flags&chaser == chaser:
-		return true
-	// If we've  passed the message trigger-point
-	case a.parent.conf.Producer.Flush.Messages > 0 && a.bufferCount >= a.parent.conf.Producer.Flush.Messages:
-		return true
-	// If we've  passed the byte trigger-point
-	case a.parent.conf.Producer.Flush.Bytes > 0 && a.bufferBytes >= a.parent.conf.Producer.Flush.Bytes:
-		return true
-	default:
-		return false
-	}
-}
-
 func (a *aggregator) reset() {
 	a.timer = nil
 	a.buffer = newProduceSet(a.parent.conf)
-	a.bufferBytes = 0
-	a.bufferCount = 0
 }
 
 // takes a batch at a time from the aggregator and sends to the broker
@@ -799,6 +758,9 @@ func (p *asyncProducer) retryHandler() {
 type produceSet struct {
 	msgs map[string]map[int32][]*ProducerMessage
 	conf *Config
+
+	bufferBytes int
+	bufferCount int
 }
 
 func newProduceSet(conf *Config) *produceSet {
@@ -816,6 +778,9 @@ func (ps *produceSet) add(msg *ProducerMessage) {
 	}
 
 	partitionSet[msg.Partition] = append(partitionSet[msg.Partition], msg)
+
+	ps.bufferBytes += msg.byteSize()
+	ps.bufferCount++
 }
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
@@ -874,6 +839,45 @@ func (ps *produceSet) eachPartition(cb func(topic string, partition int32, msgs 
 			cb(topic, partition, msgs)
 		}
 	}
+}
+
+func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
+	switch {
+	// Would we overflow our maximum possible size-on-the-wire? 10KiB is arbitrary overhead for safety.
+	case ps.bufferBytes+msg.byteSize() >= int(MaxRequestSize-(10*1024)):
+		return true
+	// Would we overflow the size-limit of a compressed message-batch?
+	case ps.conf.Producer.Compression != CompressionNone && ps.bufferBytes+msg.byteSize() >= ps.conf.Producer.MaxMessageBytes:
+		return true
+	// Would we overflow simply in number of messages?
+	case ps.conf.Producer.Flush.MaxMessages > 0 && ps.bufferCount >= ps.conf.Producer.Flush.MaxMessages:
+		return true
+	default:
+		return false
+	}
+}
+
+func (ps *produceSet) readyToFlush(msg *ProducerMessage) bool {
+	switch {
+	// If all three config values are 0, we always flush as-fast-as-possible
+	case ps.conf.Producer.Flush.Frequency == 0 && ps.conf.Producer.Flush.Bytes == 0 && ps.conf.Producer.Flush.Messages == 0:
+		return true
+	// If the messages is a chaser we must flush to maintain the state-machine
+	case msg.flags&chaser == chaser:
+		return true
+	// If we've passed the message trigger-point
+	case ps.conf.Producer.Flush.Messages > 0 && ps.bufferCount >= ps.conf.Producer.Flush.Messages:
+		return true
+	// If we've passed the byte trigger-point
+	case ps.conf.Producer.Flush.Bytes > 0 && ps.bufferBytes >= ps.conf.Producer.Flush.Bytes:
+		return true
+	default:
+		return false
+	}
+}
+
+func (ps *produceSet) empty() bool {
+	return ps.bufferCount == 0
 }
 
 // utility functions
