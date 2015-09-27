@@ -889,9 +889,6 @@ func (ps *produceSet) readyToFlush(msg *ProducerMessage) bool {
 	// If all three config values are 0, we always flush as-fast-as-possible
 	case ps.parent.conf.Producer.Flush.Frequency == 0 && ps.parent.conf.Producer.Flush.Bytes == 0 && ps.parent.conf.Producer.Flush.Messages == 0:
 		return true
-	// If the messages is a chaser we must flush to maintain the state-machine
-	case msg.flags&chaser == chaser:
-		return true
 	// If we've passed the message trigger-point
 	case ps.parent.conf.Producer.Flush.Messages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.Messages:
 		return true
