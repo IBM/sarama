@@ -139,8 +139,10 @@ type ProducerMessage struct {
 	flags   flagSet
 }
 
+const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
+
 func (m *ProducerMessage) byteSize() int {
-	size := 26 // the metadata overhead of CRC, flags, etc.
+	size := producerMessageOverhead
 	if m.Key != nil {
 		size += m.Key.Length()
 	}
@@ -770,8 +772,14 @@ func (p *asyncProducer) retryHandler() {
 
 // produceSet
 
+type partitionSet struct {
+	msgs        []*ProducerMessage
+	setToSend   *MessageSet
+	bufferBytes int
+}
+
 type produceSet struct {
-	msgs   map[string]map[int32][]*ProducerMessage
+	msgs   map[string]map[int32]*partitionSet
 	parent *asyncProducer
 
 	bufferBytes int
@@ -780,20 +788,26 @@ type produceSet struct {
 
 func newProduceSet(parent *asyncProducer) *produceSet {
 	return &produceSet{
-		msgs:   make(map[string]map[int32][]*ProducerMessage),
+		msgs:   make(map[string]map[int32]*partitionSet),
 		parent: parent,
 	}
 }
 
 func (ps *produceSet) add(msg *ProducerMessage) {
-	partitionSet := ps.msgs[msg.Topic]
-	if partitionSet == nil {
-		partitionSet = make(map[int32][]*ProducerMessage)
-		ps.msgs[msg.Topic] = partitionSet
+	partitions := ps.msgs[msg.Topic]
+	if partitions == nil {
+		partitions = make(map[int32]*partitionSet)
+		ps.msgs[msg.Topic] = partitions
 	}
 
-	partitionSet[msg.Partition] = append(partitionSet[msg.Partition], msg)
+	set := partitions[msg.Partition]
+	if set == nil {
+		set = &partitionSet{setToSend: new(MessageSet)}
+		partitions[msg.Partition] = set
+	}
 
+	set.msgs = append(set.msgs, msg)
+	set.bufferBytes += msg.byteSize()
 	ps.bufferBytes += msg.byteSize()
 	ps.bufferCount++
 }
@@ -807,7 +821,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		for partition, msgSet := range partitionSet {
 			setToSend := new(MessageSet)
 			setSize := 0
-			for i, msg := range msgSet {
+			for i, msg := range msgSet.msgs {
 				if msg == nil {
 					continue
 				}
@@ -816,7 +830,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				if msg.Key != nil {
 					if key, err = msg.Key.Encode(); err != nil {
 						ps.parent.returnError(msg, err)
-						msgSet[i] = nil
+						msgSet.msgs[i] = nil
 						continue
 					}
 				}
@@ -824,7 +838,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				if msg.Value != nil {
 					if val, err = msg.Value.Encode(); err != nil {
 						ps.parent.returnError(msg, err)
-						msgSet[i] = nil
+						msgSet.msgs[i] = nil
 						continue
 					}
 				}
@@ -867,8 +881,8 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 
 func (ps *produceSet) eachPartition(cb func(topic string, partition int32, msgs []*ProducerMessage)) {
 	for topic, partitionSet := range ps.msgs {
-		for partition, msgs := range partitionSet {
-			cb(topic, partition, msgs)
+		for partition, set := range partitionSet {
+			cb(topic, partition, set.msgs)
 		}
 	}
 }
