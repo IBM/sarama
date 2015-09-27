@@ -794,6 +794,23 @@ func newProduceSet(parent *asyncProducer) *produceSet {
 }
 
 func (ps *produceSet) add(msg *ProducerMessage) {
+	var err error
+	var key, val []byte
+
+	if msg.Key != nil {
+		if key, err = msg.Key.Encode(); err != nil {
+			ps.parent.returnError(msg, err)
+			return
+		}
+	}
+
+	if msg.Value != nil {
+		if val, err = msg.Value.Encode(); err != nil {
+			ps.parent.returnError(msg, err)
+			return
+		}
+	}
+
 	partitions := ps.msgs[msg.Topic]
 	if partitions == nil {
 		partitions = make(map[int32]*partitionSet)
@@ -807,63 +824,30 @@ func (ps *produceSet) add(msg *ProducerMessage) {
 	}
 
 	set.msgs = append(set.msgs, msg)
-	set.bufferBytes += msg.byteSize()
-	ps.bufferBytes += msg.byteSize()
+	set.setToSend.addMessage(&Message{Codec: CompressionNone, Key: key, Value: val})
+
+	size := producerMessageOverhead + len(key) + len(val)
+	set.bufferBytes += size
+	ps.bufferBytes += size
 	ps.bufferCount++
 }
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
+	if ps.empty() {
+		return nil
+	}
 
-	req := &ProduceRequest{RequiredAcks: ps.parent.conf.Producer.RequiredAcks, Timeout: int32(ps.parent.conf.Producer.Timeout / time.Millisecond)}
-	empty := true
+	req := &ProduceRequest{
+		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
+		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
+	}
 
 	for topic, partitionSet := range ps.msgs {
-		for partition, msgSet := range partitionSet {
-			setToSend := new(MessageSet)
-			setSize := 0
-			for i, msg := range msgSet.msgs {
-				if msg == nil {
-					continue
-				}
-				var err error
-				var key, val []byte
-				if msg.Key != nil {
-					if key, err = msg.Key.Encode(); err != nil {
-						ps.parent.returnError(msg, err)
-						msgSet.msgs[i] = nil
-						continue
-					}
-				}
-
-				if msg.Value != nil {
-					if val, err = msg.Value.Encode(); err != nil {
-						ps.parent.returnError(msg, err)
-						msgSet.msgs[i] = nil
-						continue
-					}
-				}
-				if ps.parent.conf.Producer.Compression != CompressionNone && setSize+msg.byteSize() > ps.parent.conf.Producer.MaxMessageBytes {
-					// compression causes message-sets to be wrapped as single messages, which have tighter
-					// size requirements, so we have to respect those limits
-					valBytes, err := encode(setToSend)
-					if err != nil {
-						Logger.Println(err) // if this happens, it's basically our fault.
-						panic(err)
-					}
-					req.AddMessage(topic, partition, &Message{Codec: ps.parent.conf.Producer.Compression, Key: nil, Value: valBytes})
-					setToSend = new(MessageSet)
-					setSize = 0
-				}
-				setSize += msg.byteSize()
-
-				setToSend.addMessage(&Message{Codec: CompressionNone, Key: key, Value: val})
-				empty = false
-			}
-
+		for partition, set := range partitionSet {
 			if ps.parent.conf.Producer.Compression == CompressionNone {
-				req.AddSet(topic, partition, setToSend)
+				req.AddSet(topic, partition, set.setToSend)
 			} else {
-				valBytes, err := encode(setToSend)
+				valBytes, err := encode(set.setToSend)
 				if err != nil {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
@@ -873,9 +857,6 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		}
 	}
 
-	if empty {
-		return nil
-	}
 	return req
 }
 
