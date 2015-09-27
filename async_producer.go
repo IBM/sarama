@@ -526,13 +526,21 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) chan<- *ProducerMessag
 	}
 	go withRecover(a.run)
 
-	f := &flusher{
-		parent:    p,
-		broker:    broker,
-		input:     bridge,
-		responses: responses,
-	}
-	go withRecover(f.run)
+	// minimal bridge to make the network response `select`able
+	go withRecover(func() {
+		for set := range bridge {
+			request := set.buildRequest()
+
+			response, err := broker.Produce(request)
+
+			responses <- &brokerProducerResponse{
+				set: set,
+				err: err,
+				res: response,
+			}
+		}
+		close(responses)
+	})
 
 	return input
 }
@@ -742,29 +750,6 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		})
 		bp.rollOver()
 	}
-}
-
-// very minimal, takes a set at a time from the brokerProducer and sends to the broker
-type flusher struct {
-	parent    *asyncProducer
-	broker    *Broker
-	input     <-chan *produceSet
-	responses chan<- *brokerProducerResponse
-}
-
-func (f *flusher) run() {
-	for set := range f.input {
-		request := set.buildRequest()
-
-		response, err := f.broker.Produce(request)
-
-		f.responses <- &brokerProducerResponse{
-			set: set,
-			err: err,
-			res: response,
-		}
-	}
-	close(f.responses)
 }
 
 // singleton
