@@ -876,8 +876,10 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 	// Would we overflow our maximum possible size-on-the-wire? 10KiB is arbitrary overhead for safety.
 	case ps.bufferBytes+msg.byteSize() >= int(MaxRequestSize-(10*1024)):
 		return true
-	// Would we overflow the size-limit of a compressed message-batch?
-	case ps.parent.conf.Producer.Compression != CompressionNone && ps.bufferBytes+msg.byteSize() >= ps.parent.conf.Producer.MaxMessageBytes:
+	// Would we overflow the size-limit of a compressed message-batch for this partition?
+	case ps.parent.conf.Producer.Compression != CompressionNone &&
+		ps.msgs[msg.Topic] != nil && ps.msgs[msg.Topic][msg.Partition] != nil &&
+		ps.msgs[msg.Topic][msg.Partition].bufferBytes+msg.byteSize() >= ps.parent.conf.Producer.MaxMessageBytes:
 		return true
 	// Would we overflow simply in number of messages?
 	case ps.parent.conf.Producer.Flush.MaxMessages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.MaxMessages:
