@@ -29,6 +29,7 @@ type Broker struct {
 
 type responsePromise struct {
 	correlationID int32
+	sent          time.Time
 	packets       chan []byte
 	errors        chan error
 }
@@ -271,7 +272,7 @@ func (b *Broker) send(rb requestBody, promiseResponse bool) (*responsePromise, e
 		return nil, nil
 	}
 
-	promise := responsePromise{req.correlationID, make(chan []byte), make(chan error)}
+	promise := responsePromise{req.correlationID, time.Now(), make(chan []byte), make(chan error)}
 	b.responses <- promise
 
 	return &promise, nil
@@ -346,7 +347,7 @@ func (b *Broker) encode(pe packetEncoder) (err error) {
 func (b *Broker) responseReceiver() {
 	header := make([]byte, 8)
 	for response := range b.responses {
-		err := b.conn.SetReadDeadline(time.Now().Add(b.conf.Net.ReadTimeout))
+		err := b.conn.SetReadDeadline(response.sent.Add(b.conf.Net.ReadTimeout))
 		if err != nil {
 			response.errors <- err
 			continue
