@@ -320,7 +320,7 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 	leader.Returns(prodSuccess)
 
 	config := NewConfig()
-	config.Producer.Flush.Messages = 3
+	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewManualPartitioner
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
@@ -330,8 +330,8 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 
 	for flush := 0; flush < 3; flush++ {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(true), Value: flakyEncoder(false)}
-		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(true), Value: flakyEncoder(true)}
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(false), Value: flakyEncoder(true)}
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(true), Value: flakyEncoder(true)}
 		expectResults(t, producer, 1, 2)
 	}
 
