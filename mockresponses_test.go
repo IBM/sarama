@@ -52,14 +52,14 @@ func (mmr *mockMetadataResponse) SetBroker(addr string, brokerID int32) *mockMet
 	return mmr
 }
 
-func (mor *mockMetadataResponse) For(reqBody decoder) encoder {
+func (mmr *mockMetadataResponse) For(reqBody decoder) encoder {
 	metadataRequest := reqBody.(*MetadataRequest)
 	metadataResponse := &MetadataResponse{}
-	for addr, brokerID := range mor.brokers {
+	for addr, brokerID := range mmr.brokers {
 		metadataResponse.AddBroker(addr, brokerID)
 	}
 	if len(metadataRequest.Topics) == 0 {
-		for topic, partitions := range mor.leaders {
+		for topic, partitions := range mmr.leaders {
 			for partition, brokerID := range partitions {
 				metadataResponse.AddTopicPartition(topic, partition, brokerID, nil, nil, ErrNoError)
 			}
@@ -67,7 +67,7 @@ func (mor *mockMetadataResponse) For(reqBody decoder) encoder {
 		return metadataResponse
 	}
 	for _, topic := range metadataRequest.Topics {
-		for partition, brokerID := range mor.leaders[topic] {
+		for partition, brokerID := range mmr.leaders[topic] {
 			metadataResponse.AddTopicPartition(topic, partition, brokerID, nil, nil, ErrNoError)
 		}
 	}

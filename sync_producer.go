@@ -67,9 +67,9 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 
 	if err := <-expectation; err != nil {
 		return -1, -1, err
-	} else {
-		return msg.Partition, msg.Offset, nil
 	}
+
+	return msg.Partition, msg.Offset, nil
 }
 
 func (sp *syncProducer) handleSuccesses() {

@@ -345,9 +345,9 @@ func (pom *partitionOffsetManager) NextOffset() (int64, string) {
 
 	if pom.offset >= 0 {
 		return pom.offset + 1, pom.metadata
-	} else {
-		return pom.parent.conf.Consumer.Offsets.Initial, ""
 	}
+
+	return pom.parent.conf.Consumer.Offsets.Initial, ""
 }
 
 func (pom *partitionOffsetManager) AsyncClose() {
