@@ -12,7 +12,7 @@ type prepEncoder struct {
 // primitives
 
 func (pe *prepEncoder) putInt8(in int8) {
-	pe.length += 1
+	pe.length++
 }
 
 func (pe *prepEncoder) putInt16(in int16) {

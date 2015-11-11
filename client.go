@@ -667,11 +667,10 @@ func (client *client) updateMetadata(data *MetadataResponse) (retry bool, err er
 func (client *client) cachedCoordinator(consumerGroup string) *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
-	if coordinatorID, ok := client.coordinators[consumerGroup]; !ok {
-		return nil
-	} else {
+	if coordinatorID, ok := client.coordinators[consumerGroup]; ok {
 		return client.brokers[coordinatorID]
 	}
+	return nil
 }
 
 func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemaining int) (*ConsumerMetadataResponse, error) {

@@ -19,7 +19,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 		return -1, ErrInsufficientData
 	}
 	tmp := int8(rd.raw[rd.off])
-	rd.off += 1
+	rd.off++
 	return tmp, nil
 }
 
