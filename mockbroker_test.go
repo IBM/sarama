@@ -59,17 +59,8 @@ func (b *mockBroker) SetLatency(latency time.Duration) {
 	b.latency = latency
 }
 
-// SetHandler sets the specified function as the request handler. Whenever
-// a mock broker reads a request from the wire it passes the request to the
-// function and sends back whatever the handler function returns.
-func (b *mockBroker) SetHandler(handler requestHandlerFunc) {
-	b.lock.Lock()
-	b.handler = handler
-	b.lock.Unlock()
-}
-
 func (b *mockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
-	b.SetHandler(func(req *request) (res encoder) {
+	b.setHandler(func(req *request) (res encoder) {
 		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
 		mockResponse := handlerMap[reqTypeName]
 		if mockResponse == nil {
@@ -110,6 +101,15 @@ func (b *mockBroker) Close() {
 	}
 	close(b.closing)
 	<-b.stopper
+}
+
+// setHandler sets the specified function as the request handler. Whenever
+// a mock broker reads a request from the wire it passes the request to the
+// function and sends back whatever the handler function returns.
+func (b *mockBroker) setHandler(handler requestHandlerFunc) {
+	b.lock.Lock()
+	b.handler = handler
+	b.lock.Unlock()
 }
 
 func (b *mockBroker) serverLoop() {
