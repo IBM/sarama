@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -10,6 +11,8 @@ type MockResponse interface {
 	For(reqBody decoder) (res encoder)
 }
 
+// mockWrapper is a mock response builder that returns a particular concrete
+// response regardless of the actual request passed to the `For` method.
 type mockWrapper struct {
 	res encoder
 }
@@ -20,6 +23,38 @@ func (mw *mockWrapper) For(reqBody decoder) (res encoder) {
 
 func newMockWrapper(res encoder) *mockWrapper {
 	return &mockWrapper{res: res}
+}
+
+// mockSequence is a mock response builder that is created from a sequence of
+// concrete responses. Every time when a `MockBroker` calls its `For` method
+// the next response from the sequence is returned. When the end of the
+// sequence is reached the last element from the sequence is returned.
+type mockSequence struct {
+	responses []MockResponse
+}
+
+func newMockSequence(responses ...interface{}) *mockSequence {
+	ms := &mockSequence{}
+	ms.responses = make([]MockResponse, len(responses))
+	for i, res := range responses {
+		switch res := res.(type) {
+		case MockResponse:
+			ms.responses[i] = res
+		case encoder:
+			ms.responses[i] = newMockWrapper(res)
+		default:
+			panic(fmt.Sprintf("Unexpected response type: %T", res))
+		}
+	}
+	return ms
+}
+
+func (mc *mockSequence) For(reqBody decoder) (res encoder) {
+	res = mc.responses[0].For(reqBody)
+	if len(mc.responses) > 1 {
+		mc.responses = mc.responses[1:]
+	}
+	return res
 }
 
 // mockMetadataResponse is a `MetadataResponse` builder.
