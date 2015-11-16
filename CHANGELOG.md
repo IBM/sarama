@@ -12,7 +12,7 @@ Improvements:
    when compression is used
    ([#549](https://github.com/Shopify/sarama/pull/549),
    [#550](https://github.com/Shopify/sarama/pull/550),
-   [#451](https://github.com/Shopify/sarama/pull/451)).
+   [#551](https://github.com/Shopify/sarama/pull/551)).
 
 Bug Fixes:
  - Fix race condition in consumer test mock
