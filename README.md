@@ -12,7 +12,6 @@ Sarama is an MIT-licensed Go client library for [Apache Kafka](https://kafka.apa
 - Mocks for testing are available in the [mocks](./mocks) subpackage.
 - The [examples](./examples) directory contains more elaborate example applications.
 - The [tools](./tools) directory contains command line tools that can be useful for testing, diagnostics, and instrumentation.
-- There is a google group for Kafka client users and authors at https://groups.google.com/forum/#!forum/kafka-clients
 
 ### Compatibility and API stability
 
@@ -26,8 +25,12 @@ Sarama follows semantic versioning and provides API stability via the gopkg.in s
 You can import a version with a guaranteed stable API via http://gopkg.in/Shopify/sarama.v1.
 A changelog is available [here](CHANGELOG.md).
 
-### Other Links
+### Contributing
 
-* [Sarama wiki](https://github.com/Shopify/sarama/wiki) to get started contributing to sarama itself.
-* [Kafka Project Home](https://kafka.apache.org/)
-* [Kafka Protocol Specification](https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol)
+* Get started by checking our [contribution guidelines](https://github.com/Shopify/sarama/blob/master/CONTRIBUTING.md).
+* Read the [Sarama wiki](https://github.com/Shopify/sarama/wiki) for more
+  technical and design details.
+* The [Kafka Protocol Specification](https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol)
+  contains a wealth of useful information.
+* For more general issues, there is [a google group](https://groups.google.com/forum/#!forum/kafka-clients) for Kafka client developers.
+* If you have any questions, just ask!
