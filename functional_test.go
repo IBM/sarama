@@ -129,6 +129,8 @@ func (kv kafkaVersion) satisfies(other kafkaVersion) bool {
 
 		if v < ov {
 			return false
+		} else if v > ov {
+			return true
 		}
 	}
 	return true
