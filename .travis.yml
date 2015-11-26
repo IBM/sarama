@@ -20,7 +20,6 @@ before_install:
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
 
-
 install:
 - make install_dependencies
 
@@ -29,13 +28,5 @@ script:
 - make vet
 - make errcheck
 - make fmt
-
-matrix:
-  include:
-    - go: tip
-      env: KAFKA_VERSION=0.8.2.2
-  allow_failures:
-    - go: tip
-  fast_finish: true
 
 sudo: false
