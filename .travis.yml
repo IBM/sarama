@@ -13,6 +13,7 @@ env:
   matrix:
   - KAFKA_VERSION=0.8.1.1
   - KAFKA_VERSION=0.8.2.2
+  - KAFKA_VERSION=0.9.0.0
 
 before_install:
 - export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}
