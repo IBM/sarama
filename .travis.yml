@@ -12,7 +12,7 @@ env:
   - DEBUG=true
   matrix:
   - KAFKA_VERSION=0.8.1.1
-  - KAFKA_VERSION=0.8.2.1
+  - KAFKA_VERSION=0.8.2.2
 
 before_install:
 - export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}
@@ -33,7 +33,7 @@ script:
 matrix:
   include:
     - go: tip
-      env: KAFKA_VERSION=0.8.2.1
+      env: KAFKA_VERSION=0.8.2.2
   allow_failures:
     - go: tip
   fast_finish: true
