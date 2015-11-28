@@ -27,9 +27,11 @@ lint: install
 	go get github.com/alecthomas/gometalinter
 	gometalinter --install
 	$(GOOP) exec gometalinter -D golint -D gocyclo -D dupl
+	$(GOOP) exec gometalinter -D golint -D gocyclo -D dupl mocks
 
 test: build lint
 	$(GO) test -v -timeout 60s -race $(PACKAGE)
+	$(GO) test -v -timeout 60s -race $(PACKAGE)/mocks
 
 bench:
 	$(GO) test -bench=. -cpu 4

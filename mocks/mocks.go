@@ -13,11 +13,7 @@ guarantee of Sarama as it is still considered experimental.
 */
 package mocks
 
-import (
-	"errors"
-
-	"github.com/Shopify/sarama"
-)
+import "errors"
 
 // A simple interface that includes the testing.T methods we use to report
 // expectation violations when using the mock objects.
@@ -35,9 +31,4 @@ const AnyOffset int64 = -1000
 
 type producerExpectation struct {
 	Result error
-}
-
-type consumerExpectation struct {
-	Err error
-	Msg *sarama.ConsumerMessage
 }
