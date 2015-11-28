@@ -28,7 +28,6 @@ lint: install
 	$(GOOP) exec gometalinter -D golint -D gocyclo -D dupl
 
 test: build lint
-	go get github.com/smartystreets/goconvey
 	$(GO) test -v -timeout 60s -race $(PACKAGE)
 
 bench:
