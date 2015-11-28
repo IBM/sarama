@@ -131,12 +131,13 @@ type ProducerMessage struct {
 	// guaranteed to be defined if the message was successfully delivered and
 	// RequiredAcks is not NoResponse.
 	Offset int64
-	// Partition is the partition that the message was sent to. This is only
-	// guaranteed to be defined if the message was successfully delivered.
-	Partition int32
 
 	retries int
 	flags   flagSet
+
+	// Partition is the partition that the message was sent to. This is only
+	// guaranteed to be defined if the message was successfully delivered.
+	Partition int32
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
@@ -194,7 +195,7 @@ func (p *asyncProducer) Close() error {
 
 	if p.conf.Producer.Return.Successes {
 		go withRecover(func() {
-			for _ = range p.successes {
+			for range p.successes {
 			}
 		})
 	}

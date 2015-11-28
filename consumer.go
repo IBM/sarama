@@ -271,6 +271,7 @@ type partitionConsumer struct {
 	conf      *Config
 	topic     string
 	partition int32
+	fetchSize int32
 
 	broker   *brokerConsumer
 	messages chan *ConsumerMessage
@@ -280,7 +281,6 @@ type partitionConsumer struct {
 	trigger, dying chan none
 	responseResult error
 
-	fetchSize           int32
 	offset              int64
 	highWaterMarkOffset int64
 }
@@ -302,7 +302,7 @@ func (child *partitionConsumer) sendError(err error) {
 }
 
 func (child *partitionConsumer) dispatcher() {
-	for _ = range child.trigger {
+	for range child.trigger {
 		select {
 		case <-child.dying:
 			close(child.trigger)
@@ -389,7 +389,7 @@ func (child *partitionConsumer) Close() error {
 	child.AsyncClose()
 
 	go withRecover(func() {
-		for _ = range child.messages {
+		for range child.messages {
 			// drain
 		}
 	})

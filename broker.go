@@ -18,10 +18,10 @@ type Broker struct {
 
 	conf          *Config
 	correlationID int32
+	opened        int32
 	conn          net.Conn
 	connErr       error
 	lock          sync.Mutex
-	opened        int32
 
 	responses chan responsePromise
 	done      chan bool

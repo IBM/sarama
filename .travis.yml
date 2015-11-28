@@ -22,12 +22,9 @@ before_install:
 - vagrant/create_topics.sh
 
 install:
-- make install_dependencies
+- make dep
 
 script:
 - make test
-- make vet
-- make errcheck
-- make fmt
 
 sudo: false

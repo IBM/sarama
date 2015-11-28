@@ -2,6 +2,9 @@ package sarama
 
 import (
 	"bytes"
+	"encoding/binary"
+	"fmt"
+	"io"
 	"reflect"
 	"testing"
 )
@@ -23,6 +26,29 @@ func (s *testRequestBody) encode(pe packetEncoder) error {
 
 // not specific to request tests, just helper functions for testing structures that
 // implement the encoder or decoder interfaces that needed somewhere to live
+
+func decodeRequest(r io.Reader) (req *request, err error) {
+	lengthBytes := make([]byte, 4)
+	if _, err := io.ReadFull(r, lengthBytes); err != nil {
+		return nil, err
+	}
+
+	length := int32(binary.BigEndian.Uint32(lengthBytes))
+	if length <= 4 || length > MaxRequestSize {
+		return nil, PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", length)}
+	}
+
+	encodedReq := make([]byte, length)
+	if _, err := io.ReadFull(r, encodedReq); err != nil {
+		return nil, err
+	}
+
+	req = &request{}
+	if err := decode(encodedReq, req); err != nil {
+		return nil, err
+	}
+	return req, nil
+}
 
 func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
 	packet, err := encode(in)

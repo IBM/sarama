@@ -153,7 +153,8 @@ func (b *mockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 
 	resHeader := make([]byte, 8)
 	for {
-		req, err := decodeRequest(conn)
+		var req *request
+		req, err = decodeRequest(conn)
 		if err != nil {
 			Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(req))
 			b.serverError(err)
@@ -175,7 +176,8 @@ func (b *mockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 		}
 		Logger.Printf("*** mockbroker/%d/%d: served %v -> %v", b.brokerID, idx, req, res)
 
-		encodedRes, err := encode(res)
+		var encodedRes []byte
+		encodedRes, err = encode(res)
 		if err != nil {
 			b.serverError(err)
 			break

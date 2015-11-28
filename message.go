@@ -118,9 +118,9 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if m.Value == nil {
 			return PacketDecodingError{"GZIP compression specified, but no data to uncompress"}
 		}
-		reader, err := gzip.NewReader(bytes.NewReader(m.Value))
-		if err != nil {
-			return err
+		reader, err2 := gzip.NewReader(bytes.NewReader(m.Value))
+		if err2 != nil {
+			return err2
 		}
 		if m.Value, err = ioutil.ReadAll(reader); err != nil {
 			return err

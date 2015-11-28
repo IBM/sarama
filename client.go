@@ -289,7 +289,7 @@ func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
 	leader, err := client.cachedLeader(topic, partitionID)
 
 	if leader == nil {
-		err := client.RefreshMetadata(topic)
+		err = client.RefreshMetadata(topic)
 		if err != nil {
 			return nil, err
 		}
@@ -588,11 +588,11 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 		switch err.(type) {
 		case nil:
 			// valid response, use it
-			if shouldRetry, err := client.updateMetadata(response); shouldRetry {
+			if shouldRetry, err2 := client.updateMetadata(response); shouldRetry {
 				Logger.Println("client/metadata found some partitions to be leaderless")
-				return retry(err) // note: err can be nil
+				return retry(err2) // note: err can be nil
 			} else {
-				return err
+				return err2
 			}
 
 		case PacketEncodingError:

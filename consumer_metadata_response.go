@@ -8,8 +8,8 @@ import (
 type ConsumerMetadataResponse struct {
 	Err             KError
 	Coordinator     *Broker
-	CoordinatorID   int32  // deprecated: use Coordinator.ID()
 	CoordinatorHost string // deprecated: use Coordinator.Addr()
+	CoordinatorID   int32  // deprecated: use Coordinator.ID()
 	CoordinatorPort int32  // deprecated: use Coordinator.Addr()
 }
 

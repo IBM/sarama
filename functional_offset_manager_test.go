@@ -24,7 +24,7 @@ func TestFuncOffsetManager(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := offsetManager.ManagePartition("does_not_exist", 123); err != ErrUnknownTopicOrPartition {
+	if _, err = offsetManager.ManagePartition("does_not_exist", 123); err != ErrUnknownTopicOrPartition {
 		t.Fatal("Expected ErrUnknownTopicOrPartition when starting a partition offset manager for a partition that does not exist, got:", err)
 	}
 
