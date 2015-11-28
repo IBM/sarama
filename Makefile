@@ -21,6 +21,7 @@ install: build
 
 clean:
 	$(GO) clean
+	rm -rf $(TOP)/.vendor/
 
 lint: install
 	go get github.com/alecthomas/gometalinter
