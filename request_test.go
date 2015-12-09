@@ -48,7 +48,7 @@ func testRequest(t *testing.T, name string, rb requestBody, expected []byte) {
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(packet[headerSize:], expected) {
-		t.Error("Encoding", name, "failed\ngot ", packet, "\nwant", expected)
+		t.Error("Encoding", name, "failed\ngot ", packet[headerSize:], "\nwant", expected)
 	}
 	// Decoder request
 	decoded, err := decodeRequest(bytes.NewReader(packet))
@@ -57,7 +57,7 @@ func testRequest(t *testing.T, name string, rb requestBody, expected []byte) {
 	} else if decoded.correlationID != 123 || decoded.clientID != "foo" {
 		t.Errorf("Decoded header is not valid: %v", decoded)
 	} else if !reflect.DeepEqual(rb, decoded.body) {
-		t.Errorf("Decoded request does not match the encoded one\nencoded: %v\ndecoded: %v", rb, decoded)
+		t.Errorf("Decoded request does not match the encoded one\nencoded: %v\ndecoded: %v", rb, decoded.body)
 	}
 }
 

@@ -92,6 +92,17 @@ const (
 	ErrMessageSetSizeTooLarge          KError = 18
 	ErrNotEnoughReplicas               KError = 19
 	ErrNotEnoughReplicasAfterAppend    KError = 20
+	ErrInvalidRequiredAcks             KError = 21
+	ErrIllegalGeneration               KError = 22
+	ErrInconsistentGroupProtocol       KError = 23
+	ErrInvalidGroupId                  KError = 24
+	ErrUnknownMemberId                 KError = 25
+	ErrInvalidSessionTimeout           KError = 26
+	ErrRebalanceInProgress             KError = 27
+	ErrInvalidCommitOffsetSize         KError = 28
+	ErrTopicAuthorizationFailed        KError = 29
+	ErrGroupAuthorizationFailed        KError = 30
+	ErrClusterAuthorizationFailed      KError = 31
 )
 
 func (err KError) Error() string {
@@ -140,6 +151,28 @@ func (err KError) Error() string {
 		return "kafka server: Messages are rejected since there are fewer in-sync replicas than required."
 	case ErrNotEnoughReplicasAfterAppend:
 		return "kafka server: Messages are written to the log, but to fewer in-sync replicas than required."
+	case ErrInvalidRequiredAcks:
+		return "kafka server: The number of required acks is invalid (should be either -1, 0, or 1)."
+	case ErrIllegalGeneration:
+		return "kafka server: The provided generation id is not the current generation."
+	case ErrInconsistentGroupProtocol:
+		return "kafka server: The provider group protocol type is incompatible with the other members."
+	case ErrInvalidGroupId:
+		return "kafka server: The provided group id was empty."
+	case ErrUnknownMemberId:
+		return "kafka server: The provided member is not known in the current generation."
+	case ErrInvalidSessionTimeout:
+		return "kafka server: The provided session timeout is outside the allowed range."
+	case ErrRebalanceInProgress:
+		return "kafka server: A rebalance for the group is in progress. Please re-join the group."
+	case ErrInvalidCommitOffsetSize:
+		return "kafka server: The provided commit metadata was too large."
+	case ErrTopicAuthorizationFailed:
+		return "kafka server: The client is not authorized to access this topic."
+	case ErrGroupAuthorizationFailed:
+		return "kafka server: The client is not authorized to access this group."
+	case ErrClusterAuthorizationFailed:
+		return "kafka server: The client is not authorized to send this request type."
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)

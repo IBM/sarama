@@ -66,6 +66,21 @@ func (pe *prepEncoder) putString(in string) error {
 	return nil
 }
 
+func (pe *prepEncoder) putStringArray(in []string) error {
+	err := pe.putArrayLength(len(in))
+	if err != nil {
+		return err
+	}
+
+	for _, str := range in {
+		if err := pe.putString(str); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (pe *prepEncoder) putInt32Array(in []int32) error {
 	err := pe.putArrayLength(len(in))
 	if err != nil {

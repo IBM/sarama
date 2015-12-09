@@ -95,6 +95,18 @@ func allocateBody(key, version int16) requestBody {
 		return &OffsetFetchRequest{}
 	case 10:
 		return &ConsumerMetadataRequest{}
+	case 11:
+		return &JoinGroupRequest{}
+	case 12:
+		return &HeartbeatRequest{}
+	case 13:
+		return &LeaveGroupRequest{}
+	case 14:
+		return &SyncGroupRequest{}
+	case 15:
+		return &DescribeGroupsRequest{}
+	case 16:
+		return &ListGroupsRequest{}
 	}
 	return nil
 }
