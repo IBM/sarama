@@ -1,0 +1,6 @@
+github.com/Shopify/toxiproxy
+github.com/davecgh/go-spew/spew
+github.com/eapache/go-resiliency/breaker
+github.com/eapache/queue
+github.com/golang/snappy
+github.com/klauspost/crc32

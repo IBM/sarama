@@ -38,11 +38,11 @@ func TestFuncClientMetadata(t *testing.T) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
-	if _, err := client.Leader("unknown_topic", 0); err != ErrUnknownTopicOrPartition {
+	if _, err = client.Leader("unknown_topic", 0); err != ErrUnknownTopicOrPartition {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
-	if _, err := client.Replicas("invalid/topic", 0); err != ErrUnknownTopicOrPartition {
+	if _, err = client.Replicas("invalid/topic", 0); err != ErrUnknownTopicOrPartition {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 

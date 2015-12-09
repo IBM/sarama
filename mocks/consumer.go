@@ -74,7 +74,7 @@ func (c *Consumer) Topics() ([]string, error) {
 	}
 
 	var result []string
-	for topic, _ := range c.metadata {
+	for topic := range c.metadata {
 		result = append(result, topic)
 	}
 	return result, nil
@@ -227,8 +227,10 @@ func (pc *PartitionConsumer) Close() error {
 
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		for _ = range pc.messages {
+		defer func() {
+			wg.Done()
+		}()
+		for range pc.messages {
 			// drain
 		}
 	}()

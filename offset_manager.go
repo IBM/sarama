@@ -172,10 +172,10 @@ type partitionOffsetManager struct {
 	topic     string
 	partition int32
 
+	dirty    bool
 	lock     sync.Mutex
 	offset   int64
 	metadata string
-	dirty    bool
 	clean    chan none
 	broker   *brokerOffsetManager
 

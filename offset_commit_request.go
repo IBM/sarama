@@ -37,9 +37,9 @@ func (r *offsetCommitRequestBlock) decode(pd packetDecoder, version int16) (err 
 
 type OffsetCommitRequest struct {
 	ConsumerGroup           string
-	ConsumerGroupGeneration int32  // v1 or later
 	ConsumerID              string // v1 or later
 	RetentionTime           int64  // v2 or later
+	ConsumerGroupGeneration int32  // v1 or later
 
 	// Version can be:
 	// - 0 (kafka 0.8.1 and later)
