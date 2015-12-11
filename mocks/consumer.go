@@ -74,7 +74,7 @@ func (c *Consumer) Topics() ([]string, error) {
 	}
 
 	var result []string
-	for topic, _ := range c.metadata {
+	for topic := range c.metadata {
 		result = append(result, topic)
 	}
 	return result, nil
@@ -115,7 +115,7 @@ func (c *Consumer) Close() error {
 // Expectation API
 ///////////////////////////////////////////////////
 
-// SetMetadata sets the clusters topic/partition metadata,
+// SetTopicMetadata sets the clusters topic/partition metadata,
 // which will be returned by Topics() and Partitions().
 func (c *Consumer) SetTopicMetadata(metadata map[string][]int32) {
 	c.l.Lock()
