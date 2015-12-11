@@ -2,6 +2,19 @@
 
 #### Version 1.7.0 (trunk)
 
+New Features:
+ - Preliminary support for Kafka 0.9
+   ([#572](https://github.com/Shopify/sarama/pull/572)). This comes with several
+   caveats:
+   - Protocol-layer support is mostly in place
+     ([#577](https://github.com/Shopify/sarama/pull/577)), however Kafka 0.9
+     renamed some messages and fields, which we did not in order to preserve API
+     compatibility.
+   - The producer and consumer work against 0.9, but the offset manager does
+     not ([#573](https://github.com/Shopify/sarama/pull/573)).
+   - TLS support may or may not work
+     ([#581](https://github.com/Shopify/sarama/pull/581)).
+
 Improvements:
  - Don't wait for request timeouts on dead brokers, greatly speeding recovery
    when the TCP connection is left hanging
