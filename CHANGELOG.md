@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.7.0 (trunk)
+#### Version 1.7.0 (2015-12-11)
 
 New Features:
  - Preliminary support for Kafka 0.9
