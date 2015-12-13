@@ -1,16 +1,11 @@
 package sarama
 
 import (
-	"os"
 	"testing"
 )
 
 func TestFuncOffsetManager(t *testing.T) {
 	checkKafkaVersion(t, "0.8.2")
-	if os.Getenv("KAFKA_VERSION") == "0.9.0.0" {
-		t.Skip("Offset manager is broken with kafka 0.9 at the moment.")
-	}
-
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -22,10 +17,6 @@ func TestFuncOffsetManager(t *testing.T) {
 	offsetManager, err := NewOffsetManagerFromClient("sarama.TestFuncOffsetManager", client)
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if _, err := offsetManager.ManagePartition("does_not_exist", 123); err != ErrUnknownTopicOrPartition {
-		t.Fatal("Expected ErrUnknownTopicOrPartition when starting a partition offset manager for a partition that does not exist, got:", err)
 	}
 
 	pom1, err := offsetManager.ManagePartition("test.1", 0)
