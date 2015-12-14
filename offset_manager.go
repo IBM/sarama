@@ -7,8 +7,6 @@ import (
 
 // Offset Manager
 
-const groupGenerationUndefined = -1
-
 // OffsetManager uses Kafka to store and fetch consumed partition offsets.
 type OffsetManager interface {
 	// ManagePartition creates a PartitionOffsetManager on the given topic/partition.
@@ -480,7 +478,7 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 	r := &OffsetCommitRequest{
 		Version:                 1,
 		ConsumerGroup:           bom.parent.group,
-		ConsumerGroupGeneration: groupGenerationUndefined,
+		ConsumerGroupGeneration: GroupGenerationUndefined,
 	}
 
 	for s := range bom.subscriptions {
