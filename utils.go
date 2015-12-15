@@ -99,7 +99,7 @@ type bufConn struct {
 	buf *bufio.Reader
 }
 
-func NewBufConn(conn net.Conn) *bufConn {
+func newBufConn(conn net.Conn) *bufConn {
 	return &bufConn{
 		Conn: conn,
 		buf:  bufio.NewReader(conn),
