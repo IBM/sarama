@@ -85,6 +85,7 @@ func (b *Broker) Open(conf *Config) error {
 			Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, b.connErr)
 			return
 		}
+		b.conn = newBufConn(b.conn)
 
 		b.conf = conf
 		b.done = make(chan bool)
