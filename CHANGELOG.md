@@ -1,5 +1,19 @@
 # Changelog
 
+#### Version 1.8.0 (trunk)
+
+New Features:
+ - Add a missing protocol constant, `GroupGenerationUndefined`
+   ([#586](https://github.com/Shopify/sarama/pull/586)).
+
+Improvements:
+ - Optimize for fewer system calls when reading from the network
+   ([#584](https://github.com/Shopify/sarama/pull/584)).
+
+Bug Fixes:
+ - Fix the OffsetManager to be compatible with Kafka 0.9
+   ([#585](https://github.com/Shopify/sarama/pull/585)).
+
 #### Version 1.7.0 (2015-12-11)
 
 New Features:
