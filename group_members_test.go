@@ -53,9 +53,9 @@ func TestGroupMemberMetadata(t *testing.T) {
 func TestGroupMemberAssignment(t *testing.T) {
 	amt := &GroupMemberAssignment{
 		Version: 1,
-		Topics: []GroupMemberAssignedTopic{
-			{Topic: "one", Partitions: []int32{0, 2, 4}},
-			{Topic: "two", Partitions: []int32{1, 3}},
+		Topics: map[string][]int32{
+			"one": []int32{0, 2, 4},
+			"two": []int32{1, 3},
 		},
 		UserData: []byte{0x01, 0x02, 0x03},
 	}

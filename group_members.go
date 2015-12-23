@@ -38,13 +38,8 @@ func (m *GroupMemberMetadata) decode(pd packetDecoder) (err error) {
 
 type GroupMemberAssignment struct {
 	Version  int16
-	Topics   []GroupMemberAssignedTopic
+	Topics   map[string][]int32
 	UserData []byte
-}
-
-type GroupMemberAssignedTopic struct {
-	Topic      string
-	Partitions []int32
 }
 
 func (m *GroupMemberAssignment) encode(pe packetEncoder) error {
@@ -54,11 +49,11 @@ func (m *GroupMemberAssignment) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for _, topic := range m.Topics {
-		if err := pe.putString(topic.Topic); err != nil {
+	for topic, partitions := range m.Topics {
+		if err := pe.putString(topic); err != nil {
 			return err
 		}
-		if err := pe.putInt32Array(topic.Partitions); err != nil {
+		if err := pe.putInt32Array(partitions); err != nil {
 			return err
 		}
 	}
@@ -80,12 +75,13 @@ func (m *GroupMemberAssignment) decode(pd packetDecoder) (err error) {
 		return
 	}
 
-	m.Topics = make([]GroupMemberAssignedTopic, topicLen)
+	m.Topics = make(map[string][]int32, topicLen)
 	for i := 0; i < topicLen; i++ {
-		if m.Topics[i].Topic, err = pd.getString(); err != nil {
+		var topic string
+		if topic, err = pd.getString(); err != nil {
 			return
 		}
-		if m.Topics[i].Partitions, err = pd.getInt32Array(); err != nil {
+		if m.Topics[topic], err = pd.getInt32Array(); err != nil {
 			return
 		}
 	}
