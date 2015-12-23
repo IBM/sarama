@@ -85,7 +85,7 @@ func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment 
 	r.GroupAssignments[memberId] = memberAssignment
 }
 
-func (r *SyncGroupRequest) AddGroupAssignmentMember(memberId string, memberAssignment *GroupMemberAssignment) error {
+func (r *SyncGroupRequest) AddGroupAssignmentMember(memberId string, memberAssignment *ConsumerGroupMemberAssignment) error {
 	bin, err := encode(memberAssignment)
 	if err != nil {
 		return err

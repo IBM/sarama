@@ -5,8 +5,8 @@ type SyncGroupResponse struct {
 	MemberAssignment []byte
 }
 
-func (r *SyncGroupResponse) GetMemberAssignment() (*GroupMemberAssignment, error) {
-	assignment := new(GroupMemberAssignment)
+func (r *SyncGroupResponse) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
+	assignment := new(ConsumerGroupMemberAssignment)
 	err := decode(r.MemberAssignment, assignment)
 	return assignment, err
 }

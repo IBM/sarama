@@ -1,12 +1,12 @@
 package sarama
 
-type GroupMemberMetadata struct {
+type ConsumerGroupMemberMetadata struct {
 	Version  int16
 	Topics   []string
 	UserData []byte
 }
 
-func (m *GroupMemberMetadata) encode(pe packetEncoder) error {
+func (m *ConsumerGroupMemberMetadata) encode(pe packetEncoder) error {
 	pe.putInt16(m.Version)
 
 	if err := pe.putStringArray(m.Topics); err != nil {
@@ -20,7 +20,7 @@ func (m *GroupMemberMetadata) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (m *GroupMemberMetadata) decode(pd packetDecoder) (err error) {
+func (m *ConsumerGroupMemberMetadata) decode(pd packetDecoder) (err error) {
 	if m.Version, err = pd.getInt16(); err != nil {
 		return
 	}
@@ -36,13 +36,13 @@ func (m *GroupMemberMetadata) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-type GroupMemberAssignment struct {
+type ConsumerGroupMemberAssignment struct {
 	Version  int16
 	Topics   map[string][]int32
 	UserData []byte
 }
 
-func (m *GroupMemberAssignment) encode(pe packetEncoder) error {
+func (m *ConsumerGroupMemberAssignment) encode(pe packetEncoder) error {
 	pe.putInt16(m.Version)
 
 	if err := pe.putArrayLength(len(m.Topics)); err != nil {
@@ -65,7 +65,7 @@ func (m *GroupMemberAssignment) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (m *GroupMemberAssignment) decode(pd packetDecoder) (err error) {
+func (m *ConsumerGroupMemberAssignment) decode(pd packetDecoder) (err error) {
 	if m.Version, err = pd.getInt16(); err != nil {
 		return
 	}

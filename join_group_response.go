@@ -9,10 +9,10 @@ type JoinGroupResponse struct {
 	Members       map[string][]byte
 }
 
-func (r *JoinGroupResponse) GetMembers() (map[string]GroupMemberMetadata, error) {
-	members := make(map[string]GroupMemberMetadata, len(r.Members))
+func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata, error) {
+	members := make(map[string]ConsumerGroupMemberMetadata, len(r.Members))
 	for id, bin := range r.Members {
-		meta := new(GroupMemberMetadata)
+		meta := new(ConsumerGroupMemberMetadata)
 		if err := decode(bin, meta); err != nil {
 			return nil, err
 		}

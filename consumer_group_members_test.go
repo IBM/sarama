@@ -27,8 +27,8 @@ var (
 	}
 )
 
-func TestGroupMemberMetadata(t *testing.T) {
-	meta := &GroupMemberMetadata{
+func TestConsumerGroupMemberMetadata(t *testing.T) {
+	meta := &ConsumerGroupMemberMetadata{
 		Version:  1,
 		Topics:   []string{"one", "two"},
 		UserData: []byte{0x01, 0x02, 0x03},
@@ -41,7 +41,7 @@ func TestGroupMemberMetadata(t *testing.T) {
 		t.Errorf("Encoded data does not match expectation\nexpected: %v\nactual: %v", groupMemberMetadata, buf)
 	}
 
-	meta2 := new(GroupMemberMetadata)
+	meta2 := new(ConsumerGroupMemberMetadata)
 	err = decode(buf, meta2)
 	if err != nil {
 		t.Error("Failed to decode data", err)
@@ -50,8 +50,8 @@ func TestGroupMemberMetadata(t *testing.T) {
 	}
 }
 
-func TestGroupMemberAssignment(t *testing.T) {
-	amt := &GroupMemberAssignment{
+func TestConsumerGroupMemberAssignment(t *testing.T) {
+	amt := &ConsumerGroupMemberAssignment{
 		Version: 1,
 		Topics: map[string][]int32{
 			"one": []int32{0, 2, 4},
@@ -67,7 +67,7 @@ func TestGroupMemberAssignment(t *testing.T) {
 		t.Errorf("Encoded data does not match expectation\nexpected: %v\nactual: %v", groupMemberAssignment, buf)
 	}
 
-	amt2 := new(GroupMemberAssignment)
+	amt2 := new(ConsumerGroupMemberAssignment)
 	err = decode(buf, amt2)
 	if err != nil {
 		t.Error("Failed to decode data", err)
