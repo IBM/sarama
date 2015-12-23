@@ -176,4 +176,52 @@ var brokerTestTable = []struct {
 				t.Error("Offset request got no response!")
 			}
 		}},
+
+	{[]byte{0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := JoinGroupRequest{}
+			response, err := broker.JoinGroup(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("JoinGroup request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := SyncGroupRequest{}
+			response, err := broker.SyncGroup(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("SyncGroup request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := LeaveGroupRequest{}
+			response, err := broker.LeaveGroup(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("LeaveGroup request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := HeartbeatRequest{}
+			response, err := broker.Heartbeat(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Heartbeat request got no response!")
+			}
+		}},
 }

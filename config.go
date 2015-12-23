@@ -54,6 +54,20 @@ type Config struct {
 		RefreshFrequency time.Duration
 	}
 
+	// Group is the namespace for group management properties
+	Group struct {
+		Session struct {
+			// The allowed session timeout for registered consumers (defaults to 30s).
+			// Must be within the allowed server range.
+			Timeout time.Duration
+		}
+		Heartbeat struct {
+			// Interval between each heartbeat (defaults to 3s). It should be no more
+			// than 1/3rd of the Group.Session.Timout setting
+			Interval time.Duration
+		}
+	}
+
 	// Producer is the namespace for configuration related to producing messages,
 	// used by the Producer.
 	Producer struct {
@@ -211,6 +225,9 @@ func NewConfig() *Config {
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
 	c.Metadata.RefreshFrequency = 10 * time.Minute
+
+	c.Group.Session.Timeout = 30 * time.Second
+	c.Group.Heartbeat.Interval = 3 * time.Second
 
 	c.Producer.MaxMessageBytes = 1000000
 	c.Producer.RequiredAcks = WaitForLocal
