@@ -54,20 +54,6 @@ type Config struct {
 		RefreshFrequency time.Duration
 	}
 
-	// Group is the namespace for group management properties
-	Group struct {
-		Session struct {
-			// The allowed session timeout for registered consumers (defaults to 30s).
-			// Must be within the allowed server range.
-			Timeout time.Duration
-		}
-		Heartbeat struct {
-			// Interval between each heartbeat (defaults to 3s). It should be no more
-			// than 1/3rd of the Group.Session.Timout setting
-			Interval time.Duration
-		}
-	}
-
 	// Producer is the namespace for configuration related to producing messages,
 	// used by the Producer.
 	Producer struct {
@@ -226,9 +212,6 @@ func NewConfig() *Config {
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
 	c.Metadata.RefreshFrequency = 10 * time.Minute
 
-	c.Group.Session.Timeout = 30 * time.Second
-	c.Group.Heartbeat.Interval = 3 * time.Second
-
 	c.Producer.MaxMessageBytes = 1000000
 	c.Producer.RequiredAcks = WaitForLocal
 	c.Producer.Timeout = 10 * time.Second
@@ -276,12 +259,6 @@ func (c *Config) Validate() error {
 	if c.Consumer.MaxWaitTime%time.Millisecond != 0 {
 		Logger.Println("Consumer.MaxWaitTime only supports millisecond precision; nanoseconds will be truncated.")
 	}
-	if c.Group.Heartbeat.Interval%time.Millisecond != 0 {
-		Logger.Println("Group.Heartbeat.Interval only supports millisecond precision; nanoseconds will be truncated.")
-	}
-	if c.Group.Session.Timeout%time.Millisecond != 0 {
-		Logger.Println("Group.Session.Timeout only supports millisecond precision; nanoseconds will be truncated.")
-	}
 	if c.ClientID == "sarama" {
 		Logger.Println("ClientID is the default of 'sarama', you should consider setting it to something application-specific.")
 	}
@@ -308,14 +285,6 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Metadata.Retry.Backoff must be >= 0")
 	case c.Metadata.RefreshFrequency < 0:
 		return ConfigurationError("Metadata.RefreshFrequency must be >= 0")
-	}
-
-	// validate the Group values
-	switch {
-	case c.Group.Heartbeat.Interval <= 0:
-		return ConfigurationError("Group.Heartbeat.Interval must be > 0")
-	case c.Group.Session.Timeout <= 0:
-		return ConfigurationError("Group.Session.Timeout must be > 0")
 	}
 
 	// validate the Producer values
