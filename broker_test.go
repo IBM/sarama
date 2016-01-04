@@ -224,4 +224,28 @@ var brokerTestTable = []struct {
 				t.Error("Heartbeat request got no response!")
 			}
 		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := ListGroupsRequest{}
+			response, err := broker.ListGroups(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("ListGroups request got no response!")
+			}
+		}},
+
+	{[]byte{0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := DescribeGroupsRequest{}
+			response, err := broker.DescribeGroups(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("DescribeGroups request got no response!")
+			}
+		}},
 }
