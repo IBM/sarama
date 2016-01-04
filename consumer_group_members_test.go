@@ -16,13 +16,10 @@ var (
 	}
 	groupMemberAssignment = []byte{
 		0, 1, // Version
-		0, 0, 0, 2, // Topic array length
+		0, 0, 0, 1, // Topic array length
 		0, 3, 'o', 'n', 'e', // Topic one
 		0, 0, 0, 3, // Topic one, partition array length
 		0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 4, // 0, 2, 4
-		0, 3, 't', 'w', 'o', // Topic two
-		0, 0, 0, 2, // Topic two, partition array length
-		0, 0, 0, 1, 0, 0, 0, 3, // 1, 3
 		0, 0, 0, 3, 0x01, 0x02, 0x03, // Userdata
 	}
 )
@@ -55,7 +52,6 @@ func TestConsumerGroupMemberAssignment(t *testing.T) {
 		Version: 1,
 		Topics: map[string][]int32{
 			"one": []int32{0, 2, 4},
-			"two": []int32{1, 3},
 		},
 		UserData: []byte{0x01, 0x02, 0x03},
 	}
