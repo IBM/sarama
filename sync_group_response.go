@@ -5,6 +5,12 @@ type SyncGroupResponse struct {
 	MemberAssignment *MemberAssignment
 }
 
+func (r *SyncGroupResponse) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
+	assignment := new(ConsumerGroupMemberAssignment)
+	err := decode(r.MemberAssignment, assignment)
+	return assignment, err
+}
+
 func (r *SyncGroupResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
 
