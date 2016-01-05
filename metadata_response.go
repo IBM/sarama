@@ -5,7 +5,7 @@ type PartitionMetadata struct {
 	ID       int32
 	Leader   int32
 	Replicas []int32
-	Isr      []int32
+	ISR      []int32
 }
 
 func (pm *PartitionMetadata) decode(pd packetDecoder) (err error) {
@@ -30,7 +30,7 @@ func (pm *PartitionMetadata) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	pm.Isr, err = pd.getInt32Array()
+	pm.ISR, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (pm *PartitionMetadata) encode(pe packetEncoder) (err error) {
 		return err
 	}
 
-	err = pe.putInt32Array(pm.Isr)
+	err = pe.putInt32Array(pm.ISR)
 	if err != nil {
 		return err
 	}
@@ -221,7 +221,7 @@ foundPartition:
 
 	pmatch.Leader = brokerID
 	pmatch.Replicas = replicas
-	pmatch.Isr = isr
+	pmatch.ISR = isr
 	pmatch.Err = err
 
 }

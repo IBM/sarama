@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"container/heap"
+	"encoding/json"
 )
 
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
@@ -22,6 +24,25 @@ type ConsumerError struct {
 	Topic     string
 	Partition int32
 	Err       error
+}
+
+type SubscriptionOperation int
+
+const (
+	SubscriptionAdd SubscriptionOperation = iota
+	SubscriptionRemove SubscriptionOperation = iota
+	SubscriptionDone SubscriptionOperation = iota
+)
+
+type Subscription struct {
+	Topic string
+	Partition int32
+	Offset int64
+}
+
+type RebalanceEvent struct {
+	Subscriptions []*Subscription
+	Type	  SubscriptionOperation
 }
 
 func (ce ConsumerError) Error() string {
@@ -41,9 +62,6 @@ func (ce ConsumerErrors) Error() string {
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
 //
-// Sarama's Consumer type does not currently support automatic consumer group rebalancing and offset tracking,
-// however the https://github.com/wvanbergen/kafka library builds on Sarama to add this support. We plan
-// to properly integrate this functionality at a later date.
 type Consumer interface {
 
 	// Topics returns the set of available topics as retrieved from the cluster
@@ -55,6 +73,7 @@ type Consumer interface {
 	// This method is the same as Client.Partitions(), and is provided for convenience.
 	Partitions(topic string) ([]int32, error)
 
+	JoinGroup(consumerGroup string, sessionTimeout int32) (TopicConsumer, <-chan *RebalanceEvent, error)
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with
 	// the given offset. It will return an error if this Consumer is already consuming
 	// on the given topic/partition. Offset can be a literal offset, or OffsetNewest
@@ -73,7 +92,18 @@ type consumer struct {
 
 	lock            sync.Mutex
 	children        map[string]map[int32]*partitionConsumer
+	topicChildren	map[string]*topicConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
+
+	memberId              string
+	consumerGroupLeaderId string
+	consumerGroup         string
+	generationId          int32
+
+	memberAssignment	  *MemberAssignment
+	rebalanceEvents		  chan *RebalanceEvent
+
+	heartbeatControl      chan string
 }
 
 // NewConsumer creates a new consumer using the given broker addresses and configuration.
@@ -110,6 +140,15 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 }
 
 func (c *consumer) Close() error {
+	c.heartbeatControl <- "stop"
+
+	if c.consumerGroup != "" {
+		err := c.leaveGroup()
+		if err != nil {
+			return err
+		}
+	}
+
 	if c.ownClient {
 		return c.client.Close()
 	}
@@ -124,18 +163,128 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 	return c.client.Partitions(topic)
 }
 
+func (c *consumer) JoinGroup(consumerGroup string, sessionTimeout int32) (TopicConsumer, <-chan *RebalanceEvent, error)  {
+	if (c.consumerGroup != "") {
+		return nil, nil, errors.New("Already joining or joined group")
+	}
+
+	topicName := "GPS_Ingress"
+
+	coordinator, err := c.client.Coordinator(consumerGroup)
+	if (err != nil) {
+		return nil, nil, err
+	}
+
+	if (c.memberId != "") {
+		hbr := new(HeartbeatRequest)
+		hbr.GenerationId = -1
+		hbr.GroupId = consumerGroup
+		hbr.MemberId = c.memberId
+
+		response, err := coordinator.HeartbeatRequest(hbr)
+
+		if (err != nil) {
+			return nil, nil, err
+		}
+
+		if (response.Err == ErrIllegalGeneration) {
+			// Cluster is rebalancing, stop everything and run
+			panic("Cluster is rebalancing, stop everything and run")
+		} else if (response.Err != ErrNoError) {
+			return nil, nil, response.Err
+		}
+	}
+
+	pm := new(ProtocolMetadata)
+	pm.Subscription = []string{topicName}
+	pm.Version= 1
+	pm.UserData = []byte{0}
+
+	jgr := new(JoinGroupRequest)
+	jgr.GroupId = consumerGroup
+	jgr.MemberId = c.memberId
+	jgr.SessionTimeout = sessionTimeout
+	jgr.ProtocolType = "consumer"
+	jgr.AddGroupProtocol("BMC", pm)
+
+	response, err := coordinator.JoinGroup(jgr)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if response.Err != ErrNoError {
+		return nil, nil, response.Err
+	}
+
+	c.rebalanceEvents = make(chan *RebalanceEvent)
+
+	c.memberId = response.MemberId
+	c.consumerGroupLeaderId = response.LeaderId
+	c.generationId = response.GenerationId
+	c.consumerGroup = consumerGroup
+
+	groupedConsumer, err := c.getTopicConsumer(topicName)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	go c.topicManager(response, topicName)
+
+	return groupedConsumer, c.rebalanceEvents, nil
+}
+
+func (c *consumer) topicManager(response *JoinGroupResponse, topicName string) {
+	subscriptions := make(map[string][]string)
+	for memberId, metadata := range response.Members {
+		subscriptions[memberId] = metadata.Subscription
+	}
+
+	err := c.syncConsumerGroup(subscriptions)
+	if err != nil {
+		panic(err)
+	}
+
+	err = c.startHeartbeat()
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
-	child := &partitionConsumer{
-		consumer:  c,
-		conf:      c.conf,
-		topic:     topic,
-		partition: partition,
-		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
-		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
-		feeder:    make(chan *FetchResponse, 1),
-		trigger:   make(chan none, 1),
-		dying:     make(chan none),
-		fetchSize: c.conf.Consumer.Fetch.Default,
+	return c.consumePartition(topic, partition, offset, nil)
+}
+
+func (c *consumer) consumePartition(topic string, partition int32, offset int64, parent *topicConsumer) (PartitionConsumer, error) {
+	var child *partitionConsumer
+	if (parent == nil) {
+		child = &partitionConsumer{
+			consumer:  c,
+			conf:      c.conf,
+			topic:     topic,
+			partition: partition,
+			messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
+			errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
+			feeder:    make(chan *FetchResponse, 1),
+			trigger:   make(chan none, 1),
+			dying:     make(chan none),
+			fetchSize: c.conf.Consumer.Fetch.Default,
+		}
+	} else {
+		child = &partitionConsumer{
+			consumer:  c,
+			conf:      c.conf,
+			topic:     topic,
+			partition: partition,
+			messages:  parent.messages,
+			errors:    parent.errors,
+			feeder:    make(chan *FetchResponse, 1),
+			trigger:   make(chan none, 1),
+			dying:     make(chan none),
+			fetchSize: c.conf.Consumer.Fetch.Default,
+		}
+
+		parent.liveChildren++
 	}
 
 	if err := child.chooseStartingOffset(offset); err != nil {
@@ -268,6 +417,7 @@ type PartitionConsumer interface {
 
 type partitionConsumer struct {
 	consumer  *consumer
+	parent	  *topicConsumer
 	conf      *Config
 	topic     string
 	partition int32
@@ -433,8 +583,12 @@ feederLoop:
 		child.broker.acks.Done()
 	}
 
-	close(child.messages)
-	close(child.errors)
+	if (child.parent == nil || child.parent.liveChildren == 0) {
+		close(child.messages)
+		close(child.errors)
+	} else {
+		child.parent.liveChildren--
+	}
 }
 
 func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*ConsumerMessage, error) {
@@ -687,4 +841,325 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 
 	return bc.broker.Fetch(request)
+}
+
+func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) error {
+	if (c.consumerGroup == "") {
+		return errors.New("No active consumer group, cannot sync")
+	}
+
+	syncGroup := new(SyncGroupRequest)
+	syncGroup.GenerationId = c.generationId
+	syncGroup.GroupId = c.consumerGroup
+	syncGroup.MemberId = c.memberId
+
+	assignments, err := c.rebalanceConsumers(memberSubscriptions)
+	if err != nil {
+		return err
+	}
+
+	var renderedAssignments = make(map[string]*MemberAssignment)
+	for memberId, topics := range assignments {
+		ma := new(MemberAssignment)
+		ma.UserData = []byte{0,1}
+		ma.Version = 1
+		ma.PartitionAssignment = topics
+
+		renderedAssignments[memberId] = ma
+	}
+
+	syncGroup.GroupAssignment = renderedAssignments
+
+	coordinator, err := c.client.Coordinator(c.consumerGroup)
+	if err != nil {
+		return err
+	}
+
+	result, err := coordinator.SyncConsumerGroup(syncGroup)
+	if err != nil {
+		return err
+	}
+
+	if result.Err != ErrNoError {
+		return err
+	} else {
+		if err := c.communicateSubscriptionChanges(result.MemberAssignment); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *consumer) communicateSubscriptionChanges(newAssignments *MemberAssignment) error {
+	adds, rems := c.diffSubscriptions(newAssignments)
+
+	var changes []*Subscription
+	changes = []*Subscription{}
+
+	for topic, parts := range rems {
+		topicChildren := c.children[topic]
+		for _, part := range parts {
+			if topicChildren != nil && topicChildren[part] != nil {
+				child := topicChildren[part]
+				c.removeChild(child)
+				changes = append(changes, &Subscription{Topic: topic, Partition: part, Offset: child.offset})
+			}
+		}
+	}
+
+	if len(changes) != 0 {
+		c.rebalanceEvents <- &RebalanceEvent{Subscriptions: changes, Type: SubscriptionRemove}
+	}
+
+	changes = []*Subscription{}
+
+	for topic, parts := range adds {
+		topicChildren := c.children[topic]
+		for _, part := range parts {
+			if topicChildren == nil || topicChildren[part] == nil {
+				changes = append(changes, &Subscription{Topic: topic, Partition: part, Offset: OffsetNewest})
+			}
+		}
+	}
+
+	derp, _ := json.Marshal(changes)
+	fmt.Println(string(derp))
+
+	if len(changes) != 0 {
+		c.rebalanceEvents <- &RebalanceEvent{Subscriptions: changes, Type: SubscriptionAdd}
+
+		for _, change := range changes {
+			topicConsumer, err := c.getTopicConsumer(change.Topic)
+			if err != nil {
+				return err
+			}
+			_, err = c.consumePartition(change.Topic, change.Partition, change.Offset, topicConsumer)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	c.memberAssignment = newAssignments
+
+	return nil
+}
+
+func (c *consumer) diffSubscriptions(assignments *MemberAssignment) (additions map[string][]int32, removals map[string][]int32) {
+	// Diff with current assignments to see what has changed
+	removals = make(map[string][]int32)
+	additions = make(map[string][]int32)
+
+	if (c.memberAssignment == nil) {
+		for topic, parts := range assignments.PartitionAssignment {
+			for _, part := range parts {
+				additions[topic] = append(additions[topic], part)
+			}
+		}
+
+		return additions, removals
+	}
+
+	for topic, parts := range assignments.PartitionAssignment {
+		if activeParts, ok := c.memberAssignment.PartitionAssignment[topic]; ok {
+			for _, part := range parts {
+				if !IntInSlice(activeParts, part) {
+					additions[topic] = append(additions[topic], part)
+				}
+			}
+		} else {
+			additions[topic] = parts
+			continue
+		}
+	}
+
+	for topic, parts := range c.memberAssignment.PartitionAssignment {
+		if newParts, ok := assignments.PartitionAssignment[topic]; ok {
+			for _, part := range parts {
+				if !IntInSlice(newParts, part) {
+					removals[topic] = append(additions[topic], part)
+				}
+			}
+		} else {
+			removals[topic] = parts
+		}
+	}
+
+	return additions, removals
+}
+
+func (c *consumer) rebalanceConsumers(members map[string][]string) (map[string]map[string][]int32, error) {
+	assignments := make(map[string]map[string][]int32)
+	subscribeCount := make(map[string][]string)
+
+	// Group member subscriptions
+	for memberId, subscriptions := range members {
+		for _, subscription := range subscriptions {
+			if subscribeCount[subscription] == nil {
+				subscribeCount[subscription] = []string{}
+			}
+			subscribeCount[subscription] = append(subscribeCount[subscription], memberId)
+		}
+	}
+
+	// Preliminary round-robin assignment
+	for topic, members := range subscribeCount {
+		dequeue := &Int32Heap{}
+		heap.Init(dequeue)
+
+		partitions, err := c.client.Partitions(topic)
+		if err != nil {
+			return nil, err
+		}
+
+		for partition := range partitions {
+			dequeue.Push(int32(partition))
+		}
+
+		assignmentLoop:
+		for {
+			for _, memberId := range members {
+				if assignments[memberId] == nil {
+					assignments[memberId] = make(map[string][]int32)
+				}
+				if assignments[memberId][topic] == nil {
+					assignments[memberId][topic] = []int32{}
+				}
+
+				part, ok := dequeue.Pop().(int32)
+				if ok == false {
+					return nil, errors.New("Partitions heap contains rubbish")
+				}
+
+				assignments[memberId][topic] = append(assignments[memberId][topic], part)
+
+				if (dequeue.Len() == 0) {
+					break assignmentLoop
+				}
+			}
+		}
+	}
+
+	return assignments, nil
+}
+
+func (c *consumer) leaveGroup() error {
+	coord, err := c.client.Coordinator(c.consumerGroup)
+	if err != nil {
+		return err
+	}
+
+	lgr := new (LeaveGroupRequest)
+	lgr.GroupId = c.consumerGroup
+	lgr.MemberId = c.memberId
+	resp, err := coord.LeaveGroup(lgr)
+	if err != nil {
+		return err
+	}
+
+	if resp.Err != ErrNoError {
+		return resp.Err
+	}
+
+	c.consumerGroup = ""
+
+	return nil
+}
+
+type TopicConsumer interface {
+	Messages()	<-chan *ConsumerMessage
+	Errors()	<-chan *ConsumerError
+	Close()		error
+}
+
+func (tc *topicConsumer) Messages() <-chan *ConsumerMessage {
+	return tc.messages
+}
+
+func (tc *topicConsumer) Errors() <-chan *ConsumerError {
+	return tc.errors
+}
+
+func (tc *topicConsumer) Close() error {
+	return nil
+}
+
+type topicConsumer struct {
+	consumer *consumer
+	messages chan *ConsumerMessage
+	errors   chan *ConsumerError
+	topic	 string
+	liveChildren int
+}
+
+func (c *consumer) getTopicConsumer(topic string) (*topicConsumer, error) {
+	if c.topicChildren == nil {
+		c.topicChildren = make(map[string]*topicConsumer)
+	}
+
+	if c.topicChildren[topic] != nil {
+		return c.topicChildren[topic], nil
+	}
+
+	child := &topicConsumer{
+		consumer:  c,
+		topic:     topic,
+		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
+		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
+	}
+
+	c.topicChildren[topic] = child
+
+	return child, nil
+}
+
+func (c *consumer) startHeartbeat() error {
+	c.heartbeatControl = make(chan string)
+	go c.heartbeat(c.heartbeatControl)
+
+	return nil
+}
+
+func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
+	heartbeatTicker := time.NewTicker(1 * time.Second)
+
+	go func() error {
+		for {
+			select {
+			case <-heartbeatTicker.C:
+				hbr := new(HeartbeatRequest)
+				hbr.GenerationId = c.generationId
+				hbr.GroupId = c.consumerGroup
+				hbr.MemberId = c.memberId
+
+				coord, err := c.client.Coordinator(c.consumerGroup)
+				if err != nil {
+					fmt.Println(err)
+					return err
+				}
+
+				resp, err := coord.HeartbeatRequest(hbr)
+				if err != nil {
+					return err
+				} else if resp.Err == ErrIllegalGeneration {
+					panic("rebalance")
+					// cluster rebalance is happening
+				} else if resp.Err == ErrNotCoordinatorForConsumer {
+					// heartbeating the wrong broker
+					fmt.Println("Heartbeating the wrong broker")
+				} else if resp.Err != ErrNoError {
+					return KError(resp.Err)
+				}
+			case controlMessage := <-heartbeatChannel:
+				fmt.Println("Received heartbeat control message: ", controlMessage)
+				if controlMessage == "close" {
+					heartbeatTicker.Stop()
+					return nil
+				}
+			}
+		}
+	}()
+
+	return nil
 }

@@ -6,7 +6,7 @@ type JoinGroupResponse struct {
 	GroupProtocol string
 	LeaderId      string
 	MemberId      string
-	Members       map[string][]byte
+	Members       map[string]*ProtocolMetadata
 }
 
 func (r *JoinGroupResponse) encode(pe packetEncoder) error {
@@ -32,8 +32,12 @@ func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 			return err
 		}
 
-		if err := pe.putBytes(memberMetadata); err != nil {
-			return err
+		if data, err := encode(memberMetadata); err != nil {
+			return nil
+		} else {
+			if err := pe.putBytes(data); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -71,7 +75,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder) (err error) {
 		return nil
 	}
 
-	r.Members = make(map[string][]byte)
+	r.Members = make(map[string]*ProtocolMetadata)
 	for i := 0; i < n; i++ {
 		memberId, err := pd.getString()
 		if err != nil {
@@ -83,7 +87,12 @@ func (r *JoinGroupResponse) decode(pd packetDecoder) (err error) {
 			return err
 		}
 
-		r.Members[memberId] = memberMetadata
+		pm := new(ProtocolMetadata)
+		if err := decode(memberMetadata, pm); err != nil {
+			return nil
+		}
+
+		r.Members[memberId] = pm
 	}
 
 	return nil

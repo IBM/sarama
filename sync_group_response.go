@@ -2,12 +2,22 @@ package sarama
 
 type SyncGroupResponse struct {
 	Err              KError
-	MemberAssignment []byte
+	MemberAssignment *MemberAssignment
 }
 
 func (r *SyncGroupResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
-	return pe.putBytes(r.MemberAssignment)
+
+	maBytes, err := encode(r.MemberAssignment)
+	if err != nil {
+		return err
+	}
+
+	if err := pe.putBytes(maBytes); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *SyncGroupResponse) decode(pd packetDecoder) (err error) {
@@ -17,6 +27,17 @@ func (r *SyncGroupResponse) decode(pd packetDecoder) (err error) {
 		r.Err = KError(kerr)
 	}
 
-	r.MemberAssignment, err = pd.getBytes()
-	return
+	maBytes, err := pd.getBytes()
+	if err != nil {
+		return err
+	}
+
+	memberAssignment := new (MemberAssignment)
+	if err := decode(maBytes, memberAssignment); err != nil {
+		return err
+	}
+
+	r.MemberAssignment = memberAssignment
+
+	return nil
 }

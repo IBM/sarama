@@ -1,8 +1,6 @@
 package sarama
 
 import (
-	"bufio"
-	"net"
 	"sort"
 )
 
@@ -92,20 +90,35 @@ func (b ByteEncoder) Length() int {
 	return len(b)
 }
 
-// bufConn wraps a net.Conn with a buffer for reads to reduce the number of
-// reads that trigger syscalls.
-type bufConn struct {
-	net.Conn
-	buf *bufio.Reader
+
+// An IntHeap is a min-heap of ints.
+// https://golang.org/pkg/container/heap/#example__intHeap
+type Int32Heap []int32
+
+func (h Int32Heap) Len() int           { return len(h) }
+func (h Int32Heap) Less(i, j int) bool { return h[i] < h[j] }
+func (h Int32Heap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *Int32Heap) Push(x interface{}) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(int32))
 }
 
-func newBufConn(conn net.Conn) *bufConn {
-	return &bufConn{
-		Conn: conn,
-		buf:  bufio.NewReader(conn),
+func (h *Int32Heap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
+func IntInSlice(ints []int32, int int32) bool {
+	for _, i := range ints {
+		if i == int {
+			return true
+		}
 	}
-}
 
-func (bc *bufConn) Read(b []byte) (n int, err error) {
-	return bc.buf.Read(b)
+	return false
 }

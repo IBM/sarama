@@ -5,7 +5,7 @@ type JoinGroupRequest struct {
 	SessionTimeout int32
 	MemberId       string
 	ProtocolType   string
-	GroupProtocols map[string][]byte
+	GroupProtocols map[string]*ProtocolMetadata
 }
 
 func (r *JoinGroupRequest) encode(pe packetEncoder) error {
@@ -27,7 +27,12 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 		if err := pe.putString(name); err != nil {
 			return err
 		}
-		if err := pe.putBytes(metadata); err != nil {
+
+		data, err := encode(metadata)
+		if (err != nil) {
+			return err
+		}
+		if err := pe.putBytes(data); err != nil {
 			return err
 		}
 	}
@@ -37,19 +42,19 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 
 func (r *JoinGroupRequest) decode(pd packetDecoder) (err error) {
 	if r.GroupId, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 
 	if r.SessionTimeout, err = pd.getInt32(); err != nil {
-		return
+		return err
 	}
 
 	if r.MemberId, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 
 	if r.ProtocolType, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 
 	n, err := pd.getArrayLength()
@@ -60,18 +65,24 @@ func (r *JoinGroupRequest) decode(pd packetDecoder) (err error) {
 		return nil
 	}
 
-	r.GroupProtocols = make(map[string][]byte)
+	r.GroupProtocols = make(map[string]*ProtocolMetadata)
 	for i := 0; i < n; i++ {
 		name, err := pd.getString()
 		if err != nil {
 			return err
 		}
-		metadata, err := pd.getBytes()
-		if err != nil {
+
+		if data, err := pd.getBytes(); err != nil {
 			return err
+		} else {
+			protocolMetadata := new(ProtocolMetadata)
+			if err := decode(data, protocolMetadata); err != nil {
+				return err
+			}
+
+			r.GroupProtocols[name] = protocolMetadata
 		}
 
-		r.GroupProtocols[name] = metadata
 	}
 
 	return nil
@@ -85,9 +96,9 @@ func (r *JoinGroupRequest) version() int16 {
 	return 0
 }
 
-func (r *JoinGroupRequest) AddGroupProtocol(name string, metadata []byte) {
+func (r *JoinGroupRequest) AddGroupProtocol(name string, metadata *ProtocolMetadata) {
 	if r.GroupProtocols == nil {
-		r.GroupProtocols = make(map[string][]byte)
+		r.GroupProtocols = make(map[string]*ProtocolMetadata)
 	}
 
 	r.GroupProtocols[name] = metadata
