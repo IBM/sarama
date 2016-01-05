@@ -5,10 +5,15 @@
 New Features:
  - Add a missing protocol constant, `GroupGenerationUndefined`
    ([#586](https://github.com/Shopify/sarama/pull/586)).
+ - Finish up the last pieces of Kafka 0.9 protocol support
+   ([#588](https://github.com/Shopify/sarama/pull/588),
+   [#590](https://github.com/Shopify/sarama/pull/590)).
 
 Improvements:
  - Optimize for fewer system calls when reading from the network
    ([#584](https://github.com/Shopify/sarama/pull/584)).
+ - Automatically retry `InvalidMessage` errors to match upstream behaviour
+   ([#589](https://github.com/Shopify/sarama/pull/589)).
 
 Bug Fixes:
  - Fix the OffsetManager to be compatible with Kafka 0.9
