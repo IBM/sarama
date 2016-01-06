@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 	"container/heap"
-	"encoding/json"
 )
 
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
@@ -928,9 +927,6 @@ func (c *consumer) communicateSubscriptionChanges(newAssignments *ConsumerGroupM
 			}
 		}
 	}
-
-	derp, _ := json.Marshal(changes)
-	fmt.Println(string(derp))
 
 	if len(changes) != 0 {
 		c.rebalanceEvents <- &RebalanceEvent{Subscriptions: changes, Type: SubscriptionAdd}
