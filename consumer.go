@@ -73,7 +73,7 @@ type Consumer interface {
 	// This method is the same as Client.Partitions(), and is provided for convenience.
 	Partitions(topic string) ([]int32, error)
 
-	JoinGroup(consumerGroup string, sessionTimeout int32) (TopicConsumer, <-chan *RebalanceEvent, error)
+	JoinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error)
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with
 	// the given offset. It will return an error if this Consumer is already consuming
 	// on the given topic/partition. Offset can be a literal offset, or OffsetNewest
@@ -100,7 +100,7 @@ type consumer struct {
 	consumerGroup         string
 	generationId          int32
 
-	memberAssignment	  *MemberAssignment
+	memberAssignment	  *ConsumerGroupMemberAssignment
 	rebalanceEvents		  chan *RebalanceEvent
 
 	heartbeatControl      chan string
@@ -163,12 +163,10 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 	return c.client.Partitions(topic)
 }
 
-func (c *consumer) JoinGroup(consumerGroup string, sessionTimeout int32) (TopicConsumer, <-chan *RebalanceEvent, error)  {
+func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error)  {
 	if (c.consumerGroup != "") {
 		return nil, nil, errors.New("Already joining or joined group")
 	}
-
-	topicName := "GPS_Ingress"
 
 	coordinator, err := c.client.Coordinator(consumerGroup)
 	if (err != nil) {
@@ -195,17 +193,17 @@ func (c *consumer) JoinGroup(consumerGroup string, sessionTimeout int32) (TopicC
 		}
 	}
 
-	pm := new(ProtocolMetadata)
-	pm.Subscription = []string{topicName}
-	pm.Version= 1
-	pm.UserData = []byte{0}
+	cgmm := new(ConsumerGroupMemberMetadata)
+	cgmm.Topics = []string{topicName}
+	cgmm.Version= 1
+	cgmm.UserData = []byte{0}
 
 	jgr := new(JoinGroupRequest)
 	jgr.GroupId = consumerGroup
 	jgr.MemberId = c.memberId
-	jgr.SessionTimeout = sessionTimeout
+	jgr.SessionTimeout = int32(c.conf.Consumer.SessionTimeout.Seconds())
 	jgr.ProtocolType = "consumer"
-	jgr.AddGroupProtocol("BMC", pm)
+	jgr.AddGroupProtocolMetadata("sarama-0", cgmm)
 
 	response, err := coordinator.JoinGroup(jgr)
 
@@ -236,11 +234,17 @@ func (c *consumer) JoinGroup(consumerGroup string, sessionTimeout int32) (TopicC
 
 func (c *consumer) topicManager(response *JoinGroupResponse, topicName string) {
 	subscriptions := make(map[string][]string)
-	for memberId, metadata := range response.Members {
-		subscriptions[memberId] = metadata.Subscription
+
+	members, err := response.GetMembers()
+	if err != nil {
+		panic(err)
 	}
 
-	err := c.syncConsumerGroup(subscriptions)
+	for memberId, metadata := range members {
+		subscriptions[memberId] = metadata.Topics
+	}
+
+	err = c.syncConsumerGroup(subscriptions)
 	if err != nil {
 		panic(err)
 	}
@@ -858,17 +862,14 @@ func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) er
 		return err
 	}
 
-	var renderedAssignments = make(map[string]*MemberAssignment)
 	for memberId, topics := range assignments {
-		ma := new(MemberAssignment)
+		ma := new(ConsumerGroupMemberAssignment)
 		ma.UserData = []byte{0,1}
 		ma.Version = 1
-		ma.PartitionAssignment = topics
+		ma.Topics = topics
 
-		renderedAssignments[memberId] = ma
+		syncGroup.AddGroupAssignmentMember(memberId, ma)
 	}
-
-	syncGroup.GroupAssignment = renderedAssignments
 
 	coordinator, err := c.client.Coordinator(c.consumerGroup)
 	if err != nil {
@@ -883,7 +884,12 @@ func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) er
 	if result.Err != ErrNoError {
 		return err
 	} else {
-		if err := c.communicateSubscriptionChanges(result.MemberAssignment); err != nil {
+		memberAssignment, err := result.GetMemberAssignment()
+		if err != nil {
+			return err
+		}
+
+		if err := c.communicateSubscriptionChanges(memberAssignment); err != nil {
 			return err
 		}
 	}
@@ -891,7 +897,7 @@ func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) er
 	return nil
 }
 
-func (c *consumer) communicateSubscriptionChanges(newAssignments *MemberAssignment) error {
+func (c *consumer) communicateSubscriptionChanges(newAssignments *ConsumerGroupMemberAssignment) error {
 	adds, rems := c.diffSubscriptions(newAssignments)
 
 	var changes []*Subscription
@@ -946,13 +952,13 @@ func (c *consumer) communicateSubscriptionChanges(newAssignments *MemberAssignme
 	return nil
 }
 
-func (c *consumer) diffSubscriptions(assignments *MemberAssignment) (additions map[string][]int32, removals map[string][]int32) {
+func (c *consumer) diffSubscriptions(assignments *ConsumerGroupMemberAssignment) (additions map[string][]int32, removals map[string][]int32) {
 	// Diff with current assignments to see what has changed
 	removals = make(map[string][]int32)
 	additions = make(map[string][]int32)
 
 	if (c.memberAssignment == nil) {
-		for topic, parts := range assignments.PartitionAssignment {
+		for topic, parts := range assignments.Topics {
 			for _, part := range parts {
 				additions[topic] = append(additions[topic], part)
 			}
@@ -961,8 +967,8 @@ func (c *consumer) diffSubscriptions(assignments *MemberAssignment) (additions m
 		return additions, removals
 	}
 
-	for topic, parts := range assignments.PartitionAssignment {
-		if activeParts, ok := c.memberAssignment.PartitionAssignment[topic]; ok {
+	for topic, parts := range assignments.Topics {
+		if activeParts, ok := c.memberAssignment.Topics[topic]; ok {
 			for _, part := range parts {
 				if !IntInSlice(activeParts, part) {
 					additions[topic] = append(additions[topic], part)
@@ -974,8 +980,8 @@ func (c *consumer) diffSubscriptions(assignments *MemberAssignment) (additions m
 		}
 	}
 
-	for topic, parts := range c.memberAssignment.PartitionAssignment {
-		if newParts, ok := assignments.PartitionAssignment[topic]; ok {
+	for topic, parts := range c.memberAssignment.Topics {
+		if newParts, ok := assignments.Topics[topic]; ok {
 			for _, part := range parts {
 				if !IntInSlice(newParts, part) {
 					removals[topic] = append(additions[topic], part)

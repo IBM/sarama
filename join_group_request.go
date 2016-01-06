@@ -5,7 +5,7 @@ type JoinGroupRequest struct {
 	SessionTimeout int32
 	MemberId       string
 	ProtocolType   string
-	GroupProtocols map[string]*ProtocolMetadata
+	GroupProtocols map[string][]byte
 }
 
 func (r *JoinGroupRequest) encode(pe packetEncoder) error {
@@ -28,11 +28,7 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 			return err
 		}
 
-		data, err := encode(metadata)
-		if (err != nil) {
-			return err
-		}
-		if err := pe.putBytes(data); err != nil {
+		if err := pe.putBytes(metadata); err != nil {
 			return err
 		}
 	}
@@ -65,7 +61,7 @@ func (r *JoinGroupRequest) decode(pd packetDecoder) (err error) {
 		return nil
 	}
 
-	r.GroupProtocols = make(map[string]*ProtocolMetadata)
+	r.GroupProtocols = make(map[string][]byte)
 	for i := 0; i < n; i++ {
 		name, err := pd.getString()
 		if err != nil {
@@ -75,12 +71,7 @@ func (r *JoinGroupRequest) decode(pd packetDecoder) (err error) {
 		if data, err := pd.getBytes(); err != nil {
 			return err
 		} else {
-			protocolMetadata := new(ProtocolMetadata)
-			if err := decode(data, protocolMetadata); err != nil {
-				return err
-			}
-
-			r.GroupProtocols[name] = protocolMetadata
+			r.GroupProtocols[name] = data
 		}
 
 	}
@@ -96,9 +87,9 @@ func (r *JoinGroupRequest) version() int16 {
 	return 0
 }
 
-func (r *JoinGroupRequest) AddGroupProtocol(name string, metadata *ProtocolMetadata) {
+func (r *JoinGroupRequest) AddGroupProtocol(name string, metadata []byte) {
 	if r.GroupProtocols == nil {
-		r.GroupProtocols = make(map[string]*ProtocolMetadata)
+		r.GroupProtocols = make(map[string][]byte)
 	}
 
 	r.GroupProtocols[name] = metadata

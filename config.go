@@ -186,6 +186,8 @@ type Config struct {
 			// Should be OffsetNewest or OffsetOldest. Defaults to OffsetNewest.
 			Initial int64
 		}
+
+		SessionTimeout time.Duration
 	}
 
 	// A user-provided string sent with every request to the brokers for logging,
@@ -228,6 +230,7 @@ func NewConfig() *Config {
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
+	c.Consumer.SessionTimeout = 30 * time.Second
 
 	c.ChannelBufferSize = 256
 

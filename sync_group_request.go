@@ -4,7 +4,7 @@ type SyncGroupRequest struct {
 	GroupId         string
 	GenerationId    int32
 	MemberId        string
-	GroupAssignment map[string]*MemberAssignment
+	GroupAssignment map[string][]byte
 }
 
 func (r *SyncGroupRequest) encode(pe packetEncoder) error {
@@ -26,11 +26,7 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 			return err
 		}
 
-		gaBytes, err := encode(memberAssignment)
-		if err != nil {
-			return err
-		}
-		if err := pe.putBytes(gaBytes); err != nil {
+		if err := pe.putBytes(memberAssignment); err != nil {
 			return err
 		}
 	}
@@ -57,7 +53,7 @@ func (r *SyncGroupRequest) decode(pd packetDecoder) (err error) {
 		return nil
 	}
 
-	r.GroupAssignment = make(map[string]*MemberAssignment, n)
+	r.GroupAssignment = make(map[string][]byte, n)
 	for i := 0; i < n; i++ {
 		memberId, err := pd.getString()
 		if err != nil {
@@ -69,12 +65,7 @@ func (r *SyncGroupRequest) decode(pd packetDecoder) (err error) {
 			return err
 		}
 
-		memberAssignment := new(MemberAssignment)
-		if err := decode(gaBytes, memberAssignment); err != nil {
-			return err
-		}
-
-		r.GroupAssignment[memberId] = memberAssignment
+		r.GroupAssignment[memberId] = gaBytes
 	}
 
 	return nil
@@ -88,9 +79,9 @@ func (r *SyncGroupRequest) version() int16 {
 	return 0
 }
 
-func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment *MemberAssignment) {
+func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment []byte) {
 	if r.GroupAssignment == nil {
-		r.GroupAssignment = make(map[string]*MemberAssignment)
+		r.GroupAssignment = make(map[string][]byte)
 	}
 
 	r.GroupAssignment[memberId] = memberAssignment
