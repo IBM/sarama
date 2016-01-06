@@ -1164,7 +1164,6 @@ func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
 					c.joinGroup(c.consumerGroup, activeTopic)
 				} else if resp.Err != ErrNoError {
 					panic(resp.Err)
-					return nil
 				}
 			case controlMessage := <-heartbeatChannel:
 				fmt.Println("Received heartbeat control message: ", controlMessage)
