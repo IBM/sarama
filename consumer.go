@@ -162,34 +162,23 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 	return c.client.Partitions(topic)
 }
 
-func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error)  {
+func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error) {
 	if (c.consumerGroup != "") {
 		return nil, nil, errors.New("Already joining or joined group")
+	}
+
+	return c.joinGroup(consumerGroup, topicName)
+}
+
+func (c *consumer) joinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error) {
+	rejoin := false
+	if (c.consumerGroup == consumerGroup) {
+		rejoin = true
 	}
 
 	coordinator, err := c.client.Coordinator(consumerGroup)
 	if (err != nil) {
 		return nil, nil, err
-	}
-
-	if (c.memberId != "") {
-		hbr := new(HeartbeatRequest)
-		hbr.GenerationId = -1
-		hbr.GroupId = consumerGroup
-		hbr.MemberId = c.memberId
-
-		response, err := coordinator.HeartbeatRequest(hbr)
-
-		if (err != nil) {
-			return nil, nil, err
-		}
-
-		if (response.Err == ErrIllegalGeneration) {
-			// Cluster is rebalancing, stop everything and run
-			panic("Cluster is rebalancing, stop everything and run")
-		} else if (response.Err != ErrNoError) {
-			return nil, nil, response.Err
-		}
 	}
 
 	cgmm := new(ConsumerGroupMemberMetadata)
@@ -200,7 +189,7 @@ func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsu
 	jgr := new(JoinGroupRequest)
 	jgr.GroupId = consumerGroup
 	jgr.MemberId = c.memberId
-	jgr.SessionTimeout = int32(c.conf.Consumer.SessionTimeout.Seconds())
+	jgr.SessionTimeout = int32(c.conf.Consumer.SessionTimeout.Seconds() * 1000)
 	jgr.ProtocolType = "consumer"
 	jgr.AddGroupProtocolMetadata("sarama-0", cgmm)
 
@@ -214,24 +203,28 @@ func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsu
 		return nil, nil, response.Err
 	}
 
-	c.rebalanceEvents = make(chan *RebalanceEvent)
-
 	c.memberId = response.MemberId
 	c.consumerGroupLeaderId = response.LeaderId
 	c.generationId = response.GenerationId
 	c.consumerGroup = consumerGroup
 
-	groupedConsumer, err := c.getTopicConsumer(topicName)
-	if err != nil {
-		return nil, nil, err
+	groupedConsumer := &topicConsumer{}
+
+	if (!rejoin) {
+		c.rebalanceEvents = make(chan *RebalanceEvent)
+
+		groupedConsumer, err = c.getTopicConsumer(topicName)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
-	go c.topicManager(response, topicName)
+	go c.topicManager(response, topicName, rejoin)
 
 	return groupedConsumer, c.rebalanceEvents, nil
 }
 
-func (c *consumer) topicManager(response *JoinGroupResponse, topicName string) {
+func (c *consumer) topicManager(response *JoinGroupResponse, topicName string, resume bool) {
 	subscriptions := make(map[string][]string)
 
 	members, err := response.GetMembers()
@@ -248,9 +241,11 @@ func (c *consumer) topicManager(response *JoinGroupResponse, topicName string) {
 		panic(err)
 	}
 
-	err = c.startHeartbeat()
-	if err != nil {
-		panic(err)
+	if (!resume) {
+		err = c.startHeartbeat()
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
@@ -285,6 +280,7 @@ func (c *consumer) consumePartition(topic string, partition int32, offset int64,
 			trigger:   make(chan none, 1),
 			dying:     make(chan none),
 			fetchSize: c.conf.Consumer.Fetch.Default,
+			parent:	   parent,
 		}
 
 		parent.liveChildren++
@@ -336,6 +332,19 @@ func (c *consumer) removeChild(child *partitionConsumer) {
 	defer c.lock.Unlock()
 
 	delete(c.children[child.topic], child.partition)
+}
+
+func (c *consumer) asyncCloseChild(topic string, partition int32) *partitionConsumer {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	if child, ok := c.children[topic][partition]; ok {
+		child.AsyncClose()
+		delete(c.children[topic], partition)
+		return child
+	}
+
+	return nil
 }
 
 func (c *consumer) refBrokerConsumer(broker *Broker) *brokerConsumer {
@@ -903,13 +912,9 @@ func (c *consumer) communicateSubscriptionChanges(newAssignments *ConsumerGroupM
 	changes = []*Subscription{}
 
 	for topic, parts := range rems {
-		topicChildren := c.children[topic]
 		for _, part := range parts {
-			if topicChildren != nil && topicChildren[part] != nil {
-				child := topicChildren[part]
-				c.removeChild(child)
-				changes = append(changes, &Subscription{Topic: topic, Partition: part, Offset: child.offset})
-			}
+			child := c.asyncCloseChild(topic, part)
+			changes = append(changes, &Subscription{Topic: topic, Partition: part, Offset: child.offset})
 		}
 	}
 
@@ -980,11 +985,12 @@ func (c *consumer) diffSubscriptions(assignments *ConsumerGroupMemberAssignment)
 		if newParts, ok := assignments.Topics[topic]; ok {
 			for _, part := range parts {
 				if !IntInSlice(newParts, part) {
-					removals[topic] = append(additions[topic], part)
+					removals[topic] = append(removals[topic], part)
 				}
 			}
 		} else {
 			removals[topic] = parts
+			continue
 		}
 	}
 
@@ -1144,14 +1150,21 @@ func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
 				resp, err := coord.HeartbeatRequest(hbr)
 				if err != nil {
 					return err
-				} else if resp.Err == ErrIllegalGeneration {
-					panic("rebalance")
-					// cluster rebalance is happening
 				} else if resp.Err == ErrNotCoordinatorForConsumer {
 					// heartbeating the wrong broker
 					fmt.Println("Heartbeating the wrong broker")
+					c.client.RefreshCoordinator(c.consumerGroup)
+				} else if resp.Err == ErrRebalanceInProgress {
+					// TODO make this work with multiple topic subscriptions if that's even a thing
+					activeTopic := ""
+					for topic, _ := range c.topicChildren {
+						activeTopic = topic
+					}
+
+					c.joinGroup(c.consumerGroup, activeTopic)
 				} else if resp.Err != ErrNoError {
-					return KError(resp.Err)
+					panic(resp.Err)
+					return nil
 				}
 			case controlMessage := <-heartbeatChannel:
 				fmt.Println("Received heartbeat control message: ", controlMessage)
