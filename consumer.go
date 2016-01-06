@@ -191,7 +191,11 @@ func (c *consumer) joinGroup(consumerGroup string, topicName string) (TopicConsu
 	jgr.MemberId = c.memberId
 	jgr.SessionTimeout = int32(c.conf.Consumer.SessionTimeout.Seconds() * 1000)
 	jgr.ProtocolType = "consumer"
-	jgr.AddGroupProtocolMetadata("sarama-0", cgmm)
+
+	err = jgr.AddGroupProtocolMetadata("sarama-0", cgmm)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	response, err := coordinator.JoinGroup(jgr)
 
@@ -876,7 +880,10 @@ func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) er
 		ma.Version = 1
 		ma.Topics = topics
 
-		syncGroup.AddGroupAssignmentMember(memberId, ma)
+		err = syncGroup.AddGroupAssignmentMember(memberId, ma)
+		if err != nil {
+			return err
+		}
 	}
 
 	coordinator, err := c.client.Coordinator(c.consumerGroup)
@@ -1129,10 +1136,10 @@ func (c *consumer) startHeartbeat() error {
 	return nil
 }
 
-func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
+func (c *consumer) heartbeat(heartbeatChannel <-chan string) {
 	heartbeatTicker := time.NewTicker(1 * time.Second)
 
-	go func() error {
+	go func() {
 		for {
 			select {
 			case <-heartbeatTicker.C:
@@ -1144,16 +1151,19 @@ func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
 				coord, err := c.client.Coordinator(c.consumerGroup)
 				if err != nil {
 					fmt.Println(err)
-					return err
+					return
 				}
 
 				resp, err := coord.HeartbeatRequest(hbr)
 				if err != nil {
-					return err
+					panic(err)
 				} else if resp.Err == ErrNotCoordinatorForConsumer {
 					// heartbeating the wrong broker
 					fmt.Println("Heartbeating the wrong broker")
-					c.client.RefreshCoordinator(c.consumerGroup)
+					err = c.client.RefreshCoordinator(c.consumerGroup)
+					if err != nil {
+						panic(err)
+					}
 				} else if resp.Err == ErrRebalanceInProgress {
 					// TODO make this work with multiple topic subscriptions if that's even a thing
 					activeTopic := ""
@@ -1161,7 +1171,10 @@ func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
 						activeTopic = topic
 					}
 
-					c.joinGroup(c.consumerGroup, activeTopic)
+					_, _, err = c.joinGroup(c.consumerGroup, activeTopic)
+					if err != nil {
+						panic(err)
+					}
 				} else if resp.Err != ErrNoError {
 					panic(resp.Err)
 				}
@@ -1169,11 +1182,8 @@ func (c *consumer) heartbeat(heartbeatChannel <-chan string) error {
 				fmt.Println("Received heartbeat control message: ", controlMessage)
 				if controlMessage == "close" {
 					heartbeatTicker.Stop()
-					return nil
 				}
 			}
 		}
 	}()
-
-	return nil
 }
