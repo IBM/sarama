@@ -45,7 +45,7 @@ func (ma *MemberAssignment) decode(pd packetDecoder) error {
 	if length, err := pd.getArrayLength(); err != nil {
 		return err
 	} else {
-		for i:=0; i < length; i++ {
+		for i := 0; i < length; i++ {
 			topic, err := pd.getString()
 			if err != nil {
 				return err

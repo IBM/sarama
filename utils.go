@@ -1,9 +1,9 @@
 package sarama
 
 import (
-	"sort"
 	"bufio"
 	"net"
+	"sort"
 )
 
 type none struct{}

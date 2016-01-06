@@ -191,7 +191,7 @@ func (b *Broker) JoinGroup(request *JoinGroupRequest) (*JoinGroupResponse, error
 
 	err := b.sendAndReceive(request, response)
 
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -203,7 +203,7 @@ func (b *Broker) LeaveGroup(request *LeaveGroupRequest) (*LeaveGroupResponse, er
 
 	err := b.sendAndReceive(request, response)
 
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -227,7 +227,7 @@ func (b *Broker) DescribeGroups(request *DescribeGroupsRequest) (*DescribeGroups
 
 	err := b.sendAndReceive(request, response)
 
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -239,7 +239,7 @@ func (b *Broker) ListGroups(request *ListGroupsRequest) (*ListGroupsResponse, er
 
 	err := b.sendAndReceive(request, response)
 
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 
@@ -251,7 +251,7 @@ func (b *Broker) HeartbeatRequest(request *HeartbeatRequest) (*HeartbeatResponse
 
 	err := b.sendAndReceive(request, response)
 
-	if (err != nil) {
+	if err != nil {
 		return nil, err
 	}
 

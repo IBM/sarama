@@ -1,9 +1,9 @@
 package sarama
 
 type ProtocolMetadata struct {
-	Version int16
+	Version      int16
 	Subscription []string
-	UserData []byte
+	UserData     []byte
 }
 
 func (r *ProtocolMetadata) encode(pe packetEncoder) (err error) {
@@ -13,7 +13,7 @@ func (r *ProtocolMetadata) encode(pe packetEncoder) (err error) {
 		return err
 	}
 
-	for _,sub := range r.Subscription {
+	for _, sub := range r.Subscription {
 		if err := pe.putString(sub); err != nil {
 			return err
 		}

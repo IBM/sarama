@@ -1,12 +1,12 @@
 package sarama
 
 import (
+	"container/heap"
 	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
-	"container/heap"
 )
 
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
@@ -28,20 +28,20 @@ type ConsumerError struct {
 type SubscriptionOperation int
 
 const (
-	SubscriptionAdd SubscriptionOperation = iota
+	SubscriptionAdd    SubscriptionOperation = iota
 	SubscriptionRemove SubscriptionOperation = iota
-	SubscriptionDone SubscriptionOperation = iota
+	SubscriptionDone   SubscriptionOperation = iota
 )
 
 type Subscription struct {
-	Topic string
+	Topic     string
 	Partition int32
-	Offset int64
+	Offset    int64
 }
 
 type RebalanceEvent struct {
 	Subscriptions []*Subscription
-	Type	  SubscriptionOperation
+	Type          SubscriptionOperation
 }
 
 func (ce ConsumerError) Error() string {
@@ -91,7 +91,7 @@ type consumer struct {
 
 	lock            sync.Mutex
 	children        map[string]map[int32]*partitionConsumer
-	topicChildren	map[string]*topicConsumer
+	topicChildren   map[string]*topicConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
 
 	memberId              string
@@ -99,10 +99,10 @@ type consumer struct {
 	consumerGroup         string
 	generationId          int32
 
-	memberAssignment	  *ConsumerGroupMemberAssignment
-	rebalanceEvents		  chan *RebalanceEvent
+	memberAssignment *ConsumerGroupMemberAssignment
+	rebalanceEvents  chan *RebalanceEvent
 
-	heartbeatControl      chan string
+	heartbeatControl chan string
 }
 
 // NewConsumer creates a new consumer using the given broker addresses and configuration.
@@ -163,7 +163,7 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 }
 
 func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error) {
-	if (c.consumerGroup != "") {
+	if c.consumerGroup != "" {
 		return nil, nil, errors.New("Already joining or joined group")
 	}
 
@@ -172,18 +172,18 @@ func (c *consumer) JoinGroup(consumerGroup string, topicName string) (TopicConsu
 
 func (c *consumer) joinGroup(consumerGroup string, topicName string) (TopicConsumer, <-chan *RebalanceEvent, error) {
 	rejoin := false
-	if (c.consumerGroup == consumerGroup) {
+	if c.consumerGroup == consumerGroup {
 		rejoin = true
 	}
 
 	coordinator, err := c.client.Coordinator(consumerGroup)
-	if (err != nil) {
+	if err != nil {
 		return nil, nil, err
 	}
 
 	cgmm := new(ConsumerGroupMemberMetadata)
 	cgmm.Topics = []string{topicName}
-	cgmm.Version= 1
+	cgmm.Version = 1
 	cgmm.UserData = []byte{0}
 
 	jgr := new(JoinGroupRequest)
@@ -210,7 +210,7 @@ func (c *consumer) joinGroup(consumerGroup string, topicName string) (TopicConsu
 
 	groupedConsumer := &topicConsumer{}
 
-	if (!rejoin) {
+	if !rejoin {
 		c.rebalanceEvents = make(chan *RebalanceEvent)
 
 		groupedConsumer, err = c.getTopicConsumer(topicName)
@@ -241,7 +241,7 @@ func (c *consumer) topicManager(response *JoinGroupResponse, topicName string, r
 		panic(err)
 	}
 
-	if (!resume) {
+	if !resume {
 		err = c.startHeartbeat()
 		if err != nil {
 			panic(err)
@@ -255,7 +255,7 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 
 func (c *consumer) consumePartition(topic string, partition int32, offset int64, parent *topicConsumer) (PartitionConsumer, error) {
 	var child *partitionConsumer
-	if (parent == nil) {
+	if parent == nil {
 		child = &partitionConsumer{
 			consumer:  c,
 			conf:      c.conf,
@@ -280,7 +280,7 @@ func (c *consumer) consumePartition(topic string, partition int32, offset int64,
 			trigger:   make(chan none, 1),
 			dying:     make(chan none),
 			fetchSize: c.conf.Consumer.Fetch.Default,
-			parent:	   parent,
+			parent:    parent,
 		}
 
 		parent.liveChildren++
@@ -429,7 +429,7 @@ type PartitionConsumer interface {
 
 type partitionConsumer struct {
 	consumer  *consumer
-	parent	  *topicConsumer
+	parent    *topicConsumer
 	conf      *Config
 	topic     string
 	partition int32
@@ -595,7 +595,7 @@ feederLoop:
 		child.broker.acks.Done()
 	}
 
-	if (child.parent == nil || child.parent.liveChildren == 0) {
+	if child.parent == nil || child.parent.liveChildren == 0 {
 		close(child.messages)
 		close(child.errors)
 	} else {
@@ -856,7 +856,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 }
 
 func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) error {
-	if (c.consumerGroup == "") {
+	if c.consumerGroup == "" {
 		return errors.New("No active consumer group, cannot sync")
 	}
 
@@ -872,7 +872,7 @@ func (c *consumer) syncConsumerGroup(memberSubscriptions map[string][]string) er
 
 	for memberId, topics := range assignments {
 		ma := new(ConsumerGroupMemberAssignment)
-		ma.UserData = []byte{0,1}
+		ma.UserData = []byte{0, 1}
 		ma.Version = 1
 		ma.Topics = topics
 
@@ -958,7 +958,7 @@ func (c *consumer) diffSubscriptions(assignments *ConsumerGroupMemberAssignment)
 	removals = make(map[string][]int32)
 	additions = make(map[string][]int32)
 
-	if (c.memberAssignment == nil) {
+	if c.memberAssignment == nil {
 		for topic, parts := range assignments.Topics {
 			for _, part := range parts {
 				additions[topic] = append(additions[topic], part)
@@ -1025,7 +1025,7 @@ func (c *consumer) rebalanceConsumers(members map[string][]string) (map[string]m
 			dequeue.Push(int32(partition))
 		}
 
-		assignmentLoop:
+	assignmentLoop:
 		for {
 			for _, memberId := range members {
 				if assignments[memberId] == nil {
@@ -1042,7 +1042,7 @@ func (c *consumer) rebalanceConsumers(members map[string][]string) (map[string]m
 
 				assignments[memberId][topic] = append(assignments[memberId][topic], part)
 
-				if (dequeue.Len() == 0) {
+				if dequeue.Len() == 0 {
 					break assignmentLoop
 				}
 			}
@@ -1058,7 +1058,7 @@ func (c *consumer) leaveGroup() error {
 		return err
 	}
 
-	lgr := new (LeaveGroupRequest)
+	lgr := new(LeaveGroupRequest)
 	lgr.GroupId = c.consumerGroup
 	lgr.MemberId = c.memberId
 	resp, err := coord.LeaveGroup(lgr)
@@ -1076,9 +1076,9 @@ func (c *consumer) leaveGroup() error {
 }
 
 type TopicConsumer interface {
-	Messages()	<-chan *ConsumerMessage
-	Errors()	<-chan *ConsumerError
-	Close()		error
+	Messages() <-chan *ConsumerMessage
+	Errors() <-chan *ConsumerError
+	Close() error
 }
 
 func (tc *topicConsumer) Messages() <-chan *ConsumerMessage {
@@ -1094,10 +1094,10 @@ func (tc *topicConsumer) Close() error {
 }
 
 type topicConsumer struct {
-	consumer *consumer
-	messages chan *ConsumerMessage
-	errors   chan *ConsumerError
-	topic	 string
+	consumer     *consumer
+	messages     chan *ConsumerMessage
+	errors       chan *ConsumerError
+	topic        string
 	liveChildren int
 }
 
@@ -1111,10 +1111,10 @@ func (c *consumer) getTopicConsumer(topic string) (*topicConsumer, error) {
 	}
 
 	child := &topicConsumer{
-		consumer:  c,
-		topic:     topic,
-		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
-		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
+		consumer: c,
+		topic:    topic,
+		messages: make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
+		errors:   make(chan *ConsumerError, c.conf.ChannelBufferSize),
 	}
 
 	c.topicChildren[topic] = child
