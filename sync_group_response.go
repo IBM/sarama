@@ -13,7 +13,12 @@ func (r *SyncGroupResponse) GetMemberAssignment() (*ConsumerGroupMemberAssignmen
 
 func (r *SyncGroupResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
-	return pe.putBytes(r.MemberAssignment)
+
+	if err := pe.putBytes(r.MemberAssignment); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *SyncGroupResponse) decode(pd packetDecoder) (err error) {
@@ -23,6 +28,12 @@ func (r *SyncGroupResponse) decode(pd packetDecoder) (err error) {
 		r.Err = KError(kerr)
 	}
 
-	r.MemberAssignment, err = pd.getBytes()
-	return
+	maBytes, err := pd.getBytes()
+	if err != nil {
+		return err
+	}
+
+	r.MemberAssignment = maBytes
+
+	return nil
 }

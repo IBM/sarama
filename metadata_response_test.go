@@ -121,7 +121,7 @@ func TestMetadataResponseWithTopics(t *testing.T) {
 		}
 	}
 
-	if len(response.Topics[0].Partitions[0].Isr) != 0 {
+	if len(response.Topics[0].Partitions[0].ISR) != 0 {
 		t.Error("Decoding produced invalid topic 0 partition 0 isr length.")
 	}
 

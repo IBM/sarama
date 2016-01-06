@@ -27,6 +27,7 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 		if err := pe.putString(name); err != nil {
 			return err
 		}
+
 		if err := pe.putBytes(metadata); err != nil {
 			return err
 		}
@@ -37,19 +38,19 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 
 func (r *JoinGroupRequest) decode(pd packetDecoder) (err error) {
 	if r.GroupId, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 
 	if r.SessionTimeout, err = pd.getInt32(); err != nil {
-		return
+		return err
 	}
 
 	if r.MemberId, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 
 	if r.ProtocolType, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 
 	n, err := pd.getArrayLength()
@@ -66,12 +67,13 @@ func (r *JoinGroupRequest) decode(pd packetDecoder) (err error) {
 		if err != nil {
 			return err
 		}
-		metadata, err := pd.getBytes()
-		if err != nil {
+
+		if data, err := pd.getBytes(); err != nil {
 			return err
+		} else {
+			r.GroupProtocols[name] = data
 		}
 
-		r.GroupProtocols[name] = metadata
 	}
 
 	return nil

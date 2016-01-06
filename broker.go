@@ -33,7 +33,7 @@ type responsePromise struct {
 	errors        chan error
 }
 
-// NewBroker creates and returns a Broker targetting the given host:port address.
+// NewBroker creates and returns a Broker targeting the given host:port address.
 // This does not attempt to actually connect, you have to call Open() for that.
 func NewBroker(addr string) *Broker {
 	return &Broker{id: -1, addr: addr}
@@ -186,6 +186,78 @@ func (b *Broker) GetAvailableOffsets(request *OffsetRequest) (*OffsetResponse, e
 	return response, nil
 }
 
+func (b *Broker) JoinGroup(request *JoinGroupRequest) (*JoinGroupResponse, error) {
+	response := new(JoinGroupResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) LeaveGroup(request *LeaveGroupRequest) (*LeaveGroupResponse, error) {
+	response := new(LeaveGroupResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) SyncConsumerGroup(request *SyncGroupRequest) (*SyncGroupResponse, error) {
+	response := new(SyncGroupResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) DescribeGroups(request *DescribeGroupsRequest) (*DescribeGroupsResponse, error) {
+	response := new(DescribeGroupsResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) ListGroups(request *ListGroupsRequest) (*ListGroupsResponse, error) {
+	response := new(ListGroupsResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) HeartbeatRequest(request *HeartbeatRequest) (*HeartbeatResponse, error) {
+	response := new(HeartbeatResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 	var response *ProduceResponse
 	var err error
@@ -240,17 +312,6 @@ func (b *Broker) FetchOffset(request *OffsetFetchRequest) (*OffsetFetchResponse,
 	return response, nil
 }
 
-func (b *Broker) JoinGroup(request *JoinGroupRequest) (*JoinGroupResponse, error) {
-	response := new(JoinGroupResponse)
-
-	err := b.sendAndReceive(request, response)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
 func (b *Broker) SyncGroup(request *SyncGroupRequest) (*SyncGroupResponse, error) {
 	response := new(SyncGroupResponse)
 
@@ -262,41 +323,8 @@ func (b *Broker) SyncGroup(request *SyncGroupRequest) (*SyncGroupResponse, error
 	return response, nil
 }
 
-func (b *Broker) LeaveGroup(request *LeaveGroupRequest) (*LeaveGroupResponse, error) {
-	response := new(LeaveGroupResponse)
-
-	err := b.sendAndReceive(request, response)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
 func (b *Broker) Heartbeat(request *HeartbeatRequest) (*HeartbeatResponse, error) {
 	response := new(HeartbeatResponse)
-
-	err := b.sendAndReceive(request, response)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func (b *Broker) ListGroups(request *ListGroupsRequest) (*ListGroupsResponse, error) {
-	response := new(ListGroupsResponse)
-
-	err := b.sendAndReceive(request, response)
-	if err != nil {
-		return nil, err
-	}
-
-	return response, nil
-}
-
-func (b *Broker) DescribeGroups(request *DescribeGroupsRequest) (*DescribeGroupsResponse, error) {
-	response := new(DescribeGroupsResponse)
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {

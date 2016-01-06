@@ -1,10 +1,10 @@
 package sarama
 
 type SyncGroupRequest struct {
-	GroupId          string
-	GenerationId     int32
-	MemberId         string
-	GroupAssignments map[string][]byte
+	GroupId         string
+	GenerationId    int32
+	MemberId        string
+	GroupAssignment map[string][]byte
 }
 
 func (r *SyncGroupRequest) encode(pe packetEncoder) error {
@@ -12,19 +12,20 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 		return err
 	}
 
-	pe.putInt32(r.GenerationId)
+	pe.putInt32(int32(r.GenerationId))
 
 	if err := pe.putString(r.MemberId); err != nil {
 		return err
 	}
 
-	if err := pe.putArrayLength(len(r.GroupAssignments)); err != nil {
+	if err := pe.putArrayLength(len(r.GroupAssignment)); err != nil {
 		return err
 	}
-	for memberId, memberAssignment := range r.GroupAssignments {
+	for memberId, memberAssignment := range r.GroupAssignment {
 		if err := pe.putString(memberId); err != nil {
 			return err
 		}
+
 		if err := pe.putBytes(memberAssignment); err != nil {
 			return err
 		}
@@ -52,18 +53,19 @@ func (r *SyncGroupRequest) decode(pd packetDecoder) (err error) {
 		return nil
 	}
 
-	r.GroupAssignments = make(map[string][]byte)
+	r.GroupAssignment = make(map[string][]byte, n)
 	for i := 0; i < n; i++ {
 		memberId, err := pd.getString()
 		if err != nil {
 			return err
 		}
-		memberAssignment, err := pd.getBytes()
+
+		gaBytes, err := pd.getBytes()
 		if err != nil {
 			return err
 		}
 
-		r.GroupAssignments[memberId] = memberAssignment
+		r.GroupAssignment[memberId] = gaBytes
 	}
 
 	return nil
@@ -78,11 +80,11 @@ func (r *SyncGroupRequest) version() int16 {
 }
 
 func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment []byte) {
-	if r.GroupAssignments == nil {
-		r.GroupAssignments = make(map[string][]byte)
+	if r.GroupAssignment == nil {
+		r.GroupAssignment = make(map[string][]byte)
 	}
 
-	r.GroupAssignments[memberId] = memberAssignment
+	r.GroupAssignment[memberId] = memberAssignment
 }
 
 func (r *SyncGroupRequest) AddGroupAssignmentMember(memberId string, memberAssignment *ConsumerGroupMemberAssignment) error {

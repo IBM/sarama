@@ -109,3 +109,35 @@ func newBufConn(conn net.Conn) *bufConn {
 func (bc *bufConn) Read(b []byte) (n int, err error) {
 	return bc.buf.Read(b)
 }
+
+// An IntHeap is a min-heap of ints.
+// https://golang.org/pkg/container/heap/#example__intHeap
+type Int32Heap []int32
+
+func (h Int32Heap) Len() int           { return len(h) }
+func (h Int32Heap) Less(i, j int) bool { return h[i] < h[j] }
+func (h Int32Heap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *Int32Heap) Push(x interface{}) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(int32))
+}
+
+func (h *Int32Heap) Pop() interface{} {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
+}
+
+func IntInSlice(ints []int32, int int32) bool {
+	for _, i := range ints {
+		if i == int {
+			return true
+		}
+	}
+
+	return false
+}
