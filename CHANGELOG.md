@@ -14,6 +14,8 @@ Improvements:
    ([#584](https://github.com/Shopify/sarama/pull/584)).
  - Automatically retry `InvalidMessage` errors to match upstream behaviour
    ([#589](https://github.com/Shopify/sarama/pull/589)).
+ - Verified that TLS support works with Kafka 0.9
+   ([#581](https://github.com/Shopify/sarama/pull/581)).
 
 Bug Fixes:
  - Fix the OffsetManager to be compatible with Kafka 0.9
