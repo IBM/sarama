@@ -3,23 +3,21 @@
 #### Version 1.8.0 (trunk)
 
 New Features:
- - Add a missing protocol constant, `GroupGenerationUndefined`
-   ([#586](https://github.com/Shopify/sarama/pull/586)).
- - Finish up the last pieces of Kafka 0.9 protocol support
-   ([#588](https://github.com/Shopify/sarama/pull/588),
+ - Full support for Kafka 0.9:
+   - All protocol messages and fields
+   ([#586](https://github.com/Shopify/sarama/pull/586),
+   [#588](https://github.com/Shopify/sarama/pull/588),
    [#590](https://github.com/Shopify/sarama/pull/590)).
+   - Verified that TLS support works
+   ([#581](https://github.com/Shopify/sarama/pull/581)).
+   - Fixed the OffsetManager compatibility
+   ([#585](https://github.com/Shopify/sarama/pull/585)).
 
 Improvements:
  - Optimize for fewer system calls when reading from the network
    ([#584](https://github.com/Shopify/sarama/pull/584)).
  - Automatically retry `InvalidMessage` errors to match upstream behaviour
    ([#589](https://github.com/Shopify/sarama/pull/589)).
- - Verified that TLS support works with Kafka 0.9
-   ([#581](https://github.com/Shopify/sarama/pull/581)).
-
-Bug Fixes:
- - Fix the OffsetManager to be compatible with Kafka 0.9
-   ([#585](https://github.com/Shopify/sarama/pull/585)).
 
 #### Version 1.7.0 (2015-12-11)
 
