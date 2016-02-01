@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.8.0 (trunk)
+#### Version 1.8.0 (2016-02-01)
 
 New Features:
  - Full support for Kafka 0.9:
