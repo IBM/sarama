@@ -475,10 +475,21 @@ func (bom *brokerOffsetManager) flushToBroker() {
 }
 
 func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
-	r := &OffsetCommitRequest{
-		Version:                 1,
-		ConsumerGroup:           bom.parent.group,
-		ConsumerGroupGeneration: GroupGenerationUndefined,
+	var r *OffsetCommitRequest
+	if bom.parent.conf.Consumer.Offsets.Retention == 0 {
+		r = &OffsetCommitRequest{
+			Version:                 1,
+			ConsumerGroup:           bom.parent.group,
+			ConsumerGroupGeneration: GroupGenerationUndefined,
+		}
+	} else {
+		r = &OffsetCommitRequest{
+			Version:                 2,
+			RetentionTime:           int64(bom.parent.conf.Consumer.Offsets.Retention / time.Millisecond),
+			ConsumerGroup:           bom.parent.group,
+			ConsumerGroupGeneration: GroupGenerationUndefined,
+		}
+
 	}
 
 	for s := range bom.subscriptions {

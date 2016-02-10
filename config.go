@@ -183,6 +183,13 @@ type Config struct {
 			// The initial offset to use if no offset was previously committed.
 			// Should be OffsetNewest or OffsetOldest. Defaults to OffsetNewest.
 			Initial int64
+
+			// The retention duration for committed offsets. If zero, disabled
+			// (in which case the `offsets.retention.minutes` option on the
+			// broker will be used).  Kafka only supports precision up to
+			// milliseconds; nanoseconds will be truncated.
+			// (default is 0: disabled).
+			Retention time.Duration
 		}
 	}
 
@@ -256,6 +263,9 @@ func (c *Config) Validate() error {
 	}
 	if c.Consumer.MaxWaitTime%time.Millisecond != 0 {
 		Logger.Println("Consumer.MaxWaitTime only supports millisecond precision; nanoseconds will be truncated.")
+	}
+	if c.Consumer.Offsets.Retention%time.Millisecond != 0 {
+		Logger.Println("Consumer.Offsets.Retention only supports millisecond precision; nanoseconds will be truncated.")
 	}
 	if c.ClientID == "sarama" {
 		Logger.Println("ClientID is the default of 'sarama', you should consider setting it to something application-specific.")
