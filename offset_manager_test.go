@@ -228,6 +228,43 @@ func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
 	coordinator.Close()
 }
 
+func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
+	om, testClient, broker, coordinator := initOffsetManager(t)
+	testClient.Config().Consumer.Offsets.Retention = time.Hour
+
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+
+	ocResponse := new(OffsetCommitResponse)
+	ocResponse.AddError("my_topic", 0, ErrNoError)
+	handler := func(req *request) (res encoder) {
+		if req.body.version() != 2 {
+			t.Errorf("Expected to be using version 2. Actual: %v", req.body.version())
+		}
+		offsetCommitRequest := req.body.(*OffsetCommitRequest)
+		if offsetCommitRequest.RetentionTime != (60 * 60 * 1000) {
+			t.Errorf("Expected an hour retention time. Actual: %v", offsetCommitRequest.RetentionTime)
+		}
+		return ocResponse
+	}
+	coordinator.setHandler(handler)
+
+	pom.MarkOffset(100, "modified_meta")
+	offset, meta := pom.NextOffset()
+
+	if offset != 101 {
+		t.Errorf("Expected offset 100. Actual: %v", offset)
+	}
+	if meta != "modified_meta" {
+		t.Errorf("Expected metadata \"modified_meta\". Actual: %q", meta)
+	}
+
+	safeClose(t, pom)
+	safeClose(t, om)
+	safeClose(t, testClient)
+	broker.Close()
+	coordinator.Close()
+}
+
 func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
