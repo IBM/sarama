@@ -6,7 +6,8 @@ import (
 )
 
 // MockResponse is a response builder interface it defines one method that
-// allows generating a response based on a request body.
+// allows generating a response based on a request body. MockResponses are used
+// to program behavior of MockBroker in tests.
 type MockResponse interface {
 	For(reqBody decoder) (res encoder)
 }
