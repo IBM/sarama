@@ -6,14 +6,14 @@ import (
 )
 
 func initOffsetManager(t *testing.T) (om OffsetManager,
-	testClient Client, broker, coordinator *mockBroker) {
+	testClient Client, broker, coordinator *MockBroker) {
 
 	config := NewConfig()
 	config.Metadata.Retry.Max = 1
 	config.Consumer.Offsets.CommitInterval = 1 * time.Millisecond
 
-	broker = newMockBroker(t, 1)
-	coordinator = newMockBroker(t, 2)
+	broker = NewMockBroker(t, 1)
+	coordinator = NewMockBroker(t, 2)
 
 	seedMeta := new(MetadataResponse)
 	seedMeta.AddBroker(coordinator.Addr(), coordinator.BrokerID())
@@ -42,7 +42,7 @@ func initOffsetManager(t *testing.T) (om OffsetManager,
 }
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
-	coordinator *mockBroker, initialOffset int64, metadata string) PartitionOffsetManager {
+	coordinator *MockBroker, initialOffset int64, metadata string) PartitionOffsetManager {
 
 	fetchResponse := new(OffsetFetchResponse)
 	fetchResponse.AddBlock("my_topic", 0, &OffsetFetchResponseBlock{
@@ -61,7 +61,7 @@ func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 }
 
 func TestNewOffsetManager(t *testing.T) {
-	seedBroker := newMockBroker(t, 1)
+	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Returns(new(MetadataResponse))
 
 	testClient, err := NewClient([]string{seedBroker.Addr()}, nil)
@@ -101,7 +101,7 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	coordinator.Returns(fetchResponse)
 
 	// Refresh coordinator
-	newCoordinator := newMockBroker(t, 3)
+	newCoordinator := NewMockBroker(t, 3)
 	broker.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   newCoordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",
@@ -275,7 +275,7 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	ocResponse.AddError("my_topic", 1, ErrNoError)
 	coordinator.Returns(ocResponse)
 
-	newCoordinator := newMockBroker(t, 3)
+	newCoordinator := NewMockBroker(t, 3)
 
 	// For RefreshCoordinator()
 	broker.Returns(&ConsumerMetadataResponse{
@@ -348,7 +348,7 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 	coordinator.Close()
 
 	// Response to refresh coordinator request
-	newCoordinator := newMockBroker(t, 3)
+	newCoordinator := NewMockBroker(t, 3)
 	broker.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   newCoordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",
