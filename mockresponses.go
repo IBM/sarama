@@ -65,7 +65,7 @@ type MockMetadataResponse struct {
 	t       *testing.T
 }
 
-func newMockMetadataResponse(t *testing.T) *MockMetadataResponse {
+func NewMockMetadataResponse(t *testing.T) *MockMetadataResponse {
 	return &MockMetadataResponse{
 		leaders: make(map[string]map[int32]int32),
 		brokers: make(map[string]int32),
@@ -273,7 +273,7 @@ type MockConsumerMetadataResponse struct {
 	t            *testing.T
 }
 
-func newMockConsumerMetadataResponse(t *testing.T) *MockConsumerMetadataResponse {
+func NewMockConsumerMetadataResponse(t *testing.T) *MockConsumerMetadataResponse {
 	return &MockConsumerMetadataResponse{
 		coordinators: make(map[string]interface{}),
 		t:            t,
