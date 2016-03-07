@@ -121,6 +121,13 @@ type Config struct {
 
 	// Consumer is the namespace for configuration related to consuming messages,
 	// used by the Consumer.
+	//
+	// Note that Sarama's Consumer type does not currently support automatic
+	// consumer-group rebalancing and offset tracking.  For Zookeeper-based
+	// tracking (Kafka 0.8.2 and earlier), the https://github.com/wvanbergen/kafka
+	// library builds on Sarama to add this support. For Kafka-based tracking
+	// (Kafka 0.9 and later), the https://github.com/bsm/sarama-cluster library
+	// builds on Sarama to add this support.
 	Consumer struct {
 		Retry struct {
 			// How long to wait after a failing to read from a partition before

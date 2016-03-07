@@ -1,8 +1,13 @@
 /*
-Package sarama provides client libraries for the Kafka 0.8 protocol. The AsyncProducer object is the high-level
-API for producing messages asynchronously; the SyncProducer provides a blocking API for the same purpose.
+Package sarama provides client libraries for the Kafka protocol (versions 0.8 and later). The AsyncProducer object
+is the high-level API for producing messages asynchronously; the SyncProducer provides a blocking API for the same purpose.
 The Consumer object is the high-level API for consuming messages. The Client object provides metadata
 management functionality that is shared between the higher-level objects.
+
+Note that Sarama's Consumer type does not currently support automatic consumer-group rebalancing and offset tracking.
+For Zookeeper-based tracking (Kafka 0.8.2 and earlier), the https://github.com/wvanbergen/kafka library
+builds on Sarama to add this support. For Kafka-based tracking (Kafka 0.9 and later), the
+https://github.com/bsm/sarama-cluster library builds on Sarama to add this support.
 
 For lower-level needs, the Broker and Request/Response objects permit precise control over each connection
 and message sent on the wire.
