@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"strconv"
 	"sync"
-	"testing"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -52,7 +51,7 @@ type MockBroker struct {
 	stopper      chan none
 	expectations chan encoder
 	listener     net.Listener
-	t            *testing.T
+	t            TestReporter
 	latency      time.Duration
 	handler      requestHandlerFunc
 	history      []RequestResponse
@@ -255,16 +254,16 @@ func (b *MockBroker) serverError(err error) {
 	b.t.Errorf(err.Error())
 }
 
-// NewMockBroker launches a fake Kafka broker. It takes a *testing.T as provided by the
+// NewMockBroker launches a fake Kafka broker. It takes a TestReporter as provided by the
 // test framework and a channel of responses to use.  If an error occurs it is
-// simply logged to the *testing.T and the broker exits.
-func NewMockBroker(t *testing.T, brokerID int32) *MockBroker {
+// simply logged to the TestReporter and the broker exits.
+func NewMockBroker(t TestReporter, brokerID int32) *MockBroker {
 	return NewMockBrokerAddr(t, brokerID, "localhost:0")
 }
 
 // NewMockBrokerAddr behaves like newMockBroker but listens on the address you give
 // it rather than just some ephemeral port.
-func NewMockBrokerAddr(t *testing.T, brokerID int32, addr string) *MockBroker {
+func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker {
 	var err error
 
 	broker := &MockBroker{

@@ -2,8 +2,16 @@ package sarama
 
 import (
 	"fmt"
-	"testing"
 )
+
+// TestReporter has methods matching go's testing.T to avoid importing
+// `testing` in the main part of the library.
+type TestReporter interface {
+	Error(...interface{})
+	Errorf(string, ...interface{})
+	Fatal(...interface{})
+	Fatalf(string, ...interface{})
+}
 
 // MockResponse is a response builder interface it defines one method that
 // allows generating a response based on a request body. MockResponses are used
@@ -62,10 +70,10 @@ func (mc *MockSequence) For(reqBody decoder) (res encoder) {
 type MockMetadataResponse struct {
 	leaders map[string]map[int32]int32
 	brokers map[string]int32
-	t       *testing.T
+	t       TestReporter
 }
 
-func NewMockMetadataResponse(t *testing.T) *MockMetadataResponse {
+func NewMockMetadataResponse(t TestReporter) *MockMetadataResponse {
 	return &MockMetadataResponse{
 		leaders: make(map[string]map[int32]int32),
 		brokers: make(map[string]int32),
@@ -113,10 +121,10 @@ func (mmr *MockMetadataResponse) For(reqBody decoder) encoder {
 // MockOffsetResponse is an `OffsetResponse` builder.
 type MockOffsetResponse struct {
 	offsets map[string]map[int32]map[int64]int64
-	t       *testing.T
+	t       TestReporter
 }
 
-func NewMockOffsetResponse(t *testing.T) *MockOffsetResponse {
+func NewMockOffsetResponse(t TestReporter) *MockOffsetResponse {
 	return &MockOffsetResponse{
 		offsets: make(map[string]map[int32]map[int64]int64),
 		t:       t,
@@ -170,11 +178,11 @@ func (mor *MockOffsetResponse) getOffset(topic string, partition int32, time int
 type MockFetchResponse struct {
 	messages       map[string]map[int32]map[int64]Encoder
 	highWaterMarks map[string]map[int32]int64
-	t              *testing.T
+	t              TestReporter
 	batchSize      int
 }
 
-func NewMockFetchResponse(t *testing.T, batchSize int) *MockFetchResponse {
+func NewMockFetchResponse(t TestReporter, batchSize int) *MockFetchResponse {
 	return &MockFetchResponse{
 		messages:       make(map[string]map[int32]map[int64]Encoder),
 		highWaterMarks: make(map[string]map[int32]int64),
@@ -270,10 +278,10 @@ func (mfr *MockFetchResponse) getHighWaterMark(topic string, partition int32) in
 // MockConsumerMetadataResponse is a `ConsumerMetadataResponse` builder.
 type MockConsumerMetadataResponse struct {
 	coordinators map[string]interface{}
-	t            *testing.T
+	t            TestReporter
 }
 
-func NewMockConsumerMetadataResponse(t *testing.T) *MockConsumerMetadataResponse {
+func NewMockConsumerMetadataResponse(t TestReporter) *MockConsumerMetadataResponse {
 	return &MockConsumerMetadataResponse{
 		coordinators: make(map[string]interface{}),
 		t:            t,
@@ -307,10 +315,10 @@ func (mr *MockConsumerMetadataResponse) For(reqBody decoder) encoder {
 // MockOffsetCommitResponse is a `OffsetCommitResponse` builder.
 type MockOffsetCommitResponse struct {
 	errors map[string]map[string]map[int32]KError
-	t      *testing.T
+	t      TestReporter
 }
 
-func NewMockOffsetCommitResponse(t *testing.T) *MockOffsetCommitResponse {
+func NewMockOffsetCommitResponse(t TestReporter) *MockOffsetCommitResponse {
 	return &MockOffsetCommitResponse{t: t}
 }
 
@@ -363,10 +371,10 @@ func (mr *MockOffsetCommitResponse) getError(group, topic string, partition int3
 // MockProduceResponse is a `ProduceResponse` builder.
 type MockProduceResponse struct {
 	errors map[string]map[int32]KError
-	t      *testing.T
+	t      TestReporter
 }
 
-func NewMockProduceResponse(t *testing.T) *MockProduceResponse {
+func NewMockProduceResponse(t TestReporter) *MockProduceResponse {
 	return &MockProduceResponse{t: t}
 }
 
@@ -409,10 +417,10 @@ func (mr *MockProduceResponse) getError(topic string, partition int32) KError {
 // MockOffsetFetchResponse is a `OffsetFetchResponse` builder.
 type MockOffsetFetchResponse struct {
 	offsets map[string]map[string]map[int32]*OffsetFetchResponseBlock
-	t       *testing.T
+	t       TestReporter
 }
 
-func NewMockOffsetFetchResponse(t *testing.T) *MockOffsetFetchResponse {
+func NewMockOffsetFetchResponse(t TestReporter) *MockOffsetFetchResponse {
 	return &MockOffsetFetchResponse{t: t}
 }
 
