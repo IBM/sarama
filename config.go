@@ -2,8 +2,11 @@ package sarama
 
 import (
 	"crypto/tls"
+	"regexp"
 	"time"
 )
+
+var validID *regexp.Regexp = regexp.MustCompile(`\A[A-Za-z0-9._-]*\z`)
 
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
@@ -353,6 +356,8 @@ func (c *Config) Validate() error {
 	switch {
 	case c.ChannelBufferSize < 0:
 		return ConfigurationError("ChannelBufferSize must be >= 0")
+	case !validID.MatchString(c.ClientID):
+		return ConfigurationError("ClientID is invalid")
 	}
 
 	return nil
