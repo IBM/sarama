@@ -632,7 +632,7 @@ func (client *client) updateMetadata(data *MetadataResponse) (retry bool, err er
 		switch topic.Err {
 		case ErrNoError:
 			break
-		case ErrInvalidTopic: // don't retry, don't store partial results
+		case ErrInvalidTopic, ErrTopicAuthorizationFailed: // don't retry, don't store partial results
 			err = topic.Err
 			continue
 		case ErrUnknownTopicOrPartition: // retry, do not store partial partition results
