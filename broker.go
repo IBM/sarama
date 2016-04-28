@@ -9,6 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"bytes"
+	"encoding/binary"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -82,6 +84,38 @@ func (b *Broker) Open(conf *Config) error {
 		b.conn = newBufConn(b.conn)
 
 		b.conf = conf
+
+		if conf.Net.SASL.Enable {
+			//
+			// Begin SASL/PLAIN authentication
+			//
+			authBytes := []byte("\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password)
+			buf := new(bytes.Buffer)
+
+			err = binary.Write(buf, binary.BigEndian, int32(len(authBytes)))
+			if err != nil {
+				Logger.Printf("Failed to encode payload size (SASL credentials): %s", err.Error())
+			}
+
+			err = binary.Write(buf, binary.BigEndian, authBytes)
+			if err != nil {
+				Logger.Printf("Failed to encode payload (SASL credentials): %s", err.Error())
+			}
+
+			b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
+			b.conn.Write(buf.Bytes())
+
+			header := make([]byte, 4)
+			n, err := io.ReadFull(b.conn, header)
+			if err != nil {
+				Logger.Printf("Failed to read response while authenticating with SASL: %s", err.Error())
+			}
+			Logger.Printf("SASL authentication successful:\n%v\n%v\n%v", n, header, string(header))
+			//
+			// End SASL/PLAIN authentication
+			//
+		}
+
 		b.done = make(chan bool)
 		b.responses = make(chan responsePromise, b.conf.Net.MaxOpenRequests-1)
 

@@ -33,6 +33,17 @@ type Config struct {
 			Config *tls.Config
 		}
 
+		// SASL based authentication with broker. While there are multiple SASL authentication methods
+		// the current implementation is limited to plaintext (SASL/PLAIN) authentication
+		SASL struct {
+			// Whether or not to use SASL authentication when connecting to the broker
+			// (defaults to false).
+			Enable bool
+			//username and password for SASL/PLAIN authentication
+			User string
+			Password string
+		}
+
 		// KeepAlive specifies the keep-alive period for an active network connection.
 		// If zero, keep-alives are disabled. (default is 0: disabled).
 		KeepAlive time.Duration
@@ -222,6 +233,7 @@ func NewConfig() *Config {
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
+	c.Net.SASL.Enable = false
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
@@ -255,6 +267,14 @@ func (c *Config) Validate() error {
 	// some configuration values should be warned on but not fail completely, do those first
 	if c.Net.TLS.Enable == false && c.Net.TLS.Config != nil {
 		Logger.Println("Net.TLS is disabled but a non-nil configuration was provided.")
+	}
+	if c.Net.SASL.Enable == false {
+		if c.Net.SASL.User != "" {
+			Logger.Println("Net.SASL is disabled but a non-empty username was provided.")
+		}
+		if c.Net.SASL.Password != "" {
+			Logger.Println("Net.SASL is disabled but a non-empty password was provided.")
+		}
 	}
 	if c.Producer.RequiredAcks > 1 {
 		Logger.Println("Producer.RequiredAcks > 1 is deprecated and will raise an exception with kafka >= 0.8.2.0.")
