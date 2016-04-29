@@ -197,7 +197,8 @@ type Config struct {
 			// The retention duration for committed offsets. If zero, disabled
 			// (in which case the `offsets.retention.minutes` option on the
 			// broker will be used).  Kafka only supports precision up to
-			// milliseconds; nanoseconds will be truncated.
+			// milliseconds; nanoseconds will be truncated. Requires Kafka
+			// broker version 0.9.0 or later.
 			// (default is 0: disabled).
 			Retention time.Duration
 		}
