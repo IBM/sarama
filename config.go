@@ -40,7 +40,7 @@ type Config struct {
 			// (defaults to false).
 			Enable bool
 			//username and password for SASL/PLAIN authentication
-			User string
+			User     string
 			Password string
 		}
 

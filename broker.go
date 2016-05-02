@@ -1,7 +1,9 @@
 package sarama
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
@@ -9,8 +11,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	"bytes"
-	"encoding/binary"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -486,7 +486,7 @@ func (b *Broker) responseReceiver() {
 //
 // When credentials are valid, Kafka returns a 4 byte array of null characters.
 // When credentials are invalid, Kafka closes the connection. This does not seem to be the ideal way
-// of responding to bad credentials but thats how its being done today. 
+// of responding to bad credentials but thats how its being done today.
 func (b *Broker) doSASLPlainAuth() error {
 	authBytes := []byte("\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password)
 	buf := new(bytes.Buffer)
