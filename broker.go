@@ -492,18 +492,27 @@ func (b *Broker) doSASLPlainAuth() error {
 	binary.BigEndian.PutUint32(authBytes, uint32(length))
 	copy(authBytes[4:], []byte("\x00"+b.conf.Net.SASL.User+"\x00"+b.conf.Net.SASL.Password))
 
-	b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
-	b.conn.Write(authBytes)
+	err := b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
+	if err != nil {
+		Logger.Printf("Failed to set write deadline when doing SASL auth: %s\n", err.Error())
+		return nil
+	}
+
+	_, err = b.conn.Write(authBytes)
+	if err != nil {
+		Logger.Printf("Failed to write SASL auth header to broker: %s\n", err.Error())
+		return nil
+	}
 
 	header := make([]byte, 4)
 	n, err := io.ReadFull(b.conn, header)
 	// If the credentials are valid, we would get a 4 byte response filled with null characters.
 	// Otherwise, the broker closes the connection and we get an EOF
 	if err != nil {
-		Logger.Printf("Failed to read response while authenticating with SASL: %s", err.Error())
+		Logger.Printf("Failed to read response while authenticating with SASL: %s\n", err.Error())
 		return err
 	}
 
-	Logger.Printf("SASL authentication successful:%v - %v", n, header)
+	Logger.Printf("SASL authentication successful:%v - %v\n", n, header)
 	return nil
 }
