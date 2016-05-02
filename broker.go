@@ -488,9 +488,9 @@ func (b *Broker) responseReceiver() {
 // of responding to bad credentials but thats how its being done today.
 func (b *Broker) doSASLPlainAuth() error {
 	length := 1 + len(b.conf.Net.SASL.User) + 1 + len(b.conf.Net.SASL.Password)
-	authBytes := make([]byte, length + 4)  //4 byte length header + auth data
+	authBytes := make([]byte, length+4) //4 byte length header + auth data
 	binary.BigEndian.PutUint32(authBytes, uint32(length))
-	copy(authBytes[4:], []byte("\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password))
+	copy(authBytes[4:], []byte("\x00"+b.conf.Net.SASL.User+"\x00"+b.conf.Net.SASL.Password))
 
 	b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
 	b.conn.Write(authBytes)
