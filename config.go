@@ -234,7 +234,6 @@ func NewConfig() *Config {
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
-	c.Net.SASL.Enable = false
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
@@ -314,6 +313,10 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Net.WriteTimeout must be > 0")
 	case c.Net.KeepAlive < 0:
 		return ConfigurationError("Net.KeepAlive must be >= 0")
+	case (c.Net.SASL.Enable == true) && (c.Net.SASL.User == ""):
+		return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
+	case (c.Net.SASL.Enable == true) && (c.Net.SASL.Password == ""):
+		return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
 	}
 
 	// validate the Metadata values
