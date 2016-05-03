@@ -85,13 +85,17 @@ func (b *Broker) Open(conf *Config) error {
 		b.conf = conf
 
 		if conf.Net.SASL.Enable {
-			err = b.doSASLPlainAuth()
-			if err != nil {
-				Logger.Printf("SASL authentication with broker %s failed\n", b.addr)
-				_ = b.Close()
+			b.connErr = b.doSASLPlainAuth()
+			if b.connErr != nil {
+				err = b.conn.Close()
+				if err == nil {
+					Logger.Printf("Closed connection to broker %s\n", b.addr)
+				} else {
+					Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
+				}
+				b.conn = nil
+				atomic.StoreInt32(&b.opened, 0)
 				return
-			} else {
-				Logger.Printf("SASL authentication with broker %s succeeded\n", b.addr)
 			}
 		}
 
@@ -494,14 +498,14 @@ func (b *Broker) doSASLPlainAuth() error {
 
 	err := b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
 	if err != nil {
-		Logger.Printf("Failed to set write deadline when doing SASL auth: %s\n", err.Error())
-		return nil
+		Logger.Printf("Failed to set write deadline when doing SASL auth with broker %s: %s\n", b.addr, err.Error())
+		return err
 	}
 
 	_, err = b.conn.Write(authBytes)
 	if err != nil {
-		Logger.Printf("Failed to write SASL auth header to broker: %s\n", err.Error())
-		return nil
+		Logger.Printf("Failed to write SASL auth header to broker %s: %s\n", b.addr, err.Error())
+		return err
 	}
 
 	header := make([]byte, 4)
@@ -509,10 +513,10 @@ func (b *Broker) doSASLPlainAuth() error {
 	// If the credentials are valid, we would get a 4 byte response filled with null characters.
 	// Otherwise, the broker closes the connection and we get an EOF
 	if err != nil {
-		Logger.Printf("Failed to read response while authenticating with SASL: %s\n", err.Error())
+		Logger.Printf("Failed to read response while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
 		return err
 	}
 
-	Logger.Printf("SASL authentication successful:%v - %v\n", n, header)
+	Logger.Printf("SASL authentication successful with broker %s:%v - %v\n", b.addr, n, header)
 	return nil
 }
