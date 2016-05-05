@@ -56,7 +56,7 @@ var (
 
 func TestOffsetCommitRequestV0(t *testing.T) {
 	request := new(OffsetCommitRequest)
-	request.Version = 0
+	request.KafkaVersion = &KafkaVersion{Release: V0_8_1_0}
 	request.ConsumerGroup = "foobar"
 	testRequest(t, "no blocks v0", request, offsetCommitRequestNoBlocksV0)
 
@@ -69,7 +69,7 @@ func TestOffsetCommitRequestV1(t *testing.T) {
 	request.ConsumerGroup = "foobar"
 	request.ConsumerID = "cons"
 	request.ConsumerGroupGeneration = 0x1122
-	request.Version = 1
+	request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 	testRequest(t, "no blocks v1", request, offsetCommitRequestNoBlocksV1)
 
 	request.AddBlock("topic", 0x5221, 0xDEADBEEF, ReceiveTime, "metadata")
@@ -82,7 +82,7 @@ func TestOffsetCommitRequestV2(t *testing.T) {
 	request.ConsumerID = "cons"
 	request.ConsumerGroupGeneration = 0x1122
 	request.RetentionTime = 0x4433
-	request.Version = 2
+	request.KafkaVersion = &KafkaVersion{Release: V0_9_0_0}
 	testRequest(t, "no blocks v2", request, offsetCommitRequestNoBlocksV2)
 
 	request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, "metadata")

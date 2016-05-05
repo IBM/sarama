@@ -36,12 +36,18 @@ var (
 
 func TestProduceRequest(t *testing.T) {
 	request := new(ProduceRequest)
+	request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 	testRequest(t, "empty", request, produceRequestEmpty)
 
 	request.RequiredAcks = 0x123
 	request.Timeout = 0x444
 	testRequest(t, "header", request, produceRequestHeader)
 
-	request.AddMessage("topic", 0xAD, &Message{Codec: CompressionNone, Key: nil, Value: []byte{0x00, 0xEE}})
+	request.AddMessage("topic", 0xAD, &Message{
+		Codec:        CompressionNone,
+		Key:          nil,
+		Value:        []byte{0x00, 0xEE},
+		KafkaVersion: &KafkaVersion{Release: V0_8_2_2},
+	})
 	testRequest(t, "one message", request, produceRequestOneMessage)
 }

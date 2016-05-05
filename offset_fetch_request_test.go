@@ -21,6 +21,7 @@ var (
 
 func TestOffsetFetchRequest(t *testing.T) {
 	request := new(OffsetFetchRequest)
+	request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 	testRequest(t, "no group, no partitions", request, offsetFetchRequestNoGroupNoPartitions)
 
 	request.ConsumerGroup = "blah"

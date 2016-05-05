@@ -2,6 +2,9 @@ package sarama
 
 type OffsetCommitResponse struct {
 	Errors map[string]map[int32]KError
+
+	// This is not part of the response bytes received from Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (r *OffsetCommitResponse) AddError(topic string, partition int32, kerror KError) {

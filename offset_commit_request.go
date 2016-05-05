@@ -46,24 +46,18 @@ type OffsetCommitRequest struct {
 	ConsumerID              string // v1 or later
 	RetentionTime           int64  // v2 or later
 
-	// Version can be:
-	// - 0 (kafka 0.8.1 and later)
-	// - 1 (kafka 0.8.2 and later)
-	// - 2 (kafka 0.8.3 and later)
-	Version int16
-	blocks  map[string]map[int32]*offsetCommitRequestBlock
+	blocks map[string]map[int32]*offsetCommitRequestBlock
+
+	// This is not part of the request bytes sent to Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
-	if r.Version < 0 || r.Version > 2 {
-		return PacketEncodingError{"invalid or unsupported OffsetCommitRequest version field"}
-	}
-
 	if err := pe.putString(r.ConsumerGroup); err != nil {
 		return err
 	}
 
-	if r.Version >= 1 {
+	if r.version() >= 1 {
 		pe.putInt32(r.ConsumerGroupGeneration)
 		if err := pe.putString(r.ConsumerID); err != nil {
 			return err
@@ -77,7 +71,7 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 		}
 	}
 
-	if r.Version >= 2 {
+	if r.version() >= 2 {
 		pe.putInt64(r.RetentionTime)
 	} else if r.RetentionTime != 0 {
 		Logger.Println("Non-zero RetentionTime specified for OffsetCommitRequest version <2, it will be ignored")
@@ -95,7 +89,7 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			if err := block.encode(pe, r.Version); err != nil {
+			if err := block.encode(pe, r.version()); err != nil {
 				return err
 			}
 		}
@@ -108,7 +102,7 @@ func (r *OffsetCommitRequest) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if r.Version >= 1 {
+	if r.version() >= 1 {
 		if r.ConsumerGroupGeneration, err = pd.getInt32(); err != nil {
 			return err
 		}
@@ -117,7 +111,7 @@ func (r *OffsetCommitRequest) decode(pd packetDecoder) (err error) {
 		}
 	}
 
-	if r.Version >= 2 {
+	if r.version() >= 2 {
 		if r.RetentionTime, err = pd.getInt64(); err != nil {
 			return err
 		}
@@ -147,7 +141,7 @@ func (r *OffsetCommitRequest) decode(pd packetDecoder) (err error) {
 				return err
 			}
 			block := &offsetCommitRequestBlock{}
-			if err := block.decode(pd, r.Version); err != nil {
+			if err := block.decode(pd, r.version()); err != nil {
 				return err
 			}
 			r.blocks[topic][partition] = block
@@ -161,7 +155,13 @@ func (r *OffsetCommitRequest) key() int16 {
 }
 
 func (r *OffsetCommitRequest) version() int16 {
-	return r.Version
+	if r.KafkaVersion.AtLeast(V0_9_0_0) {
+		return 2
+	} else if r.KafkaVersion.AtLeast(V0_8_2_0) {
+		return 1
+	} else {
+		return 0
+	}
 }
 
 func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset int64, timestamp int64, metadata string) {

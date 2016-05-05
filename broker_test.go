@@ -106,6 +106,7 @@ var brokerTestTable = []struct {
 	{[]byte{},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
+			request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 			request.RequiredAcks = NoResponse
 			response, err := broker.Produce(&request)
 			if err != nil {
@@ -119,6 +120,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
+			request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 			request.RequiredAcks = WaitForLocal
 			response, err := broker.Produce(&request)
 			if err != nil {
@@ -132,6 +134,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := FetchRequest{}
+			request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 			response, err := broker.Fetch(&request)
 			if err != nil {
 				t.Error(err)
@@ -144,6 +147,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetFetchRequest{}
+			request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 			response, err := broker.FetchOffset(&request)
 			if err != nil {
 				t.Error(err)
@@ -156,6 +160,7 @@ var brokerTestTable = []struct {
 	{[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetCommitRequest{}
+			request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 			response, err := broker.CommitOffset(&request)
 			if err != nil {
 				t.Error(err)

@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"net"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 type none struct{}
@@ -108,4 +110,34 @@ func newBufConn(conn net.Conn) *bufConn {
 
 func (bc *bufConn) Read(b []byte) (n int, err error) {
 	return bc.buf.Read(b)
+}
+
+type kVersion struct {
+	versionArr [4]int
+}
+
+func NewVersion(ver string) (*kVersion, error) {
+	x := strings.Split(ver, ".")
+	ordA, _ := strconv.Atoi(x[0])
+	ordB, _ := strconv.Atoi(x[1])
+	ordC, _ := strconv.Atoi(x[2])
+	ordD, _ := strconv.Atoi(x[3])
+
+	v := &kVersion{
+		versionArr: [4]int{ordA, ordB, ordC, ordD},
+	}
+	return v, nil
+}
+
+func (v *kVersion) GE(ver *kVersion) bool {
+	for k, ord := range v.versionArr {
+		if ord != 0 {
+			if ord >= ver.versionArr[k] {
+				return true
+			} else {
+				return false
+			}
+		}
+	}
+	return false
 }

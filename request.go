@@ -79,20 +79,46 @@ func decodeRequest(r io.Reader) (req *request, err error) {
 	return req, nil
 }
 
-func allocateBody(key, version int16) requestBody {
+func allocateBody(key int16, version int16) requestBody {
 	switch key {
 	case 0:
-		return &ProduceRequest{}
+		switch version {
+		case 2:
+			return &ProduceRequest{KafkaVersion: &KafkaVersion{Release: V0_10_0}}
+		case 1:
+			return &ProduceRequest{KafkaVersion: &KafkaVersion{Release: V0_9_0_0}}
+		case 0:
+			return &ProduceRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_2}}
+		}
 	case 1:
-		return &FetchRequest{}
+		switch version {
+		case 2:
+			return &FetchRequest{KafkaVersion: &KafkaVersion{Release: V0_10_0}}
+		case 1:
+			return &FetchRequest{KafkaVersion: &KafkaVersion{Release: V0_9_0_0}}
+		case 0:
+			return &FetchRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_2}}
+		}
 	case 2:
 		return &OffsetRequest{}
 	case 3:
 		return &MetadataRequest{}
 	case 8:
-		return &OffsetCommitRequest{Version: version}
+		switch version {
+		case 2:
+			return &OffsetCommitRequest{KafkaVersion: &KafkaVersion{Release: V0_9_0_0}}
+		case 1:
+			return &OffsetCommitRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_0}}
+		case 0:
+			return &OffsetCommitRequest{KafkaVersion: &KafkaVersion{Release: V0_8_1_0}}
+		}
 	case 9:
-		return &OffsetFetchRequest{}
+		switch version {
+		case 1:
+			return &OffsetFetchRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_0}}
+		case 0:
+			return &OffsetFetchRequest{KafkaVersion: &KafkaVersion{Release: V0_8_1_0}}
+		}
 	case 10:
 		return &ConsumerMetadataRequest{}
 	case 11:

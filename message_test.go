@@ -44,7 +44,7 @@ var (
 )
 
 func TestMessageEncoding(t *testing.T) {
-	message := Message{}
+	message := Message{KafkaVersion: &KafkaVersion{Release: V0_8_2_2}}
 	testEncodable(t, "empty", &message, emptyMessage)
 
 	message.Value = []byte{}
@@ -53,7 +53,7 @@ func TestMessageEncoding(t *testing.T) {
 }
 
 func TestMessageDecoding(t *testing.T) {
-	message := Message{}
+	message := Message{KafkaVersion: &KafkaVersion{Release: V0_8_2_2}}
 	testDecodable(t, "empty", &message, emptyMessage)
 	if message.Codec != CompressionNone {
 		t.Error("Decoding produced compression codec where there was none.")

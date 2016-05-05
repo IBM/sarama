@@ -26,6 +26,7 @@ var (
 
 func TestProduceResponse(t *testing.T) {
 	response := ProduceResponse{}
+	response.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
 
 	testDecodable(t, "no blocks", &response, produceResponseNoBlocks)
 	if len(response.Blocks) != 0 {

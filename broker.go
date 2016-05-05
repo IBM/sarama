@@ -188,6 +188,7 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 		err = b.sendAndReceive(request, nil)
 	} else {
 		response = new(ProduceResponse)
+		response.KafkaVersion = request.KafkaVersion
 		err = b.sendAndReceive(request, response)
 	}
 
@@ -200,6 +201,7 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 
 func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
 	response := new(FetchResponse)
+	response.KafkaVersion = request.KafkaVersion
 
 	err := b.sendAndReceive(request, response)
 
@@ -212,6 +214,7 @@ func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
 
 func (b *Broker) CommitOffset(request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
 	response := new(OffsetCommitResponse)
+	response.KafkaVersion = request.KafkaVersion
 
 	err := b.sendAndReceive(request, response)
 
@@ -224,6 +227,7 @@ func (b *Broker) CommitOffset(request *OffsetCommitRequest) (*OffsetCommitRespon
 
 func (b *Broker) FetchOffset(request *OffsetFetchRequest) (*OffsetFetchResponse, error) {
 	response := new(OffsetFetchResponse)
+	response.KafkaVersion = request.KafkaVersion
 
 	err := b.sendAndReceive(request, response)
 

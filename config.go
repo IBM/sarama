@@ -8,8 +8,16 @@ import (
 
 var validID *regexp.Regexp = regexp.MustCompile(`\A[A-Za-z0-9._-]*\z`)
 
+type KafkaVersion struct {
+	Release *kVersion
+}
+
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
+
+	// This defines the Kafka broker version and is used for broker version specific behaviour
+	KafkaVersion KafkaVersion
+
 	// Net is the namespace for network-level properties used by the Broker, and
 	// shared by the Client/Producer/Consumer.
 	Net struct {
@@ -219,6 +227,8 @@ type Config struct {
 func NewConfig() *Config {
 	c := &Config{}
 
+	c.KafkaVersion.Release = V0_8_2_2
+
 	c.Net.MaxOpenRequests = 5
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
@@ -362,4 +372,8 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func (v *KafkaVersion) AtLeast(ver *kVersion) bool {
+	return v.Release.GE(ver)
 }

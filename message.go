@@ -29,6 +29,8 @@ type Message struct {
 	Value []byte           // the message contents
 	Set   *MessageSet      // the message set a message might wrap
 
+	KafkaVersion *KafkaVersion
+
 	compressedCache []byte
 }
 
