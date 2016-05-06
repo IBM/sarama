@@ -351,16 +351,22 @@ func (pom *partitionOffsetManager) NextOffset() (int64, string) {
 }
 
 func (pom *partitionOffsetManager) AsyncClose() {
+	cancel := make(chan none)
 	go func() {
 		pom.lock.Lock()
-		dirty := pom.dirty
-		pom.lock.Unlock()
-
-		if dirty {
-			<-pom.clean
+		defer pom.lock.Unlock()
+		if !pom.dirty {
+			select {
+			case pom.clean <- none{}:
+			case <-cancel:
+			}
 		}
+	}()
 
+	go func() {
+		<-pom.clean
 		close(pom.dying)
+		close(cancel)
 	}()
 }
 
