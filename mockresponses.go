@@ -218,7 +218,7 @@ func (mfr *MockFetchResponse) SetHighWaterMark(topic string, partition int32, of
 
 func (mfr *MockFetchResponse) For(reqBody decoder) encoder {
 	fetchRequest := reqBody.(*FetchRequest)
-	fetchRequest.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
+	fetchRequest.KafkaVersion = V0_8_2_2
 	res := &FetchResponse{}
 	res.KafkaVersion = fetchRequest.KafkaVersion
 	for topic, partitions := range fetchRequest.blocks {

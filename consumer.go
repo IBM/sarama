@@ -681,7 +681,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
 		MinBytes:     bc.consumer.conf.Consumer.Fetch.Min,
 		MaxWaitTime:  int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
-		KafkaVersion: &bc.consumer.conf.KafkaVersion,
+		KafkaVersion: bc.consumer.conf.KafkaVersion,
 	}
 
 	for child := range bc.subscriptions {

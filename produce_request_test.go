@@ -36,7 +36,7 @@ var (
 
 func TestProduceRequest(t *testing.T) {
 	request := new(ProduceRequest)
-	request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
+	request.KafkaVersion = V0_8_2_2
 	testRequest(t, "empty", request, produceRequestEmpty)
 
 	request.RequiredAcks = 0x123
@@ -47,7 +47,7 @@ func TestProduceRequest(t *testing.T) {
 		Codec:        CompressionNone,
 		Key:          nil,
 		Value:        []byte{0x00, 0xEE},
-		KafkaVersion: &KafkaVersion{Release: V0_8_2_2},
+		KafkaVersion: V0_8_2_2,
 	})
 	testRequest(t, "one message", request, produceRequestOneMessage)
 }

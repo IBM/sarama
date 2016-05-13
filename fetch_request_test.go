@@ -23,7 +23,7 @@ var (
 
 func TestFetchRequest(t *testing.T) {
 	request := new(FetchRequest)
-	request.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
+	request.KafkaVersion = V0_8_2_2
 	testRequest(t, "no blocks", request, fetchRequestNoBlocks)
 
 	request.MaxWaitTime = 0x20

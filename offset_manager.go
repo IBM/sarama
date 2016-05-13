@@ -258,7 +258,7 @@ func (pom *partitionOffsetManager) selectBroker() error {
 
 func (pom *partitionOffsetManager) fetchInitialOffset(retries int) error {
 	request := new(OffsetFetchRequest)
-	request.KafkaVersion = &pom.parent.conf.KafkaVersion
+	request.KafkaVersion = pom.parent.conf.KafkaVersion
 	request.ConsumerGroup = pom.parent.group
 	request.AddPartition(pom.topic, pom.partition)
 
@@ -491,13 +491,13 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 			RetentionTime:           int64(bom.parent.conf.Consumer.Offsets.Retention / time.Millisecond),
 			ConsumerGroup:           bom.parent.group,
 			ConsumerGroupGeneration: GroupGenerationUndefined,
-			KafkaVersion:            &bom.parent.conf.KafkaVersion,
+			KafkaVersion:            bom.parent.conf.KafkaVersion,
 		}
 	} else {
 		r = &OffsetCommitRequest{
 			ConsumerGroup:           bom.parent.group,
 			ConsumerGroupGeneration: GroupGenerationUndefined,
-			KafkaVersion:            &bom.parent.conf.KafkaVersion,
+			KafkaVersion:            bom.parent.conf.KafkaVersion,
 		}
 
 	}

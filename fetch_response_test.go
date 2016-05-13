@@ -30,7 +30,7 @@ var (
 
 func TestEmptyFetchResponse(t *testing.T) {
 	response := FetchResponse{}
-	response.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
+	response.KafkaVersion = V0_8_2_2
 	testDecodable(t, "empty", &response, emptyFetchResponse)
 
 	if len(response.Blocks) != 0 {
@@ -41,7 +41,7 @@ func TestEmptyFetchResponse(t *testing.T) {
 
 func TestOneMessageFetchResponse(t *testing.T) {
 	response := FetchResponse{}
-	response.KafkaVersion = &KafkaVersion{Release: V0_8_2_2}
+	response.KafkaVersion = V0_8_2_2
 	testDecodable(t, "one message", &response, oneMessageFetchResponse)
 
 	if len(response.Blocks) != 1 {

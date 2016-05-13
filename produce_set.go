@@ -56,7 +56,7 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 		Codec:        CompressionNone,
 		Key:          key,
 		Value:        val,
-		KafkaVersion: &ps.parent.conf.KafkaVersion,
+		KafkaVersion: ps.parent.conf.KafkaVersion,
 	})
 
 	size := producerMessageOverhead + len(key) + len(val)
@@ -71,7 +71,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	req := &ProduceRequest{
 		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
 		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
-		KafkaVersion: &ps.parent.conf.KafkaVersion,
+		KafkaVersion: ps.parent.conf.KafkaVersion,
 	}
 
 	for topic, partitionSet := range ps.msgs {
@@ -92,7 +92,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					Codec:        ps.parent.conf.Producer.Compression,
 					Key:          nil,
 					Value:        payload,
-					KafkaVersion: &ps.parent.conf.KafkaVersion,
+					KafkaVersion: ps.parent.conf.KafkaVersion,
 				})
 			}
 		}

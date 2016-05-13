@@ -84,20 +84,20 @@ func allocateBody(key int16, version int16) requestBody {
 	case 0:
 		switch version {
 		case 2:
-			return &ProduceRequest{KafkaVersion: &KafkaVersion{Release: V0_10_0}}
+			return &ProduceRequest{KafkaVersion: V0_10_0}
 		case 1:
-			return &ProduceRequest{KafkaVersion: &KafkaVersion{Release: V0_9_0_0}}
+			return &ProduceRequest{KafkaVersion:  V0_9_0_0}
 		case 0:
-			return &ProduceRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_2}}
+			return &ProduceRequest{KafkaVersion: V0_8_2_2}
 		}
 	case 1:
 		switch version {
 		case 2:
-			return &FetchRequest{KafkaVersion: &KafkaVersion{Release: V0_10_0}}
+			return &FetchRequest{KafkaVersion: V0_10_0}
 		case 1:
-			return &FetchRequest{KafkaVersion: &KafkaVersion{Release: V0_9_0_0}}
+			return &FetchRequest{KafkaVersion: V0_9_0_0}
 		case 0:
-			return &FetchRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_2}}
+			return &FetchRequest{KafkaVersion: V0_8_2_2}
 		}
 	case 2:
 		return &OffsetRequest{}
@@ -106,18 +106,18 @@ func allocateBody(key int16, version int16) requestBody {
 	case 8:
 		switch version {
 		case 2:
-			return &OffsetCommitRequest{KafkaVersion: &KafkaVersion{Release: V0_9_0_0}}
+			return &OffsetCommitRequest{KafkaVersion: V0_9_0_0}
 		case 1:
-			return &OffsetCommitRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_0}}
+			return &OffsetCommitRequest{KafkaVersion: V0_8_2_0}
 		case 0:
-			return &OffsetCommitRequest{KafkaVersion: &KafkaVersion{Release: V0_8_1_0}}
+			return &OffsetCommitRequest{KafkaVersion: V0_8_1_0}
 		}
 	case 9:
 		switch version {
 		case 1:
-			return &OffsetFetchRequest{KafkaVersion: &KafkaVersion{Release: V0_8_2_0}}
+			return &OffsetFetchRequest{KafkaVersion: V0_8_2_0}
 		case 0:
-			return &OffsetFetchRequest{KafkaVersion: &KafkaVersion{Release: V0_8_1_0}}
+			return &OffsetFetchRequest{KafkaVersion: V0_8_1_0}
 		}
 	case 10:
 		return &ConsumerMetadataRequest{}
