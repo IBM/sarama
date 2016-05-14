@@ -9,10 +9,20 @@ New Features:
    implementations ([#570](https://github.com/Shopify/sarama/pull/570)).
  - Declare support for Golang 1.6
    ([#611](https://github.com/Shopify/sarama/pull/611)).
+ - Support for SASL plain-text auth
+   ([#648](https://github.com/Shopify/sarama/pull/648)).
 
 Improvements:
  - Simplified broker locking scheme slightly
    ([#604](https://github.com/Shopify/sarama/pull/604)).
+ - Documentation cleanup
+   ([#605](https://github.com/Shopify/sarama/pull/605),
+    [#621](https://github.com/Shopify/sarama/pull/621),
+    [#654](https://github.com/Shopify/sarama/pull/654)).
+
+Bug Fixes:
+ - Fix race condition shutting down the OffsetManager
+   ([#658](https://github.com/Shopify/sarama/pull/658)).
 
 #### Version 1.8.0 (2016-02-01)
 
