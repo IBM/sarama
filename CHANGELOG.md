@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.9.0 (trunk)
+#### Version 1.9.0 (2016-05-16)
 
 New Features:
  - Add support for custom offset manager retention durations
