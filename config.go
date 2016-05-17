@@ -189,7 +189,7 @@ type Config struct {
 		// Return specifies what channels will be populated. If they are set to true,
 		// you must read from them to prevent deadlock.
 		Return struct {
-			// If enabled, any errors that occured while consuming are returned on
+			// If enabled, any errors that occurred while consuming are returned on
 			// the Errors channel (default disabled).
 			Errors bool
 		}
