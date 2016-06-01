@@ -6,7 +6,9 @@ import (
 	"time"
 )
 
-var validID *regexp.Regexp = regexp.MustCompile(`\A[A-Za-z0-9._-]*\z`)
+const defaultClientID = "sarama"
+
+var validID *regexp.Regexp = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)
 
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
@@ -258,6 +260,8 @@ func NewConfig() *Config {
 
 	c.ChannelBufferSize = 256
 
+	c.ClientID = defaultClientID
+
 	return c
 }
 
@@ -297,7 +301,7 @@ func (c *Config) Validate() error {
 	if c.Consumer.Offsets.Retention%time.Millisecond != 0 {
 		Logger.Println("Consumer.Offsets.Retention only supports millisecond precision; nanoseconds will be truncated.")
 	}
-	if c.ClientID == "sarama" {
+	if c.ClientID == defaultClientID {
 		Logger.Println("ClientID is the default of 'sarama', you should consider setting it to something application-specific.")
 	}
 
