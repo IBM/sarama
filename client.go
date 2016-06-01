@@ -67,6 +67,8 @@ type Client interface {
 }
 
 const (
+	// Default ClientID
+	DefaultClientID = "sarama"
 	// OffsetNewest stands for the log head offset, i.e. the offset that will be
 	// assigned to the next message that will be produced to the partition. You
 	// can send this to a client's GetOffset method to get this offset, or when
