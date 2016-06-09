@@ -50,7 +50,7 @@ func (m *Message) encode(pe packetEncoder) error {
 	if m.compressedCache != nil {
 		payload = m.compressedCache
 		m.compressedCache = nil
-	} else {
+	} else if m.Value != nil {
 		switch m.Codec {
 		case CompressionNone:
 			payload = m.Value
@@ -116,7 +116,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		// nothing to do
 	case CompressionGZIP:
 		if m.Value == nil {
-			return PacketDecodingError{"GZIP compression specified, but no data to uncompress"}
+			break
 		}
 		reader, err := gzip.NewReader(bytes.NewReader(m.Value))
 		if err != nil {
@@ -130,7 +130,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		}
 	case CompressionSnappy:
 		if m.Value == nil {
-			return PacketDecodingError{"Snappy compression specified, but no data to uncompress"}
+			break
 		}
 		if m.Value, err = snappyDecode(m.Value); err != nil {
 			return err
