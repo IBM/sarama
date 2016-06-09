@@ -16,7 +16,7 @@ func (r *LeaveGroupRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *LeaveGroupRequest) decode(pd packetDecoder) (err error) {
+func (r *LeaveGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 	if r.GroupId, err = pd.getString(); err != nil {
 		return
 	}

@@ -40,7 +40,7 @@ func TestJoinGroupResponse(t *testing.T) {
 	var response *JoinGroupResponse
 
 	response = new(JoinGroupResponse)
-	testDecodable(t, "no error", response, joinGroupResponseNoError)
+	testVersionDecodable(t, "no error", response, joinGroupResponseNoError, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
@@ -58,7 +58,7 @@ func TestJoinGroupResponse(t *testing.T) {
 	}
 
 	response = new(JoinGroupResponse)
-	testDecodable(t, "with error", response, joinGroupResponseWithError)
+	testVersionDecodable(t, "with error", response, joinGroupResponseWithError, 0)
 	if response.Err != ErrInconsistentGroupProtocol {
 		t.Error("Decoding Err failed: ErrInconsistentGroupProtocol expected but found", response.Err)
 	}
@@ -76,7 +76,7 @@ func TestJoinGroupResponse(t *testing.T) {
 	}
 
 	response = new(JoinGroupResponse)
-	testDecodable(t, "with error", response, joinGroupResponseLeader)
+	testVersionDecodable(t, "with error", response, joinGroupResponseLeader, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: ErrNoError expected but found", response.Err)
 	}

@@ -7,7 +7,7 @@ func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ListGroupsRequest) decode(pd packetDecoder) (err error) {
+func (r *ListGroupsRequest) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 

@@ -103,7 +103,9 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *OffsetCommitRequest) decode(pd packetDecoder) (err error) {
+func (r *OffsetCommitRequest) decode(pd packetDecoder, version int16) (err error) {
+	r.Version = version
+
 	if r.ConsumerGroup, err = pd.getString(); err != nil {
 		return err
 	}

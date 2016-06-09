@@ -9,7 +9,7 @@ func (r *LeaveGroupResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *LeaveGroupResponse) decode(pd packetDecoder) (err error) {
+func (r *LeaveGroupResponse) decode(pd packetDecoder, version int16) (err error) {
 	if kerr, err := pd.getInt16(); err != nil {
 		return err
 	} else {
@@ -17,4 +17,12 @@ func (r *LeaveGroupResponse) decode(pd packetDecoder) (err error) {
 	}
 
 	return nil
+}
+
+func (r *LeaveGroupResponse) key() int16 {
+	return 13
+}
+
+func (r *LeaveGroupResponse) version() int16 {
+	return 0
 }

@@ -18,7 +18,7 @@ func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *DescribeGroupsResponse) decode(pd packetDecoder) (err error) {
+func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err error) {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -33,6 +33,14 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder) (err error) {
 	}
 
 	return nil
+}
+
+func (r *DescribeGroupsResponse) key() int16 {
+	return 15
+}
+
+func (r *DescribeGroupsResponse) version() int16 {
+	return 0
 }
 
 type GroupDescription struct {

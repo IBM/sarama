@@ -50,7 +50,7 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *OffsetRequest) decode(pd packetDecoder) error {
+func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 	// Ignore replica ID
 	if _, err := pd.getInt32(); err != nil {
 		return err

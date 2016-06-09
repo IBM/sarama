@@ -21,7 +21,7 @@ func TestSyncGroupResponse(t *testing.T) {
 	var response *SyncGroupResponse
 
 	response = new(SyncGroupResponse)
-	testDecodable(t, "no error", response, syncGroupResponseNoError)
+	testVersionDecodable(t, "no error", response, syncGroupResponseNoError, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
@@ -30,7 +30,7 @@ func TestSyncGroupResponse(t *testing.T) {
 	}
 
 	response = new(SyncGroupResponse)
-	testDecodable(t, "no error", response, syncGroupResponseWithError)
+	testVersionDecodable(t, "no error", response, syncGroupResponseWithError, 0)
 	if response.Err != ErrRebalanceInProgress {
 		t.Error("Decoding Err failed: ErrRebalanceInProgress expected but found", response.Err)
 	}
