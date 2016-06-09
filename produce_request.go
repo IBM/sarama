@@ -20,6 +20,9 @@ type ProduceRequest struct {
 	RequiredAcks RequiredAcks
 	Timeout      int32
 	msgSets      map[string]map[int32]*MessageSet
+
+	// This is not part of the request bytes sent to Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (p *ProduceRequest) encode(pe packetEncoder) error {
@@ -110,7 +113,16 @@ func (p *ProduceRequest) key() int16 {
 }
 
 func (p *ProduceRequest) version() int16 {
-	return 0
+	// These versions indicate the following:
+	// v1 indicates the client can parse the quota ThrottleTime in the Produce Response.
+	// v2 indicates the client can parse the timestamp field in the produce Response along with the ThrottleTime
+	if p.KafkaVersion.AtLeast(V0_10_0) {
+		return 2
+	} else if p.KafkaVersion.AtLeast(V0_9_0_0) {
+		return 1
+	} else {
+		return 0
+	}
 }
 
 func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {

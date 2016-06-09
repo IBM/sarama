@@ -41,6 +41,9 @@ func (r *OffsetFetchResponseBlock) encode(pe packetEncoder) (err error) {
 
 type OffsetFetchResponse struct {
 	Blocks map[string]map[int32]*OffsetFetchResponseBlock
+
+	// This is not part of the response bytes received from Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (r *OffsetFetchResponse) encode(pe packetEncoder) error {

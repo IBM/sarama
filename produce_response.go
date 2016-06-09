@@ -22,6 +22,11 @@ func (pr *ProduceResponseBlock) decode(pd packetDecoder) (err error) {
 
 type ProduceResponse struct {
 	Blocks map[string]map[int32]*ProduceResponseBlock
+	// zero means the request did not violate any quota. This value is applicable only on Kafka version >= 0.9.0.0
+	ThrottleTime int32
+
+	// This is not part of the response bytes received from Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
@@ -56,6 +61,13 @@ func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
 				return err
 			}
 			pr.Blocks[name][id] = block
+		}
+	}
+
+	if pr.KafkaVersion.AtLeast(V0_9_0_0) {
+		pr.ThrottleTime, err = pd.getInt32()
+		if err != nil {
+			return err
 		}
 	}
 

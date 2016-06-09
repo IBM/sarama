@@ -25,6 +25,9 @@ type FetchRequest struct {
 	MaxWaitTime int32
 	MinBytes    int32
 	blocks      map[string]map[int32]*fetchRequestBlock
+
+	// This is not part of the request bytes sent to Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (f *FetchRequest) encode(pe packetEncoder) (err error) {
@@ -103,7 +106,17 @@ func (f *FetchRequest) key() int16 {
 }
 
 func (f *FetchRequest) version() int16 {
-	return 0
+	// These return values are coupled with FetchResponse and according to Kafka client protocol:
+	// Fetch Response v1 only contains message format v0.
+	// Fetch Response v2 might either contain message format v0 or message format v1.
+	// See FetchRequest decode implementation for more details.
+	if f.KafkaVersion.AtLeast(V0_10_0) {
+		return 2
+	} else if f.KafkaVersion.AtLeast(V0_9_0_0) {
+		return 1
+	} else {
+		return 0
+	}
 }
 
 func (f *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {

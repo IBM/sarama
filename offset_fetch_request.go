@@ -4,13 +4,11 @@ type OffsetFetchRequest struct {
 	ConsumerGroup string
 	Version       int16
 	partitions    map[string][]int32
+
+	KafkaVersion *KafkaVersion
 }
 
 func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
-	if r.Version < 0 || r.Version > 1 {
-		return PacketEncodingError{"invalid or unsupported OffsetFetchRequest version field"}
-	}
-
 	if err = pe.putString(r.ConsumerGroup); err != nil {
 		return err
 	}
@@ -59,7 +57,11 @@ func (r *OffsetFetchRequest) key() int16 {
 }
 
 func (r *OffsetFetchRequest) version() int16 {
-	return r.Version
+	if r.KafkaVersion.AtLeast(V0_8_2_0) {
+		return 1
+	} else {
+		return 0
+	}
 }
 
 func (r *OffsetFetchRequest) AddPartition(topic string, partitionID int32) {

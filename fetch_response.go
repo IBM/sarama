@@ -34,6 +34,11 @@ func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
 
 type FetchResponse struct {
 	Blocks map[string]map[int32]*FetchResponseBlock
+	// zero means the request did not violate any quota. This value is applicable only on Kafka version >= 0.9.0.0
+	ThrottleTime int32
+
+	// This is not part of the response bytes received from Kafka
+	KafkaVersion *KafkaVersion
 }
 
 func (pr *FetchResponseBlock) encode(pe packetEncoder) (err error) {
@@ -50,6 +55,13 @@ func (pr *FetchResponseBlock) encode(pe packetEncoder) (err error) {
 }
 
 func (fr *FetchResponse) decode(pd packetDecoder) (err error) {
+	if fr.KafkaVersion.AtLeast(V0_9_0_0) {
+		fr.ThrottleTime, err = pd.getInt32()
+		if err != nil {
+			return err
+		}
+	}
+
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -167,7 +179,7 @@ func (fr *FetchResponse) AddMessage(topic string, partition int32, key, value En
 	if value != nil {
 		vb, _ = value.Encode()
 	}
-	msg := &Message{Key: kb, Value: vb}
+	msg := &Message{Key: kb, Value: vb, KafkaVersion: fr.KafkaVersion}
 	msgBlock := &MessageBlock{Msg: msg, Offset: offset}
 	frb.MsgSet.Messages = append(frb.MsgSet.Messages, msgBlock)
 }

@@ -109,3 +109,27 @@ func newBufConn(conn net.Conn) *bufConn {
 func (bc *bufConn) Read(b []byte) (n int, err error) {
 	return bc.buf.Read(b)
 }
+
+type KafkaVersion struct {
+	release [4]int
+}
+
+func NewVersion(ordA int, ordB int, ordC int, ordD int) *KafkaVersion {
+	v := &KafkaVersion{
+		release: [4]int{ordA, ordB, ordC, ordD},
+	}
+	return v
+}
+
+func (v *KafkaVersion) GE(ver *KafkaVersion) bool {
+	for k, ord := range v.release {
+		if ord != 0 {
+			if ord >= ver.release[k] {
+				return true
+			} else {
+				return false
+			}
+		}
+	}
+	return false
+}
