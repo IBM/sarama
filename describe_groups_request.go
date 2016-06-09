@@ -8,7 +8,7 @@ func (r *DescribeGroupsRequest) encode(pe packetEncoder) error {
 	return pe.putStringArray(r.Groups)
 }
 
-func (r *DescribeGroupsRequest) decode(pd packetDecoder) (err error) {
+func (r *DescribeGroupsRequest) decode(pd packetDecoder, version int16) (err error) {
 	r.Groups, err = pd.getStringArray()
 	return
 }

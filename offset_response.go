@@ -27,7 +27,7 @@ type OffsetResponse struct {
 	Blocks map[string]map[int32]*OffsetResponseBlock
 }
 
-func (r *OffsetResponse) decode(pd packetDecoder) (err error) {
+func (r *OffsetResponse) decode(pd packetDecoder, version int16) (err error) {
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -113,6 +113,14 @@ func (r *OffsetResponse) encode(pe packetEncoder) (err error) {
 	}
 
 	return nil
+}
+
+func (r *OffsetResponse) key() int16 {
+	return 2
+}
+
+func (r *OffsetResponse) version() int16 {
+	return 0
 }
 
 // testing API

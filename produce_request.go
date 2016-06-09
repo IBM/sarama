@@ -54,7 +54,7 @@ func (p *ProduceRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (p *ProduceRequest) decode(pd packetDecoder) error {
+func (p *ProduceRequest) decode(pd packetDecoder, version int16) error {
 	requiredAcks, err := pd.getInt16()
 	if err != nil {
 		return err

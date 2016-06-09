@@ -6,9 +6,9 @@ import (
 	"io"
 )
 
-type requestBody interface {
+type protocolBody interface {
 	encoder
-	decoder
+	versionedDecoder
 	key() int16
 	version() int16
 }
@@ -16,7 +16,7 @@ type requestBody interface {
 type request struct {
 	correlationID int32
 	clientID      string
-	body          requestBody
+	body          protocolBody
 }
 
 func (r *request) encode(pe packetEncoder) (err error) {
@@ -53,7 +53,7 @@ func (r *request) decode(pd packetDecoder) (err error) {
 	if r.body == nil {
 		return PacketDecodingError{fmt.Sprintf("unknown request key (%d)", key)}
 	}
-	return r.body.decode(pd)
+	return r.body.decode(pd, version)
 }
 
 func decodeRequest(r io.Reader) (req *request, err error) {
@@ -79,7 +79,7 @@ func decodeRequest(r io.Reader) (req *request, err error) {
 	return req, nil
 }
 
-func allocateBody(key, version int16) requestBody {
+func allocateBody(key, version int16) protocolBody {
 	switch key {
 	case 0:
 		return &ProduceRequest{}

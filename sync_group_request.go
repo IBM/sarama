@@ -33,7 +33,7 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *SyncGroupRequest) decode(pd packetDecoder) (err error) {
+func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 	if r.GroupId, err = pd.getString(); err != nil {
 		return
 	}

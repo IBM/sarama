@@ -49,7 +49,7 @@ func (r *ApiVersionsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ApiVersionsResponse) decode(pd packetDecoder) error {
+func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) error {
 	if kerr, err := pd.getInt16(); err != nil {
 		return err
 	} else {
@@ -71,4 +71,12 @@ func (r *ApiVersionsResponse) decode(pd packetDecoder) error {
 	}
 
 	return nil
+}
+
+func (r *ApiVersionsResponse) key() int16 {
+	return 18
+}
+
+func (r *ApiVersionsResponse) version() int16 {
+	return 0
 }
