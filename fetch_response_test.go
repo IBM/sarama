@@ -30,7 +30,7 @@ var (
 
 func TestEmptyFetchResponse(t *testing.T) {
 	response := FetchResponse{}
-	testDecodable(t, "empty", &response, emptyFetchResponse)
+	testVersionDecodable(t, "empty", &response, emptyFetchResponse, 0)
 
 	if len(response.Blocks) != 0 {
 		t.Error("Decoding produced topic blocks where there were none.")
@@ -40,7 +40,7 @@ func TestEmptyFetchResponse(t *testing.T) {
 
 func TestOneMessageFetchResponse(t *testing.T) {
 	response := FetchResponse{}
-	testDecodable(t, "one message", &response, oneMessageFetchResponse)
+	testVersionDecodable(t, "one message", &response, oneMessageFetchResponse, 0)
 
 	if len(response.Blocks) != 1 {
 		t.Fatal("Decoding produced incorrect number of topic blocks.")

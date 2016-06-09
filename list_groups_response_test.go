@@ -27,7 +27,7 @@ func TestListGroupsResponse(t *testing.T) {
 	var response *ListGroupsResponse
 
 	response = new(ListGroupsResponse)
-	testDecodable(t, "no error", response, listGroupsResponseEmpty)
+	testVersionDecodable(t, "no error", response, listGroupsResponseEmpty, 0)
 	if response.Err != ErrNoError {
 		t.Error("Expected no gerror, found:", response.Err)
 	}
@@ -36,7 +36,7 @@ func TestListGroupsResponse(t *testing.T) {
 	}
 
 	response = new(ListGroupsResponse)
-	testDecodable(t, "no error", response, listGroupsResponseError)
+	testVersionDecodable(t, "no error", response, listGroupsResponseError, 0)
 	if response.Err != ErrClusterAuthorizationFailed {
 		t.Error("Expected no gerror, found:", response.Err)
 	}
@@ -45,7 +45,7 @@ func TestListGroupsResponse(t *testing.T) {
 	}
 
 	response = new(ListGroupsResponse)
-	testDecodable(t, "no error", response, listGroupsResponseWithConsumer)
+	testVersionDecodable(t, "no error", response, listGroupsResponseWithConsumer, 0)
 	if response.Err != ErrNoError {
 		t.Error("Expected no gerror, found:", response.Err)
 	}

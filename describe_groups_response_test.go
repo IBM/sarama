@@ -38,13 +38,13 @@ func TestDescribeGroupsResponse(t *testing.T) {
 	var response *DescribeGroupsResponse
 
 	response = new(DescribeGroupsResponse)
-	testDecodable(t, "empty", response, describeGroupsResponseEmpty)
+	testVersionDecodable(t, "empty", response, describeGroupsResponseEmpty, 0)
 	if len(response.Groups) != 0 {
 		t.Error("Expected no groups")
 	}
 
 	response = new(DescribeGroupsResponse)
-	testDecodable(t, "populated", response, describeGroupsResponsePopulated)
+	testVersionDecodable(t, "populated", response, describeGroupsResponsePopulated, 0)
 	if len(response.Groups) != 2 {
 		t.Error("Expected two groups")
 	}

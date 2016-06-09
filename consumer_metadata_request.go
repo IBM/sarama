@@ -8,7 +8,7 @@ func (r *ConsumerMetadataRequest) encode(pe packetEncoder) error {
 	return pe.putString(r.ConsumerGroup)
 }
 
-func (r *ConsumerMetadataRequest) decode(pd packetDecoder) (err error) {
+func (r *ConsumerMetadataRequest) decode(pd packetDecoder, version int16) (err error) {
 	r.ConsumerGroup, err = pd.getString()
 	return err
 }

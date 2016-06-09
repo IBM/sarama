@@ -7,7 +7,7 @@ func (r *ApiVersionsRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ApiVersionsRequest) decode(pd packetDecoder) (err error) {
+func (r *ApiVersionsRequest) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 

@@ -20,7 +20,7 @@ func (r *HeartbeatRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *HeartbeatRequest) decode(pd packetDecoder) (err error) {
+func (r *HeartbeatRequest) decode(pd packetDecoder, version int16) (err error) {
 	if r.GroupId, err = pd.getString(); err != nil {
 		return
 	}

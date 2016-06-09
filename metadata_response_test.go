@@ -41,7 +41,7 @@ var (
 func TestEmptyMetadataResponse(t *testing.T) {
 	response := MetadataResponse{}
 
-	testDecodable(t, "empty", &response, emptyMetadataResponse)
+	testVersionDecodable(t, "empty", &response, emptyMetadataResponse, 0)
 	if len(response.Brokers) != 0 {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
 	}
@@ -53,7 +53,7 @@ func TestEmptyMetadataResponse(t *testing.T) {
 func TestMetadataResponseWithBrokers(t *testing.T) {
 	response := MetadataResponse{}
 
-	testDecodable(t, "brokers, no topics", &response, brokersNoTopicsMetadataResponse)
+	testVersionDecodable(t, "brokers, no topics", &response, brokersNoTopicsMetadataResponse, 0)
 	if len(response.Brokers) != 2 {
 		t.Fatal("Decoding produced", len(response.Brokers), "brokers where there were two!")
 	}
@@ -79,7 +79,7 @@ func TestMetadataResponseWithBrokers(t *testing.T) {
 func TestMetadataResponseWithTopics(t *testing.T) {
 	response := MetadataResponse{}
 
-	testDecodable(t, "topics, no brokers", &response, topicsNoBrokersMetadataResponse)
+	testVersionDecodable(t, "topics, no brokers", &response, topicsNoBrokersMetadataResponse, 0)
 	if len(response.Brokers) != 0 {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
 	}

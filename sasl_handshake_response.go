@@ -10,7 +10,7 @@ func (r *SaslHandshakeResponse) encode(pe packetEncoder) error {
 	return pe.putStringArray(r.EnabledMechanisms)
 }
 
-func (r *SaslHandshakeResponse) decode(pd packetDecoder) error {
+func (r *SaslHandshakeResponse) decode(pd packetDecoder, version int16) error {
 	if kerr, err := pd.getInt16(); err != nil {
 		return err
 	} else {
@@ -23,4 +23,12 @@ func (r *SaslHandshakeResponse) decode(pd packetDecoder) error {
 	}
 
 	return nil
+}
+
+func (r *SaslHandshakeResponse) key() int16 {
+	return 17
+}
+
+func (r *SaslHandshakeResponse) version() int16 {
+	return 0
 }

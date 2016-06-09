@@ -27,12 +27,12 @@ var (
 func TestProduceResponse(t *testing.T) {
 	response := ProduceResponse{}
 
-	testDecodable(t, "no blocks", &response, produceResponseNoBlocks)
+	testVersionDecodable(t, "no blocks", &response, produceResponseNoBlocks, 0)
 	if len(response.Blocks) != 0 {
 		t.Error("Decoding produced", len(response.Blocks), "topics where there were none")
 	}
 
-	testDecodable(t, "many blocks", &response, produceResponseManyBlocks)
+	testVersionDecodable(t, "many blocks", &response, produceResponseManyBlocks, 0)
 	if len(response.Blocks) != 2 {
 		t.Error("Decoding produced", len(response.Blocks), "topics where there were 2")
 	}

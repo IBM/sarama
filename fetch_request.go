@@ -55,7 +55,7 @@ func (f *FetchRequest) encode(pe packetEncoder) (err error) {
 	return nil
 }
 
-func (f *FetchRequest) decode(pd packetDecoder) (err error) {
+func (f *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 	if _, err = pd.getInt32(); err != nil {
 		return err
 	}
