@@ -107,6 +107,10 @@ func allocateBody(key, version int16) requestBody {
 		return &DescribeGroupsRequest{}
 	case 16:
 		return &ListGroupsRequest{}
+	case 17:
+		return &SaslHandshakeRequest{}
+	case 18:
+		return &ApiVersionsRequest{}
 	}
 	return nil
 }
