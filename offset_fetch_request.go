@@ -28,7 +28,8 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 	return nil
 }
 
-func (r *OffsetFetchRequest) decode(pd packetDecoder) (err error) {
+func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error) {
+	r.Version = version
 	if r.ConsumerGroup, err = pd.getString(); err != nil {
 		return err
 	}

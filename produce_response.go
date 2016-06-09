@@ -24,7 +24,7 @@ type ProduceResponse struct {
 	Blocks map[string]map[int32]*ProduceResponseBlock
 }
 
-func (pr *ProduceResponse) decode(pd packetDecoder) (err error) {
+func (pr *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -83,6 +83,14 @@ func (pr *ProduceResponse) encode(pe packetEncoder) error {
 		}
 	}
 	return nil
+}
+
+func (r *ProduceResponse) key() int16 {
+	return 0
+}
+
+func (r *ProduceResponse) version() int16 {
+	return 0
 }
 
 func (pr *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {

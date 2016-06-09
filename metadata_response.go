@@ -118,7 +118,7 @@ type MetadataResponse struct {
 	Topics  []*TopicMetadata
 }
 
-func (m *MetadataResponse) decode(pd packetDecoder) (err error) {
+func (m *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -174,6 +174,14 @@ func (m *MetadataResponse) encode(pe packetEncoder) error {
 	}
 
 	return nil
+}
+
+func (r *MetadataResponse) key() int16 {
+	return 3
+}
+
+func (r *MetadataResponse) version() int16 {
+	return 0
 }
 
 // testing API

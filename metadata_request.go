@@ -19,7 +19,7 @@ func (mr *MetadataRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (mr *MetadataRequest) decode(pd packetDecoder) error {
+func (mr *MetadataRequest) decode(pd packetDecoder, version int16) error {
 	topicCount, err := pd.getArrayLength()
 	if err != nil {
 		return err

@@ -12,7 +12,7 @@ func (r *SaslHandshakeRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *SaslHandshakeRequest) decode(pd packetDecoder) (err error) {
+func (r *SaslHandshakeRequest) decode(pd packetDecoder, version int16) (err error) {
 	if r.Mechanism, err = pd.getString(); err != nil {
 		return err
 	}

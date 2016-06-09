@@ -24,7 +24,7 @@ var (
 func TestEmptyOffsetResponse(t *testing.T) {
 	response := OffsetResponse{}
 
-	testDecodable(t, "empty", &response, emptyOffsetResponse)
+	testVersionDecodable(t, "empty", &response, emptyOffsetResponse, 0)
 	if len(response.Blocks) != 0 {
 		t.Error("Decoding produced", len(response.Blocks), "topics where there were none.")
 	}
@@ -33,7 +33,7 @@ func TestEmptyOffsetResponse(t *testing.T) {
 func TestNormalOffsetResponse(t *testing.T) {
 	response := OffsetResponse{}
 
-	testDecodable(t, "normal", &response, normalOffsetResponse)
+	testVersionDecodable(t, "normal", &response, normalOffsetResponse, 0)
 
 	if len(response.Blocks) != 2 {
 		t.Fatal("Decoding produced", len(response.Blocks), "topics where there were two.")

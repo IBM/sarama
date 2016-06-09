@@ -64,7 +64,7 @@ func (r *OffsetFetchResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
+func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error) {
 	numTopics, err := pd.getArrayLength()
 	if err != nil || numTopics == 0 {
 		return err
@@ -104,6 +104,14 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder) (err error) {
 	}
 
 	return nil
+}
+
+func (r *OffsetFetchResponse) key() int16 {
+	return 9
+}
+
+func (r *OffsetFetchResponse) version() int16 {
+	return 0
 }
 
 func (r *OffsetFetchResponse) GetBlock(topic string, partition int32) *OffsetFetchResponseBlock {
