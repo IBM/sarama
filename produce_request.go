@@ -19,6 +19,7 @@ const (
 type ProduceRequest struct {
 	RequiredAcks RequiredAcks
 	Timeout      int32
+	Version      int16 // v1 requires Kafka 0.9, v2 requires Kafka 0.10
 	msgSets      map[string]map[int32]*MessageSet
 }
 
@@ -110,7 +111,7 @@ func (p *ProduceRequest) key() int16 {
 }
 
 func (p *ProduceRequest) version() int16 {
-	return 0
+	return p.Version
 }
 
 func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
