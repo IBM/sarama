@@ -67,6 +67,9 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
 		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
 	}
+	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
+		req.Version = 2
+	}
 
 	for topic, partitionSet := range ps.msgs {
 		for partition, set := range partitionSet {
