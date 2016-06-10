@@ -57,6 +57,31 @@ func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 	}
 }
 
+// SendMessages corresponds with the SendMessages method of sarama's SyncProducer implementation.
+// You have to set expectations on the mock producer before calling SendMessages, so it knows
+// how to handle them. If there is no more remaining expectations when SendMessages is called,
+// the mock producer will write an error to the test state object.
+func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
+	sp.l.Lock()
+	defer sp.l.Unlock()
+
+	if len(sp.expectations) >= len(msgs) {
+		expectations := sp.expectations[0 : len(msgs)-1]
+		sp.expectations = sp.expectations[len(msgs):]
+
+		for _, expectation := range expectations {
+			if expectation.Result != errProduceSuccess {
+				return expectation.Result
+			}
+
+		}
+		return nil
+	} else {
+		sp.t.Errorf("Insufficient expectations set on this mock producer to handle the input messages.")
+		return errOutOfExpectations
+	}
+}
+
 // Close corresponds with the Close method of sarama's SyncProducer implementation.
 // By closing a mock syncproducer, you also tell it that no more SendMessage calls will follow,
 // so it will write an error to the test state if there's any remaining expectations.
