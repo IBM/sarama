@@ -14,6 +14,7 @@ type ConsumerMessage struct {
 	Topic      string
 	Partition  int32
 	Offset     int64
+	Timestamp  time.Time // only set if kafka is version 0.10+
 }
 
 // ConsumerError is what is provided to the user when an error occurs.
@@ -489,6 +490,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 					Key:       msg.Msg.Key,
 					Value:     msg.Msg.Value,
 					Offset:    msg.Offset,
+					Timestamp: msg.Msg.Timestamp,
 				})
 				child.offset = msg.Offset + 1
 			} else {
@@ -681,6 +683,9 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
 		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
 		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
+	}
+	if bc.consumer.conf.Version.IsAtLeast(V0_10_0_0) {
+		request.Version = 2
 	}
 
 	for child := range bc.subscriptions {

@@ -24,7 +24,7 @@ func (pr *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err err
 		if millis, err := pd.getInt64(); err != nil {
 			return err
 		} else {
-			pr.Timestamp = time.Unix(millis/1000, millis%1000)
+			pr.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
 		}
 	}
 
@@ -34,7 +34,7 @@ func (pr *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err err
 type ProduceResponse struct {
 	Blocks       map[string]map[int32]*ProduceResponseBlock
 	Version      int16
-	ThrottleTime int32 // only provided if Version >= 1
+	ThrottleTime time.Duration // only provided if Version >= 1
 }
 
 func (pr *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
@@ -75,8 +75,10 @@ func (pr *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	if pr.Version >= 1 {
-		if pr.ThrottleTime, err = pd.getInt32(); err != nil {
+		if millis, err := pd.getInt32(); err != nil {
 			return err
+		} else {
+			pr.ThrottleTime = time.Duration(millis) * time.Millisecond
 		}
 	}
 
@@ -102,6 +104,9 @@ func (pr *ProduceResponse) encode(pe packetEncoder) error {
 			pe.putInt16(int16(prb.Err))
 			pe.putInt64(prb.Offset)
 		}
+	}
+	if pr.Version >= 1 {
+		pe.putInt32(int32(pr.ThrottleTime / time.Millisecond))
 	}
 	return nil
 }
