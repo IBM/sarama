@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"github.com/eapache/go-xerial-snappy"
 )
@@ -21,15 +22,13 @@ const (
 	CompressionSnappy CompressionCodec = 2
 )
 
-// The spec just says: "This is a version id used to allow backwards compatible evolution of the message
-// binary format." but it doesn't say what the current value is, so presumably 0...
-const messageFormat int8 = 0
-
 type Message struct {
-	Codec CompressionCodec // codec used to compress the message contents
-	Key   []byte           // the message key, may be nil
-	Value []byte           // the message contents
-	Set   *MessageSet      // the message set a message might wrap
+	Codec     CompressionCodec // codec used to compress the message contents
+	Key       []byte           // the message key, may be nil
+	Value     []byte           // the message contents
+	Set       *MessageSet      // the message set a message might wrap
+	Version   int8             // v1 requires Kafka 0.10
+	Timestamp time.Time        // the timestamp of the message (version 1+ only)
 
 	compressedCache []byte
 }
@@ -37,10 +36,14 @@ type Message struct {
 func (m *Message) encode(pe packetEncoder) error {
 	pe.push(&crc32Field{})
 
-	pe.putInt8(messageFormat)
+	pe.putInt8(m.Version)
 
 	attributes := int8(m.Codec) & compressionCodecMask
 	pe.putInt8(attributes)
+
+	if m.Version >= 1 {
+		pe.putInt64(m.Timestamp.UnixNano() / int64(time.Millisecond))
+	}
 
 	err := pe.putBytes(m.Key)
 	if err != nil {
@@ -89,12 +92,9 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	format, err := pd.getInt8()
+	m.Version, err = pd.getInt8()
 	if err != nil {
 		return err
-	}
-	if format != messageFormat {
-		return PacketDecodingError{"unexpected messageFormat"}
 	}
 
 	attribute, err := pd.getInt8()
@@ -102,6 +102,14 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	m.Codec = CompressionCodec(attribute & compressionCodecMask)
+
+	if m.Version >= 1 {
+		millis, err := pd.getInt64()
+		if err != nil {
+			return err
+		}
+		m.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
+	}
 
 	m.Key, err = pd.getBytes()
 	if err != nil {
