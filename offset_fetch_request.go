@@ -63,6 +63,15 @@ func (r *OffsetFetchRequest) version() int16 {
 	return r.Version
 }
 
+func (r *OffsetFetchRequest) requiredVersion() KafkaVersion {
+	switch r.Version {
+	case 1:
+		return V0_8_2_0
+	default:
+		return minVersion
+	}
+}
+
 func (r *OffsetFetchRequest) AddPartition(topic string, partitionID int32) {
 	if r.partitions == nil {
 		r.partitions = make(map[string][]int32)

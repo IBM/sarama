@@ -123,6 +123,10 @@ func (r *OffsetResponse) version() int16 {
 	return 0
 }
 
+func (r *OffsetResponse) requiredVersion() KafkaVersion {
+	return minVersion
+}
+
 // testing API
 
 func (r *OffsetResponse) AddTopicPartition(topic string, partition int32, offset int64) {

@@ -124,6 +124,10 @@ func (r *FetchResponse) version() int16 {
 	return 0
 }
 
+func (r *FetchResponse) requiredVersion() KafkaVersion {
+	return minVersion
+}
+
 func (fr *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseBlock {
 	if fr.Blocks == nil {
 		return nil

@@ -96,6 +96,10 @@ func (r *OffsetRequest) version() int16 {
 	return 0
 }
 
+func (r *OffsetRequest) requiredVersion() KafkaVersion {
+	return minVersion
+}
+
 func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetRequestBlock)

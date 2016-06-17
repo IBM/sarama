@@ -56,7 +56,9 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	defer mb.Close()
 
 	broker := NewBroker(mb.Addr())
-	err := broker.Open(nil)
+	conf := NewConfig()
+	conf.Version = V0_10_0_0
+	err := broker.Open(conf)
 	if err != nil {
 		t.Fatal(err)
 	}

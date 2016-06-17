@@ -114,6 +114,17 @@ func (p *ProduceRequest) version() int16 {
 	return p.Version
 }
 
+func (p *ProduceRequest) requiredVersion() KafkaVersion {
+	switch p.Version {
+	case 1:
+		return V0_9_0_0
+	case 2:
+		return V0_10_0_0
+	default:
+		return minVersion
+	}
+}
+
 func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
 	if p.msgSets == nil {
 		p.msgSets = make(map[string]map[int32]*MessageSet)
