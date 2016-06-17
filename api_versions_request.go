@@ -18,3 +18,7 @@ func (r *ApiVersionsRequest) key() int16 {
 func (r *ApiVersionsRequest) version() int16 {
 	return 0
 }
+
+func (r *ApiVersionsRequest) requiredVersion() KafkaVersion {
+	return V0_10_0_0
+}

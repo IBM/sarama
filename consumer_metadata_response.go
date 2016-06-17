@@ -79,3 +79,7 @@ func (r *ConsumerMetadataResponse) key() int16 {
 func (r *ConsumerMetadataResponse) version() int16 {
 	return 0
 }
+
+func (r *ConsumerMetadataResponse) requiredVersion() KafkaVersion {
+	return V0_8_2_0
+}
