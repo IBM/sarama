@@ -92,3 +92,16 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 		t.Error("Expected to report an error")
 	}
 }
+
+func TestProducerWithMatchPattern(t *testing.T) {
+	trm := newTestReporterMock()
+	mp := NewAsyncProducer(trm, nil)
+	mp.ExpectInputWithPatternAndSucceed("$tes")
+	mp.ExpectInputWithPatternAndFail("tes$", errNoMatch)
+
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
+}

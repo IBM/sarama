@@ -162,6 +162,10 @@ func (ale *accessLogEntry) Encode() ([]byte, error) {
 	return ale.encoded, ale.err
 }
 
+func (ale *accessLogEntry) String() string {
+	return fmt.Sprintf("%+v\n", ale)
+}
+
 func (s *Server) withAccessLog(next http.Handler) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
