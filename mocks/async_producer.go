@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"regexp"
 	"sync"
 
 	"github.com/Shopify/sarama"
@@ -8,8 +9,10 @@ import (
 
 // AsyncProducer implements sarama's Producer interface for testing purposes.
 // Before you can send messages to it's Input channel, you have to set expectations
-// so it knows how to handle the input. This way you can easily test success and
-// failure scenarios.
+// so it knows how to handle the input; it returns and error if the numer of messages
+// received is bigger then the number of expectations set. You can also set a
+// regexp in each expectation so that the message value is matched against this
+// regexp and an error is returned if the match fails.
 type AsyncProducer struct {
 	l            sync.Mutex
 	t            ErrorReporter
@@ -52,6 +55,18 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 			} else {
 				expectation := mp.expectations[0]
 				mp.expectations = mp.expectations[1:]
+				if len(expectation.MatchPattern) != 0 {
+					matched, err := regexp.MatchString(expectation.MatchPattern, msg.Value.String())
+					if err != nil {
+						mp.t.Errorf("Error while trying to match the input message with the expected pattern: " + err.Error())
+						mp.l.Unlock()
+						panic(err.Error())
+					}
+					if !matched {
+						mp.t.Errorf("Input value \"%s\" did not match expected pattern \"%s\"", msg.Value.String(), expectation.MatchPattern)
+						mp.errors <- &sarama.ProducerError{Err: errNoMatch, Msg: msg}
+					}
+				}
 				if expectation.Result == errProduceSuccess {
 					mp.lastOffset++
 					if config.Producer.Return.Successes {
@@ -122,21 +137,39 @@ func (mp *AsyncProducer) Errors() <-chan *sarama.ProducerError {
 // Setting expectations
 ////////////////////////////////////////////////
 
+// ExpectInputWithPatternAndSucceed sets an expectation on the mock producer that a message
+// with value matching a given regexp will be provided on the input channel. The mock producer
+// will first check the message value against the pattern. It will return an error if the matching
+// fails or handle the message as if it produced successfully, i.e. it will make it available
+// on the Successes channel if the Producer.Return.Successes setting is set to true.
+func (mp *AsyncProducer) ExpectInputWithPatternAndSucceed(pattern string) {
+	mp.l.Lock()
+	defer mp.l.Unlock()
+	mp.expectations = append(mp.expectations, &producerExpectation{Result: errProduceSuccess, MatchPattern: pattern})
+}
+
+// ExpectInputWithPatternAndFail sets an expectation on the mock producer that a message
+// with value matching a given regexp will be provided on the input channel. The mock producer
+// will first check the message value against the pattern. It will return an error if the matching
+// fails or handle the message as if it failed to produce successfully. This means it will make
+// a ProducerError available on the Errors channel.
+func (mp *AsyncProducer) ExpectInputWithPatternAndFail(pattern string, err error) {
+	mp.l.Lock()
+	defer mp.l.Unlock()
+	mp.expectations = append(mp.expectations, &producerExpectation{Result: err, MatchPattern: pattern})
+}
+
 // ExpectInputAndSucceed sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it is produced successfully,
 // i.e. it will make it available on the Successes channel if the Producer.Return.Successes setting
 // is set to true.
 func (mp *AsyncProducer) ExpectInputAndSucceed() {
-	mp.l.Lock()
-	defer mp.l.Unlock()
-	mp.expectations = append(mp.expectations, &producerExpectation{Result: errProduceSuccess})
+	mp.ExpectInputWithPatternAndSucceed("")
 }
 
 // ExpectInputAndFail sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it failed to produce
 // successfully. This means it will make a ProducerError available on the Errors channel.
 func (mp *AsyncProducer) ExpectInputAndFail(err error) {
-	mp.l.Lock()
-	defer mp.l.Unlock()
-	mp.expectations = append(mp.expectations, &producerExpectation{Result: err})
+	mp.ExpectInputWithPatternAndFail("", err)
 }

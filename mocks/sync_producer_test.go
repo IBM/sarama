@@ -96,3 +96,28 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 		t.Error("Expected to report an error")
 	}
 }
+
+func TestSyncProducerWithPattern(t *testing.T) {
+	trm := newTestReporterMock()
+
+	sp := NewSyncProducer(trm, nil)
+	sp.ExpectSendMessageWithPatternAndSucceed("^tes")
+	sp.ExpectSendMessageWithPatternAndSucceed("^tes$")
+
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if _, _, err := sp.SendMessage(msg); err != nil {
+		t.Error("No error expected on first SendMessage call", err)
+	}
+	msg = &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if _, _, err := sp.SendMessage(msg); err != errNoMatch {
+		t.Error("errNoMatch expected on second SendMessage call, found:", err)
+	}
+
+	if err := sp.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Error("Expected to report an error")
+	}
+}

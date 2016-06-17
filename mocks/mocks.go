@@ -29,12 +29,14 @@ var (
 	errProduceSuccess              error = nil
 	errOutOfExpectations                 = errors.New("No more expectations set on mock")
 	errPartitionConsumerNotStarted       = errors.New("The partition consumer was never started")
+	errNoMatch                           = errors.New("The input message value did not match with the expected pattern")
 )
 
 const AnyOffset int64 = -1000
 
 type producerExpectation struct {
-	Result error
+	Result       error
+	MatchPattern string
 }
 
 type consumerExpectation struct {
