@@ -11,6 +11,7 @@ type protocolBody interface {
 	versionedDecoder
 	key() int16
 	version() int16
+	requiredVersion() KafkaVersion
 }
 
 type request struct {

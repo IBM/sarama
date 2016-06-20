@@ -110,6 +110,17 @@ func (r *ProduceResponse) version() int16 {
 	return r.Version
 }
 
+func (r *ProduceResponse) requiredVersion() KafkaVersion {
+	switch r.Version {
+	case 1:
+		return V0_9_0_0
+	case 2:
+		return V0_10_0_0
+	default:
+		return minVersion
+	}
+}
+
 func (pr *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
 	if pr.Blocks == nil {
 		return nil

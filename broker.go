@@ -198,21 +198,6 @@ func (b *Broker) GetAvailableOffsets(request *OffsetRequest) (*OffsetResponse, e
 }
 
 func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
-	switch request.version() {
-	case 0:
-		break
-	case 1:
-		if !b.conf.Version.IsAtLeast(V0_9_0_0) {
-			return nil, ErrUnsupportedVersion
-		}
-	case 2:
-		if !b.conf.Version.IsAtLeast(V0_10_0_0) {
-			return nil, ErrUnsupportedVersion
-		}
-	default:
-		return nil, ErrUnsupportedVersion
-	}
-
 	var response *ProduceResponse
 	var err error
 
@@ -341,6 +326,10 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool) (*responsePromise, 
 			return nil, b.connErr
 		}
 		return nil, ErrNotConnected
+	}
+
+	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
+		return nil, ErrUnsupportedVersion
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
