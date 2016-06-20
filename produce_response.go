@@ -1,9 +1,11 @@
 package sarama
 
+import "time"
+
 type ProduceResponseBlock struct {
 	Err       KError
 	Offset    int64
-	Timestamp int64 // only provided if Version >= 2
+	Timestamp time.Time // only provided if Version >= 2
 }
 
 func (pr *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err error) {
@@ -19,8 +21,10 @@ func (pr *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err err
 	}
 
 	if version >= 2 {
-		if pr.Timestamp, err = pd.getInt64(); err != nil {
+		if millis, err := pd.getInt64(); err != nil {
 			return err
+		} else {
+			pr.Timestamp = time.Unix(millis/1000, millis%1000)
 		}
 	}
 
