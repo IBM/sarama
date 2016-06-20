@@ -41,3 +41,7 @@ func (r *HeartbeatRequest) key() int16 {
 func (r *HeartbeatRequest) version() int16 {
 	return 0
 }
+
+func (r *HeartbeatRequest) requiredVersion() KafkaVersion {
+	return V0_9_0_0
+}

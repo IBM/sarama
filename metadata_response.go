@@ -184,6 +184,10 @@ func (r *MetadataResponse) version() int16 {
 	return 0
 }
 
+func (r *MetadataResponse) requiredVersion() KafkaVersion {
+	return minVersion
+}
+
 // testing API
 
 func (m *MetadataResponse) AddBroker(addr string, id int32) {

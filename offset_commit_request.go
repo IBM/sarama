@@ -49,7 +49,7 @@ type OffsetCommitRequest struct {
 	// Version can be:
 	// - 0 (kafka 0.8.1 and later)
 	// - 1 (kafka 0.8.2 and later)
-	// - 2 (kafka 0.8.3 and later)
+	// - 2 (kafka 0.9.0 and later)
 	Version int16
 	blocks  map[string]map[int32]*offsetCommitRequestBlock
 }
@@ -164,6 +164,17 @@ func (r *OffsetCommitRequest) key() int16 {
 
 func (r *OffsetCommitRequest) version() int16 {
 	return r.Version
+}
+
+func (r *OffsetCommitRequest) requiredVersion() KafkaVersion {
+	switch r.Version {
+	case 1:
+		return V0_8_2_0
+	case 2:
+		return V0_9_0_0
+	default:
+		return minVersion
+	}
 }
 
 func (r *OffsetCommitRequest) AddBlock(topic string, partitionID int32, offset int64, timestamp int64, metadata string) {

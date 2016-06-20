@@ -108,3 +108,7 @@ func (r *JoinGroupResponse) key() int16 {
 func (r *JoinGroupResponse) version() int16 {
 	return 0
 }
+
+func (r *JoinGroupResponse) requiredVersion() KafkaVersion {
+	return V0_9_0_0
+}

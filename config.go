@@ -267,7 +267,7 @@ func NewConfig() *Config {
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
-	c.Version = V0_8_2_0
+	c.Version = minVersion
 
 	return c
 }

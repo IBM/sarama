@@ -32,3 +32,7 @@ func (r *SaslHandshakeResponse) key() int16 {
 func (r *SaslHandshakeResponse) version() int16 {
 	return 0
 }
+
+func (r *SaslHandshakeResponse) requiredVersion() KafkaVersion {
+	return V0_10_0_0
+}

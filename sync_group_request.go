@@ -77,6 +77,10 @@ func (r *SyncGroupRequest) version() int16 {
 	return 0
 }
 
+func (r *SyncGroupRequest) requiredVersion() KafkaVersion {
+	return V0_9_0_0
+}
+
 func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment []byte) {
 	if r.GroupAssignments == nil {
 		r.GroupAssignments = make(map[string][]byte)
