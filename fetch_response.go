@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type FetchResponseBlock struct {
 	Err                 KError
 	HighWaterMarkOffset int64
@@ -33,7 +35,9 @@ func (pr *FetchResponseBlock) decode(pd packetDecoder) (err error) {
 }
 
 type FetchResponse struct {
-	Blocks map[string]map[int32]*FetchResponseBlock
+	Blocks       map[string]map[int32]*FetchResponseBlock
+	ThrottleTime time.Duration
+	Version      int16 // v1 requires 0.9+, v2 requires 0.10+
 }
 
 func (pr *FetchResponseBlock) encode(pe packetEncoder) (err error) {
@@ -50,6 +54,16 @@ func (pr *FetchResponseBlock) encode(pe packetEncoder) (err error) {
 }
 
 func (fr *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
+	fr.Version = version
+
+	if fr.Version >= 1 {
+		throttle, err := pd.getInt32()
+		if err != nil {
+			return err
+		}
+		fr.ThrottleTime = time.Duration(throttle) * time.Millisecond
+	}
+
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -88,6 +102,10 @@ func (fr *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (fr *FetchResponse) encode(pe packetEncoder) (err error) {
+	if fr.Version >= 1 {
+		pe.putInt32(int32(fr.ThrottleTime / time.Millisecond))
+	}
+
 	err = pe.putArrayLength(len(fr.Blocks))
 	if err != nil {
 		return err
@@ -121,11 +139,18 @@ func (r *FetchResponse) key() int16 {
 }
 
 func (r *FetchResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *FetchResponse) requiredVersion() KafkaVersion {
-	return minVersion
+	switch r.Version {
+	case 1:
+		return V0_9_0_0
+	case 2:
+		return V0_10_0_0
+	default:
+		return minVersion
+	}
 }
 
 func (fr *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseBlock {

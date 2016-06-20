@@ -24,6 +24,7 @@ func (f *fetchRequestBlock) decode(pd packetDecoder) (err error) {
 type FetchRequest struct {
 	MaxWaitTime int32
 	MinBytes    int32
+	Version     int16
 	blocks      map[string]map[int32]*fetchRequestBlock
 }
 
@@ -56,6 +57,7 @@ func (f *FetchRequest) encode(pe packetEncoder) (err error) {
 }
 
 func (f *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
+	f.Version = version
 	if _, err = pd.getInt32(); err != nil {
 		return err
 	}
@@ -103,11 +105,18 @@ func (f *FetchRequest) key() int16 {
 }
 
 func (f *FetchRequest) version() int16 {
-	return 0
+	return f.Version
 }
 
 func (r *FetchRequest) requiredVersion() KafkaVersion {
-	return minVersion
+	switch r.Version {
+	case 1:
+		return V0_9_0_0
+	case 2:
+		return V0_10_0_0
+	default:
+		return minVersion
+	}
 }
 
 func (f *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
