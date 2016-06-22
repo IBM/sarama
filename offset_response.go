@@ -5,22 +5,22 @@ type OffsetResponseBlock struct {
 	Offsets []int64
 }
 
-func (r *OffsetResponseBlock) decode(pd packetDecoder) (err error) {
+func (b *OffsetResponseBlock) decode(pd packetDecoder) (err error) {
 	tmp, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
-	r.Err = KError(tmp)
+	b.Err = KError(tmp)
 
-	r.Offsets, err = pd.getInt64Array()
+	b.Offsets, err = pd.getInt64Array()
 
 	return err
 }
 
-func (r *OffsetResponseBlock) encode(pe packetEncoder) (err error) {
-	pe.putInt16(int16(r.Err))
+func (b *OffsetResponseBlock) encode(pe packetEncoder) (err error) {
+	pe.putInt16(int16(b.Err))
 
-	return pe.putInt64Array(r.Offsets)
+	return pe.putInt64Array(b.Offsets)
 }
 
 type OffsetResponse struct {

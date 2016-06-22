@@ -8,7 +8,7 @@ import (
 
 const defaultClientID = "sarama"
 
-var validID *regexp.Regexp = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)
+var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)
 
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
