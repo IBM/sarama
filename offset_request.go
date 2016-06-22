@@ -5,17 +5,17 @@ type offsetRequestBlock struct {
 	maxOffsets int32
 }
 
-func (r *offsetRequestBlock) encode(pe packetEncoder) error {
-	pe.putInt64(int64(r.time))
-	pe.putInt32(r.maxOffsets)
+func (b *offsetRequestBlock) encode(pe packetEncoder) error {
+	pe.putInt64(int64(b.time))
+	pe.putInt32(b.maxOffsets)
 	return nil
 }
 
-func (r *offsetRequestBlock) decode(pd packetDecoder) (err error) {
-	if r.time, err = pd.getInt64(); err != nil {
+func (b *offsetRequestBlock) decode(pd packetDecoder) (err error) {
+	if b.time, err = pd.getInt64(); err != nil {
 		return err
 	}
-	if r.maxOffsets, err = pd.getInt32(); err != nil {
+	if b.maxOffsets, err = pd.getInt32(); err != nil {
 		return err
 	}
 	return nil

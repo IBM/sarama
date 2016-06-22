@@ -16,27 +16,27 @@ type offsetCommitRequestBlock struct {
 	metadata  string
 }
 
-func (r *offsetCommitRequestBlock) encode(pe packetEncoder, version int16) error {
-	pe.putInt64(r.offset)
+func (b *offsetCommitRequestBlock) encode(pe packetEncoder, version int16) error {
+	pe.putInt64(b.offset)
 	if version == 1 {
-		pe.putInt64(r.timestamp)
-	} else if r.timestamp != 0 {
+		pe.putInt64(b.timestamp)
+	} else if b.timestamp != 0 {
 		Logger.Println("Non-zero timestamp specified for OffsetCommitRequest not v1, it will be ignored")
 	}
 
-	return pe.putString(r.metadata)
+	return pe.putString(b.metadata)
 }
 
-func (r *offsetCommitRequestBlock) decode(pd packetDecoder, version int16) (err error) {
-	if r.offset, err = pd.getInt64(); err != nil {
+func (b *offsetCommitRequestBlock) decode(pd packetDecoder, version int16) (err error) {
+	if b.offset, err = pd.getInt64(); err != nil {
 		return err
 	}
 	if version == 1 {
-		if r.timestamp, err = pd.getInt64(); err != nil {
+		if b.timestamp, err = pd.getInt64(); err != nil {
 			return err
 		}
 	}
-	r.metadata, err = pd.getString()
+	b.metadata, err = pd.getString()
 	return err
 }
 
