@@ -6,6 +6,12 @@ type realEncoder struct {
 	raw   []byte
 	off   int
 	stack []pushEncoder
+
+	// For exporting statistics
+	currentTopic             string
+	batchSizeObserver        func(string, int64)
+	recordCountObserver      func(string, int64)
+	compressionRatioObserver func(string, float64)
 }
 
 // primitives
@@ -112,4 +118,30 @@ func (re *realEncoder) pop() error {
 	re.stack = re.stack[:len(re.stack)-1]
 
 	return in.run(re.off, re.raw)
+}
+
+func (re *realEncoder) offset() int {
+	return re.off
+}
+
+func (re *realEncoder) recordTopic(topic string) {
+	re.currentTopic = topic
+}
+
+func (re *realEncoder) recordBatchSize(size int) {
+	if re.batchSizeObserver != nil {
+		re.batchSizeObserver(re.currentTopic, int64(size))
+	}
+}
+
+func (re *realEncoder) recordRecordCount(count int) {
+	if re.recordCountObserver != nil {
+		re.recordCountObserver(re.currentTopic, int64(count))
+	}
+}
+
+func (re *realEncoder) recordCompressionRatio(ratio float64) {
+	if re.compressionRatioObserver != nil {
+		re.compressionRatioObserver(re.currentTopic, ratio)
+	}
 }

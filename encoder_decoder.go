@@ -1,6 +1,10 @@
 package sarama
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/rcrowley/go-metrics"
+)
 
 // Encoder is the interface that wraps the basic Encode method.
 // Anything implementing Encoder can be turned into bytes using Kafka's encoding rules.
@@ -10,6 +14,10 @@ type encoder interface {
 
 // Encode takes an Encoder and turns it into bytes.
 func encode(e encoder) ([]byte, error) {
+	return encodeWithMetrics(e, nil)
+}
+
+func encodeWithMetrics(e encoder, metricRegistry metrics.Registry) ([]byte, error) {
 	if e == nil {
 		return nil, nil
 	}
@@ -26,10 +34,52 @@ func encode(e encoder) ([]byte, error) {
 		return nil, PacketEncodingError{fmt.Sprintf("invalid request size (%d)", prepEnc.length)}
 	}
 
+	recordCountPerTopic := make(map[string]int64)
+	if metricRegistry != nil {
+		// Register the observer for the batch size
+		batchSize := getOrRegisterHistogram("batch-size", metricRegistry)
+		realEnc.batchSizeObserver = func(topic string, size int64) {
+			topicBatchSize := getOrRegisterTopicHistogram("batch-size", topic, metricRegistry)
+			// Histogram do not support decimal values, let's use an integer percentage
+			batchSize.Update(size)
+			topicBatchSize.Update(size)
+		}
+		// Register the observer for the record count
+		realEnc.recordCountObserver = func(topic string, count int64) {
+			// Add message set count together to update the metric in one shot later on
+			recordCountPerTopic[topic] = recordCountPerTopic[topic] + count
+		}
+		// Register the observer for the compression ratio
+		compressionRatio := getOrRegisterHistogram("compression-rate", metricRegistry)
+		realEnc.compressionRatioObserver = func(topic string, ratio float64) {
+			topicCompressionRatio := getOrRegisterTopicHistogram("compression-rate", topic, metricRegistry)
+			// Histogram do not support decimal values, let's use an integer percentage
+			intRatio := int64(100 * ratio)
+			compressionRatio.Update(intRatio)
+			topicCompressionRatio.Update(intRatio)
+		}
+	}
+
 	realEnc.raw = make([]byte, prepEnc.length)
 	err = e.encode(&realEnc)
 	if err != nil {
 		return nil, err
+	}
+
+	if metricRegistry != nil {
+		totalRecordCount := int64(0)
+
+		for topic, count := range recordCountPerTopic {
+			getOrRegisterTopicMeter("record-send-rate", topic, metricRegistry).Mark(count)
+			getOrRegisterTopicHistogram("records-per-request", topic, metricRegistry).Update(count)
+			totalRecordCount = totalRecordCount + count
+		}
+
+		// Only recorded for produce request
+		if totalRecordCount > 0 {
+			metrics.GetOrRegisterMeter("record-send-rate", metricRegistry).Mark(totalRecordCount)
+			getOrRegisterHistogram("records-per-request", metricRegistry).Update(totalRecordCount)
+		}
 	}
 
 	return realEnc.raw, nil

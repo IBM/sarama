@@ -31,6 +31,7 @@ func (p *ProduceRequest) encode(pe packetEncoder) error {
 		return err
 	}
 	for topic, partitions := range p.msgSets {
+		pe.recordTopic(topic)
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -40,6 +41,7 @@ func (p *ProduceRequest) encode(pe packetEncoder) error {
 			return err
 		}
 		for id, msgSet := range partitions {
+			startOffset := pe.offset()
 			pe.putInt32(id)
 			pe.push(&lengthField{})
 			err = msgSet.encode(pe)
@@ -50,6 +52,7 @@ func (p *ProduceRequest) encode(pe packetEncoder) error {
 			if err != nil {
 				return err
 			}
+			pe.recordBatchSize(pe.offset() - startOffset)
 		}
 	}
 	return nil
@@ -125,7 +128,7 @@ func (p *ProduceRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
+func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message, effectiveMessageCount int) {
 	if p.msgSets == nil {
 		p.msgSets = make(map[string]map[int32]*MessageSet)
 	}
@@ -141,7 +144,7 @@ func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 		p.msgSets[topic][partition] = set
 	}
 
-	set.addMessage(msg)
+	set.addMessage(msg, effectiveMessageCount)
 }
 
 func (p *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {

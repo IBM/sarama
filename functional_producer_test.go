@@ -2,9 +2,12 @@ package sarama
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 const TestBatchSize = 1000
@@ -96,6 +99,9 @@ func testProducingMessages(t *testing.T, config *Config) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
+	// Use a dedicated registry to prevent side effect caused by the global one
+	config.MetricRegistry = metrics.NewRegistry()
+
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
 
@@ -104,11 +110,8 @@ func testProducingMessages(t *testing.T, config *Config) {
 		t.Fatal(err)
 	}
 
-	master, err := NewConsumerFromClient(client)
-	if err != nil {
-		t.Fatal(err)
-	}
-	consumer, err := master.ConsumePartition("test.1", 0, OffsetNewest)
+	// Keep in mind the current offset
+	initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,6 +143,18 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, producer)
 
+	// Validate producer metrics before using the consumer
+	validateMetrics(t, client)
+
+	master, err := NewConsumerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer, err := master.ConsumePartition("test.1", 0, initialOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i := 1; i <= TestBatchSize; i++ {
 		select {
 		case <-time.After(10 * time.Second):
@@ -157,6 +172,115 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, consumer)
 	safeClose(t, client)
+}
+
+func validateMetrics(t *testing.T, client Client) {
+	// Get the broker ids used by test1 topic
+	brokerIds := make(map[int32]bool)
+	if partitions, err := client.Partitions("test.1"); err != nil {
+		t.Error(err)
+	} else {
+		for _, partition := range partitions {
+			if broker, err := client.Leader("test.1", partition); err != nil {
+				t.Error(err)
+			} else {
+				brokerIds[broker.ID()] = true
+			}
+		}
+	}
+
+	minCountMeterValidatorBuilder := func(minCount int64) func(string, interface{}) {
+		return func(name string, metric interface{}) {
+			if meter, ok := metric.(metrics.Meter); !ok {
+				t.Errorf("Expected meter metric for '%s', got %T", name, metric)
+			} else {
+				count := meter.Count()
+				if count < minCount {
+					t.Errorf("Expected meter metric '%s' count >= %d, got %d", name, count, minCount)
+				}
+			}
+		}
+	}
+
+	histogramValidatorBuilder := func(minCount int64, minMin int64, maxMax int64) func(string, interface{}) {
+		return func(name string, metric interface{}) {
+			if histogram, ok := metric.(metrics.Histogram); !ok {
+				t.Errorf("Expected histogram metric for '%s', got %T", name, metric)
+			} else {
+				count := histogram.Count()
+				if count < minCount {
+					t.Errorf("Expected histogram metric '%s' count >= %d, got %d", name, minCount, count)
+				}
+				min := int64(histogram.Min())
+				if min < minMin {
+					t.Errorf("Expected histogram metric '%s' min >= %d, got %d", name, minMin, min)
+				}
+				max := int64(histogram.Max())
+				if max > maxMax {
+					t.Errorf("Expected histogram metric '%s' max <= %d, got %d", name, maxMax, max)
+				}
+			}
+		}
+	}
+
+	type expectedMetric struct {
+		name      string
+		validator func(string, interface{})
+	}
+	expectedMetrics := make([]expectedMetric, 0, 20)
+	addExpectedBrokerMetric := func(name string, validator func(string, interface{})) {
+		expectedMetrics = append(expectedMetrics, expectedMetric{name, validator})
+		for brokerId, _ := range brokerIds {
+			expectedMetrics = append(expectedMetrics, expectedMetric{fmt.Sprintf("%s-for-broker-%d", name, brokerId), validator})
+		}
+	}
+	addExpectedTopicMetric := func(name string, validator func(string, interface{})) {
+		expectedMetrics = append(expectedMetrics, expectedMetric{name, validator})
+		expectedMetrics = append(expectedMetrics, expectedMetric{fmt.Sprintf("%s-for-topic-test.1", name), validator})
+	}
+
+	compressionEnabled := client.Config().Producer.Compression != CompressionNone
+	noResponse := client.Config().Producer.RequiredAcks == NoResponse
+
+	// We read at least 1 byte from the brokers
+	addExpectedBrokerMetric("incoming-byte-rate", minCountMeterValidatorBuilder(1))
+	// in at least 2 requests to the brokers (1 for metadata request and N for produce request)
+	addExpectedBrokerMetric("request-rate", minCountMeterValidatorBuilder(2)) // Count 15 / 8 for broker
+	addExpectedBrokerMetric("request-size", histogramValidatorBuilder(2, 1, math.MaxInt64))
+	// We receive at least 1 byte from the broker
+	addExpectedBrokerMetric("outgoing-byte-rate", minCountMeterValidatorBuilder(1))
+	if noResponse {
+		// in a single response (metadata)
+		addExpectedBrokerMetric("response-rate", minCountMeterValidatorBuilder(1))
+		addExpectedBrokerMetric("response-size", histogramValidatorBuilder(1, 1, math.MaxInt64))
+	} else {
+		// in at least 2 responses (metadata + produce)
+		addExpectedBrokerMetric("response-rate", minCountMeterValidatorBuilder(2))
+		addExpectedBrokerMetric("response-size", histogramValidatorBuilder(2, 1, math.MaxInt64))
+	}
+
+	// We send at least 1 batch
+	addExpectedTopicMetric("batch-size", histogramValidatorBuilder(1, 1, math.MaxInt64))
+	if compressionEnabled {
+		// We record compression ratio 0.01-2.00 (1-200 with a histogram) for at least one fake message
+		addExpectedTopicMetric("compression-rate", histogramValidatorBuilder(1, 1, 200))
+	} else {
+		// We record compression ratio 1.00 (100 with a histogram) for every record
+		addExpectedTopicMetric("compression-rate", histogramValidatorBuilder(TestBatchSize, 100, 100))
+	}
+	// We send exactly TestBatchSize messages
+	addExpectedTopicMetric("record-send-rate", minCountMeterValidatorBuilder(TestBatchSize))
+	// We send at least one record per request
+	addExpectedTopicMetric("records-per-request", histogramValidatorBuilder(1, 1, math.MaxInt64))
+
+	for _, expectedMetric := range expectedMetrics {
+		foundMetric := client.Config().MetricRegistry.Get(expectedMetric.name)
+		if foundMetric == nil {
+			t.Error("No metric named", expectedMetric.name)
+		} else {
+			expectedMetric.validator(expectedMetric.name, foundMetric)
+		}
+	}
 }
 
 // Benchmarks

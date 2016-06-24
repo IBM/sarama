@@ -22,6 +22,13 @@ type packetEncoder interface {
 	// Stacks, see PushEncoder
 	push(in pushEncoder)
 	pop() error
+
+	// Statistics in order to expose metrics
+	offset() int
+	recordTopic(topic string)
+	recordBatchSize(size int)
+	recordRecordCount(count int)
+	recordCompressionRatio(ratio float64)
 }
 
 // PushEncoder is the interface for encoding fields like CRCs and lengths where the value

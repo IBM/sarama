@@ -10,6 +10,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -26,6 +28,19 @@ type Broker struct {
 
 	responses chan responsePromise
 	done      chan bool
+
+	incomingByteRate       metrics.Meter
+	requestRate            metrics.Meter
+	requestSize            metrics.Histogram
+	outgoingByteRate       metrics.Meter
+	responseRate           metrics.Meter
+	responseSize           metrics.Histogram
+	brokerIncomingByteRate metrics.Meter
+	brokerRequestRate      metrics.Meter
+	brokerRequestSize      metrics.Histogram
+	brokerOutgoingByteRate metrics.Meter
+	brokerResponseRate     metrics.Meter
+	brokerResponseSize     metrics.Histogram
 }
 
 type responsePromise struct {
@@ -83,6 +98,23 @@ func (b *Broker) Open(conf *Config) error {
 		b.conn = newBufConn(b.conn)
 
 		b.conf = conf
+
+		// Create or reuse the metrics shared between brokers
+		b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", conf.MetricRegistry)
+		b.requestRate = metrics.GetOrRegisterMeter("request-rate", conf.MetricRegistry)
+		b.requestSize = getOrRegisterHistogram("request-size", conf.MetricRegistry)
+		b.outgoingByteRate = metrics.GetOrRegisterMeter("outgoing-byte-rate", conf.MetricRegistry)
+		b.responseRate = metrics.GetOrRegisterMeter("response-rate", conf.MetricRegistry)
+		b.responseSize = getOrRegisterHistogram("response-size", conf.MetricRegistry)
+		// Do not gather metrics for seeded broker (-1 id)
+		if b.id >= 0 {
+			b.brokerIncomingByteRate = getOrRegisterBrokerMeter("incoming-byte-rate", b.id, conf.MetricRegistry)
+			b.brokerRequestRate = getOrRegisterBrokerMeter("request-rate", b.id, conf.MetricRegistry)
+			b.brokerRequestSize = getOrRegisterBrokerHistogram("request-size", b.id, conf.MetricRegistry)
+			b.brokerOutgoingByteRate = getOrRegisterBrokerMeter("outgoing-byte-rate", b.id, conf.MetricRegistry)
+			b.brokerResponseRate = getOrRegisterBrokerMeter("response-rate", b.id, conf.MetricRegistry)
+			b.brokerResponseSize = getOrRegisterBrokerHistogram("response-size", b.id, conf.MetricRegistry)
+		}
 
 		if conf.Net.SASL.Enable {
 			b.connErr = b.sendAndReceiveSASLPlainAuth()
@@ -333,10 +365,12 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool) (*responsePromise, 
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
-	buf, err := encode(req)
+	buf, err := encodeWithMetrics(req, b.conf.MetricRegistry)
 	if err != nil {
 		return nil, err
 	}
+
+	b.updateOutgoingCommunicationMetrics(len(buf))
 
 	err = b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
 	if err != nil {
@@ -441,7 +475,7 @@ func (b *Broker) responseReceiver() {
 			continue
 		}
 
-		_, err = io.ReadFull(b.conn, header)
+		headerSize, err := io.ReadFull(b.conn, header)
 		if err != nil {
 			dead = err
 			response.errors <- err
@@ -464,12 +498,14 @@ func (b *Broker) responseReceiver() {
 		}
 
 		buf := make([]byte, decodedHeader.length-4)
-		_, err = io.ReadFull(b.conn, buf)
+		remainingPayloadSize, err := io.ReadFull(b.conn, buf)
 		if err != nil {
 			dead = err
 			response.errors <- err
 			continue
 		}
+
+		b.updateIncomingCommunicationMetrics(headerSize + remainingPayloadSize)
 
 		response.packets <- buf
 	}
@@ -500,6 +536,8 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 	binary.BigEndian.PutUint32(authBytes, uint32(length))
 	copy(authBytes[4:], []byte("\x00"+b.conf.Net.SASL.User+"\x00"+b.conf.Net.SASL.Password))
 
+	b.updateOutgoingCommunicationMetrics(len(authBytes))
+
 	err := b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
 	if err != nil {
 		Logger.Printf("Failed to set write deadline when doing SASL auth with broker %s: %s\n", b.addr, err.Error())
@@ -521,6 +559,40 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 		return err
 	}
 
+	b.updateIncomingCommunicationMetrics(n)
+
 	Logger.Printf("SASL authentication successful with broker %s:%v - %v\n", b.addr, n, header)
 	return nil
+}
+
+func (b *Broker) updateIncomingCommunicationMetrics(bytes int) {
+	b.responseRate.Mark(1)
+	if b.brokerResponseRate != nil {
+		b.brokerResponseRate.Mark(1)
+	}
+	responseSize := int64(bytes)
+	b.incomingByteRate.Mark(responseSize)
+	if b.brokerIncomingByteRate != nil {
+		b.brokerIncomingByteRate.Mark(responseSize)
+	}
+	b.responseSize.Update(responseSize)
+	if b.brokerResponseSize != nil {
+		b.brokerResponseSize.Update(responseSize)
+	}
+}
+
+func (b *Broker) updateOutgoingCommunicationMetrics(bytes int) {
+	b.requestRate.Mark(1)
+	if b.brokerRequestRate != nil {
+		b.brokerRequestRate.Mark(1)
+	}
+	requestSize := int64(bytes)
+	b.outgoingByteRate.Mark(requestSize)
+	if b.brokerOutgoingByteRate != nil {
+		b.brokerOutgoingByteRate.Mark(requestSize)
+	}
+	b.requestSize.Update(requestSize)
+	if b.brokerRequestSize != nil {
+		b.brokerRequestSize.Update(requestSize)
+	}
 }

@@ -52,7 +52,7 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 	}
 
 	set.msgs = append(set.msgs, msg)
-	set.setToSend.addMessage(&Message{Codec: CompressionNone, Key: key, Value: val})
+	set.setToSend.addMessage(&Message{Codec: CompressionNone, Key: key, Value: val}, 1)
 
 	size := producerMessageOverhead + len(key) + len(val)
 	set.bufferBytes += size
@@ -85,11 +85,12 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
 				}
+				// Provide the underlying message count for statistics
 				req.AddMessage(topic, partition, &Message{
 					Codec: ps.parent.conf.Producer.Compression,
 					Key:   nil,
 					Value: payload,
-				})
+				}, set.setToSend.UnderlyingMessageCount)
 			}
 		}
 	}

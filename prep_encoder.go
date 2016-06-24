@@ -99,6 +99,10 @@ func (pe *prepEncoder) putInt64Array(in []int64) error {
 	return nil
 }
 
+func (pe *prepEncoder) offset() int {
+	return pe.length
+}
+
 // stackable
 
 func (pe *prepEncoder) push(in pushEncoder) {
@@ -107,4 +111,19 @@ func (pe *prepEncoder) push(in pushEncoder) {
 
 func (pe *prepEncoder) pop() error {
 	return nil
+}
+
+// Statistics in order to expose metrics - ignored on the prep pass,
+// will be implemented in the real encoder
+
+func (pe *prepEncoder) recordTopic(topic string) {
+}
+
+func (pe *prepEncoder) recordBatchSize(size int) {
+}
+
+func (pe *prepEncoder) recordRecordCount(count int) {
+}
+
+func (pe *prepEncoder) recordCompressionRatio(ratio float64) {
 }
