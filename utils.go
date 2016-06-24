@@ -63,7 +63,6 @@ func safeAsyncClose(b *Broker) {
 type Encoder interface {
 	Encode() ([]byte, error)
 	Length() int
-	String() string
 }
 
 // make strings and byte slices encodable for convenience so they can be used as keys
@@ -81,10 +80,6 @@ func (s StringEncoder) Length() int {
 	return len(s)
 }
 
-func (s StringEncoder) String() string {
-	return string(s)
-}
-
 // ByteEncoder implements the Encoder interface for Go byte slices so that they can be used
 // as the Key or Value in a ProducerMessage.
 type ByteEncoder []byte
@@ -95,10 +90,6 @@ func (b ByteEncoder) Encode() ([]byte, error) {
 
 func (b ByteEncoder) Length() int {
 	return len(b)
-}
-
-func (s ByteEncoder) String() string {
-	return string(s)
 }
 
 // bufConn wraps a net.Conn with a buffer for reads to reduce the number of

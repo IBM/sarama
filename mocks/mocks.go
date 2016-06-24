@@ -15,6 +15,8 @@ package mocks
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
 
 	"github.com/Shopify/sarama"
 )
@@ -25,18 +27,32 @@ type ErrorReporter interface {
 	Errorf(string, ...interface{})
 }
 
+type ValueChecker func(val []byte) error
+
+func generateRegexpChecker(re string) func([]byte) error {
+	return func(val []byte) error {
+		matched, err := regexp.MatchString(re, string(val))
+		if err != nil {
+			return errors.New("Error while trying to match the input message with the expected pattern: " + err.Error())
+		}
+		if !matched {
+			return fmt.Errorf("No match between input value \"%s\" and expected pattern \"%s\"", val, re)
+		}
+		return nil
+	}
+}
+
 var (
 	errProduceSuccess              error = nil
 	errOutOfExpectations                 = errors.New("No more expectations set on mock")
 	errPartitionConsumerNotStarted       = errors.New("The partition consumer was never started")
-	errNoMatch                           = errors.New("The input message value did not match with the expected pattern")
 )
 
 const AnyOffset int64 = -1000
 
 type producerExpectation struct {
-	Result       error
-	MatchPattern string
+	Result        error
+	CheckFunction ValueChecker
 }
 
 type consumerExpectation struct {

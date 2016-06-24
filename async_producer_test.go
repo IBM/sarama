@@ -93,10 +93,6 @@ func (f flakyEncoder) Encode() ([]byte, error) {
 	return []byte(TestMessage), nil
 }
 
-func (f flakyEncoder) String() string {
-	return string(TestMessage)
-}
-
 func TestAsyncProducer(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
