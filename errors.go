@@ -37,6 +37,11 @@ var ErrShuttingDown = errors.New("kafka: message received by producer in process
 // ErrMessageTooLarge is returned when the next message to consume is larger than the configured Consumer.Fetch.Max
 var ErrMessageTooLarge = errors.New("kafka: message is larger than Consumer.Fetch.Max")
 
+var ErrInvalidArrayLength = PacketDecodingError{"invalid array length"}
+var ErrInvalidByteSliceLength = PacketDecodingError{"invalid byteslice length"}
+var ErrInvalidStringLength = PacketDecodingError{"invalid string length"}
+var ErrInvalidSubsetSize = PacketDecodingError{"invalid subset size"}
+
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
 type PacketEncodingError struct {
