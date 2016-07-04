@@ -48,11 +48,9 @@ func (msb *MessageBlock) decode(pd packetDecoder) (err error) {
 type MessageSet struct {
 	PartialTrailingMessage bool // whether the set on the wire contained an incomplete trailing MessageBlock
 	Messages               []*MessageBlock
-	UnderlyingMessageCount int // in case of compressed messages wraps in a single fake "message"
 }
 
 func (ms *MessageSet) encode(pe packetEncoder) error {
-	pe.recordRecordCount(ms.UnderlyingMessageCount)
 	for i := range ms.Messages {
 		err := ms.Messages[i].encode(pe)
 		if err != nil {
@@ -71,8 +69,6 @@ func (ms *MessageSet) decode(pd packetDecoder) (err error) {
 		switch err {
 		case nil:
 			ms.Messages = append(ms.Messages, msb)
-			// Sync the UnderlyingMessageCount in order to use reflect.DeepEqual(rb, decoded.body) in tests
-			ms.UnderlyingMessageCount++
 		case ErrInsufficientData:
 			// As an optimization the server is allowed to return a partial message at the
 			// end of the message set. Clients should handle this case. So we just ignore such things.
@@ -86,9 +82,8 @@ func (ms *MessageSet) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func (ms *MessageSet) addMessage(msg *Message, underlyingMessageCount int) {
+func (ms *MessageSet) addMessage(msg *Message) {
 	block := new(MessageBlock)
 	block.Msg = msg
 	ms.Messages = append(ms.Messages, block)
-	ms.UnderlyingMessageCount += underlyingMessageCount
 }

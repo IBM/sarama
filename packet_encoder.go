@@ -19,16 +19,15 @@ type packetEncoder interface {
 	putInt32Array(in []int32) error
 	putInt64Array(in []int64) error
 
+	// Provide the current offset to record the batch size metric
+	offset() int
+
 	// Stacks, see PushEncoder
 	push(in pushEncoder)
 	pop() error
 
-	// Statistics in order to expose metrics
-	offset() int
-	recordTopic(topic string)
-	recordBatchSize(size int)
-	recordRecordCount(count int)
-	recordCompressionRatio(ratio float64)
+	// To only record metrics during the real encoder pass
+	doRecordMetrics() bool
 }
 
 // PushEncoder is the interface for encoding fields like CRCs and lengths where the value

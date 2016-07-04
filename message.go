@@ -76,15 +76,6 @@ func (m *Message) encode(pe packetEncoder) error {
 		}
 	}
 
-	// Record compression ratio when we have a value
-	if payload != nil && m.Value != nil {
-		if len(m.Value) == 0 {
-			pe.recordCompressionRatio(1.0)
-		} else {
-			pe.recordCompressionRatio(float64(len(payload)) / float64(len(m.Value)))
-		}
-	}
-
 	if err = pe.putBytes(payload); err != nil {
 		return err
 	}

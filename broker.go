@@ -365,7 +365,7 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool) (*responsePromise, 
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
-	buf, err := encodeWithMetrics(req, b.conf.MetricRegistry)
+	buf, err := encode(req)
 	if err != nil {
 		return nil, err
 	}

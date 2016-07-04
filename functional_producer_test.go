@@ -196,7 +196,7 @@ func validateMetrics(t *testing.T, client Client) {
 			} else {
 				count := meter.Count()
 				if count < minCount {
-					t.Errorf("Expected meter metric '%s' count >= %d, got %d", name, count, minCount)
+					t.Errorf("Expected meter metric '%s' count >= %d, got %d", name, minCount, count)
 				}
 			}
 		}
