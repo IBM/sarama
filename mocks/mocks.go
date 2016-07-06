@@ -27,8 +27,11 @@ type ErrorReporter interface {
 	Errorf(string, ...interface{})
 }
 
+// ValueChecker is a function type to be set in each expectation of the producer mocks
+// to check the value passed.
 type ValueChecker func(val []byte) error
 
+// This function is used inside the mocks unit tests to generate ValueCheckers
 func generateRegexpChecker(re string) func([]byte) error {
 	return func(val []byte) error {
 		matched, err := regexp.MatchString(re, string(val))
