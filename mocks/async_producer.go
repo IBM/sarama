@@ -8,7 +8,7 @@ import (
 
 // AsyncProducer implements sarama's Producer interface for testing purposes.
 // Before you can send messages to it's Input channel, you have to set expectations
-// so it knows how to handle the input; it returns and error if the numer of messages
+// so it knows how to handle the input; it returns an error if the number of messages
 // received is bigger then the number of expectations set. You can also set a
 // function in each expectation so that the message value is checked by this function
 // and an error is returned if the match fails.
