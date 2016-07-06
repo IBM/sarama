@@ -1,12 +1,27 @@
 package mocks
 
 import (
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"testing"
 
 	"github.com/Shopify/sarama"
 )
+
+func generateRegexpChecker(re string) func([]byte) error {
+	return func(val []byte) error {
+		matched, err := regexp.MatchString(re, string(val))
+		if err != nil {
+			return errors.New("Error while trying to match the input message with the expected pattern: " + err.Error())
+		}
+		if !matched {
+			return fmt.Errorf("No match between input value \"%s\" and expected pattern \"%s\"", val, re)
+		}
+		return nil
+	}
+}
 
 type testReporterMock struct {
 	errors []string
