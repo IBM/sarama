@@ -2,6 +2,7 @@ package mocks
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/Shopify/sarama"
@@ -90,5 +91,27 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 
 	if len(trm.errors) != 1 {
 		t.Error("Expected to report an error")
+	}
+}
+
+func TestProducerWithCheckerFunction(t *testing.T) {
+	trm := newTestReporterMock()
+	mp := NewAsyncProducer(trm, nil)
+	mp.ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
+	mp.ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
+
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(mp.Errors()) != 1 {
+		t.Error("Expected to report an error")
+	}
+
+	err1 := <-mp.Errors()
+	if !strings.HasPrefix(err1.Err.Error(), "No match") {
+		t.Error("Expected to report a value check error, found: ", err1.Err)
 	}
 }

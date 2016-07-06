@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/Shopify/sarama"
@@ -86,6 +87,31 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 	}
 	if _, _, err := sp.SendMessage(msg); err != errOutOfExpectations {
 		t.Error("errOutOfExpectations expected on second SendMessage call, found:", err)
+	}
+
+	if err := sp.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Error("Expected to report an error")
+	}
+}
+
+func TestSyncProducerWithCheckerFunction(t *testing.T) {
+	trm := newTestReporterMock()
+
+	sp := NewSyncProducer(trm, nil)
+	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
+	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
+
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if _, _, err := sp.SendMessage(msg); err != nil {
+		t.Error("No error expected on first SendMessage call, found: ", err)
+	}
+	msg = &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+	if _, _, err := sp.SendMessage(msg); err == nil || !strings.HasPrefix(err.Error(), "No match") {
+		t.Error("Error during value check expected on second SendMessage call, found:", err)
 	}
 
 	if err := sp.Close(); err != nil {
