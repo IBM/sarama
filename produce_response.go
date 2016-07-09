@@ -3,9 +3,10 @@ package sarama
 import "time"
 
 type ProduceResponseBlock struct {
-	Err       KError
-	Offset    int64
-	Timestamp time.Time // only provided if Version >= 2
+	Err    KError
+	Offset int64
+	// only provided if Version >= 2 and the broker is configured with `LogAppendTime`
+	Timestamp time.Time
 }
 
 func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err error) {
@@ -23,7 +24,7 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 	if version >= 2 {
 		if millis, err := pd.getInt64(); err != nil {
 			return err
-		} else {
+		} else if millis != -1 {
 			b.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
 		}
 	}
