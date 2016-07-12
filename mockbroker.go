@@ -54,14 +54,16 @@ type MockBroker struct {
 	t            TestReporter
 	latency      time.Duration
 	handler      requestHandlerFunc
-	history      []RequestResponse
+	history      []*RequestResponse
 	lock         sync.Mutex
 }
 
 // RequestResponse represents a Request/Response pair processed by MockBroker.
 type RequestResponse struct {
-	Request  protocolBody
-	Response encoder
+	Request      protocolBody
+	Response     encoder
+	RequestSize  int
+	ResponseSize int
 }
 
 // SetLatency makes broker pause for the specified period every time before
@@ -97,7 +99,9 @@ func (b *MockBroker) BrokerID() int32 {
 func (b *MockBroker) History() []RequestResponse {
 	b.lock.Lock()
 	history := make([]RequestResponse, len(b.history))
-	copy(history, b.history)
+	for i, rr := range b.history {
+		history[i] = *rr
+	}
 	b.lock.Unlock()
 	return history
 }
@@ -180,7 +184,7 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 
 	resHeader := make([]byte, 8)
 	for {
-		req, err := decodeRequest(conn)
+		req, bytesRead, err := decodeRequest(conn)
 		if err != nil {
 			Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(req))
 			b.serverError(err)
@@ -193,7 +197,8 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 
 		b.lock.Lock()
 		res := b.handler(req)
-		b.history = append(b.history, RequestResponse{req.body, res})
+		requestResponse := RequestResponse{req.body, res, bytesRead, 0}
+		b.history = append(b.history, &requestResponse)
 		b.lock.Unlock()
 
 		if res == nil {
@@ -221,6 +226,7 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 			b.serverError(err)
 			break
 		}
+		requestResponse.ResponseSize = len(resHeader) + len(encodedRes)
 	}
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }
