@@ -3,6 +3,9 @@ package sarama
 import (
 	"fmt"
 	"testing"
+	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 func ExampleBroker() {
@@ -52,36 +55,40 @@ func TestBrokerAccessors(t *testing.T) {
 }
 
 func TestSimpleBrokerCommunication(t *testing.T) {
-	mb := NewMockBroker(t, 0)
-	defer mb.Close()
-
-	broker := NewBroker(mb.Addr())
-	conf := NewConfig()
-	conf.Version = V0_10_0_0
-	err := broker.Open(conf)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	for _, tt := range brokerTestTable {
+		t.Log("Testing broker communication for", tt.name)
+		mb := NewMockBroker(t, 0)
 		mb.Returns(&mockEncoder{tt.response})
-	}
-	for _, tt := range brokerTestTable {
+		defer mb.Close()
+		broker := NewBroker(mb.Addr())
+		// Set the broker id in order to validate local broker metrics
+		broker.id = 0
+		conf := NewConfig()
+		conf.Version = V0_10_0_0
+		// Use a new registry every time to prevent side effect caused by the global one
+		conf.MetricRegistry = metrics.NewRegistry()
+		err := broker.Open(conf)
+		if err != nil {
+			t.Fatal(err)
+		}
 		tt.runner(t, broker)
+		validateBrokerMetrics(t, broker, mb)
+		err = broker.Close()
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
-	err = broker.Close()
-	if err != nil {
-		t.Error(err)
-	}
 }
 
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
 var brokerTestTable = []struct {
+	name     string
 	response []byte
 	runner   func(*testing.T, *Broker)
 }{
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{"MetadataRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := MetadataRequest{}
 			response, err := broker.GetMetadata(&request)
@@ -93,7 +100,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 't', 0x00, 0x00, 0x00, 0x00},
+	{"ConsumerMetadataRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 't', 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ConsumerMetadataRequest{}
 			response, err := broker.GetConsumerMetadata(&request)
@@ -105,7 +113,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{},
+	{"ProduceRequest (NoResponse)",
+		[]byte{},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = NoResponse
@@ -116,9 +125,13 @@ var brokerTestTable = []struct {
 			if response != nil {
 				t.Error("Produce request with NoResponse got a response!")
 			}
+			// Wait for the request to be processed by the broker so
+			// we do not get 0 bytes written from the broker when validating metrics
+			time.Sleep(100 * time.Millisecond)
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00},
+	{"ProduceRequest (WaitForLocal)",
+		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = WaitForLocal
@@ -131,7 +144,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00},
+	{"FetchRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := FetchRequest{}
 			response, err := broker.Fetch(&request)
@@ -143,7 +157,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00},
+	{"OffsetFetchRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetFetchRequest{}
 			response, err := broker.FetchOffset(&request)
@@ -155,7 +170,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00},
+	{"OffsetCommitRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetCommitRequest{}
 			response, err := broker.CommitOffset(&request)
@@ -167,7 +183,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00},
+	{"OffsetRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := OffsetRequest{}
 			response, err := broker.GetAvailableOffsets(&request)
@@ -179,7 +196,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{"JoinGroupRequest",
+		[]byte{0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := JoinGroupRequest{}
 			response, err := broker.JoinGroup(&request)
@@ -191,7 +209,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{"SyncGroupRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := SyncGroupRequest{}
 			response, err := broker.SyncGroup(&request)
@@ -203,7 +222,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00},
+	{"LeaveGroupRequest",
+		[]byte{0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := LeaveGroupRequest{}
 			response, err := broker.LeaveGroup(&request)
@@ -215,7 +235,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00},
+	{"HeartbeatRequest",
+		[]byte{0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := HeartbeatRequest{}
 			response, err := broker.Heartbeat(&request)
@@ -227,7 +248,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+	{"ListGroupsRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ListGroupsRequest{}
 			response, err := broker.ListGroups(&request)
@@ -239,7 +261,8 @@ var brokerTestTable = []struct {
 			}
 		}},
 
-	{[]byte{0x00, 0x00, 0x00, 0x00},
+	{"DescribeGroupsRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := DescribeGroupsRequest{}
 			response, err := broker.DescribeGroups(&request)
@@ -250,4 +273,38 @@ var brokerTestTable = []struct {
 				t.Error("DescribeGroups request got no response!")
 			}
 		}},
+}
+
+func validateBrokerMetrics(t *testing.T, broker *Broker, mockBroker *MockBroker) {
+	metricValidators := newMetricValidators()
+	mockBrokerBytesRead := 0
+	mockBrokerBytesWritten := 0
+
+	// Compute socket bytes
+	for _, requestResponse := range mockBroker.History() {
+		mockBrokerBytesRead += requestResponse.RequestSize
+		mockBrokerBytesWritten += requestResponse.ResponseSize
+	}
+
+	// Check that the number of bytes sent corresponds to what the mock broker received
+	metricValidators.registerForAllBrokers(broker, countMeterValidator("incoming-byte-rate", mockBrokerBytesWritten))
+	if mockBrokerBytesWritten == 0 {
+		// This a ProduceRequest with NoResponse
+		metricValidators.registerForAllBrokers(broker, countMeterValidator("response-rate", 0))
+		metricValidators.registerForAllBrokers(broker, countHistogramValidator("response-size", 0))
+		metricValidators.registerForAllBrokers(broker, minMaxHistogramValidator("response-size", 0, 0))
+	} else {
+		metricValidators.registerForAllBrokers(broker, countMeterValidator("response-rate", 1))
+		metricValidators.registerForAllBrokers(broker, countHistogramValidator("response-size", 1))
+		metricValidators.registerForAllBrokers(broker, minMaxHistogramValidator("response-size", mockBrokerBytesWritten, mockBrokerBytesWritten))
+	}
+
+	// Check that the number of bytes received corresponds to what the mock broker sent
+	metricValidators.registerForAllBrokers(broker, countMeterValidator("outgoing-byte-rate", mockBrokerBytesRead))
+	metricValidators.registerForAllBrokers(broker, countMeterValidator("request-rate", 1))
+	metricValidators.registerForAllBrokers(broker, countHistogramValidator("request-size", 1))
+	metricValidators.registerForAllBrokers(broker, minMaxHistogramValidator("request-size", mockBrokerBytesRead, mockBrokerBytesRead))
+
+	// Run the validators
+	metricValidators.run(t, broker.conf.MetricRegistry)
 }
