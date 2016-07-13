@@ -226,7 +226,9 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 			b.serverError(err)
 			break
 		}
+		b.lock.Lock()
 		requestResponse.ResponseSize = len(resHeader) + len(encodedRes)
+		b.lock.Unlock()
 	}
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }
