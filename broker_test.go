@@ -3,6 +3,7 @@ package sarama
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -55,12 +56,9 @@ func TestBrokerAccessors(t *testing.T) {
 
 func TestSimpleBrokerCommunication(t *testing.T) {
 	for _, tt := range brokerTestTable {
-		t.Log("Testing broker communication for", tt.name)
+		Logger.Printf("Testing broker communication for %s", tt.name)
 		mb := NewMockBroker(t, 0)
-		// Do not add expectation for ProduceRequest (No Response)
-		if len(tt.response) != 0 {
-			mb.Returns(&mockEncoder{tt.response})
-		}
+		mb.Returns(&mockEncoder{tt.response})
 		broker := NewBroker(mb.Addr())
 		// Set the broker id in order to validate local broker metrics
 		broker.id = 0
@@ -75,6 +73,11 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		tt.runner(t, broker)
 		err = broker.Close()
 		if err != nil {
+			t.Error(err)
+		}
+		// Wait up to 500 ms for the remote broker to process requests
+		// in order to have consistent metrics
+		if err := mb.WaitForExpectations(500 * time.Millisecond); err != nil {
 			t.Error(err)
 		}
 		mb.Close()
