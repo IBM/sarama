@@ -3,7 +3,6 @@ package sarama
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -58,8 +57,10 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 	for _, tt := range brokerTestTable {
 		t.Log("Testing broker communication for", tt.name)
 		mb := NewMockBroker(t, 0)
-		mb.Returns(&mockEncoder{tt.response})
-		defer mb.Close()
+		// Do not add expectation for ProduceRequest (No Response)
+		if len(tt.response) != 0 {
+			mb.Returns(&mockEncoder{tt.response})
+		}
 		broker := NewBroker(mb.Addr())
 		// Set the broker id in order to validate local broker metrics
 		broker.id = 0
@@ -72,11 +73,12 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 			t.Fatal(err)
 		}
 		tt.runner(t, broker)
-		validateBrokerMetrics(t, broker, mb)
 		err = broker.Close()
 		if err != nil {
 			t.Error(err)
 		}
+		mb.Close()
+		validateBrokerMetrics(t, broker, mb)
 	}
 
 }
@@ -125,9 +127,6 @@ var brokerTestTable = []struct {
 			if response != nil {
 				t.Error("Produce request with NoResponse got a response!")
 			}
-			// Wait for the request to be processed by the broker so
-			// we do not get 0 bytes written from the broker when validating metrics
-			time.Sleep(100 * time.Millisecond)
 		}},
 
 	{"ProduceRequest (WaitForLocal)",
