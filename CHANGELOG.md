@@ -33,6 +33,8 @@ Bug Fixes:
    ([#685](https://github.com/Shopify/sarama/pull/685)).
  - Fix a possible tight loop in the consumer
    ([#693](https://github.com/Shopify/sarama/pull/693)).
+ - Fix possible negative partition value from the HashPartitioner
+   ([#709](https://github.com/Shopify/sarama/pull/709)).
 
 #### Version 1.9.0 (2016-05-16)
 
