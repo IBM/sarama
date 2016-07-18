@@ -100,6 +100,23 @@ func TestHashPartitioner(t *testing.T) {
 	}
 }
 
+func TestHashPartitionerMinInt32(t *testing.T) {
+	partitioner := NewHashPartitioner("mytopic")
+
+	msg := ProducerMessage{}
+	// "1468509572224" generates 2147483648 (uint32) result from Sum32 function
+	// which is -2147483648 or int32's min value
+	msg.Key = StringEncoder("1468509572224")
+
+	choice, err := partitioner.Partition(&msg, 50)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
+	if choice < 0 || choice >= 50 {
+		t.Error("Returned partition", choice, "outside of range for nil key.")
+	}
+}
+
 func TestManualPartitioner(t *testing.T) {
 	partitioner := NewManualPartitioner("mytopic")
 
