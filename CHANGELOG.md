@@ -33,6 +33,8 @@ Bug Fixes:
    ([#685](https://github.com/Shopify/sarama/pull/685)).
  - Fix a possible tight loop in the consumer
    ([#693](https://github.com/Shopify/sarama/pull/693)).
+ - Report UnknownTopicOrPartition errors from the offset manager
+   ([#706](https://github.com/Shopify/sarama/pull/706)).
  - Fix possible negative partition value from the HashPartitioner
    ([#709](https://github.com/Shopify/sarama/pull/709)).
 
