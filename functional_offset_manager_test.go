@@ -34,8 +34,8 @@ func TestFuncOffsetManager(t *testing.T) {
 
 	offset, metadata := pom2.NextOffset()
 
-	if offset != 10+1 {
-		t.Errorf("Expected the next offset to be 11, found %d.", offset)
+	if offset != 10 {
+		t.Errorf("Expected the next offset to be 10, found %d.", offset)
 	}
 	if metadata != "test metadata" {
 		t.Errorf("Expected metadata to be 'test metadata', found %s.", metadata)
