@@ -8,6 +8,13 @@ features that may not be compatible with old Kafka versions. If you don't
 specify this value it will default to 0.8.2 (the minimum supported), and trying
 to use more recent features (like the offset manager) will fail with an error.
 
+_Also:_ The offset-manager's behaviour has been changed to match the upstream
+java consumer (see [#705](https://github.com/Shopify/sarama/pull/705) and
+[#713](https://github.com/Shopify/sarama/pull/713)). If you use the
+offset-manager, please ensure that you are committing one *greater* than the
+last consumed message offset or else you may end up consuming duplicate
+messages.
+
 New Features:
  - Support for Kafka 0.10
    ([#672](https://github.com/Shopify/sarama/pull/672),
@@ -35,6 +42,8 @@ Bug Fixes:
    ([#685](https://github.com/Shopify/sarama/pull/685)).
  - Fix a possible tight loop in the consumer
    ([#693](https://github.com/Shopify/sarama/pull/693)).
+ - Match upstream's offset-tracking behaviour
+   ([#705](https://github.com/Shopify/sarama/pull/705)).
  - Report UnknownTopicOrPartition errors from the offset manager
    ([#706](https://github.com/Shopify/sarama/pull/706)).
  - Fix possible negative partition value from the HashPartitioner
