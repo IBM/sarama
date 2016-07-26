@@ -413,15 +413,18 @@ func (child *partitionConsumer) HighWaterMarkOffset() int64 {
 
 func (child *partitionConsumer) responseFeeder() {
 	var msgs []*ConsumerMessage
+	expiryTimer := time.NewTimer(child.conf.Consumer.MaxProcessingTime)
 
 feederLoop:
 	for response := range child.feeder {
 		msgs, child.responseResult = child.parseResponse(response)
 
 		for i, msg := range msgs {
+			expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime)
+
 			select {
 			case child.messages <- msg:
-			case <-time.After(child.conf.Consumer.MaxProcessingTime):
+			case <-expiryTimer.C:
 				child.responseResult = errTimedOut
 				child.broker.acks.Done()
 				for _, msg = range msgs[i:] {
