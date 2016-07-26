@@ -25,6 +25,8 @@ Improvements:
    ([#634](https://github.com/Shopify/sarama/pull/634)).
  - Pre-allocate decoding errors, greatly reducing heap usage and GC time against
    misbehaving brokers ([#690](https://github.com/Shopify/sarama/pull/690)).
+ - Re-use consumer expiry timers, removing one allocation per consumed message
+   ([#707](https://github.com/Shopify/sarama/pull/707)).
 
 Bug Fixes:
  - Actually default the client ID to "sarama" like we say we do
