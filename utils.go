@@ -33,6 +33,30 @@ func dupeAndSort(input []int32) []int32 {
 	return ret
 }
 
+func (p int32Slice) Diff(o int32Slice) (res []int32) {
+	on := len(o)
+	for _, x := range p {
+		n := sort.Search(on, func(i int) bool { return o[i] >= x })
+		if n < on && o[n] == x {
+			continue
+		}
+		res = append(res, x)
+	}
+	return
+}
+
+type offsetInfo struct {
+	Offset   int64
+	Metadata string
+}
+
+func (i offsetInfo) NextOffset(fallback int64) int64 {
+	if i.Offset > -1 {
+		return i.Offset + 1
+	}
+	return fallback
+}
+
 func withRecover(fn func()) {
 	defer func() {
 		handler := PanicHandler
