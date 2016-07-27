@@ -217,6 +217,35 @@ type Config struct {
 		}
 	}
 
+	// Group is the namespace for group consumer properties
+	Group struct {
+		// The strategy to use for the allocation of partitions to consumers (defaults to StrategyRange)
+		PartitionStrategy Strategy
+		Offsets           struct {
+			Retry struct {
+				// The numer retries when comitting offsets (defaults to 3).
+				Max int
+			}
+		}
+		Session struct {
+			// The allowed session timeout for registered consumers (defaults to 30s).
+			// Must be within the allowed server range.
+			Timeout time.Duration
+		}
+		Heartbeat struct {
+			// Interval between each heartbeat (defaults to 3s). It should be no more
+			// than 1/3rd of the Group.Session.Timout setting
+			Interval time.Duration
+		}
+		// Return specifies which group channels will be populated. If they are set to true,
+		// you must read from the respective channels to prevent deadlock.
+		Return struct {
+			// If enabled, rebalance notification will be returned on the
+			// Notifications channel (default disabled).
+			Notifications bool
+		}
+	}
+
 	// A user-provided string sent with every request to the brokers for logging,
 	// debugging, and auditing purposes. Defaults to "sarama", but you should
 	// probably set it to something specific to your application.
@@ -264,6 +293,11 @@ func NewConfig() *Config {
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
+
+	c.Group.PartitionStrategy = StrategyRange
+	c.Group.Offsets.Retry.Max = 3
+	c.Group.Session.Timeout = 30 * time.Second
+	c.Group.Heartbeat.Interval = 3 * time.Second
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
@@ -393,6 +427,34 @@ func (c *Config) Validate() error {
 		return ConfigurationError("ChannelBufferSize must be >= 0")
 	case !validID.MatchString(c.ClientID):
 		return ConfigurationError("ClientID is invalid")
+	}
+
+	// validate group values
+	switch {
+	case c.Group.Offsets.Retry.Max < 0:
+		return ConfigurationError("Group.Offsets.Retry.Max must be >= 0")
+	case c.Group.Heartbeat.Interval <= 0:
+		return ConfigurationError("Group.Heartbeat.Interval must be > 0")
+	case c.Group.Session.Timeout <= 0:
+		return ConfigurationError("Group.Session.Timeout must be > 0")
+	}
+
+	// ensure offset is correct
+	switch c.Consumer.Offsets.Initial {
+	case OffsetOldest, OffsetNewest:
+	default:
+		return ConfigurationError("Consumer.Offsets.Initial must be either OffsetOldest or OffsetNewest")
+	}
+
+	// validate group heartbeat
+	if c.Group.Heartbeat.Interval%time.Millisecond != 0 {
+		Logger.Println("Group.Heartbeat.Interval only supports millisecond precision; nanoseconds will be truncated.")
+	}
+	if c.Group.Session.Timeout%time.Millisecond != 0 {
+		Logger.Println("Group.Session.Timeout only supports millisecond precision; nanoseconds will be truncated.")
+	}
+	if c.Group.PartitionStrategy != StrategyRange && c.Group.PartitionStrategy != StrategyRoundRobin {
+		Logger.Println("Group.PartitionStrategy is not supported; range will be assumed.")
 	}
 
 	return nil

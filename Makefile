@@ -19,3 +19,8 @@ install_errcheck:
 
 get:
 	go get -t
+
+watch:
+	go get github.com/cespare/reflex
+	reflex -r '\.go$$' -s -- sh -c 'clear && go test -v -run=Test$(T)'
+
