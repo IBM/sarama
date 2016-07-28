@@ -14,6 +14,9 @@ type OffsetManager interface {
 	// topic/partition.
 	ManagePartition(topic string, partition int32) (PartitionOffsetManager, error)
 
+	// TBD
+	Commit()
+
 	// Close stops the OffsetManager from managing offsets. It is required to call
 	// this function before an OffsetManager object passes out of scope, as it
 	// will otherwise leak memory. You must call this after all the
@@ -71,6 +74,12 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 
 	topicManagers[partition] = pom
 	return pom, nil
+}
+
+func (om *offsetManager) Commit() {
+	for _, bom := range om.boms {
+		bom.flushToBroker()
+	}
 }
 
 func (om *offsetManager) Close() error {
@@ -510,6 +519,7 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 	for s := range bom.subscriptions {
 		s.lock.Lock()
 		if s.dirty {
+			// fmt.Println("commit offsets", s.topic, s.partition, s.offset, perPartitionTimestamp, s.metadata)
 			r.AddBlock(s.topic, s.partition, s.offset, perPartitionTimestamp, s.metadata)
 		}
 		s.lock.Unlock()

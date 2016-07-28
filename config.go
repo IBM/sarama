@@ -219,6 +219,8 @@ type Config struct {
 
 	// Group is the namespace for group consumer properties
 	Group struct {
+		// If enabled (default enabled)
+		AutoCommit bool
 		// The strategy to use for the allocation of partitions to consumers (defaults to StrategyRange)
 		PartitionStrategy Strategy
 		Offsets           struct {
@@ -296,8 +298,11 @@ func NewConfig() *Config {
 
 	c.Group.PartitionStrategy = StrategyRange
 	c.Group.Offsets.Retry.Max = 3
-	c.Group.Session.Timeout = 30 * time.Second
-	c.Group.Heartbeat.Interval = 3 * time.Second
+	// c.Group.Session.Timeout = 30 * time.Second
+	// c.Group.Heartbeat.Interval = 3 * time.Second
+
+	c.Group.Session.Timeout = 5 * time.Second
+	c.Group.Heartbeat.Interval = time.Second
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
