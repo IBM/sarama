@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.10.0 (trunk)
+#### Version 1.10.0 (2016-08-02)
 
 _Important:_ As of Sarama 1.10 it is necessary to tell Sarama the version of
 Kafka you are running against (via the `config.Version` value) in order to use
