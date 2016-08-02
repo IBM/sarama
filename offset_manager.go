@@ -14,7 +14,7 @@ type OffsetManager interface {
 	// topic/partition.
 	ManagePartition(topic string, partition int32) (PartitionOffsetManager, error)
 
-	// TBD
+	// Commit flushs all not yet commited offsets to the broker
 	Commit()
 
 	// Close stops the OffsetManager from managing offsets. It is required to call
@@ -28,6 +28,7 @@ type offsetManager struct {
 	client Client
 	conf   *Config
 	group  string
+	cg     *consumerGroup
 
 	lock sync.Mutex
 	poms map[string]map[int32]*partitionOffsetManager
@@ -513,7 +514,12 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 			ConsumerGroup:           bom.parent.group,
 			ConsumerGroupGeneration: GroupGenerationUndefined,
 		}
+	}
 
+	if bom.parent.cg != nil {
+		// manages offsets for this consumer group
+		r.ConsumerGroupGeneration = bom.parent.cg.generationID
+		r.MemberID = bom.parent.cg.memberID
 	}
 
 	for s := range bom.subscriptions {

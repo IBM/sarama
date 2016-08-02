@@ -3,13 +3,11 @@ package sarama
 import (
 	"fmt"
 	"sort"
-	"sync"
-	"sync/atomic"
 	"time"
 )
 
 // TODO : manual vs auto commit mode as in the new offical java client
-// currently auto commits
+// currently auto commits marked offsets
 
 type ConsumerGroup interface {
 	// Subscriptions returns the subscripted topics and partitions
@@ -30,8 +28,12 @@ type ConsumerGroup interface {
 	// Cluster.Return.Notifications setting to true.
 	Notifications() <-chan *Notification
 
-	MarkOffset(msg *ConsumerMessage, metadata string)
+	// mark a consumer mesasges as commited
+	MarkMessage(msg *ConsumerMessage, metadata string)
 
+	// MarkOffset
+
+	// Shutdown the consumer group
 	Close() error
 }
 
@@ -40,24 +42,21 @@ type consumerGroup struct {
 	ownsClient bool
 
 	consumer Consumer
+	om       OffsetManager
+	managed  map[TopicPartition]*managedPartition
 
-	consumerID   string
-	generationID int32
-	group        string
-	memberID     string
 	topics       []string
+	group        string
+	consumerID   string
+	memberID     string
+	generationID int32
 
 	dying, dead chan none
+	closed      bool
 
-	consuming     int32
-	errors        chan error
 	messages      chan *ConsumerMessage
 	notifications chan *Notification
-
-	commitMu sync.Mutex
-
-	om      OffsetManager
-	managed map[TopicPartition]*managedPartition
+	errors        chan error
 }
 
 type managedPartition struct {
@@ -91,6 +90,12 @@ func NewConsumerGroupFromClient(client Client, group string, topics []string) (C
 		notifications: make(chan *Notification, 1),
 		managed:       make(map[TopicPartition]*managedPartition),
 	}
+
+	// we could make this nicer as it break encapsulation
+	if com, castOk := om.(*offsetManager); castOk {
+		com.cg = cg
+	}
+
 	if err := client.RefreshCoordinator(group); err != nil {
 		return nil, err
 	}
@@ -99,7 +104,7 @@ func NewConsumerGroupFromClient(client Client, group string, topics []string) (C
 	return cg, nil
 }
 
-//  initializes a new consumer
+// initializes a new consumer
 func NewConsumerGroup(addrs []string, group string, topics []string, config *Config) (ConsumerGroup, error) {
 	client, err := NewClient(addrs, config)
 	if err != nil {
@@ -130,23 +135,23 @@ func (cg *consumerGroup) Errors() <-chan error { return cg.errors }
 // Cluster.Return.Notifications setting to true.
 func (cg *consumerGroup) Notifications() <-chan *Notification { return cg.notifications }
 
-// MarkOffset marks the provided message as processed, alongside a metadata string
+// MarkMessage marks the provided message as processed, alongside a metadata string
 // that represents the state of the partition consumer at that point in time. The
 // metadata string can be used by another consumer to restore that state, so it
 // can resume consumption.
 //
-// Note: calling MarkOffset does not necessarily commit the offset to the backend
+// Note: calling MarMessage does not necessarily commit the offset to the backend
 // store immediately for efficiency reasons, and it may never be committed if
 // your application crashes. This means that you may end up processing the same
 // message twice, and your processing should ideally be idempotent.
-func (cg *consumerGroup) MarkOffset(msg *ConsumerMessage, metadata string) {
+func (cg *consumerGroup) MarkMessage(msg *ConsumerMessage, metadata string) {
+	cg.MarkOffset(msg.Topic, msg.Partition, msg.Offset, metadata)
+}
 
-	if mp := cg.managed[TopicPartition{msg.Topic, msg.Partition}]; mp != nil {
-		mp.pom.MarkOffset(msg.Offset, metadata)
-		// pom.MarkOffset(msg.Offset, metadata)
+func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64, metadata string) {
+	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
+		mp.pom.MarkOffset(offset, metadata)
 	}
-
-	// cg.subscriptions.Fetch(msg.Topic, msg.Partition).MarkOffset(msg.Offset, metadata)
 }
 
 func (cg *consumerGroup) log(f string, a ...interface{}) {
@@ -154,29 +159,33 @@ func (cg *consumerGroup) log(f string, a ...interface{}) {
 	if len(a) > 0 {
 		s = fmt.Sprintf(f, a...)
 	}
-	fmt.Printf("%s: %s\n", cg.memberID, s)
+	member := cg.memberID
+	if member == "" {
+		member = "<???>"
+	}
+	Logger.Printf("consumerGroup/%s/%s %s\n", cg.group, member, s)
 }
 
 // Close safely closes the consumer and releases all resources
 func (cg *consumerGroup) Close() (err error) {
+	if cg.closed {
+		return
+	}
+	cg.log("closing")
+
 	close(cg.dying)
-	cg.log("close dying wait for dead")
 	<-cg.dead
 
-	cg.log("cg.release")
 	if e := cg.release(); e != nil {
 		err = e
 	}
-	cg.log("cg.consumer.Close")
 
 	if e := cg.consumer.Close(); e != nil {
 		err = e
 	}
-	cg.log("cg close msg/errs")
 	close(cg.messages)
 	close(cg.errors)
 
-	cg.log("cg.leaveGroup")
 	if e := cg.leaveGroup(); e != nil {
 		err = e
 	}
@@ -187,32 +196,60 @@ func (cg *consumerGroup) Close() (err error) {
 			err = e
 		}
 	}
-	cg.log("dead")
+	cg.log("closed")
+	cg.closed = true
 	return
+}
+
+func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
+	cg.log("consume %s/%d\n", topic, partition)
+
+	pom, err := cg.om.ManagePartition(topic, partition)
+
+	if err != nil {
+		return err
+	}
+
+	offset, _ := pom.NextOffset()
+
+	pc, err := cg.consumer.ConsumePartition(topic, partition, offset)
+	if err != nil {
+		return err
+	}
+
+	fwder := newForwarder(pc.Messages(), pc.Errors())
+
+	go fwder.forwardTo(cg.messages, cg.errors)
+
+	cg.managed[TopicPartition{topic, partition}] = &managedPartition{
+		fwd: fwder,
+		pc:  pc,
+		pom: pom,
+	}
+
+	return nil
 }
 
 func (cg *consumerGroup) mainLoop() {
 	defer close(cg.dead)
-	defer atomic.StoreInt32(&cg.consuming, 0)
 
 	for {
-		atomic.StoreInt32(&cg.consuming, 0)
-
-		// Remember previous subscriptions
 		var notification *Notification
 		if cg.client.Config().Group.Return.Notifications {
-			// notification = newNotification(cg.subscriptions.Info())
+			m := make(map[string][]int32)
+			for tp := range cg.managed {
+				m[tp.Topic] = append(m[tp.Topic], tp.Partition)
+			}
+			notification = newNotification(m)
 		}
 
-		// Rebalance, fetch new subscriptions
-		cg.log("trigger rebalance from mainLoop")
 		subscriptions, err := cg.rebalance()
 		if err != nil {
 			cg.rebalanceError(err, notification)
 			continue
 		}
 
-		// Start the heartbeat
+		// start heartbeat
 		hbStop, hbDone := make(chan struct{}), make(chan struct{})
 		go cg.heartbeatLoop(hbStop, hbDone)
 
@@ -224,18 +261,12 @@ func (cg *consumerGroup) mainLoop() {
 			continue
 		}
 
-		// Start consuming and comitting offsets
-		// cmStop, cmDone := make(chan struct{}), make(chan struct{})
-		// go cg.commitLoop(cmStop, cmDone)
-		atomic.StoreInt32(&cg.consuming, 1)
-
-		// Update notification with new claims
+		// send notifications
 		if cg.client.Config().Group.Return.Notifications {
 			notification.claim(subscriptions)
 			cg.notifications <- notification
 		}
 
-		// Wait for signals
 		select {
 		case <-hbDone:
 		case <-cg.dying:
@@ -262,7 +293,7 @@ func (cg *consumerGroup) heartbeatLoop(stop <-chan struct{}, done chan<- struct{
 				cg.log("heartbeat broken: %v", err)
 				return
 			default:
-				cg.handleError(fmt.Errorf("heartbeat: %v", err))
+				cg.handleError(fmt.Errorf("heartbeat broken: %v", err))
 				return
 			}
 		case <-stop:
@@ -278,7 +309,7 @@ func (cg *consumerGroup) rebalanceError(err error, notification *Notification) {
 	switch err {
 	case ErrRebalanceInProgress:
 	default:
-		cg.handleError(fmt.Errorf("rebalance: %v", err))
+		cg.handleError(fmt.Errorf("rebalance error: %v", err))
 	}
 	time.Sleep(cg.client.Config().Metadata.Retry.Backoff)
 }
@@ -291,7 +322,6 @@ func (cg *consumerGroup) handleError(err error) {
 			return
 		}
 	} else {
-		Logger.Printf("%s error: %v\n", err)
 		cg.log("%v", err)
 	}
 }
@@ -302,10 +332,8 @@ func (cg *consumerGroup) release() (err error) {
 		cg.log("release subscriptions n=%d", len(cg.managed))
 	}
 
-	// Stop all consumers, don't stop on errors
-	// stop consuming
+	// stop all consumers, don't stop on errors
 	for _, mp := range cg.managed {
-		// todo add error handling
 		mp.fwd.Close()
 		mp.pc.Close()
 	}
@@ -318,7 +346,6 @@ func (cg *consumerGroup) release() (err error) {
 
 	// stop managing these offsets
 	for _, mp := range cg.managed {
-		// todo add error handling
 		mp.pom.Close()
 	}
 
@@ -328,15 +355,11 @@ func (cg *consumerGroup) release() (err error) {
 	return
 }
 
-// --------------------------------------------------------------------
-
-// Performs a heartbeat, part of the mainLoop()
 func (cg *consumerGroup) heartbeat() error {
 	broker, err := cg.client.Coordinator(cg.group)
 	if err != nil {
 		return err
 	}
-
 	resp, err := broker.Heartbeat(&HeartbeatRequest{
 		GroupId:      cg.group,
 		MemberId:     cg.memberID,
@@ -348,26 +371,58 @@ func (cg *consumerGroup) heartbeat() error {
 	return resp.Err
 }
 
+func (cg *consumerGroup) redistributePartitions(joinResponse *JoinGroupResponse, syncRequest *SyncGroupRequest) error {
+	var strategy *balancer
+
+	members, err := joinResponse.GetMembers()
+
+	// fmt.Println("LEADER got group meta data")
+	// for m, meta := range members {
+	// 	fmt.Printf("  %s: v=%d %v\n", m, meta.Version, meta.Topics)
+	// }
+
+	if err != nil {
+		return err
+	}
+
+	strategy, err = newBalancerFromMeta(cg.client, members)
+
+	if err != nil {
+		return err
+	}
+
+	newDistribution := strategy.Perform(cg.client.Config().Group.PartitionStrategy)
+	for memberID, topics := range newDistribution {
+		// cg.log("propose memberID=%s topics=%v", memberID, topics)
+		if err := syncRequest.AddGroupAssignmentMember(memberID, &ConsumerGroupMemberAssignment{
+			Version: 1,
+			Topics:  topics,
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // Performs a rebalance, part of the mainLoop()
 func (cg *consumerGroup) rebalance() (map[string][]int32, error) {
-	// Logger.Printf("cluster/consumer memberId=%s rebalance\n", cg.memberID)
-	// cg.log("trigger rebalance")
+	cg.log("rebalance")
 
 	if err := cg.client.RefreshCoordinator(cg.group); err != nil {
-		cg.log("error on rebalance refresh coord: %v", err)
+		cg.log("rebalance coordinator error: %v", err)
 		return nil, err
 	}
 
 	// Release subscriptions
 	if err := cg.release(); err != nil {
-		cg.log("error on rebalance release: %v", err)
+		cg.log("rebalance group release error: %v", err)
 		return nil, err
 	}
 
 	// Re-join consumer group
-	strategy, err := cg.joinGroup()
+	joinResponse, err := cg.joinGroup()
 	if err != nil {
-		cg.log("error on rebalance joinGroup: %v", err)
+		cg.log("rebalance join group error: %v", err)
 	}
 	switch {
 	case err == ErrUnknownMemberId:
@@ -377,14 +432,19 @@ func (cg *consumerGroup) rebalance() (map[string][]int32, error) {
 		return nil, err
 	}
 
-	// Logger.Printf("consumerGroup memberId=%s gen=%d joined group=%s\n", cg.memberID, cg.generationID, cg.group)
-	cg.log("joining group=%s gen=%d\n", cg.group, cg.generationID)
+	cg.log("joining group=%s generation=%d\n", cg.group, cg.generationID)
 
-	if strategy != nil {
-		cg.log("I AM MASTER")
+	syncRequest := cg.newSyncGroupRequest()
+
+	if joinResponse.IsLeader() {
+		cg.log("elected as leader")
+		err := cg.redistributePartitions(joinResponse, syncRequest)
+		if err != nil {
+			return nil, err
+		}
 	}
-	// Sync consumer group state, fetch subscriptions
-	subscriptions, err := cg.syncGroup(strategy)
+
+	subscriptions, err := cg.syncGroup(syncRequest)
 	switch {
 	case err == ErrRebalanceInProgress:
 		return nil, err
@@ -393,20 +453,11 @@ func (cg *consumerGroup) rebalance() (map[string][]int32, error) {
 		return nil, err
 	}
 	cg.log("subscribe %v", subscriptions)
-	// fmt.Printf("consumerGroup memberId=%s gen=%d group=%s subscriptions=%v\n", cg.memberID, cg.generationID, cg.group, subscriptions)
 	return subscriptions, nil
 }
 
 // Performs the subscriptionscription, part of the mainLoop()
 func (cg *consumerGroup) subcribe(subscriptions map[string][]int32) error {
-	// // fetch offsets
-	// offsets, err := cg.fetchOffsets(subscriptions)
-	// if err != nil {
-	// 	_ = cg.leaveGroup()
-	// 	return err
-	// }
-
-	// Create consumers
 	for topic, partitions := range subscriptions {
 		for _, partition := range partitions {
 			if err := cg.createConsumer(topic, partition); err != nil {
@@ -419,10 +470,8 @@ func (cg *consumerGroup) subcribe(subscriptions map[string][]int32) error {
 	return nil
 }
 
-// --------------------------------------------------------------------
-
 // Send a request to the broker to join group on rebalance()
-func (cg *consumerGroup) joinGroup() (*balancer, error) {
+func (cg *consumerGroup) joinGroup() (*JoinGroupResponse, error) {
 	req := &JoinGroupRequest{
 		GroupId:        cg.group,
 		MemberId:       cg.memberID,
@@ -448,59 +497,38 @@ func (cg *consumerGroup) joinGroup() (*balancer, error) {
 		return nil, err
 	}
 
-	cg.log("join group as %s", cg.memberID)
-	resp, err := broker.JoinGroup(req)
+	response, err := broker.JoinGroup(req)
 
 	if err != nil {
 		return nil, err
-	} else if resp.Err != ErrNoError {
-		return nil, resp.Err
+	} else if response.Err != ErrNoError {
+		return nil, response.Err
 	}
 
-	var strategy *balancer
-	if resp.LeaderId == resp.MemberId {
-		members, err := resp.GetMembers()
-		if err != nil {
-			return nil, err
-		}
-		strategy, err = newBalancerFromMeta(cg.client, members)
-		if err != nil {
-			return nil, err
-		}
-	}
+	cg.log("join group")
 
-	cg.memberID = resp.MemberId
-	cg.generationID = resp.GenerationId
+	cg.memberID = response.MemberId
+	cg.generationID = response.GenerationId
 
-	return strategy, nil
+	return response, nil
 }
 
-// Send a request to the broker to sync the group on rebalance().
-// Returns a list of topics and partitions to consume.
-func (cg *consumerGroup) syncGroup(strategy *balancer) (map[string][]int32, error) {
-	req := &SyncGroupRequest{
+func (cg *consumerGroup) newSyncGroupRequest() *SyncGroupRequest {
+	return &SyncGroupRequest{
 		GroupId:      cg.group,
 		MemberId:     cg.memberID,
 		GenerationId: cg.generationID,
 	}
-	// TODO : change - annoying to call stuff with empty this pointer (make explicit that we only send an empy
-	// request if we are not the leader)
-	newDistribution := strategy.Perform(cg.client.Config().Group.PartitionStrategy)
-	for memberID, topics := range newDistribution {
-		cg.log("  propose memberID=%s topics=%v", memberID, topics)
-		if err := req.AddGroupAssignmentMember(memberID, &ConsumerGroupMemberAssignment{
-			Version: 1,
-			Topics:  topics,
-		}); err != nil {
-			return nil, err
-		}
-	}
+}
 
+// Send a request to the broker to sync the group on rebalance().
+// Returns a list of topics and partitions to consume.
+func (cg *consumerGroup) syncGroup(req *SyncGroupRequest) (map[string][]int32, error) {
 	broker, err := cg.client.Coordinator(cg.group)
 	if err != nil {
 		return nil, err
 	}
-	cg.log("sync group request gen=%d", cg.generationID)
+	cg.log("sync group request generation=%d", cg.generationID)
 	sync, err := broker.SyncGroup(req)
 	if err != nil {
 		return nil, err
@@ -532,6 +560,7 @@ func (cg *consumerGroup) leaveGroup() error {
 	if err != nil {
 		return err
 	}
+	cg.log("leave group")
 
 	_, err = broker.LeaveGroup(&LeaveGroupRequest{
 		GroupId:  cg.group,
@@ -540,7 +569,7 @@ func (cg *consumerGroup) leaveGroup() error {
 	return err
 }
 
-// TODO : move to sep file later
+// forwards messages and error from source to destination channels
 type forwarder struct {
 	msgs   <-chan *ConsumerMessage
 	errors <-chan *ConsumerError
@@ -593,56 +622,4 @@ func (f *forwarder) Close() {
 	f.closed = true
 	close(f.dying)
 	<-f.dead
-}
-
-func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
-	// Logger.Printf("cluster/consumer %s consume %s/%d from %d\n", cg.memberID, topic, partition, 0)
-
-	pom, err := cg.om.ManagePartition(topic, partition)
-
-	if err != nil {
-		return err
-	}
-
-	offset, _ := pom.NextOffset()
-
-	pc, err := cg.consumer.ConsumePartition(topic, partition, offset)
-	if err != nil {
-		return err
-	}
-
-	fwder := newForwarder(pc.Messages(), pc.Errors())
-
-	go fwder.forwardTo(cg.messages, cg.errors)
-
-	cg.managed[TopicPartition{topic, partition}] = &managedPartition{
-		fwd: fwder,
-		pc:  pc,
-		pom: pom,
-	}
-
-	return nil
-
-}
-
-// Strategy for partition to consumer assignement
-type Strategy string
-
-const (
-	// StrategyRange is the default and assigns partition ranges to consumers.
-	// Example with six partitions and two consumers:
-	//   C1: [0, 1, 2]
-	//   C2: [3, 4, 5]
-	StrategyRange Strategy = "range"
-
-	// StrategyRoundRobin assigns partitions by alternating over consumers.
-	// Example with six partitions and two consumers:
-	//   C1: [0, 2, 4]
-	//   C2: [1, 3, 5]
-	StrategyRoundRobin Strategy = "roundrobin"
-)
-
-type TopicPartition struct {
-	Topic     string
-	Partition int32
 }

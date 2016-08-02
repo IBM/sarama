@@ -67,7 +67,7 @@ func TestOffsetCommitRequestV0(t *testing.T) {
 func TestOffsetCommitRequestV1(t *testing.T) {
 	request := new(OffsetCommitRequest)
 	request.ConsumerGroup = "foobar"
-	request.ConsumerID = "cons"
+	request.MemberID = "cons"
 	request.ConsumerGroupGeneration = 0x1122
 	request.Version = 1
 	testRequest(t, "no blocks v1", request, offsetCommitRequestNoBlocksV1)
@@ -79,7 +79,7 @@ func TestOffsetCommitRequestV1(t *testing.T) {
 func TestOffsetCommitRequestV2(t *testing.T) {
 	request := new(OffsetCommitRequest)
 	request.ConsumerGroup = "foobar"
-	request.ConsumerID = "cons"
+	request.MemberID = "cons"
 	request.ConsumerGroupGeneration = 0x1122
 	request.RetentionTime = 0x4433
 	request.Version = 2

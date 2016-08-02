@@ -298,11 +298,12 @@ func NewConfig() *Config {
 
 	c.Group.PartitionStrategy = StrategyRange
 	c.Group.Offsets.Retry.Max = 3
-	// c.Group.Session.Timeout = 30 * time.Second
-	// c.Group.Heartbeat.Interval = 3 * time.Second
 
-	c.Group.Session.Timeout = 5 * time.Second
-	c.Group.Heartbeat.Interval = time.Second
+	c.Group.Session.Timeout = 30 * time.Second
+	c.Group.Heartbeat.Interval = 3 * time.Second
+
+	// c.Group.Session.Timeout = 5 * time.Second
+	// c.Group.Heartbeat.Interval = time.Second
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
