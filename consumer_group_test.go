@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -10,13 +11,14 @@ func consume(g ConsumerGroup, name string) {
 	for {
 		msg := <-g.Messages()
 		if msg != nil {
-			g.MarkOffset(msg, "")
+			g.MarkMessage(msg, "")
 			// fmt.Printf("%s got partition=%d offset=%d. msg=%v\n", name, msg.Partition, msg.Offset, string(msg.Value))
 		}
 	}
 }
 
 func TestConsumerGroupX(t *testing.T) {
+	return
 
 	conf := NewConfig()
 	conf.Version = V0_10_0_0
@@ -28,6 +30,7 @@ func TestConsumerGroupX(t *testing.T) {
 
 	// one test producer
 	p, err := NewSyncProducerFromClient(client)
+
 	if err != nil {
 
 		panic(err)
@@ -46,31 +49,51 @@ func TestConsumerGroupX(t *testing.T) {
 		}
 	}()
 
-	// client2, err := NewClient([]string{"0.0.0.0:9092"}, conf)
+	client2, err := NewClient([]string{"0.0.0.0:9092"}, conf)
+	client3, err := NewClient([]string{"0.0.0.0:9092"}, conf)
+	client4, err := NewClient([]string{"0.0.0.0:9092"}, conf)
+	client5, err := NewClient([]string{"0.0.0.0:9092"}, conf)
 
 	cg, err := NewConsumerGroupFromClient(client, "test", []string{"test2"})
 	if err != nil {
 		panic(err)
 	}
 
-	// cg2, err := NewConsumerGroupFromClient(client2, "test", []string{"test2"})
+	cg2, err := NewConsumerGroupFromClient(client2, "test", []string{"test2"})
+	cg3, err := NewConsumerGroupFromClient(client3, "test", []string{"test2"})
+	cg4, err := NewConsumerGroupFromClient(client4, "test", []string{"test2"})
 
 	go consume(cg, "G1")
-	// go consume(cg2, "G2")
-	// time.Sleep(5000 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 
-	// time.Sleep(100 * time.Millisecond)
-	// fmt.Println("killing G2")
-	// cg2.Close()
+	go consume(cg2, "G2")
+	time.Sleep(1000 * time.Millisecond)
+
+	go consume(cg3, "G3")
+	time.Sleep(1000 * time.Millisecond)
+
+	go consume(cg4, "G4")
+
+	time.Sleep(1000 * time.Millisecond)
+
+	cg5, err := NewConsumerGroupFromClient(client5, "test", []string{"test2"})
+	go consume(cg5, "G5")
+
+	time.Sleep(1000 * time.Millisecond)
+
+	fmt.Println("killing G2")
+	cg2.Close()
 	// time.Sleep(5000 * time.Millisecond)
 	// cg3, _ := NewConsumerGroupFromClient(client2, "test", []string{"test2"})
 	// go consume(cg3, "G3")
-	time.Sleep(10000 * time.Millisecond)
+	// time.Sleep(5000 * time.Millisecond)
 	// cg3.Close()
-	err = cg.Close()
-	if err != nil {
-		panic(err)
-	}
+	time.Sleep(20000 * time.Millisecond)
+	// cg3.Close()
+	// err = cg.Close()
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	client.Close()
 }
