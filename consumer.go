@@ -479,14 +479,18 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	prelude := true
 	var messages []*ConsumerMessage
 	for _, msgBlock := range block.MsgSet.Messages {
-
 		for _, msg := range msgBlock.Messages() {
-			if prelude && msg.Offset < child.offset {
+			offset := msg.Offset
+			if child.conf.Version.IsAtLeast(V0_10_0_0) {
+				// calculate correct offset from relative offset
+				offset = msgBlock.Offset - int64(len(msgBlock.Messages())) + msg.Offset + 1
+			}
+			if prelude && offset < child.offset {
 				continue
 			}
 			prelude = false
 
-			if msg.Offset >= child.offset {
+			if offset >= child.offset {
 				messages = append(messages, &ConsumerMessage{
 					Topic:     child.topic,
 					Partition: child.partition,
@@ -495,7 +499,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 					Offset:    msg.Offset,
 					Timestamp: msg.Msg.Timestamp,
 				})
-				child.offset = msg.Offset + 1
+				child.offset = offset + 1
 			} else {
 				incomplete = true
 			}
