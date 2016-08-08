@@ -330,6 +330,8 @@ func (cg *consumerGroup) handleError(err error) {
 func (cg *consumerGroup) release() (err error) {
 	if len(cg.managed) > 0 {
 		cg.log("release subscriptions n=%d", len(cg.managed))
+	} else {
+		return
 	}
 
 	// stop all consumers, don't stop on errors
@@ -337,9 +339,6 @@ func (cg *consumerGroup) release() (err error) {
 		mp.fwd.Close()
 		mp.pc.Close()
 	}
-
-	// Wait for messages to be processed
-	time.Sleep(cg.client.Config().Consumer.MaxProcessingTime)
 
 	// Commit offsets
 	cg.om.Commit()
