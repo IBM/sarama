@@ -85,8 +85,8 @@ func NewConsumerGroupFromClient(client Client, group string, topics []string) (C
 		topics:        topics,
 		dying:         make(chan none),
 		dead:          make(chan none),
-		errors:        make(chan error, client.Config().ChannelBufferSize),
-		messages:      make(chan *ConsumerMessage),
+		errors:        make(chan error),
+		messages:      make(chan *ConsumerMessage, client.Config().ChannelBufferSize),
 		notifications: make(chan *Notification, 1),
 		managed:       make(map[TopicPartition]*managedPartition),
 	}
@@ -358,6 +358,7 @@ func (cg *consumerGroup) release() (err error) {
 func (cg *consumerGroup) heartbeat() error {
 	broker, err := cg.client.Coordinator(cg.group)
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return err
 	}
 	resp, err := broker.Heartbeat(&HeartbeatRequest{
@@ -366,6 +367,7 @@ func (cg *consumerGroup) heartbeat() error {
 		GenerationId: cg.generationID,
 	})
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return err
 	}
 	return resp.Err
@@ -494,14 +496,17 @@ func (cg *consumerGroup) joinGroup() (*JoinGroupResponse, error) {
 
 	broker, err := cg.client.Coordinator(cg.group)
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return nil, err
 	}
 
 	response, err := broker.JoinGroup(req)
 
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return nil, err
 	} else if response.Err != ErrNoError {
+		cg.closeCoordinator(broker, response.Err)
 		return nil, response.Err
 	}
 
@@ -526,13 +531,16 @@ func (cg *consumerGroup) newSyncGroupRequest() *SyncGroupRequest {
 func (cg *consumerGroup) syncGroup(req *SyncGroupRequest) (map[string][]int32, error) {
 	broker, err := cg.client.Coordinator(cg.group)
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return nil, err
 	}
 	cg.log("sync group request generation=%d", cg.generationID)
 	sync, err := broker.SyncGroup(req)
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return nil, err
 	} else if sync.Err != ErrNoError {
+		cg.closeCoordinator(broker, sync.Err)
 		return nil, sync.Err
 	}
 
@@ -558,6 +566,7 @@ func (cg *consumerGroup) syncGroup(req *SyncGroupRequest) (map[string][]int32, e
 func (cg *consumerGroup) leaveGroup() error {
 	broker, err := cg.client.Coordinator(cg.group)
 	if err != nil {
+		cg.closeCoordinator(broker, err)
 		return err
 	}
 	cg.log("leave group")
@@ -566,7 +575,20 @@ func (cg *consumerGroup) leaveGroup() error {
 		GroupId:  cg.group,
 		MemberId: cg.memberID,
 	})
+	if err != nil {
+		cg.closeCoordinator(broker, err)
+	}
 	return err
+}
+
+func (cg *consumerGroup) closeCoordinator(broker *Broker, err error) {
+	if broker != nil {
+		_ = broker.Close()
+	}
+	switch err {
+	case ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer:
+		_ = cg.client.RefreshCoordinator(cg.group)
+	}
 }
 
 // forwards messages and error from source to destination channels
@@ -591,6 +613,7 @@ func (f *forwarder) forwardTo(messages chan<- *ConsumerMessage, errors chan<- er
 	for {
 		select {
 		case msg := <-f.msgs:
+
 			if msg != nil {
 				select {
 				case messages <- msg:
