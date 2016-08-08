@@ -496,7 +496,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 					Partition: child.partition,
 					Key:       msg.Msg.Key,
 					Value:     msg.Msg.Value,
-					Offset:    msg.Offset,
+					Offset:    offset,
 					Timestamp: msg.Msg.Timestamp,
 				})
 				child.offset = offset + 1
