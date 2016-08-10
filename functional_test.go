@@ -62,6 +62,11 @@ func init() {
 	kafkaRequired = os.Getenv("CI") != ""
 }
 
+func randBool() bool {
+	// Intn(2) returns either 0 or 1, so this results in a 50/50 split
+	return rand.Intn(2) == 0
+}
+
 func checkKafkaAvailability(t testing.TB) {
 	if !kafkaAvailable {
 		if kafkaRequired {

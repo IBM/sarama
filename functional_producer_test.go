@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"testing"
 	"time"
@@ -157,6 +158,69 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, consumer)
 	safeClose(t, client)
+}
+
+func TestReliableProducing(t *testing.T) {
+	checkKafkaVersion(t, "0.9.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewConfig()
+	config.Producer.Return.Successes = true
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Timeout = 5 * time.Second
+	config.Producer.Retry.Backoff = 2 * time.Second
+	config.Producer.Retry.Max = 5
+	producer, err := NewAsyncProducer(kafkaBrokers, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	disabledCount := 0
+	expectedResponses := 8 * TestBatchSize
+	for i := expectedResponses; i >= 0; {
+		msg := &ProducerMessage{Topic: "test.64", Key: nil, Value: StringEncoder(fmt.Sprintf("testing %d", i))}
+		select {
+		case producer.Input() <- msg:
+			i--
+
+			if i%TestBatchSize == 0 {
+				if disabledCount == 0 || (disabledCount < 2 && randBool()) {
+					zk := ZKProxies[rand.Intn(len(ZKProxies))]
+					for Proxies[zk].Enabled == false {
+						zk = ZKProxies[rand.Intn(len(ZKProxies))]
+					}
+					Proxies[zk].Enabled = false
+					SaveProxy(t, zk)
+					disabledCount++
+					Logger.Println(zk, "disabled")
+				} else if randBool() {
+					zk := ZKProxies[rand.Intn(len(ZKProxies))]
+					for Proxies[zk].Enabled == true {
+						zk = ZKProxies[rand.Intn(len(ZKProxies))]
+					}
+					Proxies[zk].Enabled = true
+					SaveProxy(t, zk)
+					disabledCount--
+					Logger.Println(zk, "enabled")
+				}
+			}
+			time.Sleep(3 * time.Millisecond)
+		case ret := <-producer.Errors():
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
+		}
+	}
+	for expectedResponses > 0 {
+		select {
+		case ret := <-producer.Errors():
+			t.Fatal(ret.Err)
+		case <-producer.Successes():
+			expectedResponses--
+		}
+	}
+	safeClose(t, producer)
 }
 
 // Benchmarks
