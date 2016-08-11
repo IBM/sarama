@@ -28,10 +28,11 @@ type ConsumerGroup interface {
 	// Cluster.Return.Notifications setting to true.
 	Notifications() <-chan *Notification
 
-	// mark a consumer mesasges as commited
+	// mark a consumer mesasges as ready to commit
 	MarkMessage(msg *ConsumerMessage, metadata string)
 
-	// MarkOffset
+	// mark a topic/partition/offset combination as ready to commit
+	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
 	// Shutdown the consumer group
 	Close() error
