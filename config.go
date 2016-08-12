@@ -48,7 +48,7 @@ type Config struct {
 			User     string
 			Password string
 			// Service name for GSSAPI Mechanism
-			Service string // "service/host" format
+			Service string
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection.

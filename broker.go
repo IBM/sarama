@@ -543,14 +543,12 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 // complete handling of establishing SASL/Kerberos Authentication
 func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
 	var context *C.sasl_conn_t // TODO needs to be freed, need to free on unsuccessful authentication
-	names := strings.SplitN(b.conf.Net.SASL.Service, "/", 2)
-	if len(names) < 2 {
-		return errors.New("Service name must be in \"service/host\" format")
 
-	}
-	serviceName := C.CString(names[0])
+	serviceName := C.CString(b.conf.Net.SASL.Service)
 	defer C.free(unsafe.Pointer(serviceName))
-	host := C.CString(names[1])
+
+	addrName := strings.SplitN(b.addr, ":", 2)
+	host := C.CString(addrName[0])
 	defer C.free(unsafe.Pointer(host))
 
 	errorCode := C.sasl_client_new(serviceName,
