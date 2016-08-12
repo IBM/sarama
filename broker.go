@@ -546,7 +546,13 @@ func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
 	// but there is no clear canonical way to do this
 	C.sasl_client_init(nil)
 
-	var context *C.sasl_conn_t // TODO needs to be freed, need to free on unsuccessful authentication
+	var context *C.sasl_conn_t
+	success := false
+	defer func() {
+		if !success {
+			C.sasl_dispose(context)
+		}
+	}()
 
 	serviceName := C.CString(b.conf.Net.SASL.Service)
 	defer C.free(unsafe.Pointer(serviceName))
@@ -611,6 +617,7 @@ func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
 		return errors.New("Authentication handshake was not completed")
 	}
 
+	success = true
 	return nil
 }
 
