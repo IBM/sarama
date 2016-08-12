@@ -371,14 +371,13 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool) (*responsePromise, 
 		return nil, err
 	}
 
-	b.updateOutgoingCommunicationMetrics(len(buf))
-
 	err = b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
 	if err != nil {
 		return nil, err
 	}
 
-	_, err = b.conn.Write(buf)
+	bytes, err := b.conn.Write(buf)
+	b.updateOutgoingCommunicationMetrics(bytes)
 	if err != nil {
 		return nil, err
 	}
@@ -476,8 +475,9 @@ func (b *Broker) responseReceiver() {
 			continue
 		}
 
-		_, err = io.ReadFull(b.conn, header)
+		bytesReadHeader, err := io.ReadFull(b.conn, header)
 		if err != nil {
+			b.updateIncomingCommunicationMetrics(bytesReadHeader)
 			dead = err
 			response.errors <- err
 			continue
@@ -486,11 +486,13 @@ func (b *Broker) responseReceiver() {
 		decodedHeader := responseHeader{}
 		err = decode(header, &decodedHeader)
 		if err != nil {
+			b.updateIncomingCommunicationMetrics(bytesReadHeader)
 			dead = err
 			response.errors <- err
 			continue
 		}
 		if decodedHeader.correlationID != response.correlationID {
+			b.updateIncomingCommunicationMetrics(bytesReadHeader)
 			// TODO if decoded ID < cur ID, discard until we catch up
 			// TODO if decoded ID > cur ID, save it so when cur ID catches up we have a response
 			dead = PacketDecodingError{fmt.Sprintf("correlation ID didn't match, wanted %d, got %d", response.correlationID, decodedHeader.correlationID)}
@@ -499,14 +501,13 @@ func (b *Broker) responseReceiver() {
 		}
 
 		buf := make([]byte, decodedHeader.length-4)
-		_, err = io.ReadFull(b.conn, buf)
+		bytesReadBody, err := io.ReadFull(b.conn, buf)
+		b.updateIncomingCommunicationMetrics(bytesReadHeader + bytesReadBody)
 		if err != nil {
 			dead = err
 			response.errors <- err
 			continue
 		}
-
-		b.updateIncomingCommunicationMetrics(len(header) + len(buf))
 
 		response.packets <- buf
 	}
@@ -537,15 +538,14 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 	binary.BigEndian.PutUint32(authBytes, uint32(length))
 	copy(authBytes[4:], []byte("\x00"+b.conf.Net.SASL.User+"\x00"+b.conf.Net.SASL.Password))
 
-	b.updateOutgoingCommunicationMetrics(len(authBytes))
-
 	err := b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout))
 	if err != nil {
 		Logger.Printf("Failed to set write deadline when doing SASL auth with broker %s: %s\n", b.addr, err.Error())
 		return err
 	}
 
-	_, err = b.conn.Write(authBytes)
+	bytesWritten, err := b.conn.Write(authBytes)
+	b.updateOutgoingCommunicationMetrics(bytesWritten)
 	if err != nil {
 		Logger.Printf("Failed to write SASL auth header to broker %s: %s\n", b.addr, err.Error())
 		return err
@@ -553,14 +553,13 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 
 	header := make([]byte, 4)
 	n, err := io.ReadFull(b.conn, header)
+	b.updateIncomingCommunicationMetrics(n)
 	// If the credentials are valid, we would get a 4 byte response filled with null characters.
 	// Otherwise, the broker closes the connection and we get an EOF
 	if err != nil {
 		Logger.Printf("Failed to read response while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
 		return err
 	}
-
-	b.updateIncomingCommunicationMetrics(n)
 
 	Logger.Printf("SASL authentication successful with broker %s:%v - %v\n", b.addr, n, header)
 	return nil

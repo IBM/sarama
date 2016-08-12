@@ -37,6 +37,11 @@ func (m mockEncoder) encode(pe packetEncoder) error {
 	return pe.putRawBytes(m.bytes)
 }
 
+type brokerMetrics struct {
+	bytesRead    int
+	bytesWritten int
+}
+
 func TestBrokerAccessors(t *testing.T) {
 	broker := NewBroker("abc:123")
 
@@ -59,6 +64,11 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		Logger.Printf("Testing broker communication for %s", tt.name)
 		mb := NewMockBroker(t, 0)
 		mb.Returns(&mockEncoder{tt.response})
+		pendingNotify := make(chan brokerMetrics)
+		// Register a callback to be notified about successful requests
+		mb.SetNotifier(func(bytesRead, bytesWritten int) {
+			pendingNotify <- brokerMetrics{bytesRead, bytesWritten}
+		})
 		broker := NewBroker(mb.Addr())
 		// Set the broker id in order to validate local broker metrics
 		broker.id = 0
@@ -75,13 +85,16 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		// Wait up to 500 ms for the remote broker to process requests
-		// in order to have consistent metrics
-		if err := mb.WaitForExpectations(500 * time.Millisecond); err != nil {
-			t.Error(err)
+		// Wait up to 500 ms for the remote broker to process the request and
+		// notify us about the metrics
+		timeout := 500 * time.Millisecond
+		select {
+		case mockBrokerMetrics := <-pendingNotify:
+			validateBrokerMetrics(t, broker, mockBrokerMetrics)
+		case <-time.After(timeout):
+			t.Errorf("No request received for: %s after waiting for %v", tt.name, timeout)
 		}
 		mb.Close()
-		validateBrokerMetrics(t, broker, mb)
 	}
 
 }
@@ -277,16 +290,10 @@ var brokerTestTable = []struct {
 		}},
 }
 
-func validateBrokerMetrics(t *testing.T, broker *Broker, mockBroker *MockBroker) {
+func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics brokerMetrics) {
 	metricValidators := newMetricValidators()
-	mockBrokerBytesRead := 0
-	mockBrokerBytesWritten := 0
-
-	// Compute socket bytes
-	for _, requestResponse := range mockBroker.History() {
-		mockBrokerBytesRead += requestResponse.RequestSize
-		mockBrokerBytesWritten += requestResponse.ResponseSize
-	}
+	mockBrokerBytesRead := mockBrokerMetrics.bytesRead
+	mockBrokerBytesWritten := mockBrokerMetrics.bytesWritten
 
 	// Check that the number of bytes sent corresponds to what the mock broker received
 	metricValidators.registerForAllBrokers(broker, countMeterValidator("incoming-byte-rate", mockBrokerBytesWritten))

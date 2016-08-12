@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -254,6 +255,17 @@ func BenchmarkProducerMediumSnappy(b *testing.B) {
 func benchmarkProducer(b *testing.B, conf *Config, topic string, value Encoder) {
 	setupFunctionalTest(b)
 	defer teardownFunctionalTest(b)
+
+	metricsDisable := os.Getenv("METRICS_DISABLE")
+	if metricsDisable != "" {
+		previousUseNilMetrics := metrics.UseNilMetrics
+		Logger.Println("Disabling metrics using no-op implementation")
+		metrics.UseNilMetrics = true
+		// Restore previous setting
+		defer func() {
+			metrics.UseNilMetrics = previousUseNilMetrics
+		}()
+	}
 
 	producer, err := NewAsyncProducer(kafkaBrokers, conf)
 	if err != nil {

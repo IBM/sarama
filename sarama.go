@@ -42,7 +42,7 @@ Broker related metrics:
 	| histogram response-size-for-broker-<broker-id> | histogram  | Distribution of the response size in bytes for a given broker |
 	+------------------------------------------------+------------+---------------------------------------------------------------+
 
-Note that we do not gather specific metrics for seed broker but they are part of the "all brokers" metrics.
+Note that we do not gather specific metrics for seed brokers but they are part of the "all brokers" metrics.
 
 */
 package sarama

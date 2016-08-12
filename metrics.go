@@ -6,9 +6,18 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+// Use exponentially decaying reservoir for sampling histograms with the same defaults as the Java library:
+// 1028 elements, which offers a 99.9% confidence level with a 5% margin of error assuming a normal distribution,
+// and an alpha factor of 0.015, which heavily biases the reservoir to the past 5 minutes of measurements.
+// See https://github.com/dropwizard/metrics/blob/v3.1.0/metrics-core/src/main/java/com/codahale/metrics/ExponentiallyDecayingReservoir.java#L38
+const (
+	metricsReservoirSize = 1028
+	metricsAlphaFactor   = 0.015
+)
+
 func getOrRegisterHistogram(name string, r metrics.Registry) metrics.Histogram {
 	return r.GetOrRegister(name, func() metrics.Histogram {
-		return metrics.NewHistogram(metrics.NewExpDecaySample(1028, 0.015))
+		return metrics.NewHistogram(metrics.NewExpDecaySample(metricsReservoirSize, metricsAlphaFactor))
 	}).(metrics.Histogram)
 }
 
