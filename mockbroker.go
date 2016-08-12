@@ -3,7 +3,6 @@ package sarama
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -20,6 +19,10 @@ const (
 )
 
 type requestHandlerFunc func(req *request) (res encoder)
+
+// RequestNotifierFunc is invoked when a mock broker processes a request successfully
+// and will provides the number of bytes read and written.
+type RequestNotifierFunc func(bytesRead, bytesWritten int)
 
 // MockBroker is a mock Kafka broker that is used in unit tests. It is exposed
 // to facilitate testing of higher level or specialized consumers and producers
@@ -51,22 +54,19 @@ type MockBroker struct {
 	closing      chan none
 	stopper      chan none
 	expectations chan encoder
-	done         sync.WaitGroup
 	listener     net.Listener
 	t            TestReporter
 	latency      time.Duration
 	handler      requestHandlerFunc
-	origHandler  bool
-	history      []*RequestResponse
+	notifier     RequestNotifierFunc
+	history      []RequestResponse
 	lock         sync.Mutex
 }
 
 // RequestResponse represents a Request/Response pair processed by MockBroker.
 type RequestResponse struct {
-	Request      protocolBody
-	Response     encoder
-	RequestSize  int
-	ResponseSize int
+	Request  protocolBody
+	Response encoder
 }
 
 // SetLatency makes broker pause for the specified period every time before
@@ -90,6 +90,14 @@ func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
 	})
 }
 
+// SetNotifier set a function that will get invoked whenever a request has been
+// processed successfully and will provide the number of bytes read and written
+func (b *MockBroker) SetNotifier(notifier RequestNotifierFunc) {
+	b.lock.Lock()
+	b.notifier = notifier
+	b.lock.Unlock()
+}
+
 // BrokerID returns broker ID assigned to the broker.
 func (b *MockBroker) BrokerID() int32 {
 	return b.brokerID
@@ -102,9 +110,7 @@ func (b *MockBroker) BrokerID() int32 {
 func (b *MockBroker) History() []RequestResponse {
 	b.lock.Lock()
 	history := make([]RequestResponse, len(b.history))
-	for i, rr := range b.history {
-		history[i] = *rr
-	}
+	copy(history, b.history)
 	b.lock.Unlock()
 	return history
 }
@@ -117,21 +123,6 @@ func (b *MockBroker) Port() int32 {
 // Addr returns the broker connection string in the form "<address>:<port>".
 func (b *MockBroker) Addr() string {
 	return b.listener.Addr().String()
-}
-
-// Wait for the remaining expectations to be consumed or that the timeout expires
-func (b *MockBroker) WaitForExpectations(timeout time.Duration) error {
-	c := make(chan none)
-	go func() {
-		b.done.Wait()
-		close(c)
-	}()
-	select {
-	case <-c:
-		return nil
-	case <-time.After(timeout):
-		return errors.New(fmt.Sprintf("Not all expectations have been honoured after %v", timeout))
-	}
 }
 
 // Close terminates the broker blocking until it stops internal goroutines and
@@ -155,7 +146,6 @@ func (b *MockBroker) Close() {
 func (b *MockBroker) setHandler(handler requestHandlerFunc) {
 	b.lock.Lock()
 	b.handler = handler
-	b.origHandler = false
 	b.lock.Unlock()
 }
 
@@ -215,10 +205,8 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 		}
 
 		b.lock.Lock()
-		originalHandlerUsed := b.origHandler
 		res := b.handler(req)
-		requestResponse := RequestResponse{req.body, res, bytesRead, 0}
-		b.history = append(b.history, &requestResponse)
+		b.history = append(b.history, RequestResponse{req.body, res})
 		b.lock.Unlock()
 
 		if res == nil {
@@ -232,25 +220,31 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 			b.serverError(err)
 			break
 		}
-		if len(encodedRes) != 0 {
-			binary.BigEndian.PutUint32(resHeader, uint32(len(encodedRes)+4))
-			binary.BigEndian.PutUint32(resHeader[4:], uint32(req.correlationID))
-			if _, err = conn.Write(resHeader); err != nil {
-				b.serverError(err)
-				break
-			}
-			if _, err = conn.Write(encodedRes); err != nil {
-				b.serverError(err)
-				break
-			}
+		if len(encodedRes) == 0 {
 			b.lock.Lock()
-			requestResponse.ResponseSize = len(resHeader) + len(encodedRes)
+			if b.notifier != nil {
+				b.notifier(bytesRead, 0)
+			}
 			b.lock.Unlock()
+			continue
 		}
-		// Prevent negative wait group in case we are using a custom handler
-		if originalHandlerUsed {
-			b.done.Done()
+
+		binary.BigEndian.PutUint32(resHeader, uint32(len(encodedRes)+4))
+		binary.BigEndian.PutUint32(resHeader[4:], uint32(req.correlationID))
+		if _, err = conn.Write(resHeader); err != nil {
+			b.serverError(err)
+			break
 		}
+		if _, err = conn.Write(encodedRes); err != nil {
+			b.serverError(err)
+			break
+		}
+
+		b.lock.Lock()
+		if b.notifier != nil {
+			b.notifier(bytesRead, len(resHeader)+len(encodedRes))
+		}
+		b.lock.Unlock()
 	}
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }
@@ -302,10 +296,8 @@ func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker 
 		t:            t,
 		brokerID:     brokerID,
 		expectations: make(chan encoder, 512),
-		done:         sync.WaitGroup{},
 	}
 	broker.handler = broker.defaultRequestHandler
-	broker.origHandler = true
 
 	broker.listener, err = net.Listen("tcp", addr)
 	if err != nil {
@@ -328,6 +320,5 @@ func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker 
 }
 
 func (b *MockBroker) Returns(e encoder) {
-	b.done.Add(1)
 	b.expectations <- e
 }
