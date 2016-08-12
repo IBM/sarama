@@ -542,6 +542,10 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 
 // complete handling of establishing SASL/Kerberos Authentication
 func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
+	// load sasl library.  This should only be loaded once per session,
+	// but there is no clear canonical way to do this
+	C.sasl_client_init(nil)
+
 	var context *C.sasl_conn_t // TODO needs to be freed, need to free on unsuccessful authentication
 
 	serviceName := C.CString(b.conf.Net.SASL.Service)
