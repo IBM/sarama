@@ -547,13 +547,6 @@ func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
 	C.sasl_client_init(nil)
 
 	var context *C.sasl_conn_t
-	success := false
-	defer func() {
-		if !success {
-			C.sasl_dispose(context)
-		}
-	}()
-
 	serviceName := C.CString(b.conf.Net.SASL.Service)
 	defer C.free(unsafe.Pointer(serviceName))
 
@@ -572,6 +565,13 @@ func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
 	if errorCode != C.SASL_OK {
 		return errors.New("sasl_client_new cannot establish new context")
 	}
+
+	success := false
+	defer func() {
+		if !success {
+			C.sasl_dispose(&context)
+		}
+	}()
 
 	var out *C.char
 	var outlen C.uint
