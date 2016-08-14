@@ -8,6 +8,10 @@ type encoder interface {
 	encode(pe packetEncoder) error
 }
 
+func Encode(e encoder) ([]byte, error) {
+	return encode(e)
+}
+
 // Encode takes an Encoder and turns it into bytes.
 func encode(e encoder) ([]byte, error) {
 	if e == nil {
