@@ -420,10 +420,11 @@ feederLoop:
 		msgs, child.responseResult = child.parseResponse(response)
 
 		for i, msg := range msgs {
-			if !expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime) {
+			if !expiryTimer.Stop() {
 				// expiryTimer was expired; clear out the waiting msg
 				<-expiryTimer.C
 			}
+			expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime)
 
 			select {
 			case child.messages <- msg:
