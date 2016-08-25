@@ -203,7 +203,7 @@ func (cg *consumerGroup) Close() (err error) {
 }
 
 func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
-	cg.log("consume %s/%d\n", topic, partition)
+	cg.log("consume %s/%d", topic, partition)
 
 	pom, err := cg.om.ManagePartition(topic, partition)
 
@@ -212,6 +212,18 @@ func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
 	}
 
 	offset, _ := pom.NextOffset()
+
+	oldest, err := cg.client.GetOffset(topic, partition, OffsetOldest)
+	if err != nil {
+		return err
+	}
+
+	newest, err := cg.client.GetOffset(topic, partition, OffsetNewest)
+	if err != nil {
+		return err
+	}
+
+	cg.log("consume %s/%d pom-offset=%d oldest=%d newest=%d", topic, partition, offset, oldest, newest)
 
 	pc, err := cg.consumer.ConsumePartition(topic, partition, offset)
 	if err != nil {
