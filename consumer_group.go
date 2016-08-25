@@ -225,6 +225,11 @@ func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
 
 	cg.log("consume %s/%d pom-offset=%d oldest=%d newest=%d", topic, partition, offset, oldest, newest)
 
+	// well this should not really happen ... the offset should be between oldest and newest
+	if offset < oldest {
+		offset = oldest
+	}
+
 	pc, err := cg.consumer.ConsumePartition(topic, partition, offset)
 	if err != nil {
 		return err
@@ -625,7 +630,6 @@ func (f *forwarder) forwardTo(messages chan<- *ConsumerMessage, errors chan<- er
 	for {
 		select {
 		case msg := <-f.msgs:
-
 			if msg != nil {
 				select {
 				case messages <- msg:
@@ -646,6 +650,8 @@ func (f *forwarder) forwardTo(messages chan<- *ConsumerMessage, errors chan<- er
 		case <-f.dying:
 			close(f.dead)
 			return
+		default:
+			time.Sleep(20 * time.Millisecond)
 		}
 	}
 }
