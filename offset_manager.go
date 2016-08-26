@@ -334,8 +334,6 @@ func (pom *partitionOffsetManager) MarkOffset(offset int64, metadata string) {
 	pom.lock.Lock()
 	defer pom.lock.Unlock()
 
-	Logger.Printf("client/partitionOffsetManager mark group=%s topic=%s partition=%d pom-offset=%d mark-offset=%d\n", pom.parent.group, pom.topic, pom.partition, pom.offset, offset)
-
 	if offset > pom.offset {
 		pom.offset = offset
 		pom.metadata = metadata
@@ -529,7 +527,7 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 	for s := range bom.subscriptions {
 		s.lock.Lock()
 		if s.dirty {
-			Logger.Printf("client/brokerOffsetManager commit topic=%s partition=%d offset=%d\n", s.topic, s.partition, s.offset)
+			// Logger.Printf("client/brokerOffsetManager commit topic=%s partition=%d offset=%d\n", s.topic, s.partition, s.offset)
 			// fmt.Println("commit offsets", s.topic, s.partition, s.offset, perPartitionTimestamp, s.metadata)
 			r.AddBlock(s.topic, s.partition, s.offset, perPartitionTimestamp, s.metadata)
 		}
