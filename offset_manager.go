@@ -525,6 +525,7 @@ func (bom *brokerOffsetManager) constructRequest() *OffsetCommitRequest {
 	for s := range bom.subscriptions {
 		s.lock.Lock()
 		if s.dirty {
+			Logger.Printf("client/brokerOffsetManager commit topic=%s partition=%d offset=%d\n", s.topic, s.partition, s.offset)
 			// fmt.Println("commit offsets", s.topic, s.partition, s.offset, perPartitionTimestamp, s.metadata)
 			r.AddBlock(s.topic, s.partition, s.offset, perPartitionTimestamp, s.metadata)
 		}
