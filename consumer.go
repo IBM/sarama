@@ -481,9 +481,9 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	for _, msgBlock := range block.MsgSet.Messages {
 		for _, msg := range msgBlock.Messages() {
 			offset := msg.Offset
-			if child.conf.Version.IsAtLeast(V0_10_0_0) {
-				// calculate correct offset from relative offset
-				offset = msgBlock.Offset - int64(len(msgBlock.Messages())) + msg.Offset + 1
+			if msg.Msg.Version >= 1 {
+				baseOffset := msgBlock.Offset - msgBlock.Messages()[len(msgBlock.Messages())-1].Offset
+				offset += baseOffset
 			}
 			if prelude && offset < child.offset {
 				continue
