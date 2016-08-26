@@ -60,6 +60,8 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 		return nil, err
 	}
 
+	Logger.Printf("client/offsetManager inital offsets group=%s topic=%s partition=%d offset=%s\n", om.group, topic, partition, pom.offset)
+
 	om.lock.Lock()
 	defer om.lock.Unlock()
 
@@ -331,6 +333,8 @@ func (pom *partitionOffsetManager) Errors() <-chan *ConsumerError {
 func (pom *partitionOffsetManager) MarkOffset(offset int64, metadata string) {
 	pom.lock.Lock()
 	defer pom.lock.Unlock()
+
+	Logger.Printf("client/partitionOffsetManager mark group=%s topic=%s partition=%d pom-offset=%d mark-offset=%d\n", pom.parent.group, pom.topic, pom.partition, pom.offset, offset)
 
 	if offset > pom.offset {
 		pom.offset = offset
