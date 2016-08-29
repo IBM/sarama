@@ -567,10 +567,11 @@ func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
 		return errors.New("sasl_client_new cannot establish new context")
 	}
 
+	// Still getting a double free bug.  Tolerating the memory leak for now
 	success := false
 	defer func() {
 		if !success {
-			C.sasl_dispose(&context)
+	//		C.sasl_dispose(&context)
 		}
 	}()
 
