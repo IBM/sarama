@@ -41,9 +41,14 @@ type Config struct {
 			// Whether or not to use SASL authentication when connecting to the broker
 			// (defaults to false).
 			Enable bool
+			// Which mechanism to employ
+			// set to "GSSAPI" to employ GSSAPI, defaults to SASL/PLAIN mechanism
+			Mechanism string
 			//username and password for SASL/PLAIN authentication
 			User     string
 			Password string
+			// Service name for GSSAPI Mechanism
+			Service string
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection.
@@ -286,6 +291,12 @@ func (c *Config) Validate() error {
 		if c.Net.SASL.Password != "" {
 			Logger.Println("Net.SASL is disabled but a non-empty password was provided.")
 		}
+		if c.Net.SASL.Mechanism != "" {
+			Logger.Println("Net.SASL is disabled but a non-empty mechanism was provided.")
+		}
+		if c.Net.SASL.Service != "" {
+			Logger.Println("Net.SASL is disabled but a non-empty service was provided.")
+		}
 	}
 	if c.Producer.RequiredAcks > 1 {
 		Logger.Println("Producer.RequiredAcks > 1 is deprecated and will raise an exception with kafka >= 0.8.2.0.")
@@ -324,10 +335,12 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Net.WriteTimeout must be > 0")
 	case c.Net.KeepAlive < 0:
 		return ConfigurationError("Net.KeepAlive must be >= 0")
-	case c.Net.SASL.Enable == true && c.Net.SASL.User == "":
-		return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
-	case c.Net.SASL.Enable == true && c.Net.SASL.Password == "":
-		return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
+	case c.Net.SASL.Enable == true && c.Net.SASL.Mechanism != "GSSAPI" && c.Net.SASL.User == "":
+		return ConfigurationError("Net.SASL.User must not be empty when SASL/PLAIN is enabled")
+	case c.Net.SASL.Enable == true && c.Net.SASL.Mechanism != "GSSAPI" && c.Net.SASL.Password == "":
+		return ConfigurationError("Net.SASL.Password must not be empty when SASL/PLAIN is enabled")
+	case c.Net.SASL.Enable == true && c.Net.SASL.Mechanism == "GSSAPI" && c.Net.SASL.Service == "":
+		return ConfigurationError("Net.SASL.Service must not be empty when SASL/KERBEROS is enabled")
 	}
 
 	// validate the Metadata values

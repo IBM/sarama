@@ -1,5 +1,12 @@
 package sarama
 
+// #cgo LDFLAGS: -lsasl2
+/*
+#include <sasl/sasl.h>
+#include <stdlib.h>
+ */
+import "C"
+
 import (
 	"crypto/tls"
 	"encoding/binary"
@@ -10,6 +17,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"strings"
+	"errors"
+	"unsafe"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -85,7 +95,12 @@ func (b *Broker) Open(conf *Config) error {
 		b.conf = conf
 
 		if conf.Net.SASL.Enable {
-			b.connErr = b.sendAndReceiveSASLPlainAuth()
+			switch conf.Net.SASL.Mechanism {
+			case "GSSAPI":
+				b.connErr = b.sendAndReceiveSASLKerberosAuth()
+			default:
+				b.connErr = b.sendAndReceiveSASLPlainAuth()
+			}
 			if b.connErr != nil {
 				err = b.conn.Close()
 				if err == nil {
@@ -523,4 +538,115 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 
 	Logger.Printf("SASL authentication successful with broker %s:%v - %v\n", b.addr, n, header)
 	return nil
+}
+
+// complete handling of establishing SASL/Kerberos Authentication
+func (b *Broker) sendAndReceiveSASLKerberosAuth() (error) {
+	// load sasl library.  This should only be loaded once per session,
+	// but there is no clear canonical way to do this
+	C.sasl_client_init(nil)
+
+	var context *C.sasl_conn_t
+
+	serviceName := C.CString(b.conf.Net.SASL.Service)
+	defer C.free(unsafe.Pointer(serviceName))
+
+	addrName := strings.SplitN(b.addr, ":", 2)
+	host := C.CString(addrName[0])
+	defer C.free(unsafe.Pointer(host))
+
+	errorCode := C.sasl_client_new(serviceName,
+		host,
+		nil,
+		nil,
+		nil,
+		C.uint(0),
+		&context)
+
+	if errorCode != C.SASL_OK {
+		return errors.New("sasl_client_new cannot establish new context")
+	}
+
+	// Still getting a double free bug.  Tolerating the memory leak for now
+	success := false
+	defer func() {
+		if !success {
+	//		C.sasl_dispose(&context)
+		}
+	}()
+
+	var out *C.char
+	var outlen C.uint
+	mech := C.CString(b.conf.Net.SASL.Mechanism)
+	defer C.free(unsafe.Pointer(mech))
+
+	errorCode = C.sasl_client_start(context,
+		mech,
+		nil,
+		&out,
+		&outlen,
+		nil)
+	defer C.free(unsafe.Pointer(out))
+
+	// send initial requestToken
+	requestToken := C.GoBytes(unsafe.Pointer(out), C.int(outlen))
+	err := sendToken(b.conn, requestToken)
+	if err != nil {
+		return errors.New("Connection closed by service")
+	}
+
+	for errorCode == C.SASL_CONTINUE {
+		responseToken, err := recvToken(b.conn)
+		if err != nil {
+			return errors.New("Connection closed by service")
+		}
+
+		errorCode = C.sasl_client_step(context,
+			(*C.char)(unsafe.Pointer(&responseToken[0])),
+			C.uint(len(responseToken)),
+			nil,
+			&out,
+			&outlen)
+
+		requestToken := C.GoBytes(unsafe.Pointer(out), C.int(outlen))
+		err = sendToken(b.conn, requestToken)
+		if err != nil {
+			return errors.New("Connection closed by service")
+		}
+	}
+
+	if errorCode != C.SASL_OK {
+		return errors.New("Authentication handshake was not completed")
+	}
+
+	success = true
+	return nil
+}
+
+func sendToken(conn net.Conn, buf []byte) (error) {
+	b := make([]byte,4)
+	binary.BigEndian.PutUint32(b, uint32(len(buf)))
+	_, err := conn.Write(b)
+	if err != nil {
+		return err
+	}
+	conn.Write(buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func recvToken(conn net.Conn)  ([]byte, error) {
+	b := make([]byte,4)
+	_, err := conn.Read(b)
+	if err != nil {
+		return b, err
+	}
+
+	size := binary.BigEndian.Uint32(b)
+	buf := make([]byte, size)
+	_, err = conn.Read(buf)
+
+	return buf, err
 }
