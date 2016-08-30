@@ -58,13 +58,15 @@ func testRequest(t *testing.T, name string, rb protocolBody, expected []byte) {
 		t.Error("Encoding", name, "failed\ngot ", packet[headerSize:], "\nwant", expected)
 	}
 	// Decoder request
-	decoded, err := decodeRequest(bytes.NewReader(packet))
+	decoded, n, err := decodeRequest(bytes.NewReader(packet))
 	if err != nil {
 		t.Error("Failed to decode request", err)
 	} else if decoded.correlationID != 123 || decoded.clientID != "foo" {
 		t.Errorf("Decoded header is not valid: %v", decoded)
 	} else if !reflect.DeepEqual(rb, decoded.body) {
 		t.Errorf("Decoded request does not match the encoded one\nencoded: %v\ndecoded: %v", rb, decoded.body)
+	} else if n != len(packet) {
+		t.Errorf("Decoded request bytes: %d does not match the encoded one: %d\n", n, len(packet))
 	}
 }
 
