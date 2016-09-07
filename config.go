@@ -236,7 +236,7 @@ type Config struct {
 	// running may lead to random breakage.
 	Version KafkaVersion
 	// The registry to define metrics into.
-	// Defaults to metrics.DefaultRegistry.
+	// Defaults to a local registry.
 	// If you want to disable metrics gathering, set "metrics.UseNilMetrics" to "true"
 	// prior to starting Sarama.
 	// See Examples on how to use the metrics registry
@@ -276,7 +276,7 @@ func NewConfig() *Config {
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
 	c.Version = minVersion
-	c.MetricRegistry = metrics.DefaultRegistry
+	c.MetricRegistry = metrics.NewRegistry()
 
 	return c
 }

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"github.com/rcrowley/go-metrics"
 )
 
 func ExampleBroker() {
@@ -74,8 +72,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		broker.id = 0
 		conf := NewConfig()
 		conf.Version = V0_10_0_0
-		// Use a new registry every time to prevent side effect caused by the global one
-		conf.MetricRegistry = metrics.NewRegistry()
 		err := broker.Open(conf)
 		if err != nil {
 			t.Fatal(err)
