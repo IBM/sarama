@@ -21,7 +21,7 @@ the producers and the consumer. The Request/Response objects and properties are 
 exactly with the protocol fields documented by Kafka at
 https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol
 
-Metrics are exposed through https://github.com/rcrowley/go-metrics library.
+Metrics are exposed through https://github.com/rcrowley/go-metrics library in a local registry.
 
 Broker related metrics:
 
