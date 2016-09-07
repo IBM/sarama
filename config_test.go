@@ -12,8 +12,8 @@ func TestDefaultConfigValidates(t *testing.T) {
 	if err := config.Validate(); err != nil {
 		t.Error(err)
 	}
-	if config.MetricRegistry != metrics.DefaultRegistry {
-		t.Error("Expected metrics.DefaultRegistry, got ", config.MetricRegistry)
+	if config.MetricRegistry == nil {
+		t.Error("Expected non nil metrics.MetricRegistry, got nil")
 	}
 }
 
@@ -42,7 +42,7 @@ func ExampleConfig_metrics() {
 	appGauge.Update(1)
 
 	config := NewConfig()
-	// Use a prefix registry instead of the default global one
+	// Use a prefix registry instead of the default local one
 	config.MetricRegistry = metrics.NewPrefixedChildRegistry(appMetricRegistry, "sarama.")
 
 	// Simulate a metric created by sarama without starting a broker

@@ -99,9 +99,6 @@ func testProducingMessages(t *testing.T, config *Config) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	// Use a dedicated registry to prevent side effect caused by the global one
-	config.MetricRegistry = metrics.NewRegistry()
-
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
 
