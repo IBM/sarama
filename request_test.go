@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"reflect"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 type testRequestBody struct {
@@ -25,7 +27,7 @@ func (s *testRequestBody) encode(pe packetEncoder) error {
 // implement the encoder or decoder interfaces that needed somewhere to live
 
 func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
-	packet, err := encode(in)
+	packet, err := encode(in, nil)
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(packet, expect) {
@@ -50,7 +52,7 @@ func testVersionDecodable(t *testing.T, name string, out versionedDecoder, in []
 func testRequest(t *testing.T, name string, rb protocolBody, expected []byte) {
 	// Encoder request
 	req := &request{correlationID: 123, clientID: "foo", body: rb}
-	packet, err := encode(req)
+	packet, err := encode(req, nil)
 	headerSize := 14 + len("foo")
 	if err != nil {
 		t.Error(err)
@@ -62,16 +64,16 @@ func testRequest(t *testing.T, name string, rb protocolBody, expected []byte) {
 	if err != nil {
 		t.Error("Failed to decode request", err)
 	} else if decoded.correlationID != 123 || decoded.clientID != "foo" {
-		t.Errorf("Decoded header is not valid: %v", decoded)
+		t.Errorf("Decoded header %q is not valid: %+v", name, decoded)
 	} else if !reflect.DeepEqual(rb, decoded.body) {
-		t.Errorf("Decoded request does not match the encoded one\nencoded: %v\ndecoded: %v", rb, decoded.body)
+		t.Error(spew.Sprintf("Decoded request %q does not match the encoded one\nencoded: %+v\ndecoded: %+v", name, rb, decoded.body))
 	} else if n != len(packet) {
-		t.Errorf("Decoded request bytes: %d does not match the encoded one: %d\n", n, len(packet))
+		t.Errorf("Decoded request %q bytes: %d does not match the encoded one: %d\n", name, n, len(packet))
 	}
 }
 
 func testResponse(t *testing.T, name string, res protocolBody, expected []byte) {
-	encoded, err := encode(res)
+	encoded, err := encode(res, nil)
 	if err != nil {
 		t.Error(err)
 	} else if expected != nil && !bytes.Equal(encoded, expected) {
