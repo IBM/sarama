@@ -31,6 +31,7 @@ type Message struct {
 	Timestamp time.Time        // the timestamp of the message (version 1+ only)
 
 	compressedCache []byte
+	compressedSize  int // used for computing the compression ratio metrics
 }
 
 func (m *Message) encode(pe packetEncoder) error {
@@ -77,6 +78,8 @@ func (m *Message) encode(pe packetEncoder) error {
 		default:
 			return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", m.Codec)}
 		}
+		// Keep in mind the compressed payload size for metric gathering
+		m.compressedSize = len(payload)
 	}
 
 	if err = pe.putBytes(payload); err != nil {
@@ -120,6 +123,10 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
+
+	// Required for deep equal assertion during tests but might be useful
+	// for future metrics about the compression ratio in fetch requests
+	m.compressedSize = len(m.Value)
 
 	switch m.Codec {
 	case CompressionNone:
