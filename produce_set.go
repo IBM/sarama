@@ -90,11 +90,29 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
 				}
-				req.AddMessage(topic, partition, &Message{
+				compMsg := &Message{
 					Codec: ps.parent.conf.Producer.Compression,
 					Key:   nil,
 					Value: payload,
-				})
+				}
+				if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
+					// Compressed messages must use a protocol version
+					// that is newer than the inner messages version.
+					// Due to a lack of better timestamp notation copy the oldest
+					// (earliest) timestamp to message.
+					for _, msgBlock := range set.setToSend.Messages {
+						msg := msgBlock.Msg
+						if msg.Version > compMsg.Version {
+							compMsg.Version = msg.Version
+						}
+						if !msg.Timestamp.IsZero() &&
+							(compMsg.Timestamp.IsZero() ||
+								compMsg.Timestamp.After(msg.Timestamp)) {
+							compMsg.Timestamp = msg.Timestamp
+						}
+					}
+				}
+				req.AddMessage(topic, partition, compMsg)
 			}
 		}
 	}
