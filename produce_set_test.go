@@ -141,3 +141,45 @@ func TestProduceSetRequestBuilding(t *testing.T) {
 		t.Error("Wrong number of topics in request")
 	}
 }
+
+func TestProduceSetCompressedRequestBuilding(t *testing.T) {
+	parent, ps := makeProduceSet()
+	parent.conf.Producer.RequiredAcks = WaitForAll
+	parent.conf.Producer.Timeout = 10 * time.Second
+	parent.conf.Producer.Compression = CompressionGZIP
+	parent.conf.Version = V0_10_0_0
+
+	msg := &ProducerMessage{
+		Topic:     "t1",
+		Partition: 0,
+		Key:       StringEncoder(TestMessage),
+		Value:     StringEncoder(TestMessage),
+		Timestamp: time.Now(),
+	}
+	for i := 0; i < 10; i++ {
+		safeAddMessage(t, ps, msg)
+	}
+
+	req := ps.buildRequest()
+
+	if req.Version != 2 {
+		t.Error("Wrong request version")
+	}
+
+	for _, msgBlock := range req.msgSets["t1"][0].Messages {
+		msg := msgBlock.Msg
+		err := msg.decodeSet()
+		if err != nil {
+			t.Error("Failed to decode set from payload")
+		}
+		for _, compMsgBlock := range msg.Set.Messages {
+			compMsg := compMsgBlock.Msg
+			if compMsg.Version != 1 {
+				t.Error("Wrong compressed message version")
+			}
+		}
+		if msg.Version != 1 {
+			t.Error("Wrong compressed parent message version")
+		}
+	}
+}
