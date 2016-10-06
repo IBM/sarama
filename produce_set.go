@@ -53,8 +53,12 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 
 	set.msgs = append(set.msgs, msg)
 	msgToSend := &Message{Codec: CompressionNone, Key: key, Value: val}
-	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) && !msg.Timestamp.IsZero() {
-		msgToSend.Timestamp = msg.Timestamp
+	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
+		if msg.Timestamp.IsZero() {
+			msgToSend.Timestamp = time.Now()
+		} else {
+			msgToSend.Timestamp = msg.Timestamp
+		}
 		msgToSend.Version = 1
 	}
 	set.setToSend.addMessage(msgToSend)
@@ -96,21 +100,8 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					Value: payload,
 				}
 				if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
-					// Compressed messages must use a protocol version
-					// that is newer than the inner messages version.
-					// Due to a lack of better timestamp notation copy the oldest
-					// (earliest) timestamp to message.
-					for _, msgBlock := range set.setToSend.Messages {
-						msg := msgBlock.Msg
-						if msg.Version > compMsg.Version {
-							compMsg.Version = msg.Version
-						}
-						if !msg.Timestamp.IsZero() &&
-							(compMsg.Timestamp.IsZero() ||
-								compMsg.Timestamp.After(msg.Timestamp)) {
-							compMsg.Timestamp = msg.Timestamp
-						}
-					}
+					compMsg.Version = 1
+					compMsg.Timestamp = time.Now()
 				}
 				req.AddMessage(topic, partition, compMsg)
 			}
