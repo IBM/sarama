@@ -101,7 +101,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				}
 				if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 					compMsg.Version = 1
-					compMsg.Timestamp = time.Now()
+					compMsg.Timestamp = set.setToSend.Messages[0].Msg.Timestamp
 				}
 				req.AddMessage(topic, partition, compMsg)
 			}
