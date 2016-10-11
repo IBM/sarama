@@ -300,7 +300,7 @@ func (p *asyncProducer) newTopicProducer(topic string) chan<- *ProducerMessage {
 
 func (tp *topicProducer) dispatch() {
 	for msg := range tp.input {
-		if msg.retries == 0 {
+		if msg.retries == 0 || (msg.flags == 0 && !tp.partitioner.RequiresConsistency()) {
 			if err := tp.partitionMessage(msg); err != nil {
 				tp.parent.returnError(msg, err)
 				continue
