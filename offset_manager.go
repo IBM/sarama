@@ -398,10 +398,12 @@ type brokerOffsetManager struct {
 	updateSubscriptions chan *partitionOffsetManager
 	subscriptions       map[*partitionOffsetManager]none
 	refs                int
+	autoCommit          bool
 }
 
 func (om *offsetManager) newBrokerOffsetManager(broker *Broker) *brokerOffsetManager {
 	bom := &brokerOffsetManager{
+		autoCommit:          om.conf.Group.AutoCommit,
 		parent:              om,
 		broker:              broker,
 		timer:               time.NewTicker(om.conf.Consumer.Offsets.CommitInterval),
@@ -418,7 +420,7 @@ func (bom *brokerOffsetManager) mainLoop() {
 	for {
 		select {
 		case <-bom.timer.C:
-			if len(bom.subscriptions) > 0 {
+			if len(bom.subscriptions) > 0 && bom.autoCommit {
 				bom.flushToBroker()
 			}
 		case s, ok := <-bom.updateSubscriptions:

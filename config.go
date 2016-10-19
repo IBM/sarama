@@ -296,6 +296,7 @@ func NewConfig() *Config {
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 
+	c.Group.AutoCommit = true
 	c.Group.PartitionStrategy = StrategyRange
 	c.Group.Offsets.Retry.Max = 3
 

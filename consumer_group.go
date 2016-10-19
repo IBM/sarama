@@ -34,6 +34,9 @@ type ConsumerGroup interface {
 	// mark a topic/partition/offset combination as ready to commit
 	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
+	// commit marked offsets - only needed if auto commit is disabeled
+	Commit()
+
 	// Shutdown the consumer group
 	Close() error
 }
@@ -153,6 +156,11 @@ func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64,
 	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
 		mp.pom.MarkOffset(offset+1, metadata)
 	}
+}
+
+// commits marked offsets
+func (cg *consumerGroup) Commit() {
+	cg.om.Commit()
 }
 
 func (cg *consumerGroup) log(f string, a ...interface{}) {
