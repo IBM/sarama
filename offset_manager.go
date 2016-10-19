@@ -60,7 +60,7 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 		return nil, err
 	}
 
-	Logger.Printf("client/offsetManager inital offsets group=%s topic=%s partition=%d offset=%s\n", om.group, topic, partition, pom.offset)
+	Logger.Printf("client/offsetManager inital offsets group=%s topic=%s partition=%d offset=%d\n", om.group, topic, partition, pom.offset)
 
 	om.lock.Lock()
 	defer om.lock.Unlock()
