@@ -3,6 +3,7 @@ package sarama
 import (
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -42,6 +43,8 @@ type ConsumerGroup interface {
 }
 
 type consumerGroup struct {
+	sync.RWMutex
+
 	client     Client
 	ownsClient bool
 
@@ -153,9 +156,11 @@ func (cg *consumerGroup) MarkMessage(msg *ConsumerMessage, metadata string) {
 }
 
 func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64, metadata string) {
+	cg.RLock()
 	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
 		mp.pom.MarkOffset(offset+1, metadata)
 	}
+	cg.RUnlock()
 }
 
 // commits marked offsets
@@ -248,11 +253,13 @@ func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
 
 	go fwder.forwardTo(cg.messages, cg.errors)
 
+	cg.Lock()
 	cg.managed[TopicPartition{topic, partition}] = &managedPartition{
 		fwd: fwder,
 		pc:  pc,
 		pom: pom,
 	}
+	cg.Unlock()
 
 	return nil
 }
@@ -264,9 +271,11 @@ func (cg *consumerGroup) mainLoop() {
 		var notification *Notification
 		if cg.client.Config().Group.Return.Notifications {
 			m := make(map[string][]int32)
+			cg.RLock()
 			for tp := range cg.managed {
 				m[tp.Topic] = append(m[tp.Topic], tp.Partition)
 			}
+			cg.RUnlock()
 			notification = newNotification(m)
 		}
 
@@ -355,6 +364,8 @@ func (cg *consumerGroup) handleError(err error) {
 
 // Releases the consumer and commits offsets, called from rebalance() and Close()
 func (cg *consumerGroup) release() (err error) {
+	cg.Lock()
+	defer cg.Unlock()
 	if len(cg.managed) > 0 {
 		cg.log("release subscriptions n=%d", len(cg.managed))
 	} else {
