@@ -7,3 +7,7 @@ In these examples, we use `github.com/Shopify/sarama` as import path. We do this
 #### HTTP server
 
 [http_server](./http_server) is a simple HTTP server uses both the sync producer to produce data as part of the request handling cycle, as well as the async producer to maintain an access log. It also uses the [mocks subpackage](https://godoc.org/github.com/Shopify/sarama/mocks) to test both.
+
+#### Console Consumer
+
+[console_consumer](./console_consumer) is a simple consumer that displays messages to the console. It shows how to use the [Consumer](https://godoc.org/github.com/Shopify/sarama#Config) properties and interface based testing.
