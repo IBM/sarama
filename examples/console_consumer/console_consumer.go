@@ -115,9 +115,9 @@ func parseBrokerList(brokersTogether string) []string {
 func parseOffset(offset string) (int64, error) {
 	switch offset {
 	case offsetLatest:
-		return sarama.OffsetOldest, nil
-	case offsetEarliest:
 		return sarama.OffsetNewest, nil
+	case offsetEarliest:
+		return sarama.OffsetOldest, nil
 	default:
 		return strconv.ParseInt(offset, 10, 64)
 	}
