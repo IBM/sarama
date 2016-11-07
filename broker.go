@@ -118,11 +118,6 @@ func (b *Broker) Open(conf *Config) error {
 		}
 
 		if conf.Net.SASL.Enable {
-			b.connErr = b.sendAndReceiveSASLPlainHandshake()
-			if b.connErr != nil {
-				Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
-				return
-			}
 			b.connErr = b.sendAndReceiveSASLPlainAuth()
 			if b.connErr != nil {
 				err = b.conn.Close()
@@ -563,7 +558,6 @@ func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 	}
 	Logger.Print("Successful SASL handshake")
 	return nil
-
 }
 
 // Kafka 0.10.0 plans to support SASL Plain and Kerberos as per PR #812 (KIP-43)/(JIRA KAFKA-3149)
@@ -585,7 +579,6 @@ func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 // When credentials are invalid, Kafka closes the connection. This does not seem to be the ideal way
 // of responding to bad credentials but thats how its being done today.
 func (b *Broker) sendAndReceiveSASLPlainAuth() error {
-
 	handshakeErr := b.sendAndReceiveSASLPlainHandshake()
 	if handshakeErr != nil {
 		Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
