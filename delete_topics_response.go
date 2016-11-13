@@ -1,10 +1,10 @@
 package sarama
 
-type CreateTopicsResponse struct {
+type DeleteTopicsResponse struct {
 	TopicErrorCodes []*TopicErrorCode
 }
 
-func (c *CreateTopicsResponse) encode(e packetEncoder) error {
+func (c *DeleteTopicsResponse) encode(e packetEncoder) error {
 	if err := e.putArrayLength(len(c.TopicErrorCodes)); err != nil {
 		return err
 	}
@@ -17,7 +17,7 @@ func (c *CreateTopicsResponse) encode(e packetEncoder) error {
 	return nil
 }
 
-func (c *CreateTopicsResponse) decode(d packetDecoder, version int16) error {
+func (c *DeleteTopicsResponse) decode(d packetDecoder, version int16) error {
 	topicCount, err := d.getArrayLength()
 	if err != nil {
 		return err
