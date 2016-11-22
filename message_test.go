@@ -41,6 +41,20 @@ var (
 		0x1f, 0x8b, // Gzip Magic
 		0x08, // deflate compressed
 		0, 0, 0, 0, 0, 0, 0, 99, 96, 128, 3, 190, 202, 112, 143, 7, 12, 12, 255, 129, 0, 33, 200, 192, 136, 41, 3, 0, 199, 226, 155, 70, 52, 0, 0, 0}
+
+	emptyBulkLZ4Message = []byte{
+		246, 12, 188, 129, // CRC
+		0x01,                                  // Version
+		0x03,                                  // attribute flags (LZ4)
+		255, 255, 249, 209, 212, 181, 73, 201, // timestamp
+		0xFF, 0xFF, 0xFF, 0xFF, // key
+		0x00, 0x00, 0x00, 0x47, // len
+		0x04, 0x22, 0x4D, 0x18, // magic number lz4
+		100, // lz4 flags 01100100
+		// version: 01, block indep: 1, block checksum: 0, content size: 0, content checksum: 1, reserved: 00
+		112, 185, 52, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 14, 121, 87, 72, 224, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 14, 121, 87, 72, 224, 0, 0, 255, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,
+		71, 129, 23, 111, // LZ4 checksum
+	}
 )
 
 func TestMessageEncoding(t *testing.T) {
@@ -101,6 +115,22 @@ func TestMessageDecodingBulkGzip(t *testing.T) {
 	testDecodable(t, "bulk gzip", &message, emptyBulkGzipMessage)
 	if message.Codec != CompressionGZIP {
 		t.Errorf("Decoding produced codec %d, but expected %d.", message.Codec, CompressionGZIP)
+	}
+	if message.Key != nil {
+		t.Errorf("Decoding produced key %+v, but none was expected.", message.Key)
+	}
+	if message.Set == nil {
+		t.Error("Decoding produced no set, but one was expected.")
+	} else if len(message.Set.Messages) != 2 {
+		t.Errorf("Decoding produced a set with %d messages, but 2 were expected.", len(message.Set.Messages))
+	}
+}
+
+func TestMessageDecodingBulkLZ4(t *testing.T) {
+	message := Message{}
+	testDecodable(t, "bulk lz4", &message, emptyBulkLZ4Message)
+	if message.Codec != CompressionLZ4 {
+		t.Errorf("Decoding produced codec %d, but expected %d.", message.Codec, CompressionLZ4)
 	}
 	if message.Key != nil {
 		t.Errorf("Decoding produced key %+v, but none was expected.", message.Key)
