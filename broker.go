@@ -526,7 +526,7 @@ func (b *Broker) responseReceiver() {
 func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 	rb := &SaslHandshakeRequest{"PLAIN"}
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
-	buf, err := encode(req)
+	buf, err := encode(req, b.conf.MetricRegistry)
 	if err != nil {
 		return err
 	}
@@ -536,6 +536,7 @@ func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 		return err
 	}
 
+	requestTime := time.Now()
 	bytes, err := b.conn.Write(buf)
 	b.updateOutgoingCommunicationMetrics(bytes)
 	if err != nil {
@@ -545,16 +546,19 @@ func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 	b.correlationID++
 	//wait for the response
 	header := make([]byte, 8) // response header
-	n, err := io.ReadFull(b.conn, header)
-	b.updateIncomingCommunicationMetrics(n)
+	_, err = io.ReadFull(b.conn, header)
+	if err != nil {
+		Logger.Printf("Failed to read SASL handshake header : %s\n", err.Error())
+		return err
+	}
 	length := binary.BigEndian.Uint32(header[:4])
 	payload := make([]byte, length-4)
-	n, err = io.ReadFull(b.conn, payload)
+	n, err := io.ReadFull(b.conn, payload)
 	if err != nil {
 		Logger.Printf("Failed to read SASL handshake payload : %s\n", err.Error())
 		return err
 	}
-	b.updateIncomingCommunicationMetrics(n)
+	b.updateIncomingCommunicationMetrics(n+8, time.Since(requestTime))
 	res := &SaslHandshakeResponse{}
 	err = versionedDecode(payload, res, 0)
 	if err != nil {
@@ -588,10 +592,12 @@ func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 // When credentials are invalid, Kafka closes the connection. This does not seem to be the ideal way
 // of responding to bad credentials but thats how its being done today.
 func (b *Broker) sendAndReceiveSASLPlainAuth() error {
-	handshakeErr := b.sendAndReceiveSASLPlainHandshake()
-	if handshakeErr != nil {
-		Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
-		return handshakeErr
+	if b.conf.Net.SASL.Handshake {
+		handshakeErr := b.sendAndReceiveSASLPlainHandshake()
+		if handshakeErr != nil {
+			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+			return handshakeErr
+		}
 	}
 	length := 1 + len(b.conf.Net.SASL.User) + 1 + len(b.conf.Net.SASL.Password)
 	authBytes := make([]byte, length+4) //4 byte length header + auth data

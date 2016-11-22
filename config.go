@@ -43,6 +43,10 @@ type Config struct {
 			// Whether or not to use SASL authentication when connecting to the broker
 			// (defaults to false).
 			Enable bool
+			// Whether or not to send the Kafka SASL handshake first if enabled
+			// (defaults to true). You should only set this to false if you're using
+			// a non-Kafka SASL proxy.
+			Handshake bool
 			//username and password for SASL/PLAIN authentication
 			User     string
 			Password string
@@ -251,6 +255,7 @@ func NewConfig() *Config {
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
+	c.Net.SASL.Handshake = true
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
