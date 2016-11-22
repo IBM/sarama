@@ -1,6 +1,9 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 var (
 	emptyMessage = []byte{
@@ -20,6 +23,19 @@ var (
 		0x1f, 0x8b,
 		0x08,
 		0, 0, 9, 110, 136, 0, 255, 1, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0}
+
+	emptyLZ4Message = []byte{
+		132, 219, 238, 101, // CRC
+		0x01,                          // version byte
+		0x03,                          // attribute flags: lz4
+		0, 0, 1, 88, 141, 205, 89, 56, // timestamp
+		0xFF, 0xFF, 0xFF, 0xFF, // key
+		0x00, 0x00, 0x00, 0x0f, // len
+		0x04, 0x22, 0x4D, 0x18, // LZ4 magic number
+		100,                  // LZ4 flags: version 01, block indepedant, content checksum
+		112, 185, 0, 0, 0, 0, // LZ4 data
+		5, 93, 204, 2, // LZ4 checksum
+	}
 
 	emptyBulkSnappyMessage = []byte{
 		180, 47, 53, 209, //CRC
@@ -64,6 +80,12 @@ func TestMessageEncoding(t *testing.T) {
 	message.Value = []byte{}
 	message.Codec = CompressionGZIP
 	testEncodable(t, "empty gzip", &message, emptyGzipMessage)
+
+	message.Value = []byte{}
+	message.Codec = CompressionLZ4
+	message.Timestamp = time.Unix(1479847795, 0)
+	message.Version = 1
+	testEncodable(t, "empty lz4", &message, emptyLZ4Message)
 }
 
 func TestMessageDecoding(t *testing.T) {
