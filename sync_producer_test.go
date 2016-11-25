@@ -69,6 +69,7 @@ func TestSyncProducerBatch(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 3
+	config.Producer.Return.Successes = true
 	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -116,6 +117,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 
 	config := NewConfig()
 	config.Producer.Flush.Messages = 100
+	config.Producer.Return.Successes = true
 	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -155,6 +157,7 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 	config := NewConfig()
 	config.Metadata.Retry.Max = 0
 	config.Producer.Retry.Max = 0
+	config.Producer.Return.Successes = true
 
 	producer, err := NewSyncProducer([]string{broker.Addr()}, config)
 	if err != nil {
