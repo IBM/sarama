@@ -14,7 +14,9 @@ const (
 	NoResponse RequiredAcks = 0
 	// WaitForLocal waits for only the local commit to succeed before responding.
 	WaitForLocal RequiredAcks = 1
-	// WaitForAll waits for all replicas to commit before responding.
+	// WaitForAll waits for all in-sync replicas to commit before responding.
+	// The minimum number of in-sync replicas is configured on the broker via
+	// the `min.insync.replicas` configuration key.
 	WaitForAll RequiredAcks = -1
 )
 
