@@ -566,7 +566,7 @@ func (b *Broker) sendAndReceiveSASLPlainHandshake() error {
 		return err
 	}
 	if res.Err != ErrNoError {
-		Logger.Printf("Invalid SASL Mechanism : %s\n", err.Error())
+		Logger.Printf("Invalid SASL Mechanism : %s\n", res.Err.Error())
 		return res.Err
 	}
 	Logger.Print("Successful SASL handshake")
