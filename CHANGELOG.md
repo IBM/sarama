@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.11.0 (unreleased)
+#### Version 1.11.0 (2016-12-20)
 
 New Features:
  - Metrics! Thanks to Sébastien Launay for all his work on this feature
