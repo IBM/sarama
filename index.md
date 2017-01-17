@@ -11,7 +11,7 @@ API documentation and examples are available via [godoc](https://godoc.org/githu
 Sarama provides a "2 releases + 2 months" compatibility guarantee: we support
 the two latest stable releases of Kafka and Go, and we provide a two month
 grace period for older releases. This means we currently officially support
-Go 1.4 and 1.5, and Kafka 0.8.1 and 0.8.2, although older releases are still
+Go 1.7 and 1.6, and Kafka 0.10.0 and 0.9.0, although older releases are still
 likely to work.
 
 Sarama follows semantic versioning and provides API stability via the gopkg.in service.
