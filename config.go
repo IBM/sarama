@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"regexp"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 const defaultClientID = "sarama"
@@ -41,6 +43,10 @@ type Config struct {
 			// Whether or not to use SASL authentication when connecting to the broker
 			// (defaults to false).
 			Enable bool
+			// Whether or not to send the Kafka SASL handshake first if enabled
+			// (defaults to true). You should only set this to false if you're using
+			// a non-Kafka SASL proxy.
+			Handshake bool
 			//username and password for SASL/PLAIN authentication
 			User     string
 			Password string
@@ -264,6 +270,12 @@ type Config struct {
 	// latest features. Setting it to a version greater than you are actually
 	// running may lead to random breakage.
 	Version KafkaVersion
+	// The registry to define metrics into.
+	// Defaults to a local registry.
+	// If you want to disable metrics gathering, set "metrics.UseNilMetrics" to "true"
+	// prior to starting Sarama.
+	// See Examples on how to use the metrics registry
+	MetricRegistry metrics.Registry
 }
 
 // NewConfig returns a new configuration instance with sane defaults.
@@ -274,6 +286,7 @@ func NewConfig() *Config {
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
+	c.Net.SASL.Handshake = true
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
@@ -309,6 +322,7 @@ func NewConfig() *Config {
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
 	c.Version = minVersion
+	c.MetricRegistry = metrics.NewRegistry()
 
 	return c
 }
@@ -405,6 +419,10 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Max must be >= 0")
 	case c.Producer.Retry.Backoff < 0:
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
+	}
+
+	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
+		return ConfigurationError("lz4 compression requires Version >= V0_10_0_0")
 	}
 
 	// validate the Consumer values

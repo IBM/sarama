@@ -138,7 +138,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 	switch err {
 	case nil:
 		break
-	case ErrLeaderNotAvailable, ErrReplicaNotAvailable:
+	case ErrLeaderNotAvailable, ErrReplicaNotAvailable, ErrTopicAuthorizationFailed, ErrClusterAuthorizationFailed:
 		// indicates that maybe part of the cluster is down, but is not fatal to creating the client
 		Logger.Println(err)
 	default:
@@ -521,6 +521,9 @@ func (client *client) getOffset(topic string, partitionID int32, time int64) (in
 	}
 
 	request := &OffsetRequest{}
+	if client.conf.Version.IsAtLeast(V0_10_1_0) {
+		request.Version = 1
+	}
 	request.AddBlock(topic, partitionID, time, 1)
 
 	response, err := broker.GetAvailableOffsets(request)

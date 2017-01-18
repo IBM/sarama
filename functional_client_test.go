@@ -78,7 +78,7 @@ func TestFuncClientCoordinator(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		broker, err := client.Coordinator(fmt.Sprintf("another_new_consumer_group_%d", i))
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 
 		if connected, err := broker.Connected(); !connected || err != nil {

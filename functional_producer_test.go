@@ -2,9 +2,13 @@ package sarama
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
+
+	toxiproxy "github.com/Shopify/toxiproxy/client"
+	"github.com/rcrowley/go-metrics"
 )
 
 const TestBatchSize = 1000
@@ -96,6 +100,13 @@ func testProducingMessages(t *testing.T, config *Config) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
+	// Configure some latency in order to properly validate the request latency metric
+	for _, proxy := range Proxies {
+		if _, err := proxy.AddToxic("", "latency", "", 1, toxiproxy.Attributes{"latency": 10}); err != nil {
+			t.Fatal("Unable to configure latency toxicity", err)
+		}
+	}
+
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
 
@@ -104,11 +115,8 @@ func testProducingMessages(t *testing.T, config *Config) {
 		t.Fatal(err)
 	}
 
-	master, err := NewConsumerFromClient(client)
-	if err != nil {
-		t.Fatal(err)
-	}
-	consumer, err := master.ConsumePartition("test.1", 0, OffsetNewest)
+	// Keep in mind the current offset
+	initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,6 +148,18 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, producer)
 
+	// Validate producer metrics before using the consumer minus the offset request
+	validateMetrics(t, client)
+
+	master, err := NewConsumerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer, err := master.ConsumePartition("test.1", 0, initialOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	for i := 1; i <= TestBatchSize; i++ {
 		select {
 		case <-time.After(10 * time.Second):
@@ -157,6 +177,95 @@ func testProducingMessages(t *testing.T, config *Config) {
 	}
 	safeClose(t, consumer)
 	safeClose(t, client)
+}
+
+func validateMetrics(t *testing.T, client Client) {
+	// Get the broker used by test1 topic
+	var broker *Broker
+	if partitions, err := client.Partitions("test.1"); err != nil {
+		t.Error(err)
+	} else {
+		for _, partition := range partitions {
+			if b, err := client.Leader("test.1", partition); err != nil {
+				t.Error(err)
+			} else {
+				if broker != nil && b != broker {
+					t.Fatal("Expected only one broker, got at least 2")
+				}
+				broker = b
+			}
+		}
+	}
+
+	metricValidators := newMetricValidators()
+	noResponse := client.Config().Producer.RequiredAcks == NoResponse
+	compressionEnabled := client.Config().Producer.Compression != CompressionNone
+
+	// We are adding 10ms of latency to all requests with toxiproxy
+	minRequestLatencyInMs := 10
+	if noResponse {
+		// but when we do not wait for a response it can be less than 1ms
+		minRequestLatencyInMs = 0
+	}
+
+	// We read at least 1 byte from the broker
+	metricValidators.registerForAllBrokers(broker, minCountMeterValidator("incoming-byte-rate", 1))
+	// in at least 3 global requests (1 for metadata request, 1 for offset request and N for produce request)
+	metricValidators.register(minCountMeterValidator("request-rate", 3))
+	metricValidators.register(minCountHistogramValidator("request-size", 3))
+	metricValidators.register(minValHistogramValidator("request-size", 1))
+	metricValidators.register(minValHistogramValidator("request-latency-in-ms", minRequestLatencyInMs))
+	// and at least 2 requests to the registered broker (offset + produces)
+	metricValidators.registerForBroker(broker, minCountMeterValidator("request-rate", 2))
+	metricValidators.registerForBroker(broker, minCountHistogramValidator("request-size", 2))
+	metricValidators.registerForBroker(broker, minValHistogramValidator("request-size", 1))
+	metricValidators.registerForBroker(broker, minValHistogramValidator("request-latency-in-ms", minRequestLatencyInMs))
+
+	// We send at least 1 batch
+	metricValidators.registerForGlobalAndTopic("test_1", minCountHistogramValidator("batch-size", 1))
+	metricValidators.registerForGlobalAndTopic("test_1", minValHistogramValidator("batch-size", 1))
+	if compressionEnabled {
+		// We record compression ratios between [0.50,-10.00] (50-1000 with a histogram) for at least one "fake" record
+		metricValidators.registerForGlobalAndTopic("test_1", minCountHistogramValidator("compression-ratio", 1))
+		metricValidators.registerForGlobalAndTopic("test_1", minValHistogramValidator("compression-ratio", 50))
+		metricValidators.registerForGlobalAndTopic("test_1", maxValHistogramValidator("compression-ratio", 1000))
+	} else {
+		// We record compression ratios of 1.00 (100 with a histogram) for every TestBatchSize record
+		metricValidators.registerForGlobalAndTopic("test_1", countHistogramValidator("compression-ratio", TestBatchSize))
+		metricValidators.registerForGlobalAndTopic("test_1", minValHistogramValidator("compression-ratio", 100))
+		metricValidators.registerForGlobalAndTopic("test_1", maxValHistogramValidator("compression-ratio", 100))
+	}
+
+	// We send exactly TestBatchSize messages
+	metricValidators.registerForGlobalAndTopic("test_1", countMeterValidator("record-send-rate", TestBatchSize))
+	// We send at least one record per request
+	metricValidators.registerForGlobalAndTopic("test_1", minCountHistogramValidator("records-per-request", 1))
+	metricValidators.registerForGlobalAndTopic("test_1", minValHistogramValidator("records-per-request", 1))
+
+	// We receive at least 1 byte from the broker
+	metricValidators.registerForAllBrokers(broker, minCountMeterValidator("outgoing-byte-rate", 1))
+	if noResponse {
+		// in exactly 2 global responses (metadata + offset)
+		metricValidators.register(countMeterValidator("response-rate", 2))
+		metricValidators.register(minCountHistogramValidator("response-size", 2))
+		metricValidators.register(minValHistogramValidator("response-size", 1))
+		// and exactly 1 offset response for the registered broker
+		metricValidators.registerForBroker(broker, countMeterValidator("response-rate", 1))
+		metricValidators.registerForBroker(broker, minCountHistogramValidator("response-size", 1))
+		metricValidators.registerForBroker(broker, minValHistogramValidator("response-size", 1))
+	} else {
+		// in at least 3 global responses (metadata + offset + produces)
+		metricValidators.register(minCountMeterValidator("response-rate", 3))
+		metricValidators.register(minCountHistogramValidator("response-size", 3))
+		metricValidators.register(minValHistogramValidator("response-size", 1))
+		// and at least 2 for the registered broker
+		metricValidators.registerForBroker(broker, minCountMeterValidator("response-rate", 2))
+		metricValidators.registerForBroker(broker, minCountHistogramValidator("response-size", 2))
+		metricValidators.registerForBroker(broker, minValHistogramValidator("response-size", 1))
+	}
+
+	// Run the validators
+	metricValidators.run(t, client.Config().MetricRegistry)
 }
 
 // Benchmarks
@@ -182,6 +291,17 @@ func BenchmarkProducerMediumSnappy(b *testing.B) {
 func benchmarkProducer(b *testing.B, conf *Config, topic string, value Encoder) {
 	setupFunctionalTest(b)
 	defer teardownFunctionalTest(b)
+
+	metricsDisable := os.Getenv("METRICS_DISABLE")
+	if metricsDisable != "" {
+		previousUseNilMetrics := metrics.UseNilMetrics
+		Logger.Println("Disabling metrics using no-op implementation")
+		metrics.UseNilMetrics = true
+		// Restore previous setting
+		defer func() {
+			metrics.UseNilMetrics = previousUseNilMetrics
+		}()
+	}
 
 	producer, err := NewAsyncProducer(kafkaBrokers, conf)
 	if err != nil {

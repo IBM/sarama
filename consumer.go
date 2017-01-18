@@ -63,6 +63,10 @@ type Consumer interface {
 	// or OffsetOldest
 	ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error)
 
+	// HighWaterMarks returns the current high water marks for each topic and partition.
+	// Consistency between partitions is not guaranteed since high water marks are updated separately.
+	HighWaterMarks() map[string]map[int32]int64
+
 	// Close shuts down the consumer. It must be called after all child
 	// PartitionConsumers have already been closed.
 	Close() error
@@ -161,6 +165,22 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 	child.broker.input <- child
 
 	return child, nil
+}
+
+func (c *consumer) HighWaterMarks() map[string]map[int32]int64 {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	hwms := make(map[string]map[int32]int64)
+	for topic, p := range c.children {
+		hwm := make(map[int32]int64, len(p))
+		for partition, pc := range p {
+			hwm[partition] = pc.HighWaterMarkOffset()
+		}
+		hwms[topic] = hwm
+	}
+
+	return hwms
 }
 
 func (c *consumer) addChild(child *partitionConsumer) error {
@@ -414,17 +434,24 @@ func (child *partitionConsumer) HighWaterMarkOffset() int64 {
 func (child *partitionConsumer) responseFeeder() {
 	var msgs []*ConsumerMessage
 	expiryTimer := time.NewTimer(child.conf.Consumer.MaxProcessingTime)
+	expireTimedOut := false
 
 feederLoop:
 	for response := range child.feeder {
 		msgs, child.responseResult = child.parseResponse(response)
 
 		for i, msg := range msgs {
+			if !expiryTimer.Stop() && !expireTimedOut {
+				// expiryTimer was expired; clear out the waiting msg
+				<-expiryTimer.C
+			}
 			expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime)
+			expireTimedOut = false
 
 			select {
 			case child.messages <- msg:
 			case <-expiryTimer.C:
+				expireTimedOut = true
 				child.responseResult = errTimedOut
 				child.broker.acks.Done()
 				for _, msg = range msgs[i:] {

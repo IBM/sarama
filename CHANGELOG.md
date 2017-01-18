@@ -1,5 +1,47 @@
 # Changelog
 
+#### Version 1.11.0 (2016-12-20)
+
+New Features:
+ - Metrics! Thanks to Sébastien Launay for all his work on this feature
+   ([#701](https://github.com/Shopify/sarama/pull/701),
+    [#746](https://github.com/Shopify/sarama/pull/746),
+    [#766](https://github.com/Shopify/sarama/pull/766)).
+ - Add support for LZ4 compression
+   ([#786](https://github.com/Shopify/sarama/pull/786)).
+ - Add support for ListOffsetRequest v1 and Kafka 0.10.1
+   ([#775](https://github.com/Shopify/sarama/pull/775)).
+ - Added a `HighWaterMarks` method to the Consumer which aggregates the
+   `HighWaterMarkOffset` values of its child topic/partitions
+   ([#769](https://github.com/Shopify/sarama/pull/769)).
+
+Bug Fixes:
+ - Fixed producing when using timestamps, compression and Kafka 0.10
+   ([#759](https://github.com/Shopify/sarama/pull/759)).
+ - Added missing decoder methods to DescribeGroups response
+   ([#756](https://github.com/Shopify/sarama/pull/756)).
+ - Fix producer shutdown when `Return.Errors` is disabled
+   ([#787](https://github.com/Shopify/sarama/pull/787)).
+ - Don't mutate configuration in SyncProducer
+   ([#790](https://github.com/Shopify/sarama/pull/790)).
+ - Fix crash on SASL initialization failure
+   ([#795](https://github.com/Shopify/sarama/pull/795)).
+
+#### Version 1.10.1 (2016-08-30)
+
+Bug Fixes:
+ - Fix the documentation for `HashPartitioner` which was incorrect
+   ([#717](https://github.com/Shopify/sarama/pull/717)).
+ - Permit client creation even when it is limited by ACLs
+   ([#722](https://github.com/Shopify/sarama/pull/722)).
+ - Several fixes to the consumer timer optimization code, regressions introduced
+   in v1.10.0. Go's timers are finicky
+   ([#730](https://github.com/Shopify/sarama/pull/730),
+    [#733](https://github.com/Shopify/sarama/pull/733),
+    [#734](https://github.com/Shopify/sarama/pull/734)).
+ - Handle consuming compressed relative offsets with Kafka 0.10
+   ([#735](https://github.com/Shopify/sarama/pull/735)).
+
 #### Version 1.10.0 (2016-08-02)
 
 _Important:_ As of Sarama 1.10 it is necessary to tell Sarama the version of
