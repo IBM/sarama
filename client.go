@@ -161,7 +161,7 @@ func (client *client) Config() *Config {
 }
 
 func (client *client) Brokers() []*Broker {
-	brokers := make([]*Broker, len(client.brokers))
+	brokers := make([]*Broker, 0)
 	for _, broker := range client.brokers {
 		brokers = append(brokers, broker)
 	}
