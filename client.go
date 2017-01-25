@@ -17,6 +17,9 @@ type Client interface {
 	// altered after it has been created.
 	Config() *Config
 
+	// Brokers returns the current set of active brokers as retrieved from cluster metadata.
+	Brokers() []*Broker
+
 	// Topics returns the set of available topics as retrieved from cluster metadata.
 	Topics() ([]string, error)
 
@@ -155,6 +158,14 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 
 func (client *client) Config() *Config {
 	return client.conf
+}
+
+func (client *client) Brokers() []*Broker {
+	brokers := make([]*Broker, len(client.brokers))
+	for _, broker := range client.brokers {
+		brokers = append(brokers, broker)
+	}
+	return brokers
 }
 
 func (client *client) Close() error {
