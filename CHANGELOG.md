@@ -2,6 +2,11 @@
 
 #### Version 1.11.0 (2016-12-20)
 
+_Important:_ As of Sarama 1.11 it is necessary to set the config value of
+`Producer.Return.Successes` to true in order to use the SyncProducer. Previous
+versions would silently override this value when instantiating a SyncProducer
+which led to unexpected values and data races.
+
 New Features:
  - Metrics! Thanks to Sébastien Launay for all his work on this feature
    ([#701](https://github.com/Shopify/sarama/pull/701),
