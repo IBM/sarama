@@ -27,7 +27,7 @@ A changelog is available [here](CHANGELOG.md).
 
 ### Contributing
 
-* Get started by checking our [contribution guidelines](https://github.com/Shopify/sarama/blob/master/CONTRIBUTING.md).
+* Get started by checking our [contribution guidelines](https://github.com/Shopify/sarama/blob/master/.github/CONTRIBUTING.md).
 * Read the [Sarama wiki](https://github.com/Shopify/sarama/wiki) for more
   technical and design details.
 * The [Kafka Protocol Specification](https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol)
