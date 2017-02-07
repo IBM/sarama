@@ -7,7 +7,7 @@ import (
 )
 
 type protocolBody interface {
-	Encoder
+	encoder
 	versionedDecoder
 	key() int16
 	version() int16

@@ -17,20 +17,20 @@ type TestReporter interface {
 // allows generating a response based on a request body. MockResponses are used
 // to program behavior of MockBroker in tests.
 type MockResponse interface {
-	For(reqBody versionedDecoder) (res Encoder)
+	For(reqBody versionedDecoder) (res encoder)
 }
 
 // MockWrapper is a mock response builder that returns a particular concrete
 // response regardless of the actual request passed to the `For` method.
 type MockWrapper struct {
-	res Encoder
+	res encoder
 }
 
-func (mw *MockWrapper) For(reqBody versionedDecoder) (res Encoder) {
+func (mw *MockWrapper) For(reqBody versionedDecoder) (res encoder) {
 	return mw.res
 }
 
-func NewMockWrapper(res Encoder) *MockWrapper {
+func NewMockWrapper(res encoder) *MockWrapper {
 	return &MockWrapper{res: res}
 }
 
@@ -49,7 +49,7 @@ func NewMockSequence(responses ...interface{}) *MockSequence {
 		switch res := res.(type) {
 		case MockResponse:
 			ms.responses[i] = res
-		case Encoder:
+		case encoder:
 			ms.responses[i] = NewMockWrapper(res)
 		default:
 			panic(fmt.Sprintf("Unexpected response type: %T", res))
@@ -58,7 +58,7 @@ func NewMockSequence(responses ...interface{}) *MockSequence {
 	return ms
 }
 
-func (mc *MockSequence) For(reqBody versionedDecoder) (res Encoder) {
+func (mc *MockSequence) For(reqBody versionedDecoder) (res encoder) {
 	res = mc.responses[0].For(reqBody)
 	if len(mc.responses) > 1 {
 		mc.responses = mc.responses[1:]
@@ -96,7 +96,7 @@ func (mmr *MockMetadataResponse) SetBroker(addr string, brokerID int32) *MockMet
 	return mmr
 }
 
-func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) Encoder {
+func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoder {
 	metadataRequest := reqBody.(*MetadataRequest)
 	metadataResponse := &MetadataResponse{}
 	for addr, brokerID := range mmr.brokers {
@@ -146,7 +146,7 @@ func (mor *MockOffsetResponse) SetOffset(topic string, partition int32, time, of
 	return mor
 }
 
-func (mor *MockOffsetResponse) For(reqBody versionedDecoder) Encoder {
+func (mor *MockOffsetResponse) For(reqBody versionedDecoder) encoder {
 	offsetRequest := reqBody.(*OffsetRequest)
 	offsetResponse := &OffsetResponse{}
 	for topic, partitions := range offsetRequest.blocks {
@@ -216,7 +216,7 @@ func (mfr *MockFetchResponse) SetHighWaterMark(topic string, partition int32, of
 	return mfr
 }
 
-func (mfr *MockFetchResponse) For(reqBody versionedDecoder) Encoder {
+func (mfr *MockFetchResponse) For(reqBody versionedDecoder) encoder {
 	fetchRequest := reqBody.(*FetchRequest)
 	res := &FetchResponse{}
 	for topic, partitions := range fetchRequest.blocks {
@@ -298,7 +298,7 @@ func (mr *MockConsumerMetadataResponse) SetError(group string, kerror KError) *M
 	return mr
 }
 
-func (mr *MockConsumerMetadataResponse) For(reqBody versionedDecoder) Encoder {
+func (mr *MockConsumerMetadataResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*ConsumerMetadataRequest)
 	group := req.ConsumerGroup
 	res := &ConsumerMetadataResponse{}
@@ -340,7 +340,7 @@ func (mr *MockOffsetCommitResponse) SetError(group, topic string, partition int3
 	return mr
 }
 
-func (mr *MockOffsetCommitResponse) For(reqBody versionedDecoder) Encoder {
+func (mr *MockOffsetCommitResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*OffsetCommitRequest)
 	group := req.ConsumerGroup
 	res := &OffsetCommitResponse{}
@@ -391,7 +391,7 @@ func (mr *MockProduceResponse) SetError(topic string, partition int32, kerror KE
 	return mr
 }
 
-func (mr *MockProduceResponse) For(reqBody versionedDecoder) Encoder {
+func (mr *MockProduceResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*ProduceRequest)
 	res := &ProduceResponse{}
 	for topic, partitions := range req.msgSets {
@@ -442,7 +442,7 @@ func (mr *MockOffsetFetchResponse) SetOffset(group, topic string, partition int3
 	return mr
 }
 
-func (mr *MockOffsetFetchResponse) For(reqBody versionedDecoder) Encoder {
+func (mr *MockOffsetFetchResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*OffsetFetchRequest)
 	group := req.ConsumerGroup
 	res := &OffsetFetchResponse{}

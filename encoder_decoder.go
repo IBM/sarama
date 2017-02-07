@@ -8,12 +8,12 @@ import (
 
 // Encoder is the interface that wraps the basic Encode method.
 // Anything implementing Encoder can be turned into bytes using Kafka's encoding rules.
-type Encoder interface {
+type encoder interface {
 	encode(pe packetEncoder) error
 }
 
 // Encode takes an Encoder and turns it into bytes while potentially recording metrics.
-func encode(e Encoder, metricRegistry metrics.Registry) ([]byte, error) {
+func encode(e encoder, metricRegistry metrics.Registry) ([]byte, error) {
 	if e == nil {
 		return nil, nil
 	}

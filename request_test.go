@@ -26,7 +26,7 @@ func (s *testRequestBody) encode(pe packetEncoder) error {
 // not specific to request tests, just helper functions for testing structures that
 // implement the encoder or decoder interfaces that needed somewhere to live
 
-func testEncodable(t *testing.T, name string, in Encoder, expect []byte) {
+func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
 	packet, err := encode(in, nil)
 	if err != nil {
 		t.Error(err)
