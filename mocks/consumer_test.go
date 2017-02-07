@@ -32,35 +32,35 @@ func TestConsumerHandlesExpectations(t *testing.T) {
 	consumer.ExpectConsumePartition("test", 1, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world again")})
 	consumer.ExpectConsumePartition("other", 0, AnyOffset).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello other")})
 
-	pc_test0, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	pcTest0, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	test0_msg := <-pc_test0.Messages()
-	if test0_msg.Topic != "test" || test0_msg.Partition != 0 || string(test0_msg.Value) != "hello world" {
-		t.Error("Message was not as expected:", test0_msg)
+	test0Msg := <-pcTest0.Messages()
+	if test0Msg.Topic != "test" || test0Msg.Partition != 0 || string(test0Msg.Value) != "hello world" {
+		t.Error("Message was not as expected:", test0Msg)
 	}
-	test0_err := <-pc_test0.Errors()
-	if test0_err.Err != sarama.ErrOutOfBrokers {
-		t.Error("Expected sarama.ErrOutOfBrokers, found:", test0_err.Err)
+	test0Err := <-pcTest0.Errors()
+	if test0Err.Err != sarama.ErrOutOfBrokers {
+		t.Error("Expected sarama.ErrOutOfBrokers, found:", test0Err.Err)
 	}
 
-	pc_test1, err := consumer.ConsumePartition("test", 1, sarama.OffsetOldest)
+	pcTest1, err := consumer.ConsumePartition("test", 1, sarama.OffsetOldest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	test1_msg := <-pc_test1.Messages()
-	if test1_msg.Topic != "test" || test1_msg.Partition != 1 || string(test1_msg.Value) != "hello world again" {
-		t.Error("Message was not as expected:", test1_msg)
+	test1Msg := <-pcTest1.Messages()
+	if test1Msg.Topic != "test" || test1Msg.Partition != 1 || string(test1Msg.Value) != "hello world again" {
+		t.Error("Message was not as expected:", test1Msg)
 	}
 
-	pc_other0, err := consumer.ConsumePartition("other", 0, sarama.OffsetNewest)
+	pcOther0, err := consumer.ConsumePartition("other", 0, sarama.OffsetNewest)
 	if err != nil {
 		t.Fatal(err)
 	}
-	other0_msg := <-pc_other0.Messages()
-	if other0_msg.Topic != "other" || other0_msg.Partition != 0 || string(other0_msg.Value) != "hello other" {
-		t.Error("Message was not as expected:", other0_msg)
+	other0Msg := <-pcOther0.Messages()
+	if other0Msg.Topic != "other" || other0Msg.Partition != 0 || string(other0Msg.Value) != "hello other" {
+		t.Error("Message was not as expected:", other0Msg)
 	}
 }
 
