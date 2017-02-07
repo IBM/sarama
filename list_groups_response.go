@@ -11,8 +11,8 @@ func (r *ListGroupsResponse) encode(pe packetEncoder) error {
 	if err := pe.putArrayLength(len(r.Groups)); err != nil {
 		return err
 	}
-	for groupId, protocolType := range r.Groups {
-		if err := pe.putString(groupId); err != nil {
+	for groupID, protocolType := range r.Groups {
+		if err := pe.putString(groupID); err != nil {
 			return err
 		}
 		if err := pe.putString(protocolType); err != nil {
@@ -24,11 +24,12 @@ func (r *ListGroupsResponse) encode(pe packetEncoder) error {
 }
 
 func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
-	if kerr, err := pd.getInt16(); err != nil {
+	kerr, err := pd.getInt16();
+	if err != nil {
 		return err
-	} else {
-		r.Err = KError(kerr)
 	}
+
+	r.Err = KError(kerr)
 
 	n, err := pd.getArrayLength()
 	if err != nil {
@@ -40,7 +41,7 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 
 	r.Groups = make(map[string]string)
 	for i := 0; i < n; i++ {
-		groupId, err := pd.getString()
+		groupID, err := pd.getString()
 		if err != nil {
 			return err
 		}
@@ -49,7 +50,7 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 			return err
 		}
 
-		r.Groups[groupId] = protocolType
+		r.Groups[groupID] = protocolType
 	}
 
 	return nil

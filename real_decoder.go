@@ -204,11 +204,11 @@ func (rd *realDecoder) getStringArray() ([]string, error) {
 
 	ret := make([]string, n)
 	for i := range ret {
-		if str, err := rd.getString(); err != nil {
+		str, err := rd.getString();
+		if err != nil {
 			return nil, err
-		} else {
-			ret[i] = str
 		}
+		ret[i] = str
 	}
 	return ret, nil
 }

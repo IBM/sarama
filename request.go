@@ -7,7 +7,7 @@ import (
 )
 
 type protocolBody interface {
-	encoder
+	Encoder
 	versionedDecoder
 	key() int16
 	version() int16
@@ -113,7 +113,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 17:
 		return &SaslHandshakeRequest{}
 	case 18:
-		return &ApiVersionsRequest{}
+		return &APIVersionsRequest{}
 	}
 	return nil
 }

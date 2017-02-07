@@ -2,10 +2,10 @@ package sarama
 
 type JoinGroupResponse struct {
 	Err           KError
-	GenerationId  int32
+	GenerationID  int32
 	GroupProtocol string
-	LeaderId      string
-	MemberId      string
+	LeaderID      string
+	MemberID      string
 	Members       map[string][]byte
 }
 
@@ -23,15 +23,15 @@ func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata
 
 func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
-	pe.putInt32(r.GenerationId)
+	pe.putInt32(r.GenerationID)
 
 	if err := pe.putString(r.GroupProtocol); err != nil {
 		return err
 	}
-	if err := pe.putString(r.LeaderId); err != nil {
+	if err := pe.putString(r.LeaderID); err != nil {
 		return err
 	}
-	if err := pe.putString(r.MemberId); err != nil {
+	if err := pe.putString(r.MemberID); err != nil {
 		return err
 	}
 
@@ -39,8 +39,8 @@ func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for memberId, memberMetadata := range r.Members {
-		if err := pe.putString(memberId); err != nil {
+	for memberID, memberMetadata := range r.Members {
+		if err := pe.putString(memberID); err != nil {
 			return err
 		}
 
@@ -53,13 +53,14 @@ func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 }
 
 func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) {
-	if kerr, err := pd.getInt16(); err != nil {
+	kerr, err := pd.getInt16();
+	if err != nil {
 		return err
-	} else {
-		r.Err = KError(kerr)
 	}
 
-	if r.GenerationId, err = pd.getInt32(); err != nil {
+	r.Err = KError(kerr)
+
+	if r.GenerationID, err = pd.getInt32(); err != nil {
 		return
 	}
 
@@ -67,11 +68,11 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 		return
 	}
 
-	if r.LeaderId, err = pd.getString(); err != nil {
+	if r.LeaderID, err = pd.getString(); err != nil {
 		return
 	}
 
-	if r.MemberId, err = pd.getString(); err != nil {
+	if r.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -85,7 +86,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 
 	r.Members = make(map[string][]byte)
 	for i := 0; i < n; i++ {
-		memberId, err := pd.getString()
+		memberID, err := pd.getString()
 		if err != nil {
 			return err
 		}
@@ -95,7 +96,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 			return err
 		}
 
-		r.Members[memberId] = memberMetadata
+		r.Members[memberID] = memberMetadata
 	}
 
 	return nil

@@ -18,7 +18,7 @@ const (
 	expectationTimeout = 500 * time.Millisecond
 )
 
-type requestHandlerFunc func(req *request) (res encoder)
+type requestHandlerFunc func(req *request) (res Encoder)
 
 // RequestNotifierFunc is invoked when a mock broker processes a request successfully
 // and will provides the number of bytes read and written.
@@ -53,7 +53,7 @@ type MockBroker struct {
 	port         int32
 	closing      chan none
 	stopper      chan none
-	expectations chan encoder
+	expectations chan Encoder
 	listener     net.Listener
 	t            TestReporter
 	latency      time.Duration
@@ -66,7 +66,7 @@ type MockBroker struct {
 // RequestResponse represents a Request/Response pair processed by MockBroker.
 type RequestResponse struct {
 	Request  protocolBody
-	Response encoder
+	Response Encoder
 }
 
 // SetLatency makes broker pause for the specified period every time before
@@ -80,7 +80,7 @@ func (b *MockBroker) SetLatency(latency time.Duration) {
 // and uses the found MockResponse instance to generate an appropriate reply.
 // If the request type is not found in the map then nothing is sent.
 func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
-	b.setHandler(func(req *request) (res encoder) {
+	b.setHandler(func(req *request) (res Encoder) {
 		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
 		mockResponse := handlerMap[reqTypeName]
 		if mockResponse == nil {
@@ -249,7 +249,7 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }
 
-func (b *MockBroker) defaultRequestHandler(req *request) (res encoder) {
+func (b *MockBroker) defaultRequestHandler(req *request) (res Encoder) {
 	select {
 	case res, ok := <-b.expectations:
 		if !ok {
@@ -295,7 +295,7 @@ func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker 
 		stopper:      make(chan none),
 		t:            t,
 		brokerID:     brokerID,
-		expectations: make(chan encoder, 512),
+		expectations: make(chan Encoder, 512),
 	}
 	broker.handler = broker.defaultRequestHandler
 
@@ -319,6 +319,6 @@ func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker 
 	return broker
 }
 
-func (b *MockBroker) Returns(e encoder) {
+func (b *MockBroker) Returns(e Encoder) {
 	b.expectations <- e
 }

@@ -608,9 +608,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 			if shouldRetry, err := client.updateMetadata(response); shouldRetry {
 				Logger.Println("client/metadata found some partitions to be leaderless")
 				return retry(err) // note: err can be nil
-			} else {
-				return err
 			}
+
+			return err
 
 		case PacketEncodingError:
 			// didn't even send, return the error

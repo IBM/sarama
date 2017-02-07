@@ -237,7 +237,7 @@ func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
 
 	ocResponse := new(OffsetCommitResponse)
 	ocResponse.AddError("my_topic", 0, ErrNoError)
-	handler := func(req *request) (res encoder) {
+	handler := func(req *request) (res Encoder) {
 		if req.body.version() != 2 {
 			t.Errorf("Expected to be using version 2. Actual: %v", req.body.version())
 		}
