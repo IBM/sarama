@@ -34,7 +34,3 @@ A changelog is available [here](CHANGELOG.md).
   contains a wealth of useful information.
 * For more general issues, there is [a google group](https://groups.google.com/forum/#!forum/kafka-clients) for Kafka client developers.
 * If you have any questions, just ask!
-
-### License
-
-MIT License
