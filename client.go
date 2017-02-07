@@ -136,7 +136,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		client.seedBrokers = append(client.seedBrokers, NewBroker(addrs[index]))
 	}
 
-	// do an initial fetch of all cluster metadata by specifing an empty list of topics
+	// do an initial fetch of all cluster metadata by specifying an empty list of topics
 	err := client.RefreshMetadata()
 	switch err {
 	case nil:
