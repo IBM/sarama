@@ -200,7 +200,7 @@ func (p *asyncProducer) Close() error {
 
 	if p.conf.Producer.Return.Successes {
 		go withRecover(func() {
-			for _ = range p.successes {
+			for range p.successes {
 			}
 		})
 	}
