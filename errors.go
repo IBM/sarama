@@ -96,8 +96,8 @@ const (
 	ErrInvalidRequiredAcks             KError = 21
 	ErrIllegalGeneration               KError = 22
 	ErrInconsistentGroupProtocol       KError = 23
-	ErrInvalidGroupId                  KError = 24
-	ErrUnknownMemberId                 KError = 25
+	ErrInvalidGroupID                  KError = 24
+	ErrUnknownMemberID                 KError = 25
 	ErrInvalidSessionTimeout           KError = 26
 	ErrRebalanceInProgress             KError = 27
 	ErrInvalidCommitOffsetSize         KError = 28
@@ -165,9 +165,9 @@ func (err KError) Error() string {
 		return "kafka server: The provided generation id is not the current generation."
 	case ErrInconsistentGroupProtocol:
 		return "kafka server: The provider group protocol type is incompatible with the other members."
-	case ErrInvalidGroupId:
+	case ErrInvalidGroupID:
 		return "kafka server: The provided group id was empty."
-	case ErrUnknownMemberId:
+	case ErrUnknownMemberID:
 		return "kafka server: The provided member is not known in the current generation."
 	case ErrInvalidSessionTimeout:
 		return "kafka server: The provided session timeout is outside the allowed range."

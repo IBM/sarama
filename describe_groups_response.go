@@ -76,8 +76,8 @@ func (gd *GroupDescription) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for memberId, groupMemberDescription := range gd.Members {
-		if err := pe.putString(memberId); err != nil {
+	for memberID, groupMemberDescription := range gd.Members {
+		if err := pe.putString(memberID); err != nil {
 			return err
 		}
 		if err := groupMemberDescription.encode(pe); err != nil {
@@ -118,13 +118,13 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 
 	gd.Members = make(map[string]*GroupMemberDescription)
 	for i := 0; i < n; i++ {
-		memberId, err := pd.getString()
+		memberID, err := pd.getString()
 		if err != nil {
 			return err
 		}
 
-		gd.Members[memberId] = new(GroupMemberDescription)
-		if err := gd.Members[memberId].decode(pd); err != nil {
+		gd.Members[memberID] = new(GroupMemberDescription)
+		if err := gd.Members[memberID].decode(pd); err != nil {
 			return err
 		}
 	}
