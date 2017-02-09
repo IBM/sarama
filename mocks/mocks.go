@@ -30,9 +30,9 @@ type ErrorReporter interface {
 type ValueChecker func(val []byte) error
 
 var (
-	errProduceSuccess              error = nil
-	errOutOfExpectations                 = errors.New("No more expectations set on mock")
-	errPartitionConsumerNotStarted       = errors.New("The partition consumer was never started")
+	errProduceSuccess              error
+	errOutOfExpectations           = errors.New("No more expectations set on mock")
+	errPartitionConsumerNotStarted = errors.New("The partition consumer was never started")
 )
 
 const AnyOffset int64 = -1000
