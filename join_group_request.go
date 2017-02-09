@@ -1,19 +1,19 @@
 package sarama
 
 type JoinGroupRequest struct {
-	GroupId        string
+	GroupID        string
 	SessionTimeout int32
-	MemberId       string
+	MemberID       string
 	ProtocolType   string
 	GroupProtocols map[string][]byte
 }
 
 func (r *JoinGroupRequest) encode(pe packetEncoder) error {
-	if err := pe.putString(r.GroupId); err != nil {
+	if err := pe.putString(r.GroupID); err != nil {
 		return err
 	}
 	pe.putInt32(r.SessionTimeout)
-	if err := pe.putString(r.MemberId); err != nil {
+	if err := pe.putString(r.MemberID); err != nil {
 		return err
 	}
 	if err := pe.putString(r.ProtocolType); err != nil {
@@ -36,7 +36,7 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 }
 
 func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
-	if r.GroupId, err = pd.getString(); err != nil {
+	if r.GroupID, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -44,7 +44,7 @@ func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 		return
 	}
 
-	if r.MemberId, err = pd.getString(); err != nil {
+	if r.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 
