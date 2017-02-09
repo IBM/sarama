@@ -26,15 +26,15 @@ func TestJoinGroupRequest(t *testing.T) {
 	var request *JoinGroupRequest
 
 	request = new(JoinGroupRequest)
-	request.GroupId = "TestGroup"
+	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
 	request.ProtocolType = "consumer"
 	testRequest(t, "no protocols", request, joinGroupRequestNoProtocols)
 
 	request = new(JoinGroupRequest)
-	request.GroupId = "TestGroup"
+	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
-	request.MemberId = "OneProtocol"
+	request.MemberID = "OneProtocol"
 	request.ProtocolType = "consumer"
 	request.AddGroupProtocol("one", []byte{0x01, 0x02, 0x03})
 	testRequest(t, "one protocol", request, joinGroupRequestOneProtocol)

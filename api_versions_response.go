@@ -1,13 +1,13 @@
 package sarama
 
 type ApiVersionsResponseBlock struct {
-	ApiKey     int16
+	APIKey     int16
 	MinVersion int16
 	MaxVersion int16
 }
 
 func (b *ApiVersionsResponseBlock) encode(pe packetEncoder) error {
-	pe.putInt16(b.ApiKey)
+	pe.putInt16(b.APIKey)
 	pe.putInt16(b.MinVersion)
 	pe.putInt16(b.MaxVersion)
 	return nil
@@ -16,7 +16,7 @@ func (b *ApiVersionsResponseBlock) encode(pe packetEncoder) error {
 func (b *ApiVersionsResponseBlock) decode(pd packetDecoder) error {
 	var err error
 
-	if b.ApiKey, err = pd.getInt16(); err != nil {
+	if b.APIKey, err = pd.getInt16(); err != nil {
 		return err
 	}
 
@@ -33,15 +33,15 @@ func (b *ApiVersionsResponseBlock) decode(pd packetDecoder) error {
 
 type ApiVersionsResponse struct {
 	Err         KError
-	ApiVersions []*ApiVersionsResponseBlock
+	APIVersions []*ApiVersionsResponseBlock
 }
 
 func (r *ApiVersionsResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
-	if err := pe.putArrayLength(len(r.ApiVersions)); err != nil {
+	if err := pe.putArrayLength(len(r.APIVersions)); err != nil {
 		return err
 	}
-	for _, apiVersion := range r.ApiVersions {
+	for _, apiVersion := range r.APIVersions {
 		if err := apiVersion.encode(pe); err != nil {
 			return err
 		}
@@ -61,13 +61,13 @@ func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 
-	r.ApiVersions = make([]*ApiVersionsResponseBlock, numBlocks)
+	r.APIVersions = make([]*ApiVersionsResponseBlock, numBlocks)
 	for i := 0; i < numBlocks; i++ {
 		block := new(ApiVersionsResponseBlock)
 		if err := block.decode(pd); err != nil {
 			return err
 		}
-		r.ApiVersions[i] = block
+		r.APIVersions[i] = block
 	}
 
 	return nil

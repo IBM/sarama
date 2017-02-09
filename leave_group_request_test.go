@@ -13,7 +13,7 @@ func TestLeaveGroupRequest(t *testing.T) {
 	var request *LeaveGroupRequest
 
 	request = new(LeaveGroupRequest)
-	request.GroupId = "foo"
-	request.MemberId = "bar"
+	request.GroupID = "foo"
+	request.MemberID = "bar"
 	testRequest(t, "basic", request, basicLeaveGroupRequest)
 }

@@ -14,8 +14,8 @@ func TestHeartbeatRequest(t *testing.T) {
 	var request *HeartbeatRequest
 
 	request = new(HeartbeatRequest)
-	request.GroupId = "foo"
-	request.GenerationId = 66051
-	request.MemberId = "baz"
+	request.GroupID = "foo"
+	request.GenerationID = 66051
+	request.MemberID = "baz"
 	testRequest(t, "basic", request, basicHeartbeatRequest)
 }

@@ -49,7 +49,7 @@ func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 
 type GroupDescription struct {
 	Err          KError
-	GroupId      string
+	GroupID      string
 	State        string
 	ProtocolType string
 	Protocol     string
@@ -59,7 +59,7 @@ type GroupDescription struct {
 func (gd *GroupDescription) encode(pe packetEncoder) error {
 	pe.putInt16(int16(gd.Err))
 
-	if err := pe.putString(gd.GroupId); err != nil {
+	if err := pe.putString(gd.GroupID); err != nil {
 		return err
 	}
 	if err := pe.putString(gd.State); err != nil {
@@ -95,7 +95,7 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 		gd.Err = KError(kerr)
 	}
 
-	if gd.GroupId, err = pd.getString(); err != nil {
+	if gd.GroupID, err = pd.getString(); err != nil {
 		return
 	}
 	if gd.State, err = pd.getString(); err != nil {
@@ -133,14 +133,14 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 }
 
 type GroupMemberDescription struct {
-	ClientId         string
+	ClientID         string
 	ClientHost       string
 	MemberMetadata   []byte
 	MemberAssignment []byte
 }
 
 func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
-	if err := pe.putString(gmd.ClientId); err != nil {
+	if err := pe.putString(gmd.ClientID); err != nil {
 		return err
 	}
 	if err := pe.putString(gmd.ClientHost); err != nil {
@@ -157,7 +157,7 @@ func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
 }
 
 func (gmd *GroupMemberDescription) decode(pd packetDecoder) (err error) {
-	if gmd.ClientId, err = pd.getString(); err != nil {
+	if gmd.ClientID, err = pd.getString(); err != nil {
 		return
 	}
 	if gmd.ClientHost, err = pd.getString(); err != nil {
