@@ -55,7 +55,7 @@ func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 			errCheck := expectation.CheckFunction(val)
 			if errCheck != nil {
 				sp.t.Errorf("Check function returned an error: %s", errCheck.Error())
-				return -1, -1, err
+				return -1, -1, errCheck
 			}
 		}
 		if expectation.Result == errProduceSuccess {
