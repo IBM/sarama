@@ -123,7 +123,7 @@ func (sp *SyncProducer) ExpectSendMessageWithCheckerFunctionAndSucceed(cf ValueC
 	sp.expectations = append(sp.expectations, &producerExpectation{Result: errProduceSuccess, CheckFunction: cf})
 }
 
-// ExpectSendMessageAndFail sets an expectation on the mock producer that SendMessage will be
+// ExpectSendMessageWithCheckerFunctionAndFail sets an expectation on the mock producer that SendMessage will be
 // called. The mock producer will first call the given function to check the message value.
 // It will cascade the error of the function, if any, or handle the message as if it failed
 // to produce successfully, i.e. by returning the provided error.
