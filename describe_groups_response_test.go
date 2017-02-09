@@ -53,8 +53,8 @@ func TestDescribeGroupsResponse(t *testing.T) {
 	if group0.Err != ErrNoError {
 		t.Error("Unxpected groups[0].Err, found", group0.Err)
 	}
-	if group0.GroupId != "foo" {
-		t.Error("Unxpected groups[0].GroupId, found", group0.GroupId)
+	if group0.GroupID != "foo" {
+		t.Error("Unxpected groups[0].GroupId, found", group0.GroupID)
 	}
 	if group0.State != "bar" {
 		t.Error("Unxpected groups[0].State, found", group0.State)
@@ -68,8 +68,8 @@ func TestDescribeGroupsResponse(t *testing.T) {
 	if len(group0.Members) != 1 {
 		t.Error("Unxpected groups[0].Members, found", group0.Members)
 	}
-	if group0.Members["id"].ClientId != "sarama" {
-		t.Error("Unxpected groups[0].Members[id].ClientId, found", group0.Members["id"].ClientId)
+	if group0.Members["id"].ClientID != "sarama" {
+		t.Error("Unxpected groups[0].Members[id].ClientId, found", group0.Members["id"].ClientID)
 	}
 	if group0.Members["id"].ClientHost != "localhost" {
 		t.Error("Unxpected groups[0].Members[id].ClientHost, found", group0.Members["id"].ClientHost)

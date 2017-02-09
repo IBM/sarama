@@ -24,15 +24,15 @@ func TestSyncGroupRequest(t *testing.T) {
 	var request *SyncGroupRequest
 
 	request = new(SyncGroupRequest)
-	request.GroupId = "foo"
-	request.GenerationId = 66051
-	request.MemberId = "baz"
+	request.GroupID = "foo"
+	request.GenerationID = 66051
+	request.MemberID = "baz"
 	testRequest(t, "empty", request, emptySyncGroupRequest)
 
 	request = new(SyncGroupRequest)
-	request.GroupId = "foo"
-	request.GenerationId = 66051
-	request.MemberId = "baz"
+	request.GroupID = "foo"
+	request.GenerationID = 66051
+	request.MemberID = "baz"
 	request.AddGroupAssignment("baz", []byte("foo"))
 	testRequest(t, "populated", request, populatedSyncGroupRequest)
 }

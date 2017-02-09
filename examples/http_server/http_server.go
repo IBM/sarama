@@ -54,7 +54,7 @@ func main() {
 	log.Fatal(server.Run(*addr))
 }
 
-func createTlsConfiguration() (t *tls.Config) {
+func createTLSConfiguration() (t *tls.Config) {
 	if *certFile != "" && *keyFile != "" && *caFile != "" {
 		cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
 		if err != nil {
@@ -197,7 +197,7 @@ func newDataCollector(brokerList []string) sarama.SyncProducer {
 	config.Producer.RequiredAcks = sarama.WaitForAll // Wait for all in-sync replicas to ack the message
 	config.Producer.Retry.Max = 10                   // Retry up to 10 times to produce the message
 	config.Producer.Return.Successes = true
-	tlsConfig := createTlsConfiguration()
+	tlsConfig := createTLSConfiguration()
 	if tlsConfig != nil {
 		config.Net.TLS.Config = tlsConfig
 		config.Net.TLS.Enable = true
@@ -221,7 +221,7 @@ func newAccessLogProducer(brokerList []string) sarama.AsyncProducer {
 	// For the access log, we are looking for AP semantics, with high throughput.
 	// By creating batches of compressed messages, we reduce network I/O at a cost of more latency.
 	config := sarama.NewConfig()
-	tlsConfig := createTlsConfiguration()
+	tlsConfig := createTLSConfiguration()
 	if tlsConfig != nil {
 		config.Net.TLS.Enable = true
 		config.Net.TLS.Config = tlsConfig

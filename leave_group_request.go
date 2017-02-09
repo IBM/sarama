@@ -1,15 +1,15 @@
 package sarama
 
 type LeaveGroupRequest struct {
-	GroupId  string
-	MemberId string
+	GroupID  string
+	MemberID string
 }
 
 func (r *LeaveGroupRequest) encode(pe packetEncoder) error {
-	if err := pe.putString(r.GroupId); err != nil {
+	if err := pe.putString(r.GroupID); err != nil {
 		return err
 	}
-	if err := pe.putString(r.MemberId); err != nil {
+	if err := pe.putString(r.MemberID); err != nil {
 		return err
 	}
 
@@ -17,10 +17,10 @@ func (r *LeaveGroupRequest) encode(pe packetEncoder) error {
 }
 
 func (r *LeaveGroupRequest) decode(pd packetDecoder, version int16) (err error) {
-	if r.GroupId, err = pd.getString(); err != nil {
+	if r.GroupID, err = pd.getString(); err != nil {
 		return
 	}
-	if r.MemberId, err = pd.getString(); err != nil {
+	if r.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 
