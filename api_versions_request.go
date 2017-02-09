@@ -1,24 +1,24 @@
 package sarama
 
-type ApiVersionsRequest struct {
+type APIVersionsRequest struct {
 }
 
-func (r *ApiVersionsRequest) encode(pe packetEncoder) error {
+func (r *APIVersionsRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ApiVersionsRequest) decode(pd packetDecoder, version int16) (err error) {
+func (r *APIVersionsRequest) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-func (r *ApiVersionsRequest) key() int16 {
+func (r *APIVersionsRequest) key() int16 {
 	return 18
 }
 
-func (r *ApiVersionsRequest) version() int16 {
+func (r *APIVersionsRequest) version() int16 {
 	return 0
 }
 
-func (r *ApiVersionsRequest) requiredVersion() KafkaVersion {
+func (r *APIVersionsRequest) requiredVersion() KafkaVersion {
 	return V0_10_0_0
 }
