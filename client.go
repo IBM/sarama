@@ -17,6 +17,9 @@ type Client interface {
 	// altered after it has been created.
 	Config() *Config
 
+	// Brokers returns the current set of active brokers as retrieved from cluster metadata.
+	Brokers() []*Broker
+
 	// Topics returns the set of available topics as retrieved from cluster metadata.
 	Topics() ([]string, error)
 
@@ -136,7 +139,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		client.seedBrokers = append(client.seedBrokers, NewBroker(addrs[index]))
 	}
 
-	// do an initial fetch of all cluster metadata by specifing an empty list of topics
+	// do an initial fetch of all cluster metadata by specifying an empty list of topics
 	err := client.RefreshMetadata()
 	switch err {
 	case nil:
@@ -158,6 +161,16 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 
 func (client *client) Config() *Config {
 	return client.conf
+}
+
+func (client *client) Brokers() []*Broker {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+	brokers := make([]*Broker, 0)
+	for _, broker := range client.brokers {
+		brokers = append(brokers, broker)
+	}
+	return brokers
 }
 
 func (client *client) Close() error {
@@ -590,17 +603,17 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 		} else {
 			Logger.Printf("client/metadata fetching metadata for all topics from broker %s\n", broker.addr)
 		}
-		response, err := broker.GetMetadata(&MetadataRequest{Topics: topics})
+		response, err := broker.GetMetadata(NewMetadataRequest(client.conf.Version, topics))
 
 		switch err.(type) {
 		case nil:
 			// valid response, use it
-			if shouldRetry, err := client.updateMetadata(response); shouldRetry {
+			shouldRetry, err := client.updateMetadata(response)
+			if shouldRetry {
 				Logger.Println("client/metadata found some partitions to be leaderless")
 				return retry(err) // note: err can be nil
-			} else {
-				return err
 			}
+			return err
 
 		case PacketEncodingError:
 			// didn't even send, return the error
@@ -628,6 +641,7 @@ func (client *client) updateMetadata(data *MetadataResponse) (retry bool, err er
 	// - if it is an existing ID, but the address we have is stale, discard the old one and save it
 	// - otherwise ignore it, replacing our existing one would just bounce the connection
 	for _, broker := range data.Brokers {
+		broker.isController = broker.id == data.ControllerId
 		client.registerBroker(broker)
 	}
 
@@ -745,25 +759,25 @@ func (client *client) CreateTopic(topic string, numPartitions int32,
 	}
 
 	createTopicsRequest := new(CreateTopicsRequest)
-	createTopicsRequest.CreateRequests = make([]*CreateTopicRequest, 1)
-	createTopicRequest := new(CreateTopicRequest)
+	createTopicsRequest.CreateRequests = make([]CreateTopicRequest, 1)
+	createTopicRequest := CreateTopicRequest{}
 	createTopicRequest.Topic = topic
 	createTopicRequest.NumPartitions = numPartitions
 	createTopicRequest.ReplicationFactor = replicationFactor
-	createTopicRequest.ReplicaAssignments = make([]*ReplicaAssignment, 0)
-	createTopicRequest.Configs = make([]*ConfigKV, len(configs))
+	createTopicRequest.ReplicaAssignments = make([]ReplicaAssignment, 0)
+	createTopicRequest.Configs = make([]ConfigKV, len(configs))
 	createTopicsRequest.CreateRequests[0] = createTopicRequest
 	createTopicsRequest.Timeout = timeout
 	i := 0
 	for key, value := range configs {
-		configKV := new(ConfigKV)
+		configKV := ConfigKV{}
 		configKV.Key = key
 		configKV.Value = value
 		createTopicRequest.Configs[i] = configKV
 		i = i + 1
 	}
 
-	for broker := client.any(); broker != nil; broker = client.any() {
+	for broker := client.any(); broker != nil && broker.isController; broker = client.any() {
 		Logger.Printf("Creating topic %v on broker %v\n", topic, broker.addr)
 		createTopicsResponse, err := broker.CreateTopics(createTopicsRequest)
 		if err != nil {

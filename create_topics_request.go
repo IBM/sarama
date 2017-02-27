@@ -14,12 +14,12 @@ type CreateTopicRequest struct {
 	Topic              string
 	NumPartitions      int32
 	ReplicationFactor  int16
-	ReplicaAssignments []*ReplicaAssignment
-	Configs            []*ConfigKV
+	ReplicaAssignments []ReplicaAssignment
+	Configs            []ConfigKV
 }
 
 type CreateTopicsRequest struct {
-	CreateRequests []*CreateTopicRequest
+	CreateRequests []CreateTopicRequest
 	Timeout        int32
 }
 
@@ -89,32 +89,34 @@ func (cr *CreateTopicRequest) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 
-	cr.ReplicaAssignments = make([]*ReplicaAssignment, partitionCount)
+	if partitionCount > 0 {
+		cr.ReplicaAssignments = make([]ReplicaAssignment, partitionCount)
 
-	for i := range cr.ReplicaAssignments {
-		replicaAssignment := new(ReplicaAssignment)
+		for i := range cr.ReplicaAssignments {
+			replicaAssignment := ReplicaAssignment{}
 
-		partitionID, err := pd.getInt32()
-		if err != nil {
-			return err
-		}
-		replicaAssignment.PartitionID = partitionID
-
-		replicaCount, err := pd.getArrayLength()
-		if err != nil {
-			return err
-		}
-
-		replicaAssignment.Replicas = make([]int32, replicaCount)
-
-		for j := range replicaAssignment.Replicas {
-			replica, err := pd.getInt32()
+			partitionID, err := pd.getInt32()
 			if err != nil {
 				return err
 			}
-			replicaAssignment.Replicas[j] = replica
+			replicaAssignment.PartitionID = partitionID
+
+			replicaCount, err := pd.getArrayLength()
+			if err != nil {
+				return err
+			}
+
+			replicaAssignment.Replicas = make([]int32, replicaCount)
+
+			for j := range replicaAssignment.Replicas {
+				replica, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				replicaAssignment.Replicas[j] = replica
+			}
+			cr.ReplicaAssignments[i] = replicaAssignment
 		}
-		cr.ReplicaAssignments[i] = replicaAssignment
 	}
 
 	configCount, err := pd.getArrayLength()
@@ -122,24 +124,22 @@ func (cr *CreateTopicRequest) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 
-	cr.Configs = make([]*ConfigKV, configCount)
+	if configCount > 0 {
+		cr.Configs = make([]ConfigKV, configCount)
 
-	for i := range cr.Configs {
-		config := new(ConfigKV)
+		for i := range cr.Configs {
+			key, err := pd.getString()
+			if err != nil {
+				return err
+			}
 
-		key, err := pd.getString()
-		if err != nil {
-			return err
+			value, err := pd.getString()
+			if err != nil {
+				return err
+			}
+
+			cr.Configs[i] = ConfigKV{Key: key, Value: value}
 		}
-
-		value, err := pd.getString()
-		if err != nil {
-			return err
-		}
-
-		config.Key = key
-		config.Value = value
-		cr.Configs[i] = config
 	}
 
 	return nil
@@ -170,9 +170,9 @@ func (ct *CreateTopicsRequest) decode(pd packetDecoder, version int16) error {
 		return nil
 	}
 
-	ct.CreateRequests = make([]*CreateTopicRequest, createTopicRequestCount)
+	ct.CreateRequests = make([]CreateTopicRequest, createTopicRequestCount)
 	for i := range ct.CreateRequests {
-		ct.CreateRequests[i] = new(CreateTopicRequest)
+		ct.CreateRequests[i] = CreateTopicRequest{}
 		err = ct.CreateRequests[i].decode(pd, version)
 		if err != nil {
 			return err
@@ -198,5 +198,5 @@ func (ct *CreateTopicsRequest) version() int16 {
 }
 
 func (ct *CreateTopicsRequest) requiredVersion() KafkaVersion {
-	return minVersion
+	return V0_10_0_0
 }
