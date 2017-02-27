@@ -202,7 +202,6 @@ func (b *Broker) Addr() string {
 }
 
 func (b *Broker) GetMetadata(request *MetadataRequest) (*MetadataResponse, error) {
-	fmt.Printf("Getting metadata %v\n", *request)
 	response := new(MetadataResponse)
 
 	err := b.sendAndReceive(request, response)
