@@ -21,7 +21,7 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder, version int16) (err 
 	r.Err = KError(tmp)
 
 	coordinator := new(Broker)
-	if err := coordinator.decode(pd); err != nil {
+	if err := coordinator.decode(pd, version); err != nil {
 		return err
 	}
 	if coordinator.addr == ":0" {
