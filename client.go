@@ -451,6 +451,20 @@ func (client *client) any() *Broker {
 	return nil
 }
 
+func (client *client) controller() *Broker {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	for _, broker := range client.brokers {
+		if broker.isController {
+			_ = broker.Open(client.conf)
+			return broker
+		}
+	}
+
+	return nil
+}
+
 // private caching/lazy metadata helpers
 
 type partitionType int
@@ -641,7 +655,7 @@ func (client *client) updateMetadata(data *MetadataResponse) (retry bool, err er
 	// - if it is an existing ID, but the address we have is stale, discard the old one and save it
 	// - otherwise ignore it, replacing our existing one would just bounce the connection
 	for _, broker := range data.Brokers {
-		broker.isController = broker.id == data.ControllerId
+		broker.isController = (broker.id == data.ControllerId)
 		client.registerBroker(broker)
 	}
 
@@ -776,8 +790,8 @@ func (client *client) CreateTopic(topic string, numPartitions int32,
 		createTopicRequest.Configs[i] = configKV
 		i = i + 1
 	}
-
-	for broker := client.any(); broker != nil && broker.isController; broker = client.any() {
+	broker := client.controller()
+	if broker != nil {
 		Logger.Printf("Creating topic %v on broker %v\n", topic, broker.addr)
 		createTopicsResponse, err := broker.CreateTopics(createTopicsRequest)
 		if err != nil {
