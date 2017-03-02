@@ -13,7 +13,7 @@ Sarama is an MIT-licensed Go client library for [Apache Kafka](https://kafka.apa
 - The [examples](./examples) directory contains more elaborate example applications.
 - The [tools](./tools) directory contains command line tools that can be useful for testing, diagnostics, and instrumentation.
 
-You might also want to look at the [Frequently Asked Questions](https://github.com/Shopify/sarama/wiki/Frequently-Asked-Questions)
+You might also want to look at the [Frequently Asked Questions](https://github.com/Shopify/sarama/wiki/Frequently-Asked-Questions).
 
 ### Compatibility and API stability
 
