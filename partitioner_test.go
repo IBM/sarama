@@ -73,7 +73,7 @@ func TestRoundRobinPartitioner(t *testing.T) {
 
 func TestNewHashPartitionerWithHasher(t *testing.T) {
 	// use the current default hasher fnv.New32a()
-	partitioner := NewCustomHashPartitioner(fnv.New32a())("mytopic")
+	partitioner := NewCustomHashPartitioner(fnv.New32a)("mytopic")
 
 	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
 	if err != nil {
@@ -104,7 +104,7 @@ func TestNewHashPartitionerWithHasher(t *testing.T) {
 
 func TestHashPartitionerWithHasherMinInt32(t *testing.T) {
 	// use the current default hasher fnv.New32a()
-	partitioner := NewCustomHashPartitioner(fnv.New32a())("mytopic")
+	partitioner := NewCustomHashPartitioner(fnv.New32a)("mytopic")
 
 	msg := ProducerMessage{}
 	// "1468509572224" generates 2147483648 (uint32) result from Sum32 function

@@ -86,7 +86,7 @@ type hasherFunc func() hash.Hash32
 
 type hashPartitioner struct {
 	random Partitioner
-	hasher hasherFunc
+	hasher hash.Hash32
 }
 
 // NewCustomHashPartitioner is a wrapper around NewHashPartitioner,
@@ -95,7 +95,7 @@ func NewCustomHashPartitioner(hasher hasherFunc) PartitionerConstructor {
 	return func(topic string) Partitioner {
 		p := new(hashPartitioner)
 		p.random = NewRandomPartitioner(topic)
-		p.hasher = hasher
+		p.hasher = hasher()
 		return p
 	}
 }
@@ -107,7 +107,7 @@ func NewCustomHashPartitioner(hasher hasherFunc) PartitionerConstructor {
 func NewHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
-	p.hasher = fnv.New32a
+	p.hasher = fnv.New32a()
 	return p
 }
 
@@ -119,12 +119,12 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	if err != nil {
 		return -1, err
 	}
-	hash := p.hasher()
-	_, err = hash.Write(bytes)
+	p.hasher.Reset()
+	_, err = p.hasher.Write(bytes)
 	if err != nil {
 		return -1, err
 	}
-	partition := int32(hash.Sum32()) % numPartitions
+	partition := int32(p.hasher.Sum32()) % numPartitions
 	if partition < 0 {
 		partition = -partition
 	}
