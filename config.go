@@ -310,6 +310,9 @@ func (c *Config) Validate() error {
 	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.Flush.Bytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
+	if (c.Producer.Flush.Bytes > 0 || c.Producer.Flush.Messages > 0) && c.Producer.Flush.Frequency == 0 {
+		Logger.Println("Producer.Flush: Bytes or Messages are set, but Frequency is not; messages may not get flushed.")
+	}
 	if c.Producer.Timeout%time.Millisecond != 0 {
 		Logger.Println("Producer.Timeout only supports millisecond resolution; nanoseconds will be truncated.")
 	}
