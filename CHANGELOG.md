@@ -1,5 +1,25 @@
 # Changelog
 
+#### Unreleased
+
+New Features:
+ - Added a `Brokers` method fo the Client which returns the complete set of
+   active brokers ([#813](https://github.com/Shopify/sarama/pull/813)).
+ - Added a `NewCustomHashPartitioner` method which allows constructing a hash
+   partitioner with a custom hash method in case the default (FNV-1a) is not
+   suitable
+   ([#837](https://github.com/Shopify/sarama/pull/837),
+    [#841](https://github.com/Shopify/sarama/pull/841)).
+
+Bug Fixes:
+ - Fix an issue where decoding a malformed FetchRequest would not return the
+   correct error ([#818](https://github.com/Shopify/sarama/pull/818)).
+ - Respect ordering of group protocols in JoinGroupRequests. This fix is
+   transparent if you're using the `AddGroupProtocol` or
+   `AddGroupProtocolMetadata` helpers; otherwise you will need to switch from
+   the `GroupProtocols` field (now deprecated) to use `OrderedGroupProtocols`
+   ([#812](https://github.com/Shopify/sarama/issues/812)).
+
 #### Version 1.11.0 (2016-12-20)
 
 _Important:_ As of Sarama 1.11 it is necessary to set the config value of
