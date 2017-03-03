@@ -3,7 +3,7 @@
 #### Unreleased
 
 New Features:
- - Added a `Brokers` method fo the Client which returns the complete set of
+ - Added a `Brokers` method to the Client which returns the complete set of
    active brokers ([#813](https://github.com/Shopify/sarama/pull/813)).
  - Added a `NewCustomHashPartitioner` method which allows constructing a hash
    partitioner with a custom hash method in case the default (FNV-1a) is not
