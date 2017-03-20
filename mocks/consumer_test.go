@@ -197,8 +197,8 @@ func TestConsumerTopicMetadata(t *testing.T) {
 	consumer := NewConsumer(trm, nil)
 
 	consumer.SetTopicMetadata(map[string][]int32{
-		"test1": []int32{0, 1, 2, 3},
-		"test2": []int32{0, 1, 2, 3, 4, 5, 6, 7},
+		"test1": {0, 1, 2, 3},
+		"test2": {0, 1, 2, 3, 4, 5, 6, 7},
 	})
 
 	topics, err := consumer.Topics()
