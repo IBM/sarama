@@ -239,7 +239,7 @@ func (cg *consumerGroup) createConsumer(topic string, partition int32) error {
 	// well this should not really happen ... the offset should be between oldest and newest
 	// unless it's negative for OffsetOldest/OffsetNewest
 	if offset >= 0 && offset < oldest {
-		offset = oldest
+		offset = oldest + 1
 	}
 
 	cg.log("consume %s/%d pom-offset=%d oldest=%d newest=%d", topic, partition, offset, oldest, newest)

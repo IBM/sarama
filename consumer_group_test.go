@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func consume(g ConsumerGroup, name string) {
@@ -15,6 +17,45 @@ func consume(g ConsumerGroup, name string) {
 			// fmt.Printf("%s got partition=%d offset=%d. msg=%v\n", name, msg.Partition, msg.Offset, string(msg.Value))
 		}
 	}
+}
+
+func TestConsumerGroupOffsetCorrection(t *testing.T) {
+	conf := NewConfig()
+	conf.Version = V0_10_0_0
+	conf.Producer.Return.Successes = true
+	// conf.Consumer.Offsets.Initial = OffsetOldest
+	client, err := NewClient([]string{"0.0.0.0:9092"}, conf)
+	if err != nil {
+		panic(err)
+	}
+
+	offset, _ := client.GetOffset("test", 0, OffsetNewest)
+	fmt.Println(offset)
+
+	consumer, _ := NewConsumerFromClient(client)
+	pc, err := consumer.ConsumePartition("test", 0, 3)
+	if err != nil {
+		panic(err)
+	}
+
+	m, ok := <-pc.Messages()
+	if !ok {
+		fmt.Println("NOT OK")
+	}
+
+	spew.Dump(m)
+
+	// // one test producer
+	// p, err := NewSyncProducerFromClient(client)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// p.SendMessage(&ProducerMessage{Topic: "test", Value: StringEncoder("test3")})
+	// time.Sleep(1000 * time.Millisecond)
+
+	// p.Close()
+	client.Close()
+
 }
 
 func TestConsumerGroupX(t *testing.T) {
