@@ -5,8 +5,7 @@ import "testing"
 var ()
 
 var (
-	createTopicsResponseSingleBrokerNoTopics = []byte{
-	}
+	createTopicsResponseSingleBrokerNoTopics = []byte{}
 )
 
 func TestCreateTopicsResponse(t *testing.T) {
