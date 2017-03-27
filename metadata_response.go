@@ -205,7 +205,6 @@ func (r *MetadataResponse) requiredVersion() KafkaVersion {
 	default:
 		return minVersion
 	}
-	return minVersion
 }
 
 // testing API
