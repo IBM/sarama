@@ -672,3 +672,15 @@ func (b *Broker) updateOutgoingCommunicationMetrics(bytes int) {
 		b.brokerRequestSize.Update(requestSize)
 	}
 }
+
+func (b *Broker) CreateTopics(request *CreateTopicsRequest) (*CreateTopicsResponse, error) {
+	response := new(CreateTopicsResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}

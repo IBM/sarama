@@ -67,6 +67,9 @@ type Client interface {
 
 	// Closed returns true if the client has already had Close called on it
 	Closed() bool
+
+	// Create a topic
+	CreateTopic(topic string, numPartitions int32, replicationFactor int16, configs map[string]string, timeout int32) error
 }
 
 const (
@@ -746,4 +749,46 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 	Logger.Println("client/coordinator no available broker to send consumer metadata request to")
 	client.resurrectDeadBrokers()
 	return retry(ErrOutOfBrokers)
+}
+
+func (client *client) CreateTopic(topic string, numPartitions int32,
+	replicationFactor int16, configs map[string]string, timeout int32) error {
+	if client.Closed() {
+		return ErrClosedClient
+	}
+
+	createTopicsRequest := new(CreateTopicsRequest)
+	createTopicsRequest.CreateRequests = make([]*CreateTopicRequest, 1)
+	createTopicRequest := new(CreateTopicRequest)
+	createTopicRequest.Topic = topic
+	createTopicRequest.NumPartitions = numPartitions
+	createTopicRequest.ReplicationFactor = replicationFactor
+	createTopicRequest.ReplicaAssignments = make([]*ReplicaAssignment, 0)
+	createTopicRequest.Configs = make([]*ConfigKV, len(configs))
+	createTopicsRequest.CreateRequests[0] = createTopicRequest
+	createTopicsRequest.Timeout = timeout
+	i := 0
+	for key, value := range configs {
+		configKV := new(ConfigKV)
+		configKV.Key = key
+		configKV.Value = value
+		createTopicRequest.Configs[i] = configKV
+		i = i + 1
+	}
+
+	for broker := client.any(); broker != nil; broker = client.any() {
+		Logger.Printf("Creating topic %v on broker %v\n", topic, broker.addr)
+		createTopicsResponse, err := broker.CreateTopics(createTopicsRequest)
+		if err != nil {
+			return err
+		}
+
+		kafkaErr := createTopicsResponse.CreateTopicResponses[0].Err
+
+		if kafkaErr != ErrNoError {
+			return kafkaErr
+		}
+		return nil
+	}
+	return ErrOutOfBrokers
 }
