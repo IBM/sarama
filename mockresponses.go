@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"fmt"
+	"strconv"
+	"time"
 )
 
 // TestReporter has methods matching go's testing.T to avoid importing
@@ -219,6 +221,8 @@ func (mfr *MockFetchResponse) SetHighWaterMark(topic string, partition int32, of
 func (mfr *MockFetchResponse) For(reqBody versionedDecoder) encoder {
 	fetchRequest := reqBody.(*FetchRequest)
 	res := &FetchResponse{}
+	//if you are using kafka V0_10_0_0 we need to set this since your consumer uses request version 2. check consumer.go fetchNewMessages()
+	res.Version = 2
 	for topic, partitions := range fetchRequest.blocks {
 		for partition, block := range partitions {
 			initialOffset := block.fetchOffset
@@ -451,5 +455,75 @@ func (mr *MockOffsetFetchResponse) For(reqBody versionedDecoder) encoder {
 			res.AddBlock(topic, partition, block)
 		}
 	}
+	return res
+}
+
+type MockJoinGroupResponse struct {
+	t TestReporter
+}
+
+func NewMockJoinGroupResponse(t TestReporter) *MockJoinGroupResponse {
+	return &MockJoinGroupResponse{t: t}
+}
+
+func (mjgr *MockJoinGroupResponse) For(reqBody versionedDecoder) encoder {
+	req := reqBody.(*JoinGroupRequest)
+	res := &JoinGroupResponse{}
+	res.Members = make(map[string][]byte)
+	res.MemberId = "sarama-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+	res.LeaderId = res.MemberId
+	res.GenerationId = 1
+	for protocol, _ := range req.GroupProtocols {
+		res.GroupProtocol = protocol
+		break
+	}
+
+	metaData := req.GroupProtocols[res.GroupProtocol]
+	res.Members[res.MemberId] = metaData
+	return res
+}
+
+type MockSyncGroupResponse struct {
+	t TestReporter
+}
+
+func NewMockSyncGroupResponse(t TestReporter) *MockSyncGroupResponse {
+	return &MockSyncGroupResponse{t: t}
+}
+
+func (msgr *MockSyncGroupResponse) For(reqBody versionedDecoder) encoder {
+	req := reqBody.(*SyncGroupRequest)
+	res := &SyncGroupResponse{}
+
+	for _, assignment := range req.GroupAssignments {
+		res.MemberAssignment = assignment
+		break
+	}
+	return res
+}
+
+type MockLeaveGroupResponse struct {
+	t TestReporter
+}
+
+func NewMockLeaveGroupResponse(t TestReporter) *MockLeaveGroupResponse {
+	return &MockLeaveGroupResponse{t: t}
+}
+
+func (mlgr *MockLeaveGroupResponse) For(reqBody versionedDecoder) encoder {
+	res := &LeaveGroupResponse{}
+	return res
+}
+
+type MockHeartbeatResponse struct {
+	t TestReporter
+}
+
+func NewMockHeartbeatResponse(t TestReporter) *MockHeartbeatResponse {
+	return &MockHeartbeatResponse{t: t}
+}
+
+func (mlgr *MockHeartbeatResponse) For(reqBody versionedDecoder) encoder {
+	res := &HeartbeatResponse{}
 	return res
 }
