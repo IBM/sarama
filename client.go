@@ -156,7 +156,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 	return client, nil
 }
 
-func NewClientFromBrokerList(brokers []Broker, conf *Config) (Client,error) {
+func NewClientFromBrokerList(brokers []Broker, conf *Config) (Client, error) {
 	Logger.Println("Initializing new client from brokers")
 
 	if conf == nil {
