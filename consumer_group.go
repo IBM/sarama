@@ -364,11 +364,12 @@ func (cg *consumerGroup) handleError(err error) {
 
 // Releases the consumer and commits offsets, called from rebalance() and Close()
 func (cg *consumerGroup) release() (err error) {
-	cg.Lock()
-	defer cg.Unlock()
+	cg.RLock()
+
 	if len(cg.managed) > 0 {
 		cg.log("release subscriptions n=%d", len(cg.managed))
 	} else {
+		cg.RUnlock()
 		return
 	}
 
@@ -386,7 +387,11 @@ func (cg *consumerGroup) release() (err error) {
 		mp.pom.Close()
 	}
 
+	cg.RUnlock()
+
 	// clear all by recreating the map
+	cg.Lock()
+	defer cg.Unlock()
 	cg.managed = make(map[TopicPartition]*managedPartition)
 
 	return
