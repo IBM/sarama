@@ -366,11 +366,20 @@ func (pom *partitionOffsetManager) AsyncClose() {
 	go func() {
 		pom.lock.Lock()
 		defer pom.lock.Unlock()
-
 		for pom.dirty {
-			pom.clean.Wait()
+			done := make(chan none)
+			go func() {
+				pom.clean.Wait()
+				close(done)
+			}()
+			select {
+			case <-time.After(time.Second * 5):
+				Logger.Printf("client/offsetManager offset commit timeout on shutdown! Not commited group=%s topic=%s partition=%d offset=%d\n", pom.parent.group, pom.topic, pom.partition, pom.offset)
+				goto timeout
+			case <-done:
+			}
 		}
-
+	timeout:
 		close(pom.dying)
 	}()
 }
