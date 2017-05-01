@@ -38,8 +38,10 @@ type Client interface {
 	// Replicas returns the set of all replica IDs for the given partition.
 	Replicas(topic string, partitionID int32) ([]int32, error)
 
-	// Isr returns the set of in-sync replica IDs for the given partition.
-	Isr(topic string, partitionID int32) ([]int32, error)
+	// InSyncReplicas returns the set of all in-sync replica IDs for the given
+	// partition. In-sync replicas are replicas which are fully caught up with
+	// the partition leader.
+	InSyncReplicas(topic string, partitionID int32) ([]int32, error)
 
 	// RefreshMetadata takes a list of topics and queries the cluster to refresh the
 	// available metadata for those topics. If no topics are provided, it will refresh
@@ -298,7 +300,7 @@ func (client *client) Replicas(topic string, partitionID int32) ([]int32, error)
 	return dupeAndSort(metadata.Replicas), nil
 }
 
-func (client *client) Isr(topic string, partitionID int32) ([]int32, error) {
+func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}

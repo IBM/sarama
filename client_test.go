@@ -196,7 +196,7 @@ func TestClientMetadata(t *testing.T) {
 		t.Error("Incorrect (or unsorted) replica")
 	}
 
-	isr, err = client.Isr("my_topic", 0)
+	isr, err = client.InSyncReplicas("my_topic", 0)
 	if err != nil {
 		t.Error(err)
 	} else if len(isr) != 2 {
