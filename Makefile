@@ -18,4 +18,4 @@ install_errcheck:
 	go get github.com/kisielk/errcheck
 
 get:
-	go get -t
+	go get -t ./...
