@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.12.0 (2016-05-08)
+#### Version 1.12.0 (2017-05-08)
 
 New Features:
  - Added support for the `ApiVersions` request and response pair, and Kafka
