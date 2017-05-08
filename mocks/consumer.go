@@ -178,6 +178,7 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 // Errors and Messages channel, you should specify what values will be provided on these
 // channels using YieldMessage and YieldError.
 type PartitionConsumer struct {
+	highWaterMarkOffset     int64
 	l                       sync.Mutex
 	t                       ErrorReporter
 	topic                   string
@@ -189,7 +190,6 @@ type PartitionConsumer struct {
 	consumed                bool
 	errorsShouldBeDrained   bool
 	messagesShouldBeDrained bool
-	highWaterMarkOffset     int64
 }
 
 ///////////////////////////////////////////////////
