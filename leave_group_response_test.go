@@ -18,7 +18,7 @@ func TestLeaveGroupResponse(t *testing.T) {
 
 	response = new(LeaveGroupResponse)
 	testVersionDecodable(t, "with error", response, leaveGroupResponseWithError, 0)
-	if response.Err != ErrUnknownMemberId {
+	if response.Err != ErrUnknownMemberID {
 		t.Error("Decoding error failed: ErrUnknownMemberId expected but found", response.Err)
 	}
 }

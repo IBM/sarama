@@ -39,8 +39,8 @@ func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for memberId, memberMetadata := range r.Members {
-		if err := pe.putString(memberId); err != nil {
+	for memberID, memberMetadata := range r.Members {
+		if err := pe.putString(memberID); err != nil {
 			return err
 		}
 
@@ -86,7 +86,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 
 	r.Members = make(map[string][]byte)
 	for i := 0; i < n; i++ {
-		memberId, err := pd.getString()
+		memberID, err := pd.getString()
 		if err != nil {
 			return err
 		}
@@ -96,7 +96,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 			return err
 		}
 
-		r.Members[memberId] = memberMetadata
+		r.Members[memberID] = memberMetadata
 	}
 
 	return nil

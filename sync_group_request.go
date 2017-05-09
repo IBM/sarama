@@ -21,8 +21,8 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 	if err := pe.putArrayLength(len(r.GroupAssignments)); err != nil {
 		return err
 	}
-	for memberId, memberAssignment := range r.GroupAssignments {
-		if err := pe.putString(memberId); err != nil {
+	for memberID, memberAssignment := range r.GroupAssignments {
+		if err := pe.putString(memberID); err != nil {
 			return err
 		}
 		if err := pe.putBytes(memberAssignment); err != nil {
@@ -54,7 +54,7 @@ func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 
 	r.GroupAssignments = make(map[string][]byte)
 	for i := 0; i < n; i++ {
-		memberId, err := pd.getString()
+		memberID, err := pd.getString()
 		if err != nil {
 			return err
 		}
@@ -63,7 +63,7 @@ func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 
-		r.GroupAssignments[memberId] = memberAssignment
+		r.GroupAssignments[memberID] = memberAssignment
 	}
 
 	return nil
@@ -81,20 +81,20 @@ func (r *SyncGroupRequest) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }
 
-func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment []byte) {
+func (r *SyncGroupRequest) AddGroupAssignment(memberID string, memberAssignment []byte) {
 	if r.GroupAssignments == nil {
 		r.GroupAssignments = make(map[string][]byte)
 	}
 
-	r.GroupAssignments[memberId] = memberAssignment
+	r.GroupAssignments[memberID] = memberAssignment
 }
 
-func (r *SyncGroupRequest) AddGroupAssignmentMember(memberId string, memberAssignment *ConsumerGroupMemberAssignment) error {
+func (r *SyncGroupRequest) AddGroupAssignmentMember(memberID string, memberAssignment *ConsumerGroupMemberAssignment) error {
 	bin, err := encode(memberAssignment, nil)
 	if err != nil {
 		return err
 	}
 
-	r.AddGroupAssignment(memberId, bin)
+	r.AddGroupAssignment(memberID, bin)
 	return nil
 }
