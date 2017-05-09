@@ -161,6 +161,58 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 	return client, nil
 }
 
+func NewClientFromBrokerList(brokers []Broker, conf *Config) (Client, error) {
+	Logger.Println("Initializing new client from brokers")
+
+	if conf == nil {
+		conf = NewConfig()
+	}
+
+	if err := conf.Validate(); err != nil {
+		return nil, err
+	}
+
+	if len(brokers) < 1 {
+		return nil, ConfigurationError("You must provide at least one broker")
+	}
+
+	// TODO: Do some check for brokers
+
+	client := &client{
+		conf:                    conf,
+		closer:                  make(chan none),
+		closed:                  make(chan none),
+		brokers:                 make(map[int32]*Broker),
+		metadata:                make(map[string]map[int32]*PartitionMetadata),
+		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
+		coordinators:            make(map[string]int32),
+	}
+
+	random := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for _, index := range random.Perm(len(brokers)) {
+		client.seedBrokers = append(client.seedBrokers, &brokers[index])
+	}
+
+	// do an initial fetch of all cluster metadata by specifying an empty list of topics
+	err := client.RefreshMetadata()
+	switch err {
+	case nil:
+		break
+	case ErrLeaderNotAvailable, ErrReplicaNotAvailable, ErrTopicAuthorizationFailed, ErrClusterAuthorizationFailed:
+		// indicates that maybe part of the cluster is down, but is not fatal to creating the client
+		Logger.Println(err)
+	default:
+		close(client.closed) // we haven't started the background updater yet, so we have to do this manually
+		_ = client.Close()
+		return nil, err
+	}
+	go withRecover(client.backgroundMetadataUpdater)
+
+	Logger.Println("Successfully initialized new client")
+
+	return client, nil
+}
+
 func (client *client) Config() *Config {
 	return client.conf
 }

@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/Shopify/sarama"
+	"github.com/hanbing0715/sarama"
 	"github.com/rcrowley/go-metrics"
 )
 

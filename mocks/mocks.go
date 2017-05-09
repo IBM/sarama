@@ -16,7 +16,7 @@ package mocks
 import (
 	"errors"
 
-	"github.com/Shopify/sarama"
+	"github.com/hanbing0715/sarama"
 )
 
 // ErrorReporter is a simple interface that includes the testing.T methods we use to report
