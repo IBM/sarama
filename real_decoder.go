@@ -74,6 +74,22 @@ func (rd *realDecoder) getArrayLength() (int, error) {
 	return tmp, nil
 }
 
+func (rd *realDecoder) getNullableArrayLength() (int32, error) {
+	if rd.remaining() < 4 {
+		rd.off = len(rd.raw)
+		return -1, ErrInsufficientData
+	}
+	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+	rd.off += 4
+	if int(tmp) > rd.remaining() {
+		rd.off = len(rd.raw)
+		return -1, ErrInsufficientData
+	} else if tmp > 2*math.MaxUint16 {
+		return -1, errInvalidArrayLength
+	}
+	return tmp, nil
+}
+
 // collections
 
 func (rd *realDecoder) getBytes() ([]byte, error) {

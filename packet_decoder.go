@@ -10,6 +10,7 @@ type packetDecoder interface {
 	getInt32() (int32, error)
 	getInt64() (int64, error)
 	getArrayLength() (int, error)
+	getNullableArrayLength() (int32, error)
 
 	// Collections
 	getBytes() ([]byte, error)
