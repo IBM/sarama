@@ -672,6 +672,7 @@ func (bc *brokerConsumer) handleResponses() {
 		case errTimedOut:
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because consuming was taking too long\n",
 				bc.broker.ID(), child.topic, child.partition)
+			child.sendError(errTimedOut)
 			delete(bc.subscriptions, child)
 		case ErrOffsetOutOfRange:
 			// there's no point in retrying this it will just fail the same way again
