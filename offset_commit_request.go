@@ -43,7 +43,7 @@ func (b *offsetCommitRequestBlock) decode(pd packetDecoder, version int16) (err 
 type OffsetCommitRequest struct {
 	ConsumerGroup           string
 	ConsumerGroupGeneration int32  // v1 or later
-	ConsumerID              string // v1 or later
+	MemberID                string // v1 or later
 	RetentionTime           int64  // v2 or later
 
 	// Version can be:
@@ -65,15 +65,15 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 
 	if r.Version >= 1 {
 		pe.putInt32(r.ConsumerGroupGeneration)
-		if err := pe.putString(r.ConsumerID); err != nil {
+		if err := pe.putString(r.MemberID); err != nil {
 			return err
 		}
 	} else {
 		if r.ConsumerGroupGeneration != 0 {
 			Logger.Println("Non-zero ConsumerGroupGeneration specified for OffsetCommitRequest v0, it will be ignored")
 		}
-		if r.ConsumerID != "" {
-			Logger.Println("Non-empty ConsumerID specified for OffsetCommitRequest v0, it will be ignored")
+		if r.MemberID != "" {
+			Logger.Println("Non-empty MemberID specified for OffsetCommitRequest v0, it will be ignored")
 		}
 	}
 
@@ -114,7 +114,7 @@ func (r *OffsetCommitRequest) decode(pd packetDecoder, version int16) (err error
 		if r.ConsumerGroupGeneration, err = pd.getInt32(); err != nil {
 			return err
 		}
-		if r.ConsumerID, err = pd.getString(); err != nil {
+		if r.MemberID, err = pd.getString(); err != nil {
 			return err
 		}
 	}

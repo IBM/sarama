@@ -21,6 +21,10 @@ func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata
 	return members, nil
 }
 
+func (r *JoinGroupResponse) IsLeader() bool {
+	return r.LeaderId == r.MemberId
+}
+
 func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
 	pe.putInt32(r.GenerationId)
