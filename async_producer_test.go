@@ -580,12 +580,12 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 	// send another message on partition 0 to trigger the EOF and retry
 	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 
-	// tell partition 0 to go to that broker again
+	// tell both partitions to go to that broker again
 	seedBroker.Returns(metadataResponse)
 
-	// succeed this time
+	// succeed on retry to partition 1
 	prodSuccess = new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	prodSuccess.AddTopicPartition("my_topic", 1, ErrNoError)
 	leader.Returns(prodSuccess)
 	expectResults(t, producer, 1, 0)
 
