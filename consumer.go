@@ -728,7 +728,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_10_1_0) {
 		request.Version = 3
-		request.MaxBytes = MaxResponseSize - 47 // TODO(mherstin): WTF?!
+		request.MaxBytes = MaxResponseSize
 	}
 
 	for child := range bc.subscriptions {
