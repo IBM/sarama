@@ -36,7 +36,7 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 	pe.putInt32(-1) // replica ID is always -1 for clients
 	pe.putInt32(r.MaxWaitTime)
 	pe.putInt32(r.MinBytes)
-	if 3 == r.Version {
+	if r.Version == 3 {
 		pe.putInt32(r.MaxBytes)
 	}
 	err = pe.putArrayLength(len(r.blocks))
