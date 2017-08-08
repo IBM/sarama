@@ -91,7 +91,7 @@ func TestMessageEncoding(t *testing.T) {
 
 	message.Value = []byte{}
 	message.Codec = CompressionGZIP
-	if runtime.Version() == "go1.8" {
+	if runtime.Version() == "go1.8" || runtime.Version() == "go1.8.1" {
 		testEncodable(t, "empty gzip", &message, emptyGzipMessage18)
 	} else {
 		testEncodable(t, "empty gzip", &message, emptyGzipMessage)
