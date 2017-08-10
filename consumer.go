@@ -247,9 +247,9 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 
 // PartitionConsumer
 
-// PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call Close()
-// or AsyncClose() on a PartitionConsumer to avoid leaks, it will not be garbage-collected automatically
-// when it passes out of scope.
+// PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call one of Close() or
+// AsyncClose() on a PartitionConsumer to avoid leaks; it will not be garbage-collected automatically when it passes out
+// of scope.
 //
 // The simplest way of using a PartitionConsumer is to loop over its Messages channel using a for/range
 // loop. The PartitionConsumer will only stop itself in one case: when the offset being consumed is reported
@@ -258,19 +258,25 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 // By default, it logs these errors to sarama.Logger; if you want to be notified directly of all errors, set
 // your config's Consumer.Return.Errors to true and read from the Errors channel, using a select statement
 // or a separate goroutine. Check out the Consumer examples to see implementations of these different approaches.
+//
+// To terminate such a for/range loop while the loop is executing, call AsyncClose. This will kick off the process of
+// consumer tear-down & return imediately. Continue to loop, servicing the Messages channel until the teardown process
+// AsyncClose initiated closes it (thus terminating the for/range loop). If you've already ceased reading Messages, call
+// Close; this will signal the PartitionConsumer's goroutines to begin shutting down (just like AsyncClose), but will
+// also drain the Messages channel, harvest all errors & return them once cleanup has completed.
 type PartitionConsumer interface {
 
-	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will
-	// return immediately, after which you should wait until the 'messages' and
-	// 'errors' channel are drained. It is required to call this function, or
-	// Close before a consumer object passes out of scope, as it will otherwise
-	// leak memory. You must call this before calling Close on the underlying client.
+	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately, after which you
+	// should continue to service the 'Messages' and 'Errors' channels until they are empty. It is required to call this
+	// function, or Close before a consumer object passes out of scope, as it will otherwise leak memory. You must call
+	// this before calling Close on the underlying client.
 	AsyncClose()
 
-	// Close stops the PartitionConsumer from fetching messages. It is required to
-	// call this function (or AsyncClose) before a consumer object passes out of
-	// scope, as it will otherwise leak memory. You must call this before calling
-	// Close on the underlying client.
+	// Close stops the PartitionConsumer from fetching messages. It will initiate a shutdown just like AsyncClose, drain
+	// the Messages channel, harvest any errors & return them to the caller. Note that if you are continuing to service
+	// the Messages channel when this function is called, you will be competing with Close for messages; consider
+	// calling AsyncClose, instead. It is required to call this function (or AsyncClose) before a consumer object passes
+	// out of scope, as it will otherwise leak memory. You must call this before calling Close on the underlying client.
 	Close() error
 
 	// Messages returns the read channel for the messages that are returned by
