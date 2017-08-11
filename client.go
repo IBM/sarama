@@ -297,7 +297,7 @@ func (client *client) Replicas(topic string, partitionID int32) ([]int32, error)
 	if metadata.Err == ErrReplicaNotAvailable {
 		return nil, metadata.Err
 	}
-	return dupeAndSort(metadata.Replicas), nil
+	return dupInt32Slice(metadata.Replicas), nil
 }
 
 func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, error) {
@@ -322,7 +322,7 @@ func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, 
 	if metadata.Err == ErrReplicaNotAvailable {
 		return nil, metadata.Err
 	}
-	return dupeAndSort(metadata.Isr), nil
+	return dupInt32Slice(metadata.Isr), nil
 }
 
 func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
