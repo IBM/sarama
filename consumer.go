@@ -441,67 +441,36 @@ func (child *partitionConsumer) HighWaterMarkOffset() int64 {
 func (child *partitionConsumer) responseFeeder() {
 	var msgs []*ConsumerMessage
 	msgSent := false
-	// Initialize timer without a pending send on its channel
-	expiryTimer := time.NewTimer(0)
-	<-expiryTimer.C
-	expiryTimerSet := false
-
-	var fastCheckerChan <-chan (time.Time)
-	if child.conf.Consumer.FastCheckerInterval > 0 {
-		fastChecker := time.NewTicker(child.conf.Consumer.FastCheckerInterval)
-		defer fastChecker.Stop()
-		fastCheckerChan = fastChecker.C
-	}
 
 feederLoop:
 	for response := range child.feeder {
 		msgs, child.responseResult = child.parseResponse(response)
+		expiryTicker := time.NewTicker(child.conf.Consumer.MaxProcessingTime)
 
 		for i, msg := range msgs {
-			if child.conf.Consumer.FastCheckerInterval <= 0 {
-				expiryTimerSet = true
-				expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime)
-			}
-
 		messageSelect:
 			select {
 			case child.messages <- msg:
 				msgSent = true
-				if expiryTimerSet {
-					// The timer was set and a message was sent, stop the
-					// timer and resume using the fast checker
-					if !expiryTimer.Stop() {
-						<-expiryTimer.C
+			case <-expiryTicker.C:
+				if !msgSent {
+					child.responseResult = errTimedOut
+					child.broker.acks.Done()
+					for _, msg = range msgs[i:] {
+						child.messages <- msg
 					}
-					expiryTimerSet = false
-				}
-			// Periodically check if messages have been sent
-			case <-fastCheckerChan:
-				if msgSent {
+					child.broker.input <- child
+					continue feederLoop
+				} else {
+					// current message has not been sent, return to select
+					// statement
 					msgSent = false
-				} else if !expiryTimerSet {
-					// No messages have been sent since the last tick,
-					// start the timer
-					expiryTimerSet = true
-					// If the fast checker is being used, then at least
-					// the time between two fast checker ticks has already
-					// passed since the last message was sent.
-					expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime - child.conf.Consumer.FastCheckerInterval)
+					goto messageSelect
 				}
-				// message has not been sent, return to select statement
-				goto messageSelect
-			case <-expiryTimer.C:
-				expiryTimerSet = false
-				child.responseResult = errTimedOut
-				child.broker.acks.Done()
-				for _, msg = range msgs[i:] {
-					child.messages <- msg
-				}
-				child.broker.input <- child
-				continue feederLoop
 			}
 		}
 
+		expiryTicker.Stop()
 		child.broker.acks.Done()
 	}
 
