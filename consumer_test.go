@@ -822,7 +822,7 @@ func TestConsumerFastCheckerOff(t *testing.T) {
 
 	config := NewConfig()
 	config.ChannelBufferSize = 0
-	config.Consumer.FastCheckerInterval = 0
+	config.Consumer.UseFastChecker = false
 	config.Consumer.MaxProcessingTime = 10 * time.Millisecond
 	master, err := NewConsumer([]string{broker0.Addr()}, config)
 	if err != nil {
@@ -865,7 +865,7 @@ func TestConsumerFastCheckerOn(t *testing.T) {
 
 	config := NewConfig()
 	config.ChannelBufferSize = 0
-	config.Consumer.FastCheckerInterval = 1 * time.Millisecond
+	config.Consumer.UseFastChecker = true
 	config.Consumer.MaxProcessingTime = 10 * time.Millisecond
 	master, err := NewConsumer([]string{broker0.Addr()}, config)
 	if err != nil {

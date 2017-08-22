@@ -197,22 +197,20 @@ type Config struct {
 		// (MaxProcessingTime * ChanneBufferSize). Defaults to 100ms.
 		MaxProcessingTime time.Duration
 
-		// The time interval between ticks of the fast checker. A value of 0
-		// turns off the fast checker.
-		// If this is set to a non-zero value, then there will be periodic
-		// checks to see if messages have been written to the Messages channel.
-		// If a message has not been written to the Messages channel since the
-		// last tick of the fast checker, then the timer will be set.
+		// Whether or not to use the fast checker. The fast checker uses a
+		// ticker instead of a timer to implement the timeout functionality in
+		// (*partitionConsumer).responseFeeder.
+		// If a message is not written to the Messages channel between two ticks
+		// of the fast checker then a timeout is detected.
 		// Using the fast checker should typically result in many fewer calls to
 		// Timer functions resulting in a significant performance improvement if
 		// many messages are being sent and timeouts are infrequent.
 		// The disadvantage of using the fast checker is that timeouts will be
 		// less accurate. That is, the effective timeout could be between
-		// `MaxProcessingTime` and `MaxProcessingTime + FastCheckerInterval`.
-		// For example, if `MaxProcessingTime` is 100ms and
-		// `FastCheckerInterval` is 10ms, then a delay of 108ms between two
+		// `MaxProcessingTime` and `2 * MaxProcessingTime`. For example, if
+		// `MaxProcessingTime` is 100ms then a delay of 180ms between two
 		// messages being sent may not be recognized as a timeout.
-		FastCheckerInterval time.Duration
+		UseFastChecker bool
 
 		// Return specifies what channels will be populated. If they are set to true,
 		// you must read from them to prevent deadlock.
@@ -294,7 +292,7 @@ func NewConfig() *Config {
 	c.Consumer.Retry.Backoff = 2 * time.Second
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
-	c.Consumer.FastCheckerInterval = 0
+	c.Consumer.UseFastChecker = false
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
@@ -420,8 +418,6 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.MaxWaitTime must be >= 1ms")
 	case c.Consumer.MaxProcessingTime <= 0:
 		return ConfigurationError("Consumer.MaxProcessingTime must be > 0")
-	case c.Consumer.FastCheckerInterval < 0:
-		return ConfigurationError("Consumer.FastCheckerInterval must be >= 0")
 	case c.Consumer.Retry.Backoff < 0:
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
 	case c.Consumer.Offsets.CommitInterval <= 0:
