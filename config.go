@@ -190,27 +190,24 @@ type Config struct {
 		// Equivalent to the JVM's `fetch.wait.max.ms`.
 		MaxWaitTime time.Duration
 
-		// The maximum amount of time the consumer expects a message takes to process
-		// for the user. If writing to the Messages channel takes longer than this,
-		// that partition will stop fetching more messages until it can proceed again.
+		// The maximum amount of time the consumer expects a message takes to
+		// process for the user. If writing to the Messages channel takes longer
+		// than this, that partition will stop fetching more messages until it
+		// can proceed again.
 		// Note that, since the Messages channel is buffered, the actual grace time is
 		// (MaxProcessingTime * ChanneBufferSize). Defaults to 100ms.
-		MaxProcessingTime time.Duration
-
-		// Whether or not to use the fast checker. The fast checker uses a
-		// ticker instead of a timer to implement the timeout functionality in
-		// (*partitionConsumer).responseFeeder.
 		// If a message is not written to the Messages channel between two ticks
-		// of the fast checker then a timeout is detected.
-		// Using the fast checker should typically result in many fewer calls to
-		// Timer functions resulting in a significant performance improvement if
-		// many messages are being sent and timeouts are infrequent.
-		// The disadvantage of using the fast checker is that timeouts will be
-		// less accurate. That is, the effective timeout could be between
-		// `MaxProcessingTime` and `2 * MaxProcessingTime`. For example, if
-		// `MaxProcessingTime` is 100ms then a delay of 180ms between two
-		// messages being sent may not be recognized as a timeout.
-		UseFastChecker bool
+		// of the expiryTicker then a timeout is detected.
+		// Using a ticker instead of a timer to detect timeouts should typically
+		// result in many fewer calls to Timer functions which may result in a
+		// significant performance improvement if many messages are being sent
+		// and timeouts are infrequent.
+		// The disadvantage of using a ticker instead of a timer is that
+		// timeouts will be less accurate. That is, the effective timeout could
+		// be between `MaxProcessingTime` and `2 * MaxProcessingTime`. For
+		// example, if `MaxProcessingTime` is 100ms then a delay of 180ms
+		// between two messages being sent may not be recognized as a timeout.
+		MaxProcessingTime time.Duration
 
 		// Return specifies what channels will be populated. If they are set to true,
 		// you must read from them to prevent deadlock.
@@ -292,7 +289,6 @@ func NewConfig() *Config {
 	c.Consumer.Retry.Backoff = 2 * time.Second
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
-	c.Consumer.UseFastChecker = false
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
