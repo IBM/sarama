@@ -14,6 +14,21 @@ var (
 		0xFF, 0xFF, 0xFF, 0xFF, // key
 		0xFF, 0xFF, 0xFF, 0xFF} // value
 
+	emptyV1Message = []byte{
+		204, 47, 121, 217, // CRC
+		0x01,                                           // magic version byte
+		0x00,                                           // attribute flags
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // timestamp
+		0xFF, 0xFF, 0xFF, 0xFF, // key
+		0xFF, 0xFF, 0xFF, 0xFF} // value
+
+	emptyV2Message = []byte{
+		167, 236, 104, 3, // CRC
+		0x02,                   // magic version byte
+		0x00,                   // attribute flags
+		0xFF, 0xFF, 0xFF, 0xFF, // key
+		0xFF, 0xFF, 0xFF, 0xFF} // value
+
 	emptyGzipMessage = []byte{
 		97, 79, 149, 90, //CRC
 		0x00,                   // magic version byte
@@ -177,5 +192,21 @@ func TestMessageDecodingBulkLZ4(t *testing.T) {
 		t.Error("Decoding produced no set, but one was expected.")
 	} else if len(message.Set.Messages) != 2 {
 		t.Errorf("Decoding produced a set with %d messages, but 2 were expected.", len(message.Set.Messages))
+	}
+}
+
+func TestMessageDecodingVersion1(t *testing.T) {
+	message := Message{Version: 1}
+	testDecodable(t, "decoding empty v1 message", &message, emptyV1Message)
+}
+
+func TestMessageDecodingUnknownVersions(t *testing.T) {
+	message := Message{Version: 2}
+	err := decode(emptyV2Message, &message)
+	if err == nil {
+		t.Error("Decoding did not produce an error for an unknown magic byte")
+	}
+	if err.Error() != "kafka: error decoding packet: unknown magic byte (2)" {
+		t.Error("Decoding an unknown magic byte produced an unknown error ", err)
 	}
 }
