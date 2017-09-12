@@ -612,6 +612,9 @@ func (client *client) backgroundMetadataUpdater() {
 				if specificTopics, err := client.Topics(); err != nil {
 					Logger.Println("Client background metadata topic load:", err)
 					break
+				} else if len(specificTopics) == 0 {
+					Logger.Println("Client background metadata update: no specific topics to update")
+					break
 				} else {
 					topics = specificTopics
 				}
