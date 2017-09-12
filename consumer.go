@@ -440,35 +440,37 @@ func (child *partitionConsumer) HighWaterMarkOffset() int64 {
 
 func (child *partitionConsumer) responseFeeder() {
 	var msgs []*ConsumerMessage
-	expiryTimer := time.NewTimer(child.conf.Consumer.MaxProcessingTime)
-	expireTimedOut := false
+	msgSent := false
 
 feederLoop:
 	for response := range child.feeder {
 		msgs, child.responseResult = child.parseResponse(response)
+		expiryTicker := time.NewTicker(child.conf.Consumer.MaxProcessingTime)
 
 		for i, msg := range msgs {
-			if !expiryTimer.Stop() && !expireTimedOut {
-				// expiryTimer was expired; clear out the waiting msg
-				<-expiryTimer.C
-			}
-			expiryTimer.Reset(child.conf.Consumer.MaxProcessingTime)
-			expireTimedOut = false
-
+		messageSelect:
 			select {
 			case child.messages <- msg:
-			case <-expiryTimer.C:
-				expireTimedOut = true
-				child.responseResult = errTimedOut
-				child.broker.acks.Done()
-				for _, msg = range msgs[i:] {
-					child.messages <- msg
+				msgSent = true
+			case <-expiryTicker.C:
+				if !msgSent {
+					child.responseResult = errTimedOut
+					child.broker.acks.Done()
+					for _, msg = range msgs[i:] {
+						child.messages <- msg
+					}
+					child.broker.input <- child
+					continue feederLoop
+				} else {
+					// current message has not been sent, return to select
+					// statement
+					msgSent = false
+					goto messageSelect
 				}
-				child.broker.input <- child
-				continue feederLoop
 			}
 		}
 
+		expiryTicker.Stop()
 		child.broker.acks.Done()
 	}
 
