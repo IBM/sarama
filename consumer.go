@@ -676,7 +676,7 @@ func (bc *brokerConsumer) handleResponses() {
 			// there's no point in retrying this it will just fail the same way again
 			// shut it down and force the user to choose what to do
 			child.sendError(result)
-			Logger.Printf("consumer/%s/%d shutting down because %s\n", child.topic, child.partition, result)
+			Logger.Printf("consumer/%s/%d@%d shutting down because %s\n", child.topic, child.partition, child.offset, result)
 			close(child.trigger)
 			delete(bc.subscriptions, child)
 		case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable, ErrReplicaNotAvailable:
