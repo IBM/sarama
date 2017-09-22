@@ -3,6 +3,7 @@ package sarama
 import (
 	"bufio"
 	"net"
+	"sort"
 )
 
 type none struct{}
