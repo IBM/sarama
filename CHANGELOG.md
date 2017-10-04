@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.13.0 (unreleased)
+#### Version 1.13.0 (2017-10-04)
 
 New Features:
  - Support for FetchRequest version 3
