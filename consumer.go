@@ -417,12 +417,6 @@ func (child *partitionConsumer) AsyncClose() {
 func (child *partitionConsumer) Close() error {
 	child.AsyncClose()
 
-	go withRecover(func() {
-		for range child.messages {
-			// drain
-		}
-	})
-
 	var errors ConsumerErrors
 	for err := range child.errors {
 		errors = append(errors, err)
