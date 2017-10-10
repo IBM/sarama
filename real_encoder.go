@@ -67,25 +67,15 @@ func (re *realEncoder) putString(in string) error {
 }
 
 func (re *realEncoder) putStringArray(in []string) error {
-	err := re.putArrayLength(len(in))
-	if err != nil {
-		return err
-	}
-
+	re.putArrayLength(len(in))
 	for _, val := range in {
-		if err := re.putString(val); err != nil {
-			return err
-		}
+		re.putString(val)
 	}
-
 	return nil
 }
 
 func (re *realEncoder) putInt32Array(in []int32) error {
-	err := re.putArrayLength(len(in))
-	if err != nil {
-		return err
-	}
+	re.putArrayLength(len(in))
 	for _, val := range in {
 		re.putInt32(val)
 	}
@@ -93,10 +83,7 @@ func (re *realEncoder) putInt32Array(in []int32) error {
 }
 
 func (re *realEncoder) putInt64Array(in []int64) error {
-	err := re.putArrayLength(len(in))
-	if err != nil {
-		return err
-	}
+	re.putArrayLength(len(in))
 	for _, val := range in {
 		re.putInt64(val)
 	}
