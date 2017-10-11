@@ -3,9 +3,9 @@ package sarama
 import "time"
 
 type partitionSet struct {
-	msgs        []*ProducerMessage
-	setToSend   *MessageSet
-	bufferBytes int
+	msgs          []*ProducerMessage
+	recordsToSend Records
+	bufferBytes   int
 }
 
 type produceSet struct {
@@ -21,6 +21,10 @@ func newProduceSet(parent *asyncProducer) *produceSet {
 		msgs:   make(map[string]map[int32]*partitionSet),
 		parent: parent,
 	}
+}
+
+func toMillis(timestamp time.Time) int64 {
+	return timestamp.UnixNano() / int64(time.Millisecond)
 }
 
 func (ps *produceSet) add(msg *ProducerMessage) error {
@@ -39,31 +43,65 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 		}
 	}
 
+	timestamp := msg.Timestamp
+	if msg.Timestamp.IsZero() {
+		timestamp = time.Now()
+	}
+
 	partitions := ps.msgs[msg.Topic]
 	if partitions == nil {
 		partitions = make(map[int32]*partitionSet)
 		ps.msgs[msg.Topic] = partitions
 	}
 
+	var size int
+
 	set := partitions[msg.Partition]
 	if set == nil {
-		set = &partitionSet{setToSend: new(MessageSet)}
+		if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
+			batch := &RecordBatch{
+				FirstTimestamp: toMillis(timestamp),
+				Version:        2,
+				ProducerID:     -1, /* No producer id */
+				Codec:          ps.parent.conf.Producer.Compression,
+			}
+			set = &partitionSet{recordsToSend: newDefaultRecords(batch)}
+			size = recordBatchOverhead
+		} else {
+			set = &partitionSet{recordsToSend: newLegacyRecords(new(MessageSet))}
+		}
 		partitions[msg.Partition] = set
 	}
 
 	set.msgs = append(set.msgs, msg)
-	msgToSend := &Message{Codec: CompressionNone, Key: key, Value: val}
-	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
-		if msg.Timestamp.IsZero() {
-			msgToSend.Timestamp = time.Now()
-		} else {
-			msgToSend.Timestamp = msg.Timestamp
+	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
+		rec := &Record{
+			Key:            key,
+			Value:          val,
+			TimestampDelta: toMillis(timestamp) - set.recordsToSend.recordBatch.FirstTimestamp,
 		}
-		msgToSend.Version = 1
+		if len(msg.Headers) > 0 {
+			rec.Headers = make([]*Header, len(msg.Headers))
+			for i, h := range msg.Headers {
+				rec.Headers[i] = &h
+			}
+		}
+		set.recordsToSend.recordBatch.addRecord(rec)
+		s, err := rec.getTotalLength()
+		if err != nil {
+			return err
+		}
+		size += s
+	} else {
+		msgToSend := &Message{Codec: CompressionNone, Key: key, Value: val}
+		if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
+			msgToSend.Timestamp = timestamp
+			msgToSend.Version = 1
+		}
+		set.recordsToSend.msgSet.addMessage(msgToSend)
+		size = producerMessageOverhead + len(key) + len(val)
 	}
-	set.setToSend.addMessage(msgToSend)
 
-	size := producerMessageOverhead + len(key) + len(val)
 	set.bufferBytes += size
 	ps.bufferBytes += size
 	ps.bufferCount++
@@ -79,17 +117,24 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 		req.Version = 2
 	}
+	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
+		req.Version = 3
+	}
 
 	for topic, partitionSet := range ps.msgs {
 		for partition, set := range partitionSet {
+			if req.Version >= 3 {
+				req.AddBatch(topic, partition, set.recordsToSend.recordBatch)
+				continue
+			}
 			if ps.parent.conf.Producer.Compression == CompressionNone {
-				req.AddSet(topic, partition, set.setToSend)
+				req.AddSet(topic, partition, set.recordsToSend.msgSet)
 			} else {
 				// When compression is enabled, the entire set for each partition is compressed
 				// and sent as the payload of a single fake "message" with the appropriate codec
 				// set and no key. When the server sees a message with a compression codec, it
 				// decompresses the payload and treats the result as its message set.
-				payload, err := encode(set.setToSend, ps.parent.conf.MetricRegistry)
+				payload, err := encode(set.recordsToSend.msgSet, ps.parent.conf.MetricRegistry)
 				if err != nil {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
@@ -98,11 +143,11 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					Codec: ps.parent.conf.Producer.Compression,
 					Key:   nil,
 					Value: payload,
-					Set:   set.setToSend, // Provide the underlying message set for accurate metrics
+					Set:   set.recordsToSend.msgSet, // Provide the underlying message set for accurate metrics
 				}
 				if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 					compMsg.Version = 1
-					compMsg.Timestamp = set.setToSend.Messages[0].Msg.Timestamp
+					compMsg.Timestamp = set.recordsToSend.msgSet.Messages[0].Msg.Timestamp
 				}
 				req.AddMessage(topic, partition, compMsg)
 			}
