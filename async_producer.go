@@ -119,6 +119,10 @@ type ProducerMessage struct {
 	// StringEncoder and ByteEncoder.
 	Value Encoder
 
+	// The headers are key-value pairs that are transparently passed
+	// by Kafka between producers and consumers.
+	Headers []Header
+
 	// This field is used to hold arbitrary data you wish to include so it
 	// will be available when receiving on the Successes and Errors channels.
 	// Sarama completely ignores this field and is only to be used for

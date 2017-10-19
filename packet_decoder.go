@@ -9,11 +9,15 @@ type packetDecoder interface {
 	getInt16() (int16, error)
 	getInt32() (int32, error)
 	getInt64() (int64, error)
+	getVarint() (int64, error)
 	getArrayLength() (int, error)
 
 	// Collections
 	getBytes() ([]byte, error)
+	getVarintBytes() ([]byte, error)
+	getRawBytes(length int) ([]byte, error)
 	getString() (string, error)
+	getNullableString() (*string, error)
 	getInt32Array() ([]int32, error)
 	getInt64Array() ([]int64, error)
 	getStringArray() ([]string, error)
