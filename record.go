@@ -1,9 +1,13 @@
 package sarama
 
-import "time"
+import (
+	"encoding/binary"
+	"time"
+)
 
 const (
-	controlMask = 0x20
+	controlMask           = 0x20
+	maximumRecordOverhead = 5*binary.MaxVarintLen32 + binary.MaxVarintLen64 + 1
 )
 
 type RecordHeader struct {
