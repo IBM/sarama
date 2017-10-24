@@ -71,6 +71,14 @@ func (pe *prepEncoder) putRawBytes(in []byte) error {
 	return nil
 }
 
+func (pe *prepEncoder) putNullableString(in *string) error {
+	if in == nil {
+		pe.length += 2
+		return nil
+	}
+	return pe.putString(*in)
+}
+
 func (pe *prepEncoder) putString(in string) error {
 	pe.length += 2
 	if len(in) > math.MaxInt16 {
