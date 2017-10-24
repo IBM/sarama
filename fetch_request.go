@@ -29,15 +29,24 @@ type FetchRequest struct {
 	MinBytes    int32
 	MaxBytes    int32
 	Version     int16
+	Isolation   int8
 	blocks      map[string]map[int32]*fetchRequestBlock
 }
+
+const (
+	ReadUncommitted = 0
+	ReadCommitted   = 1
+)
 
 func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 	pe.putInt32(-1) // replica ID is always -1 for clients
 	pe.putInt32(r.MaxWaitTime)
 	pe.putInt32(r.MinBytes)
-	if r.Version == 3 {
+	if r.Version >= 3 {
 		pe.putInt32(r.MaxBytes)
+	}
+	if r.Version >= 4 {
+		pe.putInt8(r.Isolation)
 	}
 	err = pe.putArrayLength(len(r.blocks))
 	if err != nil {
@@ -74,8 +83,13 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 	if r.MinBytes, err = pd.getInt32(); err != nil {
 		return err
 	}
-	if r.Version == 3 {
+	if r.Version >= 3 {
 		if r.MaxBytes, err = pd.getInt32(); err != nil {
+			return err
+		}
+	}
+	if r.Version >= 4 {
+		if r.Isolation, err = pd.getInt8(); err != nil {
 			return err
 		}
 	}
@@ -128,6 +142,8 @@ func (r *FetchRequest) requiredVersion() KafkaVersion {
 		return V0_10_0_0
 	case 3:
 		return V0_10_1_0
+	case 4:
+		return V0_11_0_0
 	default:
 		return minVersion
 	}
