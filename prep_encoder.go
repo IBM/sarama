@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"encoding/binary"
 	"fmt"
 	"math"
 
@@ -29,6 +30,11 @@ func (pe *prepEncoder) putInt64(in int64) {
 	pe.length += 8
 }
 
+func (pe *prepEncoder) putVarint(in int64) {
+	var buf [binary.MaxVarintLen64]byte
+	pe.length += binary.PutVarint(buf[:], in)
+}
+
 func (pe *prepEncoder) putArrayLength(in int) error {
 	if in > math.MaxInt32 {
 		return PacketEncodingError{fmt.Sprintf("array too long (%d)", in)}
@@ -44,11 +50,16 @@ func (pe *prepEncoder) putBytes(in []byte) error {
 	if in == nil {
 		return nil
 	}
-	if len(in) > math.MaxInt32 {
-		return PacketEncodingError{fmt.Sprintf("byteslice too long (%d)", len(in))}
+	return pe.putRawBytes(in)
+}
+
+func (pe *prepEncoder) putVarintBytes(in []byte) error {
+	if in == nil {
+		pe.putVarint(-1)
+		return nil
 	}
-	pe.length += len(in)
-	return nil
+	pe.putVarint(int64(len(in)))
+	return pe.putRawBytes(in)
 }
 
 func (pe *prepEncoder) putRawBytes(in []byte) error {
