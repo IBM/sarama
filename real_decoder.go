@@ -79,7 +79,7 @@ func (rd *realDecoder) getArrayLength() (int, error) {
 		rd.off = len(rd.raw)
 		return -1, ErrInsufficientData
 	}
-	tmp := int(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+	tmp := int(int32(binary.BigEndian.Uint32(rd.raw[rd.off:])))
 	rd.off += 4
 	if tmp > rd.remaining() {
 		rd.off = len(rd.raw)
