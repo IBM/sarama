@@ -142,6 +142,15 @@ func (rd *realDecoder) getString() (string, error) {
 	return tmpStr, nil
 }
 
+func (rd *realDecoder) getNullableString() (*string, error) {
+	tmp, err := rd.getInt16()
+	if err != nil || tmp == -1 {
+		return nil, err
+	}
+	str, err := rd.getString()
+	return &str, err
+}
+
 func (rd *realDecoder) getInt32Array() ([]int32, error) {
 	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)

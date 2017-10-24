@@ -77,6 +77,14 @@ func (re *realEncoder) putString(in string) error {
 	return nil
 }
 
+func (re *realEncoder) putNullableString(in *string) error {
+	if in == nil {
+		re.putInt16(-1)
+		return nil
+	}
+	return re.putString(*in)
+}
+
 func (re *realEncoder) putStringArray(in []string) error {
 	err := re.putArrayLength(len(in))
 	if err != nil {
