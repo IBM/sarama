@@ -191,6 +191,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", b.Codec)}
 	}
 
+	b.recordsLen = len(recBuffer)
 	err = decode(recBuffer, recordsArray(b.Records))
 	if err == ErrInsufficientData {
 		b.PartialTrailingRecord = true
