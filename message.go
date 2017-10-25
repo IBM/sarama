@@ -37,7 +37,7 @@ type Message struct {
 }
 
 func (m *Message) encode(pe packetEncoder) error {
-	pe.push(&crc32Field{})
+	pe.push(newCRC32Field(crcIEEE))
 
 	pe.putInt8(m.Version)
 
@@ -112,7 +112,7 @@ func (m *Message) encode(pe packetEncoder) error {
 }
 
 func (m *Message) decode(pd packetDecoder) (err error) {
-	err = pd.push(&crc32Field{})
+	err = pd.push(newCRC32Field(crcIEEE))
 	if err != nil {
 		return err
 	}
