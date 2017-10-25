@@ -6,8 +6,10 @@ import (
 	"hash/crc32"
 )
 
+type crcPolynomial int8
+
 const (
-	crcIEEE = iota
+	crcIEEE crcPolynomial = iota
 	crcCastagnoli
 )
 
@@ -16,7 +18,7 @@ var castagnoliTable = crc32.MakeTable(crc32.Castagnoli)
 // crc32Field implements the pushEncoder and pushDecoder interfaces for calculating CRC32s.
 type crc32Field struct {
 	startOffset int
-	polynomial  int
+	polynomial  crcPolynomial
 }
 
 func (c *crc32Field) saveOffset(in int) {
@@ -27,7 +29,7 @@ func (c *crc32Field) reserveLength() int {
 	return 4
 }
 
-func newCRC32Field(polynomial int) *crc32Field {
+func newCRC32Field(polynomial crcPolynomial) *crc32Field {
 	return &crc32Field{polynomial: polynomial}
 }
 
