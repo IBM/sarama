@@ -27,3 +27,32 @@ func (l *lengthField) check(curOffset int, buf []byte) error {
 
 	return nil
 }
+
+type varintLengthField struct {
+	startOffset int
+	length      int64
+}
+
+func newVarintLengthField(pd packetDecoder) (*varintLengthField, error) {
+	n, err := pd.getVarint()
+	if err != nil {
+		return nil, err
+	}
+	return &varintLengthField{length: n}, nil
+}
+
+func (l *varintLengthField) saveOffset(in int) {
+	l.startOffset = in
+}
+
+func (l *varintLengthField) reserveLength() int {
+	return 0
+}
+
+func (l *varintLengthField) check(curOffset int, buf []byte) error {
+	if int64(curOffset-l.startOffset) != l.length {
+		return PacketDecodingError{"length field invalid"}
+	}
+
+	return nil
+}
