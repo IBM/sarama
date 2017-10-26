@@ -63,7 +63,7 @@ var recordBatchTestCases = []struct {
 				TimestampDelta: 5,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
-				Headers: []*Header{{
+				Headers: []*RecordHeader{{
 					Key:   []byte{8, 9, 10},
 					Value: []byte{11, 12},
 				}},
@@ -108,7 +108,7 @@ var recordBatchTestCases = []struct {
 				TimestampDelta: 5,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
-				Headers: []*Header{{
+				Headers: []*RecordHeader{{
 					Key:   []byte{8, 9, 10},
 					Value: []byte{11, 12},
 				}},
@@ -159,7 +159,7 @@ var recordBatchTestCases = []struct {
 				TimestampDelta: 5,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
-				Headers: []*Header{{
+				Headers: []*RecordHeader{{
 					Key:   []byte{8, 9, 10},
 					Value: []byte{11, 12},
 				}},
@@ -192,7 +192,7 @@ var recordBatchTestCases = []struct {
 				TimestampDelta: 5,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
-				Headers: []*Header{{
+				Headers: []*RecordHeader{{
 					Key:   []byte{8, 9, 10},
 					Value: []byte{11, 12},
 				}},
