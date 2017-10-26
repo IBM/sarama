@@ -6,19 +6,19 @@ const (
 	controlMask = 0x20
 )
 
-type Header struct {
+type RecordHeader struct {
 	Key   []byte
 	Value []byte
 }
 
-func (h *Header) encode(pe packetEncoder) error {
+func (h *RecordHeader) encode(pe packetEncoder) error {
 	if err := pe.putVarintBytes(h.Key); err != nil {
 		return err
 	}
 	return pe.putVarintBytes(h.Value)
 }
 
-func (h *Header) decode(pd packetDecoder) (err error) {
+func (h *RecordHeader) decode(pd packetDecoder) (err error) {
 	if h.Key, err = pd.getVarintBytes(); err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ type Record struct {
 	OffsetDelta    int64
 	Key            []byte
 	Value          []byte
-	Headers        []*Header
+	Headers        []*RecordHeader
 
 	lengthComputed bool
 	length         int64
@@ -105,10 +105,10 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 	}
 
 	if numHeaders >= 0 {
-		r.Headers = make([]*Header, numHeaders)
+		r.Headers = make([]*RecordHeader, numHeaders)
 	}
 	for i := int64(0); i < numHeaders; i++ {
-		hdr := new(Header)
+		hdr := new(RecordHeader)
 		if err := hdr.decode(pd); err != nil {
 			return err
 		}
