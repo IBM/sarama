@@ -53,6 +53,22 @@ func TestLegacyRecords(t *testing.T) {
 	if n != 1 {
 		t.Errorf("Wrong number of records, wanted 1, got %d", n)
 	}
+
+	p, err := r.isPartial()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p {
+		t.Errorf("MessageSet shouldn't have a partial trailing message")
+	}
+
+	c, err := r.isControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c {
+		t.Errorf("MessageSet can't be a control batch")
+	}
 }
 
 func TestDefaultRecords(t *testing.T) {
@@ -101,5 +117,21 @@ func TestDefaultRecords(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("Wrong number of records, wanted 1, got %d", n)
+	}
+
+	p, err := r.isPartial()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p {
+		t.Errorf("RecordBatch shouldn't have a partial trailing record")
+	}
+
+	c, err := r.isControl()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c {
+		t.Errorf("RecordBatch shouldn't be a control batch")
 	}
 }
