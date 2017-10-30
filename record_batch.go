@@ -59,10 +59,7 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 		if err := pe.pop(); err != nil {
 			return err
 		}
-		if err := pe.pop(); err != nil {
-			return err
-		}
-		return nil
+		return pe.pop()
 	}
 
 	var re packetEncoder
@@ -72,14 +69,9 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	case CompressionNone:
 		re = pe
 	case CompressionGZIP, CompressionLZ4, CompressionSnappy:
-		for _, r := range b.Records {
-			l, err := r.getTotalLength()
-			if err != nil {
-				return err
-			}
-			b.recordsLen += l
+		if err := b.computeRecordsLength(); err != nil {
+			return err
 		}
-
 		raw = make([]byte, b.recordsLen)
 		re = &realEncoder{raw: raw}
 	default:
@@ -123,11 +115,7 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	if err := pe.pop(); err != nil {
 		return err
 	}
-	if err := pe.pop(); err != nil {
-		return err
-	}
-
-	return nil
+	return pe.pop()
 }
 
 func (b *RecordBatch) decode(pd packetDecoder) (err error) {
@@ -247,6 +235,18 @@ func (b *RecordBatch) computeAttributes() int16 {
 		attr |= controlMask
 	}
 	return attr
+}
+
+func (b *RecordBatch) computeRecordsLength() error {
+	b.recordsLen = 0
+	for _, r := range b.Records {
+		l, err := r.getTotalLength()
+		if err != nil {
+			return err
+		}
+		b.recordsLen += l
+	}
+	return nil
 }
 
 func (b *RecordBatch) addRecord(r *Record) {

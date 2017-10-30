@@ -9,6 +9,7 @@ import (
 )
 
 type prepEncoder struct {
+	stack  []pushEncoder
 	length int
 }
 
@@ -119,10 +120,18 @@ func (pe *prepEncoder) offset() int {
 // stackable
 
 func (pe *prepEncoder) push(in pushEncoder) {
+	in.saveOffset(pe.length)
 	pe.length += in.reserveLength()
+	pe.stack = append(pe.stack, in)
 }
 
 func (pe *prepEncoder) pop() error {
+	in := pe.stack[len(pe.stack)-1]
+	pe.stack = pe.stack[:len(pe.stack)-1]
+	if dpe, ok := in.(dynamicPushEncoder); ok {
+		pe.length += dpe.adjustLength(pe.length)
+	}
+
 	return nil
 }
 

@@ -252,14 +252,10 @@ func TestRecordBatchDecoding(t *testing.T) {
 		batch := RecordBatch{}
 		testDecodable(t, tc.name, &batch, tc.encoded)
 		for _, r := range batch.Records {
-			if _, err := r.getTotalLength(); err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			r.length = varintLengthField{}
 		}
 		for _, r := range tc.batch.Records {
-			if _, err := r.getTotalLength(); err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			r.length = varintLengthField{}
 		}
 		if !reflect.DeepEqual(batch, tc.batch) {
 			t.Errorf(spew.Sprintf("invalid decode of %s\ngot %+v\nwanted %+v", tc.name, batch, tc.batch))
