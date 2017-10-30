@@ -31,22 +31,43 @@ func (l *lengthField) check(curOffset int, buf []byte) error {
 type varintLengthField struct {
 	startOffset int
 	length      int64
+	adjusted    bool
+	size        int
 }
 
-func newVarintLengthField(pd packetDecoder) (*varintLengthField, error) {
-	n, err := pd.getVarint()
-	if err != nil {
-		return nil, err
-	}
-	return &varintLengthField{length: n}, nil
+func (l *varintLengthField) decode(pd packetDecoder) error {
+	var err error
+	l.length, err = pd.getVarint()
+	return err
 }
 
 func (l *varintLengthField) saveOffset(in int) {
 	l.startOffset = in
 }
 
+func (l *varintLengthField) adjustLength(currOffset int) int {
+	l.adjusted = true
+
+	var tmp [binary.MaxVarintLen64]byte
+	l.length = int64(currOffset - l.startOffset - l.size)
+
+	newSize := binary.PutVarint(tmp[:], l.length)
+	diff := newSize - l.size
+	l.size = newSize
+
+	return diff
+}
+
 func (l *varintLengthField) reserveLength() int {
-	return 0
+	return l.size
+}
+
+func (l *varintLengthField) run(curOffset int, buf []byte) error {
+	if !l.adjusted {
+		return PacketEncodingError{"varintLengthField.run called before adjustLength"}
+	}
+	binary.PutVarint(buf[l.startOffset:], l.length)
+	return nil
 }
 
 func (l *varintLengthField) check(curOffset int, buf []byte) error {
