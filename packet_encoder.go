@@ -58,5 +58,6 @@ type dynamicPushEncoder interface {
 	pushEncoder
 
 	// Called during pop() to adjust the length of the field.
+	// It should return the difference in bytes between the last computed length and current length.
 	adjustLength(currOffset int) int
 }
