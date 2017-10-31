@@ -52,7 +52,7 @@ type pushEncoder interface {
 }
 
 // dynamicPushEncoder extends the interface of pushEncoder for uses cases where the length of the
-// fields itself is unknown until its value was computed (for instance varint encoded lenght
+// fields itself is unknown until its value was computed (for instance varint encoded length
 // fields).
 type dynamicPushEncoder interface {
 	pushEncoder
