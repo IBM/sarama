@@ -75,7 +75,9 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	}
 
 	if b.compressedRecords == nil {
-		b.encodeRecords(pe)
+		if err := b.encodeRecords(pe); err != nil {
+			return err
+		}
 	}
 	if err := pe.putRawBytes(b.compressedRecords); err != nil {
 		return err
