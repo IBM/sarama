@@ -50,3 +50,14 @@ type pushEncoder interface {
 	// of data to the saved offset, based on the data between the saved offset and curOffset.
 	run(curOffset int, buf []byte) error
 }
+
+// dynamicPushEncoder extends the interface of pushEncoder for uses cases where the length of the
+// fields itself is unknown until its value was computed (for instance varint encoded length
+// fields).
+type dynamicPushEncoder interface {
+	pushEncoder
+
+	// Called during pop() to adjust the length of the field.
+	// It should return the difference in bytes between the last computed length and current length.
+	adjustLength(currOffset int) int
+}
