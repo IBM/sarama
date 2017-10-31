@@ -35,8 +35,7 @@ type Record struct {
 	Value          []byte
 	Headers        []*RecordHeader
 
-	length      varintLengthField
-	totalLength int
+	length varintLengthField
 }
 
 func (r *Record) encode(pe packetEncoder) error {
@@ -110,10 +109,6 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 
 func (r *Record) getTotalLength() (int, error) {
 	var prep prepEncoder
-	if !r.length.adjusted {
-		if err := r.encode(&prep); err != nil {
-			return 0, err
-		}
-	}
-	return int(r.length.length) + r.length.size, nil
+	err := r.encode(&prep)
+	return prep.length, err
 }
