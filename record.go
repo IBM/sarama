@@ -61,9 +61,6 @@ func (r *Record) encode(pe packetEncoder) error {
 }
 
 func (r *Record) decode(pd packetDecoder) (err error) {
-	if err := r.length.decode(pd); err != nil {
-		return err
-	}
 	if err = pd.push(&r.length); err != nil {
 		return err
 	}
