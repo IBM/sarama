@@ -31,10 +31,12 @@ func (l *lengthField) check(curOffset int, buf []byte) error {
 type varintLengthField struct {
 	startOffset int
 	length      int64
+	consumed    bool
 }
 
 func (l *varintLengthField) decode(pd packetDecoder) error {
 	var err error
+	l.consumed = true
 	l.length, err = pd.getVarint()
 	return err
 }
@@ -51,6 +53,10 @@ func (l *varintLengthField) adjustLength(currOffset int) int {
 }
 
 func (l *varintLengthField) reserveLength() int {
+	if l.consumed { // the field was consumed during the decode
+		l.consumed = false
+		return 0
+	}
 	var tmp [binary.MaxVarintLen64]byte
 	return binary.PutVarint(tmp[:], l.length)
 }
