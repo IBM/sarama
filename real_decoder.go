@@ -260,10 +260,17 @@ func (rd *realDecoder) getRawBytes(length int) ([]byte, error) {
 func (rd *realDecoder) push(in pushDecoder) error {
 	in.saveOffset(rd.off)
 
-	reserve := in.reserveLength()
-	if rd.remaining() < reserve {
-		rd.off = len(rd.raw)
-		return ErrInsufficientData
+	var reserve int
+	if dpd, ok := in.(dynamicPushDecoder); ok {
+		if err := dpd.decode(rd); err != nil {
+			return err
+		}
+	} else {
+		reserve = in.reserveLength()
+		if rd.remaining() < reserve {
+			rd.off = len(rd.raw)
+			return ErrInsufficientData
+		}
 	}
 
 	rd.stack = append(rd.stack, in)

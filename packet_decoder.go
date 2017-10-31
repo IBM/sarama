@@ -46,3 +46,12 @@ type pushDecoder interface {
 	// of data from the saved offset, and verify it based on the data between the saved offset and curOffset.
 	check(curOffset int, buf []byte) error
 }
+
+// dynamicPushDecoder extends the interface of pushDecoder for uses cases where the length of the
+// fields itself is unknown until its value was decoded (for instance varint encoded length
+// fields).
+// During push, dynamicPushDecoder.decode() method will be called instead of reserveLength()
+type dynamicPushDecoder interface {
+	pushDecoder
+	decoder
+}
