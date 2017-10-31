@@ -106,9 +106,3 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 
 	return pd.pop()
 }
-
-func (r *Record) getTotalLength() (int, error) {
-	var prep prepEncoder
-	err := r.encode(&prep)
-	return prep.length, err
-}
