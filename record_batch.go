@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"github.com/eapache/go-xerial-snappy"
 	"github.com/pierrec/lz4"
@@ -41,8 +42,8 @@ type RecordBatch struct {
 	Codec                 CompressionCodec
 	Control               bool
 	LastOffsetDelta       int32
-	FirstTimestamp        int64
-	MaxTimestamp          int64
+	FirstTimestamp        time.Time
+	MaxTimestamp          time.Time
 	ProducerID            int64
 	ProducerEpoch         int16
 	FirstSequence         int32
@@ -64,8 +65,15 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	pe.push(newCRC32Field(crcCastagnoli))
 	pe.putInt16(b.computeAttributes())
 	pe.putInt32(b.LastOffsetDelta)
-	pe.putInt64(b.FirstTimestamp)
-	pe.putInt64(b.MaxTimestamp)
+
+	if err := (Timestamp{&b.FirstTimestamp}).encode(pe); err != nil {
+		return err
+	}
+
+	if err := (Timestamp{&b.MaxTimestamp}).encode(pe); err != nil {
+		return err
+	}
+
 	pe.putInt64(b.ProducerID)
 	pe.putInt16(b.ProducerEpoch)
 	pe.putInt32(b.FirstSequence)
@@ -122,11 +130,11 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if b.FirstTimestamp, err = pd.getInt64(); err != nil {
+	if err = (Timestamp{&b.FirstTimestamp}).decode(pd); err != nil {
 		return err
 	}
 
-	if b.MaxTimestamp, err = pd.getInt64(); err != nil {
+	if err = (Timestamp{&b.MaxTimestamp}).decode(pd); err != nil {
 		return err
 	}
 
