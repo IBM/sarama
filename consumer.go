@@ -532,12 +532,6 @@ func (child *partitionConsumer) parseRecords(block *FetchResponseBlock) ([]*Cons
 		}
 		prelude = false
 
-		millis := batch.FirstTimestamp + rec.TimestampDelta
-		timestamp := time.Time{}
-		if millis >= 0 {
-			timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
-		}
-
 		if offset >= child.offset {
 			messages = append(messages, &ConsumerMessage{
 				Topic:     child.topic,
@@ -545,7 +539,7 @@ func (child *partitionConsumer) parseRecords(block *FetchResponseBlock) ([]*Cons
 				Key:       rec.Key,
 				Value:     rec.Value,
 				Offset:    offset,
-				Timestamp: timestamp,
+				Timestamp: batch.FirstTimestamp.Add(rec.TimestampDelta),
 				Headers:   rec.Headers,
 			})
 			child.offset = offset + 1

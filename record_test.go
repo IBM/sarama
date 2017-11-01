@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 )
@@ -17,8 +18,13 @@ var recordBatchTestCases = []struct {
 	oldGoEncoded []byte // used in case of gzipped content for go versions prior to 1.8
 }{
 	{
-		name:  "empty record",
-		batch: RecordBatch{Version: 2, Records: []*Record{}},
+		name: "empty record",
+		batch: RecordBatch{
+			Version:        2,
+			FirstTimestamp: time.Unix(0, 0),
+			MaxTimestamp:   time.Unix(0, 0),
+			Records:        []*Record{},
+		},
 		encoded: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 49, // Length
@@ -36,8 +42,14 @@ var recordBatchTestCases = []struct {
 		},
 	},
 	{
-		name:  "control batch",
-		batch: RecordBatch{Version: 2, Control: true, Records: []*Record{}},
+		name: "control batch",
+		batch: RecordBatch{
+			Version:        2,
+			Control:        true,
+			FirstTimestamp: time.Unix(0, 0),
+			MaxTimestamp:   time.Unix(0, 0),
+			Records:        []*Record{},
+		},
 		encoded: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 49, // Length
@@ -58,9 +70,10 @@ var recordBatchTestCases = []struct {
 		name: "uncompressed record",
 		batch: RecordBatch{
 			Version:        2,
-			FirstTimestamp: 10,
+			FirstTimestamp: time.Unix(1479847795, 0),
+			MaxTimestamp:   time.Unix(0, 0),
 			Records: []*Record{{
-				TimestampDelta: 5,
+				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
 				Headers: []*RecordHeader{{
@@ -74,10 +87,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 70, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
 			2,                // Version
-			219, 71, 20, 201, // CRC
+			84, 121, 97, 253, // CRC
 			0, 0, // Attributes
 			0, 0, 0, 0, // Last Offset Delta
-			0, 0, 0, 0, 0, 0, 0, 10, // First Timestamp
+			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
 			0, 0, // Producer Epoch
@@ -103,9 +116,10 @@ var recordBatchTestCases = []struct {
 		batch: RecordBatch{
 			Version:        2,
 			Codec:          CompressionGZIP,
-			FirstTimestamp: 10,
+			FirstTimestamp: time.Unix(1479847795, 0),
+			MaxTimestamp:   time.Unix(0, 0),
 			Records: []*Record{{
-				TimestampDelta: 5,
+				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
 				Headers: []*RecordHeader{{
@@ -118,11 +132,11 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 94, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,                // Version
-			15, 156, 184, 78, // CRC
+			2,                  // Version
+			159, 236, 182, 189, // CRC
 			0, 1, // Attributes
 			0, 0, 0, 0, // Last Offset Delta
-			0, 0, 0, 0, 0, 0, 0, 10, // First Timestamp
+			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
 			0, 0, // Producer Epoch
@@ -136,10 +150,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 94, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
 			2,               // Version
-			144, 168, 0, 33, // CRC
+			0, 216, 14, 210, // CRC
 			0, 1, // Attributes
 			0, 0, 0, 0, // Last Offset Delta
-			0, 0, 0, 0, 0, 0, 0, 10, // First Timestamp
+			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
 			0, 0, // Producer Epoch
@@ -154,9 +168,10 @@ var recordBatchTestCases = []struct {
 		batch: RecordBatch{
 			Version:        2,
 			Codec:          CompressionSnappy,
-			FirstTimestamp: 10,
+			FirstTimestamp: time.Unix(1479847795, 0),
+			MaxTimestamp:   time.Unix(0, 0),
 			Records: []*Record{{
-				TimestampDelta: 5,
+				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
 				Headers: []*RecordHeader{{
@@ -169,11 +184,11 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 72, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,               // Version
-			95, 173, 35, 17, // CRC
+			2,              // Version
+			21, 0, 159, 97, // CRC
 			0, 2, // Attributes
 			0, 0, 0, 0, // Last Offset Delta
-			0, 0, 0, 0, 0, 0, 0, 10, // First Timestamp
+			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
 			0, 0, // Producer Epoch
@@ -187,9 +202,10 @@ var recordBatchTestCases = []struct {
 		batch: RecordBatch{
 			Version:        2,
 			Codec:          CompressionLZ4,
-			FirstTimestamp: 10,
+			FirstTimestamp: time.Unix(1479847795, 0),
+			MaxTimestamp:   time.Unix(0, 0),
 			Records: []*Record{{
-				TimestampDelta: 5,
+				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
 				Value:          []byte{5, 6, 7},
 				Headers: []*RecordHeader{{
@@ -202,11 +218,11 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 89, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,                // Version
-			129, 238, 43, 82, // CRC
+			2,                 // Version
+			169, 74, 119, 197, // CRC
 			0, 3, // Attributes
 			0, 0, 0, 0, // Last Offset Delta
-			0, 0, 0, 0, 0, 0, 0, 10, // First Timestamp
+			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
 			0, 0, // Producer Epoch
