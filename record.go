@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 const (
 	controlMask = 0x20
 )
@@ -29,7 +31,7 @@ func (h *RecordHeader) decode(pd packetDecoder) (err error) {
 
 type Record struct {
 	Attributes     int8
-	TimestampDelta int64
+	TimestampDelta time.Duration
 	OffsetDelta    int64
 	Key            []byte
 	Value          []byte
@@ -41,7 +43,7 @@ type Record struct {
 func (r *Record) encode(pe packetEncoder) error {
 	pe.push(&r.length)
 	pe.putInt8(r.Attributes)
-	pe.putVarint(r.TimestampDelta)
+	pe.putVarint(int64(r.TimestampDelta / time.Millisecond))
 	pe.putVarint(r.OffsetDelta)
 	if err := pe.putVarintBytes(r.Key); err != nil {
 		return err
@@ -69,9 +71,11 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if r.TimestampDelta, err = pd.getVarint(); err != nil {
+	timestamp, err := pd.getVarint()
+	if err != nil {
 		return err
 	}
+	r.TimestampDelta = time.Duration(timestamp) * time.Millisecond
 
 	if r.OffsetDelta, err = pd.getVarint(); err != nil {
 		return err
