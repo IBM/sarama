@@ -29,13 +29,15 @@ type FetchRequest struct {
 	MinBytes    int32
 	MaxBytes    int32
 	Version     int16
-	Isolation   int8
+	Isolation   IsolationLevel
 	blocks      map[string]map[int32]*fetchRequestBlock
 }
 
+type IsolationLevel int8
+
 const (
-	ReadUncommitted = 0
-	ReadCommitted   = 1
+	ReadUncommitted IsolationLevel = 0
+	ReadCommitted   IsolationLevel = 1
 )
 
 func (r *FetchRequest) encode(pe packetEncoder) (err error) {
@@ -46,7 +48,7 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 		pe.putInt32(r.MaxBytes)
 	}
 	if r.Version >= 4 {
-		pe.putInt8(r.Isolation)
+		pe.putInt8(int8(r.Isolation))
 	}
 	err = pe.putArrayLength(len(r.blocks))
 	if err != nil {
@@ -89,9 +91,11 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 	if r.Version >= 4 {
-		if r.Isolation, err = pd.getInt8(); err != nil {
+		isolation, err := pd.getInt8()
+		if err != nil {
 			return err
 		}
+		r.Isolation = IsolationLevel(isolation)
 	}
 	topicCount, err := pd.getArrayLength()
 	if err != nil {
