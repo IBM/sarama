@@ -49,9 +49,9 @@ type Client interface {
 	RefreshMetadata(topics ...string) error
 
 	// GetOffset queries the cluster to get the most recent available offset at the
-	// given time on the topic/partition combination. Time should be OffsetOldest for
-	// the earliest available offset, OffsetNewest for the offset of the message that
-	// will be produced next, or a time.
+	// given time (in milliseconds) on the topic/partition combination.
+	// Time should be OffsetOldest for the earliest available offset,
+	// OffsetNewest for the offset of the message that will be produced next, or a time.
 	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 
 	// Coordinator returns the coordinating broker for a consumer group. It will
