@@ -81,6 +81,7 @@ var recordBatchTestCases = []struct {
 					Value: []byte{11, 12},
 				}},
 			}},
+			recordsLen: 21,
 		},
 		encoded: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
@@ -127,6 +128,7 @@ var recordBatchTestCases = []struct {
 					Value: []byte{11, 12},
 				}},
 			}},
+			recordsLen: 21,
 		},
 		encoded: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
@@ -179,6 +181,7 @@ var recordBatchTestCases = []struct {
 					Value: []byte{11, 12},
 				}},
 			}},
+			recordsLen: 21,
 		},
 		encoded: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
@@ -213,6 +216,7 @@ var recordBatchTestCases = []struct {
 					Value: []byte{11, 12},
 				}},
 			}},
+			recordsLen: 21,
 		},
 		encoded: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
