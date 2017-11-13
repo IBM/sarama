@@ -18,7 +18,9 @@ import (
 type Broker struct {
 	id   int32
 	addr string
+	rack string
 
+	isController  bool
 	conf          *Config
 	correlationID int32
 	conn          net.Conn
@@ -431,7 +433,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res versionedDecoder) error {
 	}
 }
 
-func (b *Broker) decode(pd packetDecoder) (err error) {
+func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 	b.id, err = pd.getInt32()
 	if err != nil {
 		return err
@@ -447,6 +449,13 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
+	if version == 1 {
+		// v1 metadata response adds a rack to the broker metadata
+		if b.rack, err = pd.getString(); err != nil {
+			return err
+		}
+	}
+
 	b.addr = net.JoinHostPort(host, fmt.Sprint(port))
 	if _, _, err := net.SplitHostPort(b.addr); err != nil {
 		return err
@@ -455,7 +464,7 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func (b *Broker) encode(pe packetEncoder) (err error) {
+func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 	host, portstr, err := net.SplitHostPort(b.addr)
 	if err != nil {
@@ -474,6 +483,13 @@ func (b *Broker) encode(pe packetEncoder) (err error) {
 	}
 
 	pe.putInt32(int32(port))
+
+	if version == 1 {
+		// v1 metadata response adds a rack to the broker metadata
+		if err = pe.putString(b.rack); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -682,4 +698,16 @@ func (b *Broker) updateOutgoingCommunicationMetrics(bytes int) {
 	if b.brokerRequestSize != nil {
 		b.brokerRequestSize.Update(requestSize)
 	}
+}
+
+func (b *Broker) CreateTopics(request *CreateTopicsRequest) (*CreateTopicsResponse, error) {
+	response := new(CreateTopicsResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }
