@@ -136,32 +136,6 @@ func (v KafkaVersion) IsAtLeast(other KafkaVersion) bool {
 	return true
 }
 
-func (v KafkaVersion) String() string {
-	return fmt.Sprintf("%d.%d.%d.%d", v.version[0], v.version[1], v.version[2], v.version[3])
-}
-
-func ParseKafkaVersion(s string) (version KafkaVersion, ok bool) {
-	versions := []KafkaVersion{
-		V0_8_2_0,
-		V0_8_2_1,
-		V0_8_2_2,
-		V0_9_0_0,
-		V0_9_0_1,
-		V0_10_0_0,
-		V0_10_0_1,
-		V0_10_1_0,
-		V0_10_2_0,
-		V0_11_0_0,
-		V1_0_0_0,
-	}
-	for _, v := range versions {
-		if s == v.String() {
-			return v, true
-		}
-	}
-	return minVersion, false
-}
-
 // Effective constants defining the supported kafka versions.
 var (
 	V0_8_2_0   = newKafkaVersion(0, 8, 2, 0)
@@ -177,3 +151,31 @@ var (
 	V1_0_0_0   = newKafkaVersion(1, 0, 0, 0)
 	minVersion = V0_8_2_0
 )
+
+var KafkaVersion_value = map[string]KafkaVersion{
+	"0.8.2.0": V0_8_2_0,
+	"0.8.2.1": V0_8_2_1,
+	"0.8.2.2": V0_8_2_2,
+	"0.9.0.0": V0_9_0_0,
+	"0.9.0.1": V0_9_0_1,
+	"0.10.0.0": V0_10_0_0,
+	"0.10.0.1": V0_10_0_1,
+	"0.10.1.0": V0_10_1_0,
+	"0.10.2.0": V0_10_2_0,
+	"0.11.0.0": V0_11_0_0,
+	"1.0.0.0": V1_0_0_0,
+}
+
+var KafkaVersion_name = map[KafkaVersion]string{
+	V0_8_2_0: "0.8.2.0",
+	V0_8_2_1: "0.8.2.1",
+	V0_8_2_2: "0.8.2.2",
+	V0_9_0_0: "0.9.0.0",
+	V0_9_0_1: "0.9.0.1",
+	V0_10_0_0: "0.10.0.0",
+	V0_10_0_1: "0.10.0.1",
+	V0_10_1_0: "0.10.1.0",
+	V0_10_2_0: "0.10.2.0",
+	V0_11_0_0: "0.11.0.0",
+	V1_0_0_0: "1.0.0.0",
+}
