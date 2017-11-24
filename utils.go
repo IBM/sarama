@@ -179,3 +179,7 @@ var KafkaVersion_name = map[KafkaVersion]string{
 	V0_11_0_0: "0.11.0.0",
 	V1_0_0_0: "1.0.0.0",
 }
+
+func (v KafkaVersion) String() string {
+	return KafkaVersion_name[v]
+}
