@@ -3,6 +3,7 @@ package sarama
 import (
 	"bufio"
 	"net"
+	"fmt"
 )
 
 type none struct{}
@@ -133,6 +134,32 @@ func (v KafkaVersion) IsAtLeast(other KafkaVersion) bool {
 		}
 	}
 	return true
+}
+
+func (v KafkaVersion) String() string {
+	return fmt.Sprintf("%d.%d.%d.%d", v.version[0], v.version[1], v.version[2], v.version[3])
+}
+
+func ParseKafkaVersion(s string) (version KafkaVersion, ok bool) {
+	versions := []KafkaVersion{
+		V0_8_2_0,
+		V0_8_2_1,
+		V0_8_2_2,
+		V0_9_0_0,
+		V0_9_0_1,
+		V0_10_0_0,
+		V0_10_0_1,
+		V0_10_1_0,
+		V0_10_2_0,
+		V0_11_0_0,
+		V1_0_0_0,
+	}
+	for _, v := range versions {
+		if s == v.String() {
+			return v, true
+		}
+	}
+	return minVersion, false
 }
 
 // Effective constants defining the supported kafka versions.
