@@ -3,7 +3,6 @@ package sarama
 import (
 	"bufio"
 	"net"
-	"fmt"
 )
 
 type none struct{}
@@ -152,7 +151,7 @@ var (
 	minVersion = V0_8_2_0
 )
 
-var KafkaVersion_value = map[string]KafkaVersion{
+var KafkaVersionValue = map[string]KafkaVersion{
 	"0.8.2.0": V0_8_2_0,
 	"0.8.2.1": V0_8_2_1,
 	"0.8.2.2": V0_8_2_2,
@@ -166,7 +165,7 @@ var KafkaVersion_value = map[string]KafkaVersion{
 	"1.0.0.0": V1_0_0_0,
 }
 
-var KafkaVersion_name = map[KafkaVersion]string{
+var KafkaVersionName = map[KafkaVersion]string{
 	V0_8_2_0: "0.8.2.0",
 	V0_8_2_1: "0.8.2.1",
 	V0_8_2_2: "0.8.2.2",
@@ -181,5 +180,5 @@ var KafkaVersion_name = map[KafkaVersion]string{
 }
 
 func (v KafkaVersion) String() string {
-	return KafkaVersion_name[v]
+	return KafkaVersionName[v]
 }
