@@ -20,36 +20,22 @@ func TestVersionCompare(t *testing.T) {
 	}
 }
 
-func TestVersionValues(t *testing.T) {
-	validNames := []string{"0.8.2.0", "0.8.2.1", "0.9.0.0", "0.10.2.0", "1.0.0"}
-	for _, name := range validNames {
-		if _, ok := KafkaVersionValue[name]; !ok {
-			t.Errorf("valid version name %s missing in value map", name)
+func TestVersionParsing(t *testing.T) {
+	validVersions := []string{"0.8.2.0", "0.8.2.1", "0.9.0.0", "0.10.2.0", "1.0.0"}
+	for _, s := range validVersions {
+		v, err := ParseKafkaVersion(s)
+		if err != nil {
+			t.Errorf("could not parse valid version %s: %s", s, err)
+		}
+		if v.String() != s {
+			t.Errorf("version %s != %s", v.String(), s)
 		}
 	}
 
-	invalidNames := []string{"0.8.2.4", "0.8.20.1", "0.19.0.0", "1.0.x"}
-	for _, name := range invalidNames {
-		if _, ok := KafkaVersionValue[name]; ok {
-			t.Errorf("invalid version name %s found in value map", name)
-		}
-	}
-}
-
-func TestVersionNames(t *testing.T) {
-	validValues := map[string]KafkaVersion{
-		"V0_8_2_0":  V0_8_2_0,
-		"V0_8_2_1":  V0_8_2_1,
-		"V0_9_0_0":  V0_9_0_0,
-		"V0_10_2_0": V0_10_2_0,
-		"V1_0_0_0":  V1_0_0_0,
-	}
-	for s, value := range validValues {
-		if _, ok := KafkaVersionName[value]; !ok {
-			t.Errorf("kafka version %s missing in name map", s)
-		}
-		if value.String() == "" {
-			t.Errorf("%s.String() == \"\"", s)
+	invalidVersions := []string{"0.8.2-4", "0.8.20", "1.19.0.0", "1.0.x"}
+	for _, s := range invalidVersions {
+		if _, err := ParseKafkaVersion(s); err == nil {
+			t.Errorf("invalid version %s parsed without error", s)
 		}
 	}
 }
