@@ -2,8 +2,8 @@ package sarama
 
 import (
 	"bufio"
-	"net"
 	"fmt"
+	"net"
 	"regexp"
 )
 
