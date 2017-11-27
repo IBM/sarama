@@ -2,7 +2,9 @@ package sarama
 
 import (
 	"bufio"
+	"fmt"
 	"net"
+	"regexp"
 )
 
 type none struct{}
@@ -150,3 +152,33 @@ var (
 	V1_0_0_0   = newKafkaVersion(1, 0, 0, 0)
 	minVersion = V0_8_2_0
 )
+
+func ParseKafkaVersion(s string) (KafkaVersion, error) {
+	var major, minor, veryMinor, patch uint
+	var err error
+	if s[0] == '0' {
+		err = scanKafkaVersion(s, `^0.\d+.\d+.\d+$`, "0.%d.%d.%d", [3]*uint{&minor, &veryMinor, &patch})
+	} else {
+		err = scanKafkaVersion(s, `^\d+.\d+.\d+$`, "%d.%d.%d", [3]*uint{&major, &minor, &veryMinor})
+	}
+	if err != nil {
+		return minVersion, err
+	}
+	return newKafkaVersion(major, minor, veryMinor, patch), nil
+}
+
+func scanKafkaVersion(s string, pattern string, format string, v [3]*uint) error {
+	if !regexp.MustCompile(pattern).MatchString(s) {
+		return fmt.Errorf("invalid version `%s`", s)
+	}
+	_, err := fmt.Sscanf(s, format, v[0], v[1], v[2])
+	return err
+}
+
+func (v KafkaVersion) String() string {
+	if v.version[0] == 0 {
+		return fmt.Sprintf("0.%d.%d.%d", v.version[1], v.version[2], v.version[3])
+	} else {
+		return fmt.Sprintf("%d.%d.%d", v.version[0], v.version[1], v.version[2])
+	}
+}
