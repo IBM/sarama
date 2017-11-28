@@ -264,6 +264,14 @@ func (rd *realDecoder) getRawBytes(length int) ([]byte, error) {
 	return rd.raw[start:rd.off], nil
 }
 
+func (rd *realDecoder) peek(offset, length int) (packetDecoder, error) {
+	if rd.remaining() < offset+length {
+		return nil, ErrInsufficientData
+	}
+	off := rd.off + offset
+	return &realDecoder{raw: rd.raw[off : off+length]}, nil
+}
+
 // stacks
 
 func (rd *realDecoder) push(in pushDecoder) error {
