@@ -128,25 +128,29 @@ func (rd *realDecoder) getVarintBytes() ([]byte, error) {
 	return rd.getRawBytes(int(tmp))
 }
 
-func (rd *realDecoder) getString() (string, error) {
-	tmp, err := rd.getInt16()
-
+func (rd *realDecoder) getStringLength() (int, error) {
+	length, err := rd.getInt16()
 	if err != nil {
-		return "", err
+		return 0, err
 	}
 
-	n := int(tmp)
+	n := int(length)
 
 	switch {
 	case n < -1:
-		return "", errInvalidStringLength
-	case n == -1:
-		return "", nil
-	case n == 0:
-		return "", nil
+		return 0, errInvalidStringLength
 	case n > rd.remaining():
 		rd.off = len(rd.raw)
-		return "", ErrInsufficientData
+		return 0, ErrInsufficientData
+	}
+
+	return n, nil
+}
+
+func (rd *realDecoder) getString() (string, error) {
+	n, err := rd.getStringLength()
+	if err != nil || n == -1 {
+		return "", err
 	}
 
 	tmpStr := string(rd.raw[rd.off : rd.off+n])
@@ -155,11 +159,14 @@ func (rd *realDecoder) getString() (string, error) {
 }
 
 func (rd *realDecoder) getNullableString() (*string, error) {
-	str, err := rd.getString()
-	if err != nil || str == "" {
+	n, err := rd.getStringLength()
+	if err != nil || n == -1 {
 		return nil, err
 	}
-	return &str, err
+
+	tmpStr := string(rd.raw[rd.off : rd.off+n])
+	rd.off += n
+	return &tmpStr, err
 }
 
 func (rd *realDecoder) getInt32Array() ([]int32, error) {
