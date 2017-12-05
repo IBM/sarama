@@ -84,7 +84,9 @@ func (t *TopicPartition) encode(pe packetEncoder) error {
 		return nil
 	}
 
-	pe.putInt32(int32(len(t.Assignment)))
+	if err := pe.putArrayLength(len(t.Assignment)); err != nil {
+		return err
+	}
 
 	for _, assign := range t.Assignment {
 		if err := pe.putInt32Array(assign); err != nil {
