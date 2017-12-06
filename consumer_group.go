@@ -35,6 +35,9 @@ type ConsumerGroup interface {
 	// mark a topic/partition/offset combination as ready to commit
 	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
+	// reset a partitions offset to a previous value
+	ResetOffset(topic string, partition int32, offset int64, metadata string)
+
 	// commit marked offsets - only needed if auto commit is disabeled
 	Commit()
 
@@ -159,6 +162,14 @@ func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64,
 	cg.RLock()
 	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
 		mp.pom.MarkOffset(offset+1, metadata)
+	}
+	cg.RUnlock()
+}
+
+func (cg *consumerGroup) ResetOffset(topic string, partition int32, offset int64, metadata string) {
+	cg.RLock()
+	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
+		mp.pom.ResetOffset(offset, metadata)
 	}
 	cg.RUnlock()
 }
