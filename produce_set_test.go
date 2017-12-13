@@ -173,10 +173,13 @@ func TestProduceSetCompressedRequestBuilding(t *testing.T) {
 		if err != nil {
 			t.Error("Failed to decode set from payload")
 		}
-		for _, compMsgBlock := range msg.Set.Messages {
+		for i, compMsgBlock := range msg.Set.Messages {
 			compMsg := compMsgBlock.Msg
 			if compMsg.Version != 1 {
 				t.Error("Wrong compressed message version")
+			}
+			if compMsgBlock.Offset != int64(i) {
+				t.Error("Wrong relative inner offset")
 			}
 		}
 		if msg.Version != 1 {
