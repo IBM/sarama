@@ -30,6 +30,7 @@ script:
 - make vet
 - make errcheck
 - make fmt
+- travis_terminate
 
 after_success:
   - bash <(curl -s https://codecov.io/bash)
