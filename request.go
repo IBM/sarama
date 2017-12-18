@@ -97,7 +97,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 9:
 		return &OffsetFetchRequest{}
 	case 10:
-		return &ConsumerMetadataRequest{}
+		return &FindCoordinatorRequest{}
 	case 11:
 		return &JoinGroupRequest{}
 	case 12:
