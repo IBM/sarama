@@ -735,8 +735,8 @@ func (client *client) cachedCoordinator(consumerGroup string) *Broker {
 	return nil
 }
 
-func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemaining int) (*ConsumerMetadataResponse, error) {
-	retry := func(err error) (*ConsumerMetadataResponse, error) {
+func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemaining int) (*FindCoordinatorResponse, error) {
+	retry := func(err error) (*FindCoordinatorResponse, error) {
 		if attemptsRemaining > 0 {
 			Logger.Printf("client/coordinator retrying after %dms... (%d attempts remaining)\n", client.conf.Metadata.Retry.Backoff/time.Millisecond, attemptsRemaining)
 			time.Sleep(client.conf.Metadata.Retry.Backoff)
@@ -748,10 +748,11 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 	for broker := client.any(); broker != nil; broker = client.any() {
 		Logger.Printf("client/coordinator requesting coordinator for consumergroup %s from %s\n", consumerGroup, broker.Addr())
 
-		request := new(ConsumerMetadataRequest)
-		request.ConsumerGroup = consumerGroup
+		request := new(FindCoordinatorRequest)
+		request.CoordinatorKey = consumerGroup
+		request.CoordinatorType = CoordinatorGroup
 
-		response, err := broker.GetConsumerMetadata(request)
+		response, err := broker.FindCoordinator(request)
 
 		if err != nil {
 			Logger.Printf("client/coordinator request to broker %s failed: %s\n", broker.Addr(), err)
