@@ -523,6 +523,7 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 	var messages []*ConsumerMessage
 	var incomplete bool
 	prelude := true
+	originalOffset := child.offset
 
 	for _, rec := range batch.Records {
 		offset := batch.FirstOffset + rec.OffsetDelta
@@ -547,9 +548,15 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 		}
 	}
 
-	if incomplete || len(messages) == 0 {
+	if incomplete {
 		return nil, ErrIncompleteResponse
 	}
+
+	child.offset = batch.FirstOffset + int64(batch.LastOffsetDelta) + 1
+	if child.offset <= originalOffset {
+		return nil, ErrConsumerOffsetNotAdvanced
+	}
+
 	return messages, nil
 }
 
