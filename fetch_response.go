@@ -309,6 +309,16 @@ func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Enco
 	batch.addRecord(rec)
 }
 
+func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
+	frb := r.getOrCreateBlock(topic, partition)
+	batch := frb.Records.recordBatch
+	if batch == nil {
+		batch = &RecordBatch{Version: 2}
+		frb.Records = newDefaultRecords(batch)
+	}
+	batch.LastOffsetDelta = offset
+}
+
 func (r *FetchResponse) SetLastStableOffset(topic string, partition int32, offset int64) {
 	frb := r.getOrCreateBlock(topic, partition)
 	frb.LastStableOffset = offset
