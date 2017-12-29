@@ -137,7 +137,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 32:
 		return &DescribeConfigsRequest{}
 	case 33:
-		return &AlterConfigRequest{}
+		return &AlterConfigsRequest{}
 	case 37:
 		return &CreatePartitionsRequest{}
 	}

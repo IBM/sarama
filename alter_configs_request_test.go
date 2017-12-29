@@ -45,16 +45,16 @@ var (
 )
 
 func TestAlterConfigsRequest(t *testing.T) {
-	var request *AlterConfigRequest
+	var request *AlterConfigsRequest
 
-	request = &AlterConfigRequest{
-		Resources: []*AlterConfigResource{},
+	request = &AlterConfigsRequest{
+		Resources: []*AlterConfigsResource{},
 	}
 	testRequest(t, "no requests", request, emptyAlterConfigsRequest)
 
-	request = &AlterConfigRequest{
-		Resources: []*AlterConfigResource{
-			&AlterConfigResource{
+	request = &AlterConfigsRequest{
+		Resources: []*AlterConfigsResource{
+			&AlterConfigsResource{
 				T:    TopicResource,
 				Name: "foo",
 				ConfigEntries: []*ConfigEntryKV{
@@ -69,9 +69,9 @@ func TestAlterConfigsRequest(t *testing.T) {
 
 	testRequest(t, "one config", request, singleAlterConfigsRequest)
 
-	request = &AlterConfigRequest{
-		Resources: []*AlterConfigResource{
-			&AlterConfigResource{
+	request = &AlterConfigsRequest{
+		Resources: []*AlterConfigsResource{
+			&AlterConfigsResource{
 				T:    TopicResource,
 				Name: "foo",
 				ConfigEntries: []*ConfigEntryKV{
@@ -81,7 +81,7 @@ func TestAlterConfigsRequest(t *testing.T) {
 					},
 				},
 			},
-			&AlterConfigResource{
+			&AlterConfigsResource{
 				T:    TopicResource,
 				Name: "bar",
 				ConfigEntries: []*ConfigEntryKV{

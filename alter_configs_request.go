@@ -1,11 +1,11 @@
 package sarama
 
-type AlterConfigRequest struct {
-	Resources    []*AlterConfigResource
+type AlterConfigsRequest struct {
+	Resources    []*AlterConfigsResource
 	ValidateOnly bool
 }
 
-type AlterConfigResource struct {
+type AlterConfigsResource struct {
 	T             ResourceType
 	Name          string
 	ConfigEntries []*ConfigEntryKV
@@ -16,7 +16,7 @@ type ConfigEntryKV struct {
 	Value string
 }
 
-func (acr *AlterConfigRequest) encode(pe packetEncoder) error {
+func (acr *AlterConfigsRequest) encode(pe packetEncoder) error {
 	if err := pe.putArrayLength(len(acr.Resources)); err != nil {
 		return err
 	}
@@ -31,15 +31,15 @@ func (acr *AlterConfigRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (acr *AlterConfigRequest) decode(pd packetDecoder, version int16) error {
+func (acr *AlterConfigsRequest) decode(pd packetDecoder, version int16) error {
 	resourceCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	acr.Resources = make([]*AlterConfigResource, resourceCount)
+	acr.Resources = make([]*AlterConfigsResource, resourceCount)
 	for i := range acr.Resources {
-		r := &AlterConfigResource{}
+		r := &AlterConfigsResource{}
 		err = r.decode(pd, version)
 		if err != nil {
 			return err
@@ -57,7 +57,7 @@ func (acr *AlterConfigRequest) decode(pd packetDecoder, version int16) error {
 	return nil
 }
 
-func (ac *AlterConfigResource) encode(pe packetEncoder) error {
+func (ac *AlterConfigsResource) encode(pe packetEncoder) error {
 	pe.putInt8(int8(ac.T))
 
 	if err := pe.putString(ac.Name); err != nil {
@@ -77,7 +77,7 @@ func (ac *AlterConfigResource) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (ac *AlterConfigResource) decode(pd packetDecoder, version int16) error {
+func (ac *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 	t, err := pd.getInt8()
 	if err != nil {
 		return err
@@ -107,15 +107,15 @@ func (ac *AlterConfigResource) decode(pd packetDecoder, version int16) error {
 	return err
 }
 
-func (acr *AlterConfigRequest) key() int16 {
+func (acr *AlterConfigsRequest) key() int16 {
 	return 33
 }
 
-func (acr *AlterConfigRequest) version() int16 {
+func (acr *AlterConfigsRequest) version() int16 {
 	return 0
 }
 
-func (acr *AlterConfigRequest) requiredVersion() KafkaVersion {
+func (acr *AlterConfigsRequest) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
