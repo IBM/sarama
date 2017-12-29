@@ -136,6 +136,8 @@ func allocateBody(key, version int16) protocolBody {
 		return &DeleteAclsRequest{}
 	case 32:
 		return &DescribeConfigsRequest{}
+	case 33:
+		return &AlterConfigRequest{}
 	case 37:
 		return &CreatePartitionsRequest{}
 	}
