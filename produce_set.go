@@ -122,6 +122,10 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	for topic, partitionSet := range ps.msgs {
 		for partition, set := range partitionSet {
 			if req.Version >= 3 {
+				for i, record := range set.recordsToSend.recordBatch.Records {
+					record.OffsetDelta = int64(i)
+				}
+
 				req.AddBatch(topic, partition, set.recordsToSend.recordBatch)
 				continue
 			}
