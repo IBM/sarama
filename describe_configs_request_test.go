@@ -44,7 +44,7 @@ func TestDescribeConfigsRequest(t *testing.T) {
 	request = &DescribeConfigsRequest{
 		Resources: []*Resource{
 			&Resource{
-				T:           TopicResource,
+				Type:        TopicResource,
 				Name:        "foo",
 				ConfigNames: []string{"segment.ms"},
 			},
@@ -56,12 +56,12 @@ func TestDescribeConfigsRequest(t *testing.T) {
 	request = &DescribeConfigsRequest{
 		Resources: []*Resource{
 			&Resource{
-				T:           TopicResource,
+				Type:        TopicResource,
 				Name:        "foo",
 				ConfigNames: []string{"segment.ms", "retention.ms"},
 			},
 			&Resource{
-				T:           TopicResource,
+				Type:        TopicResource,
 				Name:        "bar",
 				ConfigNames: []string{"segment.ms"},
 			},

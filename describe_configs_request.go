@@ -1,7 +1,7 @@
 package sarama
 
 type Resource struct {
-	T           ResourceType
+	Type        ResourceType
 	Name        string
 	ConfigNames []string
 }
@@ -16,7 +16,7 @@ func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
 	}
 
 	for _, c := range r.Resources {
-		pe.putInt8(int8(c.T))
+		pe.putInt8(int8(c.Type))
 		if err := pe.putString(c.Name); err != nil {
 			return err
 		}
@@ -42,7 +42,7 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 		if err != nil {
 			return err
 		}
-		r.Resources[i].T = ResourceType(t)
+		r.Resources[i].Type = ResourceType(t)
 		name, err := pd.getString()
 		if err != nil {
 			return err
