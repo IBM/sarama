@@ -52,16 +52,14 @@ func TestAlterConfigsRequest(t *testing.T) {
 	}
 	testRequest(t, "no requests", request, emptyAlterConfigsRequest)
 
+	configValue := "1000"
 	request = &AlterConfigsRequest{
 		Resources: []*AlterConfigsResource{
 			&AlterConfigsResource{
 				Type: TopicResource,
 				Name: "foo",
-				ConfigEntries: []*ConfigEntryKV{
-					&ConfigEntryKV{
-						Name:  "segment.ms",
-						Value: "1000",
-					},
+				ConfigEntries: map[string]*string{
+					"segment.ms": &configValue,
 				},
 			},
 		},
@@ -74,25 +72,16 @@ func TestAlterConfigsRequest(t *testing.T) {
 			&AlterConfigsResource{
 				Type: TopicResource,
 				Name: "foo",
-				ConfigEntries: []*ConfigEntryKV{
-					&ConfigEntryKV{
-						Name:  "segment.ms",
-						Value: "1000",
-					},
+				ConfigEntries: map[string]*string{
+					"segment.ms": &configValue,
 				},
 			},
 			&AlterConfigsResource{
 				Type: TopicResource,
 				Name: "bar",
-				ConfigEntries: []*ConfigEntryKV{
-					&ConfigEntryKV{
-						Name:  "segment.ms",
-						Value: "1000",
-					},
-					&ConfigEntryKV{
-						Name:  "retention.ms",
-						Value: "1000",
-					},
+				ConfigEntries: map[string]*string{
+					"segment.ms":   &configValue,
+					"retention.ms": &configValue,
 				},
 			},
 		},
