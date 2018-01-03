@@ -55,7 +55,7 @@ func TestAlterConfigsRequest(t *testing.T) {
 	request = &AlterConfigsRequest{
 		Resources: []*AlterConfigsResource{
 			&AlterConfigsResource{
-				T:    TopicResource,
+				Type: TopicResource,
 				Name: "foo",
 				ConfigEntries: []*ConfigEntryKV{
 					&ConfigEntryKV{
@@ -72,7 +72,7 @@ func TestAlterConfigsRequest(t *testing.T) {
 	request = &AlterConfigsRequest{
 		Resources: []*AlterConfigsResource{
 			&AlterConfigsResource{
-				T:    TopicResource,
+				Type: TopicResource,
 				Name: "foo",
 				ConfigEntries: []*ConfigEntryKV{
 					&ConfigEntryKV{
@@ -82,7 +82,7 @@ func TestAlterConfigsRequest(t *testing.T) {
 				},
 			},
 			&AlterConfigsResource{
-				T:    TopicResource,
+				Type: TopicResource,
 				Name: "bar",
 				ConfigEntries: []*ConfigEntryKV{
 					&ConfigEntryKV{

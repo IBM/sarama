@@ -6,7 +6,7 @@ type AlterConfigsRequest struct {
 }
 
 type AlterConfigsResource struct {
-	T             ResourceType
+	Type          ResourceType
 	Name          string
 	ConfigEntries []*ConfigEntryKV
 }
@@ -58,7 +58,7 @@ func (acr *AlterConfigsRequest) decode(pd packetDecoder, version int16) error {
 }
 
 func (ac *AlterConfigsResource) encode(pe packetEncoder) error {
-	pe.putInt8(int8(ac.T))
+	pe.putInt8(int8(ac.Type))
 
 	if err := pe.putString(ac.Name); err != nil {
 		return err
@@ -82,7 +82,7 @@ func (ac *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 	if err != nil {
 		return err
 	}
-	ac.T = ResourceType(t)
+	ac.Type = ResourceType(t)
 
 	name, err := pd.getString()
 	if err != nil {
