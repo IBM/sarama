@@ -384,9 +384,9 @@ func (mr *MockOffsetCommitResponse) getError(group, topic string, partition int3
 
 // MockProduceResponse is a `ProduceResponse` builder.
 type MockProduceResponse struct {
-	version      int16
-	errors map[string]map[int32]KError
-	t      TestReporter
+	version int16
+	errors  map[string]map[int32]KError
+	t       TestReporter
 }
 
 func NewMockProduceResponse(t TestReporter) *MockProduceResponse {
