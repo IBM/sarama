@@ -1,6 +1,8 @@
 package sarama
 
-import "time"
+import (
+	"time"
+)
 
 type AbortedTransaction struct {
 	ProducerID  int64
@@ -301,22 +303,18 @@ func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Enco
 	frb := r.getOrCreateBlock(topic, partition)
 	kb, vb := encodeKV(key, value)
 	rec := &Record{Key: kb, Value: vb, OffsetDelta: offset}
-	batch := frb.Records.recordBatch
-	if batch == nil {
-		batch = &RecordBatch{Version: 2}
-		frb.Records = newDefaultRecords(batch)
+	if frb.Records.recordBatchSet == nil {
+		frb.Records = newDefaultRecords([]*RecordBatch{&RecordBatch{Version: 2}})
 	}
-	batch.addRecord(rec)
+	frb.Records.recordBatchSet.batches[0].addRecord(rec)
 }
 
 func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
 	frb := r.getOrCreateBlock(topic, partition)
-	batch := frb.Records.recordBatch
-	if batch == nil {
-		batch = &RecordBatch{Version: 2}
-		frb.Records = newDefaultRecords(batch)
+	if frb.Records.recordBatchSet == nil {
+		frb.Records = newDefaultRecords([]*RecordBatch{&RecordBatch{Version: 2}})
 	}
-	batch.LastOffsetDelta = offset
+	frb.Records.recordBatchSet.batches[0].LastOffsetDelta = offset
 }
 
 func (r *FetchResponse) SetLastStableOffset(topic string, partition int32, offset int64) {

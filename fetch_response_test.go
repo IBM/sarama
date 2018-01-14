@@ -185,7 +185,7 @@ func TestOneRecordFetchResponse(t *testing.T) {
 	if n != 1 {
 		t.Fatal("Decoding produced incorrect number of records.")
 	}
-	rec := block.Records.recordBatch.Records[0]
+	rec := block.Records.recordBatchSet.batches[0].Records[0]
 	if !bytes.Equal(rec.Key, []byte{0x01, 0x02, 0x03, 0x04}) {
 		t.Error("Decoding produced incorrect record key.")
 	}

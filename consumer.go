@@ -601,14 +601,25 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	child.fetchSize = child.conf.Consumer.Fetch.Default
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
-	if control, err := block.Records.isControl(); err != nil || control {
-		return nil, err
-	}
-
 	if block.Records.recordsType == legacyRecords {
 		return child.parseMessages(block.Records.msgSet)
 	}
-	return child.parseRecords(block.Records.recordBatch)
+
+	messages := []*ConsumerMessage{}
+	for _, recordBatch := range block.Records.recordBatchSet.batches {
+		if recordBatch.Control {
+			continue
+		}
+
+		recordBatchMessages, err := child.parseRecords(recordBatch)
+		messages = append(messages, recordBatchMessages...)
+
+		if err != nil {
+			return messages, err
+		}
+	}
+
+	return messages, nil
 }
 
 // brokerConsumer
