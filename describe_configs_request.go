@@ -20,6 +20,11 @@ func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
 		if err := pe.putString(c.Name); err != nil {
 			return err
 		}
+
+		if len(c.ConfigNames) == 0 {
+			pe.putInt32(-1)
+			continue
+		}
 		if err := pe.putStringArray(c.ConfigNames); err != nil {
 			return err
 		}
@@ -48,11 +53,26 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 			return err
 		}
 		r.Resources[i].Name = name
-		s, err := pd.getStringArray()
+
+		confLength, err := pd.getArrayLength()
+
 		if err != nil {
 			return err
 		}
-		r.Resources[i].ConfigNames = s
+
+		if confLength == -1 {
+			continue
+		}
+
+		cfnames := make([]string, confLength)
+		for i := 0; i < confLength; i++ {
+			s, err := pd.getString()
+			if err != nil {
+				return err
+			}
+			cfnames[i] = s
+		}
+		r.Resources[i].ConfigNames = cfnames
 	}
 
 	return nil

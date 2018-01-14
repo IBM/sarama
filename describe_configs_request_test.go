@@ -31,6 +31,13 @@ var (
 		0, 10, // 10 chars
 		's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 	}
+
+	singleDescribeConfigsRequestAllConfigs = []byte{
+		0, 0, 0, 1, // 1 config
+		2,                   // a topic
+		0, 3, 'f', 'o', 'o', // topic name: foo
+		255, 255, 255, 255, // no configs
+	}
 )
 
 func TestDescribeConfigsRequest(t *testing.T) {
@@ -41,12 +48,13 @@ func TestDescribeConfigsRequest(t *testing.T) {
 	}
 	testRequest(t, "no requests", request, emptyDescribeConfigsRequest)
 
+	configs := []string{"segment.ms"}
 	request = &DescribeConfigsRequest{
 		Resources: []*Resource{
 			&Resource{
 				Type:        TopicResource,
 				Name:        "foo",
-				ConfigNames: []string{"segment.ms"},
+				ConfigNames: configs,
 			},
 		},
 	}
@@ -68,4 +76,15 @@ func TestDescribeConfigsRequest(t *testing.T) {
 		},
 	}
 	testRequest(t, "two configs", request, doubleDescribeConfigsRequest)
+
+	request = &DescribeConfigsRequest{
+		Resources: []*Resource{
+			&Resource{
+				Type: TopicResource,
+				Name: "foo",
+			},
+		},
+	}
+
+	testRequest(t, "one topic, all configs", request, singleDescribeConfigsRequestAllConfigs)
 }
