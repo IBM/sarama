@@ -1,6 +1,8 @@
 package sarama
 
-import "fmt"
+import (
+	"fmt"
+)
 
 const (
 	unknownRecords = iota
@@ -13,28 +15,28 @@ const (
 
 // Records implements a union type containing either a RecordBatch or a legacy MessageSet.
 type Records struct {
-	recordsType int
-	msgSet      *MessageSet
-	recordBatch *RecordBatch
+	recordsType    int
+	msgSet         *MessageSet
+	recordBatchSet *RecordBatchSet
 }
 
 func newLegacyRecords(msgSet *MessageSet) Records {
 	return Records{recordsType: legacyRecords, msgSet: msgSet}
 }
 
-func newDefaultRecords(batch *RecordBatch) Records {
-	return Records{recordsType: defaultRecords, recordBatch: batch}
+func newDefaultRecords(batches []*RecordBatch) Records {
+	return Records{recordsType: defaultRecords, recordBatchSet: &RecordBatchSet{batches}}
 }
 
 // setTypeFromFields sets type of Records depending on which of msgSet or recordBatch is not nil.
 // The first return value indicates whether both fields are nil (and the type is not set).
 // If both fields are not nil, it returns an error.
 func (r *Records) setTypeFromFields() (bool, error) {
-	if r.msgSet == nil && r.recordBatch == nil {
+	if r.msgSet == nil && r.recordBatchSet == nil {
 		return true, nil
 	}
-	if r.msgSet != nil && r.recordBatch != nil {
-		return false, fmt.Errorf("both msgSet and recordBatch are set, but record type is unknown")
+	if r.msgSet != nil && r.recordBatchSet != nil {
+		return false, fmt.Errorf("both msgSet and recordBatchSet are set, but record type is unknown")
 	}
 	r.recordsType = defaultRecords
 	if r.msgSet != nil {
@@ -57,10 +59,10 @@ func (r *Records) encode(pe packetEncoder) error {
 		}
 		return r.msgSet.encode(pe)
 	case defaultRecords:
-		if r.recordBatch == nil {
+		if r.recordBatchSet == nil {
 			return nil
 		}
-		return r.recordBatch.encode(pe)
+		return r.recordBatchSet.encode(pe)
 	}
 	return fmt.Errorf("unknown records type: %v", r.recordsType)
 }
@@ -95,8 +97,8 @@ func (r *Records) decode(pd packetDecoder) error {
 		r.msgSet = &MessageSet{}
 		return r.msgSet.decode(pd)
 	case defaultRecords:
-		r.recordBatch = &RecordBatch{}
-		return r.recordBatch.decode(pd)
+		r.recordBatchSet = &RecordBatchSet{batches: []*RecordBatch{}}
+		return r.recordBatchSet.decode(pd)
 	}
 	return fmt.Errorf("unknown records type: %v", r.recordsType)
 }
@@ -115,10 +117,14 @@ func (r *Records) numRecords() (int, error) {
 		}
 		return len(r.msgSet.Messages), nil
 	case defaultRecords:
-		if r.recordBatch == nil {
+		if r.recordBatchSet == nil {
 			return 0, nil
 		}
-		return len(r.recordBatch.Records), nil
+		s := 0
+		for i := range r.recordBatchSet.batches {
+			s += len(r.recordBatchSet.batches[i].Records)
+		}
+		return s, nil
 	}
 	return 0, fmt.Errorf("unknown records type: %v", r.recordsType)
 }
@@ -139,29 +145,13 @@ func (r *Records) isPartial() (bool, error) {
 		}
 		return r.msgSet.PartialTrailingMessage, nil
 	case defaultRecords:
-		if r.recordBatch == nil {
+		if r.recordBatchSet == nil {
 			return false, nil
 		}
-		return r.recordBatch.PartialTrailingRecord, nil
-	}
-	return false, fmt.Errorf("unknown records type: %v", r.recordsType)
-}
-
-func (r *Records) isControl() (bool, error) {
-	if r.recordsType == unknownRecords {
-		if empty, err := r.setTypeFromFields(); err != nil || empty {
-			return false, err
+		if len(r.recordBatchSet.batches) == 1 {
+			return r.recordBatchSet.batches[0].PartialTrailingRecord, nil
 		}
-	}
-
-	switch r.recordsType {
-	case legacyRecords:
 		return false, nil
-	case defaultRecords:
-		if r.recordBatch == nil {
-			return false, nil
-		}
-		return r.recordBatch.Control, nil
 	}
 	return false, fmt.Errorf("unknown records type: %v", r.recordsType)
 }

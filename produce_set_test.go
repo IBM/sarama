@@ -227,7 +227,7 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 		t.Error("Wrong request version")
 	}
 
-	batch := req.records["t1"][0].recordBatch
+	batch := req.records["t1"][0].recordBatchSet.batches[0]
 	if batch.FirstTimestamp != now {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
 	}

@@ -64,14 +64,6 @@ func TestLegacyRecords(t *testing.T) {
 	if p {
 		t.Errorf("MessageSet shouldn't have a partial trailing message")
 	}
-
-	c, err := r.isControl()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c {
-		t.Errorf("MessageSet can't be a control batch")
-	}
 }
 
 func TestDefaultRecords(t *testing.T) {
@@ -84,7 +76,7 @@ func TestDefaultRecords(t *testing.T) {
 		},
 	}
 
-	r := newDefaultRecords(batch)
+	r := newDefaultRecords([]*RecordBatch{batch})
 
 	exp, err := encode(batch, nil)
 	if err != nil {
@@ -113,8 +105,8 @@ func TestDefaultRecords(t *testing.T) {
 	if r.recordsType != defaultRecords {
 		t.Fatalf("Wrong records type %v, expected %v", r.recordsType, defaultRecords)
 	}
-	if !reflect.DeepEqual(batch, r.recordBatch) {
-		t.Errorf("Wrong decoding for default records, wanted %#+v, got %#+v", batch, r.recordBatch)
+	if !reflect.DeepEqual(batch, r.recordBatchSet.batches[0]) {
+		t.Errorf("Wrong decoding for default records, wanted %#+v, got %#+v", batch, r.recordBatchSet.batches[0])
 	}
 
 	n, err := r.numRecords()
@@ -133,11 +125,7 @@ func TestDefaultRecords(t *testing.T) {
 		t.Errorf("RecordBatch shouldn't have a partial trailing record")
 	}
 
-	c, err := r.isControl()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if c {
+	if r.recordBatchSet.batches[0].Control {
 		t.Errorf("RecordBatch shouldn't be a control batch")
 	}
 }
