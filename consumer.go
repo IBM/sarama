@@ -570,18 +570,10 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 		return nil, block.Err
 	}
 
-	nRecs, err := block.Records.numRecords()
-	if err != nil {
-		return nil, err
-	}
-	if nRecs == 0 {
-		partialTrailingMessage, err := block.Records.isPartial()
-		if err != nil {
-			return nil, err
-		}
+	if block.numRecords() == 0 {
 		// We got no messages. If we got a trailing one then we need to ask for more data.
 		// Otherwise we just poll again and wait for one to be produced...
-		if partialTrailingMessage {
+		if block.isPartial() {
 			if child.conf.Consumer.Fetch.Max > 0 && child.fetchSize == child.conf.Consumer.Fetch.Max {
 				// we can't ask for more data, we've hit the configured limit
 				child.sendError(ErrMessageTooLarge)
@@ -601,21 +593,28 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	child.fetchSize = child.conf.Consumer.Fetch.Default
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
-	if block.Records.recordsType == legacyRecords {
-		return child.parseMessages(block.Records.msgSet)
-	}
-
 	messages := []*ConsumerMessage{}
-	for _, recordBatch := range block.Records.recordBatchSet.batches {
-		if recordBatch.Control {
-			continue
+	for _, chunk := range block.RecordsSet {
+		if chunk.msgSet != nil {
+			messageSetMessages, err := child.parseMessages(chunk.msgSet)
+			if err != nil {
+				return nil, err
+			}
+
+			messages = append(messages, messageSetMessages...)
 		}
 
-		recordBatchMessages, err := child.parseRecords(recordBatch)
-		messages = append(messages, recordBatchMessages...)
+		if chunk.recordBatch != nil {
+			if chunk.recordBatch.Control {
+				continue
+			}
 
-		if err != nil {
-			return messages, err
+			recordBatchMessages, err := child.parseRecords(chunk.recordBatch)
+			if err != nil {
+				return nil, err
+			}
+
+			messages = append(messages, recordBatchMessages...)
 		}
 	}
 

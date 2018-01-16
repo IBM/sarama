@@ -35,47 +35,6 @@ func (e recordsArray) decode(pd packetDecoder) error {
 	return nil
 }
 
-type RecordBatchSet struct {
-	batches []*RecordBatch
-}
-
-func (rbs *RecordBatchSet) encode(pe packetEncoder) error {
-	for _, rb := range rbs.batches {
-		if err := rb.encode(pe); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (rbs *RecordBatchSet) decode(pd packetDecoder) error {
-	rbs.batches = []*RecordBatch{}
-
-	for {
-		if pd.remaining() == 0 {
-			break
-		}
-
-		rb := &RecordBatch{}
-		if err := rb.decode(pd); err != nil {
-			// If we have at least one decoded record batch, this is not an error
-			if err == ErrInsufficientData && len(rbs.batches) > 0 {
-				return nil
-			}
-			return err
-		}
-
-		// If we have at least one full record batch, we skip incomplete ones
-		if rb.PartialTrailingRecord && len(rbs.batches) > 0 {
-			return nil
-		}
-
-		rbs.batches = append(rbs.batches, rb)
-	}
-
-	return nil
-}
-
 type RecordBatch struct {
 	FirstOffset           int64
 	PartitionLeaderEpoch  int32

@@ -64,10 +64,10 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 				ProducerID:     -1, /* No producer id */
 				Codec:          ps.parent.conf.Producer.Compression,
 			}
-			set = &partitionSet{recordsToSend: newDefaultRecords([]*RecordBatch{batch})}
+			set = &partitionSet{recordsToSend: Records{recordBatch: batch}}
 			size = recordBatchOverhead
 		} else {
-			set = &partitionSet{recordsToSend: newLegacyRecords(new(MessageSet))}
+			set = &partitionSet{recordsToSend: Records{msgSet: &MessageSet{}}}
 		}
 		partitions[msg.Partition] = set
 	}
@@ -79,7 +79,7 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 		rec := &Record{
 			Key:            key,
 			Value:          val,
-			TimestampDelta: timestamp.Sub(set.recordsToSend.recordBatchSet.batches[0].FirstTimestamp),
+			TimestampDelta: timestamp.Sub(set.recordsToSend.recordBatch.FirstTimestamp),
 		}
 		size += len(key) + len(val)
 		if len(msg.Headers) > 0 {
@@ -89,7 +89,7 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 				size += len(rec.Headers[i].Key) + len(rec.Headers[i].Value) + 2*binary.MaxVarintLen32
 			}
 		}
-		set.recordsToSend.recordBatchSet.batches[0].addRecord(rec)
+		set.recordsToSend.recordBatch.addRecord(rec)
 	} else {
 		msgToSend := &Message{Codec: CompressionNone, Key: key, Value: val}
 		if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
@@ -122,11 +122,11 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	for topic, partitionSet := range ps.msgs {
 		for partition, set := range partitionSet {
 			if req.Version >= 3 {
-				for i, record := range set.recordsToSend.recordBatchSet.batches[0].Records {
+				for i, record := range set.recordsToSend.recordBatch.Records {
 					record.OffsetDelta = int64(i)
 				}
 
-				req.AddBatch(topic, partition, set.recordsToSend.recordBatchSet.batches[0])
+				req.AddBatch(topic, partition, set.recordsToSend.recordBatch)
 				continue
 			}
 			if ps.parent.conf.Producer.Compression == CompressionNone {
