@@ -113,7 +113,7 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 			}
 			if metricRegistry != nil {
 				if r.Version >= 3 {
-					topicRecordCount += updateBatchMetrics(records.recordBatchSet.batches[0], compressionRatioMetric, topicCompressionRatioMetric)
+					topicRecordCount += updateBatchMetrics(records.recordBatch, compressionRatioMetric, topicCompressionRatioMetric)
 				} else {
 					topicRecordCount += updateMsgSetMetrics(records.msgSet, compressionRatioMetric, topicCompressionRatioMetric)
 				}
@@ -235,7 +235,7 @@ func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 
 	if set == nil {
 		set = new(MessageSet)
-		r.records[topic][partition] = newLegacyRecords(set)
+		r.records[topic][partition] = Records{msgSet: set}
 	}
 
 	set.addMessage(msg)
@@ -243,10 +243,10 @@ func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 
 func (r *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
 	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = newLegacyRecords(set)
+	r.records[topic][partition] = Records{msgSet: set}
 }
 
 func (r *ProduceRequest) AddBatch(topic string, partition int32, batch *RecordBatch) {
 	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = newDefaultRecords([]*RecordBatch{batch})
+	r.records[topic][partition] = Records{recordBatch: batch}
 }

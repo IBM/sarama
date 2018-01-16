@@ -64,6 +64,15 @@ func (ms *MessageSet) decode(pd packetDecoder) (err error) {
 	ms.Messages = nil
 
 	for pd.remaining() > 0 {
+		magic, err := magicValue(pd)
+		if err != nil {
+			return err
+		}
+
+		if magic > 1 {
+			return nil
+		}
+
 		msb := new(MessageBlock)
 		err = msb.decode(pd)
 		switch err {

@@ -16,7 +16,7 @@ func TestLegacyRecords(t *testing.T) {
 			},
 		},
 	}
-	r := newLegacyRecords(set)
+	r := Records{msgSet: set}
 
 	exp, err := encode(set, nil)
 	if err != nil {
@@ -42,25 +42,16 @@ func TestLegacyRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r.recordsType != legacyRecords {
-		t.Fatalf("Wrong records type %v, expected %v", r.recordsType, legacyRecords)
-	}
 	if !reflect.DeepEqual(set, r.msgSet) {
 		t.Errorf("Wrong decoding for legacy records, wanted %#+v, got %#+v", set, r.msgSet)
 	}
 
-	n, err := r.numRecords()
-	if err != nil {
-		t.Fatal(err)
-	}
+	n := r.numRecords()
 	if n != 1 {
 		t.Errorf("Wrong number of records, wanted 1, got %d", n)
 	}
 
-	p, err := r.isPartial()
-	if err != nil {
-		t.Fatal(err)
-	}
+	p := r.isPartial()
 	if p {
 		t.Errorf("MessageSet shouldn't have a partial trailing message")
 	}
@@ -76,7 +67,7 @@ func TestDefaultRecords(t *testing.T) {
 		},
 	}
 
-	r := newDefaultRecords([]*RecordBatch{batch})
+	r := Records{recordBatch: batch}
 
 	exp, err := encode(batch, nil)
 	if err != nil {
@@ -102,14 +93,11 @@ func TestDefaultRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if r.recordsType != defaultRecords {
-		t.Fatalf("Wrong records type %v, expected %v", r.recordsType, defaultRecords)
-	}
-	if !reflect.DeepEqual(batch, r.recordBatchSet.batches[0]) {
-		t.Errorf("Wrong decoding for default records, wanted %#+v, got %#+v", batch, r.recordBatchSet.batches[0])
+	if !reflect.DeepEqual(batch, r.recordBatch) {
+		t.Errorf("Wrong decoding for default records, wanted %#+v, got %#+v", batch, r.recordBatch)
 	}
 
-	n, err := r.numRecords()
+	n := r.numRecords()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +105,7 @@ func TestDefaultRecords(t *testing.T) {
 		t.Errorf("Wrong number of records, wanted 1, got %d", n)
 	}
 
-	p, err := r.isPartial()
+	p := r.isPartial()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +113,7 @@ func TestDefaultRecords(t *testing.T) {
 		t.Errorf("RecordBatch shouldn't have a partial trailing record")
 	}
 
-	if r.recordBatchSet.batches[0].Control {
+	if r.recordBatch.Control {
 		t.Errorf("RecordBatch shouldn't be a control batch")
 	}
 }
