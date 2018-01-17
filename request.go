@@ -118,6 +118,12 @@ func allocateBody(key, version int16) protocolBody {
 		return &CreateTopicsRequest{}
 	case 20:
 		return &DeleteTopicsRequest{}
+	case 29:
+		return &DescribeAclsRequest{}
+	case 30:
+		return &CreateAclsRequest{}
+	case 31:
+		return &DeleteAclsRequest{}
 	case 37:
 		return &CreatePartitionsRequest{}
 	}
