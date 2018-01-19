@@ -64,10 +64,10 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 				ProducerID:     -1, /* No producer id */
 				Codec:          ps.parent.conf.Producer.Compression,
 			}
-			set = &partitionSet{recordsToSend: Records{recordBatch: batch}}
+			set = &partitionSet{recordsToSend: newDefaultRecords(batch)}
 			size = recordBatchOverhead
 		} else {
-			set = &partitionSet{recordsToSend: Records{msgSet: &MessageSet{}}}
+			set = &partitionSet{recordsToSend: newLegacyRecords(new(MessageSet))}
 		}
 		partitions[msg.Partition] = set
 	}

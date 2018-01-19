@@ -235,7 +235,7 @@ func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 
 	if set == nil {
 		set = new(MessageSet)
-		r.records[topic][partition] = Records{msgSet: set}
+		r.records[topic][partition] = newLegacyRecords(set)
 	}
 
 	set.addMessage(msg)
@@ -243,10 +243,10 @@ func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message)
 
 func (r *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
 	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = Records{msgSet: set}
+	r.records[topic][partition] = newLegacyRecords(set)
 }
 
 func (r *ProduceRequest) AddBatch(topic string, partition int32, batch *RecordBatch) {
 	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = Records{recordBatch: batch}
+	r.records[topic][partition] = newDefaultRecords(batch)
 }
