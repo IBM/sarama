@@ -161,7 +161,7 @@ func (cg *consumerGroup) MarkMessage(msg *ConsumerMessage, metadata string) {
 func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64, metadata string) {
 	cg.RLock()
 	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
-		mp.pom.MarkOffset(offset+1, metadata)
+		mp.pom.MarkOffset(offset, metadata)
 	}
 	cg.RUnlock()
 }
