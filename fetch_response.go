@@ -90,9 +90,9 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 			break
 		}
 
-		chunk := &Records{}
-		if err := chunk.decode(recordsDecoder); err != nil {
-			// If we have at least one decoded record chunk, this is not an error
+		records := &Records{}
+		if err := records.decode(recordsDecoder); err != nil {
+			// If we have at least one decoded records, this is not an error
 			if err == ErrInsufficientData {
 				if len(b.RecordsSet) == 0 {
 					b.Partial = true
@@ -102,29 +102,47 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 			return err
 		}
 
-		// If we have at least one full record chunk, we skip incomplete ones
-		if chunk.isPartial() && len(b.RecordsSet) > 0 {
+		partial, err := records.isPartial()
+		if err != nil {
+			return err
+		}
+
+		// If we have at least one full records, we skip incomplete ones
+		if partial && len(b.RecordsSet) > 0 {
 			break
 		}
 
-		b.RecordsSet = append(b.RecordsSet, chunk)
+		b.RecordsSet = append(b.RecordsSet, records)
 	}
 
 	return nil
 }
 
-func (b *FetchResponseBlock) numRecords() int {
-	s := 0
+func (b *FetchResponseBlock) numRecords() (int, error) {
+	sum := 0
 
-	for _, chunk := range b.RecordsSet {
-		s += chunk.numRecords()
+	for _, records := range b.RecordsSet {
+		count, err := records.numRecords()
+		if err != nil {
+			return 0, err
+		}
+
+		sum += count
 	}
 
-	return s
+	return sum, nil
 }
 
-func (b *FetchResponseBlock) isPartial() bool {
-	return b.Partial || len(b.RecordsSet) == 1 && b.RecordsSet[0].isPartial()
+func (b *FetchResponseBlock) isPartial() (bool, error) {
+	if b.Partial {
+		return true, nil
+	}
+
+	if len(b.RecordsSet) == 1 {
+		return b.RecordsSet[0].isPartial()
+	}
+
+	return false, nil
 }
 
 func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error) {
@@ -146,8 +164,8 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 	}
 
 	pe.push(&lengthField{})
-	for _, chunk := range b.RecordsSet {
-		err = chunk.encode(pe)
+	for _, records := range b.RecordsSet {
+		err = records.encode(pe)
 		if err != nil {
 			return err
 		}
@@ -331,7 +349,8 @@ func (r *FetchResponse) AddMessage(topic string, partition int32, key, value Enc
 	msg := &Message{Key: kb, Value: vb}
 	msgBlock := &MessageBlock{Msg: msg, Offset: offset}
 	if len(frb.RecordsSet) == 0 {
-		frb.RecordsSet = []*Records{&Records{msgSet: &MessageSet{}}}
+		records := newLegacyRecords(&MessageSet{})
+		frb.RecordsSet = []*Records{&records}
 	}
 	set := frb.RecordsSet[0].msgSet
 	set.Messages = append(set.Messages, msgBlock)
@@ -342,7 +361,8 @@ func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Enco
 	kb, vb := encodeKV(key, value)
 	rec := &Record{Key: kb, Value: vb, OffsetDelta: offset}
 	if len(frb.RecordsSet) == 0 {
-		frb.RecordsSet = []*Records{&Records{recordBatch: &RecordBatch{Version: 2}}}
+		records := newDefaultRecords(&RecordBatch{Version: 2})
+		frb.RecordsSet = []*Records{&records}
 	}
 	batch := frb.RecordsSet[0].recordBatch
 	batch.addRecord(rec)
@@ -351,7 +371,8 @@ func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Enco
 func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
 	frb := r.getOrCreateBlock(topic, partition)
 	if len(frb.RecordsSet) == 0 {
-		frb.RecordsSet = []*Records{&Records{recordBatch: &RecordBatch{Version: 2}}}
+		records := newDefaultRecords(&RecordBatch{Version: 2})
+		frb.RecordsSet = []*Records{&records}
 	}
 	batch := frb.RecordsSet[0].recordBatch
 	batch.LastOffsetDelta = offset
