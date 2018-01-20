@@ -85,11 +85,7 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 
 	b.RecordsSet = []*Records{}
 
-	for {
-		if recordsDecoder.remaining() == 0 {
-			break
-		}
-
+	for recordsDecoder.remaining() > 0 {
 		records := &Records{}
 		if err := records.decode(recordsDecoder); err != nil {
 			// If we have at least one decoded records, this is not an error
