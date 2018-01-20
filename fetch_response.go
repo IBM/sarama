@@ -33,6 +33,7 @@ type FetchResponseBlock struct {
 	HighWaterMarkOffset int64
 	LastStableOffset    int64
 	AbortedTransactions []*AbortedTransaction
+	Records             *Records // deprecated: use FetchResponseBlock.Records
 	RecordsSet          []*Records
 	Partial             bool
 }
@@ -109,6 +110,10 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		}
 
 		b.RecordsSet = append(b.RecordsSet, records)
+
+		if b.Records == nil {
+			b.Records = records
+		}
 	}
 
 	return nil
