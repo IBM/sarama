@@ -64,7 +64,7 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	pe.putInt8(b.Version)
 	pe.push(newCRC32Field(crcCastagnoli))
 	pe.putInt16(b.computeAttributes())
-	pe.putInt32(b.LastOffsetDelta)
+	pe.putInt32(int32(len(b.Records)))
 
 	if err := (Timestamp{&b.FirstTimestamp}).encode(pe); err != nil {
 		return err
