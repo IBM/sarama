@@ -570,12 +570,12 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 		return nil, block.Err
 	}
 
-	nRecs, err := block.Records.numRecords()
+	nRecs, err := block.numRecords()
 	if err != nil {
 		return nil, err
 	}
 	if nRecs == 0 {
-		partialTrailingMessage, err := block.Records.isPartial()
+		partialTrailingMessage, err := block.isPartial()
 		if err != nil {
 			return nil, err
 		}
@@ -601,14 +601,33 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	child.fetchSize = child.conf.Consumer.Fetch.Default
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
-	if control, err := block.Records.isControl(); err != nil || control {
-		return nil, err
+	messages := []*ConsumerMessage{}
+	for _, records := range block.RecordsSet {
+		if control, err := records.isControl(); err != nil || control {
+			continue
+		}
+
+		switch records.recordsType {
+		case legacyRecords:
+			messageSetMessages, err := child.parseMessages(records.msgSet)
+			if err != nil {
+				return nil, err
+			}
+
+			messages = append(messages, messageSetMessages...)
+		case defaultRecords:
+			recordBatchMessages, err := child.parseRecords(records.recordBatch)
+			if err != nil {
+				return nil, err
+			}
+
+			messages = append(messages, recordBatchMessages...)
+		default:
+			return nil, fmt.Errorf("unknown records type: %v", records.recordsType)
+		}
 	}
 
-	if block.Records.recordsType == legacyRecords {
-		return child.parseMessages(block.Records.msgSet)
-	}
-	return child.parseRecords(block.Records.recordBatch)
+	return messages, nil
 }
 
 // brokerConsumer
