@@ -155,7 +155,7 @@ func (cg *consumerGroup) Notifications() <-chan *Notification { return cg.notifi
 // your application crashes. This means that you may end up processing the same
 // message twice, and your processing should ideally be idempotent.
 func (cg *consumerGroup) MarkMessage(msg *ConsumerMessage, metadata string) {
-	cg.MarkOffset(msg.Topic, msg.Partition, msg.Offset, metadata)
+	cg.MarkOffset(msg.Topic, msg.Partition, msg.Offset+1, metadata)
 }
 
 func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64, metadata string) {
