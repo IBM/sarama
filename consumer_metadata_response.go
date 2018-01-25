@@ -1,5 +1,10 @@
 package sarama
 
+import (
+	"net"
+	"strconv"
+)
+
 type ConsumerMetadataResponse struct {
 	Err             KError
 	Coordinator     *Broker
@@ -16,22 +21,40 @@ func (r *ConsumerMetadataResponse) decode(pd packetDecoder, version int16) (err 
 	}
 
 	r.Err = tmp.Err
+
 	r.Coordinator = tmp.Coordinator
-	r.CoordinatorID = tmp.CoordinatorID
-	r.CoordinatorHost = tmp.CoordinatorHost
-	r.CoordinatorPort = tmp.CoordinatorPort
+	if tmp.Coordinator == nil {
+		return nil
+	}
+
+	// this can all go away in 2.0, but we have to fill in deprecated fields to maintain
+	// backwards compatibility
+	host, portstr, err := net.SplitHostPort(r.Coordinator.Addr())
+	if err != nil {
+		return err
+	}
+	port, err := strconv.ParseInt(portstr, 10, 32)
+	if err != nil {
+		return err
+	}
+	r.CoordinatorID = r.Coordinator.ID()
+	r.CoordinatorHost = host
+	r.CoordinatorPort = int32(port)
 
 	return nil
 }
 
 func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
+	if r.Coordinator == nil {
+		r.Coordinator = new(Broker)
+		r.Coordinator.id = r.CoordinatorID
+		r.Coordinator.addr = net.JoinHostPort(r.CoordinatorHost, strconv.Itoa(int(r.CoordinatorPort)))
+	}
+
 	tmp := &FindCoordinatorResponse{
-		Version:         0,
-		Err:             r.Err,
-		Coordinator:     r.Coordinator,
-		CoordinatorID:   r.CoordinatorID,
-		CoordinatorHost: r.CoordinatorHost,
-		CoordinatorPort: r.CoordinatorPort,
+		Version:     0,
+		Err:         r.Err,
+		Coordinator: r.Coordinator,
 	}
 
 	if err := tmp.encode(pe); err != nil {

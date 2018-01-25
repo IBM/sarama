@@ -1,20 +1,15 @@
 package sarama
 
 import (
-	"net"
-	"strconv"
 	"time"
 )
 
 type FindCoordinatorResponse struct {
-	Version         int16
-	ThrottleTime    time.Duration
-	Err             KError
-	ErrMsg          *string
-	Coordinator     *Broker
-	CoordinatorID   int32  // deprecated: use Coordinator.ID()
-	CoordinatorHost string // deprecated: use Coordinator.Addr()
-	CoordinatorPort int32  // deprecated: use Coordinator.Addr()
+	Version      int16
+	ThrottleTime time.Duration
+	Err          KError
+	ErrMsg       *string
+	Coordinator  *Broker
 }
 
 func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err error) {
@@ -49,20 +44,6 @@ func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err e
 	}
 	f.Coordinator = coordinator
 
-	// this can all go away in 2.0, but we have to fill in deprecated fields to maintain
-	// backwards compatibility
-	host, portstr, err := net.SplitHostPort(f.Coordinator.Addr())
-	if err != nil {
-		return err
-	}
-	port, err := strconv.ParseInt(portstr, 10, 32)
-	if err != nil {
-		return err
-	}
-	f.CoordinatorID = f.Coordinator.ID()
-	f.CoordinatorHost = host
-	f.CoordinatorPort = int32(port)
-
 	return nil
 }
 
@@ -79,27 +60,10 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 		}
 	}
 
-	if f.Coordinator != nil {
-		host, portstr, err := net.SplitHostPort(f.Coordinator.Addr())
-		if err != nil {
-			return err
-		}
-		port, err := strconv.ParseInt(portstr, 10, 32)
-		if err != nil {
-			return err
-		}
-		pe.putInt32(f.Coordinator.ID())
-		if err := pe.putString(host); err != nil {
-			return err
-		}
-		pe.putInt32(int32(port))
-		return nil
-	}
-	pe.putInt32(f.CoordinatorID)
-	if err := pe.putString(f.CoordinatorHost); err != nil {
+	if err := f.Coordinator.encode(pe); err != nil {
 		return err
 	}
-	pe.putInt32(f.CoordinatorPort)
+
 	return nil
 }
 

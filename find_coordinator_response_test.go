@@ -29,14 +29,11 @@ func TestFindCoordinatorResponse(t *testing.T) {
 	broker := NewBroker("host:9092")
 	broker.id = 1
 	resp := &FindCoordinatorResponse{
-		Version:         1,
-		ThrottleTime:    100 * time.Millisecond,
-		Err:             ErrNoError,
-		ErrMsg:          nil,
-		CoordinatorID:   1,
-		CoordinatorHost: "host",
-		CoordinatorPort: 9092,
-		Coordinator:     broker,
+		Version:      1,
+		ThrottleTime: 100 * time.Millisecond,
+		Err:          ErrNoError,
+		ErrMsg:       nil,
+		Coordinator:  broker,
 	}
 
 	testResponse(t, "version 1 - no error", resp, findCoordinatorResponse)
