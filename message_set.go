@@ -66,6 +66,10 @@ func (ms *MessageSet) decode(pd packetDecoder) (err error) {
 	for pd.remaining() > 0 {
 		magic, err := magicValue(pd)
 		if err != nil {
+			if err == ErrInsufficientData {
+				ms.PartialTrailingMessage = true
+				return nil
+			}
 			return err
 		}
 
