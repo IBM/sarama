@@ -44,14 +44,14 @@ func TestDescribeConfigsRequest(t *testing.T) {
 	var request *DescribeConfigsRequest
 
 	request = &DescribeConfigsRequest{
-		Resources: []*Resource{},
+		Resources: []*ConfigResource{},
 	}
 	testRequest(t, "no requests", request, emptyDescribeConfigsRequest)
 
 	configs := []string{"segment.ms"}
 	request = &DescribeConfigsRequest{
-		Resources: []*Resource{
-			&Resource{
+		Resources: []*ConfigResource{
+			&ConfigResource{
 				Type:        TopicResource,
 				Name:        "foo",
 				ConfigNames: configs,
@@ -62,13 +62,13 @@ func TestDescribeConfigsRequest(t *testing.T) {
 	testRequest(t, "one config", request, singleDescribeConfigsRequest)
 
 	request = &DescribeConfigsRequest{
-		Resources: []*Resource{
-			&Resource{
+		Resources: []*ConfigResource{
+			&ConfigResource{
 				Type:        TopicResource,
 				Name:        "foo",
 				ConfigNames: []string{"segment.ms", "retention.ms"},
 			},
-			&Resource{
+			&ConfigResource{
 				Type:        TopicResource,
 				Name:        "bar",
 				ConfigNames: []string{"segment.ms"},
@@ -78,8 +78,8 @@ func TestDescribeConfigsRequest(t *testing.T) {
 	testRequest(t, "two configs", request, doubleDescribeConfigsRequest)
 
 	request = &DescribeConfigsRequest{
-		Resources: []*Resource{
-			&Resource{
+		Resources: []*ConfigResource{
+			&ConfigResource{
 				Type: TopicResource,
 				Name: "foo",
 			},

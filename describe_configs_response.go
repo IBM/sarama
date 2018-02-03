@@ -10,7 +10,7 @@ type DescribeConfigsResponse struct {
 type ResourceResponse struct {
 	ErrorCode int16
 	ErrorMsg  string
-	T         ResourceType
+	Type      ConfigResourceType
 	Name      string
 	Configs   []*ConfigEntry
 }
@@ -80,7 +80,7 @@ func (r *ResourceResponse) encode(pe packetEncoder) (err error) {
 		return err
 	}
 
-	pe.putInt8(int8(r.T))
+	pe.putInt8(int8(r.Type))
 
 	if err = pe.putString(r.Name); err != nil {
 		return err
@@ -115,7 +115,7 @@ func (r *ResourceResponse) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	r.T = ResourceType(t)
+	r.Type = ConfigResourceType(t)
 
 	name, err := pd.getString()
 	if err != nil {

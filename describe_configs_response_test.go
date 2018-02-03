@@ -42,7 +42,7 @@ func TestDescribeConfigsResponse(t *testing.T) {
 			&ResourceResponse{
 				ErrorCode: 0,
 				ErrorMsg:  "",
-				T:         TopicResource,
+				Type:      TopicResource,
 				Name:      "foo",
 				Configs: []*ConfigEntry{
 					&ConfigEntry{

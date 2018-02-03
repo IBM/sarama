@@ -10,7 +10,7 @@ type AlterConfigsResponse struct {
 type AlterConfigsResourceResponse struct {
 	ErrorCode int16
 	ErrorMsg  string
-	Type      ResourceType
+	Type      ConfigResourceType
 	Name      string
 }
 
@@ -70,7 +70,7 @@ func (acr *AlterConfigsResponse) decode(pd packetDecoder, version int16) error {
 		if err != nil {
 			return err
 		}
-		acr.Resources[i].Type = ResourceType(t)
+		acr.Resources[i].Type = ConfigResourceType(t)
 
 		name, err := pd.getString()
 		if err != nil {

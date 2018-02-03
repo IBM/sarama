@@ -6,7 +6,7 @@ type AlterConfigsRequest struct {
 }
 
 type AlterConfigsResource struct {
-	Type          ResourceType
+	Type          ConfigResourceType
 	Name          string
 	ConfigEntries map[string]*string
 }
@@ -79,7 +79,7 @@ func (ac *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 	if err != nil {
 		return err
 	}
-	ac.Type = ResourceType(t)
+	ac.Type = ConfigResourceType(t)
 
 	name, err := pd.getString()
 	if err != nil {

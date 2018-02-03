@@ -1,13 +1,13 @@
 package sarama
 
-type Resource struct {
-	Type        ResourceType
+type ConfigResource struct {
+	Type        ConfigResourceType
 	Name        string
 	ConfigNames []string
 }
 
 type DescribeConfigsRequest struct {
-	Resources []*Resource
+	Resources []*ConfigResource
 }
 
 func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
@@ -39,15 +39,15 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 		return err
 	}
 
-	r.Resources = make([]*Resource, n)
+	r.Resources = make([]*ConfigResource, n)
 
 	for i := 0; i < n; i++ {
-		r.Resources[i] = &Resource{}
+		r.Resources[i] = &ConfigResource{}
 		t, err := pd.getInt8()
 		if err != nil {
 			return err
 		}
-		r.Resources[i].Type = ResourceType(t)
+		r.Resources[i].Type = ConfigResourceType(t)
 		name, err := pd.getString()
 		if err != nil {
 			return err
