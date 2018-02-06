@@ -35,6 +35,9 @@ type ConsumerGroup interface {
 	// mark a topic/partition/offset combination as ready to commit
 	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
+	// reset a partitions offset to a previous value
+	ResetOffset(topic string, partition int32, offset int64, metadata string)
+
 	// commit marked offsets - only needed if auto commit is disabeled
 	Commit()
 
@@ -152,13 +155,21 @@ func (cg *consumerGroup) Notifications() <-chan *Notification { return cg.notifi
 // your application crashes. This means that you may end up processing the same
 // message twice, and your processing should ideally be idempotent.
 func (cg *consumerGroup) MarkMessage(msg *ConsumerMessage, metadata string) {
-	cg.MarkOffset(msg.Topic, msg.Partition, msg.Offset, metadata)
+	cg.MarkOffset(msg.Topic, msg.Partition, msg.Offset+1, metadata)
 }
 
 func (cg *consumerGroup) MarkOffset(topic string, partition int32, offset int64, metadata string) {
 	cg.RLock()
 	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
-		mp.pom.MarkOffset(offset+1, metadata)
+		mp.pom.MarkOffset(offset, metadata)
+	}
+	cg.RUnlock()
+}
+
+func (cg *consumerGroup) ResetOffset(topic string, partition int32, offset int64, metadata string) {
+	cg.RLock()
+	if mp := cg.managed[TopicPartition{topic, partition}]; mp != nil {
+		mp.pom.ResetOffset(offset, metadata)
 	}
 	cg.RUnlock()
 }
