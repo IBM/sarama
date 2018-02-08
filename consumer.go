@@ -524,10 +524,20 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 	var messages []*ConsumerMessage
 	var incomplete bool
 	prelude := true
-	originalOffset := child.offset
+
+	// Compacted records can lie about their offset delta, but that can be
+	// detected comparing the last offset delta from the record batch with
+	// actual offset delta of the last record. The difference (skew) should be
+	// applied to all records in the batch.
+	var offsetSkew int64
+	recordCount := len(batch.Records)
+	if recordCount > 0 {
+		lastRecordOffsetDelta := batch.Records[recordCount-1].OffsetDelta
+		offsetSkew = int64(batch.LastOffsetDelta) - lastRecordOffsetDelta
+	}
 
 	for _, rec := range batch.Records {
-		offset := batch.FirstOffset + rec.OffsetDelta
+		offset := batch.FirstOffset + rec.OffsetDelta + offsetSkew
 		if prelude && offset < child.offset {
 			continue
 		}
@@ -552,12 +562,6 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 	if incomplete {
 		return nil, ErrIncompleteResponse
 	}
-
-	child.offset = batch.FirstOffset + int64(batch.LastOffsetDelta) + 1
-	if child.offset <= originalOffset {
-		return nil, ErrConsumerOffsetNotAdvanced
-	}
-
 	return messages, nil
 }
 
