@@ -122,11 +122,15 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	for topic, partitionSet := range ps.msgs {
 		for partition, set := range partitionSet {
 			if req.Version >= 3 {
-				for i, record := range set.recordsToSend.recordBatch.Records {
-					record.OffsetDelta = int64(i)
+				rb := set.recordsToSend.recordBatch
+				if len(rb.Records) > 0 {
+					rb.LastOffsetDelta = int32(len(rb.Records) - 1)
+					for i, record := range rb.Records {
+						record.OffsetDelta = int64(i)
+					}
 				}
 
-				req.AddBatch(topic, partition, set.recordsToSend.recordBatch)
+				req.AddBatch(topic, partition, rb)
 				continue
 			}
 			if ps.parent.conf.Producer.Compression == CompressionNone {
