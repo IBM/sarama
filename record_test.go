@@ -210,7 +210,7 @@ var recordBatchTestCases = []struct {
 			Codec:           CompressionLZ4,
 			FirstTimestamp:  time.Unix(1479847795, 0),
 			MaxTimestamp:    time.Unix(0, 0),
-			LastOffsetDelta: 1,
+			LastOffsetDelta: 0,
 			Records: []*Record{{
 				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
@@ -226,10 +226,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 89, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,                // Version
-			223, 53, 65, 233, // CRC
+			2,                 // Version
+			169, 74, 119, 197, // CRC
 			0, 3, // Attributes
-			0, 0, 0, 1, // Last Offset Delta
+			0, 0, 0, 0, // Last Offset Delta
 			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
