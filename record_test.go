@@ -69,9 +69,10 @@ var recordBatchTestCases = []struct {
 	{
 		name: "uncompressed record",
 		batch: RecordBatch{
-			Version:        2,
-			FirstTimestamp: time.Unix(1479847795, 0),
-			MaxTimestamp:   time.Unix(0, 0),
+			Version:         2,
+			FirstTimestamp:  time.Unix(1479847795, 0),
+			MaxTimestamp:    time.Unix(0, 0),
+			LastOffsetDelta: 0,
 			Records: []*Record{{
 				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
@@ -87,10 +88,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 70, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,               // Version
-			202, 51, 188, 5, // CRC
+			2,                // Version
+			84, 121, 97, 253, // CRC
 			0, 0, // Attributes
-			0, 0, 0, 1, // Last Offset Delta
+			0, 0, 0, 0, // Last Offset Delta
 			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
@@ -115,10 +116,11 @@ var recordBatchTestCases = []struct {
 	{
 		name: "gzipped record",
 		batch: RecordBatch{
-			Version:        2,
-			Codec:          CompressionGZIP,
-			FirstTimestamp: time.Unix(1479847795, 0),
-			MaxTimestamp:   time.Unix(0, 0),
+			Version:         2,
+			Codec:           CompressionGZIP,
+			FirstTimestamp:  time.Unix(1479847795, 0),
+			MaxTimestamp:    time.Unix(0, 0),
+			LastOffsetDelta: 0,
 			Records: []*Record{{
 				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
@@ -134,10 +136,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 94, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,                 // Version
-			151, 214, 216, 81, // CRC
+			2,                  // Version
+			159, 236, 182, 189, // CRC
 			0, 1, // Attributes
-			0, 0, 0, 1, // Last Offset Delta
+			0, 0, 0, 0, // Last Offset Delta
 			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
@@ -168,10 +170,11 @@ var recordBatchTestCases = []struct {
 	{
 		name: "snappy compressed record",
 		batch: RecordBatch{
-			Version:        2,
-			Codec:          CompressionSnappy,
-			FirstTimestamp: time.Unix(1479847795, 0),
-			MaxTimestamp:   time.Unix(0, 0),
+			Version:         2,
+			Codec:           CompressionSnappy,
+			FirstTimestamp:  time.Unix(1479847795, 0),
+			MaxTimestamp:    time.Unix(0, 0),
+			LastOffsetDelta: 0,
 			Records: []*Record{{
 				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
@@ -187,10 +190,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 72, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,                 // Version
-			160, 117, 65, 149, // CRC
+			2,              // Version
+			21, 0, 159, 97, // CRC
 			0, 2, // Attributes
-			0, 0, 0, 1, // Last Offset Delta
+			0, 0, 0, 0, // Last Offset Delta
 			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
@@ -203,10 +206,11 @@ var recordBatchTestCases = []struct {
 	{
 		name: "lz4 compressed record",
 		batch: RecordBatch{
-			Version:        2,
-			Codec:          CompressionLZ4,
-			FirstTimestamp: time.Unix(1479847795, 0),
-			MaxTimestamp:   time.Unix(0, 0),
+			Version:         2,
+			Codec:           CompressionLZ4,
+			FirstTimestamp:  time.Unix(1479847795, 0),
+			MaxTimestamp:    time.Unix(0, 0),
+			LastOffsetDelta: 0,
 			Records: []*Record{{
 				TimestampDelta: 5 * time.Millisecond,
 				Key:            []byte{1, 2, 3, 4},
@@ -222,10 +226,10 @@ var recordBatchTestCases = []struct {
 			0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 			0, 0, 0, 89, // Length
 			0, 0, 0, 0, // Partition Leader Epoch
-			2,                // Version
-			223, 53, 65, 233, // CRC
+			2,                 // Version
+			169, 74, 119, 197, // CRC
 			0, 3, // Attributes
-			0, 0, 0, 1, // Last Offset Delta
+			0, 0, 0, 0, // Last Offset Delta
 			0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
 			0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
