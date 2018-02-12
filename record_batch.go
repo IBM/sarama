@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/DataDog/zstd"
 	"github.com/eapache/go-xerial-snappy"
 	"github.com/pierrec/lz4"
 )
@@ -193,6 +194,12 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		if recBuffer, err = ioutil.ReadAll(reader); err != nil {
 			return err
 		}
+	case CompressionZSTD:
+		reader := zstd.NewReader(bytes.NewReader(recBuffer))
+		defer reader.Close()
+		if recBuffer, err = ioutil.ReadAll(reader); err != nil {
+			return err
+		}
 	default:
 		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", b.Codec)}
 	}
@@ -245,6 +252,16 @@ func (b *RecordBatch) encodeRecords(pe packetEncoder) error {
 			return err
 		}
 		if err := writer.Close(); err != nil {
+			return err
+		}
+		b.compressedRecords = buf.Bytes()
+	case CompressionZSTD:
+		var buf bytes.Buffer
+		writer := zstd.NewWriterLevel(&buf, b.CompressionLevel)
+		if _, err = writer.Write(raw); err != nil {
+			return err
+		}
+		if err = writer.Close(); err != nil {
 			return err
 		}
 		b.compressedRecords = buf.Bytes()
