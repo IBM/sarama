@@ -1,6 +1,6 @@
 # Changelog
 
-#### Version 1.16.0 (unreleased)
+#### Version 1.16.0 (2018-02-12)
 
 New Features:
  - Add support for the Create/Delete Topics request/response pairs
