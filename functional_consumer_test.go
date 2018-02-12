@@ -218,7 +218,7 @@ consumerVersionLoop:
 						consVer, i, prodMsg2Str(prodMsg), consMsg2Str(consMsg))
 					continue consumerVersionLoop
 				}
-			case <-time.After(time.Second):
+			case <-time.After(3 * time.Second):
 				t.Fatalf("Timeout waiting for: index=%d, offset=%d, msg=%s", i, prodMsg.Offset, prodMsg.Value)
 			}
 		}
