@@ -99,6 +99,10 @@ type Config struct {
 		// The type of compression to use on messages (defaults to no compression).
 		// Similar to `compression.codec` setting of the JVM producer.
 		Compression CompressionCodec
+		// The level of compression to use on messages. The meaning depends
+		// on the actual compression type used and defaults to default compression
+		// level for the codec.
+		CompressionLevel int
 		// Generates partitioners for choosing the partition to send messages to
 		// (defaults to hashing the message key). Similar to the `partitioner.class`
 		// setting for the JVM producer.
@@ -290,6 +294,7 @@ func NewConfig() *Config {
 	c.Producer.Retry.Max = 3
 	c.Producer.Retry.Backoff = 100 * time.Millisecond
 	c.Producer.Return.Errors = true
+	c.Producer.CompressionLevel = CompressionLevelDefault
 
 	c.Consumer.Fetch.Min = 1
 	c.Consumer.Fetch.Default = 1024 * 1024
