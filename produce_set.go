@@ -59,10 +59,11 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 	if set == nil {
 		if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 			batch := &RecordBatch{
-				FirstTimestamp: timestamp,
-				Version:        2,
-				ProducerID:     -1, /* No producer id */
-				Codec:          ps.parent.conf.Producer.Compression,
+				FirstTimestamp:   timestamp,
+				Version:          2,
+				ProducerID:       -1, /* No producer id */
+				Codec:            ps.parent.conf.Producer.Compression,
+				CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
 			}
 			set = &partitionSet{recordsToSend: newDefaultRecords(batch)}
 			size = recordBatchOverhead
@@ -157,10 +158,11 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					panic(err)
 				}
 				compMsg := &Message{
-					Codec: ps.parent.conf.Producer.Compression,
-					Key:   nil,
-					Value: payload,
-					Set:   set.recordsToSend.msgSet, // Provide the underlying message set for accurate metrics
+					Codec:            ps.parent.conf.Producer.Compression,
+					CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
+					Key:              nil,
+					Value:            payload,
+					Set:              set.recordsToSend.msgSet, // Provide the underlying message set for accurate metrics
 				}
 				if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 					compMsg.Version = 1
