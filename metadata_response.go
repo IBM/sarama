@@ -59,10 +59,11 @@ func (pm *PartitionMetadata) encode(pe packetEncoder) (err error) {
 type TopicMetadata struct {
 	Err        KError
 	Name       string
+	IsInternal bool // Only valid for Version >= 1
 	Partitions []*PartitionMetadata
 }
 
-func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
+func (tm *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	tmp, err := pd.getInt16()
 	if err != nil {
 		return err
@@ -72,6 +73,13 @@ func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
 	tm.Name, err = pd.getString()
 	if err != nil {
 		return err
+	}
+
+	if version >= 1 {
+		tm.IsInternal, err = pd.getBool()
+		if err != nil {
+			return err
+		}
 	}
 
 	n, err := pd.getArrayLength()
@@ -90,12 +98,16 @@ func (tm *TopicMetadata) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func (tm *TopicMetadata) encode(pe packetEncoder) (err error) {
+func (tm *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
 	pe.putInt16(int16(tm.Err))
 
 	err = pe.putString(tm.Name)
 	if err != nil {
 		return err
+	}
+
+	if version >= 1 {
+		pe.putBool(tm.IsInternal)
 	}
 
 	err = pe.putArrayLength(len(tm.Partitions))
@@ -114,8 +126,10 @@ func (tm *TopicMetadata) encode(pe packetEncoder) (err error) {
 }
 
 type MetadataResponse struct {
-	Brokers []*Broker
-	Topics  []*TopicMetadata
+	Version      int16
+	Brokers      []*Broker
+	ControllerID int32
+	Topics       []*TopicMetadata
 }
 
 func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
@@ -127,10 +141,19 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Brokers = make([]*Broker, n)
 	for i := 0; i < n; i++ {
 		r.Brokers[i] = new(Broker)
-		err = r.Brokers[i].decode(pd)
+		err = r.Brokers[i].decode(pd, version)
 		if err != nil {
 			return err
 		}
+	}
+
+	if version >= 1 {
+		r.ControllerID, err = pd.getInt32()
+		if err != nil {
+			return err
+		}
+	} else {
+		r.ControllerID = -1
 	}
 
 	n, err = pd.getArrayLength()
@@ -141,7 +164,7 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Topics = make([]*TopicMetadata, n)
 	for i := 0; i < n; i++ {
 		r.Topics[i] = new(TopicMetadata)
-		err = r.Topics[i].decode(pd)
+		err = r.Topics[i].decode(pd, version)
 		if err != nil {
 			return err
 		}
@@ -162,12 +185,16 @@ func (r *MetadataResponse) encode(pe packetEncoder) error {
 		}
 	}
 
+	if r.Version >= 1 {
+		pe.putInt32(r.ControllerID)
+	}
+
 	err = pe.putArrayLength(len(r.Topics))
 	if err != nil {
 		return err
 	}
 	for _, tm := range r.Topics {
-		err = tm.encode(pe)
+		err = tm.encode(pe, r.Version)
 		if err != nil {
 			return err
 		}
