@@ -48,5 +48,5 @@ func (r *MetadataRequest) version() int16 {
 }
 
 func (r *MetadataRequest) requiredVersion() KafkaVersion {
-	return minVersion
+	return MinVersion
 }
