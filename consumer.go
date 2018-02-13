@@ -583,14 +583,14 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 
 		switch records.recordsType {
 		case legacyRecords:
-			messageSetMessages, err := child.parseMessages(records.msgSet)
+			messageSetMessages, err := child.parseMessages(records.MsgSet)
 			if err != nil {
 				return nil, err
 			}
 
 			messages = append(messages, messageSetMessages...)
 		case defaultRecords:
-			recordBatchMessages, err := child.parseRecords(records.recordBatch)
+			recordBatchMessages, err := child.parseRecords(records.RecordBatch)
 			if err != nil {
 				return nil, err
 			}
