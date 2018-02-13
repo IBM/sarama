@@ -36,7 +36,7 @@ func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err e
 	}
 
 	coordinator := new(Broker)
-	if err := coordinator.decode(pd); err != nil {
+	if err := coordinator.decode(pd, 0); err != nil {
 		return err
 	}
 	if coordinator.addr == ":0" {
@@ -60,7 +60,7 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 		}
 	}
 
-	if err := f.Coordinator.encode(pe); err != nil {
+	if err := f.Coordinator.encode(pe, 0); err != nil {
 		return err
 	}
 

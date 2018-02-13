@@ -3,11 +3,11 @@ package sarama
 import "testing"
 
 var (
-	emptyMetadataResponse = []byte{
+	emptyMetadataResponseV0 = []byte{
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00}
 
-	brokersNoTopicsMetadataResponse = []byte{
+	brokersNoTopicsMetadataResponseV0 = []byte{
 		0x00, 0x00, 0x00, 0x02,
 
 		0x00, 0x00, 0xab, 0xff,
@@ -20,7 +20,7 @@ var (
 
 		0x00, 0x00, 0x00, 0x00}
 
-	topicsNoBrokersMetadataResponse = []byte{
+	topicsNoBrokersMetadataResponseV0 = []byte{
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x02,
 
@@ -36,12 +36,51 @@ var (
 		0x00, 0x00,
 		0x00, 0x03, 'b', 'a', 'r',
 		0x00, 0x00, 0x00, 0x00}
+
+	brokersNoTopicsMetadataResponseV1 = []byte{
+		0x00, 0x00, 0x00, 0x02,
+
+		0x00, 0x00, 0xab, 0xff,
+		0x00, 0x09, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't',
+		0x00, 0x00, 0x00, 0x33,
+		0x00, 0x05, 'r', 'a', 'c', 'k', '0',
+
+		0x00, 0x01, 0x02, 0x03,
+		0x00, 0x0a, 'g', 'o', 'o', 'g', 'l', 'e', '.', 'c', 'o', 'm',
+		0x00, 0x00, 0x01, 0x11,
+		0x00, 0x05, 'r', 'a', 'c', 'k', '1',
+
+		0x00, 0x00, 0x00, 0x01,
+
+		0x00, 0x00, 0x00, 0x00}
+
+	topicsNoBrokersMetadataResponseV1 = []byte{
+		0x00, 0x00, 0x00, 0x00,
+
+		0x00, 0x00, 0x00, 0x04,
+
+		0x00, 0x00, 0x00, 0x02,
+
+		0x00, 0x00,
+		0x00, 0x03, 'f', 'o', 'o',
+		0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x04,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x07,
+		0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03,
+		0x00, 0x00, 0x00, 0x00,
+
+		0x00, 0x00,
+		0x00, 0x03, 'b', 'a', 'r',
+		0x01,
+		0x00, 0x00, 0x00, 0x00}
 )
 
-func TestEmptyMetadataResponse(t *testing.T) {
+func TestEmptyMetadataResponseV0(t *testing.T) {
 	response := MetadataResponse{}
 
-	testVersionDecodable(t, "empty", &response, emptyMetadataResponse, 0)
+	testVersionDecodable(t, "empty, V0", &response, emptyMetadataResponseV0, 0)
 	if len(response.Brokers) != 0 {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
 	}
@@ -50,10 +89,10 @@ func TestEmptyMetadataResponse(t *testing.T) {
 	}
 }
 
-func TestMetadataResponseWithBrokers(t *testing.T) {
+func TestMetadataResponseWithBrokersV0(t *testing.T) {
 	response := MetadataResponse{}
 
-	testVersionDecodable(t, "brokers, no topics", &response, brokersNoTopicsMetadataResponse, 0)
+	testVersionDecodable(t, "brokers, no topics, V0", &response, brokersNoTopicsMetadataResponseV0, 0)
 	if len(response.Brokers) != 2 {
 		t.Fatal("Decoding produced", len(response.Brokers), "brokers where there were two!")
 	}
@@ -76,10 +115,10 @@ func TestMetadataResponseWithBrokers(t *testing.T) {
 	}
 }
 
-func TestMetadataResponseWithTopics(t *testing.T) {
+func TestMetadataResponseWithTopicsV0(t *testing.T) {
 	response := MetadataResponse{}
 
-	testVersionDecodable(t, "topics, no brokers", &response, topicsNoBrokersMetadataResponse, 0)
+	testVersionDecodable(t, "topics, no brokers, V0", &response, topicsNoBrokersMetadataResponseV0, 0)
 	if len(response.Brokers) != 0 {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
 	}
@@ -135,5 +174,47 @@ func TestMetadataResponseWithTopics(t *testing.T) {
 
 	if len(response.Topics[1].Partitions) != 0 {
 		t.Error("Decoding produced invalid partition count for topic 1.")
+	}
+}
+
+func TestMetadataResponseWithBrokersV1(t *testing.T) {
+	response := MetadataResponse{}
+
+	testVersionDecodable(t, "topics, V1", &response, brokersNoTopicsMetadataResponseV1, 1)
+	if len(response.Brokers) != 2 {
+		t.Error("Decoding produced", len(response.Brokers), "brokers where there were 2!")
+	}
+	if response.Brokers[0].rack == nil || *response.Brokers[0].rack != "rack0" {
+		t.Error("Decoding produced invalid broker 0 rack.")
+	}
+	if response.Brokers[1].rack == nil || *response.Brokers[1].rack != "rack1" {
+		t.Error("Decoding produced invalid broker 1 rack.")
+	}
+	if response.ControllerID != 1 {
+		t.Error("Decoding produced", response.ControllerID, "should have been 1!")
+	}
+	if len(response.Topics) != 0 {
+		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
+	}
+}
+
+func TestMetadataResponseWithTopicsV1(t *testing.T) {
+	response := MetadataResponse{}
+
+	testVersionDecodable(t, "topics, V1", &response, topicsNoBrokersMetadataResponseV1, 1)
+	if len(response.Brokers) != 0 {
+		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
+	}
+	if response.ControllerID != 4 {
+		t.Error("Decoding produced", len(response.Brokers), "should have been 4!")
+	}
+	if len(response.Topics) != 2 {
+		t.Error("Decoding produced", len(response.Brokers), "topics where there were 2!")
+	}
+	if response.Topics[0].IsInternal {
+		t.Error("Decoding produced", response.ControllerID, "topic0 should have been false!")
+	}
+	if !response.Topics[1].IsInternal {
+		t.Error("Decoding produced", response.ControllerID, "topic1 should have been true!")
 	}
 }

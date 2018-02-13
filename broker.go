@@ -18,6 +18,7 @@ import (
 type Broker struct {
 	id   int32
 	addr string
+	rack *string
 
 	conf          *Config
 	correlationID int32
@@ -592,7 +593,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res versionedDecoder) error {
 	}
 }
 
-func (b *Broker) decode(pd packetDecoder) (err error) {
+func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 	b.id, err = pd.getInt32()
 	if err != nil {
 		return err
@@ -608,6 +609,13 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
+	if version >= 1 {
+		b.rack, err = pd.getNullableString()
+		if err != nil {
+			return err
+		}
+	}
+
 	b.addr = net.JoinHostPort(host, fmt.Sprint(port))
 	if _, _, err := net.SplitHostPort(b.addr); err != nil {
 		return err
@@ -616,7 +624,7 @@ func (b *Broker) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
-func (b *Broker) encode(pe packetEncoder) (err error) {
+func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 	host, portstr, err := net.SplitHostPort(b.addr)
 	if err != nil {
@@ -635,6 +643,13 @@ func (b *Broker) encode(pe packetEncoder) (err error) {
 	}
 
 	pe.putInt32(int32(port))
+
+	if version >= 1 {
+		err = pe.putNullableString(b.rack)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
