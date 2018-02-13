@@ -179,7 +179,7 @@ func (r *MetadataResponse) encode(pe packetEncoder) error {
 		return err
 	}
 	for _, broker := range r.Brokers {
-		err = broker.encode(pe)
+		err = broker.encode(pe, r.Version)
 		if err != nil {
 			return err
 		}

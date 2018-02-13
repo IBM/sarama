@@ -624,7 +624,7 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-func (b *Broker) encode(pe packetEncoder) (err error) {
+func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 	host, portstr, err := net.SplitHostPort(b.addr)
 	if err != nil {
@@ -643,6 +643,13 @@ func (b *Broker) encode(pe packetEncoder) (err error) {
 	}
 
 	pe.putInt32(int32(port))
+
+	if version >= 1 {
+		err = pe.putNullableString(b.rack)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
