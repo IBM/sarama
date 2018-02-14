@@ -60,10 +60,22 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 		}
 	}
 
+	if f.Coordinator == nil {
+		pe.putInt32(0)
+		if err := pe.putString(""); err != nil {
+			return nil
+		}
+		pe.putInt32(0)
+		if f.Version >= 1 {
+			if err := pe.putNullableString(nil); err != nil {
+				return nil
+			}
+		}
+		return nil
+	}
 	if err := f.Coordinator.encode(pe, 0); err != nil {
 		return err
 	}
-
 	return nil
 }
 
