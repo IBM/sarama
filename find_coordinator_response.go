@@ -38,7 +38,9 @@ func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err e
 	}
 
 	coordinator := new(Broker)
-	if err := coordinator.decode(pd, version); err != nil {
+	// The version is hardcoded to 0, as version 1 of the Broker-decode
+	// contains the rack-field which is not present in the FindCoordinatorResponse.
+	if err := coordinator.decode(pd, 0); err != nil {
 		return err
 	}
 	if coordinator.addr == ":0" {
@@ -66,7 +68,7 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 	if coordinator == nil {
 		coordinator = NoNode
 	}
-	if err := coordinator.encode(pe, f.Version); err != nil {
+	if err := coordinator.encode(pe, 0); err != nil {
 		return err
 	}
 	return nil
