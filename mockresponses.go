@@ -326,6 +326,60 @@ func (mr *MockConsumerMetadataResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+// MockFindCoordinatorResponse is a `FindCoordinatorResponse` builder.
+type MockFindCoordinatorResponse struct {
+	groupCoordinators map[string]interface{}
+	transCoordinators map[string]interface{}
+	t                 TestReporter
+}
+
+func NewMockFindCoordinatorResponse(t TestReporter) *MockFindCoordinatorResponse {
+	return &MockFindCoordinatorResponse{
+		groupCoordinators: make(map[string]interface{}),
+		transCoordinators: make(map[string]interface{}),
+		t:                 t,
+	}
+}
+
+func (mr *MockFindCoordinatorResponse) SetCoordinator(coordinatorType CoordinatorType, group string, broker *MockBroker) *MockFindCoordinatorResponse {
+	switch coordinatorType {
+	case CoordinatorGroup:
+		mr.groupCoordinators[group] = broker
+	case CoordinatorTransaction:
+		mr.transCoordinators[group] = broker
+	}
+	return mr
+}
+
+func (mr *MockFindCoordinatorResponse) SetError(coordinatorType CoordinatorType, group string, kerror KError) *MockFindCoordinatorResponse {
+	switch coordinatorType {
+	case CoordinatorGroup:
+		mr.groupCoordinators[group] = kerror
+	case CoordinatorTransaction:
+		mr.transCoordinators[group] = kerror
+	}
+	return mr
+}
+
+func (mr *MockFindCoordinatorResponse) For(reqBody versionedDecoder) encoder {
+	req := reqBody.(*FindCoordinatorRequest)
+	res := &FindCoordinatorResponse{}
+	var v interface{}
+	switch req.CoordinatorType {
+	case CoordinatorGroup:
+		v = mr.groupCoordinators[req.CoordinatorKey]
+	case CoordinatorTransaction:
+		v = mr.transCoordinators[req.CoordinatorKey]
+	}
+	switch v := v.(type) {
+	case *MockBroker:
+		res.Coordinator = &Broker{id: v.BrokerID(), addr: v.Addr()}
+	case KError:
+		res.Err = v
+	}
+	return res
+}
+
 // MockOffsetCommitResponse is a `OffsetCommitResponse` builder.
 type MockOffsetCommitResponse struct {
 	errors map[string]map[string]map[int32]KError

@@ -5,42 +5,83 @@ import (
 	"time"
 )
 
-var (
-	findCoordinatorResponse = []byte{
-		0, 0, 0, 100,
-		0, 0,
-		255, 255, // empty ErrMsg
-		0, 0, 0, 1,
-		0, 4, 'h', 'o', 's', 't',
-		0, 0, 35, 132,
-	}
-
-	findCoordinatorResponseError = []byte{
-		0, 0, 0, 100,
-		0, 15,
-		0, 3, 'm', 's', 'g',
-		0, 0, 0, 1,
-		0, 4, 'h', 'o', 's', 't',
-		0, 0, 35, 132,
-	}
-)
-
 func TestFindCoordinatorResponse(t *testing.T) {
-	broker := NewBroker("host:9092")
-	broker.id = 1
-	resp := &FindCoordinatorResponse{
-		Version:      1,
-		ThrottleTime: 100 * time.Millisecond,
-		Err:          ErrNoError,
-		ErrMsg:       nil,
-		Coordinator:  broker,
+	errMsg := "kaboom"
+	brokerRack := "foo"
+
+	for _, tc := range []struct {
+		desc     string
+		response *FindCoordinatorResponse
+		encoded  []byte
+	}{{
+		desc: "version 0 - no error",
+		response: &FindCoordinatorResponse{
+			Version: 0,
+			Err:     ErrNoError,
+			Coordinator: &Broker{
+				id:   7,
+				addr: "host:9092",
+			},
+		},
+		encoded: []byte{
+			0, 0, // Err
+			0, 0, 0, 7, // Coordinator.ID
+			0, 4, 'h', 'o', 's', 't', // Coordinator.Host
+			0, 0, 35, 132, // Coordinator.Port
+		},
+	}, {
+		desc: "version 1 - no error",
+		response: &FindCoordinatorResponse{
+			Version:      1,
+			ThrottleTime: 100 * time.Millisecond,
+			Err:          ErrNoError,
+			Coordinator: &Broker{
+				id:   7,
+				addr: "host:9092",
+				rack: &brokerRack,
+			},
+		},
+		encoded: []byte{
+			0, 0, 0, 100, // ThrottleTime
+			0, 0, // Err
+			255, 255, // ErrMsg: empty
+			0, 0, 0, 7, // Coordinator.ID
+			0, 4, 'h', 'o', 's', 't', // Coordinator.Host
+			0, 0, 35, 132, // Coordinator.Port
+			0, 3, 'f', 'o', 'o', // Coordinator.Rack
+		},
+	}, {
+		desc: "version 0 - error",
+		response: &FindCoordinatorResponse{
+			Version:     0,
+			Err:         ErrConsumerCoordinatorNotAvailable,
+			Coordinator: NoNode,
+		},
+		encoded: []byte{
+			0, 15, // Err
+			255, 255, 255, 255, // Coordinator.ID: -1
+			0, 0, // Coordinator.Host: ""
+			255, 255, 255, 255, // Coordinator.Port: -1
+		},
+	}, {
+		desc: "version 1 - error",
+		response: &FindCoordinatorResponse{
+			Version:      1,
+			ThrottleTime: 100 * time.Millisecond,
+			Err:          ErrConsumerCoordinatorNotAvailable,
+			ErrMsg:       &errMsg,
+			Coordinator:  NoNode,
+		},
+		encoded: []byte{
+			0, 0, 0, 100, // ThrottleTime
+			0, 15, // Err
+			0, 6, 'k', 'a', 'b', 'o', 'o', 'm', // ErrMsg
+			255, 255, 255, 255, // Coordinator.ID: -1
+			0, 0, // Coordinator.Host: ""
+			255, 255, 255, 255, // Coordinator.Port: -1
+			255, 255, // Coordinator.Rack: empty
+		},
+	}} {
+		testResponse(t, tc.desc, tc.response, tc.encoded)
 	}
-
-	testResponse(t, "version 1 - no error", resp, findCoordinatorResponse)
-
-	msg := "msg"
-	resp.Err = ErrConsumerCoordinatorNotAvailable
-	resp.ErrMsg = &msg
-
-	testResponse(t, "version 1 - error", resp, findCoordinatorResponseError)
 }
