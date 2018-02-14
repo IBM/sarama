@@ -7,7 +7,6 @@ import (
 
 func TestFindCoordinatorResponse(t *testing.T) {
 	errMsg := "kaboom"
-	brokerRack := "foo"
 
 	for _, tc := range []struct {
 		desc     string
@@ -38,7 +37,6 @@ func TestFindCoordinatorResponse(t *testing.T) {
 			Coordinator: &Broker{
 				id:   7,
 				addr: "host:9092",
-				rack: &brokerRack,
 			},
 		},
 		encoded: []byte{
@@ -48,7 +46,6 @@ func TestFindCoordinatorResponse(t *testing.T) {
 			0, 0, 0, 7, // Coordinator.ID
 			0, 4, 'h', 'o', 's', 't', // Coordinator.Host
 			0, 0, 35, 132, // Coordinator.Port
-			0, 3, 'f', 'o', 'o', // Coordinator.Rack
 		},
 	}, {
 		desc: "version 0 - error",
@@ -79,7 +76,6 @@ func TestFindCoordinatorResponse(t *testing.T) {
 			255, 255, 255, 255, // Coordinator.ID: -1
 			0, 0, // Coordinator.Host: ""
 			255, 255, 255, 255, // Coordinator.Port: -1
-			255, 255, // Coordinator.Rack: empty
 		},
 	}} {
 		testResponse(t, tc.desc, tc.response, tc.encoded)
