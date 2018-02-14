@@ -4,6 +4,8 @@ import (
 	"time"
 )
 
+var NoNode = &Broker{id: -1, addr: ":-1"}
+
 type FindCoordinatorResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
@@ -36,7 +38,7 @@ func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err e
 	}
 
 	coordinator := new(Broker)
-	if err := coordinator.decode(pd, 0); err != nil {
+	if err := coordinator.decode(pd, version); err != nil {
 		return err
 	}
 	if coordinator.addr == ":0" {
@@ -60,20 +62,11 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 		}
 	}
 
-	if f.Coordinator == nil {
-		pe.putInt32(0)
-		if err := pe.putString(""); err != nil {
-			return nil
-		}
-		pe.putInt32(0)
-		if f.Version >= 1 {
-			if err := pe.putNullableString(nil); err != nil {
-				return nil
-			}
-		}
-		return nil
+	coordinator := f.Coordinator
+	if coordinator == nil {
+		coordinator = NoNode
 	}
-	if err := f.Coordinator.encode(pe, 0); err != nil {
+	if err := coordinator.encode(pe, f.Version); err != nil {
 		return err
 	}
 	return nil
