@@ -42,9 +42,15 @@ func (ca *clusterAdmin) handleResponses(rsp interface{}) {
 	case nil:
 		break
 	case CreateTopicsResponse:
-		Logger.Print("topic errors", rsp.(CreateTopicsResponse).TopicErrors)
+		Logger.Print("CreateTopicsResponse errors", rsp.(CreateTopicsResponse).TopicErrors)
 	case DeleteTopicsResponse:
-		Logger.Print("topic errors", rsp.(DeleteTopicsResponse).TopicErrorCodes)
+		Logger.Print("DeleteTopicsResponse errors", rsp.(DeleteTopicsResponse).TopicErrorCodes)
+	case DeleteRecordsResponse:
+		Logger.Print("DeleteRecordsResponse", rsp.(DeleteRecordsResponse).Topics)
+	case CreateAclsResponse:
+		Logger.Print("CreateAclsResponse", rsp.(CreateAclsResponse).AclCreationResponses)
+	case DeleteAclsResponse:
+		Logger.Print("DeleteAclsResponse", rsp.(DeleteAclsResponse).FilterResponses)
 	default:
 		break
 	}
@@ -92,6 +98,7 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [][]int32, validateOnly bool) error {
 	return nil
 }
+
 func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]int64) error {
 	topics := make(map[string]*DeleteRecordsRequestTopic)
 	topics[topic] = &DeleteRecordsRequestTopic{PartitionOffsets: partitionOffsets}
@@ -109,6 +116,7 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, error) {
 	return nil, nil
 }
+
 func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string, entries map[string]*string, validateOnly bool) error {
 	return nil
 }
@@ -126,9 +134,11 @@ func (ca *clusterAdmin) CreateAcl(resource Resource, acl Acl) error {
 	ca.handleResponses(rsp)
 	return nil
 }
+
 func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 	return nil, nil
 }
+
 func (ca *clusterAdmin) DeleteAcl(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
 	var filters []*AclFilter
 	filters = append(filters, &filter)
