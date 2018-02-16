@@ -5,10 +5,8 @@ type ClusterAdmin interface {
 	DeleteTopic(topic string) error
 	CreatePartitions(topic string, count int32, assignment [][]int32, validateOnly bool) error
 	DeleteRecords(topic string, partitionOffsets map[int32]int64) error
-
 	DescribeConfig(resource ConfigResource) ([]ConfigEntry, error)
 	AlterConfig(resourceType ConfigResourceType, name string, entries map[string]*string, validateOnly bool) error
-
 	CreateAcl(resource Resource, acl Acl) error
 	ListAcls(filter AclFilter) ([]ResourceAcls, error)
 	DeleteAcl(filter AclFilter, validateOnly bool) ([]MatchingAcl, error)
@@ -44,9 +42,9 @@ func (ca *clusterAdmin) handleResponses(rsp interface{}) {
 	case nil:
 		break
 	case CreateTopicsResponse:
-		Logger.Printf("topic errors", rsp.(CreateTopicsResponse).TopicErrors)
+		Logger.Print("topic errors", rsp.(CreateTopicsResponse).TopicErrors)
 	case DeleteTopicsResponse:
-		Logger.Printf("topic errors", rsp.(DeleteTopicsResponse).TopicErrorCodes)
+		Logger.Print("topic errors", rsp.(DeleteTopicsResponse).TopicErrorCodes)
 	default:
 		break
 	}
@@ -74,7 +72,6 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
 	}
 	ca.handleResponses(rsp)
 	return nil
-
 }
 
 func (ca *clusterAdmin) DeleteTopic(topic string) error {
@@ -96,6 +93,16 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 	return nil
 }
 func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]int64) error {
+	topics := make(map[string]*DeleteRecordsRequestTopic)
+	topics[topic] = &DeleteRecordsRequestTopic{PartitionOffsets: partitionOffsets}
+	request := &DeleteRecordsRequest{Topics: topics}
+
+	b := ca.client.Any()
+	rsp, err := b.DeleteRecords(request)
+	if err != nil {
+		return err
+	}
+	ca.handleResponses(rsp)
 	return nil
 }
 
@@ -107,11 +114,39 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 }
 
 func (ca *clusterAdmin) CreateAcl(resource Resource, acl Acl) error {
+	var acls []*AclCreation
+	acls = append(acls, &AclCreation{resource, acl})
+	request := &CreateAclsRequest{AclCreations: acls}
+
+	b := ca.client.Any()
+	rsp, err := b.CreateAcls(request)
+	if err != nil {
+		return err
+	}
+	ca.handleResponses(rsp)
 	return nil
 }
 func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 	return nil, nil
 }
 func (ca *clusterAdmin) DeleteAcl(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
-	return nil, nil
+	var filters []*AclFilter
+	filters = append(filters, &filter)
+	request := &DeleteAclsRequest{Filters: filters}
+
+	b := ca.client.Any()
+	rsp, err := b.DeleteAcls(request)
+	if err != nil {
+		return nil, err
+	}
+
+	ca.handleResponses(rsp)
+	var mAcls []MatchingAcl
+	for _, fr := range rsp.FilterResponses {
+		for _, mAcl := range fr.MatchingAcls {
+			mAcls = append(mAcls, *mAcl)
+		}
+
+	}
+	return mAcls, nil
 }
