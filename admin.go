@@ -19,7 +19,7 @@ type clusterAdmin struct {
 	conf   *Config
 }
 
-// NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
+// NewClusterAdmin creates a new ClusterAdmin using the given broker addresses and configuration.
 func NewClusterAdmin(addrs []string, conf *Config) (ClusterAdmin, error) {
 	client, err := NewClient(addrs, conf)
 	if err != nil {
@@ -46,8 +46,6 @@ func (ca *clusterAdmin) handleResponses(rsp interface{}) {
 	case CreateTopicsResponse:
 		Logger.Printf("topic errors", rsp.(CreateTopicsResponse).TopicErrors)
 	case DeleteTopicsResponse:
-		// there's no point in retrying this it will just fail the same way again
-		// shut it down and force the user to choose what to do
 		Logger.Printf("topic errors", rsp.(DeleteTopicsResponse).TopicErrorCodes)
 	default:
 		break
@@ -80,7 +78,6 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
 }
 
 func (ca *clusterAdmin) DeleteTopic(topic string) error {
-
 	request := &DeleteTopicsRequest{Topics: []string{topic}}
 	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 1
