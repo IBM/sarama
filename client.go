@@ -38,8 +38,6 @@ type Client interface {
 	// topic/partition, as determined by querying the cluster metadata.
 	Leader(topic string, partitionID int32) (*Broker, error)
 
-	Any() *Broker
-
 	// Replicas returns the set of all replica IDs for the given partition.
 	Replicas(topic string, partitionID int32) ([]int32, error)
 
@@ -443,10 +441,6 @@ func (client *client) RefreshCoordinator(consumerGroup string) error {
 	client.registerBroker(response.Coordinator)
 	client.coordinators[consumerGroup] = response.Coordinator.ID()
 	return nil
-}
-
-func (client *client) Any() *Broker {
-	return client.any()
 }
 
 // private broker management helpers
