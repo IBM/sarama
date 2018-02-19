@@ -1,9 +1,6 @@
 package sarama
 
-import (
-	"errors"
-	"math/rand"
-)
+import "errors"
 
 // The administrative client for Kafka, which supports managing and inspecting topics,
 // brokers, configurations and ACLs. The minimum broker version required is 0.10.0.0.
@@ -98,20 +95,18 @@ func (ca *clusterAdmin) Close() error {
 	return ca.client.Close()
 }
 
-func (ca *clusterAdmin) Any() (*Broker, error) {
-
-	activeBrokers := ca.client.Brokers()
-
-	if len(activeBrokers) <= 0 {
-		return nil, ErrBrokerNotAvailable
-	}
-	return activeBrokers[rand.Intn(len(activeBrokers)-1)], nil
+func (ca *clusterAdmin) any() *Broker {
+	return ca.client.Any()
 }
 
 func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
 
 	if topic == "" {
 		return ErrInvalidTopic
+	}
+
+	if detail == nil {
+		return ErrInvalidInput
 	}
 
 	topicDetails := make(map[string]*TopicDetail)
@@ -128,10 +123,7 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
 		request.Version = 2
 	}
 
-	b, err := ca.Any()
-	if err != nil {
-		return err
-	}
+	b := ca.any()
 
 	rsp, err := b.CreateTopics(request)
 	if err != nil {
@@ -162,10 +154,8 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		request.Version = 1
 	}
 
-	b, err := ca.Any()
-	if err != nil {
-		return err
-	}
+	b := ca.any()
+
 	rsp, err := b.DeleteTopics(request)
 	if err != nil {
 		return err
@@ -194,10 +184,7 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		TopicPartitions: topicPartitions,
 	}
 
-	b, err := ca.Any()
-	if err != nil {
-		return err
-	}
+	b := ca.any()
 
 	rsp, err := b.CreatePartitions(request)
 	if err != nil {
@@ -227,10 +214,7 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	request := &DeleteRecordsRequest{
 		Topics: topics}
 
-	b, err := ca.Any()
-	if err != nil {
-		return err
-	}
+	b := ca.any()
 
 	rsp, err := b.DeleteRecords(request)
 	if err != nil {
@@ -257,10 +241,7 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 		Resources: resources,
 	}
 
-	b, err := ca.Any()
-	if err != nil {
-		return nil, err
-	}
+	b := ca.any()
 
 	rsp, err := b.DescribeConfigs(request)
 	if err != nil {
@@ -294,10 +275,7 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		ValidateOnly: validateOnly,
 	}
 
-	b, err := ca.Any()
-	if err != nil {
-		return err
-	}
+	b := ca.any()
 
 	rsp, err := b.AlterConfigs(request)
 	if err != nil {
@@ -320,12 +298,9 @@ func (ca *clusterAdmin) CreateAcl(resource Resource, acl Acl) error {
 	acls = append(acls, &AclCreation{resource, acl})
 	request := &CreateAclsRequest{AclCreations: acls}
 
-	b, err := ca.Any()
-	if err != nil {
-		return err
-	}
+	b := ca.any()
 
-	_, err = b.CreateAcls(request)
+	_, err := b.CreateAcls(request)
 	if err != nil {
 		return err
 	}
@@ -342,10 +317,7 @@ func (ca *clusterAdmin) DeleteAcl(filter AclFilter, validateOnly bool) ([]Matchi
 	filters = append(filters, &filter)
 	request := &DeleteAclsRequest{Filters: filters}
 
-	b, err := ca.Any()
-	if err != nil {
-		return nil, err
-	}
+	b := ca.any()
 
 	rsp, err := b.DeleteAcls(request)
 	if err != nil {
