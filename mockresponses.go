@@ -684,7 +684,6 @@ func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
-
 type MockDeleteAclsResponse struct {
 	t TestReporter
 }
@@ -699,7 +698,7 @@ func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) encoder {
 
 	for range req.Filters {
 		response := &FilterResponse{Err: ErrNoError}
-		response.MatchingAcls = append(response.MatchingAcls,&MatchingAcl{Err:ErrNoError})
+		response.MatchingAcls = append(response.MatchingAcls, &MatchingAcl{Err: ErrNoError})
 		res.FilterResponses = append(res.FilterResponses, response)
 	}
 	return res
