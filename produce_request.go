@@ -129,7 +129,9 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		}
 	}
 	if totalRecordCount > 0 {
-		metrics.GetOrRegisterMeter("record-send-rate", metricRegistry).Mark(totalRecordCount)
+		if metricRegistry != nil {
+			metrics.GetOrRegisterMeter("record-send-rate", metricRegistry).Mark(totalRecordCount)
+		}
 		getOrRegisterHistogram("records-per-request", metricRegistry).Update(totalRecordCount)
 	}
 

@@ -269,8 +269,10 @@ type Config struct {
 	Version KafkaVersion
 	// The registry to define metrics into.
 	// Defaults to a local registry.
-	// If you want to disable metrics gathering, set "metrics.UseNilMetrics" to "true"
-	// prior to starting Sarama.
+	// If you want to disable metrics gathering for all of rcrowley/go-metrics
+	// managed metrics, set "metrics.UseNilMetrics" to "true" prior to
+	// starting Sarama.  If you want to disable only Sarama metrics gathering,
+	// set to nil prior to starting Sarama
 	// See Examples on how to use the metrics registry
 	MetricRegistry metrics.Registry
 }

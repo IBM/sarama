@@ -104,12 +104,19 @@ func (b *Broker) Open(conf *Config) error {
 		b.conf = conf
 
 		// Create or reuse the global metrics shared between brokers
-		b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", conf.MetricRegistry)
-		b.requestRate = metrics.GetOrRegisterMeter("request-rate", conf.MetricRegistry)
+		if conf.MetricRegistry != nil {
+			b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", conf.MetricRegistry)
+			b.requestRate = metrics.GetOrRegisterMeter("request-rate", conf.MetricRegistry)
+			b.outgoingByteRate = metrics.GetOrRegisterMeter("outgoing-byte-rate", conf.MetricRegistry)
+			b.responseRate = metrics.GetOrRegisterMeter("response-rate", conf.MetricRegistry)
+		} else {
+			b.incomingByteRate = metrics.NilMeter{}
+			b.requestRate = metrics.NilMeter{}
+			b.responseRate = metrics.NilMeter{}
+			b.outgoingByteRate = metrics.NilMeter{}
+		}
 		b.requestSize = getOrRegisterHistogram("request-size", conf.MetricRegistry)
 		b.requestLatency = getOrRegisterHistogram("request-latency-in-ms", conf.MetricRegistry)
-		b.outgoingByteRate = metrics.GetOrRegisterMeter("outgoing-byte-rate", conf.MetricRegistry)
-		b.responseRate = metrics.GetOrRegisterMeter("response-rate", conf.MetricRegistry)
 		b.responseSize = getOrRegisterHistogram("response-size", conf.MetricRegistry)
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
