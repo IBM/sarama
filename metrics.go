@@ -17,9 +17,13 @@ const (
 )
 
 func getOrRegisterHistogram(name string, r metrics.Registry) metrics.Histogram {
-	return r.GetOrRegister(name, func() metrics.Histogram {
-		return metrics.NewHistogram(metrics.NewExpDecaySample(metricsReservoirSize, metricsAlphaFactor))
-	}).(metrics.Histogram)
+	if r != nil {
+		return r.GetOrRegister(name, func() metrics.Histogram {
+			return metrics.NewHistogram(metrics.NewExpDecaySample(metricsReservoirSize, metricsAlphaFactor))
+		}).(metrics.Histogram)
+	} else {
+		return metrics.NilHistogram{}
+	}
 }
 
 func getMetricNameForBroker(name string, broker *Broker) string {
@@ -29,11 +33,19 @@ func getMetricNameForBroker(name string, broker *Broker) string {
 }
 
 func getOrRegisterBrokerMeter(name string, broker *Broker, r metrics.Registry) metrics.Meter {
-	return metrics.GetOrRegisterMeter(getMetricNameForBroker(name, broker), r)
+	if r != nil {
+		return metrics.GetOrRegisterMeter(getMetricNameForBroker(name, broker), r)
+	} else {
+		return metrics.NilMeter{}
+	}
 }
 
 func getOrRegisterBrokerHistogram(name string, broker *Broker, r metrics.Registry) metrics.Histogram {
-	return getOrRegisterHistogram(getMetricNameForBroker(name, broker), r)
+	if r != nil {
+		return getOrRegisterHistogram(getMetricNameForBroker(name, broker), r)
+	} else {
+		return metrics.NilHistogram{}
+	}
 }
 
 func getMetricNameForTopic(name string, topic string) string {
@@ -43,9 +55,17 @@ func getMetricNameForTopic(name string, topic string) string {
 }
 
 func getOrRegisterTopicMeter(name string, topic string, r metrics.Registry) metrics.Meter {
-	return metrics.GetOrRegisterMeter(getMetricNameForTopic(name, topic), r)
+	if r != nil {
+		return metrics.GetOrRegisterMeter(getMetricNameForTopic(name, topic), r)
+	} else {
+		return metrics.NilMeter{}
+	}
 }
 
 func getOrRegisterTopicHistogram(name string, topic string, r metrics.Registry) metrics.Histogram {
-	return getOrRegisterHistogram(getMetricNameForTopic(name, topic), r)
+	if r != nil {
+		return getOrRegisterHistogram(getMetricNameForTopic(name, topic), r)
+	} else {
+		return metrics.NilHistogram{}
+	}
 }

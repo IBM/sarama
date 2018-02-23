@@ -27,6 +27,12 @@ func TestGetOrRegisterHistogram(t *testing.T) {
 	if sameHistogram != histogram {
 		t.Error("Unexpected different histogram", sameHistogram, histogram)
 	}
+
+	// Pulling from a nil registry should result in a nil metric type
+	nilHistogram := getOrRegisterHistogram("name", nil)
+	if nilHistogram != metrics.Histogram(metrics.NilHistogram{}) {
+		t.Error("Histogram from nil registry is not nil", nilHistogram)
+	}
 }
 
 func TestGetMetricNameForBroker(t *testing.T) {
