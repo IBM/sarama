@@ -109,6 +109,11 @@ func (b *Broker) Open(conf *Config) error {
 			b.requestRate = metrics.GetOrRegisterMeter("request-rate", conf.MetricRegistry)
 			b.outgoingByteRate = metrics.GetOrRegisterMeter("outgoing-byte-rate", conf.MetricRegistry)
 			b.responseRate = metrics.GetOrRegisterMeter("response-rate", conf.MetricRegistry)
+		} else {
+			b.incomingByteRate = metrics.NilMeter{}
+			b.requestRate = metrics.NilMeter{}
+			b.responseRate = metrics.NilMeter{}
+			b.outgoingByteRate = metrics.NilMeter{}
 		}
 		b.requestSize = getOrRegisterHistogram("request-size", conf.MetricRegistry)
 		b.requestLatency = getOrRegisterHistogram("request-latency-in-ms", conf.MetricRegistry)
