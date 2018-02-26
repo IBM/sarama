@@ -507,7 +507,7 @@ func (bom *brokerOffsetManager) flushToBroker() {
 			// not a critical error, we just need to redispatch
 			delete(bom.subscriptions, s)
 			s.rebalance <- none{}
-		case ErrOffsetMetadataTooLarge, ErrInvalidCommitOffsetSize:
+		case ErrOffsetMetadataTooLarge, ErrInvalidCommitOffsetSize, ErrUnknownMemberId:
 			// nothing we can do about this, just tell the user and carry on
 			s.handleError(err)
 		case ErrOffsetsLoadInProgress:
