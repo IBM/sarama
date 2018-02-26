@@ -461,7 +461,6 @@ feederLoop:
 						child.messages <- msg
 					}
 					child.broker.input <- child
-					expiryTicker.Stop()
 					continue feederLoop
 				} else {
 					// current message has not been sent, return to select
