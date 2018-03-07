@@ -68,9 +68,10 @@ func (mc *MockSequence) For(reqBody versionedDecoder) (res encoder) {
 
 // MockMetadataResponse is a `MetadataResponse` builder.
 type MockMetadataResponse struct {
-	leaders map[string]map[int32]int32
-	brokers map[string]int32
-	t       TestReporter
+	controllerID int32
+	leaders      map[string]map[int32]int32
+	brokers      map[string]int32
+	t            TestReporter
 }
 
 func NewMockMetadataResponse(t TestReporter) *MockMetadataResponse {
@@ -96,9 +97,17 @@ func (mmr *MockMetadataResponse) SetBroker(addr string, brokerID int32) *MockMet
 	return mmr
 }
 
+func (mmr *MockMetadataResponse) SetController(brokerID int32) *MockMetadataResponse {
+	mmr.controllerID = brokerID
+	return mmr
+}
+
 func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoder {
 	metadataRequest := reqBody.(*MetadataRequest)
-	metadataResponse := &MetadataResponse{}
+	metadataResponse := &MetadataResponse{
+		Version:      metadataRequest.version(),
+		ControllerID: mmr.controllerID,
+	}
 	for addr, brokerID := range mmr.brokers {
 		metadataResponse.AddBroker(addr, brokerID)
 	}
