@@ -27,9 +27,10 @@ type topicConsumer struct {
 	consumedPartitions []consumedPartition
 	messages           chan *ConsumerMessage
 	errors             chan error
+	offsetCorrection   bool
 }
 
-func NewTopicConsumer(client Client, topic string, offsets map[int32]int64) (TopicConsumer, error) {
+func NewTopicConsumer(client Client, topic string, offsets map[int32]int64, offsetCorrection bool) (TopicConsumer, error) {
 	partitions, err := client.Partitions(topic)
 
 	if err != nil {
@@ -43,11 +44,12 @@ func NewTopicConsumer(client Client, topic string, offsets map[int32]int64) (Top
 	}
 
 	consumer := &topicConsumer{
-		topic:    topic,
-		client:   client,
-		master:   master,
-		messages: make(chan *ConsumerMessage, client.Config().ChannelBufferSize),
-		errors:   make(chan error),
+		topic:            topic,
+		client:           client,
+		master:           master,
+		messages:         make(chan *ConsumerMessage, client.Config().ChannelBufferSize),
+		errors:           make(chan error),
+		offsetCorrection: offsetCorrection,
 	}
 
 	for _, partition := range partitions {
@@ -72,8 +74,18 @@ func (sc *topicConsumer) initPartition(partition int32, offset int64) error {
 
 	resumeFrom := offset
 
-	if oldestOffset > resumeFrom || newestOffset < resumeFrom {
+	if !sc.offsetCorrection && (oldestOffset > resumeFrom || newestOffset < resumeFrom) {
 		return fmt.Errorf("offset for %v/%v is out of range of available offsets (%v..%v)", sc.topic, partition, newestOffset, oldestOffset)
+	}
+
+	if oldestOffset > resumeFrom {
+		Logger.Printf("given offset %v is unavailable. Auto correcting to oldest available offset %v", resumeFrom, oldestOffset)
+		resumeFrom = oldestOffset
+	}
+
+	if newestOffset < resumeFrom {
+		Logger.Printf("given offset %v is unavailable. Auto correcting to newest available offset %v", resumeFrom, newestOffset)
+		resumeFrom = newestOffset
 	}
 
 	partitionConsumer, err := sc.master.ConsumePartition(sc.topic, partition, resumeFrom)
