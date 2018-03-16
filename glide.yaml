@@ -1,0 +1,31 @@
+package: github.com/Shopify/sarama
+import:
+- package: github.com/davecgh/go-spew
+  subpackages:
+  - spew
+- package: github.com/docker/docker
+  version: ^17.5.0-ce-rc3
+  subpackages:
+  - api/types
+  - api/types/container
+  - api/types/filters
+  - client
+- package: github.com/docker/go-connections
+  version: ^0.3.0
+  subpackages:
+  - nat
+- package: github.com/eapache/go-resiliency
+  version: ^1.0.0
+  subpackages:
+  - breaker
+- package: github.com/eapache/go-xerial-snappy
+- package: github.com/eapache/queue
+  version: ^1.1.0
+- package: github.com/pierrec/lz4
+  version: ^1.1.0
+- package: github.com/rcrowley/go-metrics
+testImport:
+- package: github.com/Shopify/toxiproxy
+  version: ^2.1.3
+  subpackages:
+  - client
