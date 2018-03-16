@@ -17,6 +17,9 @@ type Client interface {
 	// altered after it has been created.
 	Config() *Config
 
+	// Controller returns the cluster controller broker.
+	Controller() (*Broker, error)
+
 	// Brokers returns the current set of active brokers as retrieved from cluster metadata.
 	Brokers() []*Broker
 
@@ -97,6 +100,7 @@ type client struct {
 	seedBrokers []*Broker
 	deadSeeds   []*Broker
 
+	controllerID int32                                   // cluster controller broker id
 	brokers      map[int32]*Broker                       // maps broker ids to brokers
 	metadata     map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
 	coordinators map[string]int32                        // Maps consumer group names to coordinating broker IDs
@@ -379,6 +383,27 @@ func (client *client) GetOffset(topic string, partitionID int32, time int64) (in
 	return offset, err
 }
 
+func (client *client) Controller() (*Broker, error) {
+	if client.Closed() {
+		return nil, ErrClosedClient
+	}
+
+	controller := client.cachedController()
+	if controller == nil {
+		if err := client.refreshMetadata(); err != nil {
+			return nil, err
+		}
+		controller = client.cachedController()
+	}
+
+	if controller == nil {
+		return nil, ErrControllerNotAvailable
+	}
+
+	_ = controller.Open(client.conf)
+	return controller, nil
+}
+
 func (client *client) Coordinator(consumerGroup string) (*Broker, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -607,26 +632,33 @@ func (client *client) backgroundMetadataUpdater() {
 	for {
 		select {
 		case <-ticker.C:
-			topics := []string{}
-			if !client.conf.Metadata.Full {
-				if specificTopics, err := client.Topics(); err != nil {
-					Logger.Println("Client background metadata topic load:", err)
-					break
-				} else if len(specificTopics) == 0 {
-					Logger.Println("Client background metadata update: no specific topics to update")
-					break
-				} else {
-					topics = specificTopics
-				}
-			}
-
-			if err := client.RefreshMetadata(topics...); err != nil {
+			if err := client.refreshMetadata(); err != nil {
 				Logger.Println("Client background metadata update:", err)
 			}
 		case <-client.closer:
 			return
 		}
 	}
+}
+
+func (client *client) refreshMetadata() error {
+	topics := []string{}
+
+	if !client.conf.Metadata.Full {
+		if specificTopics, err := client.Topics(); err != nil {
+			return err
+		} else if len(specificTopics) == 0 {
+			return ErrNoTopicsToUpdateMetadata
+		} else {
+			topics = specificTopics
+		}
+	}
+
+	if err := client.RefreshMetadata(topics...); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int) error {
@@ -645,7 +677,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 		} else {
 			Logger.Printf("client/metadata fetching metadata for all topics from broker %s\n", broker.addr)
 		}
-		response, err := broker.GetMetadata(&MetadataRequest{Topics: topics})
+
+		req := &MetadataRequest{Topics: topics}
+		if client.conf.Version.IsAtLeast(V0_10_0_0) {
+			req.Version = 1
+		}
+		response, err := broker.GetMetadata(req)
 
 		switch err.(type) {
 		case nil:
@@ -686,6 +723,9 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 	for _, broker := range data.Brokers {
 		client.registerBroker(broker)
 	}
+
+	client.controllerID = data.ControllerID
+
 	if allKnownMetaData {
 		client.metadata = make(map[string]map[int32]*PartitionMetadata)
 		client.cachedPartitionsResults = make(map[string][maxPartitionIndex][]int32)
@@ -737,6 +777,13 @@ func (client *client) cachedCoordinator(consumerGroup string) *Broker {
 		return client.brokers[coordinatorID]
 	}
 	return nil
+}
+
+func (client *client) cachedController() *Broker {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	return client.brokers[client.controllerID]
 }
 
 func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemaining int) (*FindCoordinatorResponse, error) {
