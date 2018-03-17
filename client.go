@@ -75,8 +75,6 @@ type Client interface {
 
 	// Closed returns true if the client has already had Close called on it
 	Closed() bool
-
-	Any() *Broker
 }
 
 const (
@@ -505,10 +503,6 @@ func (client *client) any() *Broker {
 	}
 
 	return nil
-}
-
-func (client *client) Any() *Broker {
-	return client.any()
 }
 
 // private caching/lazy metadata helpers
