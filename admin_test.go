@@ -45,8 +45,12 @@ func TestClusterAdminCreateTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,10 +73,13 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	err = admin.CreateTopic("my_topic", nil)
 	if err != ErrInvalidInput {
+		t.Fatal(err)
+	}
+	err = admin.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -94,10 +101,14 @@ func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1})
 	if err != ErrInsufficientData {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -148,9 +159,13 @@ func TestClusterAdminCreatePartitions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	err = admin.CreatePartitions("my_topic", 3, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,10 +188,14 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	err = admin.CreatePartitions("my_topic", 3, nil, false)
 	if err != ErrUnsupportedVersion {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -198,7 +217,6 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	partitionOffset := make(map[int32]int64)
 	partitionOffset[1] = 1000
@@ -206,6 +224,11 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 	partitionOffset[3] = 1000
 
 	err = admin.DeleteRecords("my_topic", partitionOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +251,6 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	partitionOffset := make(map[int32]int64)
 	partitionOffset[1] = 1000
@@ -237,6 +259,11 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 
 	err = admin.DeleteRecords("my_topic", partitionOffset)
 	if err != ErrUnsupportedVersion {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
 		t.Fatal(err)
 	}
 }
@@ -258,7 +285,6 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	resource := ConfigResource{Name: "r1", Type: TopicResource, ConfigNames: []string{"my_topic"}}
 	entries, err := admin.DescribeConfig(resource)
@@ -268,6 +294,11 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 
 	if len(entries) <= 0 {
 		t.Fatal(errors.New("no resource present"))
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -288,13 +319,17 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	var value string
 	entries := make(map[string]*string)
 	value = "3"
 	entries["ReplicationFactor"] = &value
 	err = admin.AlterConfig(TopicResource, "my_topic", entries, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,12 +352,16 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
 	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
 
 	err = admin.CreateAcl(r, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,7 +388,6 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
 
 	resourceName := "my_topic"
 	filter := AclFilter{
@@ -359,6 +397,11 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 	}
 
 	_, err = admin.DeleteAcl(filter, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
 	}
