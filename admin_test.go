@@ -7,11 +7,13 @@ import (
 
 func TestClusterAdmin(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
+	defer seedBroker.Close()
 
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	seedBroker.Returns(metadataResponse)
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
 
 	config := NewConfig()
 	config.Version = V1_0_0_0
@@ -24,17 +26,16 @@ func TestClusterAdmin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	leader.Close()
-	seedBroker.Close()
 }
 
 func TestClusterAdminCreateTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":     NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
 	})
 
@@ -44,25 +45,21 @@ func TestClusterAdminCreateTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1})
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":     NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
 	})
 
@@ -72,27 +69,22 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	err = admin.CreateTopic("my_topic", nil)
 	if err != ErrInvalidInput {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":     NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
 	})
 
@@ -102,26 +94,22 @@ func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1})
 	if err != ErrInsufficientData {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminDeleteTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":     NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"DeleteTopicsRequest": NewMockDeleteTopicsResponse(t),
 	})
 
@@ -141,16 +129,16 @@ func TestClusterAdminDeleteTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminCreatePartitions(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":         NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
 	})
 
@@ -160,26 +148,22 @@ func TestClusterAdminCreatePartitions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	err = admin.CreatePartitions("my_topic", 3, nil, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":         NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
 	})
 
@@ -189,26 +173,22 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	err = admin.CreatePartitions("my_topic", 3, nil, false)
 	if err != ErrUnsupportedVersion {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminDeleteRecords(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":      NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
@@ -218,6 +198,7 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	partitionOffset := make(map[int32]int64)
 	partitionOffset[1] = 1000
@@ -228,21 +209,16 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":      NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
@@ -252,6 +228,7 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	partitionOffset := make(map[int32]int64)
 	partitionOffset[1] = 1000
@@ -262,21 +239,16 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	if err != ErrUnsupportedVersion {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminDescribeConfig(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":        NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
 	})
 
@@ -286,6 +258,7 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	resource := ConfigResource{Name: "r1", Type: TopicResource, ConfigNames: []string{"my_topic"}}
 	entries, err := admin.DescribeConfig(resource)
@@ -296,21 +269,16 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 	if len(entries) <= 0 {
 		t.Fatal(errors.New("no resource present"))
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminAlterConfig(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":     NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"AlterConfigsRequest": NewMockAlterConfigsResponse(t),
 	})
 
@@ -320,6 +288,7 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	var value string
 	entries := make(map[string]*string)
@@ -329,21 +298,16 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminCreateAcl(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":   NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"CreateAclsRequest": NewMockCreateAclsResponse(t),
 	})
 
@@ -353,6 +317,7 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
 	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
@@ -361,12 +326,6 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }
 
 func TestClusterAdminListAcls(t *testing.T) {
@@ -375,11 +334,12 @@ func TestClusterAdminListAcls(t *testing.T) {
 
 func TestClusterAdminDeleteAcl(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest":   NewMockMetadataResponse(t),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 		"DeleteAclsRequest": NewMockDeleteAclsResponse(t),
 	})
 
@@ -389,6 +349,7 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	resourceName := "my_topic"
 	filter := AclFilter{
@@ -401,10 +362,4 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-	seedBroker.Close()
 }

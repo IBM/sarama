@@ -84,6 +84,12 @@ func NewClusterAdmin(addrs []string, conf *Config) (ClusterAdmin, error) {
 		return nil, err
 	}
 
+	//make sure we can retrieve the controller
+	_, err = client.Controller()
+	if err != nil {
+		return nil, err
+	}
+
 	ca := &clusterAdmin{
 		client: client,
 		conf:   client.Config(),
@@ -95,8 +101,8 @@ func (ca *clusterAdmin) Close() error {
 	return ca.client.Close()
 }
 
-func (ca *clusterAdmin) any() *Broker {
-	return ca.client.Any()
+func (ca *clusterAdmin) Controller() (*Broker, error) {
+	return ca.client.Controller()
 }
 
 func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
@@ -123,7 +129,10 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
 		request.Version = 2
 	}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
 
 	rsp, err := b.CreateTopics(request)
 	if err != nil {
@@ -154,7 +163,10 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		request.Version = 1
 	}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
 
 	rsp, err := b.DeleteTopics(request)
 	if err != nil {
@@ -184,7 +196,10 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		TopicPartitions: topicPartitions,
 	}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
 
 	rsp, err := b.CreatePartitions(request)
 	if err != nil {
@@ -214,7 +229,10 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	request := &DeleteRecordsRequest{
 		Topics: topics}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
 
 	rsp, err := b.DeleteRecords(request)
 	if err != nil {
@@ -241,7 +259,10 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 		Resources: resources,
 	}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
 
 	rsp, err := b.DescribeConfigs(request)
 	if err != nil {
@@ -275,7 +296,10 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		ValidateOnly: validateOnly,
 	}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
 
 	rsp, err := b.AlterConfigs(request)
 	if err != nil {
@@ -298,9 +322,12 @@ func (ca *clusterAdmin) CreateAcl(resource Resource, acl Acl) error {
 	acls = append(acls, &AclCreation{resource, acl})
 	request := &CreateAclsRequest{AclCreations: acls}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
 
-	_, err := b.CreateAcls(request)
+	_, err = b.CreateAcls(request)
 	if err != nil {
 		return err
 	}
@@ -317,7 +344,10 @@ func (ca *clusterAdmin) DeleteAcl(filter AclFilter, validateOnly bool) ([]Matchi
 	filters = append(filters, &filter)
 	request := &DeleteAclsRequest{Filters: filters}
 
-	b := ca.any()
+	b, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
 
 	rsp, err := b.DeleteAcls(request)
 	if err != nil {
