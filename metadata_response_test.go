@@ -75,6 +75,31 @@ var (
 		0x00, 0x03, 'b', 'a', 'r',
 		0x01,
 		0x00, 0x00, 0x00, 0x00}
+
+	noBrokersNoTopicsWithThrottleTimeAndClusterIDV3 = []byte{
+		0x00, 0x00, 0x00, 0x10,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x09, 'c', 'l', 'u', 's', 't', 'e', 'r', 'I', 'd',
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x00}
+
+	noBrokersOneTopicWithOfflineReplicasV5 = []byte{
+		0x00, 0x00, 0x00, 0x05,
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x09, 'c', 'l', 'u', 's', 't', 'e', 'r', 'I', 'd',
+		0x00, 0x00, 0x00, 0x02,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00,
+		0x00, 0x03, 'f', 'o', 'o',
+		0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x04,
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x07,
+		0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x03,
+		0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02,
+		0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x03,
+	}
 )
 
 func TestEmptyMetadataResponseV0(t *testing.T) {
@@ -206,15 +231,60 @@ func TestMetadataResponseWithTopicsV1(t *testing.T) {
 		t.Error("Decoding produced", len(response.Brokers), "brokers where there were none!")
 	}
 	if response.ControllerID != 4 {
-		t.Error("Decoding produced", len(response.Brokers), "should have been 4!")
+		t.Error("Decoding produced", response.ControllerID, "should have been 4!")
 	}
 	if len(response.Topics) != 2 {
-		t.Error("Decoding produced", len(response.Brokers), "topics where there were 2!")
+		t.Error("Decoding produced", len(response.Topics), "topics where there were 2!")
 	}
 	if response.Topics[0].IsInternal {
-		t.Error("Decoding produced", response.ControllerID, "topic0 should have been false!")
+		t.Error("Decoding produced", response.Topics[0], "topic0 should have been false!")
 	}
 	if !response.Topics[1].IsInternal {
-		t.Error("Decoding produced", response.ControllerID, "topic1 should have been true!")
+		t.Error("Decoding produced", response.Topics[1], "topic1 should have been true!")
+	}
+}
+
+func TestMetadataResponseWithThrottleTime(t *testing.T) {
+	response := MetadataResponse{}
+
+	testVersionDecodable(t, "no topics, no brokers, throttle time and cluster Id V3", &response, noBrokersNoTopicsWithThrottleTimeAndClusterIDV3, 3)
+	if response.ThrottleTimeMs != int32(16) {
+		t.Error("Decoding produced", response.ThrottleTimeMs, "should have been 16!")
+	}
+	if len(response.Brokers) != 0 {
+		t.Error("Decoding produced", response.Brokers, "should have been 0!")
+	}
+	if response.ControllerID != int32(1) {
+		t.Error("Decoding produced", response.ControllerID, "should have been 1!")
+	}
+	if *response.ClusterID != "clusterId" {
+		t.Error("Decoding produced", response.ClusterID, "should have been clusterId!")
+	}
+	if len(response.Topics) != 0 {
+		t.Error("Decoding produced", len(response.Topics), "should have been 0!")
+	}
+}
+
+func TestMetadataResponseWithOfflineReplicasV5(t *testing.T) {
+	response := MetadataResponse{}
+
+	testVersionDecodable(t, "no brokers, 1 topic with offline replica V5", &response, noBrokersOneTopicWithOfflineReplicasV5, 5)
+	if response.ThrottleTimeMs != int32(5) {
+		t.Error("Decoding produced", response.ThrottleTimeMs, "should have been 5!")
+	}
+	if len(response.Brokers) != 0 {
+		t.Error("Decoding produced", response.Brokers, "should have been 0!")
+	}
+	if response.ControllerID != int32(2) {
+		t.Error("Decoding produced", response.ControllerID, "should have been 21!")
+	}
+	if *response.ClusterID != "clusterId" {
+		t.Error("Decoding produced", response.ClusterID, "should have been clusterId!")
+	}
+	if len(response.Topics) != 1 {
+		t.Error("Decoding produced", len(response.Topics), "should have been 1!")
+	}
+	if len(response.Topics[0].Partitions[0].OfflineReplicas) != 1 {
+		t.Error("Decoding produced", len(response.Topics[0].Partitions[0].OfflineReplicas), "should have been 1!")
 	}
 }
