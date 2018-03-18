@@ -28,6 +28,27 @@ func TestClusterAdmin(t *testing.T) {
 	}
 }
 
+func TestClusterAdminInvalidController(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	_, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err == nil {
+		t.Fatal(errors.New("controller not set still cluster admin was created"))
+	}
+
+	if err != ErrControllerNotAvailable {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminCreateTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -133,6 +154,35 @@ func TestClusterAdminDeleteTopic(t *testing.T) {
 
 	err = admin.DeleteTopic("my_topic")
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminDeleteEmptyTopic(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DeleteTopicsRequest": NewMockDeleteTopicsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V0_10_2_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.DeleteTopic("")
+	if err != ErrInvalidTopic {
 		t.Fatal(err)
 	}
 
@@ -356,7 +406,7 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
 	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
 
-	err = admin.CreateAcl(r, a)
+	err = admin.CreateACL(r, a)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -396,7 +446,7 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 		ResourceName: &resourceName,
 	}
 
-	_, err = admin.DeleteAcl(filter, false)
+	_, err = admin.DeleteACL(filter, false)
 	if err != nil {
 		t.Fatal(err)
 	}

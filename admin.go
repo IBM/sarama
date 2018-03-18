@@ -2,7 +2,7 @@ package sarama
 
 import "errors"
 
-// The administrative client for Kafka, which supports managing and inspecting topics,
+// ClusterAdmin is the administrative client for Kafka, which supports managing and inspecting topics,
 // brokers, configurations and ACLs. The minimum broker version required is 0.10.0.0.
 // Methods with stricter requirements will specify the minimum broker version required.
 // This client was introduced in 0.11.0.0 and the API is still evolving.
@@ -59,14 +59,14 @@ type ClusterAdmin interface {
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
 	// no changes will be made.This operation is supported by brokers with version 0.11.0.0 or higher.
-	CreateAcl(resource Resource, acl Acl) error
+	CreateACL(resource Resource, acl Acl) error
 
 	ListAcls(filter AclFilter) ([]ResourceAcls, error)
 
 	// Deletes access control lists (ACLs) according to the supplied filters.
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
-	DeleteAcl(filter AclFilter, validateOnly bool) ([]MatchingAcl, error)
+	DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error)
 
 	// Close shuts down the admin and closes underlying client.
 	Close() error
@@ -316,8 +316,7 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 	return nil
 }
 
-func (ca *clusterAdmin) CreateAcl(resource Resource, acl Acl) error {
-
+func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
 	var acls []*AclCreation
 	acls = append(acls, &AclCreation{resource, acl})
 	request := &CreateAclsRequest{AclCreations: acls}
@@ -328,18 +327,14 @@ func (ca *clusterAdmin) CreateAcl(resource Resource, acl Acl) error {
 	}
 
 	_, err = b.CreateAcls(request)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 	return nil, nil
 }
 
-func (ca *clusterAdmin) DeleteAcl(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
+func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
 	var filters []*AclFilter
 	filters = append(filters, &filter)
 	request := &DeleteAclsRequest{Filters: filters}
@@ -356,8 +351,8 @@ func (ca *clusterAdmin) DeleteAcl(filter AclFilter, validateOnly bool) ([]Matchi
 
 	var mAcls []MatchingAcl
 	for _, fr := range rsp.FilterResponses {
-		for _, mAcl := range fr.MatchingAcls {
-			mAcls = append(mAcls, *mAcl)
+		for _, mACL := range fr.MatchingAcls {
+			mAcls = append(mAcls, *mACL)
 		}
 
 	}
