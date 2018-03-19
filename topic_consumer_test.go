@@ -97,7 +97,6 @@ func TestTopicConsumerSettingOffsets(t *testing.T) {
 	conf.Version = V0_10_0_0
 	conf.Producer.Partitioner = NewManualPartitioner
 	conf.Producer.Return.Successes = true
-	// conf.Consumer.Offsets.Initial = OffsetOldest
 	client, err := NewClient([]string{server.Address()}, conf)
 	failOnErr(t, err)
 
