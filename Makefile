@@ -16,7 +16,7 @@ install_dependencies: install_errcheck glide_install
 
 glide_install:
 	go get -u github.com/Masterminds/glide
-	cd $(TRAVIS_BUILD_DIR) && glide install --strip-vendor
+	cd $(GOPATH)/src/github.com/remerge/sarama && glide install --strip-vendor
 
 install_errcheck:
 	go get github.com/kisielk/errcheck
