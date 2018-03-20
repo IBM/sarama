@@ -168,7 +168,7 @@ func TestFunctionalConsumerGroup(t *testing.T) {
 	}
 
 	if consuming != 4 {
-		t.Error("There should be exactly four active consumers but we have %d.", consuming)
+		t.Errorf("There should be exactly four active consumers but we have %d.", consuming)
 	}
 
 	// close one consumer that is not the one withoutPartition

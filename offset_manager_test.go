@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -430,4 +431,34 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 	safeClose(t, om)
 	broker.Close()
 	safeClose(t, testClient)
+}
+
+func TestForcedCommits(t *testing.T) {
+	om, testClient, broker, coordinator := initOffsetManager(t)
+	testClient.Config().Consumer.Offsets.CommitForcedInterval = time.Second
+
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+
+	var totalNumberOfCommitRequests int32
+
+	ocResponse := new(OffsetCommitResponse)
+	ocResponse.AddError("my_topic", 0, ErrNoError)
+	handler := func(req *request) (res encoder) {
+		atomic.AddInt32(&totalNumberOfCommitRequests, 1)
+		return ocResponse
+	}
+	coordinator.setHandler(handler)
+
+	pom.MarkOffset(100, "modified_meta")
+	time.Sleep(3 * time.Second)
+
+	safeClose(t, pom)
+	safeClose(t, om)
+	safeClose(t, testClient)
+	broker.Close()
+	coordinator.Close()
+
+	if totalNumberOfCommitRequests < 2 {
+		t.Errorf("Too low amount of commit requests: %v", totalNumberOfCommitRequests)
+	}
 }

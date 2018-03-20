@@ -230,6 +230,8 @@ type Config struct {
 			// How frequently to commit updated offsets. Defaults to 1s.
 			CommitInterval time.Duration
 
+			CommitForcedInterval time.Duration
+
 			// The initial offset to use if no offset was previously committed.
 			// Should be OffsetNewest or OffsetOldest. Defaults to OffsetNewest.
 			Initial int64
@@ -329,6 +331,7 @@ func NewConfig() *Config {
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
+	c.Consumer.Offsets.CommitForcedInterval = 12 * time.Hour
 	c.Consumer.Offsets.Initial = OffsetNewest
 
 	c.Group.AutoCommit = true
@@ -466,6 +469,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
 	case c.Consumer.Offsets.CommitInterval <= 0:
 		return ConfigurationError("Consumer.Offsets.CommitInterval must be > 0")
+	case c.Consumer.Offsets.CommitForcedInterval <= 0:
+		return ConfigurationError("Consumer.Offsets.CommitEvenIfNotChangedInterval must be > 0")
 	case c.Consumer.Offsets.Initial != OffsetOldest && c.Consumer.Offsets.Initial != OffsetNewest:
 		return ConfigurationError("Consumer.Offsets.Initial must be OffsetOldest or OffsetNewest")
 
