@@ -433,6 +433,36 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 	safeClose(t, testClient)
 }
 
+func TestForcedCommitsWithoutAutoCommit(t *testing.T) {
+	om, testClient, broker, coordinator := initOffsetManager(t)
+	testClient.Config().Consumer.Offsets.CommitForcedInterval = time.Second
+	testClient.Config().Group.AutoCommit = false
+
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+
+	var totalNumberOfCommitRequests int32
+
+	ocResponse := new(OffsetCommitResponse)
+	ocResponse.AddError("my_topic", 0, ErrNoError)
+	handler := func(req *request) (res encoder) {
+		atomic.AddInt32(&totalNumberOfCommitRequests, 1)
+		return ocResponse
+	}
+	coordinator.setHandler(handler)
+
+	time.Sleep(3 * time.Second)
+
+	safeClose(t, pom)
+	safeClose(t, om)
+	safeClose(t, testClient)
+	broker.Close()
+	coordinator.Close()
+
+	if totalNumberOfCommitRequests != 0 {
+		t.Errorf("Error - commiting without autocommit %v", totalNumberOfCommitRequests)
+	}
+}
+
 func TestForcedCommits(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
 	testClient.Config().Consumer.Offsets.CommitForcedInterval = time.Second

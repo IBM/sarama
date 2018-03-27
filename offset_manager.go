@@ -195,13 +195,12 @@ type partitionOffsetManager struct {
 	topic     string
 	partition int32
 
-	lock                         sync.Mutex
-	offset                       int64
-	metadata                     string
-	dirty                        bool
-	offsetChangedSinceLastForced bool
-	clean                        sync.Cond
-	broker                       *brokerOffsetManager
+	lock     sync.Mutex
+	offset   int64
+	metadata string
+	dirty    bool
+	clean    sync.Cond
+	broker   *brokerOffsetManager
 
 	errors    chan *ConsumerError
 	rebalance chan none
@@ -366,7 +365,6 @@ func (pom *partitionOffsetManager) updateCommitted(offset int64, metadata string
 
 	if pom.offset == offset && pom.metadata == metadata {
 		pom.dirty = false
-		pom.offsetChangedSinceLastForced = true
 		pom.clean.Signal()
 	}
 }
@@ -424,7 +422,7 @@ type brokerOffsetManager struct {
 	parent              *offsetManager
 	broker              *Broker
 	timer               *time.Ticker
-	commitForcedTimer   *time.Ticker
+	forcedTimer         *time.Ticker
 	updateSubscriptions chan *partitionOffsetManager
 	subscriptions       map[*partitionOffsetManager]none
 	refs                int
@@ -437,7 +435,7 @@ func (om *offsetManager) newBrokerOffsetManager(broker *Broker) *brokerOffsetMan
 		parent:              om,
 		broker:              broker,
 		timer:               time.NewTicker(om.conf.Consumer.Offsets.CommitInterval),
-		commitForcedTimer:   time.NewTicker(om.conf.Consumer.Offsets.CommitForcedInterval),
+		forcedTimer:         time.NewTicker(om.conf.Consumer.Offsets.CommitForcedInterval),
 		updateSubscriptions: make(chan *partitionOffsetManager),
 		subscriptions:       make(map[*partitionOffsetManager]none),
 	}
@@ -450,17 +448,14 @@ func (om *offsetManager) newBrokerOffsetManager(broker *Broker) *brokerOffsetMan
 func (bom *brokerOffsetManager) mainLoop() {
 	for {
 		select {
-		case <-bom.commitForcedTimer.C:
-			if len(bom.subscriptions) > 0 {
+		case <-bom.forcedTimer.C:
+			if len(bom.subscriptions) > 0 && bom.autoCommit {
 				for s := range bom.subscriptions {
-					if !s.offsetChangedSinceLastForced {
-						s.dirty = true
-					}
+					s.lock.Lock()
+					s.dirty = true
+					s.lock.Unlock()
 				}
 				bom.flushToBroker()
-				for s := range bom.subscriptions {
-					s.offsetChangedSinceLastForced = false
-				}
 			}
 		case <-bom.timer.C:
 			if len(bom.subscriptions) > 0 && bom.autoCommit {
@@ -469,7 +464,7 @@ func (bom *brokerOffsetManager) mainLoop() {
 		case s, ok := <-bom.updateSubscriptions:
 			if !ok {
 				bom.timer.Stop()
-				bom.commitForcedTimer.Stop()
+				bom.forcedTimer.Stop()
 				return
 			}
 			if _, ok := bom.subscriptions[s]; ok {
