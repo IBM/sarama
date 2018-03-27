@@ -248,6 +248,7 @@ func (pom *partitionOffsetManager) mainLoop() {
 				select {
 				case <-pom.rebalance:
 				case pom.broker.updateSubscriptions <- pom:
+				case <-time.After(time.Second * 5):
 				}
 				pom.parent.unrefBrokerOffsetManager(pom.broker)
 			}
@@ -380,24 +381,33 @@ func (pom *partitionOffsetManager) NextOffset() (int64, string) {
 	return pom.parent.conf.Consumer.Offsets.Initial, ""
 }
 
+func (pom *partitionOffsetManager) closeLoop(done chan none) bool {
+	timeouted := false
+	for {
+		select {
+		case <-time.After(time.Second * 5):
+			Logger.Printf("client/offsetManager offset commit timeout on shutdown! Not commited group=%s topic=%s partition=%d offset=%d\n", pom.parent.group, pom.topic, pom.partition, pom.offset)
+			pom.clean.Signal()
+			timeouted = true
+		case <-done:
+			return timeouted
+		}
+	}
+}
+
 func (pom *partitionOffsetManager) AsyncClose() {
 	go func() {
 		pom.lock.Lock()
 		defer pom.lock.Unlock()
-		for pom.dirty {
+		timeouted := false
+		for pom.dirty && !timeouted {
 			done := make(chan none)
 			go func() {
 				pom.clean.Wait()
 				close(done)
 			}()
-			select {
-			case <-time.After(time.Second * 5):
-				Logger.Printf("client/offsetManager offset commit timeout on shutdown! Not commited group=%s topic=%s partition=%d offset=%d\n", pom.parent.group, pom.topic, pom.partition, pom.offset)
-				goto timeout
-			case <-done:
-			}
+			timeouted = pom.closeLoop(done)
 		}
-	timeout:
 		close(pom.dying)
 	}()
 }

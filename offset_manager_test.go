@@ -205,6 +205,26 @@ func TestPartitionOffsetManagerNextOffset(t *testing.T) {
 	safeClose(t, testClient)
 }
 
+func TestCloseWhenTimeouted(t *testing.T) {
+	om, testClient, broker, coordinator := initOffsetManager(t)
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+
+	ocResponse := new(OffsetCommitResponse)
+	ocResponse.AddError("my_topic", 0, ErrNoError)
+	handler := func(req *request) (res encoder) {
+		time.Sleep(5 * time.Minute)
+		return ocResponse
+	}
+	coordinator.setHandler(handler)
+
+	pom.MarkOffset(110, "modified_meta")
+
+	safeClose(t, pom)
+	safeClose(t, om)
+	safeClose(t, testClient)
+	broker.Close()
+}
+
 func TestPartitionOffsetManagerResetOffset(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
