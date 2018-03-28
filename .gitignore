@@ -8,6 +8,7 @@
 _obj
 _test
 .vagrant
+.vscode
 
 # Architecture specific extensions/prefixes
 *.[568vq]
