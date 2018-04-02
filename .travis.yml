@@ -12,6 +12,7 @@ env:
   - KAFKA_HOSTNAME=localhost
   - DEBUG=true
   matrix:
+  - KAFKA_VERSION=0.11.0.2
   - KAFKA_VERSION=1.0.0
   - KAFKA_VERSION=1.1.0
 
