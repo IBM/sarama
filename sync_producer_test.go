@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"context"
 	"log"
 	"sync"
 	"testing"
@@ -47,6 +48,82 @@ func TestSyncProducer(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
+	}
+
+	safeClose(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
+func TestSyncProducerSendMessageNoResponse(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msg := &ProducerMessage{
+		Topic:    "my_topic",
+		Value:    StringEncoder(TestMessage),
+		Metadata: "test",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, _, err = producer.SendMessageContext(ctx, msg)
+	if err != context.Canceled {
+		t.Errorf("expected context canceled error, but got %s", err)
+	}
+
+	safeClose(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
+func TestSyncProducerSendMessagesNoResponse(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	msgs := []*ProducerMessage{
+		{
+			Topic:    "my_topic",
+			Value:    StringEncoder(TestMessage),
+			Metadata: "test",
+		},
+		{
+			Topic:    "my_topic",
+			Value:    StringEncoder(TestMessage),
+			Metadata: "test",
+		},
+		{
+			Topic:    "my_topic",
+			Value:    StringEncoder(TestMessage),
+			Metadata: "test",
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err = producer.SendMessagesContext(ctx, msgs)
+	if err != context.Canceled {
+		t.Errorf("expected context canceled error, but got %s", err)
 	}
 
 	safeClose(t, producer)
