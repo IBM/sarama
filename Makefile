@@ -1,7 +1,7 @@
 default: fmt vet errcheck test
 
 test:
-	go test -v -timeout 60s -race
+	go test -v -timeout 90s -race
 
 vet:
 	go vet ./...
@@ -27,4 +27,3 @@ get:
 watch:
 	go get github.com/cespare/reflex
 	reflex -r '\.go$$' -s -- sh -c 'clear && go test -v -run=Test$(T)'
-

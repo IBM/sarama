@@ -184,7 +184,9 @@ func TestConsumerDuplicate(t *testing.T) {
 // specified by `Config.Consumer.Retry.Backoff`.
 func TestConsumerLeaderRefreshError(t *testing.T) {
 	// Given
+
 	broker0 := NewMockBroker(t, 100)
+	broker0.expectationTimeout = time.Millisecond
 
 	// Stage 1: my_topic/0 served by broker0
 	Logger.Printf("    STAGE 1")

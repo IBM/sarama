@@ -14,10 +14,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-const (
-	expectationTimeout = 500 * time.Millisecond
-)
-
 type requestHandlerFunc func(req *request) (res encoder)
 
 // RequestNotifierFunc is invoked when a mock broker processes a request successfully
@@ -49,18 +45,19 @@ type RequestNotifierFunc func(bytesRead, bytesWritten int)
 // It is not necessary to prefix message length or correlation ID to your
 // response bytes, the server does that automatically as a convenience.
 type MockBroker struct {
-	brokerID     int32
-	port         int32
-	closing      chan none
-	stopper      chan none
-	expectations chan encoder
-	listener     net.Listener
-	t            TestReporter
-	latency      time.Duration
-	handler      requestHandlerFunc
-	notifier     RequestNotifierFunc
-	history      []RequestResponse
-	lock         sync.Mutex
+	brokerID           int32
+	port               int32
+	closing            chan none
+	stopper            chan none
+	expectations       chan encoder
+	listener           net.Listener
+	t                  TestReporter
+	latency            time.Duration
+	handler            requestHandlerFunc
+	notifier           RequestNotifierFunc
+	history            []RequestResponse
+	lock               sync.Mutex
+	expectationTimeout time.Duration
 }
 
 // RequestResponse represents a Request/Response pair processed by MockBroker.
@@ -78,13 +75,13 @@ func (b *MockBroker) SetLatency(latency time.Duration) {
 // SetHandlerByMap defines mapping of Request types to MockResponses. When a
 // request is received by the broker, it looks up the request type in the map
 // and uses the found MockResponse instance to generate an appropriate reply.
-// If the request type is not found in the map then nothing is sent.
+// If the request type is not found in the map default request handler is used
 func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
 	b.setHandler(func(req *request) (res encoder) {
 		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
 		mockResponse := handlerMap[reqTypeName]
 		if mockResponse == nil {
-			return nil
+			return b.defaultRequestHandler(req)
 		}
 		return mockResponse.For(req.body)
 	})
@@ -249,14 +246,103 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }
 
+func (b *MockBroker) getRequestType(req *request) int {
+	switch req.body.(type) {
+	case *ProduceRequest:
+		return apiKeyProduce
+	case *FetchRequest:
+		return apiKeyFetch
+	case *OffsetRequest:
+		return apiKeyListOffsets
+	case *MetadataRequest:
+		return apiKeyMetadata
+	case *OffsetCommitRequest:
+		return apiKeyOffsetCommit
+	case *OffsetFetchRequest:
+		return apiKeyOffsetFetch
+	case *ConsumerMetadataRequest:
+		return apiKeyFindCoordinator
+	case *JoinGroupRequest:
+		return apiKeyJoinGroup
+	case *HeartbeatRequest:
+		return apiKeyHeartbeat
+	case *LeaveGroupRequest:
+		return apiKeyLeaveGroup
+	case *SyncGroupRequest:
+		return apiKeySyncGroup
+	case *DescribeGroupsRequest:
+		return apiKeyDescribeGroups
+	case *ListGroupsRequest:
+		return apiKeyListGroups
+	case *SaslHandshakeRequest:
+		return apiKeySaslHandshake
+	case *ApiVersionsRequest:
+		return apiKeyApiVersions
+	default:
+		b.t.Errorf("Unknown request %v", reflect.TypeOf(req.body).Elem().Name())
+		return -1
+	}
+}
+
+func (b *MockBroker) getResponseType(res encoder) int {
+	switch res.(type) {
+	case *ProduceResponse:
+		return apiKeyProduce
+	case *FetchResponse:
+		return apiKeyFetch
+	case *OffsetResponse:
+		return apiKeyListOffsets
+	case *MetadataResponse:
+		return apiKeyMetadata
+	case *OffsetCommitResponse:
+		return apiKeyOffsetCommit
+	case *OffsetFetchResponse:
+		return apiKeyOffsetFetch
+	case *ConsumerMetadataResponse:
+		return apiKeyFindCoordinator
+	case *JoinGroupResponse:
+		return apiKeyJoinGroup
+	case *HeartbeatResponse:
+		return apiKeyHeartbeat
+	case *SyncGroupResponse:
+		return apiKeySyncGroup
+	case *LeaveGroupResponse:
+		return apiKeyLeaveGroup
+	case *ListGroupsResponse:
+		return apiKeyListGroups
+	case *DescribeGroupsResponse:
+		return apiKeyDescribeGroups
+	case *ApiVersionsResponse:
+		return apiKeyApiVersions
+	default:
+		return -1
+	}
+}
+
+func (b *MockBroker) matchRequestAndResponse(req *request, res encoder) {
+	reqType := b.getRequestType(req)
+	resType := b.getResponseType(res)
+	if resType == -1 {
+		// Response is Unknown is OK
+		return
+	}
+
+	if reqType != resType {
+		b.t.Errorf("Request type %v does not match response %v",
+			reflect.TypeOf(req.body).Elem().Name(),
+			reflect.TypeOf(res).Elem().Name())
+	}
+}
+
 func (b *MockBroker) defaultRequestHandler(req *request) (res encoder) {
 	select {
 	case res, ok := <-b.expectations:
 		if !ok {
 			return nil
 		}
+		b.matchRequestAndResponse(req, res)
 		return res
-	case <-time.After(expectationTimeout):
+	case <-time.After(b.expectationTimeout):
 		return nil
 	}
 }
@@ -291,11 +377,12 @@ func NewMockBrokerAddr(t TestReporter, brokerID int32, addr string) *MockBroker 
 	var err error
 
 	broker := &MockBroker{
-		closing:      make(chan none),
-		stopper:      make(chan none),
-		t:            t,
-		brokerID:     brokerID,
-		expectations: make(chan encoder, 512),
+		closing:            make(chan none),
+		stopper:            make(chan none),
+		t:                  t,
+		brokerID:           brokerID,
+		expectations:       make(chan encoder, 512),
+		expectationTimeout: 500 * time.Millisecond,
 	}
 	broker.handler = broker.defaultRequestHandler
 

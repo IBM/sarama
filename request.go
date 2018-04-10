@@ -82,37 +82,53 @@ func decodeRequest(r io.Reader) (req *request, bytesRead int, err error) {
 	return req, bytesRead, nil
 }
 
+const apiKeyProduce = 0
+const apiKeyFetch = 1
+const apiKeyListOffsets = 2
+const apiKeyMetadata = 3
+const apiKeyOffsetCommit = 8
+const apiKeyOffsetFetch = 9
+const apiKeyFindCoordinator = 10
+const apiKeyJoinGroup = 11
+const apiKeyHeartbeat = 12
+const apiKeyLeaveGroup = 13
+const apiKeySyncGroup = 14
+const apiKeyDescribeGroups = 15
+const apiKeyListGroups = 16
+const apiKeySaslHandshake = 17
+const apiKeyApiVersions = 18
+
 func allocateBody(key, version int16) protocolBody {
 	switch key {
-	case 0:
+	case apiKeyProduce:
 		return &ProduceRequest{}
-	case 1:
+	case apiKeyFetch:
 		return &FetchRequest{}
-	case 2:
+	case apiKeyListOffsets:
 		return &OffsetRequest{Version: version}
-	case 3:
+	case apiKeyMetadata:
 		return &MetadataRequest{}
-	case 8:
+	case apiKeyOffsetCommit:
 		return &OffsetCommitRequest{Version: version}
-	case 9:
+	case apiKeyOffsetFetch:
 		return &OffsetFetchRequest{}
-	case 10:
+	case apiKeyFindCoordinator:
 		return &ConsumerMetadataRequest{}
-	case 11:
+	case apiKeyJoinGroup:
 		return &JoinGroupRequest{}
-	case 12:
+	case apiKeyHeartbeat:
 		return &HeartbeatRequest{}
-	case 13:
+	case apiKeyLeaveGroup:
 		return &LeaveGroupRequest{}
-	case 14:
+	case apiKeySyncGroup:
 		return &SyncGroupRequest{}
-	case 15:
+	case apiKeyDescribeGroups:
 		return &DescribeGroupsRequest{}
-	case 16:
+	case apiKeyListGroups:
 		return &ListGroupsRequest{}
-	case 17:
+	case apiKeySaslHandshake:
 		return &SaslHandshakeRequest{}
-	case 18:
+	case apiKeyApiVersions:
 		return &ApiVersionsRequest{}
 	}
 	return nil

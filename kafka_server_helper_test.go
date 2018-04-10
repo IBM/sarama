@@ -141,7 +141,7 @@ func (s *KafkaTestServer) waitForStartup(count int) error {
 		return err
 	}
 
-	s.t.Log("Waiting for kakfka")
+	s.t.Log("Waiting for kafka")
 
 	time.Sleep(time.Millisecond * 500)
 
