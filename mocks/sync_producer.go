@@ -3,6 +3,7 @@ package mocks
 import (
 	"sync"
 
+	"context"
 	"github.com/Shopify/sarama"
 )
 
@@ -31,6 +32,13 @@ func NewSyncProducer(t ErrorReporter, config *sarama.Config) *SyncProducer {
 ////////////////////////////////////////////////
 // Implement SyncProducer interface
 ////////////////////////////////////////////////
+
+func (sp *SyncProducer) SendMessageContext(
+	_ context.Context,
+	msg *sarama.ProducerMessage,
+) (partition int32, offset int64, err error) {
+	return sp.SendMessage(msg)
+}
 
 // SendMessage corresponds with the SendMessage method of sarama's SyncProducer implementation.
 // You have to set expectations on the mock producer before calling SendMessage, so it knows
@@ -67,6 +75,13 @@ func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 	}
 	sp.t.Errorf("No more expectation set on this mock producer to handle the input message.")
 	return -1, -1, errOutOfExpectations
+}
+
+func (sp *SyncProducer) SendMessagesContext(
+	_ context.Context,
+	msgs []*sarama.ProducerMessage,
+) error {
+	return sp.SendMessages(msgs)
 }
 
 // SendMessages corresponds with the SendMessages method of sarama's SyncProducer implementation.

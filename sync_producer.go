@@ -1,6 +1,9 @@
 package sarama
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 // SyncProducer publishes Kafka messages, blocking until they have been acknowledged. It routes messages to the correct
 // broker, refreshing metadata as appropriate, and parses responses for errors. You must call Close() on a producer
@@ -19,11 +22,24 @@ type SyncProducer interface {
 	// of the produced message, or an error if the message failed to produce.
 	SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error)
 
+	// SendMessagesContext produces a given message, and returns when it has either succeed
+	// or failed to produce or if the context is done. It will return the partition and the offset
+	// of the produced message, or an error if the message failed to produce.
+	SendMessageContext(ctx context.Context, msg *ProducerMessage) (partition int32, offset int64, err error)
+
 	// SendMessages produces a given set of messages, and returns only when all
 	// messages in the set have either succeeded or failed. Note that messages
 	// can succeed and fail individually; if some succeed and some fail,
 	// SendMessages will return an error.
+	// If the context is canceled before all messages have been enqueued, some might
+	// never be enqueued.
 	SendMessages(msgs []*ProducerMessage) error
+
+	// SendMessages produces a given set of messages, and returns when all
+	// messages in the set have either succeeded or failed or the context is done.
+	// Note that messages can succeed and fail individually; if some succeed and some fail,
+	// SendMessages will return an error.
+	SendMessagesContext(ctx context.Context, msgs []*ProducerMessage) error
 
 	// Close shuts down the producer and waits for any buffered messages to be
 	// flushed. You must call this function before a producer object passes out of
@@ -89,7 +105,16 @@ func verifyProducerConfig(config *Config) error {
 	return nil
 }
 
-func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error) {
+func (sp *syncProducer) SendMessage(
+	msg *ProducerMessage,
+) (partition int32, offset int64, err error) {
+	return sp.SendMessageContext(context.Background(), msg)
+}
+
+func (sp *syncProducer) SendMessageContext(
+	ctx context.Context,
+	msg *ProducerMessage,
+) (partition int32, offset int64, err error) {
 	oldMetadata := msg.Metadata
 	defer func() {
 		msg.Metadata = oldMetadata
@@ -97,16 +122,35 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 
 	expectation := make(chan *ProducerError, 1)
 	msg.Metadata = expectation
-	sp.producer.Input() <- msg
 
-	if err := <-expectation; err != nil {
-		return -1, -1, err.Err
+	select {
+	case <-ctx.Done():
+		return -1, -1, ctx.Err()
+	case sp.producer.Input() <- msg:
+	}
+
+	select {
+	case <-ctx.Done():
+		return -1, -1, ctx.Err()
+	case err := <-expectation:
+		if err != nil {
+			return -1, -1, err.Err
+		}
 	}
 
 	return msg.Partition, msg.Offset, nil
 }
 
-func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
+func (sp *syncProducer) SendMessages(
+	msgs []*ProducerMessage,
+) error {
+	return sp.SendMessagesContext(context.Background(), msgs)
+}
+
+func (sp *syncProducer) SendMessagesContext(
+	ctx context.Context,
+	msgs []*ProducerMessage,
+) error {
 	savedMetadata := make([]interface{}, len(msgs))
 	for i := range msgs {
 		savedMetadata[i] = msgs[i].Metadata
@@ -117,27 +161,47 @@ func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
 		}
 	}()
 
+	var err error
 	expectations := make(chan chan *ProducerError, len(msgs))
 	go func() {
+		defer close(expectations)
 		for _, msg := range msgs {
 			expectation := make(chan *ProducerError, 1)
 			msg.Metadata = expectation
-			sp.producer.Input() <- msg
+
+			select {
+			case <-ctx.Done():
+				// Abort early and don't enqueue remaining messages (no one will be waiting for them).
+				err = ctx.Err()
+				return
+			case sp.producer.Input() <- msg:
+			}
+
 			expectations <- expectation
 		}
-		close(expectations)
 	}()
 
 	var errors ProducerErrors
 	for expectation := range expectations {
-		if err := <-expectation; err != nil {
-			errors = append(errors, err)
+		// Wait for context or an expectation
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+		case producerErr := <-expectation:
+			if producerErr != nil {
+				errors = append(errors, producerErr)
+			}
 		}
+	}
+
+	if err != nil {
+		return err
 	}
 
 	if len(errors) > 0 {
 		return errors
 	}
+
 	return nil
 }
 
