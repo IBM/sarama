@@ -54,6 +54,8 @@ type Client interface {
 	// will be produced next, or a time.
 	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 
+	GetOffsets(topic string) (earliestMap OffsetMap, latestMap OffsetMap, err error)
+
 	// Coordinator returns the coordinating broker for a consumer group. It will
 	// return a locally cached value if it's available. You can call
 	// RefreshCoordinator to update the cached value. This function only works on
@@ -360,6 +362,30 @@ func (client *client) RefreshMetadata(topics ...string) error {
 	}
 
 	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max)
+}
+
+func (client *client) GetOffsets(topic string) (earliestMap OffsetMap, latestMap OffsetMap, err error) {
+	earliestMap = make(OffsetMap)
+	latestMap = make(OffsetMap)
+	partitions, err := client.Partitions(topic)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	for _, p := range partitions {
+		earliest, err := client.GetOffset(topic, p, OffsetOldest)
+		if err != nil {
+			return nil, nil, err
+		}
+		earliestMap[p] = earliest
+
+		latest, err := client.GetOffset(topic, p, OffsetNewest)
+		if err != nil {
+			return nil, nil, err
+		}
+		latestMap[p] = latest
+	}
+	return earliestMap, latestMap, nil
 }
 
 func (client *client) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
