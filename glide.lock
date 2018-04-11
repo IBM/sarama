@@ -1,15 +1,10 @@
-hash: e20d67a52a14458fecdf0a260c01689f6b125f82beb0b910d83af116884a0883
-updated: 2018-03-16T11:27:55.710118+01:00
+hash: 8d699991b417ab9b4de9525bc744794a69b787228643f9730d907c42c94a3780
+updated: 2018-04-11T18:47:57.922777706+02:00
 imports:
 - name: github.com/davecgh/go-spew
   version: 87df7c60d5820d0f8ae11afede5aa52325c09717
   subpackages:
   - spew
-- name: github.com/docker/distribution
-  version: 607ae5d128a82f280e8c7f453d5fb30c535bda17
-  subpackages:
-  - digestset
-  - reference
 - name: github.com/docker/docker
   version: 90d35abf7b3535c1c319c872900fbd76374e521c
   subpackages:
@@ -39,12 +34,8 @@ imports:
   - nat
   - sockets
   - tlsconfig
-- name: github.com/docker/go-units
-  version: 47565b4f722fb6ceae66b95f853feed578a4a51c
-- name: github.com/docker/libtrust
-  version: aabc10ec26b754e797f9028f4589c5b7bd90dc20
 - name: github.com/eapache/go-resiliency
-  version: 6800482f2c813e689c88b7ed3282262385011890
+  version: ea41b0fad31007accc7f806884dcdf3da98b79ce
   subpackages:
   - breaker
 - name: github.com/eapache/go-xerial-snappy
@@ -53,24 +44,46 @@ imports:
   version: 44cc805cf13205b55f69e14bcb69867d1ae92f98
 - name: github.com/golang/snappy
   version: 553a641470496b2327abcac10b36396bd98e45c9
-- name: github.com/Microsoft/go-winio
-  version: 7da180ee92d8bd8bb8c37fc560e673e6557c392f
-- name: github.com/opencontainers/go-digest
-  version: 279bed98673dd5bef374d3b6e4b09e2af76183bf
 - name: github.com/pierrec/lz4
   version: 2fcda4cb7018ce05a25959d2fe08c83e3329f169
 - name: github.com/pierrec/xxHash
   version: a0006b13c722f7f12368c00a3d3c2ae8a999a0c6
   subpackages:
   - xxHash32
-- name: github.com/pkg/errors
-  version: 816c9085562cd7ee03e7f8188a1cfd942858cded
 - name: github.com/rcrowley/go-metrics
   version: 8732c616f52954686704c8645fe1a9d59e9df7c1
+- name: github.com/stretchr/testify
+  version: 12b6f73e6084dad08a7c6e575284b177ecafbc71
+  subpackages:
+  - assert
+testImports:
+- name: github.com/docker/distribution
+  version: 607ae5d128a82f280e8c7f453d5fb30c535bda17
+  subpackages:
+  - digestset
+  - reference
+- name: github.com/docker/go-units
+  version: 47565b4f722fb6ceae66b95f853feed578a4a51c
+- name: github.com/docker/libtrust
+  version: aabc10ec26b754e797f9028f4589c5b7bd90dc20
+- name: github.com/Microsoft/go-winio
+  version: 7da180ee92d8bd8bb8c37fc560e673e6557c392f
+- name: github.com/opencontainers/go-digest
+  version: 279bed98673dd5bef374d3b6e4b09e2af76183bf
+- name: github.com/pkg/errors
+  version: 816c9085562cd7ee03e7f8188a1cfd942858cded
+- name: github.com/pmezard/go-difflib
+  version: 792786c7400a136282c1664665ae0a8db921c6c2
+  subpackages:
+  - difflib
+- name: github.com/Shopify/toxiproxy
+  version: 0b4f0a7eb0cfe79bc83ccbaca6d78172c9bcfc9b
+  subpackages:
+  - client
 - name: github.com/Sirupsen/logrus
   version: 90150a8ed11b6ce285e77e8af2b0109559ce4777
 - name: golang.org/x/crypto
-  version: 96846453c37f0876340a66a47f3f75b1f3a6cd2d
+  version: e7ba82683099cae71475961448ab8f903ea77c26
   subpackages:
   - ssh/terminal
 - name: golang.org/x/net
@@ -80,12 +93,7 @@ imports:
   - context/ctxhttp
   - proxy
 - name: golang.org/x/sys
-  version: 37707fdb30a5b38865cfb95e5aab41707daec7fd
+  version: a646d33e2ee3172a661fc09bca23bb4889a41bc8
   subpackages:
   - unix
   - windows
-testImports:
-- name: github.com/Shopify/toxiproxy
-  version: 0b4f0a7eb0cfe79bc83ccbaca6d78172c9bcfc9b
-  subpackages:
-  - client
