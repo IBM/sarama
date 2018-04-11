@@ -343,6 +343,7 @@ func (b *MockBroker) defaultRequestHandler(req *request) (res encoder) {
 		b.matchRequestAndResponse(req, res)
 		return res
 	case <-time.After(b.expectationTimeout):
+		fmt.Printf("Timeout when requesting %v from broker %v\n", reflect.TypeOf(req.body).Elem().Name(), b.BrokerID())
 		return nil
 	}
 }
