@@ -11,14 +11,13 @@ func TestFuncConsumerGroupPartitioning(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	errs := make(chan error, 10)
-
+	errs := make(chan error, 2)
 	go func() {
-		errs <- testFuncConsumerGroupPartitioning("M1")
+		errs <- testFuncConsumerGroupPartitioning()
 	}()
 	go func() {
 		time.Sleep(4 * time.Second)
-		errs <- testFuncConsumerGroupPartitioning("M2")
+		errs <- testFuncConsumerGroupPartitioning()
 	}()
 
 	if err := <-errs; err != nil {
@@ -29,14 +28,14 @@ func TestFuncConsumerGroupPartitioning(t *testing.T) {
 	}
 }
 
-func testFuncConsumerGroupPartitioning(name string) error {
+func testFuncConsumerGroupPartitioning() error {
 	config := NewConfig()
 	config.Version = V0_10_1_0
 
 	deadline := time.NewTimer(30 * time.Second)
 	defer deadline.Stop()
 
-	member, err := NewConsumerGroup(kafkaBrokers, "my_group", config)
+	member, err := NewConsumerGroup(kafkaBrokers, "sarama.TestFuncConsumerGroupPartitioning", config)
 	if err != nil {
 		return err
 	}

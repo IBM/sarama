@@ -69,7 +69,6 @@ func (c *consumerGroup) Close() (err error) {
 
 	c.lock.Lock()
 	session := c.session
-	c.session = nil
 	c.lock.Unlock()
 
 	if session != nil {
@@ -190,13 +189,13 @@ func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retr
 		return nil, sync.Err
 	}
 
-	// Retrieve and sort claims
+	// Retrieve and sort claim partitions
 	members, err := sync.GetMemberAssignment()
 	if err != nil {
 		return nil, err
 	}
-	for topic := range members.Topics {
-		sort.Sort(int32Slice(members.Topics[topic]))
+	for _, partitions := range members.Topics {
+		sort.Sort(int32Slice(partitions))
 	}
 
 	// Init session
@@ -375,7 +374,9 @@ func (s *consumerGroupSession) Release() (err error) {
 
 		err = s.lastError
 		s.parent.lock.Lock()
-		s.parent.session = nil
+		if s.parent.session == s {
+			s.parent.session = nil
+		}
 		s.parent.lock.Unlock()
 	})
 	return
