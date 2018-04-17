@@ -53,7 +53,7 @@ func testFuncConsumerGroupPartitioning() error {
 
 		select {
 		case <-sess.Done():
-			if err := sess.Release(); err != nil {
+			if err := sess.Close(); err != nil {
 				return err
 			}
 		case <-deadline.C:

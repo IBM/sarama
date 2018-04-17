@@ -68,13 +68,13 @@ func (c *consumerGroup) Close() (err error) {
 	}
 
 	c.lock.Lock()
-	session := c.session
-	c.lock.Unlock()
+	defer c.lock.Unlock()
 
-	if session != nil {
-		if e := session.Release(); e != nil {
+	if c.session != nil {
+		if e := c.session.close(); e != nil {
 			err = e
 		}
+		c.session = nil
 	}
 
 	if e := c.leave(); e != nil {
@@ -204,7 +204,7 @@ func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retr
 		parent:       c,
 		generationID: join.GenerationId,
 
-		closing: make(chan none),
+		stopped: make(chan none),
 		done:    make(chan struct{}),
 	}
 	go session.loop()
@@ -331,6 +331,7 @@ func (c *consumerGroup) leave() error {
 // --------------------------------------------------------------------
 
 // ConsumerGroupSession represents a consumer group member session.
+// You MUST call Close() at the end of a session to avoid leaks.
 type ConsumerGroupSession interface {
 	// Claims returns the claimed partitions by topic.
 	Claims() map[string][]int32
@@ -346,8 +347,14 @@ type ConsumerGroupSession interface {
 	// Consumer.Group.Rebalance.Timeout before evicting the worker from
 	// the group.
 	Done() <-chan struct{}
-	// Release aborts the session and releases the claims.
-	Release() error
+	// Stop allows to manually signal the end of the session and trigger a new
+	// rebalance cycle.
+	Stop()
+	// Close terminates the session and releases all claims, making them
+	// again available to all consumer group members. It MUST be called at
+	// the end of a session, once all consumers have been stopped and all
+	// the offsets have been committed.
+	Close() error
 }
 
 type consumerGroupSession struct {
@@ -356,10 +363,11 @@ type consumerGroupSession struct {
 
 	generationID int32
 
-	closing     chan none
-	done        chan struct{}
-	lastError   error
-	releaseOnce sync.Once
+	stopped   chan none
+	done      chan struct{}
+	lastError error
+
+	stopOnce, closeOnce sync.Once
 }
 
 func (s *consumerGroupSession) Claims() map[string][]int32 { return s.claims }
@@ -367,17 +375,27 @@ func (s *consumerGroupSession) MemberID() string           { return s.parent.mem
 func (s *consumerGroupSession) GenerationID() int32        { return s.generationID }
 func (s *consumerGroupSession) Done() <-chan struct{}      { return s.done }
 
-func (s *consumerGroupSession) Release() (err error) {
-	s.releaseOnce.Do(func() {
-		close(s.closing)
-		<-s.done
+func (s *consumerGroupSession) Stop() {
+	s.stopOnce.Do(func() {
+		close(s.stopped)
+	})
+}
 
+func (s *consumerGroupSession) Close() error {
+	err := s.close()
+	s.parent.lock.Lock()
+	if s.parent.session == s {
+		s.parent.session = nil
+	}
+	s.parent.lock.Unlock()
+	return err
+}
+
+func (s *consumerGroupSession) close() (err error) {
+	s.closeOnce.Do(func() {
+		s.Stop()
+		<-s.done
 		err = s.lastError
-		s.parent.lock.Lock()
-		if s.parent.session == s {
-			s.parent.session = nil
-		}
-		s.parent.lock.Unlock()
 	})
 	return
 }
@@ -399,7 +417,7 @@ func (s *consumerGroupSession) loop() {
 				}
 				return
 			}
-		case <-s.closing:
+		case <-s.stopped:
 			return
 		}
 	}
