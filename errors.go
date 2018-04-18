@@ -43,7 +43,7 @@ var ErrConsumerOffsetNotAdvanced = errors.New("kafka: consumer offset was not ad
 
 // ErrControllerNotAvailable is returned when server didn't give correct controller id. May be kafka server's version
 // is lower than 0.10.0.0.
-var ErrControllerNotAvailable = errors.New("kafka: controller is not avaiable")
+var ErrControllerNotAvailable = errors.New("kafka: controller is not available")
 
 // ErrNoTopicsToUpdateMetadata is returned when Meta.Full is set to false but no specific topics were found to update
 // the metadata.
