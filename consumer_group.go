@@ -122,7 +122,7 @@ func (c *consumerGroup) Subscribe(topics []string) (ConsumerGroupSession, error)
 		return nil, err
 	}
 
-	session, err := c.createSession(coordinator, topics, 0)
+	session, err := c.createSession(coordinator, topics, c.config.Consumer.Group.Rebalance.Retry.Max)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (c *consumerGroup) isClosed() bool {
 	return atomic.LoadUint32(&c.closed) != 0
 }
 
-func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retry int) (*consumerGroupSession, error) {
+func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retries int) (*consumerGroupSession, error) {
 	// Abort retries if closed
 	if c.isClosed() {
 		return nil, ErrClosedConsumerGroup
@@ -152,7 +152,7 @@ func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retr
 		c.memberID = join.MemberId
 	case ErrUnknownMemberId: // reset member ID and retry
 		c.memberID = ""
-		return c.createSession(coordinator, topics, retry)
+		return c.createSession(coordinator, topics, retries)
 	default:
 		return nil, join.Err
 	}
@@ -180,11 +180,12 @@ func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retr
 	switch sync.Err {
 	case ErrNoError:
 	case ErrRebalanceInProgress:
-		if retry < c.config.Consumer.Group.Rebalance.Retry.Max {
-			time.Sleep(c.config.Consumer.Group.Rebalance.Retry.Backoff)
-			return c.createSession(coordinator, topics, retry+1)
+		if retries <= 0 {
+			return nil, sync.Err
 		}
-		return nil, sync.Err
+
+		time.Sleep(c.config.Consumer.Group.Rebalance.Retry.Backoff)
+		return c.createSession(coordinator, topics, retries-1)
 	default:
 		return nil, sync.Err
 	}
