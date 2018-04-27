@@ -47,8 +47,8 @@ var BalanceStrategyRange = &balanceStrategy{
 
 		for i, memberID := range memberIDs {
 			pos := float64(i)
-			min := int(math.Round(pos * step))
-			max := int(math.Round((pos + 1) * step))
+			min := int(math.Floor(pos*step + 0.5))
+			max := int(math.Floor((pos+1)*step + 0.5))
 			plan.Add(memberID, topic, partitions[min:max]...)
 		}
 	},
