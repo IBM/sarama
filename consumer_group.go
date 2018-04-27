@@ -191,17 +191,22 @@ func (c *consumerGroup) createSession(coordinator *Broker, topics []string, retr
 	}
 
 	// Retrieve and sort claim partitions
-	members, err := sync.GetMemberAssignment()
-	if err != nil {
-		return nil, err
-	}
-	for _, partitions := range members.Topics {
-		sort.Sort(int32Slice(partitions))
+	var claims map[string][]int32
+	if len(sync.MemberAssignment) > 0 {
+		members, err := sync.GetMemberAssignment()
+		if err != nil {
+			return nil, err
+		}
+		claims = members.Topics
+
+		for _, partitions := range claims {
+			sort.Sort(int32Slice(partitions))
+		}
 	}
 
 	// Init session
 	session := &consumerGroupSession{
-		claims:       members.Topics,
+		claims:       claims,
 		parent:       c,
 		generationID: join.GenerationId,
 
