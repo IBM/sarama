@@ -27,6 +27,9 @@ type offsetManager struct {
 	group  string
 	ticker *time.Ticker
 
+	memberID   string
+	generation int32
+
 	broker     *Broker
 	brokerLock sync.RWMutex
 
@@ -53,6 +56,8 @@ func NewOffsetManagerFromClient(group string, client Client) (OffsetManager, err
 		group:  group,
 		ticker: time.NewTicker(conf.Consumer.Offsets.CommitInterval),
 		poms:   make(map[string]map[int32]*partitionOffsetManager),
+
+		generation: GroupGenerationUndefined,
 
 		closing: make(chan none),
 		closed:  make(chan none),
@@ -245,14 +250,14 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 		r = &OffsetCommitRequest{
 			Version:                 1,
 			ConsumerGroup:           om.group,
-			ConsumerGroupGeneration: GroupGenerationUndefined,
+			ConsumerGroupGeneration: bom.parent.generation,
 		}
 	} else {
 		r = &OffsetCommitRequest{
 			Version:                 2,
 			RetentionTime:           int64(om.conf.Consumer.Offsets.Retention / time.Millisecond),
 			ConsumerGroup:           om.group,
-			ConsumerGroupGeneration: GroupGenerationUndefined,
+			ConsumerGroupGeneration: bom.parent.generation,
 		}
 
 	}
