@@ -1,12 +1,16 @@
 package sarama
 
+import (
+	"time"
+)
+
 type DeleteGroupsResponse struct {
-	ThrottleTimeMs  int32
+	ThrottleTime    time.Duration
 	GroupErrorCodes map[string]KError
 }
 
 func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(r.ThrottleTimeMs)
+	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
 
 	if err := pe.putArrayLength(len(r.GroupErrorCodes)); err != nil {
 		return err
@@ -22,12 +26,11 @@ func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
 }
 
 func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
-	throttleTimeMs, err := pd.getInt32()
+	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
 	}
-
-	r.ThrottleTimeMs = throttleTimeMs
+	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	n, err := pd.getArrayLength()
 	if err != nil {
