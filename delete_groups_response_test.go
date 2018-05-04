@@ -30,7 +30,7 @@ func TestDeleteGroupsResponse(t *testing.T) {
 
 	response = new(DeleteGroupsResponse)
 	testVersionDecodable(t, "empty", response, emptyDeleteGroupsResponse, 0)
-	if response.ThrottleTimeMs != 0 {
+	if response.ThrottleTime != 0 {
 		t.Error("Expected no violation")
 	}
 	if len(response.GroupErrorCodes) != 0 {
@@ -39,7 +39,7 @@ func TestDeleteGroupsResponse(t *testing.T) {
 
 	response = new(DeleteGroupsResponse)
 	testVersionDecodable(t, "error", response, errorDeleteGroupsResponse, 0)
-	if response.ThrottleTimeMs != 0 {
+	if response.ThrottleTime != 0 {
 		t.Error("Expected no violation")
 	}
 	if response.GroupErrorCodes["foo"] != ErrClusterAuthorizationFailed {
@@ -48,7 +48,7 @@ func TestDeleteGroupsResponse(t *testing.T) {
 
 	response = new(DeleteGroupsResponse)
 	testVersionDecodable(t, "no error", response, noErrorDeleteGroupsResponse, 0)
-	if response.ThrottleTimeMs != 0 {
+	if response.ThrottleTime != 0 {
 		t.Error("Expected no violation")
 	}
 	if response.GroupErrorCodes["foo"] != ErrNoError {
