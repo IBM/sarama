@@ -1,5 +1,46 @@
 # Changelog
 
+#### Version 1.17.0 (2018-05-30)
+
+New Features:
+ - Add support for gzip compression levels
+   ([#1044](https://github.com/Shopify/sarama/pull/1044)).
+ - Add DeleteRecords operation to Broker
+   ([#1027](https://github.com/Shopify/sarama/pull/1027)).
+ - Add support for Metadata Request/Response
+   ([#1047](https://github.com/Shopify/sarama/pull/1047)).
+ - Add CreatePartitions to Broker
+   ([#1065](https://github.com/Shopify/sarama/pull/1065)).
+ - Add support for DeleteGroups
+   ([#1096](https://github.com/Shopify/sarama/pull/1096)).
+
+Improvements:
+ - Refactor ConsumerMetadataReq/Resp as part of `KIP-98`
+   ([#1010](https://github.com/Shopify/sarama/pull/1010)).
+ - Add support for Metadata Request/Response up to v5
+   ([#1069](https://github.com/Shopify/sarama/pull/1069)).
+ - Expose missing protocol parts: `msgSet` and `recordBatch`
+   ([#1049](https://github.com/Shopify/sarama/pull/1049)).
+ - Add support for v1 DeleteTopicsRequest
+   ([#1052](https://github.com/Shopify/sarama/pull/1052)).
+ - Add support for Go 1.10
+   ([#1064](https://github.com/Shopify/sarama/pull/1064)).
+ - Claim support for Kafka 1.1.0
+   ([#1073](https://github.com/Shopify/sarama/pull/1073)).
+ - Add `Controller()` method to Client interface
+   ([#1063](https://github.com/Shopify/sarama/pull/1063)).
+ - Add versioning for join-group requests and responses
+   ([#1098](https://github.com/Shopify/sarama/pull/1098))
+
+Bug Fixes:
+ - Fix FindCoordinatorResponse.encode to allow nil Coordinator
+   ([#1050](https://github.com/Shopify/sarama/pull/1050),
+    [#1051](https://github.com/Shopify/sarama/pull/1051)).
+ - Clear all metadata when we have the latest topic info
+   ([#1033](https://github.com/Shopify/sarama/pull/1033)).
+ - Make `PartitionConsumer.Close` idempotent
+   ([#1092](https://github.com/Shopify/sarama/pull/1092)).
+
 #### Version 1.16.0 (2018-02-12)
 
 New Features:
