@@ -343,7 +343,14 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 	var partitions []int32
 
 	err := tp.breaker.Run(func() (err error) {
-		if tp.partitioner.RequiresConsistency() {
+		var requiresConsistency = false
+		if ep, ok := tp.partitioner.(DynamicConsistencyPartitioner); ok {
+			requiresConsistency = ep.MessageRequiresConsistency(msg)
+		} else {
+			requiresConsistency = tp.partitioner.RequiresConsistency()
+		}
+
+		if requiresConsistency {
 			partitions, err = tp.parent.client.Partitions(msg.Topic)
 		} else {
 			partitions, err = tp.parent.client.WritablePartitions(msg.Topic)
