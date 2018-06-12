@@ -123,10 +123,7 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	if err != nil {
 		return -1, err
 	}
-	partition := int32(p.hasher.Sum32()) % numPartitions
-	if partition < 0 {
-		partition = -partition
-	}
+	partition :=  (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions
 	return partition, nil
 }
 
