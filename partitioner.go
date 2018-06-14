@@ -22,6 +22,21 @@ type Partitioner interface {
 	RequiresConsistency() bool
 }
 
+// DynamicConsistencyPartitioner can optionally be implemented by Partitioners
+// in order to allow more flexibility than is originally allowed by the
+// RequiresConsistency method in the Partitioner interface. This allows
+// partitioners to require consistency sometimes, but not all times. It's useful
+// for, e.g., the HashPartitioner, which does not require consistency if the
+// message key is nil.
+type DynamicConsistencyPartitioner interface {
+	Partitioner
+
+	// MessageRequiresConsistency is similar to Partitioner.RequiresConsistency,
+	// but takes in the message being partitioned so that the partitioner can
+	// make a per-message determination.
+	MessageRequiresConsistency(message *ProducerMessage) bool
+}
+
 // PartitionerConstructor is the type for a function capable of constructing new Partitioners.
 type PartitionerConstructor func(topic string) Partitioner
 
@@ -132,4 +147,8 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 
 func (p *hashPartitioner) RequiresConsistency() bool {
 	return true
+}
+
+func (p *hashPartitioner) MessageRequiresConsistency(message *ProducerMessage) bool {
+	return message.Key != nil
 }
