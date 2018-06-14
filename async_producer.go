@@ -145,8 +145,9 @@ type ProducerMessage struct {
 	// least version 0.10.0.
 	Timestamp time.Time
 
-	retries int
-	flags   flagSet
+	retries     int
+	flags       flagSet
+	expectation chan *ProducerError
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
