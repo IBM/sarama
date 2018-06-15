@@ -28,6 +28,24 @@ func TestClusterAdmin(t *testing.T) {
 	}
 }
 
+func TestClusterAdminWithOutAddr(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	_, err := NewClusterAdmin([]string{""}, config)
+	if err == nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminInvalidController(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
