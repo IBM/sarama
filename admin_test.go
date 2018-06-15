@@ -66,7 +66,7 @@ func TestClusterAdminCreateTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1})
+	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,8 +95,8 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = admin.CreateTopic("my_topic", nil)
-	if err != ErrInvalidInput {
+	err = admin.CreateTopic("my_topic", nil, false)
+	if err.Error() != "You must specify topic details" {
 		t.Fatal(err)
 	}
 	err = admin.Close()
@@ -123,7 +123,7 @@ func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1})
+	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
 	if err != ErrInsufficientData {
 		t.Fatal(err)
 	}
@@ -418,7 +418,50 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 }
 
 func TestClusterAdminListAcls(t *testing.T) {
-	//have to be filled once the implementation is done
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DescribeAclsRequest": NewMockListAclsResponse(t),
+		"CreateAclsRequest":   NewMockCreateAclsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
+	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
+
+	err = admin.CreateACL(r, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resourceName := "my_topic"
+	filter := AclFilter{
+		ResourceType: AclResourceTopic,
+		Operation:    AclOperationRead,
+		ResourceName: &resourceName,
+	}
+
+	rAcls, err := admin.ListAcls(filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rAcls) <= 0 {
+		t.Fatal("no acls present")
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestClusterAdminDeleteAcl(t *testing.T) {

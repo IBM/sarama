@@ -49,8 +49,6 @@ var ErrControllerNotAvailable = errors.New("kafka: controller is not avaiable")
 // the metadata.
 var ErrNoTopicsToUpdateMetadata = errors.New("kafka: no specific topics to update metadata")
 
-var ErrInvalidInput = errors.New("kafka client: input is invalid")
-
 var ErrReferenceNodeNotFound = errors.New("kafka: response did not contain a reference to node")
 
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,

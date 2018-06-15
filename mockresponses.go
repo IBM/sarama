@@ -684,6 +684,28 @@ func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+type MockListAclsResponse struct {
+	t TestReporter
+}
+
+func NewMockListAclsResponse(t TestReporter) *MockListAclsResponse {
+	return &MockListAclsResponse{t: t}
+}
+
+func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
+	req := reqBody.(*DescribeAclsRequest)
+	res := &DescribeAclsResponse{}
+
+	res.Err = ErrNoError
+	acl := &ResourceAcls{}
+	acl.Resource.ResourceName = *req.ResourceName
+	acl.Resource.ResourceType = req.ResourceType
+	acl.Acls = append(acl.Acls, &Acl{})
+	res.ResourceAcls = append(res.ResourceAcls, acl)
+
+	return res
+}
+
 type MockDeleteAclsResponse struct {
 	t TestReporter
 }

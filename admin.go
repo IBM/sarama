@@ -2,19 +2,14 @@ package sarama
 
 import "errors"
 
-// ClusterAdmin is the administrative client for Kafka, which supports managing and inspecting topics,
-// brokers, configurations and ACLs. The minimum broker version required is 0.10.0.0.
-// Methods with stricter requirements will specify the minimum broker version required.
-// This client was introduced in 0.11.0.0 and the API is still evolving.
-// You MUST call Close() on a client to avoid leaks
 type ClusterAdmin interface {
-	// Creates a new topic .This operation is supported by brokers with version 0.10.1.0 or higher.
+	// Creates a new topic. This operation is supported by brokers with version 0.10.1.0 or higher.
 	// It may take several seconds after CreateTopic returns success for all the brokers
-	// to become aware that the topics have been created. During this time, ClusterAdmin#listTopics
-	// and ClusterAdmin#describeTopics may not return information about the new topics.
+	// to become aware that the topic has been created. During this time, ClusterAdmin#listTopics
+	// and ClusterAdmin#describeTopics may not return information about the new topic.
 	// This operation is supported by brokers with version 0.10.1.0 or higher.
 	// The validateOnly option is supported from version 0.10.2.0.
-	CreateTopic(topic string, detail *TopicDetail) error
+	CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error
 
 	// Delete a batch of topics.
 	// It may take several seconds after the DeleteTopic returns success
@@ -58,9 +53,12 @@ type ClusterAdmin interface {
 	// Creates access control lists (ACLs) which are bound to specific resources.
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
-	// no changes will be made.This operation is supported by brokers with version 0.11.0.0 or higher.
+	// no changes will be made. This operation is supported by brokers with version 0.11.0.0 or higher.
 	CreateACL(resource Resource, acl Acl) error
 
+	// Lists access control lists (ACLs) according to the supplied filter.
+	// it may take some time for changes made by createAcls or deleteAcls to be reflected in the output of ListAcls
+	// This operation is supported by brokers with version 0.11.0.0 or higher.
 	ListAcls(filter AclFilter) ([]ResourceAcls, error)
 
 	// Deletes access control lists (ACLs) according to the supplied filters.
@@ -105,14 +103,14 @@ func (ca *clusterAdmin) Controller() (*Broker, error) {
 	return ca.client.Controller()
 }
 
-func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
+func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error {
 
 	if topic == "" {
 		return ErrInvalidTopic
 	}
 
 	if detail == nil {
-		return ErrInvalidInput
+		return errors.New("You must specify topic details")
 	}
 
 	topicDetails := make(map[string]*TopicDetail)
@@ -120,6 +118,7 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail) error {
 
 	request := &CreateTopicsRequest{
 		TopicDetails: topicDetails,
+		ValidateOnly: validateOnly,
 	}
 
 	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
@@ -331,7 +330,24 @@ func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
 }
 
 func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
-	return nil, nil
+
+	request := &DescribeAclsRequest{AclFilter: filter}
+
+	b, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := b.DescribeAcls(request)
+	if err != nil {
+		return nil, err
+	}
+
+	var lAcls []ResourceAcls
+	for _, rAcl := range rsp.ResourceAcls {
+		lAcls = append(lAcls, *rAcl)
+	}
+	return lAcls, nil
 }
 
 func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
