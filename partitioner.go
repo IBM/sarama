@@ -60,8 +60,8 @@ func WithCustomHashFunction(hasher func() hash.Hash32) HashPartitionerOption {
 	}
 }
 
-// WithCustomRandomPartitioner lets you specify what HashPartitioner should be used in case a Distribution Key is empty
-func WithCustomRandomPartitioner(randomHP *hashPartitioner) HashPartitionerOption {
+// WithCustomFallbackPartitioner lets you specify what HashPartitioner should be used in case a Distribution Key is empty
+func WithCustomFallbackPartitioner(randomHP *hashPartitioner) HashPartitionerOption {
 	return func(hp *hashPartitioner) {
 		hp.random = hp
 	}
