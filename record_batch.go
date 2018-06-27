@@ -195,9 +195,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 			return err
 		}
 	case CompressionZSTD:
-		reader := zstd.NewReader(bytes.NewReader(recBuffer))
-		defer reader.Close()
-		if recBuffer, err = ioutil.ReadAll(reader); err != nil {
+		if recBuffer, err = zstd.Decompress(nil, recBuffer); err != nil {
 			return err
 		}
 	default:
@@ -256,15 +254,11 @@ func (b *RecordBatch) encodeRecords(pe packetEncoder) error {
 		}
 		b.compressedRecords = buf.Bytes()
 	case CompressionZSTD:
-		var buf bytes.Buffer
-		writer := zstd.NewWriterLevel(&buf, b.CompressionLevel)
-		if _, err = writer.Write(raw); err != nil {
+		c, err := zstd.CompressLevel(nil, raw, b.CompressionLevel)
+		if err != nil {
 			return err
 		}
-		if err = writer.Close(); err != nil {
-			return err
-		}
-		b.compressedRecords = buf.Bytes()
+		b.compressedRecords = c
 	default:
 		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", b.Codec)}
 	}
