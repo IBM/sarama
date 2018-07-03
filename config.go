@@ -261,7 +261,7 @@ type Config struct {
 	// Defaults to 256.
 	ChannelBufferSize int
 	// The version of Kafka that Sarama will assume it is running against.
-	// Defaults to the oldest supported stable version. Since Kafka provides
+	// Defaults to oldest officially supported stable version. Since Kafka provides
 	// backwards-compatibility, setting it to a version older than you have
 	// will not break anything, although it may prevent you from using the
 	// latest features. Setting it to a version greater than you are actually
@@ -310,7 +310,7 @@ func NewConfig() *Config {
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
-	c.Version = MinVersion
+	c.Version = V0_11_0_0
 	c.MetricRegistry = metrics.NewRegistry()
 
 	return c
