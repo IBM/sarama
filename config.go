@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"regexp"
 	"time"
 
@@ -58,6 +59,12 @@ type Config struct {
 		// KeepAlive specifies the keep-alive period for an active network connection.
 		// If zero, keep-alives are disabled. (default is 0: disabled).
 		KeepAlive time.Duration
+
+		// LocalAddr is the local address to use when dialing an
+		// address. The address must be of a compatible type for the
+		// network being dialed.
+		// If nil, a local address is automatically chosen.
+		LocalAddr net.Addr
 	}
 
 	// Metadata is the namespace for metadata management properties used by the
