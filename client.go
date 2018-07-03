@@ -17,7 +17,7 @@ type Client interface {
 	// altered after it has been created.
 	Config() *Config
 
-	// Controller returns the cluster controller broker.
+	// Controller returns the cluster controller broker. Requires Kafka 0.10 or higher.
 	Controller() (*Broker, error)
 
 	// Brokers returns the current set of active brokers as retrieved from cluster metadata.
@@ -386,6 +386,10 @@ func (client *client) GetOffset(topic string, partitionID int32, time int64) (in
 func (client *client) Controller() (*Broker, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
+	}
+
+	if !client.conf.Version.IsAtLeast(V0_10_0_0) {
+		return nil, ErrUnsupportedVersion
 	}
 
 	controller := client.cachedController()
