@@ -86,6 +86,7 @@ func (b *Broker) Open(conf *Config) error {
 		dialer := net.Dialer{
 			Timeout:   conf.Net.DialTimeout,
 			KeepAlive: conf.Net.KeepAlive,
+			LocalAddr: conf.Net.LocalAddr,
 		}
 
 		if conf.Net.TLS.Enable {
