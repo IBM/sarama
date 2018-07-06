@@ -64,25 +64,24 @@ func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 func TestNewOffsetManager(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Returns(new(MetadataResponse))
+	defer seedBroker.Close()
 
 	testClient, err := NewClient([]string{seedBroker.Addr()}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = NewOffsetManagerFromClient("group", testClient)
+	om, err := NewOffsetManagerFromClient("group", testClient)
 	if err != nil {
 		t.Error(err)
 	}
-
+	safeClose(t, om)
 	safeClose(t, testClient)
 
 	_, err = NewOffsetManagerFromClient("group", testClient)
 	if err != ErrClosedClient {
 		t.Errorf("Error expected for closed client; actual value: %v", err)
 	}
-
-	seedBroker.Close()
 }
 
 // Test recovery from ErrNotCoordinatorForConsumer
@@ -353,24 +352,14 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	ocResponse2 := new(OffsetCommitResponse)
 	newCoordinator.Returns(ocResponse2)
 
-	// For RefreshCoordinator()
-	broker.Returns(&ConsumerMetadataResponse{
-		CoordinatorID:   newCoordinator.BrokerID(),
-		CoordinatorHost: "127.0.0.1",
-		CoordinatorPort: newCoordinator.Port(),
-	})
+	// No error, no need to refresh coordinator
 
 	// Error on the wrong partition for this pom
 	ocResponse3 := new(OffsetCommitResponse)
 	ocResponse3.AddError("my_topic", 1, ErrNoError)
 	newCoordinator.Returns(ocResponse3)
 
-	// For RefreshCoordinator()
-	broker.Returns(&ConsumerMetadataResponse{
-		CoordinatorID:   newCoordinator.BrokerID(),
-		CoordinatorHost: "127.0.0.1",
-		CoordinatorPort: newCoordinator.Port(),
-	})
+	// No error, no need to refresh coordinator
 
 	// ErrUnknownTopicOrPartition/ErrNotLeaderForPartition/ErrLeaderNotAvailable block
 	ocResponse4 := new(OffsetCommitResponse)
