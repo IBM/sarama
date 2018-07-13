@@ -210,7 +210,7 @@ func TestManualPartitioner(t *testing.T) {
 }
 
 func TestConsistentHashPartitioner(t *testing.T) {
-	partitioner := NewConsistenHashPartitioner("mytopic")
+	partitioner := NewConsistentHashPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
 	if err != nil {

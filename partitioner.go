@@ -221,7 +221,7 @@ type consistentHashPartitioner struct {
 }
 
 // Creates a Partitioner that uses go-jump for consistent key->partition hashing
-func NewConsistenHashPartitioner(topic string) Partitioner {
+func NewConsistentHashPartitioner(topic string) Partitioner {
 	p := new(consistentHashPartitioner)
 	p.random = NewRandomPartitioner(topic)
 	return p
