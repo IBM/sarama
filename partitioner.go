@@ -215,3 +215,59 @@ func (p *hashPartitioner) RequiresConsistency() bool {
 func (p *hashPartitioner) MessageRequiresConsistency(message *ProducerMessage) bool {
 	return message.Key != nil
 }
+
+type consistentHashPartitioner struct {
+	random Partitioner
+}
+
+// Creates a Partitioner that uses go-jump for consistent key->partition hashing
+func NewConsistenHashPartitioner(topic string) Partitioner {
+	p := new(consistentHashPartitioner)
+	p.random = NewRandomPartitioner(topic)
+	return p
+}
+
+func (p *consistentHashPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
+	if message.Key == nil {
+		return p.random.Partition(message, numPartitions)
+	}
+	bytes, err := message.Key.Encode()
+	if err != nil {
+		return -1, err
+	}
+	hasher := fnv.New64a()
+	_, err = hasher.Write(bytes)
+	if err != nil {
+		return -1, err
+	}
+	partition := jumpHash(hasher.Sum64(), int(numPartitions))
+	if partition < 0 {
+		partition = -partition
+	}
+	return partition, nil
+}
+
+func (p *consistentHashPartitioner) RequiresConsistency() bool {
+	return true
+}
+
+/*
+Implements Google's Jump Consistent Hash
+Copied from: https://github.com/dgryski/go-jump
+From the paper "A Fast, Minimal Memory, Consistent Hash Algorithm" by John Lamping, Eric Veach (2014).
+http://arxiv.org/abs/1406.2294
+*/
+// Hash consistently chooses a hash bucket number in the range [0, numBuckets) for the given key. numBuckets must be >= 1.
+func jumpHash(key uint64, numBuckets int) int32 {
+
+	var b int64 = -1
+	var j int64
+
+	for j < int64(numBuckets) {
+		b = j
+		key = key*2862933555777941757 + 1
+		j = int64(float64(b+1) * (float64(int64(1)<<31) / float64((key>>33)+1)))
+	}
+
+	return int32(b)
+}
