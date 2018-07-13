@@ -241,9 +241,6 @@ func (p *consistentHashPartitioner) Partition(message *ProducerMessage, numParti
 		return -1, err
 	}
 	partition := jumpHash(hasher.Sum64(), int(numPartitions))
-	if partition < 0 {
-		partition = -partition
-	}
 	return partition, nil
 }
 
