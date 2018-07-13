@@ -56,7 +56,7 @@ func WithAbsFirst() HashPartitionerOption {
 // WithCustomHashFunction lets you specify what hash function to use for the partitioning
 func WithCustomHashFunction(hasher func() hash.Hash32) HashPartitionerOption {
 	return func(hp *hashPartitioner) {
-		hp.hasher = hasher()
+		hp.hasher = hasher
 	}
 }
 
@@ -124,7 +124,7 @@ func (p *roundRobinPartitioner) RequiresConsistency() bool {
 
 type hashPartitioner struct {
 	random       Partitioner
-	hasher       hash.Hash32
+	hasher       func() hash.Hash32
 	referenceAbs bool
 }
 
@@ -135,7 +135,7 @@ func NewCustomHashPartitioner(hasher func() hash.Hash32) PartitionerConstructor 
 	return func(topic string) Partitioner {
 		p := new(hashPartitioner)
 		p.random = NewRandomPartitioner(topic)
-		p.hasher = hasher()
+		p.hasher = hasher
 		p.referenceAbs = false
 		return p
 	}
@@ -146,7 +146,7 @@ func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstruct
 	return func(topic string) Partitioner {
 		p := new(hashPartitioner)
 		p.random = NewRandomPartitioner(topic)
-		p.hasher = fnv.New32a()
+		p.hasher = fnv.New32a
 		p.referenceAbs = false
 		for _, option := range options {
 			option(p)
@@ -162,7 +162,7 @@ func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstruct
 func NewHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
-	p.hasher = fnv.New32a()
+	p.hasher = fnv.New32a
 	p.referenceAbs = false
 	return p
 }
@@ -174,7 +174,7 @@ func NewHashPartitioner(topic string) Partitioner {
 func NewReferenceHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
-	p.hasher = fnv.New32a()
+	p.hasher = fnv.New32a
 	p.referenceAbs = true
 	return p
 }
@@ -187,8 +187,8 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	if err != nil {
 		return -1, err
 	}
-	p.hasher.Reset()
-	_, err = p.hasher.Write(bytes)
+	hasher := p.hasher()
+	_, err = hasher.Write(bytes)
 	if err != nil {
 		return -1, err
 	}
@@ -198,9 +198,9 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	// the old version; if referenceAbs is set we are compatible with the reference java client
 	// but not past Sarama versions
 	if p.referenceAbs {
-		partition = (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions
+		partition = (int32(hasher.Sum32()) & 0x7fffffff) % numPartitions
 	} else {
-		partition = int32(p.hasher.Sum32()) % numPartitions
+		partition = int32(hasher.Sum32()) % numPartitions
 		if partition < 0 {
 			partition = -partition
 		}
