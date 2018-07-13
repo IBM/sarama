@@ -4,9 +4,9 @@ import (
 	"crypto/rand"
 	"hash/fnv"
 	"log"
-	"testing"
-	"strconv"
 	"math"
+	"strconv"
+	"testing"
 )
 
 func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, message *ProducerMessage, numPartitions int32) {
@@ -271,7 +271,7 @@ func TestConsistentHashPartitioner(t *testing.T) {
 		for k, _ := range partitions[p] {
 			_, ok := partitionsAdded[p][k]
 			if ok {
-				unmovedKeys ++
+				unmovedKeys++
 			}
 		}
 	}
