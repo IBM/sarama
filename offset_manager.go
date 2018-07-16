@@ -95,12 +95,9 @@ func (om *offsetManager) Close() error {
 		om.asyncClosePOMs()
 
 		// flush one last time
-		for retries := om.conf.Metadata.Retry.Max; true; {
+		for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
 			om.flushToBroker()
 			if om.releasePOMs(false) == 0 {
-				break
-			}
-			if retries--; retries < 0 {
 				break
 			}
 		}
