@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"hash/fnv"
 	"log"
+	"math"
+	"strconv"
 	"testing"
 )
 
@@ -204,6 +206,81 @@ func TestManualPartitioner(t *testing.T) {
 		if choice != i {
 			t.Error("Returned partition not the same as the input partition")
 		}
+	}
+}
+
+func TestConsistentHashPartitioner(t *testing.T) {
+	partitioner := NewConsistentHashPartitioner("mytopic")
+
+	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
+	if err != nil {
+		t.Error(partitioner, err)
+	}
+	if choice != 0 {
+		t.Error("Returned non-zero partition when only one available.")
+	}
+
+	for i := 1; i < 50; i++ {
+		choice, err := partitioner.Partition(&ProducerMessage{}, 50)
+		if err != nil {
+			t.Error(partitioner, err)
+		}
+		if choice < 0 || choice >= 50 {
+			t.Error("Returned partition", choice, "outside of range for nil key.")
+		}
+	}
+
+	buf := make([]byte, 256)
+	for i := 1; i < 50; i++ {
+		if _, err := rand.Read(buf); err != nil {
+			t.Error(err)
+		}
+		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: ByteEncoder(buf)}, 50)
+	}
+
+	beforeCnt := 4
+	afterCnt := 5
+	partitions := make([]map[string]bool, beforeCnt)
+	partitionsAdded := make([]map[string]bool, afterCnt)
+
+	for p := 0; p < beforeCnt; p++ {
+		partitions[p] = make(map[string]bool)
+	}
+	for p := 0; p < afterCnt; p++ {
+		partitionsAdded[p] = make(map[string]bool)
+	}
+	keyCnt := 100000
+	for k := 0; k < keyCnt; k++ {
+		key := strconv.Itoa(k)
+		choice, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(key)}, int32(beforeCnt))
+		if err != nil {
+			t.Error(partitioner, err)
+		} else {
+			partitions[choice][key] = true
+		}
+		choice, err = partitioner.Partition(&ProducerMessage{Key: StringEncoder(key)}, int32(afterCnt))
+		if err != nil {
+			t.Error(partitioner, err)
+		} else {
+			partitionsAdded[choice][key] = true
+		}
+	}
+
+	unmovedKeys := 0
+	for p := 0; p < beforeCnt; p++ {
+		for k, _ := range partitions[p] {
+			_, ok := partitionsAdded[p][k]
+			if ok {
+				unmovedKeys++
+			}
+		}
+	}
+
+	targetRatio := float64(beforeCnt) / float64(afterCnt)
+	actualRatio := float64(unmovedKeys) / float64(keyCnt)
+	diff := math.Abs(targetRatio - actualRatio)
+	if diff > 0.005 {
+		t.Errorf("Consistent key hash inaccurate. targetRatio=%v actualRatio=%v", targetRatio, actualRatio)
 	}
 }
 

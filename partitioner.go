@@ -56,7 +56,7 @@ func WithAbsFirst() HashPartitionerOption {
 // WithCustomHashFunction lets you specify what hash function to use for the partitioning
 func WithCustomHashFunction(hasher func() hash.Hash32) HashPartitionerOption {
 	return func(hp *hashPartitioner) {
-		hp.hasher = hasher()
+		hp.hasher = hasher
 	}
 }
 
@@ -124,7 +124,7 @@ func (p *roundRobinPartitioner) RequiresConsistency() bool {
 
 type hashPartitioner struct {
 	random       Partitioner
-	hasher       hash.Hash32
+	hasher       func() hash.Hash32
 	referenceAbs bool
 }
 
@@ -135,7 +135,7 @@ func NewCustomHashPartitioner(hasher func() hash.Hash32) PartitionerConstructor 
 	return func(topic string) Partitioner {
 		p := new(hashPartitioner)
 		p.random = NewRandomPartitioner(topic)
-		p.hasher = hasher()
+		p.hasher = hasher
 		p.referenceAbs = false
 		return p
 	}
@@ -146,7 +146,7 @@ func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstruct
 	return func(topic string) Partitioner {
 		p := new(hashPartitioner)
 		p.random = NewRandomPartitioner(topic)
-		p.hasher = fnv.New32a()
+		p.hasher = fnv.New32a
 		p.referenceAbs = false
 		for _, option := range options {
 			option(p)
@@ -162,7 +162,7 @@ func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstruct
 func NewHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
-	p.hasher = fnv.New32a()
+	p.hasher = fnv.New32a
 	p.referenceAbs = false
 	return p
 }
@@ -174,7 +174,7 @@ func NewHashPartitioner(topic string) Partitioner {
 func NewReferenceHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
 	p.random = NewRandomPartitioner(topic)
-	p.hasher = fnv.New32a()
+	p.hasher = fnv.New32a
 	p.referenceAbs = true
 	return p
 }
@@ -187,8 +187,8 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	if err != nil {
 		return -1, err
 	}
-	p.hasher.Reset()
-	_, err = p.hasher.Write(bytes)
+	hasher := p.hasher()
+	_, err = hasher.Write(bytes)
 	if err != nil {
 		return -1, err
 	}
@@ -198,9 +198,9 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	// the old version; if referenceAbs is set we are compatible with the reference java client
 	// but not past Sarama versions
 	if p.referenceAbs {
-		partition = (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions
+		partition = (int32(hasher.Sum32()) & 0x7fffffff) % numPartitions
 	} else {
-		partition = int32(p.hasher.Sum32()) % numPartitions
+		partition = int32(hasher.Sum32()) % numPartitions
 		if partition < 0 {
 			partition = -partition
 		}
@@ -214,4 +214,57 @@ func (p *hashPartitioner) RequiresConsistency() bool {
 
 func (p *hashPartitioner) MessageRequiresConsistency(message *ProducerMessage) bool {
 	return message.Key != nil
+}
+
+type consistentHashPartitioner struct {
+	random Partitioner
+}
+
+// Creates a Partitioner that uses go-jump for consistent key->partition hashing
+func NewConsistentHashPartitioner(topic string) Partitioner {
+	p := new(consistentHashPartitioner)
+	p.random = NewRandomPartitioner(topic)
+	return p
+}
+
+func (p *consistentHashPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
+	if message.Key == nil {
+		return p.random.Partition(message, numPartitions)
+	}
+	bytes, err := message.Key.Encode()
+	if err != nil {
+		return -1, err
+	}
+	hasher := fnv.New64a()
+	_, err = hasher.Write(bytes)
+	if err != nil {
+		return -1, err
+	}
+	partition := jumpHash(hasher.Sum64(), int(numPartitions))
+	return partition, nil
+}
+
+func (p *consistentHashPartitioner) RequiresConsistency() bool {
+	return true
+}
+
+/*
+Implements Google's Jump Consistent Hash
+Copied from: https://github.com/dgryski/go-jump
+From the paper "A Fast, Minimal Memory, Consistent Hash Algorithm" by John Lamping, Eric Veach (2014).
+http://arxiv.org/abs/1406.2294
+*/
+// Hash consistently chooses a hash bucket number in the range [0, numBuckets) for the given key. numBuckets must be >= 1.
+func jumpHash(key uint64, numBuckets int) int32 {
+
+	var b int64 = -1
+	var j int64
+
+	for j < int64(numBuckets) {
+		b = j
+		key = key*2862933555777941757 + 1
+		j = int64(float64(b+1) * (float64(int64(1)<<31) / float64((key>>33)+1)))
+	}
+
+	return int32(b)
 }
