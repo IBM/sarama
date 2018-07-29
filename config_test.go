@@ -122,6 +122,28 @@ func TestMetadataConfigValidates(t *testing.T) {
 	}
 }
 
+func TestAdminConfigValidates(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  func(*Config) // resorting to using a function as a param because of internal composite structs
+		err  string
+	}{
+		{"Timeout",
+			func(cfg *Config) {
+				cfg.Admin.Timeout = 0
+			},
+			"Admin.Timeout must be > 0"},
+	}
+
+	for i, test := range tests {
+		c := NewConfig()
+		test.cfg(c)
+		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
+		}
+	}
+}
+
 func TestProducerConfigValidates(t *testing.T) {
 	tests := []struct {
 		name string
