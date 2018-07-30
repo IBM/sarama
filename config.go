@@ -18,6 +18,13 @@ var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)
 
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
+	// Admin is the namespace for ClusterAdmin properties used by the administrative Kafka client.
+	Admin struct {
+		// The maximum duration the administrative Kafka client will wait for ClusterAdmin operations,
+		// including topics, brokers, configurations and ACLs (defaults to 3 seconds).
+		Timeout time.Duration
+	}
+
 	// Net is the namespace for network-level properties used by the Broker, and
 	// shared by the Client/Producer/Consumer.
 	Net struct {
@@ -292,6 +299,8 @@ type Config struct {
 func NewConfig() *Config {
 	c := &Config{}
 
+	c.Admin.Timeout = 3 * time.Second
+
 	c.Net.MaxOpenRequests = 5
 	c.Net.DialTimeout = 30 * time.Second
 	c.Net.ReadTimeout = 30 * time.Second
@@ -389,6 +398,12 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
 	case c.Net.SASL.Enable == true && c.Net.SASL.Password == "":
 		return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
+	}
+
+	// validate the Admin values
+	switch {
+	case c.Admin.Timeout <= 0:
+		return ConfigurationError("Admin.Timeout must be > 0")
 	}
 
 	// validate the Metadata values
