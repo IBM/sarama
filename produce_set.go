@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"time"
 )
 
@@ -58,12 +60,17 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 	set := partitions[msg.Partition]
 	if set == nil {
 		if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
+			fmt.Printf("Creating a new batch for partition %s-%d with base sequence %d \n", msg.Topic, msg.Partition, msg.sequenceNumber)
 			batch := &RecordBatch{
 				FirstTimestamp:   timestamp,
 				Version:          2,
-				ProducerID:       -1, /* No producer id */
 				Codec:            ps.parent.conf.Producer.Compression,
 				CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
+				ProducerID:       ps.parent.txnmgr.producerID,
+				ProducerEpoch:    ps.parent.txnmgr.producerEpoch,
+			}
+			if ps.parent.conf.Producer.Idempotent {
+				batch.FirstSequence = msg.sequenceNumber
 			}
 			set = &partitionSet{recordsToSend: newDefaultRecords(batch)}
 			size = recordBatchOverhead
@@ -72,9 +79,13 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 		}
 		partitions[msg.Partition] = set
 	}
-
+	fmt.Printf("Adding message with sequence %d to batch for partition %s-%d value: %v\n", msg.sequenceNumber, msg.Topic, msg.Partition, msg.Value)
 	set.msgs = append(set.msgs, msg)
+
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
+		if ps.parent.conf.Producer.Idempotent && msg.sequenceNumber < set.recordsToSend.RecordBatch.FirstSequence {
+			return errors.New("Assertion failed: Message out of sequence added to a batch")
+		}
 		// We are being conservative here to avoid having to prep encode the record
 		size += maximumRecordOverhead
 		rec := &Record{
@@ -120,8 +131,8 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		req.Version = 3
 	}
 
-	for topic, partitionSet := range ps.msgs {
-		for partition, set := range partitionSet {
+	for topic, partitionSets := range ps.msgs {
+		for partition, set := range partitionSets {
 			if req.Version >= 3 {
 				// If the API version we're hitting is 3 or greater, we need to calculate
 				// offsets for each record in the batch relative to FirstOffset.
@@ -137,7 +148,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 						record.OffsetDelta = int64(i)
 					}
 				}
-
+				fmt.Printf("Add batch to ProduceRequest for TP %s-%d with firstSeq %d, size: %d\n", topic, partition, rb.FirstSequence, len(rb.Records))
 				req.AddBatch(topic, partition, rb)
 				continue
 			}

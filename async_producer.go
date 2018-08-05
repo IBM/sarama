@@ -47,6 +47,50 @@ type AsyncProducer interface {
 	Errors() <-chan *ProducerError
 }
 
+// transactionManager keeps the state necessary to ensure idempotent production
+type transactionManager struct {
+	producerID      int64
+	producerEpoch   int16
+	sequenceNumbers map[string]int32
+	mutex           sync.Mutex
+}
+
+const (
+	noProducerID    = -1
+	noProducerEpoch = -1
+)
+
+func (t *transactionManager) getAndIncrementSequenceNumber(topic string, partition int32) int32 {
+	key := fmt.Sprintf("%s-%d", topic, partition)
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	sequence := t.sequenceNumbers[key]
+	t.sequenceNumbers[key] = sequence + 1
+	return sequence
+}
+
+func newTransactionManager(conf *Config, client Client) (*transactionManager, error) {
+	txnmgr := &transactionManager{
+		producerID:    noProducerID,
+		producerEpoch: noProducerEpoch,
+	}
+
+	if conf.Producer.Idempotent {
+		initProducerIDResponse, err := client.InitProducerID()
+		if err != nil {
+			return nil, err
+		}
+		txnmgr.producerID = initProducerIDResponse.ProducerID
+		txnmgr.producerEpoch = initProducerIDResponse.ProducerEpoch
+		txnmgr.sequenceNumbers = make(map[string]int32)
+		txnmgr.mutex = sync.Mutex{}
+
+		Logger.Printf("Obtained a ProducerId: %d epoch: %d\n", txnmgr.producerID, txnmgr.producerEpoch)
+	}
+
+	return txnmgr, nil
+}
+
 type asyncProducer struct {
 	client    Client
 	conf      *Config
@@ -59,6 +103,8 @@ type asyncProducer struct {
 	brokers    map[*Broker]chan<- *ProducerMessage
 	brokerRefs map[chan<- *ProducerMessage]int
 	brokerLock sync.Mutex
+
+	txnmgr *transactionManager
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
@@ -84,6 +130,11 @@ func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 		return nil, ErrClosedClient
 	}
 
+	txnmgr, err := newTransactionManager(client.Config(), client)
+	if err != nil {
+		return nil, err
+	}
+
 	p := &asyncProducer{
 		client:     client,
 		conf:       client.Config(),
@@ -93,6 +144,7 @@ func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 		retries:    make(chan *ProducerMessage),
 		brokers:    make(map[*Broker]chan<- *ProducerMessage),
 		brokerRefs: make(map[chan<- *ProducerMessage]int),
+		txnmgr:     txnmgr,
 	}
 
 	// launch our singleton dispatchers
@@ -145,9 +197,10 @@ type ProducerMessage struct {
 	// least version 0.10.0.
 	Timestamp time.Time
 
-	retries     int
-	flags       flagSet
-	expectation chan *ProducerError
+	retries        int
+	flags          flagSet
+	expectation    chan *ProducerError
+	sequenceNumber int32
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
@@ -327,6 +380,10 @@ func (tp *topicProducer) dispatch() {
 				tp.parent.returnError(msg, err)
 				continue
 			}
+		}
+		if tp.parent.conf.Producer.Idempotent && msg.retries == 0 {
+			msg.sequenceNumber = tp.parent.txnmgr.getAndIncrementSequenceNumber(msg.Topic, msg.Partition)
+			//Logger.Printf("Message %s for TP %s-%d got sequence number: %d\n", msg.Value, msg.Topic, msg.Partition, msg.sequenceNumber)
 		}
 
 		handler := tp.handlers[msg.Partition]
@@ -752,7 +809,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 			bp.parent.returnErrors(msgs, ErrIncompleteResponse)
 			return
 		}
-
+		fmt.Printf("response has error %v", block.Err)
 		switch block.Err {
 		// Success
 		case ErrNoError:
