@@ -207,6 +207,33 @@ func TestProducerConfigValidates(t *testing.T) {
 				cfg.Producer.Retry.Backoff = -1
 			},
 			"Producer.Retry.Backoff must be >= 0"},
+		{"Idempotent Version",
+			func(cfg *Config) {
+				cfg.Producer.Idempotent = true
+				cfg.Version = V0_10_0_0
+			},
+			"Idempotent producer requires Version >= V0_11_0_0"},
+		{"Idempotent with Producer.Retry.Max",
+			func(cfg *Config) {
+				cfg.Version = V0_11_0_0
+				cfg.Producer.Idempotent = true
+				cfg.Producer.Retry.Max = 0
+			},
+			"Idempotent producer requires Producer.Retry.Max >= 1"},
+		{"Idempotent with Producer.RequiredAcks",
+			func(cfg *Config) {
+				cfg.Version = V0_11_0_0
+				cfg.Producer.Idempotent = true
+			},
+			"Idempotent producer requires Producer.RequiredAcks to be WaitForAll"},
+		{"Idempotent with Net.MaxOpenRequests",
+			func(cfg *Config) {
+				cfg.Version = V0_11_0_0
+				cfg.Producer.Idempotent = true
+				cfg.Producer.RequiredAcks = WaitForAll
+				cfg.Net.MaxOpenRequests = 6
+			},
+			"Idempotent producer requires Net.MaxOpenRequests <= 5"},
 	}
 
 	for i, test := range tests {
