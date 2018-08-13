@@ -416,7 +416,6 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 // --------------------------------------------------------------------
 
 // ConsumerGroupSession represents a consumer group member session.
-// You MUST call Close() at the end of a session to avoid leaks.
 type ConsumerGroupSession interface {
 	// Claims returns information about the claimed partitions by topic.
 	Claims() map[string][]int32
@@ -685,14 +684,18 @@ type ConsumerGroupHandler interface {
 type ConsumerGroupClaim interface {
 	// Topic returns the consumed topic name.
 	Topic() string
+
 	// Partition returns the consumed partition.
 	Partition() int32
+
 	// InitialOffset returns the initial offset that was used as a starting point for this claim.
 	InitialOffset() int64
+
 	// HighWaterMarkOffset returns the high water mark offset of the partition,
 	// i.e. the offset that will be used for the next message that will be produced.
 	// You can use this to determine how far behind the processing is.
 	HighWaterMarkOffset() int64
+
 	// Messages returns the read channel for the messages that are returned by
 	// the broker. The messages channel will be closed when a new rebalance cycle
 	// is due. You must finish processing and mark offsets within
