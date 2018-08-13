@@ -37,7 +37,7 @@ type BalanceStrategy interface {
 // --------------------------------------------------------------------
 
 // BalanceStrategyRange is the default and assigns partitions as ranges to consumer group members.
-// Example with one topic T with six partitions (0..5) and two members (M1, M2) :
+// Example with one topic T with six partitions (0..5) and two members (M1, M2):
 //   M1: {T: [0, 1, 2]}
 //   M2: {T: [3, 4, 5]}
 var BalanceStrategyRange = &balanceStrategy{
