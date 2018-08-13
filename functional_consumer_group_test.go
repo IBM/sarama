@@ -158,11 +158,15 @@ func testFuncConsumerGroupFuzzySeed(topic string) error {
 
 	total := int64(0)
 	for pn := int32(0); pn < 4; pn++ {
-		offset, err := client.GetOffset(topic, pn, OffsetNewest)
+		newest, err := client.GetOffset(topic, pn, OffsetNewest)
 		if err != nil {
 			return err
 		}
-		total += offset
+		oldest, err := client.GetOffset(topic, pn, OffsetOldest)
+		if err != nil {
+			return err
+		}
+		total = total + newest - oldest
 	}
 	if total >= 21000 {
 		return nil
