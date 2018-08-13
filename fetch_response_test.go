@@ -208,7 +208,7 @@ func TestOverflowMessageFetchResponse(t *testing.T) {
 	if n != 1 {
 		t.Fatal("Decoding produced incorrect number of messages.")
 	}
-	msgBlock := block.Records.msgSet.Messages[0]
+	msgBlock := block.Records.MsgSet.Messages[0]
 	if msgBlock.Offset != 0x550000 {
 		t.Error("Decoding produced incorrect message offset.")
 	}
