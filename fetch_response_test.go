@@ -197,8 +197,15 @@ func TestOverflowMessageFetchResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	if !partial {
-		t.Error("Overflow messages should be partial.")
+	if partial {
+		t.Error("Decoding detected a partial trailing message where there wasn't one.")
+	}
+	overflow, err := block.Records.isOverflow()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if !overflow {
+		t.Error("Decoding detected a partial trailing message where there wasn't one.")
 	}
 
 	n, err := block.Records.numRecords()
