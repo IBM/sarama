@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -40,8 +41,9 @@ func ExampleConsumerGroup() {
 	}()
 
 	// Iterate over consumer sessions.
+	ctx := context.Background()
 	for {
-		err := group.Consume([]string{"my-topic"}, exampleConsumerGroupHandler(func(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
+		err := group.Consume(ctx, []string{"my-topic"}, exampleConsumerGroupHandler(func(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
 			for msg := range claim.Messages() {
 				fmt.Printf("Message topic:%q partition:%d offset:%d\n", msg.Topic, msg.Partition, msg.Offset)
 				sess.MarkMessage(msg, "")
