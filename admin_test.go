@@ -134,6 +134,53 @@ func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
 	}
 }
 
+func TestClusterAdminListTopics(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader("my_topic", 0, seedBroker.BrokerID()),
+		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := admin.ListTopics()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) <= 0 {
+		t.Fatal(errors.New("no resource present"))
+	}
+
+	topic, found := entries["my_topic"]
+	if !found {
+		t.Fatal(errors.New("topic not found in response"))
+	}
+	_, found = topic.ConfigEntries["max.message.bytes"]
+	if found {
+		t.Fatal(errors.New("default topic config entry incorrectly found in response"))
+	}
+	value, _ := topic.ConfigEntries["retention.ms"]
+	if value == nil || *value != "5000" {
+		t.Fatal(errors.New("non-default topic config entry not found in response"))
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminDeleteTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
