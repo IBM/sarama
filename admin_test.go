@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -97,6 +98,36 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 
 	err = admin.CreateTopic("my_topic", nil, false)
 	if err.Error() != "You must specify topic details" {
+		t.Fatal(err)
+	}
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminCreateTopicWithoutAuthorization(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V0_11_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.CreateTopic("_internal_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+	want := "insufficient permissions to create topic with reserved prefix"
+	if !strings.HasSuffix(err.Error(), want) {
 		t.Fatal(err)
 	}
 	err = admin.Close()
@@ -291,6 +322,35 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminCreatePartitionsWithoutAuthorization(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.CreatePartitions("_internal_topic", 3, nil, false)
+	want := "insufficient permissions to create partition on topic with reserved prefix"
+	if !strings.HasSuffix(err.Error(), want) {
+		t.Fatal(err)
+	}
 	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
