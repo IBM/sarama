@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"fmt"
+	"strings"
 )
 
 // TestReporter has methods matching go's testing.T to avoid importing
@@ -612,10 +613,20 @@ func NewMockCreateTopicsResponse(t TestReporter) *MockCreateTopicsResponse {
 
 func (mr *MockCreateTopicsResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*CreateTopicsRequest)
-	res := &CreateTopicsResponse{}
+	res := &CreateTopicsResponse{
+		Version: req.Version,
+	}
 	res.TopicErrors = make(map[string]*TopicError)
 
 	for topic, _ := range req.TopicDetails {
+		if res.Version >= 1 && strings.HasPrefix(topic, "_") {
+			msg := "insufficient permissions to create topic with reserved prefix"
+			res.TopicErrors[topic] = &TopicError{
+				Err:    ErrTopicAuthorizationFailed,
+				ErrMsg: &msg,
+			}
+			continue
+		}
 		res.TopicErrors[topic] = &TopicError{Err: ErrNoError}
 	}
 	return res
@@ -654,6 +665,14 @@ func (mr *MockCreatePartitionsResponse) For(reqBody versionedDecoder) encoder {
 	res.TopicPartitionErrors = make(map[string]*TopicPartitionError)
 
 	for topic, _ := range req.TopicPartitions {
+		if strings.HasPrefix(topic, "_") {
+			msg := "insufficient permissions to create partition on topic with reserved prefix"
+			res.TopicPartitionErrors[topic] = &TopicPartitionError{
+				Err:    ErrTopicAuthorizationFailed,
+				ErrMsg: &msg,
+			}
+			continue
+		}
 		res.TopicPartitionErrors[topic] = &TopicPartitionError{Err: ErrNoError}
 	}
 	return res
