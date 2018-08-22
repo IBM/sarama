@@ -1,6 +1,9 @@
 package sarama
 
-import "errors"
+import (
+	"errors"
+	"math/rand"
+)
 
 // ClusterAdmin is the administrative client for Kafka, which supports managing and inspecting topics,
 // brokers, configurations and ACLs. The minimum broker version required is 0.10.0.0.
@@ -12,6 +15,9 @@ type ClusterAdmin interface {
 	// to become aware that the topic has been created. During this time, listTopics
 	// may not return information about the new topic.The validateOnly option is supported from version 0.10.2.0.
 	CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error
+
+	// List the topics available in the cluster with the default options.
+	ListTopics() (map[string]TopicDetail, error)
 
 	// Delete a topic. It may take several seconds after the DeleteTopic to returns success
 	// and for all the brokers to become aware that the topics are gone.
@@ -148,6 +154,79 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 	}
 
 	return nil
+}
+
+func (ca *clusterAdmin) findAnyBroker() (*Broker, error) {
+	brokers := ca.client.Brokers()
+	if len(brokers) > 0 {
+		index := rand.Intn(len(brokers))
+		return brokers[index], nil
+	}
+	return nil, errors.New("no available broker")
+}
+
+func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
+	// In order to build TopicDetails we need to first get the list of all
+	// topics using a MetadataRequest and then get their configs using a
+	// DescribeConfigsRequest request. To avoid sending many requests to the
+	// broker, we use a single DescribeConfigsRequest.
+
+	// Send the all-topic MetadataRequest
+	b, err := ca.findAnyBroker()
+	if err != nil {
+		return nil, err
+	}
+
+	metadataReq := &MetadataRequest{}
+	metadataResp, err := b.GetMetadata(metadataReq)
+	if err != nil {
+		return nil, err
+	}
+
+	topicsDetailsMap := make(map[string]TopicDetail)
+
+	var describeConfigsResources []*ConfigResource
+
+	for _, topic := range metadataResp.Topics {
+		topicDetails := TopicDetail{
+			NumPartitions: int32(len(topic.Partitions)),
+		}
+		topicsDetailsMap[topic.Name] = topicDetails
+
+		// we populate the resources we want to describe from the MetadataResponse
+		topicResource := ConfigResource{
+			Type: TopicResource,
+			Name: topic.Name,
+		}
+		describeConfigsResources = append(describeConfigsResources, &topicResource)
+	}
+
+	// Send the DescribeConfigsRequest
+	describeConfigsReq := &DescribeConfigsRequest{
+		Resources: describeConfigsResources,
+	}
+	describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, resource := range describeConfigsResp.Resources {
+		topicDetails := topicsDetailsMap[resource.Name]
+		topicDetails.ConfigEntries = make(map[string]*string)
+
+		for _, entry := range resource.Configs {
+			// only include non-default non-sensitive config
+			// (don't actually think topic config will ever be sensitive)
+			if entry.Default || entry.Sensitive {
+				continue
+			}
+			topicDetails.ConfigEntries[entry.Name] = &entry.Value
+		}
+
+		topicsDetailsMap[resource.Name] = topicDetails
+	}
+
+	return topicsDetailsMap, nil
 }
 
 func (ca *clusterAdmin) DeleteTopic(topic string) error {

@@ -631,16 +631,32 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*DescribeConfigsRequest)
 	res := &DescribeConfigsResponse{}
 
-	var configEntries []*ConfigEntry
-	configEntries = append(configEntries, &ConfigEntry{Name: "my_topic",
-		Value:     "my_topic",
-		ReadOnly:  true,
-		Default:   true,
-		Sensitive: false,
-	})
-
 	for _, r := range req.Resources {
-		res.Resources = append(res.Resources, &ResourceResponse{Name: r.Name, Configs: configEntries})
+		var configEntries []*ConfigEntry
+		switch r.Type {
+		case TopicResource:
+			configEntries = append(configEntries,
+				&ConfigEntry{Name: "max.message.bytes",
+					Value:     "1000000",
+					ReadOnly:  false,
+					Default:   true,
+					Sensitive: false,
+				}, &ConfigEntry{Name: "retention.ms",
+					Value:     "5000",
+					ReadOnly:  false,
+					Default:   false,
+					Sensitive: false,
+				}, &ConfigEntry{Name: "password",
+					Value:     "12345",
+					ReadOnly:  false,
+					Default:   false,
+					Sensitive: true,
+				})
+			res.Resources = append(res.Resources, &ResourceResponse{
+				Name:    r.Name,
+				Configs: configEntries,
+			})
+		}
 	}
 	return res
 }
