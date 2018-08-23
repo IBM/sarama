@@ -176,6 +176,7 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 	if err != nil {
 		return nil, err
 	}
+	b.Open(ca.client.Config())
 
 	metadataReq := &MetadataRequest{}
 	metadataResp, err := b.GetMetadata(metadataReq)
