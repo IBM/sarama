@@ -192,6 +192,9 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 		topicDetails := TopicDetail{
 			NumPartitions: int32(len(topic.Partitions)),
 		}
+		if len(topic.Partitions) > 0 {
+			topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas))
+		}
 		topicsDetailsMap[topic.Name] = topicDetails
 
 		// we populate the resources we want to describe from the MetadataResponse
