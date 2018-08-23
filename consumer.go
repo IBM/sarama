@@ -448,14 +448,22 @@ feederLoop:
 		for i, msg := range msgs {
 		messageSelect:
 			select {
+			case <-child.dying:
+				child.broker.acks.Done()
+				continue feederLoop
 			case child.messages <- msg:
 				firstAttempt = true
 			case <-expiryTicker.C:
 				if !firstAttempt {
 					child.responseResult = errTimedOut
 					child.broker.acks.Done()
+				remainingLoop:
 					for _, msg = range msgs[i:] {
-						child.messages <- msg
+						select {
+						case child.messages <- msg:
+						case <-child.dying:
+							break remainingLoop
+						}
 					}
 					child.broker.input <- child
 					continue feederLoop
