@@ -807,8 +807,28 @@ func TestConsumerInterleavedClose(t *testing.T) {
 	assertMessageOffset(t, <-c0.Messages(), 1001)
 	assertMessageOffset(t, <-c0.Messages(), 1002)
 
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+
+		for range c0.Messages() {
+			// drain
+		}
+	}()
+	go func() {
+		defer wg.Done()
+
+		for range c1.Messages() {
+			// drain
+		}
+	}()
+
 	safeClose(t, c1)
 	safeClose(t, c0)
+	wg.Wait()
+
 	safeClose(t, master)
 	broker0.Close()
 }
