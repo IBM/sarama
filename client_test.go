@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -609,6 +610,75 @@ func TestClientController(t *testing.T) {
 	defer safeClose(t, client2)
 	if _, err = client2.Controller(); err != ErrUnsupportedVersion {
 		t.Errorf("Expected Contoller() to return %s, found %s", ErrUnsupportedVersion, err)
+	}
+}
+
+func TestClientMetadataTimeout(t *testing.T) {
+	for _, timeout := range []time.Duration{
+		250 * time.Millisecond, // Will cut the first retry pass
+		500 * time.Millisecond, // Will cut the second retry pass
+		750 * time.Millisecond, // Will cut the third retry pass
+		900 * time.Millisecond, // Will stop after the three retries
+	} {
+		t.Run(fmt.Sprintf("timeout=%v", timeout), func(t *testing.T) {
+			// Use a responsive broker to create a working client
+			initialSeed := NewMockBroker(t, 0)
+			emptyMetadata := new(MetadataResponse)
+			initialSeed.Returns(emptyMetadata)
+
+			conf := NewConfig()
+			// Speed up the metadata request failure because of a read timeout
+			conf.Net.ReadTimeout = 100 * time.Millisecond
+			// Disable backoff and refresh
+			conf.Metadata.Retry.Backoff = 0
+			conf.Metadata.RefreshFrequency = 0
+			// But configure a "global" timeout
+			conf.Metadata.Timeout = timeout
+			c, err := NewClient([]string{initialSeed.Addr()}, conf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			initialSeed.Close()
+
+			client := c.(*client)
+
+			// Start seed brokers that do not reply to anything and therefore a read
+			// on the TCP connection will timeout to simulate unresponsive brokers
+			seed1 := NewMockBroker(t, 1)
+			defer seed1.Close()
+			seed2 := NewMockBroker(t, 2)
+			defer seed2.Close()
+
+			// Overwrite the seed brokers with a fixed ordering to make this test deterministic
+			safeClose(t, client.seedBrokers[0])
+			client.seedBrokers = []*Broker{NewBroker(seed1.Addr()), NewBroker(seed2.Addr())}
+			client.deadSeeds = []*Broker{}
+
+			// Start refreshing metadata in the background
+			errChan := make(chan error)
+			start := time.Now()
+			go func() {
+				errChan <- c.RefreshMetadata()
+			}()
+
+			// Check that the refresh fails fast enough (less than twice the configured timeout)
+			// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
+			maxRefreshDuration := 2 * timeout
+			select {
+			case err := <-errChan:
+				t.Logf("Got err: %v after waiting for: %v", err, time.Since(start))
+				if err == nil {
+					t.Fatal("Expected failed RefreshMetadata, got nil")
+				}
+				if err != ErrOutOfBrokers {
+					t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
+				}
+			case <-time.After(maxRefreshDuration):
+				t.Fatalf("RefreshMetadata did not fail fast enough after waiting for %v", maxRefreshDuration)
+			}
+
+			safeClose(t, c)
+		})
 	}
 }
 
