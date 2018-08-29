@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -482,6 +483,73 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	leader1.Close()
 	leader2.Close()
 	closeProducer(t, producer)
+}
+
+func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader1 := NewMockBroker(t, 2)
+	leader2 := NewMockBroker(t, 3)
+
+	metadataLeader1 := new(MetadataResponse)
+	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
+	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
+	seedBroker.Returns(metadataLeader1)
+
+	config := NewConfig()
+	config.Producer.Flush.Messages = 1
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 4
+
+	backoffCalled := make([]int32, config.Producer.Retry.Max+1)
+	config.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		atomic.AddInt32(&backoffCalled[retries-1], 1)
+		return 0
+	}
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	prodNotLeader := new(ProduceResponse)
+	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+
+	metadataLeader2 := new(MetadataResponse)
+	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
+	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, ErrNoError)
+
+	leader1.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader2)
+	leader2.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader1)
+	leader1.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader1)
+	leader1.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader2)
+	leader2.Returns(prodSuccess)
+
+	expectResults(t, producer, 1, 0)
+
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	leader2.Returns(prodSuccess)
+	expectResults(t, producer, 1, 0)
+
+	seedBroker.Close()
+	leader1.Close()
+	leader2.Close()
+	closeProducer(t, producer)
+
+	for i := 0; i < config.Producer.Retry.Max; i++ {
+		if atomic.LoadInt32(&backoffCalled[i]) != 1 {
+			t.Errorf("expected one retry attempt #%d", i)
+		}
+	}
+	if atomic.LoadInt32(&backoffCalled[config.Producer.Retry.Max]) != 0 {
+		t.Errorf("expected no retry attempt #%d", config.Producer.Retry.Max)
+	}
 }
 
 func TestAsyncProducerOutOfRetries(t *testing.T) {
