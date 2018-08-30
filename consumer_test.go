@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -180,9 +181,7 @@ func TestConsumerDuplicate(t *testing.T) {
 	broker0.Close()
 }
 
-// If consumer fails to refresh metadata it keeps retrying with frequency
-// specified by `Config.Consumer.Retry.Backoff`.
-func TestConsumerLeaderRefreshError(t *testing.T) {
+func runConsumerLeaderRefreshErrorTestWithConfig(t *testing.T, config *Config) {
 	// Given
 	broker0 := NewMockBroker(t, 100)
 
@@ -200,11 +199,6 @@ func TestConsumerLeaderRefreshError(t *testing.T) {
 			SetMessage("my_topic", 0, 123, testMsg),
 	})
 
-	config := NewConfig()
-	config.Net.ReadTimeout = 100 * time.Millisecond
-	config.Consumer.Retry.Backoff = 200 * time.Millisecond
-	config.Consumer.Return.Errors = true
-	config.Metadata.Retry.Max = 0
 	c, err := NewConsumer([]string{broker0.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -256,6 +250,38 @@ func TestConsumerLeaderRefreshError(t *testing.T) {
 	safeClose(t, c)
 	broker1.Close()
 	broker0.Close()
+}
+
+// If consumer fails to refresh metadata it keeps retrying with frequency
+// specified by `Config.Consumer.Retry.Backoff`.
+func TestConsumerLeaderRefreshError(t *testing.T) {
+	config := NewConfig()
+	config.Net.ReadTimeout = 100 * time.Millisecond
+	config.Consumer.Retry.Backoff = 200 * time.Millisecond
+	config.Consumer.Return.Errors = true
+	config.Metadata.Retry.Max = 0
+
+	runConsumerLeaderRefreshErrorTestWithConfig(t, config)
+}
+
+func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
+	var calls int32 = 0
+
+	config := NewConfig()
+	config.Net.ReadTimeout = 100 * time.Millisecond
+	config.Consumer.Retry.BackoffFunc = func(retries int) time.Duration {
+		atomic.AddInt32(&calls, 1)
+		return 200 * time.Millisecond
+	}
+	config.Consumer.Return.Errors = true
+	config.Metadata.Retry.Max = 0
+
+	runConsumerLeaderRefreshErrorTestWithConfig(t, config)
+
+	// we expect at least one call to our backoff function
+	if calls == 0 {
+		t.Fail()
+	}
 }
 
 func TestConsumerInvalidTopic(t *testing.T) {

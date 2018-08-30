@@ -314,6 +314,8 @@ type partitionConsumer struct {
 
 	fetchSize int32
 	offset    int64
+
+	retries int32
 }
 
 var errTimedOut = errors.New("timed out feeding messages to the user") // not user-facing
@@ -332,12 +334,21 @@ func (child *partitionConsumer) sendError(err error) {
 	}
 }
 
+func (child *partitionConsumer) computeBackoff() time.Duration {
+	if child.conf.Consumer.Retry.BackoffFunc != nil {
+		retries := atomic.AddInt32(&child.retries, 1)
+		return child.conf.Consumer.Retry.BackoffFunc(int(retries))
+	} else {
+		return child.conf.Consumer.Retry.Backoff
+	}
+}
+
 func (child *partitionConsumer) dispatcher() {
 	for range child.trigger {
 		select {
 		case <-child.dying:
 			close(child.trigger)
-		case <-time.After(child.conf.Consumer.Retry.Backoff):
+		case <-time.After(child.computeBackoff()):
 			if child.broker != nil {
 				child.consumer.unrefBrokerConsumer(child.broker)
 				child.broker = nil
@@ -450,6 +461,10 @@ func (child *partitionConsumer) responseFeeder() {
 feederLoop:
 	for response := range child.feeder {
 		msgs, child.responseResult = child.parseResponse(response)
+
+		if child.responseResult == nil {
+			atomic.StoreInt32(&child.retries, 0)
+		}
 
 		for i, msg := range msgs {
 		messageSelect:
