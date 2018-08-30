@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"sync"
 	"time"
 )
 
@@ -36,6 +37,32 @@ type FetchResponseBlock struct {
 	Records             *Records // deprecated: use FetchResponseBlock.Records
 	RecordsSet          []*Records
 	Partial             bool
+}
+
+var fetchResponseBlockPool = &sync.Pool{
+	New: func() interface{} {
+		return &FetchResponseBlock{}
+	},
+}
+
+func acquireFetchResponseBlock() *FetchResponseBlock {
+	return fetchResponseBlockPool.Get().(*FetchResponseBlock)
+}
+
+func releaseFetchResponseBlock(b *FetchResponseBlock) {
+	b.Err = 0
+	b.HighWaterMarkOffset = 0
+	b.LastStableOffset = 0
+	b.AbortedTransactions = nil
+	b.Records = nil
+	if b.RecordsSet != nil {
+		for _, s := range b.RecordsSet {
+			releaseRecords(s)
+		}
+		b.RecordsSet = nil
+	}
+	b.Partial = false
+	fetchResponseBlockPool.Put(b)
 }
 
 func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
@@ -87,7 +114,7 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 	b.RecordsSet = []*Records{}
 
 	for recordsDecoder.remaining() > 0 {
-		records := &Records{}
+		records := acquireRecords()
 		if err := records.decode(recordsDecoder); err != nil {
 			// If we have at least one decoded records, this is not an error
 			if err == ErrInsufficientData {
@@ -191,6 +218,30 @@ type FetchResponse struct {
 	Version      int16 // v1 requires 0.9+, v2 requires 0.10+
 }
 
+var fetchResponsePool = &sync.Pool{
+	New: func() interface{} {
+		return &FetchResponse{}
+	},
+}
+
+func acquireFetchResponse() *FetchResponse {
+	return fetchResponsePool.Get().(*FetchResponse)
+}
+
+func releaseFetchResponse(r *FetchResponse) {
+	if r.Blocks != nil {
+		for _, perTopic := range r.Blocks {
+			for _, block := range perTopic {
+				releaseFetchResponseBlock(block)
+			}
+		}
+		r.Blocks = nil
+	}
+	r.ThrottleTime = 0
+	r.Version = 0
+	fetchResponsePool.Put(r)
+}
+
 func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 
@@ -227,7 +278,7 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 				return err
 			}
 
-			block := new(FetchResponseBlock)
+			block := acquireFetchResponseBlock()
 			err = block.decode(pd, version)
 			if err != nil {
 				return err
@@ -318,7 +369,7 @@ func (r *FetchResponse) AddError(topic string, partition int32, err KError) {
 	}
 	frb, ok := partitions[partition]
 	if !ok {
-		frb = new(FetchResponseBlock)
+		frb = acquireFetchResponseBlock()
 		partitions[partition] = frb
 	}
 	frb.Err = err
@@ -335,7 +386,7 @@ func (r *FetchResponse) getOrCreateBlock(topic string, partition int32) *FetchRe
 	}
 	frb, ok := partitions[partition]
 	if !ok {
-		frb = new(FetchResponseBlock)
+		frb = acquireFetchResponseBlock()
 		partitions[partition] = frb
 	}
 

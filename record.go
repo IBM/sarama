@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"encoding/binary"
+	"sync"
 	"time"
 )
 
@@ -13,6 +14,22 @@ const (
 type RecordHeader struct {
 	Key   []byte
 	Value []byte
+}
+
+var recordHeaderPool = &sync.Pool{
+	New: func() interface{} {
+		return &RecordHeader{}
+	},
+}
+
+func acquireRecordHeader() *RecordHeader {
+	return recordHeaderPool.Get().(*RecordHeader)
+}
+
+func releaseRecordHeader(r *RecordHeader) {
+	r.Key = nil
+	r.Value = nil
+	recordHeaderPool.Put(r)
 }
 
 func (h *RecordHeader) encode(pe packetEncoder) error {
@@ -42,6 +59,36 @@ type Record struct {
 	Headers        []*RecordHeader
 
 	length varintLengthField
+}
+
+var recordPool = &sync.Pool{
+	New: func() interface{} {
+		return &Record{Headers: make([]*RecordHeader, 0, 16)}
+	},
+}
+
+func acquireRecord() *Record {
+	return recordPool.Get().(*Record)
+}
+
+func releaseRecord(r *Record) {
+	r.Attributes = 0
+	r.TimestampDelta = 0
+	r.OffsetDelta = 0
+	r.Key = nil
+	r.Value = nil
+	if r.Headers == nil {
+		r.Headers = make([]*RecordHeader, 0, 16)
+	} else {
+		for i := 0; i < len(r.Headers); i++ {
+			// don't release record header here, ReleaseConsumerMessage will do it
+			r.Headers[i] = nil
+		}
+		r.Headers = r.Headers[:0]
+	}
+	r.length.startOffset = 0
+	r.length.length = 0
+	recordPool.Put(r)
 }
 
 func (r *Record) encode(pe packetEncoder) error {
@@ -99,10 +146,18 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 	}
 
 	if numHeaders >= 0 {
-		r.Headers = make([]*RecordHeader, numHeaders)
+		if r.Headers == nil {
+			r.Headers = make([]*RecordHeader, numHeaders)
+		} else {
+			diff := numHeaders - int64(len(r.Headers))
+			for i := int64(0); i < diff; i++ {
+				r.Headers = append(r.Headers, nil)
+			}
+		}
 	}
+
 	for i := int64(0); i < numHeaders; i++ {
-		hdr := new(RecordHeader)
+		hdr := acquireRecordHeader()
 		if err := hdr.decode(pd); err != nil {
 			return err
 		}

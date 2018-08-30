@@ -1,6 +1,9 @@
 package sarama
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 const (
 	unknownRecords = iota
@@ -16,6 +19,26 @@ type Records struct {
 	recordsType int
 	MsgSet      *MessageSet
 	RecordBatch *RecordBatch
+}
+
+var recordsPool = &sync.Pool{
+	New: func() interface{} {
+		return &Records{}
+	},
+}
+
+func acquireRecords() *Records {
+	return recordsPool.Get().(*Records)
+}
+
+func releaseRecords(r *Records) {
+	r.recordsType = 0
+	r.MsgSet = nil
+	if r.RecordBatch != nil {
+		releaseRecordBatch(r.RecordBatch)
+		r.RecordBatch = nil
+	}
+	recordsPool.Put(r)
 }
 
 func newLegacyRecords(msgSet *MessageSet) Records {
@@ -92,7 +115,7 @@ func (r *Records) decode(pd packetDecoder) error {
 		r.MsgSet = &MessageSet{}
 		return r.MsgSet.decode(pd)
 	case defaultRecords:
-		r.RecordBatch = &RecordBatch{}
+		r.RecordBatch = acquireRecordBatch()
 		return r.RecordBatch.decode(pd)
 	}
 	return fmt.Errorf("unknown records type: %v", r.recordsType)

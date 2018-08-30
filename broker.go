@@ -275,7 +275,7 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 }
 
 func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
-	response := new(FetchResponse)
+	response := acquireFetchResponse()
 
 	err := b.sendAndReceive(request, response)
 

@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io/ioutil"
+	"sync"
 	"time"
 
 	"github.com/eapache/go-xerial-snappy"
@@ -26,7 +27,7 @@ func (e recordsArray) encode(pe packetEncoder) error {
 
 func (e recordsArray) decode(pd packetDecoder) error {
 	for i := range e {
-		rec := &Record{}
+		rec := acquireRecord()
 		if err := rec.decode(pd); err != nil {
 			return err
 		}
@@ -53,6 +54,45 @@ type RecordBatch struct {
 
 	compressedRecords []byte
 	recordsLen        int // uncompressed records size
+}
+
+var recordBatchPool = &sync.Pool{
+	New: func() interface{} {
+		return &RecordBatch{Records: make([]*Record, 0, 1024)}
+	},
+}
+
+// AcquireRecordBatch gets an empty RecordBatch instance from sync.Pool.
+func acquireRecordBatch() *RecordBatch {
+	return recordBatchPool.Get().(*RecordBatch)
+}
+
+// ReleseRecordBatch returns a RecordBatch instance to sync.Pool.
+func releaseRecordBatch(b *RecordBatch) {
+	b.FirstOffset = 0
+	b.PartitionLeaderEpoch = 0
+	b.Version = 0
+	b.Codec = 0
+	b.Control = false
+	b.LastOffsetDelta = 0
+	b.FirstTimestamp = time.Time{}
+	b.MaxTimestamp = time.Time{}
+	b.ProducerID = 0
+	b.ProducerEpoch = 0
+	b.FirstSequence = 0
+	if b.Records == nil {
+		b.Records = make([]*Record, 0, 1024)
+	} else {
+		for i := 0; i < len(b.Records); i++ {
+			releaseRecord(b.Records[i])
+			b.Records[i] = nil
+		}
+		b.Records = b.Records[:0]
+	}
+	b.PartialTrailingRecord = false
+	b.compressedRecords = nil
+	b.recordsLen = 0
+	recordBatchPool.Put(b)
 }
 
 func (b *RecordBatch) encode(pe packetEncoder) error {
@@ -156,7 +196,14 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if numRecs >= 0 {
-		b.Records = make([]*Record, numRecs)
+		if b.Records == nil {
+			b.Records = make([]*Record, numRecs)
+		} else {
+			diff := numRecs - len(b.Records)
+			for i := 0; i < diff; i++ {
+				b.Records = append(b.Records, nil)
+			}
+		}
 	}
 
 	bufSize := int(batchLen) - recordBatchOverhead
