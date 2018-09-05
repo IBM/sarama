@@ -524,8 +524,8 @@ func (c *Config) Validate() error {
 		if c.Producer.RequiredAcks != WaitForAll {
 			return ConfigurationError("Idempotent producer requires Producer.RequiredAcks to be WaitForAll")
 		}
-		if c.Net.MaxOpenRequests > 5 {
-			return ConfigurationError("Idempotent producer requires Net.MaxOpenRequests <= 5")
+		if c.Net.MaxOpenRequests > 1 {
+			return ConfigurationError("Idempotent producer requires Net.MaxOpenRequests to be 1")
 		}
 	}
 
