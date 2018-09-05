@@ -75,8 +75,8 @@ func TestProduceSetPartitionTracking(t *testing.T) {
 	seenT1P1 := false
 	seenT2P0 := false
 
-	ps.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
-		if len(msgs) != 1 {
+	ps.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+		if len(pSet.msgs) != 1 {
 			t.Error("Wrong message count")
 		}
 

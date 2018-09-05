@@ -2,11 +2,9 @@ package sarama
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -302,6 +300,7 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
+	leader2.Returns(metadataLeader2)
 	leader2.Returns(prodSuccess)
 	expectResults(t, producer, 10, 0)
 
@@ -461,12 +460,14 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	metadataLeader2 := new(MetadataResponse)
 	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
 	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, ErrNoError)
+
 	seedBroker.Returns(metadataLeader2)
 	leader2.Returns(prodNotLeader)
 	seedBroker.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
 	seedBroker.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
+	seedBroker.Returns(metadataLeader2)
 	seedBroker.Returns(metadataLeader2)
 
 	prodSuccess := new(ProduceResponse)
@@ -653,6 +654,7 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 
 	// succeed this time
 	expectResults(t, producer, 5, 0)
+	seedBroker.Returns(metadataResponse)
 
 	// put five more through
 	for i := 0; i < 5; i++ {
@@ -755,7 +757,7 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 	leader.Close()
 }
 
-func TestAsyncProducerIdempotent(t *testing.T) {
+func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
 	clusterID := "cid"
@@ -783,6 +785,7 @@ func TestAsyncProducerIdempotent(t *testing.T) {
 	config.Producer.RequiredAcks = WaitForAll
 	config.Producer.Retry.Backoff = 0
 	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
 	config.Version = V0_11_0_0
 	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
 	if err != nil {
@@ -805,132 +808,211 @@ func TestAsyncProducerIdempotent(t *testing.T) {
 	closeProducer(t, producer)
 }
 
-func TestAsyncProducerIdempotentRetry(t *testing.T) {
-	broker := NewMockBroker(t, 1)
-
-	clusterID := "cid"
-	metadataResponse := &MetadataResponse{
-		Version:        3,
-		ThrottleTimeMs: 0,
-		ClusterID:      &clusterID,
-		ControllerID:   1,
-	}
-	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, ErrNoError)
-	broker.Returns(metadataResponse)
-
-	initProducerID := &InitProducerIDResponse{
-		ThrottleTime:  0,
-		ProducerID:    1000,
-		ProducerEpoch: 1,
-	}
-	broker.Returns(initProducerID)
-
-	config := NewConfig()
-	config.Producer.Flush.Messages = 10
-	config.Producer.Return.Successes = true
-	config.Producer.Retry.Max = 4
-	config.Producer.RequiredAcks = WaitForAll
-	config.Producer.Retry.Backoff = 0
-	config.Producer.Idempotent = true
-	config.Version = V0_11_0_0
-	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
+func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
+	//Logger = log.New(os.Stderr, "", log.LstdFlags)
+	tests := []struct {
+		name           string
+		failAfterWrite bool
+	}{
+		{"FailAfterWrite", true},
+		{"FailBeforeWrite", false},
 	}
 
-	for i := 0; i < 10; i++ {
-		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
-	}
+	for _, test := range tests {
+		broker := NewMockBroker(t, 1)
 
-	prodNotLeader := &ProduceResponse{
-		Version:      3,
-		ThrottleTime: 0,
-	}
-	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotEnoughReplicas)
-	broker.Returns(prodNotLeader)
-
-	broker.Returns(metadataResponse)
-
-	prodSuccess := &ProduceResponse{
-		Version:      3,
-		ThrottleTime: 0,
-	}
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-	broker.Returns(prodSuccess)
-	expectResults(t, producer, 10, 0)
-
-	broker.Close()
-	closeProducer(t, producer)
-}
-
-func TestAsyncProducerIdempotentRetryBatch(t *testing.T) {
-	Logger = log.New(os.Stderr, "", log.LstdFlags)
-	/*broker := NewMockBroker(t, 1)
-
-	clusterID := "cid"
-	metadataResponse := &MetadataResponse{
-		Version:        3,
-		ThrottleTimeMs: 0,
-		ClusterID:      &clusterID,
-		ControllerID:   1,
-	}
-	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, ErrNoError)
-	broker.Returns(metadataResponse)
-
-	initProducerID := &InitProducerIDResponse{
-		ThrottleTime:  0,
-		ProducerID:    1000,
-		ProducerEpoch: 1,
-	}
-	broker.Returns(initProducerID)
-	*/
-	config := NewConfig()
-	config.Producer.Flush.Messages = 3
-	config.Producer.Return.Successes = true
-	config.Producer.Retry.Max = 4
-	config.Producer.RequiredAcks = WaitForAll
-	config.Producer.Retry.Backoff = 100 * time.Millisecond
-	config.Producer.Idempotent = true
-	config.Version = V0_11_0_0
-	producer, err := NewAsyncProducer([]string{"localhost:9092"}, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < 3; i++ {
-		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage + strconv.Itoa(i))}
-	}
-	/*prodNotLeader := &ProduceResponse{
-		Version:      3,
-		ThrottleTime: 0,
-	}
-	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotEnoughReplicas)
-	broker.Returns(prodNotLeader)
-	*/
-	go func() {
-		for i := 0; i < 6; i++ {
-			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("goroutine" + strconv.Itoa(i))}
-			time.Sleep(100 * time.Millisecond)
+		clusterID := "cid"
+		metadataResponse := &MetadataResponse{
+			Version:        3,
+			ThrottleTimeMs: 0,
+			ClusterID:      &clusterID,
+			ControllerID:   1,
 		}
-	}()
-	/*
-		broker.Returns(metadataResponse)
+		metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+		metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, ErrNoError)
 
-		prodSuccess := &ProduceResponse{
+		initProducerIDResponse := &InitProducerIDResponse{
+			ThrottleTime:  0,
+			ProducerID:    1000,
+			ProducerEpoch: 1,
+		}
+
+		prodNotLeaderResponse := &ProduceResponse{
 			Version:      3,
 			ThrottleTime: 0,
 		}
-		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-		broker.Returns(prodSuccess)*/
-	expectResults(t, producer, 9, 0)
+		prodNotLeaderResponse.AddTopicPartition("my_topic", 0, ErrNotEnoughReplicas)
 
-	fmt.Printf("**** Closing Broker \n")
-	//broker.Close()
-	fmt.Printf("**** Closing producer \n")
+		prodDuplicate := &ProduceResponse{
+			Version:      3,
+			ThrottleTime: 0,
+		}
+		prodDuplicate.AddTopicPartition("my_topic", 0, ErrDuplicateSequenceNumber)
+
+		prodOutOfSeq := &ProduceResponse{
+			Version:      3,
+			ThrottleTime: 0,
+		}
+		prodOutOfSeq.AddTopicPartition("my_topic", 0, ErrOutOfOrderSequenceNumber)
+
+		prodSuccessResponse := &ProduceResponse{
+			Version:      3,
+			ThrottleTime: 0,
+		}
+		prodSuccessResponse.AddTopicPartition("my_topic", 0, ErrNoError)
+
+		prodCounter := 0
+		lastBatchFirstSeq := -1
+		lastBatchSize := -1
+		lastSequenceWrittenToDisk := -1
+		handlerFailBeforeWrite := func(req *request) (res encoder) {
+			switch req.body.key() {
+			case 3:
+				return metadataResponse
+			case 22:
+				return initProducerIDResponse
+			case 0:
+				prodCounter++
+
+				preq := req.body.(*ProduceRequest)
+				batch := preq.records["my_topic"][0].RecordBatch
+				batchFirstSeq := int(batch.FirstSequence)
+				batchSize := len(batch.Records)
+
+				if lastSequenceWrittenToDisk == batchFirstSeq-1 { //in sequence append
+
+					if lastBatchFirstSeq == batchFirstSeq { //is a batch retry
+						if lastBatchSize == batchSize { //good retry
+							// mock write to disk
+							lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
+							return prodSuccessResponse
+						}
+						t.Errorf("[%s] Retried Batch firstSeq=%d with different size old=%d new=%d", test.name, batchFirstSeq, lastBatchSize, batchSize)
+						return prodOutOfSeq
+					} else { // not a retry
+						// save batch just received for future check
+						lastBatchFirstSeq = batchFirstSeq
+						lastBatchSize = batchSize
+
+						if prodCounter%2 == 1 {
+							if test.failAfterWrite {
+								// mock write to disk
+								lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
+							}
+							return prodNotLeaderResponse
+						}
+						// mock write to disk
+						lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
+						return prodSuccessResponse
+					}
+				} else {
+					if lastBatchFirstSeq == batchFirstSeq && lastBatchSize == batchSize { // is a good batch retry
+						if lastSequenceWrittenToDisk == (batchFirstSeq + batchSize - 1) { // we already have the messages
+							return prodDuplicate
+						}
+						// mock write to disk
+						lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
+						return prodSuccessResponse
+					} else { //out of sequence / bad retried batch
+						if lastBatchFirstSeq == batchFirstSeq && lastBatchSize != batchSize {
+							t.Errorf("[%s] Retried Batch firstSeq=%d with different size old=%d new=%d", test.name, batchFirstSeq, lastBatchSize, batchSize)
+						} else if lastSequenceWrittenToDisk+1 != batchFirstSeq {
+							t.Errorf("[%s] Out of sequence message lastSequence=%d new batch starts at=%d", test.name, lastSequenceWrittenToDisk, batchFirstSeq)
+						} else {
+							t.Errorf("[%s] Unexpected error", test.name)
+						}
+
+						return prodOutOfSeq
+					}
+				}
+
+			}
+			return nil
+		}
+
+		config := NewConfig()
+		config.Version = V0_11_0_0
+		config.Producer.Idempotent = true
+		config.Net.MaxOpenRequests = 1
+		config.Producer.RequiredAcks = WaitForAll
+		config.Producer.Return.Successes = true
+		config.Producer.Flush.Frequency = 50 * time.Millisecond
+		config.Producer.Retry.Backoff = 100 * time.Millisecond
+
+		broker.setHandler(handlerFailBeforeWrite)
+		producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i := 0; i < 3; i++ {
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+		}
+
+		go func() {
+			for i := 0; i < 7; i++ {
+				producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("goroutine")}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+
+		expectResults(t, producer, 10, 0)
+
+		broker.Close()
+		closeProducer(t, producer)
+	}
+}
+
+func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+
+	clusterID := "cid"
+	metadataResponse := &MetadataResponse{
+		Version:        3,
+		ThrottleTimeMs: 0,
+		ClusterID:      &clusterID,
+		ControllerID:   1,
+	}
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, ErrNoError)
+	broker.Returns(metadataResponse)
+
+	initProducerID := &InitProducerIDResponse{
+		ThrottleTime:  0,
+		ProducerID:    1000,
+		ProducerEpoch: 1,
+	}
+	broker.Returns(initProducerID)
+
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 400000
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = V0_11_0_0
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+
+	prodOutOfSeq := &ProduceResponse{
+		Version:      3,
+		ThrottleTime: 0,
+	}
+	prodOutOfSeq.AddTopicPartition("my_topic", 0, ErrOutOfOrderSequenceNumber)
+	broker.Returns(prodOutOfSeq)
+	expectResults(t, producer, 0, 10)
+
+	broker.Close()
 	closeProducer(t, producer)
-	fmt.Printf("**** Closed producer \n")
 }
 
 // This example shows how to use the producer while simultaneously

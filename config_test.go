@@ -231,9 +231,8 @@ func TestProducerConfigValidates(t *testing.T) {
 				cfg.Version = V0_11_0_0
 				cfg.Producer.Idempotent = true
 				cfg.Producer.RequiredAcks = WaitForAll
-				cfg.Net.MaxOpenRequests = 6
 			},
-			"Idempotent producer requires Net.MaxOpenRequests <= 5"},
+			"Idempotent producer requires Net.MaxOpenRequests to be 1"},
 	}
 
 	for i, test := range tests {

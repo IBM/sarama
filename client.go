@@ -198,7 +198,7 @@ func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 			return response, nil
 		default:
 			// some error, remove that broker and try again
-			Logger.Printf("Error is %v", err)
+			Logger.Printf("Client got error from broker %d when issuing InitProducerID : %v\n", broker.ID(), err)
 			_ = broker.Close()
 			client.deregisterBroker(broker)
 		}
@@ -746,7 +746,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 			return err
 		default:
 			// some other error, remove that broker and try again
-			Logger.Println("client/metadata got error from broker while fetching metadata:", err)
+			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
 			_ = broker.Close()
 			client.deregisterBroker(broker)
 		}
