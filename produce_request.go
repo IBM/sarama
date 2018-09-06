@@ -65,8 +65,7 @@ func updateBatchMetrics(recordBatch *RecordBatch, compressionRatioMetric metrics
 
 func (r *ProduceRequest) encode(pe packetEncoder) error {
 	if r.Version >= 3 {
-		t := "test"
-		if err := pe.putNullableString(&t); err != nil {
+		if err := pe.putNullableString(r.TransactionalID); err != nil {
 			return err
 		}
 	}

@@ -98,16 +98,17 @@ func main() {
 			logger.Println("Failed to close Kafka producer cleanly:", err)
 		}
 	}()
-	initProducerReq := new(sarama.InitProducerIDRequest)
-	tId := "test-transactional-id"
-	initProducerReq.TransactionalID = &tId
+	initProducerReq := new(sarama.InitProducerIDRequest) //TODO Refactor to accept only transactionalId, or nothing at all and take all from configuration
+	initProducerReq.TransactionalID = &config.Producer.TransactionalID
 	initProducerReq.TransactionTimeout = time.Millisecond * 100
 
 	_, err = producer.InitializeTransactions(initProducerReq)
-	if err != nil{
+	if err != nil {
 		printErrorAndExit(69, "Failed to initialize producerId: %s", err)
 	}
-	//producer.BeginTransaction()
+
+	producer.BeginTransaction(topicPartitions(*message))
+
 	partition, offset, err := producer.SendMessage(message)
 	if err != nil {
 		printErrorAndExit(69, "Failed to produce message: %s", err)
@@ -118,6 +119,34 @@ func main() {
 		metrics.WriteOnce(config.MetricRegistry, os.Stderr)
 	}
 	//producer.CommitTransaction()
+}
+
+func topicPartitions(messages ... sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not
+	topicPartitionsMap := make(map[string]map[int32]bool) // TODO maybe use some library to have a set structure
+	for _, message := range messages {
+		if _, ok := topicPartitionsMap[message.Topic]; !ok {
+			topicPartitionsMap[message.Topic] = make(map[int32]bool)
+		}
+		partitions := topicPartitionsMap[message.Topic]
+		if _, ok := partitions[message.Partition]; !ok {
+			partitions[message.Partition] = true
+		}
+	}
+
+	result := make(map[string][]int32)
+	for k, v := range topicPartitionsMap {
+		result[k] = func(arg map[int32]bool) []int32 {
+			list := make([]int32, len(arg))
+			i := 0
+			for k, _ := range arg {
+				list[i] = k
+				i += 1
+			}
+			return list
+		}(v)
+	}
+	return result
+
 }
 
 func printErrorAndExit(code int, format string, values ...interface{}) {

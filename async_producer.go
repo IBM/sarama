@@ -35,6 +35,8 @@ type AsyncProducer interface {
 
 	InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error)
 
+	BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error)
+
 	// Successes is the success output channel back to the user when Return.Successes is
 	// enabled. If Return.Successes is true, you MUST read from this channel or the
 	// Producer will deadlock. It is suggested that you send and read messages
@@ -60,6 +62,10 @@ type asyncProducer struct {
 	brokers    map[*Broker]chan<- *ProducerMessage
 	brokerRefs map[chan<- *ProducerMessage]int
 	brokerLock sync.Mutex
+
+	producerID    int64
+	producerEpoch int16
+	transactionalID *string
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
@@ -74,6 +80,8 @@ func NewAsyncProducer(addrs []string, conf *Config) (AsyncProducer, error) {
 		return nil, err
 	}
 	p.(*asyncProducer).ownClient = true
+	p.(*asyncProducer).producerID =-1 //TODO Constant
+	p.(*asyncProducer).producerEpoch =-1 //TODO Constant
 	return p, nil
 }
 
@@ -216,11 +224,30 @@ func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)
 		Logger.Println("Error while getting transactional coordinator: %v", err)
 	}
 	resp, err := clusterController.InitProducerID(idRequest)
-	if resp != nil {
+	if resp != nil  && resp.Err == ErrNoError{
+		p.transactionalID = idRequest.TransactionalID
+		p.producerID = resp.ProducerID
+		p.producerEpoch = resp.ProducerEpoch
 		Logger.Println(fmt.Sprintf("InitProducerId succeeded with(producerID, producerEpoch): %v, %v", resp.ProducerID, resp.ProducerID))
 	}
+
 	return resp, err
 
+}
+
+func (p *asyncProducer) BeginTransaction(topics map[string][]int32)(*AddPartitionsToTxnResponse, error){
+	t,_ := p.client.TransactionalCoordinator()
+	tx, err := t.AddPartitionsToTxn(&AddPartitionsToTxnRequest{p.conf.Producer.TransactionalID, p.producerID, p.producerEpoch, topics})
+	if err != nil{
+		Logger.Println("ERROR while starting transaction ", err)
+	}else{
+		if tx != nil {
+			for partition, kerror := range tx.Errors{
+				Logger.Println(fmt.Sprintf("Started transaction on partition [%v] with outcome: %v", partition, &kerror)) // TODO Request was for a topic or partition that does not exist on this broker.]
+			}
+		}
+	}
+	return tx, err
 }
 
 func (p *asyncProducer) Close() error {
@@ -944,4 +971,7 @@ func (p *asyncProducer) abandonBrokerConnection(broker *Broker) {
 	defer p.brokerLock.Unlock()
 
 	delete(p.brokers, broker)
+}
+func (p *asyncProducer) TransactionalId() *string {
+	return p.transactionalID
 }

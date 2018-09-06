@@ -475,7 +475,7 @@ func (client *client) initTransactions() error {
 		switch findCoordinatorRequest.Err {
 		//TODO handle errors
 		}
-		return errors.New(fmt.Sprintf("Kafka error while InitProducerId request: %v", findCoordinatorRequest.Err))
+		return errors.New(fmt.Sprintf("Kafka error while InitProducerId request: %v", findCoordinatorRequest.Err)) // TODO Offset's topic has not yet been created.
 	} else {
 		client.transactionalCoordinator = findCoordinatorRequest.Coordinator.id
 	}

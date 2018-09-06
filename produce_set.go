@@ -61,7 +61,8 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 			batch := &RecordBatch{
 				FirstTimestamp:   timestamp,
 				Version:          2,
-				ProducerID:       -1, /* No producer id */
+				ProducerID:       ps.parent.producerID, /* No producer id */
+				ProducerEpoch:    ps.parent.producerEpoch,
 				Codec:            ps.parent.conf.Producer.Compression,
 				CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
 			}
@@ -110,8 +111,9 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
 	req := &ProduceRequest{
-		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
-		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
+		TransactionalID: ps.parent.TransactionalId(),
+		RequiredAcks:    ps.parent.conf.Producer.RequiredAcks,
+		Timeout:         int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
 	}
 	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 		req.Version = 2
@@ -215,12 +217,12 @@ func (ps *produceSet) wouldOverflow(msg *ProducerMessage) bool {
 	// Would we overflow our maximum possible size-on-the-wire? 10KiB is arbitrary overhead for safety.
 	case ps.bufferBytes+msg.byteSize(version) >= int(MaxRequestSize-(10*1024)):
 		return true
-	// Would we overflow the size-limit of a compressed message-batch for this partition?
+		// Would we overflow the size-limit of a compressed message-batch for this partition?
 	case ps.parent.conf.Producer.Compression != CompressionNone &&
 		ps.msgs[msg.Topic] != nil && ps.msgs[msg.Topic][msg.Partition] != nil &&
 		ps.msgs[msg.Topic][msg.Partition].bufferBytes+msg.byteSize(version) >= ps.parent.conf.Producer.MaxMessageBytes:
 		return true
-	// Would we overflow simply in number of messages?
+		// Would we overflow simply in number of messages?
 	case ps.parent.conf.Producer.Flush.MaxMessages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.MaxMessages:
 		return true
 	default:
@@ -233,13 +235,13 @@ func (ps *produceSet) readyToFlush() bool {
 	// If we don't have any messages, nothing else matters
 	case ps.empty():
 		return false
-	// If all three config values are 0, we always flush as-fast-as-possible
+		// If all three config values are 0, we always flush as-fast-as-possible
 	case ps.parent.conf.Producer.Flush.Frequency == 0 && ps.parent.conf.Producer.Flush.Bytes == 0 && ps.parent.conf.Producer.Flush.Messages == 0:
 		return true
-	// If we've passed the message trigger-point
+		// If we've passed the message trigger-point
 	case ps.parent.conf.Producer.Flush.Messages > 0 && ps.bufferCount >= ps.parent.conf.Producer.Flush.Messages:
 		return true
-	// If we've passed the byte trigger-point
+		// If we've passed the byte trigger-point
 	case ps.parent.conf.Producer.Flush.Bytes > 0 && ps.bufferBytes >= ps.parent.conf.Producer.Flush.Bytes:
 		return true
 	default:

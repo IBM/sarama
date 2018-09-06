@@ -260,7 +260,7 @@ func (b *RecordBatch) computeAttributes() int16 {
 	if b.Control {
 		attr |= controlMask
 	}
-	//if b.Transactional{
+	//if b.ProducerID
 		attr |= transactionalMask
 	//}
 	return attr

@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -85,6 +86,10 @@ func (a *AddPartitionsToTxnResponse) requiredVersion() KafkaVersion {
 type PartitionError struct {
 	Partition int32
 	Err       KError
+}
+
+func (p PartitionError) String() string{
+	return fmt.Sprintf("%v - %v", p.Partition, p.Err)
 }
 
 func (p *PartitionError) encode(pe packetEncoder) error {

@@ -27,6 +27,8 @@ type SyncProducer interface {
 
 	InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error)
 
+	BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error)
+
 	// Close shuts down the producer and waits for any buffered messages to be
 	// flushed. You must call this function before a producer object passes out of
 	// scope, as it may otherwise leak memory. You must call this before calling
@@ -105,6 +107,10 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 
 func (sp *syncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)(*InitProducerIDResponse, error){
 	return sp.producer.InitializeTransactions(idRequest)
+}
+
+func (sp *syncProducer) BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error){
+	return sp.producer.BeginTransaction(topics)
 }
 
 func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
