@@ -248,6 +248,10 @@ type Config struct {
 		// offsets. This currently requires the manual use of an OffsetManager
 		// but will eventually be automated.
 		Offsets struct {
+			// Whether or not to auto-commit marked offsets back to the broker
+			// (default enabled).
+			Enable bool
+
 			// How frequently to commit updated offsets. Defaults to 1s.
 			CommitInterval time.Duration
 
@@ -327,6 +331,7 @@ func NewConfig() *Config {
 	c.Consumer.MaxWaitTime = 250 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
+	c.Consumer.Offsets.Enable = true
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 	c.Consumer.Offsets.Retry.Max = 3
