@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/rcrowley/go-metrics"
@@ -44,6 +45,11 @@ func main() {
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Return.Successes = true
+	config.Producer.Return.Errors = true
+	config.Producer.TransactionalID = "transactional-id"
+	config.ClientID = "transactional-producer"
+	//config.Producer.
+	config.Version = sarama.V0_11_0_0
 
 	switch *partitioner {
 	case "":
@@ -92,7 +98,16 @@ func main() {
 			logger.Println("Failed to close Kafka producer cleanly:", err)
 		}
 	}()
+	initProducerReq := new(sarama.InitProducerIDRequest)
+	tId := "test-transactional-id"
+	initProducerReq.TransactionalID = &tId
+	initProducerReq.TransactionTimeout = time.Millisecond * 100
 
+	_, err = producer.InitializeTransactions(initProducerReq)
+	if err != nil{
+		printErrorAndExit(69, "Failed to initialize producerId: %s", err)
+	}
+	//producer.BeginTransaction()
 	partition, offset, err := producer.SendMessage(message)
 	if err != nil {
 		printErrorAndExit(69, "Failed to produce message: %s", err)
@@ -102,6 +117,7 @@ func main() {
 	if *showMetrics {
 		metrics.WriteOnce(config.MetricRegistry, os.Stderr)
 	}
+	//producer.CommitTransaction()
 }
 
 func printErrorAndExit(code int, format string, values ...interface{}) {

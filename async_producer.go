@@ -17,7 +17,6 @@ import (
 // leaks: it will not be garbage-collected automatically when it passes out of
 // scope.
 type AsyncProducer interface {
-
 	// AsyncClose triggers a shutdown of the producer. The shutdown has completed
 	// when both the Errors and Successes channels have been closed. When calling
 	// AsyncClose, you *must* continue to read from those channels in order to
@@ -33,6 +32,8 @@ type AsyncProducer interface {
 	// Input is the input channel for the user to write messages to that they
 	// wish to send.
 	Input() chan<- *ProducerMessage
+
+	InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error)
 
 	// Successes is the success output channel back to the user when Return.Successes is
 	// enabled. If Return.Successes is true, you MUST read from this channel or the
@@ -206,6 +207,20 @@ func (p *asyncProducer) Successes() <-chan *ProducerMessage {
 
 func (p *asyncProducer) Input() chan<- *ProducerMessage {
 	return p.input
+}
+
+func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error) {
+	clusterController, err := p.client.TransactionalCoordinator()
+	if err != nil {
+		//TODO handle error
+		Logger.Println("Error while getting transactional coordinator: %v", err)
+	}
+	resp, err := clusterController.InitProducerID(idRequest)
+	if resp != nil {
+		Logger.Println(fmt.Sprintf("InitProducerId succeeded with(producerID, producerEpoch): %v, %v", resp.ProducerID, resp.ProducerID))
+	}
+	return resp, err
+
 }
 
 func (p *asyncProducer) Close() error {
@@ -765,7 +780,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				msg.Offset = block.Offset + int64(i)
 			}
 			bp.parent.returnSuccesses(msgs)
-		// Retriable errors
+			// Retriable errors
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
 			Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
@@ -773,7 +788,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 			bp.currentRetries[topic][partition] = block.Err
 			bp.parent.retryMessages(msgs, block.Err)
 			bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
-		// Other non-retriable errors
+			// Other non-retriable errors
 		default:
 			bp.parent.returnErrors(msgs, block.Err)
 		}

@@ -169,6 +169,8 @@ type Config struct {
 			// JVM producer.
 			Backoff time.Duration
 		}
+		//Producer transactionalId. Has to be set for transactional features to be used.
+		TransactionalID string
 	}
 
 	// Consumer is the namespace for configuration related to consuming messages,

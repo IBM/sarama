@@ -1,6 +1,9 @@
 package sarama
 
 import (
+	"errors"
+	"fmt"
+	"log"
 	"math/rand"
 	"sort"
 	"sync"
@@ -67,6 +70,9 @@ type Client interface {
 	// in local cache. This function only works on Kafka 0.8.2 and higher.
 	RefreshCoordinator(consumerGroup string) error
 
+	//Returns cached transaction coordinator for cluster. Works only on Kafka 0.11.0 and higher.
+	TransactionalCoordinator() (*Broker, error)
+
 	// Close shuts down all broker connections managed by this client. It is required
 	// to call this function before a client object passes out of scope, as it will
 	// otherwise leak memory. You must close any Producers or Consumers using a client
@@ -100,11 +106,13 @@ type client struct {
 	seedBrokers []*Broker
 	deadSeeds   []*Broker
 
-	controllerID   int32                                   // cluster controller broker id
-	brokers        map[int32]*Broker                       // maps broker ids to brokers
-	metadata       map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
-	metadataTopics map[string]none                         // topics that need to collect metadata
-	coordinators   map[string]int32                        // Maps consumer group names to coordinating broker IDs
+	controllerID             int32                                   // cluster controller broker id
+	brokers                  map[int32]*Broker                       // maps broker ids to brokers
+	metadata                 map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
+	metadataTopics           map[string]none                         // topics that need to collect metadata
+	coordinators             map[string]int32                        // Maps consumer group names to coordinating broker IDs
+	transactionalCoordinator int32                                   // Transactional coordinator ID
+	transactionalId          string                                  //transactionalID, also for a check if client is transactional (is if its set)
 
 	// If the number of partitions is large, we can get some churn calling cachedPartitions,
 	// so the result is cached.  It is important to update this value whenever metadata is changed
@@ -160,6 +168,14 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 			close(client.closed) // we haven't started the background updater yet, so we have to do this manually
 			_ = client.Close()
 			return nil, err
+		}
+	}
+	if conf.Producer.TransactionalID != "" {
+		client.transactionalId = conf.Producer.TransactionalID
+		if err := client.initTransactions(); err != nil {
+			log.Fatal(fmt.Sprintf("Can't initialize producer id for transactional id: %v.\n Error: %v", client.transactionalId, err))
+		} else {
+			Logger.Println("Successfully initialized transactional producer with leader: ", client.transactionalCoordinator)
 		}
 	}
 	go withRecover(client.backgroundMetadataUpdater)
@@ -449,6 +465,23 @@ func (client *client) Coordinator(consumerGroup string) (*Broker, error) {
 	return coordinator, nil
 }
 
+func (client *client) initTransactions() error {
+	controller := client.any()
+	findCoordinatorRequest, err := controller.FindCoordinator(&FindCoordinatorRequest{Version: 1, CoordinatorKey: client.transactionalId, CoordinatorType: CoordinatorTransaction})
+	if err != nil {
+		return err
+	}
+	if findCoordinatorRequest.Err != ErrNoError {
+		switch findCoordinatorRequest.Err {
+		//TODO handle errors
+		}
+		return errors.New(fmt.Sprintf("Kafka error while InitProducerId request: %v", findCoordinatorRequest.Err))
+	} else {
+		client.transactionalCoordinator = findCoordinatorRequest.Coordinator.id
+	}
+	return nil
+}
+
 func (client *client) RefreshCoordinator(consumerGroup string) error {
 	if client.Closed() {
 		return ErrClosedClient
@@ -464,6 +497,23 @@ func (client *client) RefreshCoordinator(consumerGroup string) error {
 	client.registerBroker(response.Coordinator)
 	client.coordinators[consumerGroup] = response.Coordinator.ID()
 	return nil
+}
+
+func (client *client) TransactionalCoordinator() (*Broker, error) {
+	if client.transactionalId == "" {
+		return nil, errors.New("can't invoke transactional methods on client without transactional id set")
+	} else {
+		if broker, ok := client.brokers[client.transactionalCoordinator]; ok {
+			broker.Open(client.conf)
+			if connected, err := broker.Connected(); connected {
+				return broker, nil
+			} else {
+				return nil, err
+			}
+		} else {
+			return nil, errors.New("no transactional coordinator exists")
+		}
+	}
 }
 
 // private broker management helpers
