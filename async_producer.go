@@ -37,6 +37,8 @@ type AsyncProducer interface {
 
 	BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error)
 
+	CommitTransaction() (*EndTxnResponse, error)
+
 	// Successes is the success output channel back to the user when Return.Successes is
 	// enabled. If Return.Successes is true, you MUST read from this channel or the
 	// Producer will deadlock. It is suggested that you send and read messages
@@ -974,4 +976,14 @@ func (p *asyncProducer) abandonBrokerConnection(broker *Broker) {
 }
 func (p *asyncProducer) TransactionalId() *string {
 	return p.transactionalID
+}
+
+func (p *asyncProducer) CommitTransaction() (*EndTxnResponse, error) {
+	b,_ :=p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
+	return b.EndTxn(&EndTxnRequest{*p.transactionalID, p.producerID, p.producerEpoch, true})
+}
+
+func (p *asyncProducer) AbortTransaction() (*EndTxnResponse, error) {
+	b,_ :=p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
+	return b.EndTxn(&EndTxnRequest{*p.transactionalID, p.producerID, p.producerEpoch, false})
 }

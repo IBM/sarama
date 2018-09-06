@@ -29,11 +29,16 @@ type SyncProducer interface {
 
 	BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error)
 
+	CommitTransaction() (*EndTxnResponse, error)
+
+	AbortTransaction() (*EndTxnResponse, error)
+
 	// Close shuts down the producer and waits for any buffered messages to be
 	// flushed. You must call this function before a producer object passes out of
 	// scope, as it may otherwise leak memory. You must call this before calling
 	// Close on the underlying client.
 	Close() error
+
 }
 
 type syncProducer struct {
@@ -111,6 +116,14 @@ func (sp *syncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)
 
 func (sp *syncProducer) BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error){
 	return sp.producer.BeginTransaction(topics)
+}
+
+func(sp *syncProducer)CommitTransaction() (*EndTxnResponse, error){
+	return sp.producer.CommitTransaction()
+}
+
+func (sp *syncProducer)AbortTransaction() (*EndTxnResponse, error){
+	return sp.producer.AbortTransaction()
 }
 
 func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {

@@ -119,6 +119,7 @@ func main() {
 		metrics.WriteOnce(config.MetricRegistry, os.Stderr)
 	}
 	//producer.CommitTransaction()
+	producer.AbortTransaction()
 }
 
 func topicPartitions(messages ... sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not
