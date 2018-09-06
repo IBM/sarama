@@ -23,6 +23,7 @@ var (
 	verbose     = flag.Bool("verbose", false, "Turn on sarama logging to stderr")
 	showMetrics = flag.Bool("metrics", false, "Output metrics on successful publish to stderr")
 	silent      = flag.Bool("silent", false, "Turn off printing the message's topic, partition, and offset to stdout")
+	messages    = flag.Int("messages", 5, "How many messages send")
 
 	logger = log.New(os.Stderr, "", log.LstdFlags)
 )
@@ -47,7 +48,7 @@ func main() {
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 	config.Producer.TransactionalID = "transactional-id"
-	config.ClientID = "transactional-producer"
+	//config.ClientID = "transactional-producer"
 	//config.Producer.
 	config.Version = sarama.V0_11_0_0
 
@@ -107,19 +108,21 @@ func main() {
 		printErrorAndExit(69, "Failed to initialize producerId: %s", err)
 	}
 
-	producer.BeginTransaction(topicPartitions(*message))
-
-	partition, offset, err := producer.SendMessage(message)
-	if err != nil {
-		printErrorAndExit(69, "Failed to produce message: %s", err)
-	} else if !*silent {
-		fmt.Printf("topic=%s\tpartition=%d\toffset=%d\n", *topic, partition, offset)
-	}
-	if *showMetrics {
-		metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+	//producer.BeginTransaction(topicPartitions(*message))
+	for i := 0; i < *messages; i++ {
+		partition, offset, err := producer.SendMessage(message)
+		time.Sleep(time.Second*1)
+		if err != nil {
+			printErrorAndExit(69, "Failed to produce message: %s", err)
+		} else if !*silent {
+			fmt.Printf("topic=%s\tpartition=%d\toffset=%d\n", *topic, partition, offset)
+		}
+		if *showMetrics {
+			metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+		}
 	}
 	//producer.CommitTransaction()
-	producer.AbortTransaction()
+	//producer.AbortTransaction()
 }
 
 func topicPartitions(messages ... sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not

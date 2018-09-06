@@ -65,8 +65,8 @@ type asyncProducer struct {
 	brokerRefs map[chan<- *ProducerMessage]int
 	brokerLock sync.Mutex
 
-	producerID    int64
-	producerEpoch int16
+	producerID      int64
+	producerEpoch   int16
 	transactionalID *string
 }
 
@@ -82,8 +82,8 @@ func NewAsyncProducer(addrs []string, conf *Config) (AsyncProducer, error) {
 		return nil, err
 	}
 	p.(*asyncProducer).ownClient = true
-	p.(*asyncProducer).producerID =-1 //TODO Constant
-	p.(*asyncProducer).producerEpoch =-1 //TODO Constant
+	p.(*asyncProducer).producerID = -1    //TODO Constant
+	p.(*asyncProducer).producerEpoch = -1 //TODO Constant
 	return p, nil
 }
 
@@ -222,11 +222,11 @@ func (p *asyncProducer) Input() chan<- *ProducerMessage {
 func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error) {
 	clusterController, err := p.client.TransactionalCoordinator()
 	if err != nil {
-		//TODO handle error
 		Logger.Println("Error while getting transactional coordinator: %v", err)
 	}
+	//if clusterController.
 	resp, err := clusterController.InitProducerID(idRequest)
-	if resp != nil  && resp.Err == ErrNoError{
+	if resp != nil && resp.Err == ErrNoError {
 		p.transactionalID = idRequest.TransactionalID
 		p.producerID = resp.ProducerID
 		p.producerEpoch = resp.ProducerEpoch
@@ -237,15 +237,27 @@ func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)
 
 }
 
-func (p *asyncProducer) BeginTransaction(topics map[string][]int32)(*AddPartitionsToTxnResponse, error){
-	t,_ := p.client.TransactionalCoordinator()
+func (p *asyncProducer) BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error) {
+	t, _ := p.client.TransactionalCoordinator()
+	err := p.client.RefreshMetadata(func(arg map[string][]int32) []string {
+		results := make([]string, len(arg))
+		i := 0
+		for k, _ := range arg {
+			results[i] = k
+			i += 1
+		}
+		return results
+	}(topics)...)
+	if err  != nil{
+		panic(err)
+	}
 	tx, err := t.AddPartitionsToTxn(&AddPartitionsToTxnRequest{p.conf.Producer.TransactionalID, p.producerID, p.producerEpoch, topics})
-	if err != nil{
+	if err != nil {
 		Logger.Println("ERROR while starting transaction ", err)
-	}else{
+	} else {
 		if tx != nil {
-			for partition, kerror := range tx.Errors{
-				Logger.Println(fmt.Sprintf("Started transaction on partition [%v] with outcome: %v", partition, &kerror)) // TODO Request was for a topic or partition that does not exist on this broker.]
+			for topic, kerror := range tx.Errors {
+				Logger.Println(fmt.Sprintf("Started transaction on topic [%v] with outcome: %v", topic, &kerror)) // TODO Request was for a topic that does not exist on this broker.]
 			}
 		}
 	}
@@ -979,11 +991,11 @@ func (p *asyncProducer) TransactionalId() *string {
 }
 
 func (p *asyncProducer) CommitTransaction() (*EndTxnResponse, error) {
-	b,_ :=p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
+	b, _ := p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
 	return b.EndTxn(&EndTxnRequest{*p.transactionalID, p.producerID, p.producerEpoch, true})
 }
 
 func (p *asyncProducer) AbortTransaction() (*EndTxnResponse, error) {
-	b,_ :=p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
+	b, _ := p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
 	return b.EndTxn(&EndTxnRequest{*p.transactionalID, p.producerID, p.producerEpoch, false})
 }

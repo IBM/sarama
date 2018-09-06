@@ -172,7 +172,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 	}
 	if conf.Producer.TransactionalID != "" {
 		client.transactionalId = conf.Producer.TransactionalID
-		if err := client.initTransactions(); err != nil {
+		if err := client.initTransactions(conf.Producer.Retry.Max, conf.Producer.Retry.Backoff); err != nil {
 			log.Fatal(fmt.Sprintf("Can't initialize producer id for transactional id: %v.\n Error: %v", client.transactionalId, err))
 		} else {
 			Logger.Println("Successfully initialized transactional producer with leader: ", client.transactionalCoordinator)
@@ -465,7 +465,7 @@ func (client *client) Coordinator(consumerGroup string) (*Broker, error) {
 	return coordinator, nil
 }
 
-func (client *client) initTransactions() error {
+func (client *client) initTransactions(retry int, backoff time.Duration) error {
 	controller := client.any()
 	findCoordinatorRequest, err := controller.FindCoordinator(&FindCoordinatorRequest{Version: 1, CoordinatorKey: client.transactionalId, CoordinatorType: CoordinatorTransaction})
 	if err != nil {
@@ -473,7 +473,12 @@ func (client *client) initTransactions() error {
 	}
 	if findCoordinatorRequest.Err != ErrNoError {
 		switch findCoordinatorRequest.Err {
-		//TODO handle errors
+		case ErrConsumerCoordinatorNotAvailable:
+			if retry > 0 {
+				Logger.Println(fmt.Sprintf("initTransactions: %v, retrying...", ErrConsumerCoordinatorNotAvailable))
+				time.Sleep(backoff)
+				return client.initTransactions(retry-1, time.Second*1)
+			}
 		}
 		return errors.New(fmt.Sprintf("Kafka error while InitProducerId request: %v", findCoordinatorRequest.Err)) // TODO Offset's topic has not yet been created.
 	} else {
