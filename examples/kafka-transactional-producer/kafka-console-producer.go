@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/rcrowley/go-metrics"
@@ -22,6 +23,7 @@ var (
 	verbose     = flag.Bool("verbose", false, "Turn on sarama logging to stderr")
 	showMetrics = flag.Bool("metrics", false, "Output metrics on successful publish to stderr")
 	silent      = flag.Bool("silent", false, "Turn off printing the message's topic, partition, and offset to stdout")
+	messages    = flag.Int("messages", 5, "How many messages send")
 
 	logger = log.New(os.Stderr, "", log.LstdFlags)
 )
@@ -44,6 +46,11 @@ func main() {
 	config := sarama.NewConfig()
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Return.Successes = true
+	config.Producer.Return.Errors = true
+	config.Producer.TransactionalID = "transactional-id"
+	//config.ClientID = "transactional-producer"
+	//config.Producer.
+	config.Version = sarama.V0_11_0_0
 
 	switch *partitioner {
 	case "":
@@ -66,6 +73,7 @@ func main() {
 	}
 
 	message := &sarama.ProducerMessage{Topic: *topic, Partition: int32(*partition)}
+	message2 := &sarama.ProducerMessage{Topic: "test2", Partition: int32(*partition)}
 
 	if *key != "" {
 		message.Key = sarama.StringEncoder(*key)
@@ -92,16 +100,72 @@ func main() {
 			logger.Println("Failed to close Kafka producer cleanly:", err)
 		}
 	}()
+	initProducerReq := new(sarama.InitProducerIDRequest) //TODO Refactor to accept only transactionalId, or nothing at all and take all from configuration
+	initProducerReq.TransactionalID = &config.Producer.TransactionalID
+	initProducerReq.TransactionTimeout = time.Millisecond * 100
 
-	partition, offset, err := producer.SendMessage(message)
-	if err != nil {
-		printErrorAndExit(69, "Failed to produce message: %s", err)
-	} else if !*silent {
-		fmt.Printf("topic=%s\tpartition=%d\toffset=%d\n", *topic, partition, offset)
+
+	for j:=0;j<10;j++ {
+		_, err = producer.InitializeTransactions(initProducerReq)
+		if err != nil {
+			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
+		}
+		producer.BeginTransaction(topicPartitions(*message, *message2))
+		for i := 0; i < 1; i++ {
+			partition, offset, err := producer.SendMessage(message)
+			if err != nil {
+				printErrorAndExit(69, "Failed to produce message: %s", err)
+			} else if !*silent {
+				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
+			}
+			if *showMetrics {
+				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+			}
+
+			partition, offset, err = producer.SendMessage(message2)
+			if err != nil {
+				printErrorAndExit(69, "Failed to produce message: %s", err)
+			} else if !*silent {
+				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
+			}
+			if *showMetrics {
+				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+			}
+		}
+		producer.CommitTransaction()
+		//producer.AbortTransaction()
+		fmt.Println()
+		time.Sleep(2*time.Second)
 	}
-	if *showMetrics {
-		metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+
+}
+
+func topicPartitions(messages ... sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not
+	topicPartitionsMap := make(map[string]map[int32]bool) // TODO maybe use some library to have a set structure
+	for _, message := range messages {
+		if _, ok := topicPartitionsMap[message.Topic]; !ok {
+			topicPartitionsMap[message.Topic] = make(map[int32]bool)
+		}
+		partitions := topicPartitionsMap[message.Topic]
+		if _, ok := partitions[message.Partition]; !ok {
+			partitions[message.Partition] = true
+		}
 	}
+
+	result := make(map[string][]int32)
+	for k, v := range topicPartitionsMap {
+		result[k] = func(arg map[int32]bool) []int32 {
+			list := make([]int32, len(arg))
+			i := 0
+			for k, _ := range arg {
+				list[i] = k
+				i += 1
+			}
+			return list
+		}(v)
+	}
+	return result
+
 }
 
 func printErrorAndExit(code int, format string, values ...interface{}) {
