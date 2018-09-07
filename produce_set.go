@@ -133,6 +133,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				// (See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-Messagesets
 				//  under the RecordBatch section for details.)
 				rb := set.recordsToSend.RecordBatch
+				rb.FirstSequence = ps.parent.nextOffset(topic, partition)
 				if len(rb.Records) > 0 {
 					rb.LastOffsetDelta = int32(len(rb.Records) - 1)
 					for i, record := range rb.Records {

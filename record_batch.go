@@ -36,7 +36,7 @@ func (e recordsArray) decode(pd packetDecoder) error {
 }
 
 type RecordBatch struct {
-	FirstOffset           int64
+	FirstOffset           int64 //baseOffset
 	PartitionLeaderEpoch  int32
 	Version               int8
 	Codec                 CompressionCodec
@@ -54,18 +54,18 @@ type RecordBatch struct {
 	compressedRecords []byte
 	recordsLen        int // uncompressed records size
 }
-
+//var K int64 = 0
 func (b *RecordBatch) encode(pe packetEncoder) error {
 	if b.Version != 2 {
 		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", b.Codec)}
 	}
-	pe.putInt64(b.FirstOffset)
-	pe.push(&lengthField{})
+	pe.putInt64(b.FirstOffset) //baseOffset
+	pe.push(&lengthField{}) //batchLength
 	pe.putInt32(b.PartitionLeaderEpoch)
 	pe.putInt8(b.Version)
 	pe.push(newCRC32Field(crcCastagnoli))
 	pe.putInt16(b.computeAttributes())
-	pe.putInt32(b.LastOffsetDelta)
+	pe.putInt32(b.LastOffsetDelta) //lastOffsetDelta
 
 	if err := (Timestamp{&b.FirstTimestamp}).encode(pe); err != nil {
 		return err
@@ -77,7 +77,8 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 
 	pe.putInt64(b.ProducerID)
 	pe.putInt16(b.ProducerEpoch)
-	pe.putInt32(b.FirstSequence)
+	pe.putInt32(b.FirstSequence) //baseSequence
+
 
 	if err := pe.putArrayLength(len(b.Records)); err != nil {
 		return err

@@ -68,6 +68,21 @@ type asyncProducer struct {
 	producerID      int64
 	producerEpoch   int16
 	transactionalID *string
+
+	offsets map[string]int32
+}
+
+func (sp *asyncProducer) nextOffset(topic string, partition int32) int32 {
+	var result int32
+	key := topic + "-" + string(partition)
+	if offset, ok := sp.offsets[key]; ok {
+		sp.offsets[key] = offset + 1
+		result = offset
+	} else {
+		sp.offsets[key] = 0
+		result = 0
+	}
+	return result
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
@@ -104,6 +119,7 @@ func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 		retries:    make(chan *ProducerMessage),
 		brokers:    make(map[*Broker]chan<- *ProducerMessage),
 		brokerRefs: make(map[chan<- *ProducerMessage]int),
+		offsets:    make(map[string]int32),
 	}
 
 	// launch our singleton dispatchers
@@ -230,7 +246,7 @@ func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)
 		p.transactionalID = idRequest.TransactionalID
 		p.producerID = resp.ProducerID
 		p.producerEpoch = resp.ProducerEpoch
-		Logger.Println(fmt.Sprintf("InitProducerId succeeded with(producerID, producerEpoch): %v, %v", resp.ProducerID, resp.ProducerID))
+		Logger.Println(fmt.Sprintf("InitProducerId succeeded with(producerID, producerEpoch): %v, %v", resp.ProducerID, resp.ProducerEpoch))
 	}
 
 	return resp, err
@@ -992,10 +1008,13 @@ func (p *asyncProducer) TransactionalId() *string {
 
 func (p *asyncProducer) CommitTransaction() (*EndTxnResponse, error) {
 	b, _ := p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
+	p.offsets = make(map[string]int32)
+
 	return b.EndTxn(&EndTxnRequest{*p.transactionalID, p.producerID, p.producerEpoch, true})
 }
 
 func (p *asyncProducer) AbortTransaction() (*EndTxnResponse, error) {
 	b, _ := p.client.TransactionalCoordinator() //TODO error handling, cachedMethod?
+	p.offsets = make(map[string]int32)
 	return b.EndTxn(&EndTxnRequest{*p.transactionalID, p.producerID, p.producerEpoch, false})
 }
