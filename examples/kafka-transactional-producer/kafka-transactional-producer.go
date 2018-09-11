@@ -105,13 +105,13 @@ func main() {
 	initProducerReq.TransactionTimeout = time.Millisecond * 100
 
 
-	for j:=0;j<10;j++ {
+	for j:=0;j<1;j++ {
 		_, err = producer.InitializeTransactions(initProducerReq)
 		if err != nil {
 			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
 		}
 		producer.BeginTransaction(topicPartitions(*message, *message2))
-		for i := 0; i < 1; i++ {
+		for i := 0; i < 2; i++ {
 			partition, offset, err := producer.SendMessage(message)
 			if err != nil {
 				printErrorAndExit(69, "Failed to produce message: %s", err)
@@ -122,15 +122,15 @@ func main() {
 				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
 			}
 
-			partition, offset, err = producer.SendMessage(message2)
-			if err != nil {
-				printErrorAndExit(69, "Failed to produce message: %s", err)
-			} else if !*silent {
-				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
-			}
-			if *showMetrics {
-				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
-			}
+			//partition, offset, err = producer.SendMessage(message2)
+			//if err != nil {
+			//	printErrorAndExit(69, "Failed to produce message: %s", err)
+			//} else if !*silent {
+			//	log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
+			//}
+			//if *showMetrics {
+			//	metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+			//}
 		}
 		producer.CommitTransaction()
 		//producer.AbortTransaction()

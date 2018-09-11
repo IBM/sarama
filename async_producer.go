@@ -73,16 +73,13 @@ type asyncProducer struct {
 }
 
 func (sp *asyncProducer) nextOffset(topic string, partition int32) int32 {
-	var result int32
 	key := topic + "-" + string(partition)
 	if offset, ok := sp.offsets[key]; ok {
 		sp.offsets[key] = offset + 1
-		result = offset
 	} else {
 		sp.offsets[key] = 0
-		result = 0
 	}
-	return result
+	return sp.offsets[key]
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
