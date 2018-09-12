@@ -66,6 +66,69 @@ func (mc *MockSequence) For(reqBody versionedDecoder) (res encoder) {
 	return res
 }
 
+type MockListGroupsResponse struct {
+	groups map[string]string
+	t      TestReporter
+}
+
+func NewMockListGroupsResponse(t TestReporter) *MockListGroupsResponse {
+	return &MockListGroupsResponse{
+		groups: make(map[string]string),
+		t:      t,
+	}
+}
+
+func (m *MockListGroupsResponse) For(reqBody versionedDecoder) encoder {
+	request := reqBody.(*ListGroupsRequest)
+	_ = request
+	response := &ListGroupsResponse{
+		Groups: m.groups,
+	}
+	return response
+}
+
+func (m *MockListGroupsResponse) AddGroup(groupID, protocolType string) *MockListGroupsResponse {
+	m.groups[groupID] = protocolType
+	return m
+}
+
+type MockDescribeGroupsResponse struct {
+	groups map[string]*GroupDescription
+	t      TestReporter
+}
+
+func NewMockDescribeGroupsResponse(t TestReporter) *MockDescribeGroupsResponse {
+	return &MockDescribeGroupsResponse{
+		t:      t,
+		groups: make(map[string]*GroupDescription),
+	}
+}
+
+func (m *MockDescribeGroupsResponse) AddGroupDescription(groupID string, description *GroupDescription) *MockDescribeGroupsResponse {
+	m.groups[groupID] = description
+	return m
+}
+
+func (m *MockDescribeGroupsResponse) For(reqBody versionedDecoder) encoder {
+	request := reqBody.(*DescribeGroupsRequest)
+
+	response := &DescribeGroupsResponse{}
+	for _, requestedGroup := range request.Groups {
+		if group, ok := m.groups[requestedGroup]; ok {
+			response.Groups = append(response.Groups, group)
+		} else {
+			// Mimic real kafka - if a group doesn't exist, return
+			// an entry with state "Dead"
+			response.Groups = append(response.Groups, &GroupDescription{
+				GroupId: requestedGroup,
+				State:   "Dead",
+			})
+		}
+	}
+
+	return response
+}
+
 // MockMetadataResponse is a `MetadataResponse` builder.
 type MockMetadataResponse struct {
 	controllerID int32
