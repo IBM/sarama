@@ -3,6 +3,7 @@ package sarama
 import (
 	"errors"
 	"math/rand"
+	"sync"
 )
 
 // ClusterAdmin is the administrative client for Kafka, which supports managing and inspecting topics,
@@ -18,6 +19,9 @@ type ClusterAdmin interface {
 
 	// List the topics available in the cluster with the default options.
 	ListTopics() (map[string]TopicDetail, error)
+
+	// Describe some topics in the cluster
+	DescribeTopics(topics []string) (metadata []*TopicMetadata, err error)
 
 	// Delete a topic. It may take several seconds after the DeleteTopic to returns success
 	// and for all the brokers to become aware that the topics are gone.
@@ -70,6 +74,18 @@ type ClusterAdmin interface {
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
 	DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error)
+
+	// List the consumer groups available in the cluster.
+	ListConsumerGroups() (map[string]string, error)
+
+	// Describe the given consumer group
+	DescribeConsumerGroups(groups []string) ([]*GroupDescription, error)
+
+	// List the consumer group offsets available in the cluster.
+	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
+
+	// Get information about the nodes in the cluster
+	DescribeCluster() (brokers []*Broker, controllerID int32, err error)
 
 	// Close shuts down the admin and closes underlying client.
 	Close() error
@@ -156,6 +172,46 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 	return nil
 }
 
+func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetadata, err error) {
+	controller, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	request := &MetadataRequest{
+		Topics:                 topics,
+		AllowAutoTopicCreation: false,
+	}
+
+	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+		request.Version = 4
+	}
+
+	response, err := controller.GetMetadata(request)
+	if err != nil {
+		return nil, err
+	}
+	return response.Topics, nil
+}
+
+func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32, err error) {
+	controller, err := ca.Controller()
+	if err != nil {
+		return nil, int32(0), err
+	}
+
+	request := &MetadataRequest{
+		Topics: []string{},
+	}
+
+	response, err := controller.GetMetadata(request)
+	if err != nil {
+		return nil, int32(0), err
+	}
+
+	return response.Brokers, response.ControllerID, nil
+}
+
 func (ca *clusterAdmin) findAnyBroker() (*Broker, error) {
 	brokers := ca.client.Brokers()
 	if len(brokers) > 0 {
@@ -176,7 +232,7 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 	if err != nil {
 		return nil, err
 	}
-	b.Open(ca.client.Config())
+	_ = b.Open(ca.client.Config())
 
 	metadataReq := &MetadataRequest{}
 	metadataResp, err := b.GetMetadata(metadataReq)
@@ -462,4 +518,93 @@ func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]Matchi
 
 	}
 	return mAcls, nil
+}
+
+func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*GroupDescription, err error) {
+	groupsPerBroker := make(map[*Broker][]string)
+
+	for _, group := range groups {
+		controller, err := ca.client.Coordinator(group)
+		if err != nil {
+			return nil, err
+		}
+		groupsPerBroker[controller] = append(groupsPerBroker[controller], group)
+
+	}
+
+	for broker, brokerGroups := range groupsPerBroker {
+		response, err := broker.DescribeGroups(&DescribeGroupsRequest{
+			Groups: brokerGroups,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		result = append(result, response.Groups...)
+	}
+	return result, nil
+}
+
+func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err error) {
+	allGroups = make(map[string]string)
+
+	// Query brokers in parallel, since we have to query *all* brokers
+	brokers := ca.client.Brokers()
+	groupMaps := make(chan map[string]string, len(brokers))
+	errors := make(chan error, len(brokers))
+	wg := sync.WaitGroup{}
+
+	for _, b := range brokers {
+		wg.Add(1)
+		go func(b *Broker, conf *Config) {
+			defer wg.Done()
+			_ = b.Open(conf) // Ensure that broker is opened
+
+			response, err := b.ListGroups(&ListGroupsRequest{})
+			if err != nil {
+				errors <- err
+				return
+			}
+
+			groups := make(map[string]string)
+			for group, typ := range response.Groups {
+				groups[group] = typ
+			}
+
+			groupMaps <- groups
+
+		}(b, ca.conf)
+	}
+
+	wg.Wait()
+	close(groupMaps)
+	close(errors)
+
+	for groupMap := range groupMaps {
+		for group, protocolType := range groupMap {
+			allGroups[group] = protocolType
+		}
+	}
+
+	// Intentionally return only the first error for simplicity
+	err = <-errors
+	return
+}
+
+func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error) {
+	coordinator, err := ca.client.Coordinator(group)
+	if err != nil {
+		return nil, err
+	}
+
+	request := &OffsetFetchRequest{
+		ConsumerGroup: group,
+		partitions:    topicPartitions,
+	}
+
+	if ca.conf.Version.IsAtLeast(V0_8_2_2) {
+		request.Version = 1
+	}
+
+	return coordinator.FetchOffset(request)
 }
