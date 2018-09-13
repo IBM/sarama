@@ -201,7 +201,7 @@ type Config struct {
 				// The maximum allowed time for each worker to join the group once a rebalance has begun.
 				// This is basically a limit on the amount of time needed for all tasks to flush any pending
 				// data and commit offsets. If the timeout is exceeded, then the worker will be removed from
-				// the group, which will cause offset commit failures (default 60s.
+				// the group, which will cause offset commit failures (default 60s).
 				Timeout time.Duration
 
 				Retry struct {
