@@ -88,7 +88,7 @@ func NewAsyncProducerFromClient(client Client) (AsyncProducer, error) {
 		client:     client,
 		conf:       client.Config(),
 		errors:     make(chan *ProducerError),
-		input:      make(chan *ProducerMessage),
+  		input:      make(chan *ProducerMessage, 256),
 		successes:  make(chan *ProducerMessage),
 		retries:    make(chan *ProducerMessage),
 		brokers:    make(map[*Broker]chan<- *ProducerMessage),
