@@ -104,6 +104,23 @@ func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 	return errOutOfExpectations
 }
 
+func (sp *SyncProducer) InitializeTransactions(idRequest *sarama.InitProducerIDRequest) (*sarama.InitProducerIDResponse, error){
+	return nil, nil
+}
+
+func (sp *SyncProducer) BeginTransaction(topics map[string][]int32) (*sarama.AddPartitionsToTxnResponse, error){
+	return nil, nil
+}
+
+
+func (sp *SyncProducer) CommitTransaction() (*sarama.EndTxnResponse, error){
+	return nil, nil
+}
+
+func (sp *SyncProducer) AbortTransaction() (*sarama.EndTxnResponse, error){
+	return nil, nil
+}
+
 // Close corresponds with the Close method of sarama's SyncProducer implementation.
 // By closing a mock syncproducer, you also tell it that no more SendMessage calls will follow,
 // so it will write an error to the test state if there's any remaining expectations.
