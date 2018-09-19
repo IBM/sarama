@@ -8,7 +8,8 @@ import (
 
 func makeProduceSet() (*asyncProducer, *produceSet) {
 	parent := &asyncProducer{
-		conf: NewConfig(),
+		conf:    NewConfig(),
+		offsets: make(map[string]int32),
 	}
 	return parent, newProduceSet(parent)
 }

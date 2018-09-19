@@ -111,7 +111,6 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 
 func (ps *produceSet) buildRequest() *ProduceRequest {
 	req := &ProduceRequest{
-		TransactionalID: ps.parent.TransactionalId(),
 		RequiredAcks:    ps.parent.conf.Producer.RequiredAcks,
 		Timeout:         int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
 	}
@@ -125,6 +124,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	for topic, partitionSet := range ps.msgs {
 		for partition, set := range partitionSet {
 			if req.Version >= 3 {
+			req.TransactionalID= ps.parent.TransactionalId()
 				// If the API version we're hitting is 3 or greater, we need to calculate
 				// offsets for each record in the batch relative to FirstOffset.
 				// Additionally, we must set LastOffsetDelta to the value of the last offset
