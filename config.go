@@ -271,6 +271,7 @@ type Config struct {
 				Max int
 			}
 		}
+		IsolationLevel IsolationLevel
 	}
 
 	// A user-provided string sent with every request to the brokers for logging,
@@ -332,6 +333,7 @@ func NewConfig() *Config {
 	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 	c.Consumer.Offsets.Retry.Max = 3
+	c.Consumer.IsolationLevel = ReadUncommitted
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256

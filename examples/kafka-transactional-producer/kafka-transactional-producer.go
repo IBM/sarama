@@ -73,7 +73,6 @@ func main() {
 	}
 
 	message := &sarama.ProducerMessage{Topic: *topic, Partition: int32(*partition)}
-	message2 := &sarama.ProducerMessage{Topic: "test2", Partition: int32(*partition)}
 
 	if *key != "" {
 		message.Key = sarama.StringEncoder(*key)
@@ -104,13 +103,12 @@ func main() {
 	initProducerReq.TransactionalID = &config.Producer.TransactionalID
 	initProducerReq.TransactionTimeout = time.Millisecond * 100
 
-
-	for j:=0;j<1;j++ {
+	for j := 0; j < 1; j++ {
 		_, err = producer.InitializeTransactions(initProducerReq)
 		if err != nil {
 			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
 		}
-		producer.BeginTransaction(topicPartitions(*message, *message2))
+		producer.BeginTransaction(topicPartitions(*message))
 		for i := 0; i < 2; i++ {
 			partition, offset, err := producer.SendMessage(message)
 			if err != nil {
@@ -134,13 +132,63 @@ func main() {
 		}
 		producer.CommitTransaction()
 		//producer.AbortTransaction()
+
 		fmt.Println()
-		time.Sleep(2*time.Second)
+		time.Sleep(2 * time.Second)
+	}
+	message.Value = sarama.StringEncoder("Aborted")
+	for j := 0; j < 1; j++ {
+		_, err = producer.InitializeTransactions(initProducerReq)
+		if err != nil {
+			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
+		}
+		producer.BeginTransaction(topicPartitions(*message))
+		for i := 0; i < 2; i++ {
+			partition, offset, err := producer.SendMessage(message)
+			if err != nil {
+				printErrorAndExit(69, "Failed to produce message: %s", err)
+			} else if !*silent {
+				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
+			}
+			if *showMetrics {
+				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+			}
+		}
+		//producer.CommitTransaction()
+		producer.AbortTransaction()
+
+		fmt.Println()
+		time.Sleep(2 * time.Second)
+	}
+	message.Value = sarama.StringEncoder("Third")
+	for j := 0; j < 1; j++ {
+		_, err = producer.InitializeTransactions(initProducerReq)
+		if err != nil {
+			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
+		}
+		producer.BeginTransaction(topicPartitions(*message))
+		for i := 0; i < 2; i++ {
+			partition, offset, err := producer.SendMessage(message)
+			if err != nil {
+				printErrorAndExit(69, "Failed to produce message: %s", err)
+			} else if !*silent {
+				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
+			}
+			if *showMetrics {
+				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
+			}
+
+		}
+		producer.CommitTransaction()
+		//producer.AbortTransaction()
+
+		fmt.Println()
+		time.Sleep(2 * time.Second)
 	}
 
 }
 
-func topicPartitions(messages ... sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not
+func topicPartitions(messages ...sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not
 	topicPartitionsMap := make(map[string]map[int32]bool) // TODO maybe use some library to have a set structure
 	for _, message := range messages {
 		if _, ok := topicPartitionsMap[message.Topic]; !ok {

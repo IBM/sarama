@@ -49,7 +49,6 @@ func (ce ConsumerErrors) Error() string {
 // builds on Sarama to add this support. For Kafka-based tracking (Kafka 0.9 and later), the
 // https://github.com/bsm/sarama-cluster library builds on Sarama to add this support.
 type Consumer interface {
-
 	// Topics returns the set of available topics as retrieved from the cluster
 	// metadata. This method is the same as Client.Topics(), and is provided for
 	// convenience.
@@ -266,7 +265,6 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 // Close; this will signal the PartitionConsumer's goroutines to begin shutting down (just like AsyncClose), but will
 // also drain the Messages channel, harvest all errors & return them once cleanup has completed.
 type PartitionConsumer interface {
-
 	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately, after which you
 	// should continue to service the 'Messages' and 'Errors' channels until they are empty. It is required to call this
 	// function, or Close before a consumer object passes out of scope, as it will otherwise leak memory. You must call
@@ -578,6 +576,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
 	messages := []*ConsumerMessage{}
+	var lastConsumed int64
 	for _, records := range block.RecordsSet {
 		switch records.recordsType {
 		case legacyRecords:
@@ -592,7 +591,15 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 			if err != nil {
 				return nil, err
 			}
+
 			if control, err := records.isControl(); err != nil || control {
+				if lastConsumed > 0 &&
+					isAborted(block.AbortedTransactions, records.RecordBatch.ProducerID, lastConsumed+1) {
+					lastCommitedMessage := len(messages) - int(records.RecordBatch.FirstOffset-lastConsumed-1)
+					messages = messages[0:lastCommitedMessage]
+				}
+				lastConsumed = records.RecordBatch.FirstOffset
+
 				continue
 			}
 
@@ -603,6 +610,16 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	}
 
 	return messages, nil
+}
+
+func isAborted(transactions []*AbortedTransaction, producerId int64, firstOffset int64) bool {
+	//return false
+	var m = make(map[AbortedTransaction]bool)
+	for _, ab := range transactions {
+		m[*ab] = true
+	}
+	_, ok := m[AbortedTransaction{ProducerID: producerId, FirstOffset: firstOffset}]
+	return ok
 }
 
 // brokerConsumer
@@ -796,7 +813,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 4
-		request.Isolation = ReadUncommitted // We don't support yet transactions.
+		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel // We don't support yet transactions.
 	}
 
 	for child := range bc.subscriptions {
