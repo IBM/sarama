@@ -103,7 +103,7 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 			startOffset := pe.offset()
 			pe.putInt32(id)
 			pe.push(&lengthField{})
-			err = records.encode(pe)
+			err = records.encode(pe, r.TransactionalID!=nil)
 			if err != nil {
 				return err
 			}

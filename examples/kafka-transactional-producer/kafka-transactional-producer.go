@@ -94,9 +94,6 @@ func main() {
 	}
 
 	send(producer, *config, message, false)
-	send(producer, *config, message, false)
-	send(producer, *config, message, true)
-	send(producer, *config, message, false)
 	send(producer, *config, message, true)
 	send(producer, *config, message, false)
 

@@ -182,7 +182,7 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 
 	pe.push(&lengthField{})
 	for _, records := range b.RecordsSet {
-		err = records.encode(pe)
+		err = records.encode(pe, false)
 		if err != nil {
 			return err
 		}

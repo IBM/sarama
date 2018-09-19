@@ -42,6 +42,7 @@ type RecordBatch struct {
 	Codec                 CompressionCodec
 	CompressionLevel      int
 	Control               bool
+	Transactional         bool
 	LastOffsetDelta       int32
 	FirstTimestamp        time.Time
 	MaxTimestamp          time.Time
@@ -54,13 +55,14 @@ type RecordBatch struct {
 	compressedRecords []byte
 	recordsLen        int // uncompressed records size
 }
+
 //var K int64 = 0
 func (b *RecordBatch) encode(pe packetEncoder) error {
 	if b.Version != 2 {
 		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", b.Codec)}
 	}
 	pe.putInt64(b.FirstOffset) //baseOffset
-	pe.push(&lengthField{}) //batchLength
+	pe.push(&lengthField{})    //batchLength
 	pe.putInt32(b.PartitionLeaderEpoch)
 	pe.putInt8(b.Version)
 	pe.push(newCRC32Field(crcCastagnoli))
@@ -78,7 +80,6 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	pe.putInt64(b.ProducerID)
 	pe.putInt16(b.ProducerEpoch)
 	pe.putInt32(b.FirstSequence) //baseSequence
-
 
 	if err := pe.putArrayLength(len(b.Records)); err != nil {
 		return err
@@ -127,6 +128,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	}
 	b.Codec = CompressionCodec(int8(attributes) & compressionCodecMask)
 	b.Control = attributes&controlMask == controlMask
+	b.Transactional = attributes&transactionalMask == transactionalMask
 
 	if b.LastOffsetDelta, err = pd.getInt32(); err != nil {
 		return err
@@ -261,7 +263,7 @@ func (b *RecordBatch) computeAttributes() int16 {
 	if b.Control {
 		attr |= controlMask
 	}
-	if b.ProducerID != 0{
+	if b.Transactional {
 		attr |= transactionalMask
 	}
 	return attr

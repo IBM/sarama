@@ -237,7 +237,6 @@ func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)
 	if err != nil {
 		Logger.Println("Error while getting transactional coordinator: %v", err)
 	}
-	//if clusterController.
 	resp, err := clusterController.InitProducerID(idRequest)
 	if resp != nil && resp.Err == ErrNoError {
 		p.transactionalID = idRequest.TransactionalID
