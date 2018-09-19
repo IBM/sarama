@@ -1,12 +1,17 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
 type AbortedTransaction struct {
 	ProducerID  int64
 	FirstOffset int64
+}
+
+func (t AbortedTransaction) String() string{
+	return fmt.Sprintf("%v-%v", t.ProducerID, t.FirstOffset)
 }
 
 func (t *AbortedTransaction) decode(pd packetDecoder) (err error) {

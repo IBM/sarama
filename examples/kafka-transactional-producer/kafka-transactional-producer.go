@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/rcrowley/go-metrics"
 	"io/ioutil"
 	"log"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/Shopify/sarama"
-	"github.com/rcrowley/go-metrics"
 )
 
 var (
@@ -48,8 +48,6 @@ func main() {
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 	config.Producer.TransactionalID = "transactional-id"
-	//config.ClientID = "transactional-producer"
-	//config.Producer.
 	config.Version = sarama.V0_11_0_0
 
 	switch *partitioner {
@@ -94,80 +92,38 @@ func main() {
 	if err != nil {
 		printErrorAndExit(69, "Failed to open Kafka producer: %s", err)
 	}
+
+	send(producer, *config, message, false)
+	send(producer, *config, message, false)
+	send(producer, *config, message, true)
+	send(producer, *config, message, false)
+	send(producer, *config, message, true)
+	send(producer, *config, message, false)
+
 	defer func() {
 		if err := producer.Close(); err != nil {
 			logger.Println("Failed to close Kafka producer cleanly:", err)
 		}
 	}()
+
+}
+
+func send(producer sarama.SyncProducer, config sarama.Config, message *sarama.ProducerMessage, abort bool) {
 	initProducerReq := new(sarama.InitProducerIDRequest) //TODO Refactor to accept only transactionalId, or nothing at all and take all from configuration
 	initProducerReq.TransactionalID = &config.Producer.TransactionalID
 	initProducerReq.TransactionTimeout = time.Millisecond * 100
-
-	for j := 0; j < 1; j++ {
-		_, err = producer.InitializeTransactions(initProducerReq)
-		if err != nil {
-			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
-		}
-		producer.BeginTransaction(topicPartitions(*message))
-		for i := 0; i < 2; i++ {
-			partition, offset, err := producer.SendMessage(message)
-			if err != nil {
-				printErrorAndExit(69, "Failed to produce message: %s", err)
-			} else if !*silent {
-				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
-			}
-			if *showMetrics {
-				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
-			}
-
-			//partition, offset, err = producer.SendMessage(message2)
-			//if err != nil {
-			//	printErrorAndExit(69, "Failed to produce message: %s", err)
-			//} else if !*silent {
-			//	log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
-			//}
-			//if *showMetrics {
-			//	metrics.WriteOnce(config.MetricRegistry, os.Stderr)
-			//}
-		}
-		producer.CommitTransaction()
-		//producer.AbortTransaction()
-
-		fmt.Println()
-		time.Sleep(2 * time.Second)
+	if abort{
+		message.Value = sarama.StringEncoder("Abort")
+	}else{
+		message.Value = sarama.StringEncoder("Tx")
 	}
-	message.Value = sarama.StringEncoder("Aborted")
 	for j := 0; j < 1; j++ {
-		_, err = producer.InitializeTransactions(initProducerReq)
+		_, err := producer.InitializeTransactions(initProducerReq)
 		if err != nil {
 			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
 		}
 		producer.BeginTransaction(topicPartitions(*message))
-		for i := 0; i < 2; i++ {
-			partition, offset, err := producer.SendMessage(message)
-			if err != nil {
-				printErrorAndExit(69, "Failed to produce message: %s", err)
-			} else if !*silent {
-				log.Println(fmt.Sprintf("topic=%s\tpartition=%d\toffset=%d", message.Topic, partition, offset))
-			}
-			if *showMetrics {
-				metrics.WriteOnce(config.MetricRegistry, os.Stderr)
-			}
-		}
-		//producer.CommitTransaction()
-		producer.AbortTransaction()
-
-		fmt.Println()
-		time.Sleep(2 * time.Second)
-	}
-	message.Value = sarama.StringEncoder("Third")
-	for j := 0; j < 1; j++ {
-		_, err = producer.InitializeTransactions(initProducerReq)
-		if err != nil {
-			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
-		}
-		producer.BeginTransaction(topicPartitions(*message))
-		for i := 0; i < 2; i++ {
+		for i := 0; i < 6; i++ {
 			partition, offset, err := producer.SendMessage(message)
 			if err != nil {
 				printErrorAndExit(69, "Failed to produce message: %s", err)
@@ -179,13 +135,15 @@ func main() {
 			}
 
 		}
-		producer.CommitTransaction()
-		//producer.AbortTransaction()
+		if !abort {
+			producer.CommitTransaction()
+		} else {
+			producer.AbortTransaction()
+		}
 
 		fmt.Println()
 		time.Sleep(2 * time.Second)
 	}
-
 }
 
 func topicPartitions(messages ...sarama.ProducerMessage) map[string][]int32 { //TODO Decide signature for BeginTransactions and then move it into producer or not

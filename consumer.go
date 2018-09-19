@@ -576,7 +576,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
 	messages := []*ConsumerMessage{}
-	var lastConsumed int64
+	abortedTransactionHead := 0
 	for _, records := range block.RecordsSet {
 		switch records.recordsType {
 		case legacyRecords:
@@ -593,14 +593,15 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 			}
 
 			if control, err := records.isControl(); err != nil || control {
-				if lastConsumed > 0 &&
-					isAborted(block.AbortedTransactions, records.RecordBatch.ProducerID, lastConsumed+1) {
-					lastCommitedMessage := len(messages) - int(records.RecordBatch.FirstOffset-lastConsumed-1)
-					messages = messages[0:lastCommitedMessage]
+				if abortedTransactionHead < len(block.AbortedTransactions) {
+					if records.RecordBatch.FirstOffset > block.AbortedTransactions[abortedTransactionHead].FirstOffset &&
+						records.RecordBatch.ProducerID == block.AbortedTransactions[abortedTransactionHead].ProducerID{
+						messages = filter(messages, block.AbortedTransactions[abortedTransactionHead].FirstOffset, records.RecordBatch.FirstOffset)
+						abortedTransactionHead += 1
+					}
 				}
-				lastConsumed = records.RecordBatch.FirstOffset
-
 				continue
+
 			}
 
 			messages = append(messages, recordBatchMessages...)
@@ -611,15 +612,16 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 
 	return messages, nil
 }
+func filter(messages []*ConsumerMessage, bottom int64, top int64) []*ConsumerMessage {
+	results := make([]*ConsumerMessage, 0)
+	for _, msg := range messages {
+		if msg.Offset >= bottom && msg.Offset < top {
 
-func isAborted(transactions []*AbortedTransaction, producerId int64, firstOffset int64) bool {
-	//return false
-	var m = make(map[AbortedTransaction]bool)
-	for _, ab := range transactions {
-		m[*ab] = true
+		} else {
+			results = append(results, msg)
+		}
 	}
-	_, ok := m[AbortedTransaction{ProducerID: producerId, FirstOffset: firstOffset}]
-	return ok
+	return results
 }
 
 // brokerConsumer
