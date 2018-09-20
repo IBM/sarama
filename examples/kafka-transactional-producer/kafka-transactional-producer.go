@@ -120,7 +120,7 @@ func send(producer sarama.SyncProducer, config sarama.Config, message *sarama.Pr
 	}
 	for j := 0; j < 1; j++ {
 
-		producer.BeginTransaction(topicPartitions(*message))
+		_, _ = producer.BeginTransaction(topicPartitions(*message))
 		for i := 0; i < 6; i++ {
 			partition, offset, err := producer.SendMessage(message)
 			if err != nil {
@@ -134,9 +134,9 @@ func send(producer sarama.SyncProducer, config sarama.Config, message *sarama.Pr
 
 		}
 		if !abort {
-			producer.CommitTransaction()
+			_, _ = producer.CommitTransaction()
 		} else {
-			producer.AbortTransaction()
+			_, _ = producer.AbortTransaction()
 		}
 
 		fmt.Println()

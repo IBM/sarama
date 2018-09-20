@@ -509,7 +509,10 @@ func (client *client) TransactionalCoordinator() (*Broker, error) {
 		return nil, errors.New("can't invoke transactional methods on client without transactional id set")
 	} else {
 		if broker, ok := client.brokers[client.transactionalCoordinator]; ok {
-			broker.Open(client.conf)
+			err := broker.Open(client.conf)
+			if err != nil {
+				return nil, err
+			}
 			if connected, err := broker.Connected(); connected {
 				return broker, nil
 			} else {
