@@ -104,20 +104,19 @@ func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 	return errOutOfExpectations
 }
 
-func (sp *SyncProducer) InitializeTransactions(idRequest *sarama.InitProducerIDRequest) (*sarama.InitProducerIDResponse, error){
+func (sp *SyncProducer) InitializeTransactions(idRequest *sarama.InitProducerIDRequest) (*sarama.InitProducerIDResponse, error) {
 	return nil, nil
 }
 
-func (sp *SyncProducer) BeginTransaction(topics map[string][]int32) (*sarama.AddPartitionsToTxnResponse, error){
+func (sp *SyncProducer) BeginTransaction(topics map[string][]int32) (*sarama.AddPartitionsToTxnResponse, error) {
 	return nil, nil
 }
 
-
-func (sp *SyncProducer) CommitTransaction() (*sarama.EndTxnResponse, error){
+func (sp *SyncProducer) CommitTransaction() (*sarama.EndTxnResponse, error) {
 	return nil, nil
 }
 
-func (sp *SyncProducer) AbortTransaction() (*sarama.EndTxnResponse, error){
+func (sp *SyncProducer) AbortTransaction() (*sarama.EndTxnResponse, error) {
 	return nil, nil
 }
 

@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -235,7 +236,7 @@ func (p *asyncProducer) Input() chan<- *ProducerMessage {
 func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error) {
 	clusterController, err := p.client.TransactionalCoordinator()
 	if err != nil {
-		Logger.Println("Error while getting transactional coordinator: %v", err)
+		Logger.Println(fmt.Sprintf("Error while getting transactional coordinator: %v", err))
 	}
 	resp, err := clusterController.InitProducerID(idRequest)
 	if resp != nil && resp.Err == ErrNoError {
@@ -243,6 +244,8 @@ func (p *asyncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)
 		p.producerID = resp.ProducerID
 		p.producerEpoch = resp.ProducerEpoch
 		Logger.Println(fmt.Sprintf("InitProducerId succeeded with(producerID, producerEpoch): %v, %v", resp.ProducerID, resp.ProducerEpoch))
+	} else {
+		return nil, errors.New("error while initializing transactions: " + resp.Err.Error())
 	}
 
 	return resp, err

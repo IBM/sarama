@@ -132,20 +132,19 @@ func (mp *AsyncProducer) Errors() <-chan *sarama.ProducerError {
 	return mp.errors
 }
 
-func (sp *AsyncProducer) InitializeTransactions(idRequest *sarama.InitProducerIDRequest) (*sarama.InitProducerIDResponse, error){
+func (sp *AsyncProducer) InitializeTransactions(idRequest *sarama.InitProducerIDRequest) (*sarama.InitProducerIDResponse, error) {
 	return nil, nil
 }
 
-func (sp *AsyncProducer) BeginTransaction(topics map[string][]int32) (*sarama.AddPartitionsToTxnResponse, error){
+func (sp *AsyncProducer) BeginTransaction(topics map[string][]int32) (*sarama.AddPartitionsToTxnResponse, error) {
 	return nil, nil
 }
 
-
-func (sp *AsyncProducer) CommitTransaction() (*sarama.EndTxnResponse, error){
+func (sp *AsyncProducer) CommitTransaction() (*sarama.EndTxnResponse, error) {
 	return nil, nil
 }
 
-func (sp *AsyncProducer) AbortTransaction() (*sarama.EndTxnResponse, error){
+func (sp *AsyncProducer) AbortTransaction() (*sarama.EndTxnResponse, error) {
 	return nil, nil
 }
 
