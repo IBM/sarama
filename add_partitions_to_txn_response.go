@@ -88,7 +88,7 @@ type PartitionError struct {
 	Err       KError
 }
 
-func (p PartitionError) String() string{
+func (p PartitionError) String() string {
 	return fmt.Sprintf("%v - %v", p.Partition, p.Err)
 }
 

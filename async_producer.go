@@ -260,7 +260,7 @@ func (p *asyncProducer) BeginTransaction(topics map[string][]int32) (*AddPartiti
 		}
 		return results
 	}(topics)...)
-	if err  != nil{
+	if err != nil {
 		panic(err)
 	}
 	tx, err := t.AddPartitionsToTxn(&AddPartitionsToTxnRequest{p.conf.Producer.TransactionalID, p.producerID, p.producerEpoch, topics})

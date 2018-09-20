@@ -38,7 +38,6 @@ type SyncProducer interface {
 	// scope, as it may otherwise leak memory. You must call this before calling
 	// Close on the underlying client.
 	Close() error
-
 }
 
 type syncProducer struct {
@@ -110,19 +109,19 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 	return msg.Partition, msg.Offset, nil
 }
 
-func (sp *syncProducer) InitializeTransactions(idRequest *InitProducerIDRequest)(*InitProducerIDResponse, error){
+func (sp *syncProducer) InitializeTransactions(idRequest *InitProducerIDRequest) (*InitProducerIDResponse, error) {
 	return sp.producer.InitializeTransactions(idRequest)
 }
 
-func (sp *syncProducer) BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error){
+func (sp *syncProducer) BeginTransaction(topics map[string][]int32) (*AddPartitionsToTxnResponse, error) {
 	return sp.producer.BeginTransaction(topics)
 }
 
-func(sp *syncProducer)CommitTransaction() (*EndTxnResponse, error){
+func (sp *syncProducer) CommitTransaction() (*EndTxnResponse, error) {
 	return sp.producer.CommitTransaction()
 }
 
-func (sp *syncProducer)AbortTransaction() (*EndTxnResponse, error){
+func (sp *syncProducer) AbortTransaction() (*EndTxnResponse, error) {
 	return sp.producer.AbortTransaction()
 }
 

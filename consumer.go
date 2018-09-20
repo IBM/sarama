@@ -595,7 +595,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 			if control, err := records.isControl(); err != nil || control {
 				if abortedTransactionHead < len(block.AbortedTransactions) {
 					if records.RecordBatch.FirstOffset > block.AbortedTransactions[abortedTransactionHead].FirstOffset &&
-						records.RecordBatch.ProducerID == block.AbortedTransactions[abortedTransactionHead].ProducerID{
+						records.RecordBatch.ProducerID == block.AbortedTransactions[abortedTransactionHead].ProducerID {
 						messages = filter(messages, block.AbortedTransactions[abortedTransactionHead].FirstOffset, records.RecordBatch.FirstOffset)
 						abortedTransactionHead += 1
 					}
