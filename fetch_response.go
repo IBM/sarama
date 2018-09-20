@@ -10,7 +10,7 @@ type AbortedTransaction struct {
 	FirstOffset int64
 }
 
-func (t AbortedTransaction) String() string{
+func (t AbortedTransaction) String() string {
 	return fmt.Sprintf("%v-%v", t.ProducerID, t.FirstOffset)
 }
 
@@ -182,7 +182,7 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 
 	pe.push(&lengthField{})
 	for _, records := range b.RecordsSet {
-		err = records.encode(pe, false)
+		err = records.encode(pe)
 		if err != nil {
 			return err
 		}

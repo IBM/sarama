@@ -43,7 +43,11 @@ func (r *Records) setTypeFromFields() (bool, error) {
 	return false, nil
 }
 
-func (r *Records) encode(pe packetEncoder, isTransactional bool) error {
+func (r *Records) encode(pe packetEncoder) error {
+	return r.encodeTransactional(pe, false)
+}
+
+func (r *Records) encodeTransactional(pe packetEncoder, isTransactional bool) error {
 	if r.recordsType == unknownRecords {
 		if empty, err := r.setTypeFromFields(); err != nil || empty {
 			return err
@@ -60,6 +64,7 @@ func (r *Records) encode(pe packetEncoder, isTransactional bool) error {
 		if r.RecordBatch == nil {
 			return nil
 		}
+
 		r.RecordBatch.Transactional = isTransactional
 		return r.RecordBatch.encode(pe)
 	}

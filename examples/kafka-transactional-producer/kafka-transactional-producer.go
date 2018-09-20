@@ -109,16 +109,17 @@ func send(producer sarama.SyncProducer, config sarama.Config, message *sarama.Pr
 	initProducerReq := new(sarama.InitProducerIDRequest) //TODO Refactor to accept only transactionalId, or nothing at all and take all from configuration
 	initProducerReq.TransactionalID = &config.Producer.TransactionalID
 	initProducerReq.TransactionTimeout = time.Millisecond * 100
-	if abort{
+	if abort {
 		message.Value = sarama.StringEncoder("Abort")
-	}else{
+	} else {
 		message.Value = sarama.StringEncoder("Tx")
 	}
+	_, err := producer.InitializeTransactions(initProducerReq)
+	if err != nil {
+		printErrorAndExit(69, "Failed to initialize producerId: %s", err)
+	}
 	for j := 0; j < 1; j++ {
-		_, err := producer.InitializeTransactions(initProducerReq)
-		if err != nil {
-			printErrorAndExit(69, "Failed to initialize producerId: %s", err)
-		}
+
 		producer.BeginTransaction(topicPartitions(*message))
 		for i := 0; i < 6; i++ {
 			partition, offset, err := producer.SendMessage(message)
