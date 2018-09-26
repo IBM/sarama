@@ -222,7 +222,7 @@ func TestLZ4ConfigValidation(t *testing.T) {
 	config := NewConfig()
 	config.Producer.Compression = CompressionLZ4
 	if err := config.Validate(); string(err.(ConfigurationError)) != "lz4 compression requires Version >= V0_10_0_0" {
-		t.Error("Expected invalid lz4/kakfa version error, got ", err)
+		t.Error("Expected invalid lz4/kafka version error, got ", err)
 	}
 	config.Version = V0_10_0_0
 	if err := config.Validate(); err != nil {
