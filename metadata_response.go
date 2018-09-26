@@ -223,7 +223,10 @@ func (r *MetadataResponse) encode(pe packetEncoder) error {
 	}
 
 	if r.Version >= 2 {
-		pe.putNullableString(r.ClusterID)
+		err := pe.putNullableString(r.ClusterID)
+		if err != nil {
+			return err
+		}
 	}
 
 	if r.Version >= 1 {
