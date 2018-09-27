@@ -24,7 +24,7 @@ func ExampleConsumerGroup() {
 	config.Consumer.Return.Errors = true
 
 	// Start with a client
-	client, err := NewClient([]string{"localhost:9092"}, nil)
+	client, err := NewClient([]string{"localhost:9092"}, config)
 	if err != nil {
 		panic(err)
 	}

@@ -44,7 +44,7 @@ func TestFuncConsumerGroupPartitioning(t *testing.T) {
 	m2.WaitForHandlers(5)
 
 	// shutdown M2
-	m1.AssertCleanShutdown()
+	m2.AssertCleanShutdown()
 }
 
 func TestFuncConsumerGroupExcessConsumers(t *testing.T) {
