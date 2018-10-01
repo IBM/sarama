@@ -116,11 +116,16 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionZSTD:
-			c, err := zstd.CompressLevel(nil, m.Value, m.CompressionLevel)
-			if err != nil {
-				return err
+			if len(m.Value) == 0 {
+				// Hardcoded empty ZSTD frame, see: https://github.com/DataDog/zstd/issues/41
+				m.compressedCache = []byte{0x28, 0xb5, 0x2f, 0xfd, 0x24, 0x00, 0x01, 0x00, 0x00, 0x99, 0xe9, 0xd8, 0x51}
+			} else {
+				c, err := zstd.CompressLevel(nil, m.Value, m.CompressionLevel)
+				if err != nil {
+					return err
+				}
+				m.compressedCache = c
 			}
-			m.compressedCache = c
 			payload = m.compressedCache
 		default:
 			return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", m.Codec)}
