@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/DataDog/zstd"
 	"github.com/eapache/go-xerial-snappy"
 	"github.com/pierrec/lz4"
 )
@@ -14,14 +15,15 @@ import (
 // CompressionCodec represents the various compression codecs recognized by Kafka in messages.
 type CompressionCodec int8
 
-// only the last two bits are really used
-const compressionCodecMask int8 = 0x03
+// The lowest 3 bits contain the compression codec used for the message
+const compressionCodecMask int8 = 0x07
 
 const (
 	CompressionNone   CompressionCodec = 0
 	CompressionGZIP   CompressionCodec = 1
 	CompressionSnappy CompressionCodec = 2
 	CompressionLZ4    CompressionCodec = 3
+	CompressionZSTD   CompressionCodec = 4
 )
 
 func (cc CompressionCodec) String() string {
@@ -113,7 +115,18 @@ func (m *Message) encode(pe packetEncoder) error {
 			}
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
-
+		case CompressionZSTD:
+			if len(m.Value) == 0 {
+				// Hardcoded empty ZSTD frame, see: https://github.com/DataDog/zstd/issues/41
+				m.compressedCache = []byte{0x28, 0xb5, 0x2f, 0xfd, 0x24, 0x00, 0x01, 0x00, 0x00, 0x99, 0xe9, 0xd8, 0x51}
+			} else {
+				c, err := zstd.CompressLevel(nil, m.Value, m.CompressionLevel)
+				if err != nil {
+					return err
+				}
+				m.compressedCache = c
+			}
+			payload = m.compressedCache
 		default:
 			return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", m.Codec)}
 		}
@@ -207,7 +220,16 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if err := m.decodeSet(); err != nil {
 			return err
 		}
-
+	case CompressionZSTD:
+		if m.Value == nil {
+			break
+		}
+		if m.Value, err = zstd.Decompress(nil, m.Value); err != nil {
+			return err
+		}
+		if err := m.decodeSet(); err != nil {
+			return err
+		}
 	default:
 		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", m.Codec)}
 	}
