@@ -176,7 +176,7 @@ func (client *client) Config() *Config {
 func (client *client) Brokers() []*Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
-	brokers := make([]*Broker, 0)
+	brokers := make([]*Broker, 0, len(client.brokers))
 	for _, broker := range client.brokers {
 		brokers = append(brokers, broker)
 	}
