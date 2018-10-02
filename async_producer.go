@@ -493,7 +493,34 @@ func (pp *partitionProducer) dispatch() {
 		pp.brokerProducer.input <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: syn}
 	}
 
-	for msg := range pp.input {
+	defer func() {
+		if pp.brokerProducer != nil {
+			pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
+		}
+	}()
+
+	for {
+		var abandoned chan struct{}
+		if pp.brokerProducer != nil {
+			abandoned = pp.brokerProducer.abandoned
+		}
+
+		var msg *ProducerMessage
+		var ok bool
+		select {
+		case <-abandoned:
+			// a message on the abandoned channel means that our current broker selection is out of date
+			Logger.Printf("producer/leader/%s/%d abandoning broker %d\n", pp.topic, pp.partition, pp.leader.ID())
+			pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
+			pp.brokerProducer = nil
+			time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+			continue
+		case msg, ok = <-pp.input:
+			if !ok {
+				return
+			}
+		}
+
 		if msg.retries > pp.highWatermark {
 			// a new, higher, retry level; handle it and then back off
 			pp.newHighWatermark(msg.retries)
@@ -532,10 +559,6 @@ func (pp *partitionProducer) dispatch() {
 		}
 
 		pp.brokerProducer.input <- msg
-	}
-
-	if pp.brokerProducer != nil {
-		pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
 	}
 }
 
@@ -637,6 +660,10 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		close(responses)
 	})
 
+	if p.conf.Producer.Retry.Max <= 0 {
+		bp.abandoned = make(chan struct{})
+	}
+
 	return bp
 }
 
@@ -655,6 +682,7 @@ type brokerProducer struct {
 	input     chan *ProducerMessage
 	output    chan<- *produceSet
 	responses <-chan *brokerProducerResponse
+	abandoned chan struct{}
 
 	buffer     *produceSet
 	timer      <-chan time.Time
@@ -829,7 +857,12 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		// Retriable errors
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
-			retryTopics = append(retryTopics, topic)
+			if bp.parent.conf.Producer.Retry.Max <= 0 {
+				bp.parent.returnErrors(pSet.msgs, block.Err)
+				bp.parent.abandonBrokerConnection(bp.broker)
+			} else {
+				retryTopics = append(retryTopics, topic)
+			}
 		// Other non-retriable errors
 		default:
 			bp.parent.returnErrors(pSet.msgs, block.Err)
@@ -1041,6 +1074,11 @@ func (p *asyncProducer) unrefBrokerProducer(broker *Broker, bp *brokerProducer) 
 func (p *asyncProducer) abandonBrokerConnection(broker *Broker) {
 	p.brokerLock.Lock()
 	defer p.brokerLock.Unlock()
+
+	bc, ok := p.brokers[broker]
+	if ok && bc.abandoned != nil {
+		close(bc.abandoned)
+	}
 
 	delete(p.brokers, broker)
 }
