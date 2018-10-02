@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/DataDog/zstd"
 	"github.com/eapache/go-xerial-snappy"
 	"github.com/pierrec/lz4"
 )
@@ -116,7 +115,7 @@ func (m *Message) encode(pe packetEncoder) error {
 			m.compressedCache = buf.Bytes()
 			payload = m.compressedCache
 		case CompressionZSTD:
-			c, err := zstd.CompressLevel(nil, m.Value, m.CompressionLevel)
+			c, err := zstdCompressLevel(nil, m.Value, m.CompressionLevel)
 			if err != nil {
 				return err
 			}
@@ -219,7 +218,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 		if m.Value == nil {
 			break
 		}
-		if m.Value, err = zstd.Decompress(nil, m.Value); err != nil {
+		if m.Value, err = zstdDecompress(nil, m.Value); err != nil {
 			return err
 		}
 		if err := m.decodeSet(); err != nil {
