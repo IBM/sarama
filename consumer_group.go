@@ -734,7 +734,7 @@ type consumerGroupClaim struct {
 
 func newConsumerGroupClaim(sess *consumerGroupSession, topic string, partition int32, offset int64) (*consumerGroupClaim, error) {
 	pcm, err := sess.parent.consumer.ConsumePartition(topic, partition, offset)
-	if err == ErrOffsetOutOfRange {
+	if err == ErrOffsetOutOfRange && sess.parent.config.Consumer.Group.ResetInvalidOffsets {
 		offset = sess.parent.config.Consumer.Offsets.Initial
 		pcm, err = sess.parent.consumer.ConsumePartition(topic, partition, offset)
 	}
