@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/eapache/go-xerial-snappy"
@@ -174,31 +173,9 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	switch b.Codec {
-	case CompressionNone:
-	case CompressionGZIP:
-		reader, err := gzip.NewReader(bytes.NewReader(recBuffer))
-		if err != nil {
-			return err
-		}
-		if recBuffer, err = ioutil.ReadAll(reader); err != nil {
-			return err
-		}
-	case CompressionSnappy:
-		if recBuffer, err = snappy.Decode(recBuffer); err != nil {
-			return err
-		}
-	case CompressionLZ4:
-		reader := lz4.NewReader(bytes.NewReader(recBuffer))
-		if recBuffer, err = ioutil.ReadAll(reader); err != nil {
-			return err
-		}
-	case CompressionZSTD:
-		if recBuffer, err = zstdDecompress(nil, recBuffer); err != nil {
-			return err
-		}
-	default:
-		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", b.Codec)}
+	recBuffer, err = decompress(b.Codec, recBuffer)
+	if err != nil {
+		return err
 	}
 
 	b.recordsLen = len(recBuffer)

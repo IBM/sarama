@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"io/ioutil"
 	"time"
 
 	"github.com/eapache/go-xerial-snappy"
@@ -179,53 +178,18 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	switch m.Codec {
 	case CompressionNone:
 		// nothing to do
-	case CompressionGZIP:
+	default:
 		if m.Value == nil {
 			break
 		}
-		reader, err := gzip.NewReader(bytes.NewReader(m.Value))
+
+		m.Value, err = decompress(m.Codec, m.Value)
 		if err != nil {
 			return err
 		}
-		if m.Value, err = ioutil.ReadAll(reader); err != nil {
-			return err
-		}
 		if err := m.decodeSet(); err != nil {
 			return err
 		}
-	case CompressionSnappy:
-		if m.Value == nil {
-			break
-		}
-		if m.Value, err = snappy.Decode(m.Value); err != nil {
-			return err
-		}
-		if err := m.decodeSet(); err != nil {
-			return err
-		}
-	case CompressionLZ4:
-		if m.Value == nil {
-			break
-		}
-		reader := lz4.NewReader(bytes.NewReader(m.Value))
-		if m.Value, err = ioutil.ReadAll(reader); err != nil {
-			return err
-		}
-		if err := m.decodeSet(); err != nil {
-			return err
-		}
-	case CompressionZSTD:
-		if m.Value == nil {
-			break
-		}
-		if m.Value, err = zstdDecompress(nil, m.Value); err != nil {
-			return err
-		}
-		if err := m.decodeSet(); err != nil {
-			return err
-		}
-	default:
-		return PacketDecodingError{fmt.Sprintf("invalid compression specified (%d)", m.Codec)}
 	}
 
 	return pd.pop()
