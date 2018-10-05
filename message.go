@@ -1,13 +1,8 @@
 package sarama
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
 	"time"
-
-	"github.com/eapache/go-xerial-snappy"
-	"github.com/pierrec/lz4"
 )
 
 // CompressionCodec represents the various compression codecs recognized by Kafka in messages.
@@ -76,53 +71,12 @@ func (m *Message) encode(pe packetEncoder) error {
 		payload = m.compressedCache
 		m.compressedCache = nil
 	} else if m.Value != nil {
-		switch m.Codec {
-		case CompressionNone:
-			payload = m.Value
-		case CompressionGZIP:
-			var buf bytes.Buffer
-			var writer *gzip.Writer
-			if m.CompressionLevel != CompressionLevelDefault {
-				writer, err = gzip.NewWriterLevel(&buf, m.CompressionLevel)
-				if err != nil {
-					return err
-				}
-			} else {
-				writer = gzip.NewWriter(&buf)
-			}
-			if _, err = writer.Write(m.Value); err != nil {
-				return err
-			}
-			if err = writer.Close(); err != nil {
-				return err
-			}
-			m.compressedCache = buf.Bytes()
-			payload = m.compressedCache
-		case CompressionSnappy:
-			tmp := snappy.Encode(m.Value)
-			m.compressedCache = tmp
-			payload = m.compressedCache
-		case CompressionLZ4:
-			var buf bytes.Buffer
-			writer := lz4.NewWriter(&buf)
-			if _, err = writer.Write(m.Value); err != nil {
-				return err
-			}
-			if err = writer.Close(); err != nil {
-				return err
-			}
-			m.compressedCache = buf.Bytes()
-			payload = m.compressedCache
-		case CompressionZSTD:
-			c, err := zstdCompressLevel(nil, m.Value, m.CompressionLevel)
-			if err != nil {
-				return err
-			}
-			m.compressedCache = c
-			payload = m.compressedCache
-		default:
-			return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", m.Codec)}
+
+		payload, err = compress(m.Codec, m.CompressionLevel, m.Value)
+		if err != nil {
+			return err
 		}
+		m.compressedCache = payload
 		// Keep in mind the compressed payload size for metric gathering
 		m.compressedSize = len(payload)
 	}
