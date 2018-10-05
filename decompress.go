@@ -19,13 +19,13 @@ import (
 )
 
 var (
-	lz4Pool = sync.Pool{
+	lz4ReaderPool = sync.Pool{
 		New: func() interface{} {
 			return lz4.NewReader(nil)
 		},
 	}
 
-	gzipPool sync.Pool
+	gzipReaderPool sync.Pool
 )
 
 func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
@@ -36,7 +36,7 @@ func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
 		var (
 			err        error
 			reader     *gzip.Reader
-			readerIntf = gzipPool.Get()
+			readerIntf = gzipReaderPool.Get()
 		)
 		if readerIntf != nil {
 			reader = readerIntf.(*gzip.Reader)
@@ -47,7 +47,7 @@ func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
 			}
 		}
 
-		defer gzipPool.Put(reader)
+		defer gzipReaderPool.Put(reader)
 
 		if err := reader.Reset(bytes.NewReader(data)); err != nil {
 			return nil, err
@@ -57,8 +57,8 @@ func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
 	case CompressionSnappy:
 		return snappy.Decode(data)
 	case CompressionLZ4:
-		reader := lz4Pool.Get().(*lz4.Reader)
-		defer lz4Pool.Put(reader)
+		reader := lz4ReaderPool.Get().(*lz4.Reader)
+		defer lz4ReaderPool.Put(reader)
 
 		reader.Reset(bytes.NewReader(data))
 		return ioutil.ReadAll(reader)
