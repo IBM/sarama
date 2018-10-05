@@ -1,13 +1,8 @@
 package sarama
 
 import (
-	"bytes"
-	"compress/gzip"
 	"fmt"
 	"time"
-
-	"github.com/eapache/go-xerial-snappy"
-	"github.com/pierrec/lz4"
 )
 
 const recordBatchOverhead = 49
@@ -196,50 +191,8 @@ func (b *RecordBatch) encodeRecords(pe packetEncoder) error {
 	}
 	b.recordsLen = len(raw)
 
-	switch b.Codec {
-	case CompressionNone:
-		b.compressedRecords = raw
-	case CompressionGZIP:
-		var buf bytes.Buffer
-		var writer *gzip.Writer
-		if b.CompressionLevel != CompressionLevelDefault {
-			writer, err = gzip.NewWriterLevel(&buf, b.CompressionLevel)
-			if err != nil {
-				return err
-			}
-		} else {
-			writer = gzip.NewWriter(&buf)
-		}
-		if _, err := writer.Write(raw); err != nil {
-			return err
-		}
-		if err := writer.Close(); err != nil {
-			return err
-		}
-		b.compressedRecords = buf.Bytes()
-	case CompressionSnappy:
-		b.compressedRecords = snappy.Encode(raw)
-	case CompressionLZ4:
-		var buf bytes.Buffer
-		writer := lz4.NewWriter(&buf)
-		if _, err := writer.Write(raw); err != nil {
-			return err
-		}
-		if err := writer.Close(); err != nil {
-			return err
-		}
-		b.compressedRecords = buf.Bytes()
-	case CompressionZSTD:
-		c, err := zstdCompressLevel(nil, raw, b.CompressionLevel)
-		if err != nil {
-			return err
-		}
-		b.compressedRecords = c
-	default:
-		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", b.Codec)}
-	}
-
-	return nil
+	b.compressedRecords, err = compress(b.Codec, b.CompressionLevel, raw)
+	return err
 }
 
 func (b *RecordBatch) computeAttributes() int16 {
