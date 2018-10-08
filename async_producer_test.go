@@ -345,9 +345,9 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, ErrNoError)
 	metadataLeader2.AddTopicPartition("my_topic", 1, leader2.BrokerID(), nil, nil, ErrNoError)
 	leader1.Returns(metadataLeader2)
+	leader1.Returns(metadataLeader2)
 
 	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 1}
-	leader1.Returns(metadataLeader2)
 	prodSuccess := new(ProduceResponse)
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	prodSuccess.AddTopicPartition("my_topic", 1, ErrNoError)

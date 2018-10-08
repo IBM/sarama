@@ -177,7 +177,7 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 	broker.Close()
 }
 
-func TestSyncProducerRefreshMetadata(t *testing.T) {
+func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
