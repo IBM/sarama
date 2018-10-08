@@ -499,25 +499,18 @@ func (pp *partitionProducer) dispatch() {
 		}
 	}()
 
-	for {
-		var abandoned chan struct{}
-		if pp.brokerProducer != nil {
-			abandoned = pp.brokerProducer.abandoned
-		}
+	for msg := range pp.input {
 
-		var msg *ProducerMessage
-		var ok bool
-		select {
-		case <-abandoned:
-			// a message on the abandoned channel means that our current broker selection is out of date
-			Logger.Printf("producer/leader/%s/%d abandoning broker %d\n", pp.topic, pp.partition, pp.leader.ID())
-			pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
-			pp.brokerProducer = nil
-			time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
-			continue
-		case msg, ok = <-pp.input:
-			if !ok {
-				return
+		if pp.brokerProducer != nil && pp.brokerProducer.abandoned != nil {
+			select {
+			case <-pp.brokerProducer.abandoned:
+				// a message on the abandoned channel means that our current broker selection is out of date
+				Logger.Printf("producer/leader/%s/%d abandoning broker %d\n", pp.topic, pp.partition, pp.leader.ID())
+				pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
+				pp.brokerProducer = nil
+				time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+			default:
+				// producer connection is still open.
 			}
 		}
 
