@@ -7,7 +7,7 @@ type OffsetFetchRequest struct {
 }
 
 func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
-	if r.Version < 0 || r.Version > 2 {
+	if r.Version < 0 || r.Version > 5 {
 		return PacketEncodingError{"invalid or unsupported OffsetFetchRequest version field"}
 	}
 
@@ -42,7 +42,7 @@ func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error)
 	if err != nil {
 		return err
 	}
-	if partitionCount <= 0 {
+	if (partitionCount == 0 && version < 2) || partitionCount < 0 {
 		return nil
 	}
 	r.partitions = make(map[string][]int32)
@@ -74,8 +74,20 @@ func (r *OffsetFetchRequest) requiredVersion() KafkaVersion {
 		return V0_8_2_0
 	case 2:
 		return V0_10_2_0
+	case 3:
+		return V0_11_0_0
+	case 4:
+		return V2_0_0_0
+	case 5:
+		return V2_1_0_0
 	default:
 		return MinVersion
+	}
+}
+
+func (r *OffsetFetchRequest) ZeroPartitions() {
+	if r.partitions == nil && r.Version >= 2 {
+		r.partitions = make(map[string][]int32)
 	}
 }
 
