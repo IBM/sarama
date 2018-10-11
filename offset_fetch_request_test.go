@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -25,18 +26,30 @@ var (
 		0xff, 0xff, 0xff, 0xff}
 )
 
+func TestOffsetFetchRequestNoPartitions(t *testing.T) {
+	for version := 0; version <= 5; version++ {
+		request := new(OffsetFetchRequest)
+		request.Version = int16(version)
+		request.ZeroPartitions()
+		testRequest(t, fmt.Sprintf("no group, no partitions %d", version), request, offsetFetchRequestNoGroupNoPartitions)
+
+		request.ConsumerGroup = "blah"
+		testRequest(t, fmt.Sprintf("no partitions %d", version), request, offsetFetchRequestNoPartitions)
+	}
+}
 func TestOffsetFetchRequest(t *testing.T) {
-	request := new(OffsetFetchRequest)
-	testRequest(t, "no group, no partitions", request, offsetFetchRequestNoGroupNoPartitions)
-
-	request.ConsumerGroup = "blah"
-	testRequest(t, "no partitions", request, offsetFetchRequestNoPartitions)
-
-	request.AddPartition("topicTheFirst", 0x4F4F4F4F)
-	testRequest(t, "one partition", request, offsetFetchRequestOnePartition)
+	for version := 0; version <= 5; version++ {
+		request := new(OffsetFetchRequest)
+		request.Version = int16(version)
+		request.ConsumerGroup = "blah"
+		request.AddPartition("topicTheFirst", 0x4F4F4F4F)
+		testRequest(t, fmt.Sprintf("one partition %d", version), request, offsetFetchRequestOnePartition)
+	}
 }
 
 func TestOffsetFetchRequestAllPartitions(t *testing.T) {
-	requestV2 := &OffsetFetchRequest{Version: 2, ConsumerGroup: "blah"}
-	testRequest(t, "all partitions", requestV2, offsetFetchRequestAllPartitions)
+	for version := 2; version <= 5; version++ {
+		request := &OffsetFetchRequest{Version: int16(version), ConsumerGroup: "blah"}
+		testRequest(t, fmt.Sprintf("all partitions %d", version), request, offsetFetchRequestAllPartitions)
+	}
 }
