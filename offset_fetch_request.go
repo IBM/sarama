@@ -1,28 +1,33 @@
 package sarama
 
 type OffsetFetchRequest struct {
-	ConsumerGroup string
 	Version       int16
+	ConsumerGroup string
 	partitions    map[string][]int32
 }
 
 func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
-	if r.Version < 0 || r.Version > 1 {
+	if r.Version < 0 || r.Version > 2 {
 		return PacketEncodingError{"invalid or unsupported OffsetFetchRequest version field"}
 	}
 
 	if err = pe.putString(r.ConsumerGroup); err != nil {
 		return err
 	}
-	if err = pe.putArrayLength(len(r.partitions)); err != nil {
-		return err
-	}
-	for topic, partitions := range r.partitions {
-		if err = pe.putString(topic); err != nil {
+
+	if r.Version >= 2 && r.partitions == nil {
+		pe.putInt32(-1)
+	} else {
+		if err = pe.putArrayLength(len(r.partitions)); err != nil {
 			return err
 		}
-		if err = pe.putInt32Array(partitions); err != nil {
-			return err
+		for topic, partitions := range r.partitions {
+			if err = pe.putString(topic); err != nil {
+				return err
+			}
+			if err = pe.putInt32Array(partitions); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -37,7 +42,7 @@ func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error)
 	if err != nil {
 		return err
 	}
-	if partitionCount == 0 {
+	if partitionCount <= 0 {
 		return nil
 	}
 	r.partitions = make(map[string][]int32)
@@ -67,6 +72,8 @@ func (r *OffsetFetchRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
 		return V0_8_2_0
+	case 2:
+		return V0_10_2_0
 	default:
 		return MinVersion
 	}
