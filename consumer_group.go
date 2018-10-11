@@ -208,6 +208,17 @@ func (c *consumerGroup) newSession(ctx context.Context, coordinator *Broker, top
 		}
 
 		return c.newSession(ctx, coordinator, topics, handler, retries-1)
+	case ErrNotCoordinatorForConsumer: // update coordinator and retry immediately
+		if err := c.client.RefreshCoordinator(c.groupID); err != nil {
+			return nil, err
+		}
+
+		coordinator, err = c.client.Coordinator(c.groupID)
+		if err != nil {
+			return nil, err
+		}
+
+		return c.newSession(ctx, coordinator, topics, handler, retries)
 	default:
 		return nil, join.Err
 	}
@@ -603,7 +614,7 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 }
 
 func (s *consumerGroupSession) release(withCleanup bool) (err error) {
-	// signal release, stop heartbeat
+	// signal release
 	s.cancel()
 
 	// wait for consumers to exit
