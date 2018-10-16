@@ -292,7 +292,7 @@ type Config struct {
 		// offsets. This currently requires the manual use of an OffsetManager
 		// but will eventually be automated.
 		Offsets struct {
-			// How frequently to commit updated offsets. Defaults to 1s.
+			// How frequently to commit updated offsets. Value 0 will disable autocommit offsets. Defaults to 1s.
 			CommitInterval time.Duration
 
 			// The initial offset to use if no offset was previously committed.
@@ -543,8 +543,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.MaxProcessingTime must be > 0")
 	case c.Consumer.Retry.Backoff < 0:
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
-	case c.Consumer.Offsets.CommitInterval <= 0:
-		return ConfigurationError("Consumer.Offsets.CommitInterval must be > 0")
+	case c.Consumer.Offsets.CommitInterval < 0:
+		return ConfigurationError("Consumer.Offsets.CommitInterval must be >= 0")
 	case c.Consumer.Offsets.Initial != OffsetOldest && c.Consumer.Offsets.Initial != OffsetNewest:
 		return ConfigurationError("Consumer.Offsets.Initial must be OffsetOldest or OffsetNewest")
 	case c.Consumer.Offsets.Retry.Max < 0:
