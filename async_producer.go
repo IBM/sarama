@@ -851,13 +851,16 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
 			if bp.parent.conf.Producer.Retry.Max <= 0 {
-				bp.parent.returnErrors(pSet.msgs, block.Err)
 				bp.parent.abandonBrokerConnection(bp.broker)
+				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
 			}
 		// Other non-retriable errors
 		default:
+			if bp.parent.conf.Producer.Retry.Max <= 0 {
+				bp.parent.abandonBrokerConnection(bp.broker)
+			}
 			bp.parent.returnErrors(pSet.msgs, block.Err)
 		}
 	})
