@@ -23,6 +23,10 @@ var (
 		0x00, 0x00, 0x00, 0x01,
 		0x00, 0x00, 0x00, 0x04,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01}
+
+	offsetRequestReplicaID = []byte{
+		0x00, 0x00, 0x00, 0x2a,
+		0x00, 0x00, 0x00, 0x00}
 )
 
 func TestOffsetRequest(t *testing.T) {
@@ -40,4 +44,10 @@ func TestOffsetRequestV1(t *testing.T) {
 
 	request.AddBlock("bar", 4, 1, 2) // Last argument is ignored for V1
 	testRequest(t, "one block", request, offsetRequestOneBlockV1)
+}
+
+func TestOffsetRequestReplicaID(t *testing.T) {
+	request := new(OffsetRequest)
+	request.SetReplicaID(42)
+	testRequestEncode(t, "with replica ID", request, offsetRequestReplicaID)
 }
