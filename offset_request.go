@@ -67,10 +67,14 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 	r.Version = version
 
-	// Ignore replica ID
-	if _, err := pd.getInt32(); err != nil {
+	replicaID, err := pd.getInt32()
+	if err != nil {
 		return err
 	}
+	if replicaID >= 0 {
+		r.SetReplicaID(replicaID)
+	}
+
 	blockCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
