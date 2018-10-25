@@ -48,6 +48,12 @@ func TestOffsetRequestV1(t *testing.T) {
 
 func TestOffsetRequestReplicaID(t *testing.T) {
 	request := new(OffsetRequest)
-	request.SetReplicaID(42)
+	replicaID := int32(42)
+	request.SetReplicaID(replicaID)
+
+	if found := request.ReplicaID(); found != replicaID {
+		t.Errorf("replicaID: expected %v, found %v", replicaID, found)
+	}
+
 	testRequest(t, "with replica ID", request, offsetRequestReplicaID)
 }
