@@ -49,5 +49,5 @@ func TestOffsetRequestV1(t *testing.T) {
 func TestOffsetRequestReplicaID(t *testing.T) {
 	request := new(OffsetRequest)
 	request.SetReplicaID(42)
-	testRequestEncode(t, "with replica ID", request, offsetRequestReplicaID)
+	testRequest(t, "with replica ID", request, offsetRequestReplicaID)
 }
