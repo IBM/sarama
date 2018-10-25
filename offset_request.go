@@ -130,6 +130,13 @@ func (r *OffsetRequest) SetReplicaID(id int32) {
 	r.replicaID = &r.storeReplicaID
 }
 
+func (r *OffsetRequest) ReplicaID() int32 {
+	if r.replicaID == nil {
+		return -1
+	}
+	return r.storeReplicaID
+}
+
 func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
