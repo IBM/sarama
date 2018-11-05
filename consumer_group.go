@@ -83,7 +83,7 @@ func NewConsumerGroup(addrs []string, groupID string, config *Config) (ConsumerG
 	return c, nil
 }
 
-// NewConsumerFromClient creates a new consumer group using the given client. It is still
+// NewConsumerGroupFromClient creates a new consumer group using the given client. It is still
 // necessary to call Close() on the underlying client when shutting down this consumer.
 // PLEASE NOTE: consumer groups can only re-use but not share clients.
 func NewConsumerGroupFromClient(groupID string, client Client) (ConsumerGroup, error) {
