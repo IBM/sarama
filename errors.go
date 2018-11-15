@@ -78,7 +78,7 @@ func (err ConfigurationError) Error() string {
 }
 
 // KError is the type of error that can be returned directly by the Kafka broker.
-// See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
+// See https://kafka.apache.org/protocol#protocol_error_codes
 type KError int16
 
 // Numeric error codes returned by the Kafka server.
@@ -145,6 +145,18 @@ const (
 	ErrSASLAuthenticationFailed           KError = 58
 	ErrUnknownProducerID                  KError = 59
 	ErrReassignmentInProgress             KError = 60
+	ErrDelegationTokenAuthDisabled        KError = 61
+	ErrDelegationTokenNotFound            KError = 62
+	ErrDelegationTokenOwnerMismatch       KError = 63
+	ErrDelegationTokenRequestNotAllowed   KError = 64
+	ErrDelegationTokenAuthorizationFailed KError = 65
+	ErrDelegationTokenExpired             KError = 66
+	ErrInvalidPrincipalType               KError = 67
+	ErrNonEmptyGroup                      KError = 68
+	ErrGroupIdNotFound                    KError = 69
+	ErrFetchSessionIdNotFound             KError = 70
+	ErrInvalidFetchSessionEpoch           KError = 71
+	ErrListenerNotFound                   KError = 72
 )
 
 func (err KError) Error() string {
@@ -275,6 +287,30 @@ func (err KError) Error() string {
 		return "kafka server: The broker could not locate the producer metadata associated with the Producer ID."
 	case ErrReassignmentInProgress:
 		return "kafka server: A partition reassignment is in progress."
+	case ErrDelegationTokenAuthDisabled:
+		return "kafka server: Delegation Token feature is not enabled."
+	case ErrDelegationTokenNotFound:
+		return "kafka server: Delegation Token is not found on server."
+	case ErrDelegationTokenOwnerMismatch:
+		return "kafka server: Specified Principal is not valid Owner/Renewer."
+	case ErrDelegationTokenRequestNotAllowed:
+		return "kafka server: Delegation Token requests are not allowed on Plaintext/1-way Ssl channels and on delegation token authenticated channels."
+	case ErrDelegationTokenAuthorizationFailed:
+		return "kafka server: Delegation Token authorization failed."
+	case ErrDelegationTokenExpired:
+		return "kafka server: Delegation Token is expired."
+	case ErrInvalidPrincipalType:
+		return "kafka server: Supplied principalType is not supported"
+	case ErrNonEmptyGroup:
+		return "kafka server: The group is not empty"
+	case ErrGroupIdNotFound:
+		return "kafka server: The group id does not exist"
+	case ErrFetchSessionIdNotFound:
+		return "kafka server: The fetch session Id was not found"
+	case ErrInvalidFetchSessionEpoch:
+		return "kafka server: The fetch session epoch is invalid"
+	case ErrListenerNotFound:
+		return "kafka server: There is no listener on the leader broker that matches the listener on which metadata request was processed"
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
