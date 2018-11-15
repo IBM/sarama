@@ -329,7 +329,7 @@ func (p *asyncProducer) dispatcher() {
 			continue
 		}
 		if msg.byteSize(version) > p.conf.Producer.MaxMessageBytes {
-			p.returnError(msg, ErrMessageSizeTooLarge)
+			p.returnError(msg, ErrMessageTooLarge)
 			continue
 		}
 
@@ -827,7 +827,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		case ErrDuplicateSequenceNumber:
 			bp.parent.returnSuccesses(pSet.msgs)
 		// Retriable errors
-		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
+		case ErrCorruptMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
 			retryTopics = append(retryTopics, topic)
 		// Other non-retriable errors
@@ -850,7 +850,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 			}
 
 			switch block.Err {
-			case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
+			case ErrCorruptMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
 				Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
 					bp.broker.ID(), topic, partition, block.Err)

@@ -247,7 +247,7 @@ type Config struct {
 			Default int32
 			// The maximum number of message bytes to fetch from the broker in a
 			// single request. Messages larger than this will return
-			// ErrMessageTooLarge and will not be consumable, so you must be sure
+			// ErrMessageSizeTooLarge and will not be consumable, so you must be sure
 			// this is at least as large as your largest message. Defaults to 0
 			// (no limit). Similar to the JVM's `fetch.message.max.bytes`. The
 			// global `sarama.MaxResponseSize` still applies.

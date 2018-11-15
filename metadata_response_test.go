@@ -164,7 +164,7 @@ func TestMetadataResponseWithTopicsV0(t *testing.T) {
 		t.Fatal("Decoding produced invalid partition count for topic 0.")
 	}
 
-	if response.Topics[0].Partitions[0].Err != ErrInvalidMessageSize {
+	if response.Topics[0].Partitions[0].Err != ErrInvalidFetchSize {
 		t.Error("Decoding produced invalid topic 0 partition 0 error.")
 	}
 
