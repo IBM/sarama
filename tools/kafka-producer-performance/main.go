@@ -201,7 +201,11 @@ func main() {
 	if err != nil {
 		printErrorAndExit(69, "Failed to create producer: %s", err)
 	}
-	defer producer.Close()
+	defer func() {
+		if err := producer.Close(); err != nil {
+			printErrorAndExit(69, "Failed to close producer: %s", err)
+		}
+	}()
 
 	// Construct -messageLoad messages of appoximately -messageSize random bytes.
 	messages := make([]*sarama.ProducerMessage, *messageLoad)
