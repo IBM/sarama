@@ -507,7 +507,7 @@ func (child *partitionConsumer) parseMessages(msgSet *MessageSet) ([]*ConsumerMe
 		}
 	}
 	if len(messages) == 0 {
-		return nil, ErrIncompleteResponse
+		child.offset++
 	}
 	return messages, nil
 }
@@ -531,7 +531,7 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 		child.offset = offset + 1
 	}
 	if len(messages) == 0 {
-		child.offset += 1
+		child.offset++
 	}
 	return messages, nil
 }
