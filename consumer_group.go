@@ -267,7 +267,7 @@ func (c *consumerGroup) newSession(ctx context.Context, coordinator *Broker, top
 		}
 	}
 
-	return newConsumerGroupSession(c, ctx, claims, join.MemberId, join.GenerationId, handler)
+	return newConsumerGroupSession(ctx, c, claims, join.MemberId, join.GenerationId, handler)
 }
 
 func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (*JoinGroupResponse, error) {
