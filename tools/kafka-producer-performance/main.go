@@ -215,8 +215,9 @@ func main() {
 			printErrorAndExit(69, "Failed to generate message payload: %s", err)
 		}
 		messages[i] = &sarama.ProducerMessage{
-			Topic: *topic,
-			Value: sarama.ByteEncoder(payload),
+			Topic:     *topic,
+			Partition: int32(*partition),
+			Value:     sarama.ByteEncoder(payload),
 		}
 	}
 
