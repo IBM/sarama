@@ -10,7 +10,7 @@ A command line tool to test producer performance.
 ### Usage
 
     # Display all command line options
-    kafka-console-producer -help
+    kafka-producer-performance -help
 	
 	# Minimum invocation
     kafka-producer-performance \
