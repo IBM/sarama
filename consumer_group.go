@@ -221,8 +221,6 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 			return nil, join.Err
 		}
 
-		_ = coordinator.Close()
-
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	case ErrRebalanceInProgress: // retry after backoff
 		if retries <= 0 {
@@ -263,8 +261,6 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		if retries <= 0 {
 			return nil, sync.Err
 		}
-
-		_ = coordinator.Close()
 
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	case ErrRebalanceInProgress: // retry after backoff
