@@ -216,8 +216,7 @@ func main() {
 	}
 
 	// Print out metrics periodically.
-	metricsDone := make(chan struct{})
-	ctx, stopMetrics := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	go func(ctx context.Context) {
 		t := time.Tick(5 * time.Second)
 		for {
@@ -225,7 +224,6 @@ func main() {
 			case <-t:
 				printMetrics(os.Stdout, config.MetricRegistry)
 			case <-ctx.Done():
-				metricsDone <- struct{}{}
 				return
 			}
 		}
@@ -238,9 +236,8 @@ func main() {
 		runAsyncProducer(config, brokers, messages, *throughput)
 	}
 
-	stopMetrics()
-	<-metricsDone
-	close(metricsDone)
+	cancel()
+	<-ctx.Done()
 
 	// Print final metrics.
 	printMetrics(os.Stdout, config.MetricRegistry)
