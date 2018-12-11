@@ -300,7 +300,6 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
-	leader2.Returns(metadataLeader2)
 	leader2.Returns(prodSuccess)
 	expectResults(t, producer, 10, 0)
 
@@ -467,7 +466,6 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	leader1.Returns(prodNotLeader)
 	seedBroker.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader2)
 	seedBroker.Returns(metadataLeader2)
 
 	prodSuccess := new(ProduceResponse)
@@ -654,7 +652,6 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 
 	// succeed this time
 	expectResults(t, producer, 5, 0)
-	seedBroker.Returns(metadataResponse)
 
 	// put five more through
 	for i := 0; i < 5; i++ {
