@@ -361,6 +361,9 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 }
 
 func printMetrics(w io.Writer, r metrics.Registry) {
+	if r.Get("record-send-rate") == nil || r.Get("request-latency-in-ms") == nil {
+		return
+	}
 	recordSendRate := r.Get("record-send-rate").(metrics.Meter).Snapshot()
 	requestLatency := r.Get("request-latency-in-ms").(metrics.Histogram).Snapshot()
 	requestLatencyPercentiles := requestLatency.Percentiles([]float64{0.5, 0.75, 0.95, 0.99, 0.999})
