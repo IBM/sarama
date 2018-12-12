@@ -227,8 +227,10 @@ func main() {
 	}
 
 	// Print out metrics periodically.
+	done := make(chan struct{})
 	ctx, cancel := context.WithCancel(context.Background())
 	go func(ctx context.Context) {
+		defer close(done)
 		t := time.Tick(5 * time.Second)
 		for {
 			select {
@@ -250,7 +252,7 @@ func main() {
 	}
 
 	cancel()
-	<-ctx.Done()
+	<-done
 
 	// Print final metrics.
 	printMetrics(os.Stdout, config.MetricRegistry)
