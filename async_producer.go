@@ -837,9 +837,11 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 	})
 
 	if len(retryTopics) > 0 {
-		err := bp.parent.client.RefreshMetadata(retryTopics...)
-		if err != nil {
-			Logger.Printf("Failed refreshing metadata because of %v\n", err)
+		if bp.parent.conf.Producer.Idempotent {
+			err := bp.parent.client.RefreshMetadata(retryTopics...)
+			if err != nil {
+				Logger.Printf("Failed refreshing metadata because of %v\n", err)
+			}
 		}
 
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
@@ -858,9 +860,13 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 					bp.currentRetries[topic] = make(map[int32]error)
 				}
 				bp.currentRetries[topic][partition] = block.Err
+				if bp.parent.conf.Producer.Idempotent {
+					go bp.parent.retryBatch(topic, partition, pSet, block.Err)
+				} else {
+					bp.parent.retryMessages(pSet.msgs, block.Err)
+				}
 				// dropping the following messages has the side effect of incrementing their retry count
 				bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
-				bp.parent.retryBatch(topic, partition, pSet, block.Err)
 			}
 		})
 	}
