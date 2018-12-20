@@ -157,6 +157,10 @@ const (
 	ErrFetchSessionIDNotFound             KError = 70
 	ErrInvalidFetchSessionEpoch           KError = 71
 	ErrListenerNotFound                   KError = 72
+	ErrTopicDeletionDisabled              KError = 73
+	ErrFencedLeaderEpoch                  KError = 74
+	ErrUnknownLeaderEpoch                 KError = 75
+	ErrUnsupportedCompressionType         KError = 76
 )
 
 func (err KError) Error() string {
@@ -311,6 +315,14 @@ func (err KError) Error() string {
 		return "kafka server: The fetch session epoch is invalid."
 	case ErrListenerNotFound:
 		return "kafka server: There is no listener on the leader broker that matches the listener on which metadata request was processed."
+	case ErrTopicDeletionDisabled:
+		return "kafka server: Topic deletion is disabled."
+	case ErrFencedLeaderEpoch:
+		return "kafka server: The leader epoch in the request is older than the epoch on the broker."
+	case ErrUnknownLeaderEpoch:
+		return "kafka server: The leader epoch in the request is newer than the epoch on the broker."
+	case ErrUnsupportedCompressionType:
+		return "kafka server: The requesting client does not support the compression type of given partition."
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
