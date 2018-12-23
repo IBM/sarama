@@ -54,6 +54,8 @@ type Config struct {
 			// Whether or not to use SASL authentication when connecting to the broker
 			// (defaults to false).
 			Enable bool
+			// The type of SASL mechanism to enable. Possible values: OAUTHBEARER, PLAIN (defaults to PLAIN)
+			Mechanism SaslMechanism
 			// Whether or not to send the Kafka SASL handshake first if enabled
 			// (defaults to true). You should only set this to false if you're using
 			// a non-Kafka SASL proxy.
@@ -61,6 +63,10 @@ type Config struct {
 			//username and password for SASL/PLAIN authentication
 			User     string
 			Password string
+			// TokenProvider is a bearer token generator for the OAUTHBEARER flow. You can define an instance of
+			// OAuthBearerTokenProvider that generates authentication tokens according to your Kafka cluster's
+			// configuration.
+			TokenProvider OAuthBearerTokenProvider
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection.
@@ -454,10 +460,28 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Net.WriteTimeout must be > 0")
 	case c.Net.KeepAlive < 0:
 		return ConfigurationError("Net.KeepAlive must be >= 0")
-	case c.Net.SASL.Enable == true && c.Net.SASL.User == "":
-		return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
-	case c.Net.SASL.Enable == true && c.Net.SASL.Password == "":
-		return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
+	case c.Net.SASL.Enable == true:
+		// For backwards compatibility, empty mechanism value defaults to PLAIN
+		isSaslPlain := len(c.Net.SASL.Mechanism) == 0 || c.Net.SASL.Mechanism == SaslTypePlaintext
+		if isSaslPlain {
+			if c.Net.SASL.User == "" {
+				return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
+			}
+			if c.Net.SASL.Password == "" {
+				return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
+			}
+		} else if c.Net.SASL.Mechanism == SaslTypeOAuth {
+			if c.Net.SASL.TokenProvider == nil {
+				return ConfigurationError("A OAuthBearerTokenProvider instance must be provided to Net.SASL.User.TokenProvider")
+			}
+			if !c.Net.SASL.Handshake {
+				Logger.Println("A SASL hanshake is required for SASL/OAUTHBEARER, ignoring disabled handshake config")
+			}
+		} else {
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s` and `%s`",
+				SaslTypeOAuth, SaslTypePlaintext)
+			return ConfigurationError(msg)
+		}
 	}
 
 	// validate the Admin values
