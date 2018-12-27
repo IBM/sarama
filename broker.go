@@ -66,8 +66,10 @@ const (
 // can generate bearer tokens sent to Kafka brokers for authentication.
 type OAuthBearerTokenProvider interface {
 	// Token returns a bearer token. Because this method may be called multiple
-	// times, the implementor must ensure that each invocation returns a new,
-	// unexpired token.
+	// times, each invocation returns a new, unexpired token. This method should
+	// not block indefinitely. A timeout error should be returned after a short
+	// period of inactivity so that the broker connection logic can log
+	// debugging information and retry.
 	Token() (string, error)
 }
 
