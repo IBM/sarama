@@ -959,15 +959,13 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string) (int, err
 
 func (b *Broker) receiveSASLOAuthBearerServerResponse() (int, error) {
 
-	var (
-		bytesRead      int
-		err            error
-		totalBytesRead int
-	)
+	var totalBytesRead int
 
 	header := make([]byte, 8)
 
-	if bytesRead, err = io.ReadFull(b.conn, header); err != nil {
+	bytesRead, err := io.ReadFull(b.conn, header)
+
+	if err != nil {
 		return 0, err
 	}
 
@@ -976,7 +974,9 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse() (int, error) {
 	length := binary.BigEndian.Uint32(header[:4])
 	payload := make([]byte, length-4)
 
-	if bytesRead, err = io.ReadFull(b.conn, payload); err != nil {
+	bytesRead, err = io.ReadFull(b.conn, payload)
+
+	if err != nil {
 		return bytesRead, err
 	}
 
