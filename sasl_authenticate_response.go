@@ -34,7 +34,7 @@ func (r *SaslAuthenticateResponse) decode(pd packetDecoder, version int16) error
 }
 
 func (r *SaslAuthenticateResponse) key() int16 {
-	return 36
+	return APIKeySASLAuth
 }
 
 func (r *SaslAuthenticateResponse) version() int16 {

@@ -46,22 +46,29 @@ type Broker struct {
 	brokerResponseSize     metrics.Histogram
 }
 
-// SaslMechanism specifies the SASL mechanism the client uses to authenticate with the broker
-type SaslMechanism string
+// SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
+type SASLMechanism string
 
 const (
-	// SaslTypeOAuth represents the SASL/OAUTHBEARER mechanism (Kafka 2.0.0+)
-	SaslTypeOAuth = "OAUTHBEARER"
-	// SaslTypePlaintext represents the SASL/PLAIN mechanism
-	SaslTypePlaintext = "PLAIN"
+	// SASLTypeOAuth represents the SASL/OAUTHBEARER mechanism (Kafka 2.0.0+)
+	SASLTypeOAuth = "OAUTHBEARER"
+	// SASLTypePlaintext represents the SASL/PLAIN mechanism
+	SASLTypePlaintext = "PLAIN"
+	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
+	// server negotiate SASL auth using opaque packets.
+	SASLHandshakeV0 = int16(0)
+	// SASLHandshakeV1 is v1 of the Kafka SASL handshake protocol. Client and
+	// server negotiate SASL by wrapping tokens with Kafka protocol headers.
+	SASLHandshakeV1 = int16(1)
 )
 
-// OAuthBearerTokenProvider is an interface that encapsualtes bearer token creation in an
-// unopinionated way. Users are free to decide how to construct bearer tokens and how often
-// they are be refreshed.
+// OAuthBearerTokenProvider is the interface that encapsulates how implementors
+// can generate bearer tokens sent to Kafka brokers for authentication.
 type OAuthBearerTokenProvider interface {
-	// Return a valid bearer token.
-	Token() []byte
+	// Token returns a bearer token. Because this method may be called multiple
+	// times, the implementor must ensure that each invocation returns a new,
+	// unexpired token.
+	Token() (string, error)
 }
 
 type responsePromise struct {
@@ -145,9 +152,9 @@ func (b *Broker) Open(conf *Config) error {
 		if conf.Net.SASL.Enable {
 
 			switch conf.Net.SASL.Mechanism {
-			case SaslTypeOAuth:
+			case SASLTypeOAuth:
 				b.connErr = b.sendAndReceiveSASLOAuth(conf.Net.SASL.TokenProvider)
-			case SaslTypePlaintext:
+			case SASLTypePlaintext:
 				b.connErr = b.sendAndReceiveSASLPlainAuth()
 			default:
 				b.connErr = b.sendAndReceiveSASLPlainAuth()
@@ -772,7 +779,7 @@ func (b *Broker) responseReceiver() {
 }
 
 func (b *Broker) sendAndReceiveSASLHandshake(saslType string, version int16) error {
-	rb := &SaslHandshakeRequest{saslType, version}
+	rb := &SaslHandshakeRequest{Mechanism: saslType, Version: version}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
 	buf, err := encode(req, b.conf.MetricRegistry)
@@ -842,7 +849,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType string, version int16) err
 // of responding to bad credentials but thats how its being done today.
 func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 	if b.conf.Net.SASL.Handshake {
-		handshakeErr := b.sendAndReceiveSASLHandshake(SaslTypePlaintext, 0)
+		handshakeErr := b.sendAndReceiveSASLHandshake(SASLTypePlaintext, SASLHandshakeV0)
 		if handshakeErr != nil {
 			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
 			return handshakeErr
@@ -885,21 +892,23 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 // https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=75968876
 func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider OAuthBearerTokenProvider) error {
 
-	// This version allows us to wrap tokens in the Kafka protocol, as opposed
-	// to sending opaque packets
-	handshakeVersion := int16(1)
-
-	if err := b.sendAndReceiveSASLHandshake(SaslTypeOAuth, handshakeVersion); err != nil {
-		Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+	if err := b.sendAndReceiveSASLHandshake(SASLTypeOAuth, SASLHandshakeV1); err != nil {
 		return err
 	}
 
 	requestTime := time.Now()
 
-	var bytesWritten int
-	var err error
+	var (
+		bytesWritten int
+		err          error
+		token        string
+	)
 
-	if bytesWritten, err = b.sendSASLOAuthBearerClientResponse(tokenProvider.Token()); err != nil {
+	if token, err = tokenProvider.Token(); err != nil {
+		return err
+	}
+
+	if bytesWritten, err = b.sendSASLOAuthBearerClientResponse(token); err != nil {
 		return err
 	}
 
@@ -917,23 +926,21 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider OAuthBearerTokenProvider)
 	return nil
 }
 
-func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken []byte) (int, error) {
+func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string) (int, error) {
 
 	// Initial client response as described by RFC-7628
 	// https://tools.ietf.org/html/rfc7628
-	oauthRequest := []byte(`n,,`)
-	oauthRequest = append(oauthRequest, '\x01')
-	oauthRequest = append(oauthRequest, []byte(`auth=Bearer `)...)
-	oauthRequest = append(oauthRequest, bearerToken...)
-	oauthRequest = append(oauthRequest, '\x01')
-	oauthRequest = append(oauthRequest, '\x01')
+
+	oauthRequest := []byte(fmt.Sprintf("n,,\x01auth=Bearer %s\x01\x01", bearerToken))
 
 	rb := &SaslAuthenticateRequest{oauthRequest}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
 
-	var buf []byte
-	var err error
+	var (
+		buf []byte
+		err error
+	)
 
 	buf, err = encode(req, b.conf.MetricRegistry)
 
@@ -948,7 +955,6 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken []byte) (int, err
 	var bytesWritten int
 
 	if bytesWritten, err = b.conn.Write(buf); err != nil {
-		Logger.Printf("Failed to send SASL/OAUTHBEARER initial request %s: %s\n", b.addr, err.Error())
 		return 0, err
 	}
 
@@ -959,14 +965,15 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken []byte) (int, err
 
 func (b *Broker) receiveSASLOAuthBearerServerResponse() (int, error) {
 
-	var bytesRead int
-	var err error
-	totalBytesRead := 0
+	var (
+		bytesRead      int
+		err            error
+		totalBytesRead int
+	)
 
 	header := make([]byte, 8)
 
 	if bytesRead, err = io.ReadFull(b.conn, header); err != nil {
-		Logger.Printf("Failed to read SASL/OAUTHBEARER intitial response header : %s\n", err.Error())
 		return 0, err
 	}
 
@@ -976,7 +983,6 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse() (int, error) {
 	payload := make([]byte, length-4)
 
 	if bytesRead, err = io.ReadFull(b.conn, payload); err != nil {
-		Logger.Printf("Failed to read SASL/OAUTHBEARER intitial response payload : %s\n", err.Error())
 		return bytesRead, err
 	}
 
@@ -985,16 +991,12 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse() (int, error) {
 	res := &SaslAuthenticateResponse{}
 
 	if err := versionedDecode(payload, res, 0); err != nil {
-		Logger.Printf("Failed to parse SASL/OAUTHBEARER intitial response : %s\n", err.Error())
 		return bytesRead, err
 	}
 
 	if res.Err != ErrNoError {
-		Logger.Printf("Invalid SASL/OAUTHBEARER request : %s\n", res.Err.Error())
 		return bytesRead, res.Err
 	}
-
-	Logger.Print("Successfully authenticated via SASL/OAUTHBEARER")
 
 	return totalBytesRead, nil
 }
