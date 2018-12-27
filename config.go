@@ -65,9 +65,10 @@ type Config struct {
 			User     string
 			Password string
 			// TokenProvider is a user-defined callback for generating
-			// authentication tokens. See the OAuthBearerTokenProvider docs
-			// for proper implementation guidelines.
-			TokenProvider OAuthBearerTokenProvider
+			// access tokens for SASL/OAUTHBEARER auth. See the
+			// AccessTokenProvider interface docs for proper implementation
+			// guidelines.
+			TokenProvider AccessTokenProvider
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection.
@@ -473,7 +474,7 @@ func (c *Config) Validate() error {
 			}
 		} else if c.Net.SASL.Mechanism == SASLTypeOAuth {
 			if c.Net.SASL.TokenProvider == nil {
-				return ConfigurationError("A OAuthBearerTokenProvider instance must be provided to Net.SASL.User.TokenProvider")
+				return ConfigurationError("A AccessTokenProvider instance must be provided to Net.SASL.User.TokenProvider")
 			}
 			if !c.Net.SASL.Handshake {
 				Logger.Println("A SASL handshake is required for SASL/OAUTHBEARER, ignoring disabled handshake config")
