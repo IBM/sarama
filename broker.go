@@ -898,27 +898,25 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider OAuthBearerTokenProvider)
 		return err
 	}
 
-	requestTime := time.Now()
+	token, err := tokenProvider.Token()
 
-	var (
-		bytesWritten int
-		err          error
-		token        string
-	)
-
-	if token, err = tokenProvider.Token(); err != nil {
+	if err != nil {
 		return err
 	}
 
-	if bytesWritten, err = b.sendSASLOAuthBearerClientResponse(token); err != nil {
+	requestTime := time.Now()
+
+	bytesWritten, err := b.sendSASLOAuthBearerClientResponse(token)
+
+	if err != nil {
 		return err
 	}
 
 	b.updateOutgoingCommunicationMetrics(bytesWritten)
 
-	var bytesRead int
+	bytesRead, err := b.receiveSASLOAuthBearerServerResponse()
 
-	if bytesRead, err = b.receiveSASLOAuthBearerServerResponse(); err != nil {
+	if err != nil {
 		return err
 	}
 
@@ -938,12 +936,7 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string) (int, err
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
 
-	var (
-		buf []byte
-		err error
-	)
-
-	buf, err = encode(req, b.conf.MetricRegistry)
+	buf, err := encode(req, b.conf.MetricRegistry)
 
 	if err != nil {
 		return 0, err
@@ -953,9 +946,9 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string) (int, err
 		return 0, err
 	}
 
-	var bytesWritten int
+	bytesWritten, err := b.conn.Write(buf)
 
-	if bytesWritten, err = b.conn.Write(buf); err != nil {
+	if err != nil {
 		return 0, err
 	}
 
