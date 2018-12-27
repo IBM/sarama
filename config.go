@@ -64,10 +64,9 @@ type Config struct {
 			//username and password for SASL/PLAIN authentication
 			User     string
 			Password string
-			// TokenProvider is a bearer token generator for the OAUTHBEARER
-			// flow. You can define an instance of OAuthBearerTokenProvider
-			// that generates authentication tokens according to your Kafka
-			// cluster's configuration.
+			// TokenProvider is a user-defined callback for generating
+			// authentication tokens. See the OAuthBearerTokenProvider docs
+			// for proper implementation guidelines.
 			TokenProvider OAuthBearerTokenProvider
 		}
 
