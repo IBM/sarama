@@ -62,10 +62,10 @@ const (
 	SASLHandshakeV1 = int16(1)
 )
 
-// OAuthBearerTokenProvider is the interface that encapsulates how implementors
-// can generate bearer tokens sent to Kafka brokers for authentication.
-type OAuthBearerTokenProvider interface {
-	// Token returns a bearer token. Because this method may be called multiple
+// AccessTokenProvider is the interface that encapsulates how implementors
+// can generate access tokens for Kafka broker authentication.
+type AccessTokenProvider interface {
+	// Token returns an access token. Because this method may be called multiple
 	// times, each invocation returns a new, unexpired token. This method should
 	// not block indefinitely. A timeout error should be returned after a short
 	// period of inactivity so that the broker connection logic can log
@@ -892,7 +892,7 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 
 // sendAndReceiveSASLOAuth performs the authentication flow as described by KIP-255
 // https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=75968876
-func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider OAuthBearerTokenProvider) error {
+func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider) error {
 
 	if err := b.sendAndReceiveSASLHandshake(SASLTypeOAuth, SASLHandshakeV1); err != nil {
 		return err
