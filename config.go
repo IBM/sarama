@@ -474,7 +474,7 @@ func (c *Config) Validate() error {
 			}
 		} else if c.Net.SASL.Mechanism == SASLTypeOAuth {
 			if c.Net.SASL.TokenProvider == nil {
-				return ConfigurationError("A AccessTokenProvider instance must be provided to Net.SASL.User.TokenProvider")
+				return ConfigurationError("An AccessTokenProvider instance must be provided to Net.SASL.User.TokenProvider")
 			}
 			if !c.Net.SASL.Handshake {
 				Logger.Println("A SASL handshake is required for SASL/OAUTHBEARER, ignoring disabled handshake config")
