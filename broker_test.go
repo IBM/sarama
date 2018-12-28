@@ -107,42 +107,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 
 }
 
-type Conn struct {
-	times int
-}
-
-func (c *Conn) Read(b []byte) (n int, err error) {
-	return 20, nil
-}
-
-func (c *Conn) Write(b []byte) (n int, err error) {
-	return 10, nil
-}
-
-func (c *Conn) Close() error {
-	return nil
-}
-
-func (c *Conn) LocalAddr() net.Addr {
-	return nil
-}
-
-func (c *Conn) RemoteAddr() net.Addr {
-	return nil
-}
-
-func (c *Conn) SetDeadline(t time.Time) error {
-	return nil
-}
-
-func (c *Conn) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-func (c *Conn) SetWriteDeadline(t time.Time) error {
-	return nil
-}
-
 func TestReceiveSASLOAuthBearerServerResponse(t *testing.T) {
 
 	testTable := []struct {
@@ -186,16 +150,18 @@ func TestReceiveSASLOAuthBearerServerResponse(t *testing.T) {
 
 		in, out := net.Pipe()
 
+		defer out.Close()
+
 		b := &Broker{conn: out}
 
 		go func() {
-			in.Write(test.buf)
-			in.Close()
+			defer in.Close()
+			if _, err := in.Write(test.buf); err != nil {
+				t.Error(err)
+			}
 		}()
 
 		bytesRead, err := b.receiveSASLOAuthBearerServerResponse(0)
-
-		out.Close()
 
 		if len(test.buf) != bytesRead {
 			t.Errorf("[%s] Expected %d bytes read, got %d", test.name, len(test.buf), bytesRead)
