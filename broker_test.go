@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"fmt"
+	"io"
+	"net"
 	"testing"
 	"time"
 )
@@ -103,6 +105,106 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		}
 	}
 
+}
+
+type Conn struct {
+	times int
+}
+
+func (c *Conn) Read(b []byte) (n int, err error) {
+	return 20, nil
+}
+
+func (c *Conn) Write(b []byte) (n int, err error) {
+	return 10, nil
+}
+
+func (c *Conn) Close() error {
+	return nil
+}
+
+func (c *Conn) LocalAddr() net.Addr {
+	return nil
+}
+
+func (c *Conn) RemoteAddr() net.Addr {
+	return nil
+}
+
+func (c *Conn) SetDeadline(t time.Time) error {
+	return nil
+}
+
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return nil
+}
+
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return nil
+}
+
+func TestReceiveSASLOAuthBearerServerResponse(t *testing.T) {
+
+	testTable := []struct {
+		name string
+		buf  []byte
+		err  error
+	}{
+		{"OK server response",
+			[]byte{
+				0, 0, 0, 14,
+				0, 0, 0, 0,
+				0, 0,
+				255, 255, // no error message
+				0, 0, 0, 2, 'o', 'k',
+			},
+			nil},
+		{"SASL authentication failure response",
+			[]byte{
+				0, 0, 0, 19,
+				0, 0, 0, 0,
+				0, 58,
+				0, 3, 'e', 'r', 'r',
+				0, 0, 0, 4, 'f', 'a', 'i', 'l',
+			},
+			ErrSASLAuthenticationFailed},
+		{"Truncated header",
+			[]byte{
+				0, 0, 0, 12,
+			},
+			io.ErrUnexpectedEOF},
+		{"Truncated response message",
+			[]byte{
+				0, 0, 0, 12,
+				0, 0, 0, 0,
+				0, 0,
+			},
+			io.ErrUnexpectedEOF},
+	}
+
+	for _, test := range testTable {
+
+		in, out := net.Pipe()
+
+		b := &Broker{conn: out}
+
+		go func() {
+			in.Write(test.buf)
+			in.Close()
+		}()
+
+		bytesRead, err := b.receiveSASLOAuthBearerServerResponse(0)
+
+		out.Close()
+
+		if len(test.buf) != bytesRead {
+			t.Errorf("[%s] Expected %d bytes read, got %d", test.name, len(test.buf), bytesRead)
+		}
+
+		if test.err != err {
+			t.Errorf("[%s] Expected error %s, got %s", test.name, test.err, err)
+		}
+	}
 }
 
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
