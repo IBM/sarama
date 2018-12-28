@@ -150,12 +150,20 @@ func TestReceiveSASLOAuthBearerServerResponse(t *testing.T) {
 
 		in, out := net.Pipe()
 
-		defer out.Close()
+		defer func() {
+			if err := out.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
 
 		b := &Broker{conn: out}
 
 		go func() {
-			defer in.Close()
+			defer func() {
+				if err := in.Close(); err != nil {
+					t.Error(err)
+				}
+			}()
 			if _, err := in.Write(test.buf); err != nil {
 				t.Error(err)
 			}
