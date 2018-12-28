@@ -146,7 +146,7 @@ func TestReceiveSASLOAuthBearerServerResponse(t *testing.T) {
 			io.ErrUnexpectedEOF},
 	}
 
-	for _, test := range testTable {
+	for i, test := range testTable {
 
 		in, out := net.Pipe()
 
@@ -172,11 +172,11 @@ func TestReceiveSASLOAuthBearerServerResponse(t *testing.T) {
 		bytesRead, err := b.receiveSASLOAuthBearerServerResponse(0)
 
 		if len(test.buf) != bytesRead {
-			t.Errorf("[%s] Expected %d bytes read, got %d", test.name, len(test.buf), bytesRead)
+			t.Errorf("[%d]:[%s] Expected %d bytes read, got %d\n", i, test.name, len(test.buf), bytesRead)
 		}
 
 		if test.err != err {
-			t.Errorf("[%s] Expected error %s, got %s", test.name, test.err, err)
+			t.Errorf("[%d]:[%s] Expected %s error, got %s\n", i, test.name, test.err, err)
 		}
 	}
 }
