@@ -706,8 +706,50 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+type MockSaslAuthenticateResponse struct {
+	t      TestReporter
+	kerror KError
+}
+
+func NewMockSaslAuthenticateResponse(t TestReporter) *MockSaslAuthenticateResponse {
+	return &MockSaslAuthenticateResponse{t: t}
+}
+
+func (msar *MockSaslAuthenticateResponse) For(reqBody versionedDecoder) encoder {
+	res := &SaslAuthenticateResponse{}
+	res.Err = msar.kerror
+	return res
+}
+
+func (msar *MockSaslAuthenticateResponse) SetError(kerror KError) *MockSaslAuthenticateResponse {
+	msar.kerror = kerror
+	return msar
+}
+
 type MockDeleteAclsResponse struct {
 	t TestReporter
+}
+
+type MockSaslHandshakeResponse struct {
+	enabledMechanisms []string
+	kerror            KError
+	t                 TestReporter
+}
+
+func NewMockSaslHandshakeResponse(t TestReporter) *MockSaslHandshakeResponse {
+	return &MockSaslHandshakeResponse{t: t}
+}
+
+func (mshr *MockSaslHandshakeResponse) For(reqBody versionedDecoder) encoder {
+	res := &SaslHandshakeResponse{}
+	res.Err = mshr.kerror
+	res.EnabledMechanisms = mshr.enabledMechanisms
+	return res
+}
+
+func (mshr *MockSaslHandshakeResponse) SetEnabledMechanisms(enabledMechanisms []string) *MockSaslHandshakeResponse {
+	mshr.enabledMechanisms = enabledMechanisms
+	return mshr
 }
 
 func NewMockDeleteAclsResponse(t TestReporter) *MockDeleteAclsResponse {
