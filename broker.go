@@ -915,8 +915,6 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider) erro
 		return err
 	}
 
-	Logger.Printf("Correlation ID %d ", b.correlationID)
-
 	b.updateOutgoingCommunicationMetrics(bytesWritten)
 
 	b.correlationID++
@@ -997,6 +995,10 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int,
 	res := &SaslAuthenticateResponse{}
 
 	if err := versionedDecode(buf, res, 0); err != nil {
+		return bytesRead, err
+	}
+
+	if err != nil {
 		return bytesRead, err
 	}
 
