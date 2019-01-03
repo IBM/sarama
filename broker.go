@@ -933,7 +933,7 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider) erro
 
 func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string, correlationID int32) (int, error) {
 
-	// Initial client response as described by RFC-7628
+	// Initial client response as described by RFC-7628.
 	// https://tools.ietf.org/html/rfc7628
 	oauthRequest := []byte(fmt.Sprintf("n,,\x01auth=Bearer %s\x01\x01", bearerToken))
 
