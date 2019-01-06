@@ -69,6 +69,11 @@ type Config struct {
 			// AccessTokenProvider interface docs for proper implementation
 			// guidelines.
 			TokenProvider AccessTokenProvider
+			// Extensions is a optional map of arbitrary key-value pairs that
+			// can be sent with the SASL/OAUTHBEARER initial client response.
+			// These values are ignored by the SASL server if they are
+			// unexpected.
+			Extensions map[string]string
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection.
@@ -358,6 +363,7 @@ func NewConfig() *Config {
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
 	c.Net.SASL.Handshake = true
+	c.Net.SASL.Extensions = make(map[string]string)
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,6 +63,9 @@ const (
 	// SASLHandshakeV1 is v1 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL by wrapping tokens with Kafka protocol headers.
 	SASLHandshakeV1 = int16(1)
+	// SASLExtKeyAuth is the reserved extension key name sent as part of the
+	// SASL/OAUTHBEARER intial client response
+	SASLExtKeyAuth = "auth"
 )
 
 // AccessTokenProvider is the interface that encapsulates how implementors
@@ -156,7 +161,7 @@ func (b *Broker) Open(conf *Config) error {
 
 			switch conf.Net.SASL.Mechanism {
 			case SASLTypeOAuth:
-				b.connErr = b.sendAndReceiveSASLOAuth(conf.Net.SASL.TokenProvider)
+				b.connErr = b.sendAndReceiveSASLOAuth(conf.Net.SASL.TokenProvider, conf.Net.SASL.Extensions)
 			case SASLTypePlaintext:
 				b.connErr = b.sendAndReceiveSASLPlainAuth()
 			default:
@@ -893,7 +898,7 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 
 // sendAndReceiveSASLOAuth performs the authentication flow as described by KIP-255
 // https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=75968876
-func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider) error {
+func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider, extensions map[string]string) error {
 
 	if err := b.sendAndReceiveSASLHandshake(SASLTypeOAuth, SASLHandshakeV1); err != nil {
 		return err
@@ -909,7 +914,7 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider) erro
 
 	correlationID := b.correlationID
 
-	bytesWritten, err := b.sendSASLOAuthBearerClientResponse(token, correlationID)
+	bytesWritten, err := b.sendSASLOAuthBearerClientResponse(token, extensions, correlationID)
 
 	if err != nil {
 		return err
@@ -931,13 +936,45 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider) erro
 	return nil
 }
 
-func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string, correlationID int32) (int, error) {
+// Build SASL/OAUTHBEARER initial client response as described by RFC-7628
+// https://tools.ietf.org/html/rfc7628
+func buildClientInitialResponse(bearerToken string, extensions map[string]string) ([]byte, error) {
 
-	// Initial client response as described by RFC-7628.
-	// https://tools.ietf.org/html/rfc7628
-	oauthRequest := []byte(fmt.Sprintf("n,,\x01auth=Bearer %s\x01\x01", bearerToken))
+	if _, ok := extensions[SASLExtKeyAuth]; ok {
+		return []byte{}, fmt.Errorf("The extension `%s` is invalid", SASLExtKeyAuth)
+	}
 
-	rb := &SaslAuthenticateRequest{oauthRequest}
+	extensions[SASLExtKeyAuth] = "Bearer " + bearerToken
+
+	resp := []byte(fmt.Sprintf("n,,\x01%s\x01\x01", mapToString(extensions, "=", "\x01")))
+
+	return resp, nil
+}
+
+// mapToString returns a list of key-value pairs ordered by key.
+// keyValSep separates the key from the value. elemSep separates each pair.
+func mapToString(extensions map[string]string, keyValSep string, elemSep string) string {
+
+	buf := make([]string, 0, len(extensions))
+
+	for k, v := range extensions {
+		buf = append(buf, k+keyValSep+v)
+	}
+
+	sort.Strings(buf)
+
+	return strings.Join(buf, elemSep)
+}
+
+func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string, extensions map[string]string, correlationID int32) (int, error) {
+
+	initialResp, err := buildClientInitialResponse(bearerToken, extensions)
+
+	if err != nil {
+		return 0, err
+	}
+
+	rb := &SaslAuthenticateRequest{initialResp}
 
 	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
 

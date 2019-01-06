@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -192,13 +193,66 @@ func TestReceiveSASLOAuthBearerClientResponse(t *testing.T) {
 
 		broker.conn = conn
 
-		err = broker.sendAndReceiveSASLOAuth(test.tokProvider)
+		err = broker.sendAndReceiveSASLOAuth(test.tokProvider, make(map[string]string))
 
 		if test.err != err {
 			t.Errorf("[%d]:[%s] Expected %s error, got %s\n", i, test.name, test.err, err)
 		}
 
 		mockBroker.Close()
+	}
+}
+
+func TestBuildClientInitialResponse(t *testing.T) {
+
+	testTable := []struct {
+		name        string
+		token       string
+		extensions  map[string]string
+		expected    []byte
+		expectError bool
+	}{
+		{
+			"Build SASL client initial response with two extensions",
+			"the-token",
+			map[string]string{
+				"x": "1",
+				"y": "2",
+			},
+			[]byte("n,,\x01auth=Bearer the-token\x01x=1\x01y=2\x01\x01"),
+			false,
+		},
+		{
+			"Build SASL client initial response with no extensions",
+			"the-token",
+			map[string]string{},
+			[]byte("n,,\x01auth=Bearer the-token\x01\x01"),
+			false,
+		},
+		{
+			"Build SASL client initial response using reserved extension",
+			"the-token",
+			map[string]string{
+				"auth": "auth-value",
+			},
+			[]byte(""),
+			true,
+		},
+	}
+
+	for i, test := range testTable {
+
+		actual, err := buildClientInitialResponse(test.token, test.extensions)
+
+		if !reflect.DeepEqual(test.expected, actual) {
+			t.Errorf("Expected %s, got %s\n", test.expected, actual)
+		}
+		if test.expectError && err == nil {
+			t.Errorf("[%d]:[%s] Expected an error but did not get one", i, test.name)
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("[%d]:[%s] Expected no error but got %s\n", i, test.name, err)
+		}
 	}
 }
 
