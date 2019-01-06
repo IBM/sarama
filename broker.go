@@ -944,9 +944,13 @@ func buildClientInitialResponse(bearerToken string, extensions map[string]string
 		return []byte{}, fmt.Errorf("The extension `%s` is invalid", SASLExtKeyAuth)
 	}
 
-	extensions[SASLExtKeyAuth] = "Bearer " + bearerToken
+	ext := ""
 
-	resp := []byte(fmt.Sprintf("n,,\x01%s\x01\x01", mapToString(extensions, "=", "\x01")))
+	if len(extensions) > 0 {
+		ext = "\x01" + mapToString(extensions, "=", "\x01")
+	}
+
+	resp := []byte(fmt.Sprintf("n,,\x01auth=Bearer %s%s\x01\x01", bearerToken, ext))
 
 	return resp, nil
 }
