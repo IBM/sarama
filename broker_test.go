@@ -113,17 +113,17 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 var ErrTokenFailure = errors.New("Failure generating token")
 
 type TokenProvider struct {
-	accessToken string
+	accessToken *AccessToken
 	err         error
 }
 
-func (t *TokenProvider) Token() (string, error) {
+func (t *TokenProvider) Token() (*AccessToken, error) {
 	return t.accessToken, t.err
 }
 
-func newTokenProvider(accessToken string, err error) *TokenProvider {
+func newTokenProvider(token *AccessToken, err error) *TokenProvider {
 	return &TokenProvider{
-		accessToken: accessToken,
+		accessToken: token,
 		err:         err,
 	}
 }
@@ -136,44 +136,39 @@ func TestSASLOAuthBearer(t *testing.T) {
 		mockHandshakeErr KError // Mock and expect error returned from SaslHandshakeRequest
 		expectClientErr  bool   // Expect an internal client-side error
 		tokProvider      *TokenProvider
-		extensions       map[string]string
 	}{
 		{"SASL/OAUTHBEARER OK server response",
 			ErrNoError,
 			ErrNoError,
 			false,
-			newTokenProvider("access-token-123", nil),
-			map[string]string{},
+			newTokenProvider(&AccessToken{Token: "access-token-123"}, nil),
 		},
 		{"SASL/OAUTHBEARER authentication failure response",
 			ErrSASLAuthenticationFailed,
 			ErrNoError,
 			false,
-			newTokenProvider("access-token-123", nil),
-			map[string]string{},
+			newTokenProvider(&AccessToken{Token: "access-token-123"}, nil),
 		},
 		{"SASL/OAUTHBEARER handshake failure response",
 			ErrNoError,
 			ErrSASLAuthenticationFailed,
 			false,
-			newTokenProvider("access-token-123", nil),
-			map[string]string{},
+			newTokenProvider(&AccessToken{Token: "access-token-123"}, nil),
 		},
 		{"SASL/OAUTHBEARER token generation error",
 			ErrNoError,
 			ErrNoError,
 			true,
-			newTokenProvider("access-token-123", ErrTokenFailure),
-			map[string]string{},
+			newTokenProvider(&AccessToken{Token: "access-token-123"}, ErrTokenFailure),
 		},
 		{"SASL/OAUTHBEARER invalid extension",
 			ErrNoError,
 			ErrNoError,
 			true,
-			newTokenProvider("access-token-123", nil),
-			map[string]string{
-				"auth": "auth-value",
-			},
+			newTokenProvider(&AccessToken{
+				Token:      "access-token-123",
+				Extensions: map[string]string{"auth": "auth-value"},
+			}, nil),
 		},
 	}
 
@@ -213,7 +208,6 @@ func TestSASLOAuthBearer(t *testing.T) {
 		conf := NewConfig()
 		conf.Net.SASL.Mechanism = SASLTypeOAuth
 		conf.Net.SASL.TokenProvider = test.tokProvider
-		conf.Net.SASL.Extensions = test.extensions
 
 		broker.conf = conf
 
@@ -255,33 +249,35 @@ func TestBuildClientInitialResponse(t *testing.T) {
 
 	testTable := []struct {
 		name        string
-		token       string
-		extensions  map[string]string
+		token       *AccessToken
 		expected    []byte
 		expectError bool
 	}{
 		{
 			"Build SASL client initial response with two extensions",
-			"the-token",
-			map[string]string{
-				"x": "1",
-				"y": "2",
+			&AccessToken{
+				Token: "the-token",
+				Extensions: map[string]string{
+					"x": "1",
+					"y": "2",
+				},
 			},
 			[]byte("n,,\x01auth=Bearer the-token\x01x=1\x01y=2\x01\x01"),
 			false,
 		},
 		{
 			"Build SASL client initial response with no extensions",
-			"the-token",
-			map[string]string{},
+			&AccessToken{Token: "the-token"},
 			[]byte("n,,\x01auth=Bearer the-token\x01\x01"),
 			false,
 		},
 		{
 			"Build SASL client initial response using reserved extension",
-			"the-token",
-			map[string]string{
-				"auth": "auth-value",
+			&AccessToken{
+				Token: "the-token",
+				Extensions: map[string]string{
+					"auth": "auth-value",
+				},
 			},
 			[]byte(""),
 			true,
@@ -290,7 +286,7 @@ func TestBuildClientInitialResponse(t *testing.T) {
 
 	for i, test := range testTable {
 
-		actual, err := buildClientInitialResponse(test.token, test.extensions)
+		actual, err := buildClientInitialResponse(test.token)
 
 		if !reflect.DeepEqual(test.expected, actual) {
 			t.Errorf("Expected %s, got %s\n", test.expected, actual)
