@@ -177,6 +177,9 @@ func TestReceiveSASLOAuthBearerClientResponse(t *testing.T) {
 		broker.requestLatency = metrics.NilHistogram{}
 
 		conf := NewConfig()
+		conf.Net.SASL.Mechanism = SASLTypeOAuth
+		conf.Net.SASL.TokenProvider = test.tokProvider
+
 		broker.conf = conf
 
 		dialer := net.Dialer{
@@ -193,7 +196,7 @@ func TestReceiveSASLOAuthBearerClientResponse(t *testing.T) {
 
 		broker.conn = conn
 
-		err = broker.sendAndReceiveSASLOAuth(test.tokProvider, make(map[string]string))
+		err = broker.authenticateViaSASL()
 
 		if test.err != err {
 			t.Errorf("[%d]:[%s] Expected %s error, got %s\n", i, test.name, test.err, err)
