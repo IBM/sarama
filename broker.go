@@ -936,7 +936,7 @@ func (b *Broker) sendAndReceiveSASLOAuth(tokenProvider AccessTokenProvider, exte
 }
 
 // Build SASL/OAUTHBEARER initial client response as described by RFC-7628
-// https://tools.ietf.org/html/rfc7628.
+// https://tools.ietf.org/html/rfc7628
 func buildClientInitialResponse(bearerToken string, extensions map[string]string) ([]byte, error) {
 
 	if _, ok := extensions[SASLExtKeyAuth]; ok {
