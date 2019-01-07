@@ -4,14 +4,14 @@ import "testing"
 
 var (
 	saslAuthenticateRequest = []byte{
-		0, 3, 'f', 'o', 'o',
+		0, 0, 0, 3, 'f', 'o', 'o',
 	}
 )
 
 func TestSaslAuthenticateRequest(t *testing.T) {
-	var request *SaslHandshakeRequest
+	var request *SaslAuthenticateRequest
 
-	request = new(SaslHandshakeRequest)
-	request.Mechanism = "foo"
+	request = new(SaslAuthenticateRequest)
+	request.SaslAuthBytes = []byte(`foo`)
 	testRequest(t, "basic", request, saslAuthenticateRequest)
 }
