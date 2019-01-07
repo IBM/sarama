@@ -8,19 +8,12 @@ type SaslAuthenticateRequest struct {
 const APIKeySASLAuth = 36
 
 func (r *SaslAuthenticateRequest) encode(pe packetEncoder) error {
-	if err := pe.putBytes(r.SaslAuthBytes); err != nil {
-		return err
-	}
-
-	return nil
+	return pe.putBytes(r.SaslAuthBytes)
 }
 
 func (r *SaslAuthenticateRequest) decode(pd packetDecoder, version int16) (err error) {
-	if r.SaslAuthBytes, err = pd.getBytes(); err != nil {
-		return err
-	}
-
-	return nil
+	r.SaslAuthBytes, err = pd.getBytes()
+	return err
 }
 
 func (r *SaslAuthenticateRequest) key() int16 {
