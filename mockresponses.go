@@ -747,6 +747,11 @@ func (mshr *MockSaslHandshakeResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+func (mshr *MockSaslHandshakeResponse) SetError(kerror KError) *MockSaslHandshakeResponse {
+	mshr.kerror = kerror
+	return mshr
+}
+
 func (mshr *MockSaslHandshakeResponse) SetEnabledMechanisms(enabledMechanisms []string) *MockSaslHandshakeResponse {
 	mshr.enabledMechanisms = enabledMechanisms
 	return mshr
