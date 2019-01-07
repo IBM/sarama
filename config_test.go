@@ -36,8 +36,8 @@ func TestEmptyClientIDConfigValidates(t *testing.T) {
 type DummyTokenProvider struct {
 }
 
-func (t *DummyTokenProvider) Token() (string, error) {
-	return "access-token-string", nil
+func (t *DummyTokenProvider) Token() (*AccessToken, error) {
+	return &AccessToken{Token: "access-token-string"}, nil
 }
 
 func TestNetConfigValidates(t *testing.T) {
