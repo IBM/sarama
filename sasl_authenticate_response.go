@@ -26,11 +26,9 @@ func (r *SaslAuthenticateResponse) decode(pd packetDecoder, version int16) error
 		return err
 	}
 
-	if r.SaslAuthBytes, err = pd.getBytes(); err != nil {
-		return err
-	}
+	r.SaslAuthBytes, err = pd.getBytes()
 
-	return nil
+	return err
 }
 
 func (r *SaslAuthenticateResponse) key() int16 {

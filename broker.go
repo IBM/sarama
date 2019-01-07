@@ -998,11 +998,7 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(bearerToken string, extension
 
 	bytesWritten, err := b.conn.Write(buf)
 
-	if err != nil {
-		return 0, err
-	}
-
-	return bytesWritten, nil
+	return bytesWritten, err
 }
 
 func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int, error) {
