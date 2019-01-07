@@ -159,14 +159,7 @@ func (b *Broker) Open(conf *Config) error {
 
 		if conf.Net.SASL.Enable {
 
-			switch conf.Net.SASL.Mechanism {
-			case SASLTypeOAuth:
-				b.connErr = b.sendAndReceiveSASLOAuth(conf.Net.SASL.TokenProvider, conf.Net.SASL.Extensions)
-			case SASLTypePlaintext:
-				b.connErr = b.sendAndReceiveSASLPlainAuth()
-			default:
-				b.connErr = b.sendAndReceiveSASLPlainAuth()
-			}
+			b.connErr = b.authenticateViaSASL()
 
 			if b.connErr != nil {
 				err = b.conn.Close()
@@ -784,6 +777,17 @@ func (b *Broker) responseReceiver() {
 		response.packets <- buf
 	}
 	close(b.done)
+}
+
+func (b *Broker) authenticateViaSASL() error {
+	switch b.conf.Net.SASL.Mechanism {
+	case SASLTypeOAuth:
+		return b.sendAndReceiveSASLOAuth(b.conf.Net.SASL.TokenProvider, b.conf.Net.SASL.Extensions)
+	case SASLTypePlaintext:
+		return b.sendAndReceiveSASLPlainAuth()
+	default:
+		return b.sendAndReceiveSASLPlainAuth()
+	}
 }
 
 func (b *Broker) sendAndReceiveSASLHandshake(saslType string, version int16) error {
