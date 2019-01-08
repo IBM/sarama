@@ -707,8 +707,9 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
 }
 
 type MockSaslAuthenticateResponse struct {
-	t      TestReporter
-	kerror KError
+	t             TestReporter
+	kerror        KError
+	saslAuthBytes []byte
 }
 
 func NewMockSaslAuthenticateResponse(t TestReporter) *MockSaslAuthenticateResponse {
@@ -718,11 +719,17 @@ func NewMockSaslAuthenticateResponse(t TestReporter) *MockSaslAuthenticateRespon
 func (msar *MockSaslAuthenticateResponse) For(reqBody versionedDecoder) encoder {
 	res := &SaslAuthenticateResponse{}
 	res.Err = msar.kerror
+	res.SaslAuthBytes = msar.saslAuthBytes
 	return res
 }
 
 func (msar *MockSaslAuthenticateResponse) SetError(kerror KError) *MockSaslAuthenticateResponse {
 	msar.kerror = kerror
+	return msar
+}
+
+func (msar *MockSaslAuthenticateResponse) SetAuthBytes(saslAuthBytes []byte) *MockSaslAuthenticateResponse {
+	msar.saslAuthBytes = saslAuthBytes
 	return msar
 }
 

@@ -177,7 +177,8 @@ func TestSASLOAuthBearer(t *testing.T) {
 		// mockBroker mocks underlying network logic and broker responses
 		mockBroker := NewMockBroker(t, 0)
 
-		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t)
+		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
+			SetAuthBytes([]byte(`response_payload`))
 
 		if test.mockAuthErr != ErrNoError {
 			mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockAuthErr)

@@ -74,18 +74,21 @@ type AccessToken struct {
 	Token string
 	// Extensions is a optional map of arbitrary key-value pairs that can be
 	// sent with the SASL/OAUTHBEARER initial client response. These values are
-	// ignored by the SASL server if they are unexpected.
+	// ignored by the SASL server if they are unexpected. This feature is only
+	// supported by Kafka >= 2.1.0.
 	Extensions map[string]string
 }
 
 // AccessTokenProvider is the interface that encapsulates how implementors
 // can generate access tokens for Kafka broker authentication.
 type AccessTokenProvider interface {
-	// Token returns an access token. Because this method may be called multiple
-	// times, each invocation returns a new, unexpired token. This method should
-	// not block indefinitely. A timeout error should be returned after a short
-	// period of inactivity so that the broker connection logic can log
-	// debugging information and retry.
+	// Token returns an access token. The implementation should ensure token
+	// reuse so that multiple calls at connect time do not create multiple
+	// tokens. The implementation should also periodically refresh the token in
+	// order to guarantee that each call returns an unexpired token.  This
+	// method should not block indefinitely--a timeout error should be returned
+	// after a short period of inactivity so that the broker connection logic
+	// can log debugging information and retry.
 	Token() (*AccessToken, error)
 }
 
