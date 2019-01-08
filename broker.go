@@ -1052,6 +1052,10 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int,
 		return bytesRead, res.Err
 	}
 
+	if len(res.SaslAuthBytes) > 0 {
+		Logger.Printf("Received SASL auth response: %s", res.SaslAuthBytes)
+	}
+
 	return bytesRead, nil
 }
 
