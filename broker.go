@@ -953,7 +953,7 @@ func (b *Broker) sendAndReceiveSASLOAuth(provider AccessTokenProvider) error {
 // https://tools.ietf.org/html/rfc7628
 func buildClientInitialResponse(token *AccessToken) ([]byte, error) {
 
-	ext := ""
+	var ext string
 
 	if token.Extensions != nil && len(token.Extensions) > 0 {
 		if _, ok := token.Extensions[SASLExtKeyAuth]; ok {
@@ -1004,9 +1004,7 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(token *AccessToken, correlati
 		return 0, err
 	}
 
-	bytesWritten, err := b.conn.Write(buf)
-
-	return bytesWritten, err
+	return b.conn.Write(buf)
 }
 
 func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int, error) {
