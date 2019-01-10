@@ -1,5 +1,29 @@
 # Changelog
 
+#### Version 1.20.1 (2019-01-10)
+
+New Features:
+- Add optional replica id in offset request
+  ([1100](https://github.com/Shopify/sarama/pull/1100)).
+
+Improvements:
+- Implement DescribeConfigs Request + Response v1 & v2
+  ([1230](https://github.com/Shopify/sarama/pull/1230)).
+- Reuse compression objects
+  ([1185](https://github.com/Shopify/sarama/pull/1185)).
+- Switch from png to svg for GoDoc link in README
+  ([1243](https://github.com/Shopify/sarama/pull/1243)).
+- Fix typo in deprecation notice for FetchResponseBlock.Records
+  ([1242](https://github.com/Shopify/sarama/pull/1242)).
+- Fix typos in consumer metadata response file
+  ([1244](https://github.com/Shopify/sarama/pull/1244)).
+
+Bug Fixes:
+- Revert to individual msg retries for non-idempotent
+  ([1203](https://github.com/Shopify/sarama/pull/1203)).
+- Respect MaxMessageBytes limit for uncompressed messages
+  ([1141](https://github.com/Shopify/sarama/pull/1141)).
+
 #### Version 1.20.0 (2018-12-10)
 
 New Features:
