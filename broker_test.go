@@ -1,9 +1,14 @@
 package sarama
 
 import (
+	"errors"
 	"fmt"
+	"net"
+	"reflect"
 	"testing"
 	"time"
+
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 func ExampleBroker() {
@@ -103,6 +108,197 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 		}
 	}
 
+}
+
+var ErrTokenFailure = errors.New("Failure generating token")
+
+type TokenProvider struct {
+	accessToken *AccessToken
+	err         error
+}
+
+func (t *TokenProvider) Token() (*AccessToken, error) {
+	return t.accessToken, t.err
+}
+
+func newTokenProvider(token *AccessToken, err error) *TokenProvider {
+	return &TokenProvider{
+		accessToken: token,
+		err:         err,
+	}
+}
+
+func TestSASLOAuthBearer(t *testing.T) {
+
+	testTable := []struct {
+		name             string
+		mockAuthErr      KError // Mock and expect error returned from SaslAuthenticateRequest
+		mockHandshakeErr KError // Mock and expect error returned from SaslHandshakeRequest
+		expectClientErr  bool   // Expect an internal client-side error
+		tokProvider      *TokenProvider
+	}{
+		{
+			name:             "SASL/OAUTHBEARER OK server response",
+			mockAuthErr:      ErrNoError,
+			mockHandshakeErr: ErrNoError,
+			tokProvider:      newTokenProvider(&AccessToken{Token: "access-token-123"}, nil),
+		},
+		{
+			name:             "SASL/OAUTHBEARER authentication failure response",
+			mockAuthErr:      ErrSASLAuthenticationFailed,
+			mockHandshakeErr: ErrNoError,
+			tokProvider:      newTokenProvider(&AccessToken{Token: "access-token-123"}, nil),
+		},
+		{
+			name:             "SASL/OAUTHBEARER handshake failure response",
+			mockAuthErr:      ErrNoError,
+			mockHandshakeErr: ErrSASLAuthenticationFailed,
+			tokProvider:      newTokenProvider(&AccessToken{Token: "access-token-123"}, nil),
+		},
+		{
+			name:             "SASL/OAUTHBEARER token generation error",
+			mockAuthErr:      ErrNoError,
+			mockHandshakeErr: ErrNoError,
+			expectClientErr:  true,
+			tokProvider:      newTokenProvider(&AccessToken{Token: "access-token-123"}, ErrTokenFailure),
+		},
+		{
+			name:             "SASL/OAUTHBEARER invalid extension",
+			mockAuthErr:      ErrNoError,
+			mockHandshakeErr: ErrNoError,
+			expectClientErr:  true,
+			tokProvider: newTokenProvider(&AccessToken{
+				Token:      "access-token-123",
+				Extensions: map[string]string{"auth": "auth-value"},
+			}, nil),
+		},
+	}
+
+	for i, test := range testTable {
+
+		// mockBroker mocks underlying network logic and broker responses
+		mockBroker := NewMockBroker(t, 0)
+
+		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
+			SetAuthBytes([]byte(`response_payload`))
+
+		if test.mockAuthErr != ErrNoError {
+			mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockAuthErr)
+		}
+
+		mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).
+			SetEnabledMechanisms([]string{SASLTypeOAuth})
+
+		if test.mockHandshakeErr != ErrNoError {
+			mockSASLHandshakeResponse = mockSASLHandshakeResponse.SetError(test.mockHandshakeErr)
+		}
+
+		mockBroker.SetHandlerByMap(map[string]MockResponse{
+			"SaslAuthenticateRequest": mockSASLAuthResponse,
+			"SaslHandshakeRequest":    mockSASLHandshakeResponse,
+		})
+
+		// broker executes SASL requests against mockBroker
+		broker := NewBroker(mockBroker.Addr())
+		broker.requestRate = metrics.NilMeter{}
+		broker.outgoingByteRate = metrics.NilMeter{}
+		broker.incomingByteRate = metrics.NilMeter{}
+		broker.requestSize = metrics.NilHistogram{}
+		broker.responseSize = metrics.NilHistogram{}
+		broker.responseRate = metrics.NilMeter{}
+		broker.requestLatency = metrics.NilHistogram{}
+
+		conf := NewConfig()
+		conf.Net.SASL.Mechanism = SASLTypeOAuth
+		conf.Net.SASL.TokenProvider = test.tokProvider
+
+		broker.conf = conf
+
+		dialer := net.Dialer{
+			Timeout:   conf.Net.DialTimeout,
+			KeepAlive: conf.Net.KeepAlive,
+			LocalAddr: conf.Net.LocalAddr,
+		}
+
+		conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		broker.conn = conn
+
+		err = broker.authenticateViaSASL()
+
+		if test.mockAuthErr != ErrNoError {
+			if test.mockAuthErr != err {
+				t.Errorf("[%d]:[%s] Expected %s auth error, got %s\n", i, test.name, test.mockAuthErr, err)
+			}
+		} else if test.mockHandshakeErr != ErrNoError {
+			if test.mockHandshakeErr != err {
+				t.Errorf("[%d]:[%s] Expected %s handshake error, got %s\n", i, test.name, test.mockHandshakeErr, err)
+			}
+		} else if test.expectClientErr && err == nil {
+			t.Errorf("[%d]:[%s] Expected a client error and got none\n", i, test.name)
+		} else if !test.expectClientErr && err != nil {
+			t.Errorf("[%d]:[%s] Unexpected error, got %s\n", i, test.name, err)
+		}
+
+		mockBroker.Close()
+	}
+}
+
+func TestBuildClientInitialResponse(t *testing.T) {
+
+	testTable := []struct {
+		name        string
+		token       *AccessToken
+		expected    []byte
+		expectError bool
+	}{
+		{
+			name: "Build SASL client initial response with two extensions",
+			token: &AccessToken{
+				Token: "the-token",
+				Extensions: map[string]string{
+					"x": "1",
+					"y": "2",
+				},
+			},
+			expected: []byte("n,,\x01auth=Bearer the-token\x01x=1\x01y=2\x01\x01"),
+		},
+		{
+			name:     "Build SASL client initial response with no extensions",
+			token:    &AccessToken{Token: "the-token"},
+			expected: []byte("n,,\x01auth=Bearer the-token\x01\x01"),
+		},
+		{
+			name: "Build SASL client initial response using reserved extension",
+			token: &AccessToken{
+				Token: "the-token",
+				Extensions: map[string]string{
+					"auth": "auth-value",
+				},
+			},
+			expected:    []byte(""),
+			expectError: true,
+		},
+	}
+
+	for i, test := range testTable {
+
+		actual, err := buildClientInitialResponse(test.token)
+
+		if !reflect.DeepEqual(test.expected, actual) {
+			t.Errorf("Expected %s, got %s\n", test.expected, actual)
+		}
+		if test.expectError && err == nil {
+			t.Errorf("[%d]:[%s] Expected an error but did not get one", i, test.name)
+		}
+		if !test.expectError && err != nil {
+			t.Errorf("[%d]:[%s] Expected no error but got %s\n", i, test.name, err)
+		}
+	}
 }
 
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
