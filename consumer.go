@@ -487,9 +487,13 @@ func (child *partitionConsumer) parseMessages(msgSet *MessageSet) ([]*ConsumerMe
 	for _, msgBlock := range msgSet.Messages {
 		for _, msg := range msgBlock.Messages() {
 			offset := msg.Offset
+			timestamp := msg.Msg.Timestamp
 			if msg.Msg.Version >= 1 {
 				baseOffset := msgBlock.Offset - msgBlock.Messages()[len(msgBlock.Messages())-1].Offset
 				offset += baseOffset
+				if msg.Msg.LogAppendTime {
+					timestamp = msgBlock.Msg.Timestamp
+				}
 			}
 			if offset < child.offset {
 				continue
@@ -500,7 +504,7 @@ func (child *partitionConsumer) parseMessages(msgSet *MessageSet) ([]*ConsumerMe
 				Key:            msg.Msg.Key,
 				Value:          msg.Msg.Value,
 				Offset:         offset,
-				Timestamp:      msg.Msg.Timestamp,
+				Timestamp:      timestamp,
 				BlockTimestamp: msgBlock.Msg.Timestamp,
 			})
 			child.offset = offset + 1
@@ -519,13 +523,17 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 		if offset < child.offset {
 			continue
 		}
+		timestamp := batch.FirstTimestamp.Add(rec.TimestampDelta)
+		if batch.LogAppendTime {
+			timestamp = batch.MaxTimestamp
+		}
 		messages = append(messages, &ConsumerMessage{
 			Topic:     child.topic,
 			Partition: child.partition,
 			Key:       rec.Key,
 			Value:     rec.Value,
 			Offset:    offset,
-			Timestamp: batch.FirstTimestamp.Add(rec.TimestampDelta),
+			Timestamp: timestamp,
 			Headers:   rec.Headers,
 		})
 		child.offset = offset + 1
