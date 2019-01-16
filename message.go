@@ -12,11 +12,16 @@ type CompressionCodec int8
 const compressionCodecMask int8 = 0x07
 
 const (
-	CompressionNone   CompressionCodec = 0
-	CompressionGZIP   CompressionCodec = 1
-	CompressionSnappy CompressionCodec = 2
-	CompressionLZ4    CompressionCodec = 3
-	CompressionZSTD   CompressionCodec = 4
+	//CompressionNone - no compression
+	CompressionNone CompressionCodec = iota
+	//CompressionGZIP - compression using gzip protocol
+	CompressionGZIP
+	//CompressionSnappy - compression using snappy protocol
+	CompressionSnappy
+	//CompressionLZ4 - compression using LZ4 protocol
+	CompressionLZ4
+	//CompressionZSTD - compression using ZSTD protocol
+	CompressionZSTD
 )
 
 func (cc CompressionCodec) String() string {
@@ -25,6 +30,7 @@ func (cc CompressionCodec) String() string {
 		"gzip",
 		"snappy",
 		"lz4",
+		"zstd",
 	}[int(cc)]
 }
 
@@ -33,6 +39,7 @@ func (cc CompressionCodec) String() string {
 // that we don't use any existing compression levels.
 const CompressionLevelDefault = -1000
 
+//Message represents a kafka message type
 type Message struct {
 	Codec            CompressionCodec // codec used to compress the message contents
 	CompressionLevel int              // compression level
