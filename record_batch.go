@@ -202,6 +202,9 @@ func (b *RecordBatch) computeAttributes() int16 {
 	if b.Control {
 		attr |= controlMask
 	}
+	if b.LogAppendTime {
+		attr |= timestampTypeMask
+	}
 	return attr
 }
 
