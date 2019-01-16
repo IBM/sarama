@@ -795,6 +795,9 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
 		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
 	}
+	if bc.consumer.conf.Version.IsAtLeast(V0_9_0_0) {
+		request.Version = 1
+	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_10_0_0) {
 		request.Version = 2
 	}

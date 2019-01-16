@@ -5,11 +5,14 @@ import (
 	"time"
 )
 
-// CompressionCodec represents the various compression codecs recognized by Kafka in messages.
-type CompressionCodec int8
-
 // The lowest 3 bits contain the compression codec used for the message
 const compressionCodecMask int8 = 0x07
+
+// Bit 3 set for "LogAppend" timestamps
+const timestampTypeMask = 0x08
+
+// CompressionCodec represents the various compression codecs recognized by Kafka in messages.
+type CompressionCodec int8
 
 const (
 	CompressionNone   CompressionCodec = 0
@@ -18,8 +21,6 @@ const (
 	CompressionLZ4    CompressionCodec = 3
 	CompressionZSTD   CompressionCodec = 4
 )
-
-const timestampTypeMask = 0x08
 
 func (cc CompressionCodec) String() string {
 	return []string{
@@ -55,6 +56,9 @@ func (m *Message) encode(pe packetEncoder) error {
 	pe.putInt8(m.Version)
 
 	attributes := int8(m.Codec) & compressionCodecMask
+	if m.LogAppendTime {
+		attributes |= timestampTypeMask
+	}
 	pe.putInt8(attributes)
 
 	if m.Version >= 1 {
