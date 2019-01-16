@@ -1,6 +1,6 @@
 package sarama
 
-import "github.com/rcrowley/go-metrics"
+import metrics "github.com/rcrowley/go-metrics"
 
 // RequiredAcks is used in Produce Requests to tell the broker how many replica acknowledgements
 // it must see before responding. Any of the constants defined here are valid. On broker versions
@@ -28,8 +28,7 @@ type ProduceRequest struct {
 	records         map[string]map[int32]Records
 }
 
-func updateMsgSetMetrics(msgSet *MessageSet, compressionRatioMetric metrics.Histogram,
-	topicCompressionRatioMetric metrics.Histogram) int64 {
+func updateMsgSetMetrics(msgSet *MessageSet, compressionRatioMetric metrics.Histogram, topicCompressionRatioMetric metrics.Histogram) int64 {
 	var topicRecordCount int64
 	for _, messageBlock := range msgSet.Messages {
 		// Is this a fake "message" wrapping real messages?
@@ -52,8 +51,7 @@ func updateMsgSetMetrics(msgSet *MessageSet, compressionRatioMetric metrics.Hist
 	return topicRecordCount
 }
 
-func updateBatchMetrics(recordBatch *RecordBatch, compressionRatioMetric metrics.Histogram,
-	topicCompressionRatioMetric metrics.Histogram) int64 {
+func updateBatchMetrics(recordBatch *RecordBatch, compressionRatioMetric metrics.Histogram, topicCompressionRatioMetric metrics.Histogram) int64 {
 	if recordBatch.compressedRecords != nil {
 		compressionRatio := int64(float64(recordBatch.recordsLen) / float64(len(recordBatch.compressedRecords)) * 100)
 		compressionRatioMetric.Update(compressionRatio)
@@ -214,6 +212,8 @@ func (r *ProduceRequest) requiredVersion() KafkaVersion {
 		return V0_10_0_0
 	case 3:
 		return V0_11_0_0
+	case 4:
+		return V2_1_0_0
 	default:
 		return MinVersion
 	}
