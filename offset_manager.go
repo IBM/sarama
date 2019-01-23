@@ -151,13 +151,13 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 	switch block.Err {
 	case ErrNoError:
 		return block.Offset, block.Metadata, nil
-	case ErrNotCoordinatorForConsumer:
+	case ErrNotCoordinator:
 		if retries <= 0 {
 			return 0, "", block.Err
 		}
 		om.releaseCoordinator(broker)
 		return om.fetchInitialOffset(topic, partition, retries-1)
-	case ErrOffsetsLoadInProgress:
+	case ErrCoordinatorLoadInProgress:
 		if retries <= 0 {
 			return 0, "", block.Err
 		}
@@ -316,13 +316,13 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 				block := req.blocks[pom.topic][pom.partition]
 				pom.updateCommitted(block.offset, block.metadata)
 			case ErrNotLeaderForPartition, ErrLeaderNotAvailable,
-				ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer:
+				ErrCoordinatorNotAvailable, ErrNotCoordinator:
 				// not a critical error, we just need to redispatch
 				om.releaseCoordinator(broker)
 			case ErrOffsetMetadataTooLarge, ErrInvalidCommitOffsetSize:
 				// nothing we can do about this, just tell the user and carry on
 				pom.handleError(err)
-			case ErrOffsetsLoadInProgress:
+			case ErrCoordinatorLoadInProgress:
 				// nothing wrong but we didn't commit, we'll get it next time round
 				break
 			case ErrUnknownTopicOrPartition:
