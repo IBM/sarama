@@ -18,7 +18,7 @@ var (
 			0x00, 0x00, 0x00, 0x01,
 
 			0x00, 0x00, 0x00, 0x01, // Partition 1
-			0x00, 0x02, // ErrCorruptMessage
+			0x00, 0x02, // ErrInvalidMessage
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
 		}, {
 			0x00, 0x00, 0x00, 0x01,
@@ -27,7 +27,7 @@ var (
 			0x00, 0x00, 0x00, 0x01,
 
 			0x00, 0x00, 0x00, 0x01, // Partition 1
-			0x00, 0x02, // ErrCorruptMessage
+			0x00, 0x02, // ErrInvalidMessage
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
 
 			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
@@ -38,7 +38,7 @@ var (
 			0x00, 0x00, 0x00, 0x01,
 
 			0x00, 0x00, 0x00, 0x01, // Partition 1
-			0x00, 0x02, // ErrCorruptMessage
+			0x00, 0x02, // ErrInvalidMessage
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8, // Timestamp January 1st 0001 at 00:00:01,000 UTC (LogAppendTime was used)
 
@@ -68,7 +68,7 @@ func TestProduceResponseDecode(t *testing.T) {
 		if block == nil {
 			t.Error("Decoding did not produce a block for foo/1")
 		} else {
-			if block.Err != ErrCorruptMessage {
+			if block.Err != ErrInvalidMessage {
 				t.Error("Decoding failed for foo/2/Err, got:", int16(block.Err))
 			}
 			if block.Offset != 255 {
@@ -95,7 +95,7 @@ func TestProduceResponseEncode(t *testing.T) {
 
 	response.Blocks["foo"] = make(map[int32]*ProduceResponseBlock)
 	response.Blocks["foo"][1] = &ProduceResponseBlock{
-		Err:       ErrCorruptMessage,
+		Err:       ErrInvalidMessage,
 		Offset:    255,
 		Timestamp: time.Unix(1, 0),
 	}

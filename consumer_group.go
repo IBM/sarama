@@ -193,7 +193,7 @@ func (c *consumerGroup) newSession(ctx context.Context, coordinator *Broker, top
 	switch join.Err {
 	case ErrNoError:
 		c.memberID = join.MemberId
-	case ErrUnknownMemberID, ErrIllegalGeneration: // reset member ID and retry immediately
+	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately
 		c.memberID = ""
 		return c.newSession(ctx, coordinator, topics, handler, retries)
 	case ErrRebalanceInProgress: // retry after backoff
@@ -234,7 +234,7 @@ func (c *consumerGroup) newSession(ctx context.Context, coordinator *Broker, top
 	}
 	switch sync.Err {
 	case ErrNoError:
-	case ErrUnknownMemberID, ErrIllegalGeneration: // reset member ID and retry immediately
+	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately
 		c.memberID = ""
 		return c.newSession(ctx, coordinator, topics, handler, retries)
 	case ErrRebalanceInProgress: // retry after backoff
@@ -366,7 +366,7 @@ func (c *consumerGroup) leave() error {
 
 	// Check response
 	switch resp.Err {
-	case ErrRebalanceInProgress, ErrUnknownMemberID, ErrNoError:
+	case ErrRebalanceInProgress, ErrUnknownMemberId, ErrNoError:
 		return nil
 	default:
 		return resp.Err
@@ -664,7 +664,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		switch resp.Err {
 		case ErrNoError:
 			retries = s.parent.config.Metadata.Retry.Max
-		case ErrRebalanceInProgress, ErrUnknownMemberID, ErrIllegalGeneration:
+		case ErrRebalanceInProgress, ErrUnknownMemberId, ErrIllegalGeneration:
 			return
 		default:
 			s.parent.handleError(err, "", -1)

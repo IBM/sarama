@@ -560,7 +560,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 		if partialTrailingMessage {
 			if child.conf.Consumer.Fetch.Max > 0 && child.fetchSize == child.conf.Consumer.Fetch.Max {
 				// we can't ask for more data, we've hit the configured limit
-				child.sendError(ErrMessageSizeTooLarge)
+				child.sendError(ErrMessageTooLarge)
 				child.offset++ // skip this one so we can keep processing future messages
 			} else {
 				child.fetchSize *= 2

@@ -170,8 +170,8 @@ func TestConsumerMeetsErrorsDrainedExpectation(t *testing.T) {
 	consumer := NewConsumer(trm, nil)
 
 	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
-	pcmock.YieldError(sarama.ErrCorruptMessage)
-	pcmock.YieldError(sarama.ErrCorruptMessage)
+	pcmock.YieldError(sarama.ErrInvalidMessage)
+	pcmock.YieldError(sarama.ErrInvalidMessage)
 	pcmock.ExpectErrorsDrainedOnClose()
 
 	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
