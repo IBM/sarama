@@ -504,7 +504,7 @@ func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 	}
 
 	coordinatorResponse1 := new(ConsumerMetadataResponse)
-	coordinatorResponse1.Err = ErrCoordinatorNotAvailable
+	coordinatorResponse1.Err = ErrConsumerCoordinatorNotAvailable
 	seedBroker.Returns(coordinatorResponse1)
 
 	coordinatorResponse2 := new(ConsumerMetadataResponse)
@@ -581,7 +581,7 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 	}
 
 	coordinatorResponse1 := new(ConsumerMetadataResponse)
-	coordinatorResponse1.Err = ErrCoordinatorNotAvailable
+	coordinatorResponse1.Err = ErrConsumerCoordinatorNotAvailable
 	seedBroker.Returns(coordinatorResponse1)
 
 	metadataResponse2 := new(MetadataResponse)

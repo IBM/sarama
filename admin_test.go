@@ -182,7 +182,7 @@ func TestClusterAdminDeleteEmptyTopic(t *testing.T) {
 	}
 
 	err = admin.DeleteTopic("")
-	if err != ErrInvalidTopicException {
+	if err != ErrInvalidTopic {
 		t.Fatal(err)
 	}
 

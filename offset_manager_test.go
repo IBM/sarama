@@ -87,14 +87,14 @@ func TestNewOffsetManager(t *testing.T) {
 	}
 }
 
-// Test recovery from ErrNotCoordinator
+// Test recovery from ErrNotCoordinatorForConsumer
 // on first fetchInitialOffset call
 func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 
 	// Error on first fetchInitialOffset call
 	responseBlock := OffsetFetchResponseBlock{
-		Err:      ErrNotCoordinator,
+		Err:      ErrNotCoordinatorForConsumer,
 		Offset:   5,
 		Metadata: "test_meta",
 	}
@@ -131,13 +131,13 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	safeClose(t, testClient)
 }
 
-// Test fetchInitialOffset retry on ErrCoordinatorLoadInProgress
+// Test fetchInitialOffset retry on ErrOffsetsLoadInProgress
 func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 
 	// Error on first fetchInitialOffset call
 	responseBlock := OffsetFetchResponseBlock{
-		Err:      ErrCoordinatorLoadInProgress,
+		Err:      ErrOffsetsLoadInProgress,
 		Offset:   5,
 		Metadata: "test_meta",
 	}
