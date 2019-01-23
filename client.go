@@ -401,7 +401,7 @@ func (client *client) RefreshMetadata(topics ...string) error {
 	// off to Kafka. See: https://github.com/Shopify/sarama/pull/38#issuecomment-26362310
 	for _, topic := range topics {
 		if len(topic) == 0 {
-			return ErrInvalidTopicException // this is the error that 0.8.2 and later correctly return
+			return ErrInvalidTopic // this is the error that 0.8.2 and later correctly return
 		}
 	}
 
@@ -465,7 +465,7 @@ func (client *client) Coordinator(consumerGroup string) (*Broker, error) {
 	}
 
 	if coordinator == nil {
-		return nil, ErrCoordinatorNotAvailable
+		return nil, ErrConsumerCoordinatorNotAvailable
 	}
 
 	_ = coordinator.Open(client.conf)
@@ -790,7 +790,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		switch topic.Err {
 		case ErrNoError:
 			break
-		case ErrInvalidTopicException, ErrTopicAuthorizationFailed: // don't retry, don't store partial results
+		case ErrInvalidTopic, ErrTopicAuthorizationFailed: // don't retry, don't store partial results
 			err = topic.Err
 			continue
 		case ErrUnknownTopicOrPartition: // retry, do not store partial partition results
@@ -876,7 +876,7 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 			Logger.Printf("client/coordinator coordinator for consumergroup %s is #%d (%s)\n", consumerGroup, response.Coordinator.ID(), response.Coordinator.Addr())
 			return response, nil
 
-		case ErrCoordinatorNotAvailable:
+		case ErrConsumerCoordinatorNotAvailable:
 			Logger.Printf("client/coordinator coordinator for consumer group %s is not available\n", consumerGroup)
 
 			// This is very ugly, but this scenario will only happen once per cluster.
@@ -887,7 +887,7 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 				time.Sleep(2 * time.Second)
 			}
 
-			return retry(ErrCoordinatorNotAvailable)
+			return retry(ErrConsumerCoordinatorNotAvailable)
 		default:
 			return nil, response.Err
 		}
