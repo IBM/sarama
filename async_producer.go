@@ -676,6 +676,10 @@ func (bp *brokerProducer) run() {
 				output = nil
 			case response := <-bp.responses:
 				bp.handleResponse(response)
+			case t := <-bp.timer:
+				go func() {
+					bp.timer <- t
+				}()
 			}
 		}
 		select {
