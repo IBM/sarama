@@ -668,6 +668,13 @@ func (bp *brokerProducer) run() {
 	var output chan<- *produceSet
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
+	//handle response for each batch send
+	go withRecover(func() {
+		for response := range bp.responses {
+			bp.handleResponse(response)
+		}
+	})
+
 	for {
 		select {
 		case msg := <-bp.input:
@@ -717,14 +724,12 @@ func (bp *brokerProducer) run() {
 			}
 		case <-bp.timer:
 			bp.timerFired = true
-		case output <- bp.buffer:
-			bp.rollOver()
-		case response := <-bp.responses:
-			bp.handleResponse(response)
 		}
 
 		if bp.timerFired || bp.buffer.readyToFlush() {
 			output = bp.output
+			output <- bp.buffer
+			bp.rollOver()
 		} else {
 			output = nil
 		}
