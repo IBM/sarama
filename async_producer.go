@@ -669,6 +669,15 @@ func (bp *brokerProducer) run() {
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
 	for {
+		if output != nil {
+			select {
+			case output <- bp.buffer:
+				bp.rollOver()
+				output = nil
+			case response := <-bp.responses:
+				bp.handleResponse(response)
+			}
+		}
 		select {
 		case msg := <-bp.input:
 			if msg == nil {
