@@ -656,7 +656,6 @@ type brokerProducer struct {
 	output    chan<- *produceSet
 	responses <-chan *brokerProducerResponse
 
-	setLock    sync.Mutex
 	buffer     *produceSet
 	timer      <-chan time.Time
 	timerFired bool
@@ -783,11 +782,9 @@ func (bp *brokerProducer) waitForSpace(msg *ProducerMessage) error {
 }
 
 func (bp *brokerProducer) rollOver() {
-	bp.setLock.Lock()
 	bp.timer = nil
 	bp.timerFired = false
 	bp.buffer = newProduceSet(bp.parent)
-	bp.setLock.Unlock()
 }
 
 func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
@@ -795,10 +792,6 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 		bp.handleError(response.set, response.err)
 	} else {
 		bp.handleSuccess(response.set, response.res)
-	}
-
-	if bp.buffer.empty() {
-		bp.rollOver() // this can happen if the response invalidated our buffer
 	}
 }
 
@@ -925,7 +918,6 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		bp.buffer.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 			bp.parent.retryMessages(pSet.msgs, err)
 		})
-		bp.rollOver()
 	}
 }
 
