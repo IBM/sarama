@@ -985,6 +985,123 @@ func TestConsumerExpiryTicker(t *testing.T) {
 	broker0.Close()
 }
 
+func TestConsumerTimestamps(t *testing.T) {
+	now := time.Now().Truncate(time.Millisecond)
+	type testMessage struct {
+		key       Encoder
+		value     Encoder
+		offset    int64
+		timestamp time.Time
+	}
+	for _, d := range []struct {
+		kversion          KafkaVersion
+		logAppendTime     bool
+		messages          []testMessage
+		expectedTimestamp []time.Time
+	}{
+		{MinVersion, false, []testMessage{
+			{nil, testMsg, 1, now},
+			{nil, testMsg, 2, now},
+		}, []time.Time{{}, {}}},
+		{V0_9_0_0, false, []testMessage{
+			{nil, testMsg, 1, now},
+			{nil, testMsg, 2, now},
+		}, []time.Time{{}, {}}},
+		{V0_10_0_0, false, []testMessage{
+			{nil, testMsg, 1, now},
+			{nil, testMsg, 2, now},
+		}, []time.Time{{}, {}}},
+		{V0_10_2_1, false, []testMessage{
+			{nil, testMsg, 1, now.Add(time.Second)},
+			{nil, testMsg, 2, now.Add(2 * time.Second)},
+		}, []time.Time{now.Add(time.Second), now.Add(2 * time.Second)}},
+		{V0_10_2_1, true, []testMessage{
+			{nil, testMsg, 1, now.Add(time.Second)},
+			{nil, testMsg, 2, now.Add(2 * time.Second)},
+		}, []time.Time{now, now}},
+		{V0_11_0_0, false, []testMessage{
+			{nil, testMsg, 1, now.Add(time.Second)},
+			{nil, testMsg, 2, now.Add(2 * time.Second)},
+		}, []time.Time{now.Add(time.Second), now.Add(2 * time.Second)}},
+		{V0_11_0_0, true, []testMessage{
+			{nil, testMsg, 1, now.Add(time.Second)},
+			{nil, testMsg, 2, now.Add(2 * time.Second)},
+		}, []time.Time{now, now}},
+	} {
+		var fr *FetchResponse
+		var offsetResponseVersion int16
+		cfg := NewConfig()
+		cfg.Version = d.kversion
+		switch {
+		case d.kversion.IsAtLeast(V0_11_0_0):
+			offsetResponseVersion = 1
+			fr = &FetchResponse{Version: 4, LogAppendTime: d.logAppendTime, Timestamp: now}
+			for _, m := range d.messages {
+				fr.AddRecordWithTimestamp("my_topic", 0, m.key, testMsg, m.offset, m.timestamp)
+			}
+			fr.SetLastOffsetDelta("my_topic", 0, 2)
+			fr.SetLastStableOffset("my_topic", 0, 2)
+		case d.kversion.IsAtLeast(V0_10_1_0):
+			offsetResponseVersion = 1
+			fr = &FetchResponse{Version: 3, LogAppendTime: d.logAppendTime, Timestamp: now}
+			for _, m := range d.messages {
+				fr.AddMessageWithTimestamp("my_topic", 0, m.key, testMsg, m.offset, m.timestamp, 1)
+			}
+		default:
+			var version int16
+			switch {
+			case d.kversion.IsAtLeast(V0_10_0_0):
+				version = 2
+			case d.kversion.IsAtLeast(V0_9_0_0):
+				version = 1
+			}
+			fr = &FetchResponse{Version: version}
+			for _, m := range d.messages {
+				fr.AddMessageWithTimestamp("my_topic", 0, m.key, testMsg, m.offset, m.timestamp, 0)
+			}
+		}
+
+		broker0 := NewMockBroker(t, 0)
+		broker0.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetBroker(broker0.Addr(), broker0.BrokerID()).
+				SetLeader("my_topic", 0, broker0.BrokerID()),
+			"OffsetRequest": NewMockOffsetResponse(t).
+				SetVersion(offsetResponseVersion).
+				SetOffset("my_topic", 0, OffsetNewest, 1234).
+				SetOffset("my_topic", 0, OffsetOldest, 0),
+			"FetchRequest": NewMockSequence(fr),
+		})
+
+		master, err := NewConsumer([]string{broker0.Addr()}, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		consumer, err := master.ConsumePartition("my_topic", 0, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for i, ts := range d.expectedTimestamp {
+			select {
+			case msg := <-consumer.Messages():
+				assertMessageOffset(t, msg, int64(i)+1)
+				if msg.Timestamp != ts {
+					t.Errorf("Wrong timestamp (kversion:%v, logAppendTime:%v): got: %v, want: %v",
+						d.kversion, d.logAppendTime, msg.Timestamp, ts)
+				}
+			case err := <-consumer.Errors():
+				t.Fatal(err)
+			}
+		}
+
+		safeClose(t, consumer)
+		safeClose(t, master)
+		broker0.Close()
+	}
+}
+
 func assertMessageOffset(t *testing.T, msg *ConsumerMessage, expectedOffset int64) {
 	if msg.Offset != expectedOffset {
 		t.Errorf("Incorrect message offset: expected=%d, actual=%d", expectedOffset, msg.Offset)

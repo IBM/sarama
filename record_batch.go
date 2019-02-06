@@ -36,6 +36,7 @@ type RecordBatch struct {
 	Codec                 CompressionCodec
 	CompressionLevel      int
 	Control               bool
+	LogAppendTime         bool
 	LastOffsetDelta       int32
 	FirstTimestamp        time.Time
 	MaxTimestamp          time.Time
@@ -120,6 +121,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	}
 	b.Codec = CompressionCodec(int8(attributes) & compressionCodecMask)
 	b.Control = attributes&controlMask == controlMask
+	b.LogAppendTime = attributes&timestampTypeMask == timestampTypeMask
 
 	if b.LastOffsetDelta, err = pd.getInt32(); err != nil {
 		return err
@@ -199,6 +201,9 @@ func (b *RecordBatch) computeAttributes() int16 {
 	attr := int16(b.Codec) & int16(compressionCodecMask)
 	if b.Control {
 		attr |= controlMask
+	}
+	if b.LogAppendTime {
+		attr |= timestampTypeMask
 	}
 	return attr
 }
