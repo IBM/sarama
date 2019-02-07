@@ -11,6 +11,7 @@ import (
 
 // ErrClosedConsumerGroup is the error returned when a method is called on a consumer group that has been closed.
 var ErrClosedConsumerGroup = errors.New("kafka: tried to use a consumer group that was closed")
+var ErrPartitionNotClaimed = errors.New("that topic/partition is not claimed by this consumer group session")
 
 // ConsumerGroup is responsible for dividing up processing of topics and partitions
 // over a collection of processes (the members of the consumer group).
@@ -433,6 +434,13 @@ type ConsumerGroupSession interface {
 	// allows incrementing the offset. cf MarkOffset for more details.
 	ResetOffset(topic string, partition int32, offset int64, metadata string)
 
+	// NextOffset returns the next offset that should be consumed for the managed
+	// partition, accompanied by metadata which can be used to reconstruct the state
+	// of the partition consumer when it resumes. NextOffset() will return
+	// `config.Consumer.Offsets.Initial` and an empty metadata string if no offset
+	// was committed for this partition yet.
+	NextOffset(topic string, partition int32) (int64, string, error)
+
 	// MarkMessage marks a message as consumed.
 	MarkMessage(msg *ConsumerMessage, metadata string)
 
@@ -541,6 +549,15 @@ func (s *consumerGroupSession) ResetOffset(topic string, partition int32, offset
 	if pom := s.offsets.findPOM(topic, partition); pom != nil {
 		pom.ResetOffset(offset, metadata)
 	}
+}
+
+func (s *consumerGroupSession) NextOffset(topic string, partition int32) (int64, string, error) {
+	if pom := s.offsets.findPOM(topic, partition); pom != nil {
+		offset, metadata := pom.NextOffset()
+		return offset, metadata, nil
+	}
+
+	return 0, "", ErrPartitionNotClaimed
 }
 
 func (s *consumerGroupSession) MarkMessage(msg *ConsumerMessage, metadata string) {
