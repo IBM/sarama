@@ -108,3 +108,21 @@ type StdLogger interface {
 	Printf(format string, v ...interface{})
 	Println(v ...interface{})
 }
+
+type debugLogger struct{}
+
+func (d *debugLogger) Print(v ...interface{}) {
+	Logger.Print(v)
+}
+func (d *debugLogger) Printf(format string, v ...interface{}) {
+	Logger.Printf(format, v)
+}
+func (d *debugLogger) Println(v ...interface{}) {
+	Logger.Println(v)
+}
+
+// DebugLogger is the instance of a StdLogger that Sarama writes more verbose
+// debug information to. By default it is set to redirect all debug to the
+// default Logger above, but you can optionally set it to another StdLogger
+// instance to (e.g.,) discard debug information
+var DebugLogger StdLogger = &debugLogger{}
