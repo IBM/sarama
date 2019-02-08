@@ -3,7 +3,49 @@ package sarama
 import (
 	"context"
 	"fmt"
+	"testing"
 )
+
+func TestConsumerGroupSessionNextOffset(t *testing.T) {
+	var partition int32 = 13
+	var offset int64 = 23
+	var meta = "meta"
+	poms := map[string]map[int32]*partitionOffsetManager{
+		"topic1": {
+			partition: {
+				offset:   offset,
+				metadata: meta,
+			},
+		},
+	}
+
+	sess := consumerGroupSession{offsets: &offsetManager{poms: poms}}
+
+	actualOffset, actualMetadata, err := sess.NextOffset("topic1", partition)
+	if err != nil {
+		t.Errorf("partition should be claimed by this session. err: %s", err.Error())
+	}
+
+	if actualOffset != offset {
+		t.Errorf("expected next offset: %d, got: %d", offset, actualOffset)
+	}
+
+	if actualMetadata != meta {
+		t.Errorf("expected meta: %s, got %s", meta, actualMetadata)
+	}
+
+	// check we don't get offset for an unclaimed partition
+	_, _, err = sess.NextOffset("topic1", 5)
+	if err != ErrPartitionNotClaimed {
+		t.Error("partition should not be claimed by this session")
+	}
+
+	// check we don't get offset for an unclaimed topic
+	_, _, err = sess.NextOffset("topic2", 23)
+	if err != ErrPartitionNotClaimed {
+		t.Error("topic should not be claimed by this session")
+	}
+}
 
 type exampleConsumerGroupHandler struct{}
 
