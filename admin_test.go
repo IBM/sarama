@@ -179,6 +179,10 @@ func TestClusterAdminListTopics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	if topic.ReplicaAssignment == nil || topic.ReplicaAssignment[0][0] != 1 {
+		t.Fatal(errors.New("replica assignment not found in response"))
+	}
 }
 
 func TestClusterAdminDeleteTopic(t *testing.T) {
