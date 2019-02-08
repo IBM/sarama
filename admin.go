@@ -249,6 +249,10 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 			NumPartitions: int32(len(topic.Partitions)),
 		}
 		if len(topic.Partitions) > 0 {
+			topicDetails.ReplicaAssignment = map[int32][]int32{}
+			for _, partition := range topic.Partitions {
+				topicDetails.ReplicaAssignment[partition.ID] = partition.Replicas
+			}
 			topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas))
 		}
 		topicsDetailsMap[topic.Name] = topicDetails
