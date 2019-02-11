@@ -136,35 +136,6 @@ func TestClusterAdminCreateTopicWithoutAuthorization(t *testing.T) {
 	}
 }
 
-func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	defer seedBroker.Close()
-
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
-		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
-	})
-
-	config := NewConfig()
-	config.Version = V0_11_0_0
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
-	if err != ErrInsufficientData {
-		t.Fatal(err)
-	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestClusterAdminListTopics(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
