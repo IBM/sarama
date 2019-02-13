@@ -736,6 +736,7 @@ func (bp *brokerProducer) run() {
 			bp.timerFired = true
 		case output <- bp.buffer:
 			bp.rollOver()
+			output = nil
 		case response := <-bp.responses:
 			bp.handleResponse(response)
 		}
