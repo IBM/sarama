@@ -680,6 +680,12 @@ func (bp *brokerProducer) run() {
 				bp.timerFired = true
 			}
 		}
+
+		if bp.timerFired {
+			output = bp.output
+			continue
+		}
+
 		select {
 		case msg := <-bp.input:
 			if msg == nil {
@@ -732,8 +738,6 @@ func (bp *brokerProducer) run() {
 			bp.rollOver()
 		case response := <-bp.responses:
 			bp.handleResponse(response)
-		case bp.timerFired == true:
-
 		}
 
 		if bp.timerFired || bp.buffer.readyToFlush() {
