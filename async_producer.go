@@ -676,6 +676,8 @@ func (bp *brokerProducer) run() {
 				output = nil
 			case response := <-bp.responses:
 				bp.handleResponse(response)
+			case <-bp.timer:
+				bp.timerFired = true
 			}
 		}
 		select {
@@ -730,6 +732,8 @@ func (bp *brokerProducer) run() {
 			bp.rollOver()
 		case response := <-bp.responses:
 			bp.handleResponse(response)
+		case bp.timerFired == true:
+
 		}
 
 		if bp.timerFired || bp.buffer.readyToFlush() {
