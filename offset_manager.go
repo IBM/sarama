@@ -120,6 +120,14 @@ func (om *offsetManager) Close() error {
 	return nil
 }
 
+func (om *offsetManager) computeBackoff(retries int) time.Duration {
+	if om.conf.Metadata.Retry.BackoffFunc != nil {
+		return om.conf.Metadata.Retry.BackoffFunc(retries, om.conf.Metadata.Retry.Max)
+	} else {
+		return om.conf.Metadata.Retry.Backoff
+	}
+}
+
 func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retries int) (int64, string, error) {
 	broker, err := om.coordinator()
 	if err != nil {
@@ -161,10 +169,11 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 		if retries <= 0 {
 			return 0, "", block.Err
 		}
+		backoff := om.computeBackoff(retries)
 		select {
 		case <-om.closing:
 			return 0, "", block.Err
-		case <-time.After(om.conf.Metadata.Retry.Backoff):
+		case <-time.After(backoff):
 		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	default:
