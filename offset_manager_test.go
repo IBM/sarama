@@ -1,15 +1,20 @@
 package sarama
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 )
 
-func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
+func initOffsetManagerWithBackoffFunc(t *testing.T, retention time.Duration,
+	backoffFunc func(retries, maxRetries int) time.Duration) (om OffsetManager,
 	testClient Client, broker, coordinator *MockBroker) {
 
 	config := NewConfig()
 	config.Metadata.Retry.Max = 1
+	if backoffFunc != nil {
+		config.Metadata.Retry.BackoffFunc = backoffFunc
+	}
 	config.Consumer.Offsets.CommitInterval = 1 * time.Millisecond
 	config.Version = V0_9_0_0
 	if retention > 0 {
@@ -43,6 +48,11 @@ func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
 	}
 
 	return om, testClient, broker, coordinator
+}
+
+func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
+	testClient Client, broker, coordinator *MockBroker) {
+	return initOffsetManagerWithBackoffFunc(t, retention, nil)
 }
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
@@ -133,7 +143,12 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 
 // Test fetchInitialOffset retry on ErrOffsetsLoadInProgress
 func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
-	om, testClient, broker, coordinator := initOffsetManager(t, 0)
+	retryCount := int32(0)
+	backoff := func(retries, maxRetries int) time.Duration {
+		atomic.AddInt32(&retryCount, 1)
+		return 0
+	}
+	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff)
 
 	// Error on first fetchInitialOffset call
 	responseBlock := OffsetFetchResponseBlock{
@@ -163,6 +178,10 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	safeClose(t, pom)
 	safeClose(t, om)
 	safeClose(t, testClient)
+
+	if atomic.LoadInt32(&retryCount) == 0 {
+		t.Fatal("Expected at least one retry")
+	}
 }
 
 func TestPartitionOffsetManagerInitialOffset(t *testing.T) {

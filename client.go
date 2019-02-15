@@ -710,8 +710,11 @@ func (client *client) refreshMetadata() error {
 func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int) error {
 	retry := func(err error) error {
 		if attemptsRemaining > 0 {
+			backoff := client.computeBackoff(attemptsRemaining)
 			Logger.Printf("client/metadata retrying after %dms... (%d attempts remaining)\n", client.conf.Metadata.Retry.Backoff/time.Millisecond, attemptsRemaining)
-			time.Sleep(client.conf.Metadata.Retry.Backoff)
+			if backoff > 0 {
+				time.Sleep(backoff)
+			}
 			return client.tryRefreshMetadata(topics, attemptsRemaining-1)
 		}
 		return err
@@ -839,11 +842,22 @@ func (client *client) cachedController() *Broker {
 	return client.brokers[client.controllerID]
 }
 
+func (client *client) computeBackoff(attemptsRemaining int) time.Duration {
+	if client.conf.Metadata.Retry.BackoffFunc != nil {
+		maxRetries := client.conf.Metadata.Retry.Max
+		retries := maxRetries - attemptsRemaining
+		return client.conf.Metadata.Retry.BackoffFunc(retries, maxRetries)
+	} else {
+		return client.conf.Metadata.Retry.Backoff
+	}
+}
+
 func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemaining int) (*FindCoordinatorResponse, error) {
 	retry := func(err error) (*FindCoordinatorResponse, error) {
 		if attemptsRemaining > 0 {
-			Logger.Printf("client/coordinator retrying after %dms... (%d attempts remaining)\n", client.conf.Metadata.Retry.Backoff/time.Millisecond, attemptsRemaining)
-			time.Sleep(client.conf.Metadata.Retry.Backoff)
+			backoff := client.computeBackoff(attemptsRemaining)
+			Logger.Printf("client/coordinator retrying after %dms... (%d attempts remaining)\n", backoff/time.Millisecond, attemptsRemaining)
+			time.Sleep(backoff)
 			return client.getConsumerMetadata(consumerGroup, attemptsRemaining-1)
 		}
 		return nil, err
