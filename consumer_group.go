@@ -657,6 +657,12 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		resp, err := s.parent.heartbeatRequest(coordinator, s.memberID, s.generationID)
 		if err != nil {
 			_ = coordinator.Close()
+
+			if retries <= 0 {
+				s.parent.handleError(err, "", -1)
+				return
+			}
+
 			retries--
 			continue
 		}
