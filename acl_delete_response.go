@@ -3,6 +3,7 @@ package sarama
 import "time"
 
 type DeleteAclsResponse struct {
+	Version         int16
 	ThrottleTime    time.Duration
 	FilterResponses []*FilterResponse
 }
@@ -15,7 +16,7 @@ func (a *DeleteAclsResponse) encode(pe packetEncoder) error {
 	}
 
 	for _, filterResponse := range a.FilterResponses {
-		if err := filterResponse.encode(pe); err != nil {
+		if err := filterResponse.encode(pe, a.Version); err != nil {
 			return err
 		}
 	}
@@ -51,7 +52,7 @@ func (d *DeleteAclsResponse) key() int16 {
 }
 
 func (d *DeleteAclsResponse) version() int16 {
-	return 0
+	return int16(d.Version)
 }
 
 func (d *DeleteAclsResponse) requiredVersion() KafkaVersion {
@@ -64,7 +65,7 @@ type FilterResponse struct {
 	MatchingAcls []*MatchingAcl
 }
 
-func (f *FilterResponse) encode(pe packetEncoder) error {
+func (f *FilterResponse) encode(pe packetEncoder, version int16) error {
 	pe.putInt16(int16(f.Err))
 	if err := pe.putNullableString(f.ErrMsg); err != nil {
 		return err
@@ -74,7 +75,7 @@ func (f *FilterResponse) encode(pe packetEncoder) error {
 		return err
 	}
 	for _, matchingAcl := range f.MatchingAcls {
-		if err := matchingAcl.encode(pe); err != nil {
+		if err := matchingAcl.encode(pe, version); err != nil {
 			return err
 		}
 	}
@@ -115,13 +116,13 @@ type MatchingAcl struct {
 	Acl
 }
 
-func (m *MatchingAcl) encode(pe packetEncoder) error {
+func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
 	pe.putInt16(int16(m.Err))
 	if err := pe.putNullableString(m.ErrMsg); err != nil {
 		return err
 	}
 
-	if err := m.Resource.encode(pe); err != nil {
+	if err := m.Resource.encode(pe, version); err != nil {
 		return err
 	}
 
