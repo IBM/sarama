@@ -1,5 +1,41 @@
 # Changelog
 
+#### Version 1.21.0 (2019-02-24)
+
+New Features:
+- Add CreateAclRequest, DescribeAclRequest, DeleteAclRequest
+  ([1236](https://github.com/Shopify/sarama/pull/1236)).
+- Add DescribeTopic, DescribeConsumerGroup, ListConsumerGroups, ListConsumerGroupOffsets admin requests
+  ([1178](https://github.com/Shopify/sarama/pull/1178)).
+- Implement SASL/OAUTHBEARER
+  ([1240](https://github.com/Shopify/sarama/pull/1240)).
+
+Improvements:
+- Add Go mod support
+  ([1282](https://github.com/Shopify/sarama/pull/1282)).
+- Add error codes 73—76
+  ([1239](https://github.com/Shopify/sarama/pull/1239)).
+- Add retry backoff function
+  ([1160](https://github.com/Shopify/sarama/pull/1160)).
+- Maintain metadata in the producer even when retries are disabled
+  ([1189](https://github.com/Shopify/sarama/pull/1189)).
+- Include ReplicaAssignment in ListTopics
+  ([1274](https://github.com/Shopify/sarama/pull/1274)).
+- Add producer performance tool
+  ([1222](https://github.com/Shopify/sarama/pull/1222)).
+- Add support LogAppend timestamps
+  ([1258](https://github.com/Shopify/sarama/pull/1258)).
+
+Bug Fixes:
+- Fix potential deadlock when a heartbeat request fails
+  ([1286](https://github.com/Shopify/sarama/pull/1286)).
+- Fix consuming compacted topic
+  ([1227](https://github.com/Shopify/sarama/pull/1227)).
+- Set correct Kafka version for DescribeConfigsRequest v1
+  ([1277](https://github.com/Shopify/sarama/pull/1277)).
+- Update kafka test version
+  ([1273](https://github.com/Shopify/sarama/pull/1273)).
+
 #### Version 1.20.1 (2019-01-10)
 
 New Features:
