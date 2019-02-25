@@ -166,7 +166,7 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 	}
 
 	if topicErr.Err != ErrNoError {
-		return topicErr.Err
+		return topicErr
 	}
 
 	return nil
@@ -358,7 +358,7 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 	}
 
 	if topicErr.Err != ErrNoError {
-		return topicErr.Err
+		return topicErr
 	}
 
 	return nil
