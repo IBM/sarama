@@ -2,6 +2,7 @@ language: go
 go:
 - 1.10.x
 - 1.11.x
+- 1.12.x
 
 env:
   global:
@@ -27,7 +28,7 @@ script:
 - make test
 - make vet
 - make errcheck
-- if [[ "$TRAVIS_GO_VERSION" == 1.11* ]]; then make fmt; fi
+- if [[ "$TRAVIS_GO_VERSION" == 1.12* ]]; then make fmt; fi
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
