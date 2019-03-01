@@ -75,9 +75,8 @@ type Consumer interface {
 }
 
 type consumer struct {
-	client    Client
-	conf      *Config
-	ownClient bool
+	client Client
+	conf   *Config
 
 	lock            sync.Mutex
 	children        map[string]map[int32]*partitionConsumer
@@ -90,18 +89,19 @@ func NewConsumer(addrs []string, config *Config) (Consumer, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	c, err := NewConsumerFromClient(client)
-	if err != nil {
-		return nil, err
-	}
-	c.(*consumer).ownClient = true
-	return c, nil
+	return newConsumer(client)
 }
 
 // NewConsumerFromClient creates a new consumer using the given client. It is still
 // necessary to call Close() on the underlying client when shutting down this consumer.
 func NewConsumerFromClient(client Client) (Consumer, error) {
+	// For clients passed in by the client, ensure we don't
+	// call Close() on it.
+	cli := &nopCloserClient{client}
+	return newConsumer(cli)
+}
+
+func newConsumer(client Client) (Consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -118,10 +118,7 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 }
 
 func (c *consumer) Close() error {
-	if c.ownClient {
-		return c.client.Close()
-	}
-	return nil
+	return c.client.Close()
 }
 
 func (c *consumer) Topics() ([]string, error) {
