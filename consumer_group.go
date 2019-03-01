@@ -52,8 +52,7 @@ type ConsumerGroup interface {
 }
 
 type consumerGroup struct {
-	client    Client
-	ownClient bool
+	client Client
 
 	config   *Config
 	consumer Consumer
@@ -73,20 +72,24 @@ func NewConsumerGroup(addrs []string, groupID string, config *Config) (ConsumerG
 		return nil, err
 	}
 
-	c, err := NewConsumerGroupFromClient(groupID, client)
+	c, err := newConsumerGroup(groupID, client)
 	if err != nil {
 		_ = client.Close()
-		return nil, err
 	}
-
-	c.(*consumerGroup).ownClient = true
-	return c, nil
+	return c, err
 }
 
 // NewConsumerGroupFromClient creates a new consumer group using the given client. It is still
 // necessary to call Close() on the underlying client when shutting down this consumer.
 // PLEASE NOTE: consumer groups can only re-use but not share clients.
 func NewConsumerGroupFromClient(groupID string, client Client) (ConsumerGroup, error) {
+	// For clients passed in by the client, ensure we don't
+	// call Close() on it.
+	cli := &nopCloserClient{client}
+	return newConsumerGroup(groupID, cli)
+}
+
+func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 	config := client.Config()
 	if !config.Version.IsAtLeast(V0_10_2_0) {
 		return nil, ConfigurationError("consumer groups require Version to be >= V0_10_2_0")
@@ -131,10 +134,8 @@ func (c *consumerGroup) Close() (err error) {
 			err = e
 		}
 
-		if c.ownClient {
-			if e := c.client.Close(); e != nil {
-				err = e
-			}
+		if e := c.client.Close(); e != nil {
+			err = e
 		}
 	})
 	return
