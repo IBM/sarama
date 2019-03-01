@@ -911,3 +911,18 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 	client.resurrectDeadBrokers()
 	return retry(ErrOutOfBrokers)
 }
+
+// nopCloserClient embeds an existing Client, but disables
+// the Close method (yet all other methods pass
+// through unchanged). This is for use in larger structs
+// where it is undesirable to close the client that was
+// passed in by the caller.
+type nopCloserClient struct {
+	Client
+}
+
+// Close intercepts and purposely does not call the underlying
+// client's Close() method.
+func (ncc *nopCloserClient) Close() error {
+	return nil
+}
