@@ -1,0 +1,25 @@
+version: '3'
+services:
+  kafka:
+    image: landoop/fast-data-dev:1.1.1
+    ports:
+      - "2181:2181"
+      - "3030:3030"
+      - "8081-8083:8081-8083"
+      - "9581-9585:9581-9585"
+      - "9092:9092"
+    environment:
+      - ADV_HOST=kafka
+      - SAMPLEDATA=0
+      - RUNNING_SAMPLEDATA=0
+      - RUNTESTS=0
+      - FORWARDLOGS=0
+      - DISABLE_JMX=1
+      - DEBUG=1
+      - SUPERVISORWEB=0
+      - CONNECTORS=file
+
+  custom-producer:
+    build:
+      dockerfile: DockerFile_CustomerProducer.yaml
+      context: .
