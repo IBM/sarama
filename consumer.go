@@ -779,7 +779,7 @@ func (bc *brokerConsumer) handleResponses() {
 
 func (bc *brokerConsumer) abort(err error) {
 	bc.consumer.abandonBrokerConsumer(bc)
-	bc.broker.Close() // we don't care about the error this might return, we already have one
+	_ = bc.broker.Close() // we don't care about the error this might return, we already have one
 
 	for child := range bc.subscriptions {
 		child.sendError(err)
