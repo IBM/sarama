@@ -27,7 +27,6 @@ var (
 	tlsSkipVerify = flag.Bool("tls-skip-verify", false, "Whether skip TLS server cert verification")
 	clientCert    = flag.String("client-cert", "", "The client cert for client authentication (use with -tls-enabled and -client-key)")
 	clientKey     = flag.String("client-key", "", "The client key for client authentication (use with tls-enabled and -client-cert)")
-	ca            = flag.String("ca", "", "The CA that signed TLS server cert (use with -tls-enabled)")
 
 	logger = log.New(os.Stderr, "", log.LstdFlags)
 )
