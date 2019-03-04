@@ -22,8 +22,8 @@ var (
 	verbose       = flag.Bool("verbose", false, "Whether to turn on sarama logging")
 	tlsEnabled    = flag.Bool("tls-enabled", false, "Whether to enable TLS")
 	tlsSkipVerify = flag.Bool("tls-skip-verify", false, "Whether skip TLS server cert verification")
-	clientCert    = flag.String("client-cert", "", "The client cert for client authentication (use with -tls-enabled and -client-key)")
-	clientKey     = flag.String("client-key", "", "The client key for client authentication (use with tls-enabled and -client-cert)")
+	tlsClientCert = flag.String("tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
+	tlsClientKey  = flag.String("tls-client-key", "", "Client key for client authentication (use with tls-enabled and -tls-client-cert)")
 
 	bufferSize = flag.Int("buffer-size", 256, "The buffer size of the message channel.")
 
@@ -57,7 +57,7 @@ func main() {
 
 	config := sarama.NewConfig()
 	if *tlsEnabled {
-		tlsConfig, err := newTLSConfig(*clientCert, *clientKey)
+		tlsConfig, err := newTLSConfig(*tlsClientCert, *tlsClientKey)
 		if err != nil {
 			printErrorAndExit(69, "Failed to create TLS config: %s", err)
 		}
