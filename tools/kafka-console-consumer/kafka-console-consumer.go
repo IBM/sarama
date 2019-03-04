@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -14,11 +15,16 @@ import (
 )
 
 var (
-	brokerList = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The comma separated list of brokers in the Kafka cluster")
-	topic      = flag.String("topic", "", "REQUIRED: the topic to consume")
-	partitions = flag.String("partitions", "all", "The partitions to consume, can be 'all' or comma-separated numbers")
-	offset     = flag.String("offset", "newest", "The offset to start with. Can be `oldest`, `newest`")
-	verbose    = flag.Bool("verbose", false, "Whether to turn on sarama logging")
+	brokerList    = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The comma separated list of brokers in the Kafka cluster")
+	topic         = flag.String("topic", "", "REQUIRED: the topic to consume")
+	partitions    = flag.String("partitions", "all", "The partitions to consume, can be 'all' or comma-separated numbers")
+	offset        = flag.String("offset", "newest", "The offset to start with. Can be `oldest`, `newest`")
+	verbose       = flag.Bool("verbose", false, "Whether to turn on sarama logging")
+	tlsEnabled    = flag.Bool("tls-enabled", false, "Whether to enable TLS")
+	tlsSkipVerify = flag.Bool("tls-skip-verify", false, "Whether skip TLS server cert verification")
+	clientCert    = flag.String("client-cert", "", "The client cert for client authentication (use with -tls-enabled and -client-key)")
+	clientKey     = flag.String("client-key", "", "The client key for client authentication (use with tls-enabled and -client-cert)")
+
 	bufferSize = flag.Int("buffer-size", 256, "The buffer size of the message channel.")
 
 	logger = log.New(os.Stderr, "", log.LstdFlags)
@@ -49,7 +55,19 @@ func main() {
 		printUsageErrorAndExit("-offset should be `oldest` or `newest`")
 	}
 
-	c, err := sarama.NewConsumer(strings.Split(*brokerList, ","), nil)
+	config := sarama.NewConfig()
+	if *tlsEnabled {
+		tlsConfig, err := newTLSConfig(*clientCert, *clientKey)
+		if err != nil {
+			printErrorAndExit(69, "Failed to create TLS config: %s", err)
+		}
+
+		config.Net.TLS.Enable = true
+		config.Net.TLS.Config = tlsConfig
+		config.Net.TLS.Config.InsecureSkipVerify = *tlsSkipVerify
+	}
+
+	c, err := sarama.NewConsumer(strings.Split(*brokerList, ","), config)
 	if err != nil {
 		printErrorAndExit(69, "Failed to start consumer: %s", err)
 	}
@@ -142,4 +160,18 @@ func printUsageErrorAndExit(format string, values ...interface{}) {
 	fmt.Fprintln(os.Stderr, "Available command line options:")
 	flag.PrintDefaults()
 	os.Exit(64)
+}
+
+func newTLSConfig(clientCert, clientKey string) (*tls.Config, error) {
+	tlsConfig := tls.Config{}
+
+	if clientCert != "" && clientKey != "" {
+		cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
+		if err != nil {
+			return &tlsConfig, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
+	}
+
+	return &tlsConfig, nil
 }
