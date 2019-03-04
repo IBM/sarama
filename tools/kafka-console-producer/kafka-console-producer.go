@@ -25,8 +25,8 @@ var (
 	silent        = flag.Bool("silent", false, "Turn off printing the message's topic, partition, and offset to stdout")
 	tlsEnabled    = flag.Bool("tls-enabled", false, "Whether to enable TLS")
 	tlsSkipVerify = flag.Bool("tls-skip-verify", false, "Whether skip TLS server cert verification")
-	clientCert    = flag.String("client-cert", "", "The client cert for client authentication (use with -tls-enabled and -client-key)")
-	clientKey     = flag.String("client-key", "", "The client key for client authentication (use with tls-enabled and -client-cert)")
+	tlsClientCert = flag.String("tls-client-cert", "", "Client cert for client authentication (use with -tls-enabled and -tls-client-key)")
+	tlsClientKey  = flag.String("tls-client-key", "", "Client key for client authentication (use with tls-enabled and -tls-client-cert)")
 
 	logger = log.New(os.Stderr, "", log.LstdFlags)
 )
@@ -51,7 +51,7 @@ func main() {
 	config.Producer.Return.Successes = true
 
 	if *tlsEnabled {
-		tlsConfig, err := newTLSConfig(*clientCert, *clientKey)
+		tlsConfig, err := newTLSConfig(*tlsClientCert, *tlsClientKey)
 		if err != nil {
 			printErrorAndExit(69, "Failed to create TLS config: %s", err)
 		}
