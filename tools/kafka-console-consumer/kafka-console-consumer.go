@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -12,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/Shopify/sarama"
+	"github.com/Shopify/sarama/tools/tls"
 )
 
 var (
@@ -57,7 +57,7 @@ func main() {
 
 	config := sarama.NewConfig()
 	if *tlsEnabled {
-		tlsConfig, err := newTLSConfig(*tlsClientCert, *tlsClientKey)
+		tlsConfig, err := tls.NewConfig(*tlsClientCert, *tlsClientKey)
 		if err != nil {
 			printErrorAndExit(69, "Failed to create TLS config: %s", err)
 		}
@@ -160,18 +160,4 @@ func printUsageErrorAndExit(format string, values ...interface{}) {
 	fmt.Fprintln(os.Stderr, "Available command line options:")
 	flag.PrintDefaults()
 	os.Exit(64)
-}
-
-func newTLSConfig(clientCert, clientKey string) (*tls.Config, error) {
-	tlsConfig := tls.Config{}
-
-	if clientCert != "" && clientKey != "" {
-		cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-		if err != nil {
-			return &tlsConfig, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-
-	return &tlsConfig, nil
 }
