@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -10,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Shopify/sarama"
+	"github.com/Shopify/sarama/tools/tls"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -51,7 +51,7 @@ func main() {
 	config.Producer.Return.Successes = true
 
 	if *tlsEnabled {
-		tlsConfig, err := newTLSConfig(*tlsClientCert, *tlsClientKey)
+		tlsConfig, err := tls.NewConfig(*tlsClientCert, *tlsClientKey)
 		if err != nil {
 			printErrorAndExit(69, "Failed to create TLS config: %s", err)
 		}
@@ -137,18 +137,4 @@ func printUsageErrorAndExit(message string) {
 func stdinAvailable() bool {
 	stat, _ := os.Stdin.Stat()
 	return (stat.Mode() & os.ModeCharDevice) == 0
-}
-
-func newTLSConfig(clientCert, clientKey string) (*tls.Config, error) {
-	tlsConfig := tls.Config{}
-
-	if clientCert != "" && clientKey != "" {
-		cert, err := tls.LoadX509KeyPair(clientCert, clientKey)
-		if err != nil {
-			return &tlsConfig, err
-		}
-		tlsConfig.Certificates = []tls.Certificate{cert}
-	}
-
-	return &tlsConfig, nil
 }
