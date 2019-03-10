@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	isTransactionalMask   = 0x10
 	controlMask           = 0x20
 	maximumRecordOverhead = 5*binary.MaxVarintLen32 + binary.MaxVarintLen64 + 1
 )

@@ -192,3 +192,52 @@ func magicValue(pd packetDecoder) (int8, error) {
 
 	return dec.getInt8()
 }
+
+func (r *Records) getControlRecord() (ControlRecord, error) {
+	if r.RecordBatch == nil || len(r.RecordBatch.Records) <= 0 {
+		return ControlRecord{}, fmt.Errorf("cannot get control record, record batch is empty")
+	}
+
+	firstRecord := r.RecordBatch.Records[0]
+	controlRecord := ControlRecord{}
+	{
+		var err error
+		valueDecoder := realDecoder{raw: firstRecord.Value}
+		controlRecord.Version, err = valueDecoder.getInt16()
+		if err != nil {
+			return ControlRecord{}, err
+		}
+		controlRecord.CoordinatorEpoch, err = valueDecoder.getInt32()
+		if err != nil {
+			return ControlRecord{}, err
+		}
+	}
+	{
+		var err error
+		keyDecoder := realDecoder{raw: firstRecord.Key}
+
+		// There a version for the value part AND the key part. And I have no idea if they are supposed to match or not
+		// Either way, all these version can only be 0 for now
+		controlRecord.Version, err = keyDecoder.getInt16()
+		if err != nil {
+			return ControlRecord{}, err
+		}
+
+		recordType, err := keyDecoder.getInt16()
+		if err != nil {
+			return ControlRecord{}, err
+		}
+		switch recordType {
+		case 0:
+			controlRecord.Type = ControlRecordAbort
+		case 1:
+			controlRecord.Type = ControlRecordCommit
+		default:
+			// from JAVA implementation:
+			// UNKNOWN is used to indicate a control type which the client is not aware of and should be ignored
+			controlRecord.Type = ControlRecordUnknown
+		}
+	}
+
+	return controlRecord, nil
+}
