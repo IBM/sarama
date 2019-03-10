@@ -10,10 +10,7 @@ useful but comes with two caveats: it will generally be less efficient, and the 
 depend on the configured value of `Producer.RequiredAcks`. There are configurations where a message acknowledged by the
 SyncProducer can still sometimes be lost.
 
-To consume messages, use the Consumer. Note that Sarama's Consumer implementation does not currently support automatic
-consumer-group rebalancing and offset tracking. For Zookeeper-based tracking (Kafka 0.8.2 and earlier), the
-https://github.com/wvanbergen/kafka library builds on Sarama to add this support. For Kafka-based tracking (Kafka 0.9
-and later), the https://github.com/bsm/sarama-cluster library builds on Sarama to add this support.
+To consume messages, use Consumer or Consumer-Group API. 
 
 For lower-level needs, the Broker and Request/Response objects permit precise control over each connection
 and message sent on the wire; the Client provides higher-level metadata management that is shared between
