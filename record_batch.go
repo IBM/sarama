@@ -45,6 +45,7 @@ type RecordBatch struct {
 	FirstSequence         int32
 	Records               []*Record
 	PartialTrailingRecord bool
+	IsTransactional       bool
 
 	compressedRecords []byte
 	recordsLen        int // uncompressed records size
@@ -122,6 +123,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	b.Codec = CompressionCodec(int8(attributes) & compressionCodecMask)
 	b.Control = attributes&controlMask == controlMask
 	b.LogAppendTime = attributes&timestampTypeMask == timestampTypeMask
+	b.IsTransactional = attributes&isTransactionalMask == isTransactionalMask
 
 	if b.LastOffsetDelta, err = pd.getInt32(); err != nil {
 		return err
@@ -204,6 +206,9 @@ func (b *RecordBatch) computeAttributes() int16 {
 	}
 	if b.LogAppendTime {
 		attr |= timestampTypeMask
+	}
+	if b.IsTransactional {
+		attr |= isTransactionalMask
 	}
 	return attr
 }

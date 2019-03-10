@@ -24,7 +24,12 @@ func main() {
 		log.Fatal("-topic is required")
 	}
 
-	c, err := sarama.NewConsumer(strings.Split(*brokerList, ","), nil)
+	config := sarama.NewConfig()
+	config.Version = sarama.V1_1_1_0
+	config.Consumer.IsolationLevel = sarama.ReadCommitted
+	config.Consumer.MaxProcessingTime = 20 * 365 * 24 * time.Hour
+
+	c, err := sarama.NewConsumer(strings.Split(*brokerList, ","), config)
 	if err != nil {
 		log.Fatalf("Failed to start consumer: %s", err)
 	}
@@ -49,7 +54,7 @@ func main() {
 		msgChannel := pc.Messages()
 	read1Partition:
 		for {
-			timeout := time.NewTimer(1 * time.Second)
+			//timeout := time.NewTimer(1 * time.Second)
 			select {
 			case msg, open := <-msgChannel:
 				if !open {
@@ -57,8 +62,8 @@ func main() {
 					break read1Partition
 				}
 				log.Println(string(msg.Value))
-			case <-timeout.C:
-				break read1Partition
+				//case <-timeout.C:
+				//	break read1Partition
 			}
 		}
 	}

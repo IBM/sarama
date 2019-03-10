@@ -616,8 +616,21 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 			// - part of an aborted transaction when set to `ReadCommitted`
 
 			// control record
-			if control, err := records.isControl(); err != nil || control {
+			isControl, err := records.isControl()
+			if err != nil {
 				continue
+			}
+			if isControl {
+				//// TODO do not commit
+				//spew.Dump(records)
+
+				controlRecord, err := records.getControlRecord()
+				if err != nil {
+					return nil, err
+				}
+
+				//TODO do ont commit
+				fmt.Println(controlRecord)
 			}
 
 			// aborted transactions
