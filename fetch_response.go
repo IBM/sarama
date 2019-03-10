@@ -185,6 +185,15 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 	return pe.pop()
 }
 
+func (r *FetchResponseBlock) IsAborted(offset int64) bool {
+	for _, abortedTransaction := range r.AbortedTransactions {
+		if abortedTransaction != nil && abortedTransaction.FirstOffset == offset {
+			return true
+		}
+	}
+	return false
+}
+
 type FetchResponse struct {
 	Blocks        map[string]map[int32]*FetchResponseBlock
 	ThrottleTime  time.Duration
