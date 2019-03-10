@@ -338,6 +338,11 @@ type Config struct {
 				Max int
 			}
 		}
+
+		// IsolationLevel support 2 mode:
+		// 	- use `ReadUncommitted` (default) to consume and return all messages in message channel
+		//	- use `ReadCommitted` to hide messages that are part of an aborted transaction
+		IsolationLevel IsolationLevel
 	}
 
 	// A user-provided string sent with every request to the brokers for logging,

@@ -610,8 +610,25 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 			if err != nil {
 				return nil, err
 			}
+
+			// Parse and commit offset but do not expose messages that are:
+			// - control records
+			// - part of an aborted transaction when set to `ReadCommitted`
+
+			// control record
 			if control, err := records.isControl(); err != nil || control {
 				continue
+			}
+
+			// aborted transactions
+			if child.conf.Consumer.IsolationLevel == ReadCommitted {
+				committedMessages := make([]*ConsumerMessage, 0, len(recordBatchMessages))
+				for _, message := range recordBatchMessages {
+					if !block.IsAborted(message.Offset) {
+						committedMessages = append(committedMessages, message)
+					}
+				}
+				recordBatchMessages = committedMessages
 			}
 
 			messages = append(messages, recordBatchMessages...)
@@ -815,7 +832,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 4
-		request.Isolation = ReadUncommitted // We don't support yet transactions.
+		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
 	}
 
 	for child := range bc.subscriptions {
