@@ -10,7 +10,7 @@ useful but comes with two caveats: it will generally be less efficient, and the 
 depend on the configured value of `Producer.RequiredAcks`. There are configurations where a message acknowledged by the
 SyncProducer can still sometimes be lost.
 
-To consume messages, use Consumer or Consumer-Group API. 
+To consume messages, use Consumer or Consumer-Group API.
 
 For lower-level needs, the Broker and Request/Response objects permit precise control over each connection
 and message sent on the wire; the Client provides higher-level metadata management that is shared between
