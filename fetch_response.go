@@ -385,12 +385,41 @@ func (r *FetchResponse) AddRecordWithTimestamp(topic string, partition int32, ke
 	batch.addRecord(rec)
 }
 
+// AddRecordBatchWithTimestamp is similar to AddRecordWithTimestamp
+// But instead of append a record a batch of record it append a new batch of record of size 1 to a set of batch
+// Since transaction are handled on batch level (the whole batch is either committed or aborted), use this to test transactions
+func (r *FetchResponse) AddRecordBatchWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool, timestamp time.Time) {
+	frb := r.getOrCreateBlock(topic, partition)
+	kb, vb := encodeKV(key, value)
+
+	records := newDefaultRecords(&RecordBatch{Version: 2, LogAppendTime: r.LogAppendTime, FirstTimestamp: timestamp, MaxTimestamp: r.Timestamp})
+	batch := &RecordBatch{
+		Version:         2,
+		LogAppendTime:   r.LogAppendTime,
+		FirstTimestamp:  timestamp,
+		MaxTimestamp:    r.Timestamp,
+		FirstOffset:     offset,
+		LastOffsetDelta: 0,
+		ProducerID:      producerID,
+		IsTransactional: isTransactional,
+	}
+	rec := &Record{Key: kb, Value: vb, OffsetDelta: 0, TimestampDelta: timestamp.Sub(batch.FirstTimestamp)}
+	batch.addRecord(rec)
+	records.RecordBatch = batch
+
+	frb.RecordsSet = append(frb.RecordsSet, &records)
+}
+
 func (r *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
 	r.AddMessageWithTimestamp(topic, partition, key, value, offset, time.Time{}, 0)
 }
 
 func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Encoder, offset int64) {
 	r.AddRecordWithTimestamp(topic, partition, key, value, offset, time.Time{})
+}
+
+func (r *FetchResponse) AddRecordBatch(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool) {
+	r.AddRecordBatchWithTimestamp(topic, partition, key, value, offset, producerID, isTransactional, time.Time{})
 }
 
 func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
