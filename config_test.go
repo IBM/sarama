@@ -272,6 +272,24 @@ func TestProducerConfigValidates(t *testing.T) {
 				cfg.Producer.RequiredAcks = WaitForAll
 			},
 			"Idempotent producer requires Net.MaxOpenRequests to be 1"},
+		{"ReadCommitted Version",
+			func(cfg *Config) {
+				cfg.Version = V0_10_0_0
+				cfg.Consumer.IsolationLevel = ReadCommitted
+			},
+			"ReadCommitted requires Version >= V0_11_0_0"},
+		{"ReadCommitted Version",
+			func(cfg *Config) {
+				cfg.Version = V0_10_0_0
+				cfg.Consumer.IsolationLevel = ReadCommitted
+			},
+			"ReadCommitted requires Version >= V0_11_0_0"},
+		{"ReadCommitted Version",
+			func(cfg *Config) {
+				cfg.Version = V0_11_0_0
+				cfg.Consumer.IsolationLevel = IsolationLevel(42)
+			},
+			"Consumer.IsolationLevel must be ReadUncommitted or ReadCommitted"},
 	}
 
 	for i, test := range tests {
