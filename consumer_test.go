@@ -1128,6 +1128,87 @@ func TestConsumerTimestamps(t *testing.T) {
 	}
 }
 
+// When set to ReadCommitted, no uncommitted message should be available in messages channel
+func TestExcludeUncommitted(t *testing.T) {
+	// Given
+	broker0 := NewMockBroker(t, 0)
+
+	// define controlRecord key and value
+	controlRecordAbort := ControlRecord{
+		Version: 0,
+		Type:    ControlRecordAbort,
+	}
+	crKey := &realEncoder{
+		raw: make([]byte, 4),
+	}
+	crValue := &realEncoder{
+		raw: make([]byte, 6),
+	}
+	controlRecordAbort.encode(crKey, crValue)
+
+	fetchResponse := &FetchResponse{
+		Version: 4,
+		Blocks: map[string]map[int32]*FetchResponseBlock{"my_topic": {0: {
+			AbortedTransactions: []*AbortedTransaction{
+				{
+					ProducerID:  7,
+					FirstOffset: 1235,
+				},
+			},
+		}}},
+	}
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 0, 7, true) // committed msg
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 1, 7, true) // uncommitted msg
+	//TODO, need its own specific method
+	fetchResponse.AddRecordBatch("my_topic", 0, ByteEncoder(crValue.raw), ByteEncoder(crKey.raw), 2, 7, true) // abort control record
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 3, 7, true)                                     // committed msg
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetVersion(1).
+			SetOffset("my_topic", 0, OffsetOldest, 0).
+			SetOffset("my_topic", 0, OffsetNewest, 1237),
+		"FetchRequest": NewMockSequence(fetchResponse),
+	})
+
+	cfg := NewConfig()
+	cfg.Consumer.Return.Errors = true
+	cfg.Version = V0_11_0_0
+	cfg.Consumer.IsolationLevel = ReadCommitted
+
+	// When
+	master, err := NewConsumer([]string{broker0.Addr()}, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, 1234)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Then: only the 2 committed messages are returned
+	select {
+	case message := <-consumer.Messages():
+		assertMessageOffset(t, message, int64(1234))
+	case err := <-consumer.Errors():
+		t.Error(err)
+	}
+	select {
+	case message := <-consumer.Messages():
+		assertMessageOffset(t, message, int64(1237))
+	case err := <-consumer.Errors():
+		t.Error(err)
+	}
+
+	safeClose(t, consumer)
+	safeClose(t, master)
+	broker0.Close()
+}
+
 func assertMessageOffset(t *testing.T, msg *ConsumerMessage, expectedOffset int64) {
 	if msg.Offset != expectedOffset {
 		t.Errorf("Incorrect message offset: expected=%d, actual=%d", expectedOffset, msg.Offset)

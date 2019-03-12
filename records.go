@@ -26,6 +26,11 @@ func newDefaultRecords(batch *RecordBatch) Records {
 	return Records{recordsType: defaultRecords, RecordBatch: batch}
 }
 
+func newControlRecords(cr ControlRecord) Records {
+	//TODO
+	return Records{}
+}
+
 // setTypeFromFields sets type of Records depending on which of MsgSet or RecordBatch is not nil.
 // The first return value indicates whether both fields are nil (and the type is not set).
 // If both fields are not nil, it returns an error.
@@ -145,6 +150,7 @@ func (r *Records) isPartial() (bool, error) {
 }
 
 func (r *Records) isControl() (bool, error) {
+	//TODO i guess there is a type that we should support properly
 	if r.recordsType == unknownRecords {
 		if empty, err := r.setTypeFromFields(); err != nil || empty {
 			return false, err
@@ -200,43 +206,9 @@ func (r *Records) getControlRecord() (ControlRecord, error) {
 
 	firstRecord := r.RecordBatch.Records[0]
 	controlRecord := ControlRecord{}
-	{
-		var err error
-		valueDecoder := realDecoder{raw: firstRecord.Value}
-		controlRecord.Version, err = valueDecoder.getInt16()
-		if err != nil {
-			return ControlRecord{}, err
-		}
-		controlRecord.CoordinatorEpoch, err = valueDecoder.getInt32()
-		if err != nil {
-			return ControlRecord{}, err
-		}
-	}
-	{
-		var err error
-		keyDecoder := realDecoder{raw: firstRecord.Key}
-
-		// There a version for the value part AND the key part. And I have no idea if they are supposed to match or not
-		// Either way, all these version can only be 0 for now
-		controlRecord.Version, err = keyDecoder.getInt16()
-		if err != nil {
-			return ControlRecord{}, err
-		}
-
-		recordType, err := keyDecoder.getInt16()
-		if err != nil {
-			return ControlRecord{}, err
-		}
-		switch recordType {
-		case 0:
-			controlRecord.Type = ControlRecordAbort
-		case 1:
-			controlRecord.Type = ControlRecordCommit
-		default:
-			// from JAVA implementation:
-			// UNKNOWN is used to indicate a control type which the client is not aware of and should be ignored
-			controlRecord.Type = ControlRecordUnknown
-		}
+	err := controlRecord.decode(&realDecoder{raw: firstRecord.Key}, &realDecoder{raw: firstRecord.Value})
+	if err != nil {
+		return ControlRecord{}, err
 	}
 
 	return controlRecord, nil
