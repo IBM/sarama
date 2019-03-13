@@ -3,6 +3,7 @@ package sarama
 import (
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -258,6 +259,43 @@ func TestClientGetOffset(t *testing.T) {
 	seedBroker.Close()
 	leader.Close()
 	safeClose(t, client)
+}
+
+func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse1 := new(MetadataResponse)
+	seedBroker.Returns(metadataResponse1)
+
+	retryCount := int32(0)
+
+	config := NewConfig()
+	config.Metadata.Retry.Max = 1
+	config.Metadata.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		atomic.AddInt32(&retryCount, 1)
+		return 0
+	}
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadataUnknownTopic := new(MetadataResponse)
+	metadataUnknownTopic.AddTopic("new_topic", ErrUnknownTopicOrPartition)
+	seedBroker.Returns(metadataUnknownTopic)
+	seedBroker.Returns(metadataUnknownTopic)
+
+	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
+		t.Error("ErrUnknownTopicOrPartition expected, got", err)
+	}
+
+	safeClose(t, client)
+	seedBroker.Close()
+
+	actualRetryCount := atomic.LoadInt32(&retryCount)
+	if actualRetryCount != 1 {
+		t.Fatalf("Expected BackoffFunc to be called exactly once, but saw %d", actualRetryCount)
+	}
 }
 
 func TestClientReceivingUnknownTopic(t *testing.T) {

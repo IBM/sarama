@@ -3,6 +3,28 @@ package sarama
 import "testing"
 
 var (
+	aclDeleteRequestNullsv1 = []byte{
+		0, 0, 0, 1,
+		1,
+		255, 255,
+		1, // Any
+		255, 255,
+		255, 255,
+		11,
+		3,
+	}
+
+	aclDeleteRequestv1 = []byte{
+		0, 0, 0, 1,
+		1, // any
+		0, 6, 'f', 'i', 'l', 't', 'e', 'r',
+		1, // Any Filter
+		0, 9, 'p', 'r', 'i', 'n', 'c', 'i', 'p', 'a', 'l',
+		0, 4, 'h', 'o', 's', 't',
+		4, // write
+		3, // allow
+	}
+
 	aclDeleteRequestNulls = []byte{
 		0, 0, 0, 1,
 		1,
@@ -66,4 +88,25 @@ func TestDeleteAclsRequest(t *testing.T) {
 	})
 
 	testRequest(t, "delete request array", req, aclDeleteRequestArray)
+}
+
+func TestDeleteAclsRequestV1(t *testing.T) {
+	req := &DeleteAclsRequest{
+		Version: 1,
+		Filters: []*AclFilter{{
+			ResourceType:              AclResourceAny,
+			Operation:                 AclOperationAlterConfigs,
+			PermissionType:            AclPermissionAllow,
+			ResourcePatternTypeFilter: AclPatternAny,
+		}},
+	}
+
+	testRequest(t, "delete request nulls", req, aclDeleteRequestNullsv1)
+
+	req.Filters[0].ResourceName = nullString("filter")
+	req.Filters[0].Principal = nullString("principal")
+	req.Filters[0].Host = nullString("host")
+	req.Filters[0].Operation = AclOperationWrite
+
+	testRequest(t, "delete request", req, aclDeleteRequestv1)
 }

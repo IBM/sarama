@@ -61,9 +61,14 @@ type Config struct {
 			// (defaults to true). You should only set this to false if you're using
 			// a non-Kafka SASL proxy.
 			Handshake bool
-			//username and password for SASL/PLAIN authentication
+			//username and password for SASL/PLAIN  or SASL/SCRAM authentication
 			User     string
 			Password string
+			// authz id used for SASL/SCRAM authentication
+			SCRAMAuthzID string
+			// SCRAMClient is a user provided implementation of a SCRAM
+			// client used to perform the SCRAM exchange with the server.
+			SCRAMClient SCRAMClient
 			// TokenProvider is a user-defined callback for generating
 			// access tokens for SASL/OAUTHBEARER auth. See the
 			// AccessTokenProvider interface docs for proper implementation
@@ -92,6 +97,10 @@ type Config struct {
 			// How long to wait for leader election to occur before retrying
 			// (default 250ms). Similar to the JVM's `retry.backoff.ms`.
 			Backoff time.Duration
+			// Called to compute backoff time dynamically. Useful for implementing
+			// more sophisticated backoff strategies. This takes precedence over
+			// `Backoff` if set.
+			BackoffFunc func(retries, maxRetries int) time.Duration
 		}
 		// How frequently to refresh the cluster metadata in the background.
 		// Defaults to 10 minutes. Set to 0 to disable. Similar to
@@ -179,6 +188,10 @@ type Config struct {
 			// (default 100ms). Similar to the `retry.backoff.ms` setting of the
 			// JVM producer.
 			Backoff time.Duration
+			// Called to compute backoff time dynamically. Useful for implementing
+			// more sophisticated backoff strategies. This takes precedence over
+			// `Backoff` if set.
+			BackoffFunc func(retries, maxRetries int) time.Duration
 		}
 	}
 
@@ -237,6 +250,10 @@ type Config struct {
 			// How long to wait after a failing to read from a partition before
 			// trying again (default 2s).
 			Backoff time.Duration
+			// Called to compute backoff time dynamically. Useful for implementing
+			// more sophisticated backoff strategies. This takes precedence over
+			// `Backoff` if set.
+			BackoffFunc func(retries int) time.Duration
 		}
 
 		// Fetch is the namespace for controlling how many bytes are retrieved by any
@@ -463,22 +480,35 @@ func (c *Config) Validate() error {
 	case c.Net.KeepAlive < 0:
 		return ConfigurationError("Net.KeepAlive must be >= 0")
 	case c.Net.SASL.Enable:
-		// For backwards compatibility, empty mechanism value defaults to PLAIN
-		isSASLPlain := len(c.Net.SASL.Mechanism) == 0 || c.Net.SASL.Mechanism == SASLTypePlaintext
-		if isSASLPlain {
+		if c.Net.SASL.Mechanism == "" {
+			c.Net.SASL.Mechanism = SASLTypePlaintext
+		}
+
+		switch c.Net.SASL.Mechanism {
+		case SASLTypePlaintext:
 			if c.Net.SASL.User == "" {
 				return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
 			}
 			if c.Net.SASL.Password == "" {
 				return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
 			}
-		} else if c.Net.SASL.Mechanism == SASLTypeOAuth {
+		case SASLTypeOAuth:
 			if c.Net.SASL.TokenProvider == nil {
-				return ConfigurationError("An AccessTokenProvider instance must be provided to Net.SASL.User.TokenProvider")
+				return ConfigurationError("An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider")
 			}
-		} else {
-			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s` and `%s`",
-				SASLTypeOAuth, SASLTypePlaintext)
+		case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
+			if c.Net.SASL.User == "" {
+				return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
+			}
+			if c.Net.SASL.Password == "" {
+				return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
+			}
+			if c.Net.SASL.SCRAMClient == nil {
+				return ConfigurationError("A SCRAMClient instance must be provided to Net.SASL.SCRAMClient")
+			}
+		default:
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s` and `%s`",
+				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512)
 			return ConfigurationError(msg)
 		}
 	}
