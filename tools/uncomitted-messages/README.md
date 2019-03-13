@@ -20,19 +20,26 @@ Now you can tweak the lib and run this command as much as you want to see the ou
 
 You should see something like
 ```
-2019/03/03 18:52:16 test msg: 0
-2019/03/03 18:52:16 test msg: 1
-2019/03/03 18:52:16 test msg: 2
-2019/03/03 18:52:16 test msg: 3
-2019/03/03 18:52:16 test msg: 4
-2019/03/03 18:52:16 test msg: 5
-2019/03/03 18:52:16 test msg: 6
-2019/03/03 18:52:16 test msg: 7
-2019/03/03 18:52:16 test msg: 8
-2019/03/03 18:52:16 test msg: 9
+uncommitted
+uncommitted
+Committed 1
+Committed 2
+uncommitted
+uncommitted
+Committed 3
+Committed 4
 ```
 
-if you see all these messages: you are consuming some uncommitted ones.
+or if you are consuming committed only:
+```
+Committed 1
+Committed 2
+Committed 3
+Committed 4
+```
+
+There is 5 topic `topic-test`,`topic-test-2`,`topic-test-5`,`topic-test-3`,`topic-test-4`.
+Each one, in their own way, are trying to mess with you !
 
 ## Why add a line in host file?
 
