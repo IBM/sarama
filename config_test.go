@@ -91,14 +91,32 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Mechanism = "AnIncorrectSASLMechanism"
 				cfg.Net.SASL.TokenProvider = &DummyTokenProvider{}
 			},
-			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER` and `PLAIN`"},
+			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`"},
 		{"SASL.Mechanism.OAUTHBEARER - Missing token provider",
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeOAuth
 				cfg.Net.SASL.TokenProvider = nil
 			},
-			"An AccessTokenProvider instance must be provided to Net.SASL.User.TokenProvider"},
+			"An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider"},
+		{"SASL.Mechanism SCRAM-SHA-256 - Missing SCRAM client",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA256
+				cfg.Net.SASL.SCRAMClient = nil
+				cfg.Net.SASL.User = "user"
+				cfg.Net.SASL.Password = "stong_password"
+			},
+			"A SCRAMClient instance must be provided to Net.SASL.SCRAMClient"},
+		{"SASL.Mechanism SCRAM-SHA-512 - Missing SCRAM client",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
+				cfg.Net.SASL.SCRAMClient = nil
+				cfg.Net.SASL.User = "user"
+				cfg.Net.SASL.Password = "stong_password"
+			},
+			"A SCRAMClient instance must be provided to Net.SASL.SCRAMClient"},
 	}
 
 	for i, test := range tests {

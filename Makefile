@@ -1,3 +1,5 @@
+export GO111MODULE=on
+
 default: fmt vet errcheck test
 
 # Taken from https://github.com/codecov/example-go#caveat-multiple-files

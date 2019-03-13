@@ -157,7 +157,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	return pd.pop()
 }
 
-// decodes a message set from a previousy encoded bulk-message
+// decodes a message set from a previously encoded bulk-message
 func (m *Message) decodeSet() (err error) {
 	pd := realDecoder{raw: m.Value}
 	m.Set = &MessageSet{}

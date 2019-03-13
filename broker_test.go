@@ -179,16 +179,12 @@ func TestSASLOAuthBearer(t *testing.T) {
 		// mockBroker mocks underlying network logic and broker responses
 		mockBroker := NewMockBroker(t, 0)
 
-		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
-			SetAuthBytes([]byte(`response_payload`))
-
+		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).SetAuthBytes([]byte("response_payload"))
 		if test.mockAuthErr != ErrNoError {
 			mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockAuthErr)
 		}
 
-		mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).
-			SetEnabledMechanisms([]string{SASLTypeOAuth})
-
+		mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).SetEnabledMechanisms([]string{SASLTypeOAuth})
 		if test.mockHandshakeErr != ErrNoError {
 			mockSASLHandshakeResponse = mockSASLHandshakeResponse.SetError(test.mockHandshakeErr)
 		}
@@ -233,6 +229,139 @@ func TestSASLOAuthBearer(t *testing.T) {
 		if test.mockAuthErr != ErrNoError {
 			if test.mockAuthErr != err {
 				t.Errorf("[%d]:[%s] Expected %s auth error, got %s\n", i, test.name, test.mockAuthErr, err)
+			}
+		} else if test.mockHandshakeErr != ErrNoError {
+			if test.mockHandshakeErr != err {
+				t.Errorf("[%d]:[%s] Expected %s handshake error, got %s\n", i, test.name, test.mockHandshakeErr, err)
+			}
+		} else if test.expectClientErr && err == nil {
+			t.Errorf("[%d]:[%s] Expected a client error and got none\n", i, test.name)
+		} else if !test.expectClientErr && err != nil {
+			t.Errorf("[%d]:[%s] Unexpected error, got %s\n", i, test.name, err)
+		}
+
+		mockBroker.Close()
+	}
+}
+
+// A mock scram client.
+type MockSCRAMClient struct {
+	done bool
+}
+
+func (m *MockSCRAMClient) Begin(userName, password, authzID string) (err error) {
+	return nil
+}
+
+func (m *MockSCRAMClient) Step(challenge string) (response string, err error) {
+	if challenge == "" {
+		return "ping", nil
+	}
+	if challenge == "pong" {
+		m.done = true
+		return "", nil
+	}
+	return "", errors.New("failed to authenticate :(")
+}
+
+func (m *MockSCRAMClient) Done() bool {
+	return m.done
+}
+
+var _ SCRAMClient = &MockSCRAMClient{}
+
+func TestSASLSCRAMSHAXXX(t *testing.T) {
+	testTable := []struct {
+		name               string
+		mockHandshakeErr   KError
+		mockSASLAuthErr    KError
+		expectClientErr    bool
+		scramClient        *MockSCRAMClient
+		scramChallengeResp string
+	}{
+		{
+			name:               "SASL/SCRAMSHAXXX successfull authentication",
+			mockHandshakeErr:   ErrNoError,
+			scramClient:        &MockSCRAMClient{},
+			scramChallengeResp: "pong",
+		},
+		{
+			name:               "SASL/SCRAMSHAXXX SCRAM client step error client",
+			mockHandshakeErr:   ErrNoError,
+			mockSASLAuthErr:    ErrNoError,
+			scramClient:        &MockSCRAMClient{},
+			scramChallengeResp: "gong",
+			expectClientErr:    true,
+		},
+		{
+			name:               "SASL/SCRAMSHAXXX server authentication error",
+			mockHandshakeErr:   ErrNoError,
+			mockSASLAuthErr:    ErrSASLAuthenticationFailed,
+			scramClient:        &MockSCRAMClient{},
+			scramChallengeResp: "pong",
+		},
+		{
+			name:               "SASL/SCRAMSHAXXX unsupported SCRAM mechanism",
+			mockHandshakeErr:   ErrUnsupportedSASLMechanism,
+			mockSASLAuthErr:    ErrNoError,
+			scramClient:        &MockSCRAMClient{},
+			scramChallengeResp: "pong",
+		},
+	}
+
+	for i, test := range testTable {
+
+		// mockBroker mocks underlying network logic and broker responses
+		mockBroker := NewMockBroker(t, 0)
+		broker := NewBroker(mockBroker.Addr())
+		// broker executes SASL requests against mockBroker
+		broker.requestRate = metrics.NilMeter{}
+		broker.outgoingByteRate = metrics.NilMeter{}
+		broker.incomingByteRate = metrics.NilMeter{}
+		broker.requestSize = metrics.NilHistogram{}
+		broker.responseSize = metrics.NilHistogram{}
+		broker.responseRate = metrics.NilMeter{}
+		broker.requestLatency = metrics.NilHistogram{}
+
+		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).SetAuthBytes([]byte(test.scramChallengeResp))
+		mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).SetEnabledMechanisms([]string{SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512})
+
+		if test.mockSASLAuthErr != ErrNoError {
+			mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockSASLAuthErr)
+		}
+		if test.mockHandshakeErr != ErrNoError {
+			mockSASLHandshakeResponse = mockSASLHandshakeResponse.SetError(test.mockHandshakeErr)
+		}
+
+		mockBroker.SetHandlerByMap(map[string]MockResponse{
+			"SaslAuthenticateRequest": mockSASLAuthResponse,
+			"SaslHandshakeRequest":    mockSASLHandshakeResponse,
+		})
+
+		conf := NewConfig()
+		conf.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
+		conf.Net.SASL.SCRAMClient = test.scramClient
+
+		broker.conf = conf
+		dialer := net.Dialer{
+			Timeout:   conf.Net.DialTimeout,
+			KeepAlive: conf.Net.KeepAlive,
+			LocalAddr: conf.Net.LocalAddr,
+		}
+
+		conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		broker.conn = conn
+
+		err = broker.authenticateViaSASL()
+
+		if test.mockSASLAuthErr != ErrNoError {
+			if test.mockSASLAuthErr != err {
+				t.Errorf("[%d]:[%s] Expected %s SASL authentication error, got %s\n", i, test.name, test.mockHandshakeErr, err)
 			}
 		} else if test.mockHandshakeErr != ErrNoError {
 			if test.mockHandshakeErr != err {
