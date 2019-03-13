@@ -410,6 +410,40 @@ func (r *FetchResponse) AddRecordBatchWithTimestamp(topic string, partition int3
 	frb.RecordsSet = append(frb.RecordsSet, &records)
 }
 
+func (r *FetchResponse) AddControlRecordWithTimestamp(topic string, partition int32, offset int64, producerID int64, recordType ControlRecordType, timestamp time.Time) {
+	frb := r.getOrCreateBlock(topic, partition)
+
+	// batch
+	batch := &RecordBatch{
+		Version:         2,
+		LogAppendTime:   r.LogAppendTime,
+		FirstTimestamp:  timestamp,
+		MaxTimestamp:    r.Timestamp,
+		FirstOffset:     offset,
+		LastOffsetDelta: 0,
+		ProducerID:      producerID,
+		IsTransactional: true,
+		Control:         true,
+	}
+
+	// records
+	records := newDefaultRecords(nil)
+	records.RecordBatch = batch
+
+	// record
+	crAbort := ControlRecord{
+		Version: 0,
+		Type:    recordType,
+	}
+	crKey := &realEncoder{raw: make([]byte, 4)}
+	crValue := &realEncoder{raw: make([]byte, 6)}
+	crAbort.encode(crKey, crValue)
+	rec := &Record{Key: ByteEncoder(crKey.raw), Value: ByteEncoder(crValue.raw), OffsetDelta: 0, TimestampDelta: timestamp.Sub(batch.FirstTimestamp)}
+	batch.addRecord(rec)
+
+	frb.RecordsSet = append(frb.RecordsSet, &records)
+}
+
 func (r *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
 	r.AddMessageWithTimestamp(topic, partition, key, value, offset, time.Time{}, 0)
 }
@@ -420,6 +454,11 @@ func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Enco
 
 func (r *FetchResponse) AddRecordBatch(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool) {
 	r.AddRecordBatchWithTimestamp(topic, partition, key, value, offset, producerID, isTransactional, time.Time{})
+}
+
+func (r *FetchResponse) AddControlRecord(topic string, partition int32, offset int64, producerID int64, recordType ControlRecordType) {
+	// define controlRecord key and value
+	r.AddControlRecordWithTimestamp(topic, partition, offset, producerID, recordType, time.Time{})
 }
 
 func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
