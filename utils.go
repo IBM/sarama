@@ -188,6 +188,7 @@ var (
 	MaxVersion = V2_2_0_0
 )
 
+//ParseKafkaVersion parses and returns kafka version or error from a string
 func ParseKafkaVersion(s string) (KafkaVersion, error) {
 	if len(s) < 5 {
 		return MinVersion, fmt.Errorf("invalid version `%s`", s)
