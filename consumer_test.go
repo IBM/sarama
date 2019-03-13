@@ -1133,35 +1133,17 @@ func TestExcludeUncommitted(t *testing.T) {
 	// Given
 	broker0 := NewMockBroker(t, 0)
 
-	// define controlRecord key and value
-	controlRecordAbort := ControlRecord{
-		Version: 0,
-		Type:    ControlRecordAbort,
-	}
-	crKey := &realEncoder{
-		raw: make([]byte, 4),
-	}
-	crValue := &realEncoder{
-		raw: make([]byte, 6),
-	}
-	controlRecordAbort.encode(crKey, crValue)
-
 	fetchResponse := &FetchResponse{
 		Version: 4,
 		Blocks: map[string]map[int32]*FetchResponseBlock{"my_topic": {0: {
-			AbortedTransactions: []*AbortedTransaction{
-				{
-					ProducerID:  7,
-					FirstOffset: 1235,
-				},
-			},
+			AbortedTransactions: []*AbortedTransaction{{ProducerID: 7, FirstOffset: 1235}},
 		}}},
 	}
-	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 0, 7, true) // committed msg
-	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 1, 7, true) // uncommitted msg
-	//TODO, need its own specific method
-	fetchResponse.AddRecordBatch("my_topic", 0, ByteEncoder(crValue.raw), ByteEncoder(crKey.raw), 2, 7, true) // abort control record
-	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 3, 7, true)                                     // committed msg
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 1234, 7, true)   // committed msg
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 1235, 7, true)   // uncommitted msg
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 1236, 7, true)   // uncommitted msg
+	fetchResponse.AddControlRecord("my_topic", 0, 1237, 7, ControlRecordAbort) // abort control record
+	fetchResponse.AddRecordBatch("my_topic", 0, nil, testMsg, 1238, 7, true)   // committed msg
 
 	broker0.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
@@ -1171,7 +1153,7 @@ func TestExcludeUncommitted(t *testing.T) {
 			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetOldest, 0).
 			SetOffset("my_topic", 0, OffsetNewest, 1237),
-		"FetchRequest": NewMockSequence(fetchResponse),
+		"FetchRequest": NewMockWrapper(fetchResponse),
 	})
 
 	cfg := NewConfig()
@@ -1199,7 +1181,7 @@ func TestExcludeUncommitted(t *testing.T) {
 	}
 	select {
 	case message := <-consumer.Messages():
-		assertMessageOffset(t, message, int64(1237))
+		assertMessageOffset(t, message, int64(1238))
 	case err := <-consumer.Errors():
 		t.Error(err)
 	}
