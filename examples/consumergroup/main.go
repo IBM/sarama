@@ -80,7 +80,14 @@ func main() {
 		panic(err)
 	}
 
-	go client.Consume(ctx, strings.Split(topics, ","), &consumer)
+	go func() {
+		for {
+			err := client.Consume(ctx, strings.Split(topics, ","), &consumer)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
 
 	<-consumer.ready // Await till the consumer has been set up
 	log.Println("Sarama consumer up and running!...")
@@ -90,7 +97,10 @@ func main() {
 
 	<-sigterm // Await a sigterm signal before safely closing the consumer
 
-	client.Close()
+	err = client.Close()
+	if err != nil {
+		panic(err)
+	}
 }
 
 // Consumer represents a Sarama consumer group consumer
