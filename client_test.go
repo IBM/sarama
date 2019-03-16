@@ -226,11 +226,11 @@ func TestClientMetadataWithOfflineReplicas(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), replicas, isr, offlineReplicas, ErrNoError)
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, []int32{}, ErrNoError)
 	metadataResponse.Version = 5
-	metadataResponse.Topics[0].IsInternal = false
 
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
+	config.Version = V1_0_0_0
 	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {

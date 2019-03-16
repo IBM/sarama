@@ -10,7 +10,7 @@ func (r *MetadataRequest) encode(pe packetEncoder) error {
 	if r.Version < 0 || r.Version > 5 {
 		return PacketEncodingError{"invalid or unsupported MetadataRequest version field"}
 	}
-	if r.Version == 0 || len(r.Topics) > 0 {
+	if len(r.Topics) > 0 {
 		err := pe.putArrayLength(len(r.Topics))
 		if err != nil {
 			return err
@@ -37,6 +37,13 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) error {
 	if err != nil {
 		return err
 	}
+	if r.Version > 3 {
+		autoCreation, err := pd.getBool()
+		if err != nil {
+			return err
+		}
+		r.AllowAutoTopicCreation = autoCreation
+	}
 	if size < 0 {
 		return nil
 	} else {
@@ -53,13 +60,6 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) error {
 			}
 			r.Topics[i] = topic
 		}
-	}
-	if r.Version > 3 {
-		autoCreation, err := pd.getBool()
-		if err != nil {
-			return err
-		}
-		r.AllowAutoTopicCreation = autoCreation
 	}
 	return nil
 }
