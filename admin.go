@@ -183,7 +183,9 @@ func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetada
 		AllowAutoTopicCreation: false,
 	}
 
-	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+	if ca.conf.Version.IsAtLeast(V1_0_0_0) {
+		request.Version = 5
+	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 4
 	}
 
