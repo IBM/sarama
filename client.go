@@ -46,6 +46,10 @@ type Client interface {
 	// the partition leader.
 	InSyncReplicas(topic string, partitionID int32) ([]int32, error)
 
+	// OfflineReplicas returns the set of all offline replica IDs for the given
+	// partition. Offline replicas are replicas which are offline
+	OfflineReplicas(topic string, partitionID int32) ([]int32, error)
+
 	// RefreshMetadata takes a list of topics and queries the cluster to refresh the
 	// available metadata for those topics. If no topics are provided, it will refresh
 	// metadata for all topics.
@@ -371,6 +375,31 @@ func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, 
 		return dupInt32Slice(metadata.Isr), metadata.Err
 	}
 	return dupInt32Slice(metadata.Isr), nil
+}
+
+func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32, error) {
+	if client.Closed() {
+		return nil, ErrClosedClient
+	}
+
+	metadata := client.cachedMetadata(topic, partitionID)
+
+	if metadata == nil {
+		err := client.RefreshMetadata(topic)
+		if err != nil {
+			return nil, err
+		}
+		metadata = client.cachedMetadata(topic, partitionID)
+	}
+
+	if metadata == nil {
+		return nil, ErrUnknownTopicOrPartition
+	}
+
+	if metadata.Err == ErrReplicaNotAvailable {
+		return dupInt32Slice(metadata.OfflineReplicas), metadata.Err
+	}
+	return dupInt32Slice(metadata.OfflineReplicas), nil
 }
 
 func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
@@ -728,11 +757,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 		}
 
 		req := &MetadataRequest{Topics: topics}
-		if client.conf.Version.IsAtLeast(V0_10_0_0) {
+		if client.conf.Version.IsAtLeast(V1_0_0_0) {
+			req.Version = 5
+		} else if client.conf.Version.IsAtLeast(V0_10_0_0) {
 			req.Version = 1
 		}
 		response, err := broker.GetMetadata(req)
-
 		switch err.(type) {
 		case nil:
 			allKnownMetaData := len(topics) == 0
