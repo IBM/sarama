@@ -9,7 +9,7 @@ import (
 
 	// when testing locally, it is way faster to edit this to reference your local repo if different
 	// if you want to do it properly but slowly you may use some dependency manager magic
-	"github.com/Shopify/sarama"
+	"github.com/FrancoisPoinsot/sarama"
 )
 
 var (
