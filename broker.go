@@ -156,6 +156,8 @@ func (b *Broker) Open(conf *Config) error {
 
 		if conf.Net.TLS.Enable {
 			b.conn, b.connErr = tls.DialWithDialer(&dialer, "tcp", b.addr, conf.Net.TLS.Config)
+		} else if conf.Net.Proxy.Enable {
+			b.conn, b.connErr = conf.Net.Proxy.Dialer.Dial("tcp", b.addr)
 		} else {
 			b.conn, b.connErr = dialer.Dial("tcp", b.addr)
 		}
