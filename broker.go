@@ -1052,9 +1052,6 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 	if err := versionedDecode(buf, res, 0); err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 	if res.Err != ErrNoError {
 		return nil, res.Err
 	}
