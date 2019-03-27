@@ -1031,7 +1031,7 @@ func (b *Broker) sendSaslAuthenticateRequest(correlationID int32, msg []byte) (i
 
 func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, error) {
 	buf := make([]byte, responseLengthSize+correlationIDSize)
-	bytesRead, err := io.ReadFull(b.conn, buf)
+	_, err := io.ReadFull(b.conn, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -1044,8 +1044,7 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 		return nil, fmt.Errorf("correlation ID didn't match, wanted %d, got %d", b.correlationID, header.correlationID)
 	}
 	buf = make([]byte, header.length-correlationIDSize)
-	c, err := io.ReadFull(b.conn, buf)
-	bytesRead += c
+	_, err = io.ReadFull(b.conn, buf)
 	if err != nil {
 		return nil, err
 	}
