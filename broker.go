@@ -1118,7 +1118,7 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(token *AccessToken, correlati
 
 func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int, error) {
 
-	buf := make([]byte, 8)
+	buf := make([]byte, responseLengthSize+correlationIDSize)
 
 	bytesRead, err := io.ReadFull(b.conn, buf)
 
@@ -1138,7 +1138,7 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int,
 		return bytesRead, fmt.Errorf("correlation ID didn't match, wanted %d, got %d", b.correlationID, header.correlationID)
 	}
 
-	buf = make([]byte, header.length-4)
+	buf = make([]byte, header.length-correlationIDSize)
 
 	c, err := io.ReadFull(b.conn, buf)
 
