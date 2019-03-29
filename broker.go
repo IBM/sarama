@@ -31,6 +31,8 @@ type Broker struct {
 	responses     chan responsePromise
 	done          chan bool
 
+	registeredMetrics []string
+
 	incomingByteRate       metrics.Meter
 	requestRate            metrics.Meter
 	requestSize            metrics.Histogram
@@ -178,13 +180,7 @@ func (b *Broker) Open(conf *Config) error {
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
 		if b.id >= 0 {
-			b.brokerIncomingByteRate = getOrRegisterBrokerMeter("incoming-byte-rate", b, conf.MetricRegistry)
-			b.brokerRequestRate = getOrRegisterBrokerMeter("request-rate", b, conf.MetricRegistry)
-			b.brokerRequestSize = getOrRegisterBrokerHistogram("request-size", b, conf.MetricRegistry)
-			b.brokerRequestLatency = getOrRegisterBrokerHistogram("request-latency-in-ms", b, conf.MetricRegistry)
-			b.brokerOutgoingByteRate = getOrRegisterBrokerMeter("outgoing-byte-rate", b, conf.MetricRegistry)
-			b.brokerResponseRate = getOrRegisterBrokerMeter("response-rate", b, conf.MetricRegistry)
-			b.brokerResponseSize = getOrRegisterBrokerHistogram("response-size", b, conf.MetricRegistry)
+			b.registerMetrics()
 		}
 
 		if conf.Net.SASL.Enable {
@@ -246,12 +242,7 @@ func (b *Broker) Close() error {
 	b.done = nil
 	b.responses = nil
 
-	if b.id >= 0 {
-		b.conf.MetricRegistry.Unregister(getMetricNameForBroker("incoming-byte-rate", b))
-		b.conf.MetricRegistry.Unregister(getMetricNameForBroker("request-rate", b))
-		b.conf.MetricRegistry.Unregister(getMetricNameForBroker("outgoing-byte-rate", b))
-		b.conf.MetricRegistry.Unregister(getMetricNameForBroker("response-rate", b))
-	}
+	b.unregisterMetrics()
 
 	if err == nil {
 		Logger.Printf("Closed connection to broker %s\n", b.addr)
@@ -1068,7 +1059,7 @@ func (b *Broker) sendSaslAuthenticateRequest(correlationID int32, msg []byte) (i
 
 func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, error) {
 	buf := make([]byte, responseLengthSize+correlationIDSize)
-	bytesRead, err := io.ReadFull(b.conn, buf)
+	_, err := io.ReadFull(b.conn, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -1084,8 +1075,7 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 	}
 
 	buf = make([]byte, header.length-correlationIDSize)
-	c, err := io.ReadFull(b.conn, buf)
-	bytesRead += c
+	_, err = io.ReadFull(b.conn, buf)
 	if err != nil {
 		return nil, err
 	}
@@ -1094,11 +1084,9 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 	if err := versionedDecode(buf, res, 0); err != nil {
 		return nil, err
 	}
-
 	if res.Err != ErrNoError {
 		return nil, res.Err
 	}
-
 	return res.SaslAuthBytes, nil
 }
 
@@ -1156,7 +1144,8 @@ func (b *Broker) sendSASLOAuthBearerClientResponse(token *AccessToken, correlati
 }
 
 func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int, error) {
-	buf := make([]byte, 8)
+
+	buf := make([]byte, responseLengthSize+correlationIDSize)
 
 	bytesRead, err := io.ReadFull(b.conn, buf)
 	if err != nil {
@@ -1174,7 +1163,7 @@ func (b *Broker) receiveSASLOAuthBearerServerResponse(correlationID int32) (int,
 		return bytesRead, fmt.Errorf("correlation ID didn't match, wanted %d, got %d", b.correlationID, header.correlationID)
 	}
 
-	buf = make([]byte, header.length-4)
+	buf = make([]byte, header.length-correlationIDSize)
 
 	c, err := io.ReadFull(b.conn, buf)
 	bytesRead += c
@@ -1246,4 +1235,32 @@ func (b *Broker) updateOutgoingCommunicationMetrics(bytes int) {
 		b.brokerRequestSize.Update(requestSize)
 	}
 
+}
+
+func (b *Broker) registerMetrics() {
+	b.brokerIncomingByteRate = b.registerMeter("incoming-byte-rate")
+	b.brokerRequestRate = b.registerMeter("request-rate")
+	b.brokerRequestSize = b.registerHistogram("request-size")
+	b.brokerRequestLatency = b.registerHistogram("request-latency-in-ms")
+	b.brokerOutgoingByteRate = b.registerMeter("outgoing-byte-rate")
+	b.brokerResponseRate = b.registerMeter("response-rate")
+	b.brokerResponseSize = b.registerHistogram("response-size")
+}
+
+func (b *Broker) unregisterMetrics() {
+	for _, name := range b.registeredMetrics {
+		b.conf.MetricRegistry.Unregister(name)
+	}
+}
+
+func (b *Broker) registerMeter(name string) metrics.Meter {
+	nameForBroker := getMetricNameForBroker(name, b)
+	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	return metrics.GetOrRegisterMeter(nameForBroker, b.conf.MetricRegistry)
+}
+
+func (b *Broker) registerHistogram(name string) metrics.Histogram {
+	nameForBroker := getMetricNameForBroker(name, b)
+	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	return getOrRegisterHistogram(nameForBroker, b.conf.MetricRegistry)
 }
