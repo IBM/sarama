@@ -14,3 +14,4 @@ export REPOSITORY_ROOT=/vagrant
 sh /vagrant/vagrant/install_cluster.sh
 sh /vagrant/vagrant/setup_services.sh
 sh /vagrant/vagrant/create_topics.sh
+sh /vagrant/vagrant/run_java_producer.sh
