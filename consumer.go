@@ -6,6 +6,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
@@ -44,11 +46,6 @@ func (ce ConsumerErrors) Error() string {
 // Consumer manages PartitionConsumers which process Kafka messages from brokers. You MUST call Close()
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
-//
-// Sarama's Consumer type does not currently support automatic consumer-group rebalancing and offset tracking.
-// For Zookeeper-based tracking (Kafka 0.8.2 and earlier), the https://github.com/wvanbergen/kafka library
-// builds on Sarama to add this support. For Kafka-based tracking (Kafka 0.9 and later), the
-// https://github.com/bsm/sarama-cluster library builds on Sarama to add this support.
 type Consumer interface {
 
 	// Topics returns the set of available topics as retrieved from the cluster
@@ -426,12 +423,6 @@ func (child *partitionConsumer) AsyncClose() {
 func (child *partitionConsumer) Close() error {
 	child.AsyncClose()
 
-	go withRecover(func() {
-		for range child.messages {
-			// drain
-		}
-	})
-
 	var errors ConsumerErrors
 	for err := range child.errors {
 		errors = append(errors, err)
@@ -463,14 +454,22 @@ feederLoop:
 		for i, msg := range msgs {
 		messageSelect:
 			select {
+			case <-child.dying:
+				child.broker.acks.Done()
+				continue feederLoop
 			case child.messages <- msg:
 				firstAttempt = true
 			case <-expiryTicker.C:
 				if !firstAttempt {
 					child.responseResult = errTimedOut
 					child.broker.acks.Done()
+				remainingLoop:
 					for _, msg = range msgs[i:] {
-						child.messages <- msg
+						select {
+						case child.messages <- msg:
+						case <-child.dying:
+							break remainingLoop
+						}
 					}
 					child.broker.input <- child
 					continue feederLoop
@@ -555,6 +554,15 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 }
 
 func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*ConsumerMessage, error) {
+	var (
+		metricRegistry          = child.conf.MetricRegistry
+		consumerBatchSizeMetric metrics.Histogram
+	)
+
+	if metricRegistry != nil {
+		consumerBatchSizeMetric = getOrRegisterHistogram("consumer-batch-size", metricRegistry)
+	}
+
 	block := response.GetBlock(child.topic, child.partition)
 	if block == nil {
 		return nil, ErrIncompleteResponse
@@ -568,6 +576,9 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	if err != nil {
 		return nil, err
 	}
+
+	consumerBatchSizeMetric.Update(int64(nRecs))
+
 	if nRecs == 0 {
 		partialTrailingMessage, err := block.isPartial()
 		if err != nil {
