@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"sort"
 	"time"
 )
 
@@ -183,6 +184,17 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 		}
 	}
 	return pe.pop()
+}
+
+func (b *FetchResponseBlock) getAbortedTransactions() []*AbortedTransaction {
+	// I can't find any doc that guarantee the field `fetchResponse.AbortedTransactions` is ordered
+	// plus Java implementation use a PriorityQueue based on `FirstOffset`. I guess we have to order it ourself
+	at := b.AbortedTransactions
+	sort.Slice(
+		at,
+		func(i, j int) bool { return at[i].FirstOffset < at[j].FirstOffset },
+	)
+	return at
 }
 
 type FetchResponse struct {
@@ -386,7 +398,7 @@ func (r *FetchResponse) AddRecordWithTimestamp(topic string, partition int32, ke
 }
 
 // AddRecordBatchWithTimestamp is similar to AddRecordWithTimestamp
-// But instead of append a record a batch of record it append a new batch of record of size 1 to a set of batch
+// But instead of appending 1 record to a batch, it append a new batch containing 1 record to the fetchResponse
 // Since transaction are handled on batch level (the whole batch is either committed or aborted), use this to test transactions
 func (r *FetchResponse) AddRecordBatchWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool, timestamp time.Time) {
 	frb := r.getOrCreateBlock(topic, partition)
