@@ -17,7 +17,7 @@ type ControlRecord struct {
 	Type             ControlRecordType
 }
 
-func (cr *ControlRecord) decode(key, value packetDecoder) (err error) {
+func (cr *ControlRecord) decode(key, value packetDecoder) error {
 	{
 		var err error
 		cr.Version, err = value.getInt16()

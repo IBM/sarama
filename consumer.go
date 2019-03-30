@@ -3,7 +3,6 @@ package sarama
 import (
 	"errors"
 	"fmt"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -596,15 +595,11 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	child.fetchSize = child.conf.Consumer.Fetch.Default
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
-	abortedProducerIDs := make(map[int64]none, len(block.AbortedTransactions))
-
-	// Load aborted transaction in separate var because we are going to depile this one
-	abortedTransactions := make([]*AbortedTransaction, len(block.AbortedTransactions))
-	copy(abortedTransactions, block.AbortedTransactions)
-	sort.Slice(
-		abortedTransactions,
-		func(i, j int) bool { return abortedTransactions[i].FirstOffset < abortedTransactions[j].FirstOffset },
-	)
+	// abortedProducerIDs contains producerID which message should be ignored as uncommitted
+	// - producerID are added when the partitionConsumer iterate over the offset at which an aborted transaction begins (abortedTransaction.FirstOffset)
+	// - producerID are removed when partitionConsumer iterate over an aborted controlRecord, meaning the aborted transaction for this producer is over
+	abortedProducerIDs := make(map[int64]struct{}, len(block.AbortedTransactions))
+	abortedTransactions := block.getAbortedTransactions()
 
 	messages := []*ConsumerMessage{}
 	for _, records := range block.RecordsSet {
@@ -617,12 +612,13 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 
 			messages = append(messages, messageSetMessages...)
 		case defaultRecords:
-			for _, abortedTransaction := range abortedTransactions {
-				if abortedTransaction.FirstOffset > records.RecordBatch.LastOffset() {
+			// Consume remaining abortedTransaction up to last offset of current batch
+			for _, txn := range abortedTransactions {
+				if txn.FirstOffset > records.RecordBatch.LastOffset() {
 					break
 				}
-				// add aborted transaction to abortedProducer list and depile abortedTransactions
-				abortedProducerIDs[abortedTransaction.ProducerID] = none{}
+				abortedProducerIDs[txn.ProducerID] = struct{}{}
+				// Pop abortedTransactions so that we never add it again
 				abortedTransactions = abortedTransactions[1:]
 			}
 
