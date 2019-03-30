@@ -1,6 +1,5 @@
 language: go
 go:
-- 1.10.x
 - 1.11.x
 - 1.12.x
 
@@ -12,8 +11,8 @@ env:
   - KAFKA_HOSTNAME=localhost
   - DEBUG=true
   matrix:
-  - KAFKA_VERSION=2.0.1 KAFKA_SCALA_VERSION=2.12
   - KAFKA_VERSION=2.1.1 KAFKA_SCALA_VERSION=2.12
+  - KAFKA_VERSION=2.2.0 KAFKA_SCALA_VERSION=2.12
 
 before_install:
 - export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}
