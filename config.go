@@ -419,10 +419,10 @@ func NewConfig() *Config {
 // ConfigurationError if the specified values don't make sense.
 func (c *Config) Validate() error {
 	// some configuration values should be warned on but not fail completely, do those first
-	if c.Net.TLS.Enable == false && c.Net.TLS.Config != nil {
+	if !c.Net.TLS.Enable && c.Net.TLS.Config != nil {
 		Logger.Println("Net.TLS is disabled but a non-nil configuration was provided.")
 	}
-	if c.Net.SASL.Enable == false {
+	if !c.Net.SASL.Enable {
 		if c.Net.SASL.User != "" {
 			Logger.Println("Net.SASL is disabled but a non-empty username was provided.")
 		}

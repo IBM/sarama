@@ -131,7 +131,7 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 	}
 
 	if detail == nil {
-		return errors.New("You must specify topic details")
+		return errors.New("you must specify topic details")
 	}
 
 	topicDetails := make(map[string]*TopicDetail)

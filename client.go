@@ -793,7 +793,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 
 		switch topic.Err {
 		case ErrNoError:
-			break
+			// no-op
 		case ErrInvalidTopic, ErrTopicAuthorizationFailed: // don't retry, don't store partial results
 			err = topic.Err
 			continue
@@ -803,7 +803,6 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 			continue
 		case ErrLeaderNotAvailable: // retry, but store partial partition results
 			retry = true
-			break
 		default: // don't retry, don't store partial results
 			Logger.Printf("Unexpected topic-level metadata error: %s", topic.Err)
 			err = topic.Err
