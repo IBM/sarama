@@ -37,15 +37,8 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) error {
 	if err != nil {
 		return err
 	}
-	if size < 0 {
-		return nil
-	} else {
-		topicCount := size
-		if topicCount == 0 {
-			goto SKIP
-		}
-
-		r.Topics = make([]string, topicCount)
+	if size > 0 {
+		r.Topics = make([]string, size)
 		for i := range r.Topics {
 			topic, err := pd.getString()
 			if err != nil {
@@ -54,7 +47,6 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) error {
 			r.Topics[i] = topic
 		}
 	}
-SKIP:
 	if r.Version > 3 {
 		autoCreation, err := pd.getBool()
 		if err != nil {
