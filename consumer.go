@@ -746,7 +746,7 @@ func (bc *brokerConsumer) updateSubscriptions(newSubscriptions []*partitionConsu
 			close(child.trigger)
 			delete(bc.subscriptions, child)
 		default:
-			break
+			// no-op
 		}
 	}
 }
@@ -759,7 +759,7 @@ func (bc *brokerConsumer) handleResponses() {
 
 		switch result {
 		case nil:
-			break
+			// no-op
 		case errTimedOut:
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because consuming was taking too long\n",
 				bc.broker.ID(), child.topic, child.partition)
