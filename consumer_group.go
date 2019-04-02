@@ -614,7 +614,7 @@ func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 	s.releaseOnce.Do(func() {
 		if withCleanup {
 			if e := s.handler.Cleanup(s); e != nil {
-				s.parent.handleError(err, "", -1)
+				s.parent.handleError(e, "", -1)
 				err = e
 			}
 		}
