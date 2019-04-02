@@ -5,22 +5,32 @@ import (
 	"time"
 )
 
-// The lowest 3 bits contain the compression codec used for the message
-const compressionCodecMask int8 = 0x07
+const (
+	//CompressionNone no compression
+	CompressionNone CompressionCodec = iota
+	//CompressionGZIP compression using GZIP
+	CompressionGZIP
+	//CompressionSnappy compression using snappy
+	CompressionSnappy
+	//CompressionLZ4 compression using LZ4
+	CompressionLZ4
+	//CompressionZSTD compression using ZSTD
+	CompressionZSTD
 
-// Bit 3 set for "LogAppend" timestamps
-const timestampTypeMask = 0x08
+	// The lowest 3 bits contain the compression codec used for the message
+	compressionCodecMask int8 = 0x07
+
+	// Bit 3 set for "LogAppend" timestamps
+	timestampTypeMask = 0x08
+
+	// CompressionLevelDefault is the constant to use in CompressionLevel
+	// to have the default compression level for any codec. The value is picked
+	// that we don't use any existing compression levels.
+	CompressionLevelDefault = -1000
+)
 
 // CompressionCodec represents the various compression codecs recognized by Kafka in messages.
 type CompressionCodec int8
-
-const (
-	CompressionNone   CompressionCodec = 0
-	CompressionGZIP   CompressionCodec = 1
-	CompressionSnappy CompressionCodec = 2
-	CompressionLZ4    CompressionCodec = 3
-	CompressionZSTD   CompressionCodec = 4
-)
 
 func (cc CompressionCodec) String() string {
 	return []string{
@@ -28,14 +38,11 @@ func (cc CompressionCodec) String() string {
 		"gzip",
 		"snappy",
 		"lz4",
+		"zstd",
 	}[int(cc)]
 }
 
-// CompressionLevelDefault is the constant to use in CompressionLevel
-// to have the default compression level for any codec. The value is picked
-// that we don't use any existing compression levels.
-const CompressionLevelDefault = -1000
-
+//Message is a kafka message type
 type Message struct {
 	Codec            CompressionCodec // codec used to compress the message contents
 	CompressionLevel int              // compression level
