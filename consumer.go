@@ -47,7 +47,6 @@ func (ce ConsumerErrors) Error() string {
 // on a consumer to avoid leaks, it will not be garbage-collected automatically when it passes out of
 // scope.
 type Consumer interface {
-
 	// Topics returns the set of available topics as retrieved from the cluster
 	// metadata. This method is the same as Client.Topics(), and is provided for
 	// convenience.
@@ -260,7 +259,6 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 // Close; this will signal the PartitionConsumer's goroutines to begin shutting down (just like AsyncClose), but will
 // also drain the Messages channel, harvest all errors & return them once cleanup has completed.
 type PartitionConsumer interface {
-
 	// AsyncClose initiates a shutdown of the PartitionConsumer. This method will return immediately, after which you
 	// should continue to service the 'Messages' and 'Errors' channels until they are empty. It is required to call this
 	// function, or Close before a consumer object passes out of scope, as it will otherwise leak memory. You must call
@@ -606,6 +604,12 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	child.fetchSize = child.conf.Consumer.Fetch.Default
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
 
+	// abortedProducerIDs contains producerID which message should be ignored as uncommitted
+	// - producerID are added when the partitionConsumer iterate over the offset at which an aborted transaction begins (abortedTransaction.FirstOffset)
+	// - producerID are removed when partitionConsumer iterate over an aborted controlRecord, meaning the aborted transaction for this producer is over
+	abortedProducerIDs := make(map[int64]struct{}, len(block.AbortedTransactions))
+	abortedTransactions := block.getAbortedTransactions()
+
 	messages := []*ConsumerMessage{}
 	for _, records := range block.RecordsSet {
 		switch records.recordsType {
@@ -617,12 +621,54 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 
 			messages = append(messages, messageSetMessages...)
 		case defaultRecords:
+			// Consume remaining abortedTransaction up to last offset of current batch
+			for _, txn := range abortedTransactions {
+				if txn.FirstOffset > records.RecordBatch.LastOffset() {
+					break
+				}
+				abortedProducerIDs[txn.ProducerID] = struct{}{}
+				// Pop abortedTransactions so that we never add it again
+				abortedTransactions = abortedTransactions[1:]
+			}
+
 			recordBatchMessages, err := child.parseRecords(records.RecordBatch)
 			if err != nil {
 				return nil, err
 			}
-			if control, err := records.isControl(); err != nil || control {
+
+			// Parse and commit offset but do not expose messages that are:
+			// - control records
+			// - part of an aborted transaction when set to `ReadCommitted`
+
+			// control record
+			isControl, err := records.isControl()
+			if err != nil {
+				// I don't know why there is this continue in case of error to begin with
+				// Safe bet is to ignore control messages if ReadUncommitted
+				// and block on them in case of error and ReadCommitted
+				if child.conf.Consumer.IsolationLevel == ReadCommitted {
+					return nil, err
+				}
 				continue
+			}
+			if isControl {
+				controlRecord, err := records.getControlRecord()
+				if err != nil {
+					return nil, err
+				}
+
+				if controlRecord.Type == ControlRecordAbort {
+					delete(abortedProducerIDs, records.RecordBatch.ProducerID)
+				}
+				continue
+			}
+
+			// filter aborted transactions
+			if child.conf.Consumer.IsolationLevel == ReadCommitted {
+				_, isAborted := abortedProducerIDs[records.RecordBatch.ProducerID]
+				if records.RecordBatch.IsTransactional && isAborted {
+					continue
+				}
 			}
 
 			messages = append(messages, recordBatchMessages...)
@@ -826,7 +872,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 4
-		request.Isolation = ReadUncommitted // We don't support yet transactions.
+		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
 	}
 
 	for child := range bc.subscriptions {
