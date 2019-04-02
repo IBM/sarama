@@ -192,3 +192,18 @@ func magicValue(pd packetDecoder) (int8, error) {
 
 	return dec.getInt8()
 }
+
+func (r *Records) getControlRecord() (ControlRecord, error) {
+	if r.RecordBatch == nil || len(r.RecordBatch.Records) <= 0 {
+		return ControlRecord{}, fmt.Errorf("cannot get control record, record batch is empty")
+	}
+
+	firstRecord := r.RecordBatch.Records[0]
+	controlRecord := ControlRecord{}
+	err := controlRecord.decode(&realDecoder{raw: firstRecord.Key}, &realDecoder{raw: firstRecord.Value})
+	if err != nil {
+		return ControlRecord{}, err
+	}
+
+	return controlRecord, nil
+}

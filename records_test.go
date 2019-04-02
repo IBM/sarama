@@ -76,7 +76,8 @@ func TestLegacyRecords(t *testing.T) {
 
 func TestDefaultRecords(t *testing.T) {
 	batch := &RecordBatch{
-		Version: 2,
+		IsTransactional: true,
+		Version:         2,
 		Records: []*Record{
 			{
 				Value: []byte{1},

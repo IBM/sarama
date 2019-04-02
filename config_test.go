@@ -282,6 +282,36 @@ func TestProducerConfigValidates(t *testing.T) {
 		}
 	}
 }
+func TestConsumerConfigValidates(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  func(*Config)
+		err  string
+	}{
+		{"ReadCommitted Version",
+			func(cfg *Config) {
+				cfg.Version = V0_10_0_0
+				cfg.Consumer.IsolationLevel = ReadCommitted
+			},
+			"ReadCommitted requires Version >= V0_11_0_0",
+		},
+		{"Incorrect isolation level",
+			func(cfg *Config) {
+				cfg.Version = V0_11_0_0
+				cfg.Consumer.IsolationLevel = IsolationLevel(42)
+			},
+			"Consumer.IsolationLevel must be ReadUncommitted or ReadCommitted",
+		},
+	}
+
+	for i, test := range tests {
+		c := NewConfig()
+		test.cfg(c)
+		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
+		}
+	}
+}
 
 func TestLZ4ConfigValidation(t *testing.T) {
 	config := NewConfig()
