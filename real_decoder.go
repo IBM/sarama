@@ -290,6 +290,14 @@ func (rd *realDecoder) peek(offset, length int) (packetDecoder, error) {
 	return &realDecoder{raw: rd.raw[off : off+length]}, nil
 }
 
+func (rd *realDecoder) peekInt8(offset int) (int8, error) {
+	if rd.remaining() < offset+1 {
+		return -1, ErrInsufficientData
+	}
+	tmp := int8(rd.raw[rd.off+offset])
+	return tmp, nil
+}
+
 // stacks
 
 func (rd *realDecoder) push(in pushDecoder) error {
