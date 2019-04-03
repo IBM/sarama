@@ -620,6 +620,44 @@ func TestDescribeTopic(t *testing.T) {
 	}
 }
 
+func TestDescribeTopicWithVersion0_11(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetLeader("my_topic", 0, seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewConfig()
+	config.Version = V0_11_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topics, err := admin.DescribeTopics([]string{"my_topic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(topics) != 1 {
+		t.Fatalf("Expected 1 result, got %v", len(topics))
+	}
+
+	if topics[0].Name != "my_topic" {
+		t.Fatalf("Incorrect topic name: %v", topics[0].Name)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestDescribeConsumerGroup(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()

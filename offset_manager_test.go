@@ -26,8 +26,8 @@ func initOffsetManagerWithBackoffFunc(t *testing.T, retention time.Duration,
 
 	seedMeta := new(MetadataResponse)
 	seedMeta.AddBroker(coordinator.Addr(), coordinator.BrokerID())
-	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, ErrNoError)
-	seedMeta.AddTopicPartition("my_topic", 1, 1, []int32{}, []int32{}, ErrNoError)
+	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, []int32{}, ErrNoError)
+	seedMeta.AddTopicPartition("my_topic", 1, 1, []int32{}, []int32{}, []int32{}, ErrNoError)
 	broker.Returns(seedMeta)
 
 	var err error

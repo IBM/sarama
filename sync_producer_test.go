@@ -12,7 +12,7 @@ func TestSyncProducer(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	prodSuccess := new(ProduceResponse)
@@ -60,7 +60,7 @@ func TestSyncProducerBatch(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	prodSuccess := new(ProduceResponse)
@@ -108,7 +108,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	prodSuccess := new(ProduceResponse)
@@ -151,7 +151,7 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
 	broker.Returns(metadataResponse)
 
 	config := NewConfig()
@@ -184,7 +184,7 @@ func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 
 	metadataLeader1 := new(MetadataResponse)
 	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
-	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, ErrNoError)
+	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
 	config := NewConfig()
@@ -207,7 +207,7 @@ func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 
 	metadataLeader2 := new(MetadataResponse)
 	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
-	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, ErrNoError)
+	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, nil, ErrNoError)
 	leader1.Returns(metadataLeader2)
 	prodSuccess := new(ProduceResponse)
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
