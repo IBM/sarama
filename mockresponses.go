@@ -178,7 +178,7 @@ func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoder {
 
 	// Generate set of replicas
 	replicas := []int32{}
-
+	offlineReplicas := []int32{}
 	for _, brokerID := range mmr.brokers {
 		replicas = append(replicas, brokerID)
 	}
@@ -186,14 +186,14 @@ func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoder {
 	if len(metadataRequest.Topics) == 0 {
 		for topic, partitions := range mmr.leaders {
 			for partition, brokerID := range partitions {
-				metadataResponse.AddTopicPartition(topic, partition, brokerID, replicas, replicas, ErrNoError)
+				metadataResponse.AddTopicPartition(topic, partition, brokerID, replicas, replicas, offlineReplicas, ErrNoError)
 			}
 		}
 		return metadataResponse
 	}
 	for _, topic := range metadataRequest.Topics {
 		for partition, brokerID := range mmr.leaders[topic] {
-			metadataResponse.AddTopicPartition(topic, partition, brokerID, replicas, replicas, ErrNoError)
+			metadataResponse.AddTopicPartition(topic, partition, brokerID, replicas, replicas, offlineReplicas, ErrNoError)
 		}
 	}
 	return metadataResponse
