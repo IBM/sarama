@@ -1097,7 +1097,7 @@ func buildClientInitialResponse(token *AccessToken) ([]byte, error) {
 
 	if token.Extensions != nil && len(token.Extensions) > 0 {
 		if _, ok := token.Extensions[SASLExtKeyAuth]; ok {
-			return []byte{}, fmt.Errorf("The extension `%s` is invalid", SASLExtKeyAuth)
+			return []byte{}, fmt.Errorf("the extension `%s` is invalid", SASLExtKeyAuth)
 		}
 		ext = "\x01" + mapToString(token.Extensions, "=", "\x01")
 	}

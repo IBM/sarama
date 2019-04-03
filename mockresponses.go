@@ -626,7 +626,7 @@ func (mr *MockCreateTopicsResponse) For(reqBody versionedDecoder) encoder {
 	}
 	res.TopicErrors = make(map[string]*TopicError)
 
-	for topic, _ := range req.TopicDetails {
+	for topic := range req.TopicDetails {
 		if res.Version >= 1 && strings.HasPrefix(topic, "_") {
 			msg := "insufficient permissions to create topic with reserved prefix"
 			res.TopicErrors[topic] = &TopicError{
@@ -672,7 +672,7 @@ func (mr *MockCreatePartitionsResponse) For(reqBody versionedDecoder) encoder {
 	res := &CreatePartitionsResponse{}
 	res.TopicPartitionErrors = make(map[string]*TopicPartitionError)
 
-	for topic, _ := range req.TopicPartitions {
+	for topic := range req.TopicPartitions {
 		if strings.HasPrefix(topic, "_") {
 			msg := "insufficient permissions to create partition on topic with reserved prefix"
 			res.TopicPartitionErrors[topic] = &TopicPartitionError{
@@ -701,7 +701,7 @@ func (mr *MockDeleteRecordsResponse) For(reqBody versionedDecoder) encoder {
 
 	for topic, deleteRecordRequestTopic := range req.Topics {
 		partitions := make(map[int32]*DeleteRecordsResponsePartition)
-		for partition, _ := range deleteRecordRequestTopic.PartitionOffsets {
+		for partition := range deleteRecordRequestTopic.PartitionOffsets {
 			partitions[partition] = &DeleteRecordsResponsePartition{Err: ErrNoError}
 		}
 		res.Topics[topic] = &DeleteRecordsResponseTopic{Partitions: partitions}
