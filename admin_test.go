@@ -97,7 +97,7 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 	}
 
 	err = admin.CreateTopic("my_topic", nil, false)
-	if err.Error() != "You must specify topic details" {
+	if err.Error() != "you must specify topic details" {
 		t.Fatal(err)
 	}
 	err = admin.Close()
