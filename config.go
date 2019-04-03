@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
+	"golang.org/x/net/proxy"
 )
 
 const defaultClientID = "sarama"
@@ -85,6 +86,14 @@ type Config struct {
 		// network being dialed.
 		// If nil, a local address is automatically chosen.
 		LocalAddr net.Addr
+
+		Proxy struct {
+			// Whether or not to use proxy when connecting to the broker
+			// (defaults to false).
+			Enable bool
+			// The proxy dialer to use enabled (defaults to nil).
+			Dialer proxy.Dialer
+		}
 	}
 
 	// Metadata is the namespace for metadata management properties used by the
