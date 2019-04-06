@@ -246,6 +246,11 @@ type Config struct {
 					// Backoff time between retries during rebalance (default 2s)
 					Backoff time.Duration
 				}
+
+				// If enabled, any ErrRebalanceInProgress errors are returned on the Errors channel (default disabled).
+				// This gives the user the ability to cancel all in progress message handlers so that the consumer can
+				// rejoin the consumer group.
+				SendGroupError bool
 			}
 			Member struct {
 				// Custom metadata to include when joining the group. The user data for all joined members
