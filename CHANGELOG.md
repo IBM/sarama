@@ -1,5 +1,49 @@
 # Changelog
 
+#### Version 1.22.0 (2019-04-09)
+
+New Features:
+- Add Offline Replicas Operation to Client
+  ([1318](https://github.com/Shopify/sarama/pull/1318)).
+- Allow using proxy when connecting to broker
+  ([1326](https://github.com/Shopify/sarama/pull/1326)).
+- Implement ReadCommitted
+  ([1307](https://github.com/Shopify/sarama/pull/1307)).
+- Add support for Kafka 2.2.0
+  ([1331](https://github.com/Shopify/sarama/pull/1331)).
+- Add SASL SCRAM-SHA-512 and SCRAM-SHA-256 mechanismes
+  ([1331](https://github.com/Shopify/sarama/pull/1295)).
+
+Improvements:
+- Unregister all broker metrics on broker stop
+  ([1232](https://github.com/Shopify/sarama/pull/1232)).
+- Add SCRAM authentication example
+  ([1303](https://github.com/Shopify/sarama/pull/1303)).
+- Add consumergroup examples
+  ([1304](https://github.com/Shopify/sarama/pull/1304)).
+- Expose consumer batch size metric
+  ([1296](https://github.com/Shopify/sarama/pull/1296)).
+- Add TLS options to console producer and consumer
+  ([1300](https://github.com/Shopify/sarama/pull/1300)).
+- Reduce client close bookkeeping
+  ([1297](https://github.com/Shopify/sarama/pull/1297)).
+- Satisfy error interface in create responses
+  ([1154](https://github.com/Shopify/sarama/pull/1154)).
+- Please lint gods
+  ([1346](https://github.com/Shopify/sarama/pull/1346)).
+
+Bug Fixes:
+- Fix multi consumer group instance crash
+  ([1338](https://github.com/Shopify/sarama/pull/1338)).
+- Update lz4 to latest version
+  ([1347](https://github.com/Shopify/sarama/pull/1347)).
+- Retry ErrNotCoordinatorForConsumer in new consumergroup session
+  ([1231](https://github.com/Shopify/sarama/pull/1231)).
+- Fix cleanup error handler
+  ([1332](https://github.com/Shopify/sarama/pull/1332)).
+- Fix rate condition in PartitionConsumer
+  ([1156](https://github.com/Shopify/sarama/pull/1156)).
+
 #### Version 1.21.0 (2019-02-24)
 
 New Features:
