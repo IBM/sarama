@@ -877,9 +877,8 @@ func (client *client) computeBackoff(attemptsRemaining int) time.Duration {
 		maxRetries := client.conf.Metadata.Retry.Max
 		retries := maxRetries - attemptsRemaining
 		return client.conf.Metadata.Retry.BackoffFunc(retries, maxRetries)
-	} else {
-		return client.conf.Metadata.Retry.Backoff
 	}
+	return client.conf.Metadata.Retry.Backoff
 }
 
 func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemaining int) (*FindCoordinatorResponse, error) {

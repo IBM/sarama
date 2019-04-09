@@ -1001,7 +1001,6 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 				batchSize := len(batch.Records)
 
 				if lastSequenceWrittenToDisk == batchFirstSeq-1 { //in sequence append
-
 					if lastBatchFirstSeq == batchFirstSeq { //is a batch retry
 						if lastBatchSize == batchSize { //good retry
 							// mock write to disk
@@ -1010,43 +1009,39 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 						}
 						t.Errorf("[%s] Retried Batch firstSeq=%d with different size old=%d new=%d", test.name, batchFirstSeq, lastBatchSize, batchSize)
 						return prodOutOfSeq
-					} else { // not a retry
-						// save batch just received for future check
-						lastBatchFirstSeq = batchFirstSeq
-						lastBatchSize = batchSize
+					} // not a retry
+					// save batch just received for future check
+					lastBatchFirstSeq = batchFirstSeq
+					lastBatchSize = batchSize
 
-						if prodCounter%2 == 1 {
-							if test.failAfterWrite {
-								// mock write to disk
-								lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
-							}
-							return prodNotLeaderResponse
+					if prodCounter%2 == 1 {
+						if test.failAfterWrite {
+							// mock write to disk
+							lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
 						}
-						// mock write to disk
-						lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
-						return prodSuccessResponse
+						return prodNotLeaderResponse
 					}
+					// mock write to disk
+					lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
+					return prodSuccessResponse
+				}
+				if lastBatchFirstSeq == batchFirstSeq && lastBatchSize == batchSize { // is a good batch retry
+					if lastSequenceWrittenToDisk == (batchFirstSeq + batchSize - 1) { // we already have the messages
+						return prodDuplicate
+					}
+					// mock write to disk
+					lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
+					return prodSuccessResponse
+				} //out of sequence / bad retried batch
+				if lastBatchFirstSeq == batchFirstSeq && lastBatchSize != batchSize {
+					t.Errorf("[%s] Retried Batch firstSeq=%d with different size old=%d new=%d", test.name, batchFirstSeq, lastBatchSize, batchSize)
+				} else if lastSequenceWrittenToDisk+1 != batchFirstSeq {
+					t.Errorf("[%s] Out of sequence message lastSequence=%d new batch starts at=%d", test.name, lastSequenceWrittenToDisk, batchFirstSeq)
 				} else {
-					if lastBatchFirstSeq == batchFirstSeq && lastBatchSize == batchSize { // is a good batch retry
-						if lastSequenceWrittenToDisk == (batchFirstSeq + batchSize - 1) { // we already have the messages
-							return prodDuplicate
-						}
-						// mock write to disk
-						lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
-						return prodSuccessResponse
-					} else { //out of sequence / bad retried batch
-						if lastBatchFirstSeq == batchFirstSeq && lastBatchSize != batchSize {
-							t.Errorf("[%s] Retried Batch firstSeq=%d with different size old=%d new=%d", test.name, batchFirstSeq, lastBatchSize, batchSize)
-						} else if lastSequenceWrittenToDisk+1 != batchFirstSeq {
-							t.Errorf("[%s] Out of sequence message lastSequence=%d new batch starts at=%d", test.name, lastSequenceWrittenToDisk, batchFirstSeq)
-						} else {
-							t.Errorf("[%s] Unexpected error", test.name)
-						}
-
-						return prodOutOfSeq
-					}
+					t.Errorf("[%s] Unexpected error", test.name)
 				}
 
+				return prodOutOfSeq
 			}
 			return nil
 		}
