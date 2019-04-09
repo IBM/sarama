@@ -9,7 +9,7 @@ require (
 	github.com/eapache/queue v1.1.0
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db // indirect
 	github.com/kisielk/errcheck v1.2.0 // indirect
-	github.com/pierrec/lz4 v2.0.5+incompatible
+	github.com/pierrec/lz4 v0.0.0-20190327172049-315a67e90e41
 	github.com/rcrowley/go-metrics v0.0.0-20181016184325-3113b8401b8a
 	github.com/stretchr/testify v1.3.0
 	github.com/xdg/scram v0.0.0-20180814205039-7eeb5667e42c
