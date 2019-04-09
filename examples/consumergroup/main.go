@@ -70,9 +70,7 @@ func main() {
 	/**
 	 * Setup a new Sarama consumer group
 	 */
-	consumer := Consumer{
-		ready: make(chan bool, 0),
-	}
+	consumer := Consumer{}
 
 	ctx := context.Background()
 	client, err := sarama.NewConsumerGroup(strings.Split(brokers, ","), group, config)
@@ -82,6 +80,7 @@ func main() {
 
 	go func() {
 		for {
+			consumer.ready = make(chan bool, 0)
 			err := client.Consume(ctx, strings.Split(topics, ","), &consumer)
 			if err != nil {
 				panic(err)
