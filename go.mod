@@ -1,7 +1,7 @@
 module github.com/Shopify/sarama
 
 require (
-	github.com/DataDog/zstd v1.3.5
+	github.com/DataDog/zstd v1.3.6-0.20190409195224-796139022798
 	github.com/Shopify/toxiproxy v2.1.4+incompatible
 	github.com/davecgh/go-spew v1.1.1
 	github.com/eapache/go-resiliency v1.1.0
