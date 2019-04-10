@@ -780,6 +780,18 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int)
 		case PacketEncodingError:
 			// didn't even send, return the error
 			return err
+
+		case KError:
+			// if SASL auth error return as this _should_ be a non retryable err for all brokers
+			if err.(KError) == ErrSASLAuthenticationFailed {
+				Logger.Println("client/metadata failed SASL authentication")
+				return err
+			}
+			// else remove that broker and try again
+			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
+			_ = broker.Close()
+			client.deregisterBroker(broker)
+
 		default:
 			// some other error, remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
