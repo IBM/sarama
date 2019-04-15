@@ -103,20 +103,20 @@ func TestNetConfigValidates(t *testing.T) {
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA256
-				cfg.Net.SASL.SCRAMClient = nil
+				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
 				cfg.Net.SASL.User = "user"
 				cfg.Net.SASL.Password = "stong_password"
 			},
-			"A SCRAMClient instance must be provided to Net.SASL.SCRAMClient"},
+			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc"},
 		{"SASL.Mechanism SCRAM-SHA-512 - Missing SCRAM client",
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
-				cfg.Net.SASL.SCRAMClient = nil
+				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
 				cfg.Net.SASL.User = "user"
 				cfg.Net.SASL.Password = "stong_password"
 			},
-			"A SCRAMClient instance must be provided to Net.SASL.SCRAMClient"},
+			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc"},
 	}
 
 	for i, test := range tests {
