@@ -67,9 +67,9 @@ type Config struct {
 			Password string
 			// authz id used for SASL/SCRAM authentication
 			SCRAMAuthzID string
-			// SCRAMClient is a user provided implementation of a SCRAM
+			// SCRAMClientGeneratorFunc is a generator of a user provided implementation of a SCRAM
 			// client used to perform the SCRAM exchange with the server.
-			SCRAMClient SCRAMClient
+			SCRAMClientGeneratorFunc func() SCRAMClient
 			// TokenProvider is a user-defined callback for generating
 			// access tokens for SASL/OAUTHBEARER auth. See the
 			// AccessTokenProvider interface docs for proper implementation
@@ -517,8 +517,8 @@ func (c *Config) Validate() error {
 			if c.Net.SASL.Password == "" {
 				return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
 			}
-			if c.Net.SASL.SCRAMClient == nil {
-				return ConfigurationError("A SCRAMClient instance must be provided to Net.SASL.SCRAMClient")
+			if c.Net.SASL.SCRAMClientGeneratorFunc == nil {
+				return ConfigurationError("A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc")
 			}
 		default:
 			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s` and `%s`",

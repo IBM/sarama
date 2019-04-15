@@ -1004,7 +1004,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
 		return err
 	}
 
-	scramClient := b.conf.Net.SASL.SCRAMClient
+	scramClient := b.conf.Net.SASL.SCRAMClientGeneratorFunc()
 	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
 		return fmt.Errorf("failed to start SCRAM exchange with the server: %s", err.Error())
 	}
