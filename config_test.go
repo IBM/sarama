@@ -91,7 +91,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Mechanism = "AnIncorrectSASLMechanism"
 				cfg.Net.SASL.TokenProvider = &DummyTokenProvider{}
 			},
-			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `SCRAM-SHA-256` and `SCRAM-SHA-512`"},
+			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512` and `GSSAPI`"},
 		{"SASL.Mechanism.OAUTHBEARER - Missing token provider",
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
@@ -117,6 +117,86 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Password = "stong_password"
 			},
 			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Using User/Password, Missing password field",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.Username = "sarama"
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.GSSAPI.Realm = "kafka"
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+			},
+			"Net.SASL.GSSAPI.Password must not be empty when GSS-API " +
+				"mechanism is used and Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Using User/Password, Missing KeyTabPath field",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH
+				cfg.Net.SASL.GSSAPI.Username = "sarama"
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.GSSAPI.Realm = "kafka"
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+			},
+			"Net.SASL.GSSAPI.KeyTabPath must not be empty when GSS-API mechanism is used" +
+				" and  Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Missing username",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.Password = "sarama"
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.GSSAPI.Realm = "kafka"
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+			},
+			"Net.SASL.GSSAPI.Username must not be empty when GSS-API mechanism is used"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Missing ServiceName",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.Username = "sarama"
+				cfg.Net.SASL.GSSAPI.Password = "sarama"
+				cfg.Net.SASL.GSSAPI.Realm = "kafka"
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+			},
+			"Net.SASL.GSSAPI.ServiceName must not be empty when GSS-API mechanism is used"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Missing AuthType",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.Username = "sarama"
+				cfg.Net.SASL.GSSAPI.Password = "sarama"
+				cfg.Net.SASL.GSSAPI.Realm = "kafka"
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+			},
+			"Net.SASL.GSSAPI.AuthType is invalid. Possible values are KRB5_USER_AUTH and KRB5_KEYTAB_AUTH"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Missing KerberosConfigPath",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.Username = "sarama"
+				cfg.Net.SASL.GSSAPI.Password = "sarama"
+				cfg.Net.SASL.GSSAPI.Realm = "kafka"
+			},
+			"Net.SASL.GSSAPI.KerberosConfigPath must not be empty when GSS-API mechanism is used"},
+		{"SASL.Mechanism GSSAPI (Kerberos) - Missing Realm",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.Username = "sarama"
+				cfg.Net.SASL.GSSAPI.Password = "sarama"
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+
+			},
+			"Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used"},
 	}
 
 	for i, test := range tests {
