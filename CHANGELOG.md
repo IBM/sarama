@@ -1,5 +1,21 @@
 # Changelog
 
+#### Version 1.22.1 (2019-04-29)
+
+Improvements:
+- Use zstd 1.3.8
+  ([1350](https://github.com/Shopify/sarama/pull/1350)).
+- Add support for SaslHandshakeRequest v1
+  ([1354](https://github.com/Shopify/sarama/pull/1354)).
+
+Bug Fixes:
+- Fix V5 MetadataRequest nullable topics array
+  ([1353](https://github.com/Shopify/sarama/pull/1353)).
+- Use a different SCRAM client for each broker connection
+  ([1349](https://github.com/Shopify/sarama/pull/1349)).
+- Fix AllowAutoTopicCreation for MetadataRequest greater than v3
+  ([1344](https://github.com/Shopify/sarama/pull/1344)).
+
 #### Version 1.22.0 (2019-04-09)
 
 New Features:
