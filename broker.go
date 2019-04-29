@@ -101,7 +101,7 @@ type AccessTokenProvider interface {
 
 // CustomAuthHandler is the interface for custom authorization mechanism
 type CustomAuthHandler interface {
-	// Authorize get broker connection, address of broker and configuration pointer.
+	// Authorize get broker connection and address of broker.
 	// It returns error if handshake/authorization has failed, nil if success.
 	Authorize(conn net.Conn, addr string) error
 }
