@@ -75,6 +75,9 @@ type Config struct {
 			// AccessTokenProvider interface docs for proper implementation
 			// guidelines.
 			TokenProvider AccessTokenProvider
+			// CustomHandler is a user-defined callback for SASLTypeCustom mechanism.
+			// It can be used for example in GSSAPI/Kerberos implementation
+			CustomHandler CustomAuthHandler
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection.
@@ -509,6 +512,10 @@ func (c *Config) Validate() error {
 		case SASLTypeOAuth:
 			if c.Net.SASL.TokenProvider == nil {
 				return ConfigurationError("An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider")
+			}
+		case SASLTypeCustom:
+			if c.Net.SASL.CustomHandler == nil {
+				return ConfigurationError("Net.SASL.CustomHandler must not be empty when SASL Custom type is enabled")
 			}
 		case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
 			if c.Net.SASL.User == "" {

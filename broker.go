@@ -55,6 +55,8 @@ type SASLMechanism string
 const (
 	// SASLTypeOAuth represents the SASL/OAUTHBEARER mechanism (Kafka 2.0.0+)
 	SASLTypeOAuth = "OAUTHBEARER"
+	// SASLTypeCustom represents the custom implementation of SASL mechanism
+	SASLTypeCustom = "CUSTOM"
 	// SASLTypePlaintext represents the SASL/PLAIN mechanism
 	SASLTypePlaintext = "PLAIN"
 	// SASLTypeSCRAMSHA256 represents the SCRAM-SHA-256 mechanism.
@@ -95,6 +97,13 @@ type AccessTokenProvider interface {
 	// after a short period of inactivity so that the broker connection logic
 	// can log debugging information and retry.
 	Token() (*AccessToken, error)
+}
+
+// CustomAuthHandler is the interface for custom authorization mechanism
+type CustomAuthHandler interface {
+	// Authorize get broker connection, address of broker and configuration pointer.
+	// It returns error if handshake/authorization has failed, nil if success.
+	Authorize(conn net.Conn, addr string) error
 }
 
 // SCRAMClient is a an interface to a SCRAM
@@ -842,6 +851,8 @@ func (b *Broker) authenticateViaSASL() error {
 	switch b.conf.Net.SASL.Mechanism {
 	case SASLTypeOAuth:
 		return b.sendAndReceiveSASLOAuth(b.conf.Net.SASL.TokenProvider)
+	case SASLTypeCustom:
+		return b.conf.Net.SASL.CustomHandler.Authorize(b.conn, b.Addr())
 	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
 		return b.sendAndReceiveSASLSCRAMv1()
 	default:
