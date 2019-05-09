@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
@@ -115,6 +117,30 @@ func TestVersionMatrixIdempotent(t *testing.T) {
 
 	// When/Then
 	consumeMsgs(t, testVersions, producedMessages)
+}
+
+func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
+	checkKafkaVersion(t, "0.11.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewConfig()
+	config.Consumer.IsolationLevel = ReadCommitted
+	config.Version = V0_11_0_0
+
+	consumer, err := NewConsumer(kafkaBrokers, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pc, err := consumer.ConsumePartition("uncommitted-topic-test-4", 0, OffsetOldest)
+	require.NoError(t, err)
+
+	msgChannel := pc.Messages()
+	for i := 1; i <= 6; i++ {
+		msg := <-msgChannel
+		require.Equal(t, fmt.Sprintf("Committed %v", i), string(msg.Value))
+	}
 }
 
 func prodMsg2Str(prodMsg *ProducerMessage) string {

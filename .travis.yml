@@ -1,7 +1,8 @@
+dist: xenial
 language: go
 go:
-- 1.10.x
 - 1.11.x
+- 1.12.x
 
 env:
   global:
@@ -11,15 +12,15 @@ env:
   - KAFKA_HOSTNAME=localhost
   - DEBUG=true
   matrix:
-  - KAFKA_VERSION=1.1.1
-  - KAFKA_VERSION=2.0.1
-  - KAFKA_VERSION=2.1.0
+  - KAFKA_VERSION=2.1.1 KAFKA_SCALA_VERSION=2.12
+  - KAFKA_VERSION=2.2.0 KAFKA_SCALA_VERSION=2.12
 
 before_install:
 - export REPOSITORY_ROOT=${TRAVIS_BUILD_DIR}
 - vagrant/install_cluster.sh
 - vagrant/boot_cluster.sh
 - vagrant/create_topics.sh
+- vagrant/run_java_producer.sh
 
 install: make install_dependencies
 
@@ -27,7 +28,7 @@ script:
 - make test
 - make vet
 - make errcheck
-- if [[ "$TRAVIS_GO_VERSION" == 1.11* ]]; then make fmt; fi
+- if [[ "$TRAVIS_GO_VERSION" == 1.12* ]]; then make fmt; fi
 
 after_success:
 - bash <(curl -s https://codecov.io/bash)
