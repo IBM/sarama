@@ -294,8 +294,7 @@ func (rd *realDecoder) peekInt8(offset int) (int8, error) {
 	if rd.remaining() < offset+1 {
 		return -1, ErrInsufficientData
 	}
-	tmp := int8(rd.raw[rd.off+offset])
-	return tmp, nil
+	return int8(rd.raw[rd.off+offset]), nil
 }
 
 // stacks
