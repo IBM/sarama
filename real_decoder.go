@@ -291,7 +291,8 @@ func (rd *realDecoder) peek(offset, length int) (packetDecoder, error) {
 }
 
 func (rd *realDecoder) peekInt8(offset int) (int8, error) {
-	if rd.remaining() < offset+1 {
+	const byteLen = 1
+	if rd.remaining() < offset+byteLen {
 		return -1, ErrInsufficientData
 	}
 	return int8(rd.raw[rd.off+offset]), nil
