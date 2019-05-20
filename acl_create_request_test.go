@@ -49,9 +49,9 @@ func TestCreateAclsRequestv1(t *testing.T) {
 		Version: 1,
 		AclCreations: []*AclCreation{{
 			Resource: Resource{
-				ResourceType:       AclResourceGroup,
-				ResourceName:       "group",
-				ResoucePatternType: AclPatternLiteral,
+				ResourceType:        AclResourceGroup,
+				ResourceName:        "group",
+				ResourcePatternType: AclPatternLiteral,
 			},
 			Acl: Acl{
 				Principal:      "principal",
