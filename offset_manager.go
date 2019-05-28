@@ -123,9 +123,8 @@ func (om *offsetManager) Close() error {
 func (om *offsetManager) computeBackoff(retries int) time.Duration {
 	if om.conf.Metadata.Retry.BackoffFunc != nil {
 		return om.conf.Metadata.Retry.BackoffFunc(retries, om.conf.Metadata.Retry.Max)
-	} else {
-		return om.conf.Metadata.Retry.Backoff
 	}
+	return om.conf.Metadata.Retry.Backoff
 }
 
 func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retries int) (int64, string, error) {

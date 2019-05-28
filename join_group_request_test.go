@@ -35,7 +35,7 @@ var (
 
 func TestJoinGroupRequest(t *testing.T) {
 	request := new(JoinGroupRequest)
-	request.GroupId = "TestGroup"
+	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
 	request.ProtocolType = "consumer"
 	testRequest(t, "V0: no protocols", request, joinGroupRequestV0_NoProtocols)
@@ -43,9 +43,9 @@ func TestJoinGroupRequest(t *testing.T) {
 
 func TestJoinGroupRequestV0_OneProtocol(t *testing.T) {
 	request := new(JoinGroupRequest)
-	request.GroupId = "TestGroup"
+	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
-	request.MemberId = "OneProtocol"
+	request.MemberID = "OneProtocol"
 	request.ProtocolType = "consumer"
 	request.AddGroupProtocol("one", []byte{0x01, 0x02, 0x03})
 	packet := testRequestEncode(t, "V0: one protocol", request, joinGroupRequestV0_OneProtocol)
@@ -56,9 +56,9 @@ func TestJoinGroupRequestV0_OneProtocol(t *testing.T) {
 
 func TestJoinGroupRequestDeprecatedEncode(t *testing.T) {
 	request := new(JoinGroupRequest)
-	request.GroupId = "TestGroup"
+	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
-	request.MemberId = "OneProtocol"
+	request.MemberID = "OneProtocol"
 	request.ProtocolType = "consumer"
 	request.GroupProtocols = make(map[string][]byte)
 	request.GroupProtocols["one"] = []byte{0x01, 0x02, 0x03}
@@ -70,10 +70,10 @@ func TestJoinGroupRequestDeprecatedEncode(t *testing.T) {
 func TestJoinGroupRequestV1(t *testing.T) {
 	request := new(JoinGroupRequest)
 	request.Version = 1
-	request.GroupId = "TestGroup"
+	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
 	request.RebalanceTimeout = 200
-	request.MemberId = "OneProtocol"
+	request.MemberID = "OneProtocol"
 	request.ProtocolType = "consumer"
 	request.AddGroupProtocol("one", []byte{0x01, 0x02, 0x03})
 	packet := testRequestEncode(t, "V1", request, joinGroupRequestV1)

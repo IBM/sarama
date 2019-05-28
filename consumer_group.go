@@ -213,8 +213,8 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 	switch join.Err {
 	case ErrNoError:
-		c.memberID = join.MemberId
-	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately
+		c.memberID = join.MemberID
+	case ErrUnknownMemberID, ErrIllegalGeneration: // reset member ID and retry immediately
 		c.memberID = ""
 		return c.newSession(ctx, topics, handler, retries)
 	case ErrNotCoordinatorForConsumer: // retry after backoff with coordinator refresh
@@ -235,7 +235,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 
 	// Prepare distribution plan if we joined as the leader
 	var plan BalanceStrategyPlan
-	if join.LeaderId == join.MemberId {
+	if join.LeaderID == join.MemberID {
 		members, err := join.GetMembers()
 		if err != nil {
 			return nil, err
@@ -248,14 +248,14 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	// Sync consumer group
-	sync, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
+	sync, err := c.syncGroupRequest(coordinator, plan, join.GenerationID)
 	if err != nil {
 		_ = coordinator.Close()
 		return nil, err
 	}
 	switch sync.Err {
 	case ErrNoError:
-	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately
+	case ErrUnknownMemberID, ErrIllegalGeneration: // reset member ID and retry immediately
 		c.memberID = ""
 		return c.newSession(ctx, topics, handler, retries)
 	case ErrNotCoordinatorForConsumer: // retry after backoff with coordinator refresh
@@ -288,13 +288,13 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		}
 	}
 
-	return newConsumerGroupSession(ctx, c, claims, join.MemberId, join.GenerationId, handler)
+	return newConsumerGroupSession(ctx, c, claims, join.MemberID, join.GenerationID, handler)
 }
 
 func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (*JoinGroupResponse, error) {
 	req := &JoinGroupRequest{
-		GroupId:        c.groupID,
-		MemberId:       c.memberID,
+		GroupID:        c.groupID,
+		MemberID:       c.memberID,
 		SessionTimeout: int32(c.config.Consumer.Group.Session.Timeout / time.Millisecond),
 		ProtocolType:   "consumer",
 	}
@@ -317,9 +317,9 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 
 func (c *consumerGroup) syncGroupRequest(coordinator *Broker, plan BalanceStrategyPlan, generationID int32) (*SyncGroupResponse, error) {
 	req := &SyncGroupRequest{
-		GroupId:      c.groupID,
-		MemberId:     c.memberID,
-		GenerationId: generationID,
+		GroupID:      c.groupID,
+		MemberID:     c.memberID,
+		GenerationID: generationID,
 	}
 	for memberID, topics := range plan {
 		err := req.AddGroupAssignmentMember(memberID, &ConsumerGroupMemberAssignment{
@@ -334,9 +334,9 @@ func (c *consumerGroup) syncGroupRequest(coordinator *Broker, plan BalanceStrate
 
 func (c *consumerGroup) heartbeatRequest(coordinator *Broker, memberID string, generationID int32) (*HeartbeatResponse, error) {
 	req := &HeartbeatRequest{
-		GroupId:      c.groupID,
-		MemberId:     memberID,
-		GenerationId: generationID,
+		GroupID:      c.groupID,
+		MemberID:     memberID,
+		GenerationID: generationID,
 	}
 
 	return coordinator.Heartbeat(req)
@@ -374,8 +374,8 @@ func (c *consumerGroup) leave() error {
 	}
 
 	resp, err := coordinator.LeaveGroup(&LeaveGroupRequest{
-		GroupId:  c.groupID,
-		MemberId: c.memberID,
+		GroupID:  c.groupID,
+		MemberID: c.memberID,
 	})
 	if err != nil {
 		_ = coordinator.Close()
@@ -387,7 +387,7 @@ func (c *consumerGroup) leave() error {
 
 	// Check response
 	switch resp.Err {
-	case ErrRebalanceInProgress, ErrUnknownMemberId, ErrNoError:
+	case ErrRebalanceInProgress, ErrUnknownMemberID, ErrNoError:
 		return nil
 	default:
 		return resp.Err
@@ -691,7 +691,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		switch resp.Err {
 		case ErrNoError:
 			retries = s.parent.config.Metadata.Retry.Max
-		case ErrRebalanceInProgress, ErrUnknownMemberId, ErrIllegalGeneration:
+		case ErrRebalanceInProgress, ErrUnknownMemberID, ErrIllegalGeneration:
 			return
 		default:
 			s.parent.handleError(err, "", -1)
