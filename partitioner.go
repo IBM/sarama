@@ -42,7 +42,7 @@ type PartitionerConstructor func(topic string) Partitioner
 
 type manualPartitioner struct{}
 
-// HashPartitionOption lets you modify default values of the partitioner
+// HashPartitionerOption lets you modify default values of the partitioner
 type HashPartitionerOption func(*hashPartitioner)
 
 // WithAbsFirst means that the partitioner handles absolute values

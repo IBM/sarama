@@ -485,8 +485,8 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
-	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
+	r := Resource{ResourceType: ACLResourceTopic, ResourceName: "my_topic"}
+	a := ACL{Host: "localhost", Operation: ACLOperationAlter, PermissionType: ACLPermissionAny}
 
 	err = admin.CreateACL(r, a)
 	if err != nil {
@@ -518,17 +518,17 @@ func TestClusterAdminListAcls(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
-	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
+	r := Resource{ResourceType: ACLResourceTopic, ResourceName: "my_topic"}
+	a := ACL{Host: "localhost", Operation: ACLOperationAlter, PermissionType: ACLPermissionAny}
 
 	err = admin.CreateACL(r, a)
 	if err != nil {
 		t.Fatal(err)
 	}
 	resourceName := "my_topic"
-	filter := AclFilter{
-		ResourceType: AclResourceTopic,
-		Operation:    AclOperationRead,
+	filter := ACLFilter{
+		ResourceType: ACLResourceTopic,
+		Operation:    ACLOperationRead,
 		ResourceName: &resourceName,
 	}
 
@@ -565,9 +565,9 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 	}
 
 	resourceName := "my_topic"
-	filter := AclFilter{
-		ResourceType: AclResourceTopic,
-		Operation:    AclOperationAlter,
+	filter := ACLFilter{
+		ResourceType: ACLResourceTopic,
+		Operation:    ACLOperationAlter,
 		ResourceName: &resourceName,
 	}
 

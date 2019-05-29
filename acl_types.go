@@ -1,55 +1,56 @@
 package sarama
 
 type (
-	AclOperation int
-
-	AclPermissionType int
-
-	AclResourceType int
-
-	AclResourcePatternType int
+	//ACLOperation is an ACL opration value
+	ACLOperation int
+	//ACLPermissionType is an ACL permission type
+	ACLPermissionType int
+	//ACLResourceType is an ACL resource type
+	ACLResourceType int
+	//ACLResourcePatternType is an ACL resource pattern type
+	ACLResourcePatternType int
 )
 
 // ref: https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/common/acl/AclOperation.java
 const (
-	AclOperationUnknown AclOperation = iota
-	AclOperationAny
-	AclOperationAll
-	AclOperationRead
-	AclOperationWrite
-	AclOperationCreate
-	AclOperationDelete
-	AclOperationAlter
-	AclOperationDescribe
-	AclOperationClusterAction
-	AclOperationDescribeConfigs
-	AclOperationAlterConfigs
-	AclOperationIdempotentWrite
+	ACLOperationUnknown ACLOperation = iota
+	ACLOperationAny
+	ACLOperationAll
+	ACLOperationRead
+	ACLOperationWrite
+	ACLOperationCreate
+	ACLOperationDelete
+	ACLOperationAlter
+	ACLOperationDescribe
+	ACLOperationClusterAction
+	ACLOperationDescribeConfigs
+	ACLOperationAlterConfigs
+	ACLOperationIdempotentWrite
 )
 
 // ref: https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/common/acl/AclPermissionType.java
 const (
-	AclPermissionUnknown AclPermissionType = iota
-	AclPermissionAny
-	AclPermissionDeny
-	AclPermissionAllow
+	ACLPermissionUnknown ACLPermissionType = iota
+	ACLPermissionAny
+	ACLPermissionDeny
+	ACLPermissionAllow
 )
 
 // ref: https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/common/resource/ResourceType.java
 const (
-	AclResourceUnknown AclResourceType = iota
-	AclResourceAny
-	AclResourceTopic
-	AclResourceGroup
-	AclResourceCluster
-	AclResourceTransactionalID
+	ACLResourceUnknown ACLResourceType = iota
+	ACLResourceAny
+	ACLResourceTopic
+	ACLResourceGroup
+	ACLResourceCluster
+	ACLResourceTransactionalID
 )
 
 // ref: https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/common/resource/PatternType.java
 const (
-	AclPatternUnknown AclResourcePatternType = iota
-	AclPatternAny
-	AclPatternMatch
-	AclPatternLiteral
-	AclPatternPrefixed
+	ACLPatternUnknown ACLResourcePatternType = iota
+	ACLPatternAny
+	ACLPatternMatch
+	ACLPatternLiteral
+	ACLPatternPrefixed
 )

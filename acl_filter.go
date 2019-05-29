@@ -1,17 +1,18 @@
 package sarama
 
-type AclFilter struct {
-	Version                   int
-	ResourceType              AclResourceType
+//ACLFilter is an ACL filter type
+type ACLFilter struct {
 	ResourceName              *string
-	ResourcePatternTypeFilter AclResourcePatternType
 	Principal                 *string
 	Host                      *string
-	Operation                 AclOperation
-	PermissionType            AclPermissionType
+	Version                   int
+	ResourceType              ACLResourceType
+	ResourcePatternTypeFilter ACLResourcePatternType
+	Operation                 ACLOperation
+	PermissionType            ACLPermissionType
 }
 
-func (a *AclFilter) encode(pe packetEncoder) error {
+func (a *ACLFilter) encode(pe packetEncoder) error {
 	pe.putInt8(int8(a.ResourceType))
 	if err := pe.putNullableString(a.ResourceName); err != nil {
 		return err
@@ -33,12 +34,12 @@ func (a *AclFilter) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (a *AclFilter) decode(pd packetDecoder, version int16) (err error) {
+func (a *ACLFilter) decode(pd packetDecoder, version int16) (err error) {
 	resourceType, err := pd.getInt8()
 	if err != nil {
 		return err
 	}
-	a.ResourceType = AclResourceType(resourceType)
+	a.ResourceType = ACLResourceType(resourceType)
 
 	if a.ResourceName, err = pd.getNullableString(); err != nil {
 		return err
@@ -51,7 +52,7 @@ func (a *AclFilter) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 
-		a.ResourcePatternTypeFilter = AclResourcePatternType(pattern)
+		a.ResourcePatternTypeFilter = ACLResourcePatternType(pattern)
 	}
 
 	if a.Principal, err = pd.getNullableString(); err != nil {
@@ -66,13 +67,13 @@ func (a *AclFilter) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	a.Operation = AclOperation(operation)
+	a.Operation = ACLOperation(operation)
 
 	permissionType, err := pd.getInt8()
 	if err != nil {
 		return err
 	}
-	a.PermissionType = AclPermissionType(permissionType)
+	a.PermissionType = ACLPermissionType(permissionType)
 
 	return nil
 }

@@ -3,18 +3,18 @@ package sarama
 //DescribeAclsRequest is a secribe acl request type
 type DescribeAclsRequest struct {
 	Version int
-	AclFilter
+	ACLFilter
 }
 
 func (d *DescribeAclsRequest) encode(pe packetEncoder) error {
-	d.AclFilter.Version = d.Version
-	return d.AclFilter.encode(pe)
+	d.ACLFilter.Version = d.Version
+	return d.ACLFilter.encode(pe)
 }
 
 func (d *DescribeAclsRequest) decode(pd packetDecoder, version int16) (err error) {
 	d.Version = int(version)
-	d.AclFilter.Version = int(version)
-	return d.AclFilter.decode(pd, version)
+	d.ACLFilter.Version = int(version)
+	return d.ACLFilter.decode(pd, version)
 }
 
 func (d *DescribeAclsRequest) key() int16 {

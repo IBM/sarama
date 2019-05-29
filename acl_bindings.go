@@ -2,9 +2,9 @@ package sarama
 
 //Resource holds information about acl resource type
 type Resource struct {
-	ResourceType        AclResourceType
+	ResourceType        ACLResourceType
 	ResourceName        string
-	ResourcePatternType AclResourcePatternType
+	ResourcePatternType ACLResourcePatternType
 }
 
 func (r *Resource) encode(pe packetEncoder, version int16) error {
@@ -15,9 +15,9 @@ func (r *Resource) encode(pe packetEncoder, version int16) error {
 	}
 
 	if version == 1 {
-		if r.ResourcePatternType == AclPatternUnknown {
+		if r.ResourcePatternType == ACLPatternUnknown {
 			Logger.Print("Cannot encode an unknown resource pattern type, using Literal instead")
-			r.ResourcePatternType = AclPatternLiteral
+			r.ResourcePatternType = ACLPatternLiteral
 		}
 		pe.putInt8(int8(r.ResourcePatternType))
 	}
@@ -30,7 +30,7 @@ func (r *Resource) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	r.ResourceType = AclResourceType(resourceType)
+	r.ResourceType = ACLResourceType(resourceType)
 
 	if r.ResourceName, err = pd.getString(); err != nil {
 		return err
@@ -40,21 +40,21 @@ func (r *Resource) decode(pd packetDecoder, version int16) (err error) {
 		if err != nil {
 			return err
 		}
-		r.ResourcePatternType = AclResourcePatternType(pattern)
+		r.ResourcePatternType = ACLResourcePatternType(pattern)
 	}
 
 	return nil
 }
 
-//Acl holds information about acl type
-type Acl struct {
+//ACL holds information about acl type
+type ACL struct {
 	Principal      string
 	Host           string
-	Operation      AclOperation
-	PermissionType AclPermissionType
+	Operation      ACLOperation
+	PermissionType ACLPermissionType
 }
 
-func (a *Acl) encode(pe packetEncoder) error {
+func (a *ACL) encode(pe packetEncoder) error {
 	if err := pe.putString(a.Principal); err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (a *Acl) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (a *Acl) decode(pd packetDecoder, version int16) (err error) {
+func (a *ACL) decode(pd packetDecoder, version int16) (err error) {
 	if a.Principal, err = pd.getString(); err != nil {
 		return err
 	}
@@ -82,13 +82,13 @@ func (a *Acl) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	a.Operation = AclOperation(operation)
+	a.Operation = ACLOperation(operation)
 
 	permissionType, err := pd.getInt8()
 	if err != nil {
 		return err
 	}
-	a.PermissionType = AclPermissionType(permissionType)
+	a.PermissionType = ACLPermissionType(permissionType)
 
 	return nil
 }
@@ -96,7 +96,7 @@ func (a *Acl) decode(pd packetDecoder, version int16) (err error) {
 //ResourceAcls is an acl resource type
 type ResourceAcls struct {
 	Resource
-	Acls []*Acl
+	Acls []*ACL
 }
 
 func (r *ResourceAcls) encode(pe packetEncoder, version int16) error {
@@ -126,9 +126,9 @@ func (r *ResourceAcls) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 
-	r.Acls = make([]*Acl, n)
+	r.Acls = make([]*ACL, n)
 	for i := 0; i < n; i++ {
-		r.Acls[i] = new(Acl)
+		r.Acls[i] = new(ACL)
 		if err := r.Acls[i].decode(pd, version); err != nil {
 			return err
 		}

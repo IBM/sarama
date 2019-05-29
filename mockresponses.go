@@ -781,11 +781,11 @@ func NewMockCreateAclsResponse(t TestReporter) *MockCreateAclsResponse {
 }
 
 func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) encoder {
-	req := reqBody.(*CreateAclsRequest)
-	res := &CreateAclsResponse{}
+	req := reqBody.(*CreateACLsRequest)
+	res := &CreateACLsResponse{}
 
-	for range req.AclCreations {
-		res.AclCreationResponses = append(res.AclCreationResponses, &AclCreationResponse{Err: ErrNoError})
+	for range req.ACLCreations {
+		res.ACLCreationResponses = append(res.ACLCreationResponses, &ACLCreationResponse{Err: ErrNoError})
 	}
 	return res
 }
@@ -806,7 +806,7 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
 	acl := &ResourceAcls{}
 	acl.Resource.ResourceName = *req.ResourceName
 	acl.Resource.ResourceType = req.ResourceType
-	acl.Acls = append(acl.Acls, &Acl{})
+	acl.Acls = append(acl.Acls, &ACL{})
 	res.ResourceAcls = append(res.ResourceAcls, acl)
 
 	return res
@@ -880,7 +880,7 @@ func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) encoder {
 
 	for range req.Filters {
 		response := &FilterResponse{Err: ErrNoError}
-		response.MatchingAcls = append(response.MatchingAcls, &MatchingAcl{Err: ErrNoError})
+		response.MatchingAcls = append(response.MatchingAcls, &MatchingACL{Err: ErrNoError})
 		res.FilterResponses = append(res.FilterResponses, response)
 	}
 	return res

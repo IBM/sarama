@@ -151,7 +151,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 29:
 		return &DescribeAclsRequest{}
 	case 30:
-		return &CreateAclsRequest{}
+		return &CreateACLsRequest{}
 	case 31:
 		return &DeleteAclsRequest{}
 	case 32:

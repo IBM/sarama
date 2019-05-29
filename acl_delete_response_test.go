@@ -27,9 +27,9 @@ func TestDeleteAclsResponse(t *testing.T) {
 	resp := &DeleteAclsResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		FilterResponses: []*FilterResponse{{
-			MatchingAcls: []*MatchingAcl{{
-				Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "topic"},
-				Acl:      Acl{Principal: "principal", Host: "host", Operation: AclOperationWrite, PermissionType: AclPermissionAllow},
+			MatchingAcls: []*MatchingACL{{
+				Resource: Resource{ResourceType: ACLResourceTopic, ResourceName: "topic"},
+				ACL:      ACL{Principal: "principal", Host: "host", Operation: ACLOperationWrite, PermissionType: ACLPermissionAllow},
 			}},
 		}},
 	}

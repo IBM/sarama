@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
-	metrics "github.com/rcrowley/go-metrics"
 	"io"
 	"net"
 	"sort"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -62,7 +63,8 @@ const (
 	SASLTypeSCRAMSHA256 = "SCRAM-SHA-256"
 	// SASLTypeSCRAMSHA512 represents the SCRAM-SHA-512 mechanism.
 	SASLTypeSCRAMSHA512 = "SCRAM-SHA-512"
-	SASLTypeGSSAPI      = "GSSAPI"
+	//SASLTypeGSSAPI represents GSSAPI type
+	SASLTypeGSSAPI = "GSSAPI"
 	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL auth using opaque packets.
 	SASLHandshakeV0 = int16(0)
@@ -536,8 +538,8 @@ func (b *Broker) DescribeAcls(request *DescribeAclsRequest) (*DescribeAclsRespon
 }
 
 //CreateAcls sends a create acl request and returns a response or error
-func (b *Broker) CreateAcls(request *CreateAclsRequest) (*CreateAclsResponse, error) {
-	response := new(CreateAclsResponse)
+func (b *Broker) CreateAcls(request *CreateACLsRequest) (*CreateACLsResponse, error) {
+	response := new(CreateACLsResponse)
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {

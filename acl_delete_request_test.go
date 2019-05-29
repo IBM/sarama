@@ -64,10 +64,10 @@ var (
 
 func TestDeleteAclsRequest(t *testing.T) {
 	req := &DeleteAclsRequest{
-		Filters: []*AclFilter{{
-			ResourceType:   AclResourceAny,
-			Operation:      AclOperationAlterConfigs,
-			PermissionType: AclPermissionAllow,
+		Filters: []*ACLFilter{{
+			ResourceType:   ACLResourceAny,
+			Operation:      ACLOperationAlterConfigs,
+			PermissionType: ACLPermissionAllow,
 		}},
 	}
 
@@ -76,15 +76,15 @@ func TestDeleteAclsRequest(t *testing.T) {
 	req.Filters[0].ResourceName = nullString("filter")
 	req.Filters[0].Principal = nullString("principal")
 	req.Filters[0].Host = nullString("host")
-	req.Filters[0].Operation = AclOperationWrite
+	req.Filters[0].Operation = ACLOperationWrite
 
 	testRequest(t, "delete request", req, aclDeleteRequest)
 
-	req.Filters = append(req.Filters, &AclFilter{
-		ResourceType:   AclResourceTopic,
+	req.Filters = append(req.Filters, &ACLFilter{
+		ResourceType:   ACLResourceTopic,
 		ResourceName:   nullString("topic"),
-		Operation:      AclOperationDelete,
-		PermissionType: AclPermissionDeny,
+		Operation:      ACLOperationDelete,
+		PermissionType: ACLPermissionDeny,
 	})
 
 	testRequest(t, "delete request array", req, aclDeleteRequestArray)
@@ -93,11 +93,11 @@ func TestDeleteAclsRequest(t *testing.T) {
 func TestDeleteAclsRequestV1(t *testing.T) {
 	req := &DeleteAclsRequest{
 		Version: 1,
-		Filters: []*AclFilter{{
-			ResourceType:              AclResourceAny,
-			Operation:                 AclOperationAlterConfigs,
-			PermissionType:            AclPermissionAllow,
-			ResourcePatternTypeFilter: AclPatternAny,
+		Filters: []*ACLFilter{{
+			ResourceType:              ACLResourceAny,
+			Operation:                 ACLOperationAlterConfigs,
+			PermissionType:            ACLPermissionAllow,
+			ResourcePatternTypeFilter: ACLPatternAny,
 		}},
 	}
 
@@ -106,7 +106,7 @@ func TestDeleteAclsRequestV1(t *testing.T) {
 	req.Filters[0].ResourceName = nullString("filter")
 	req.Filters[0].Principal = nullString("principal")
 	req.Filters[0].Host = nullString("host")
-	req.Filters[0].Operation = AclOperationWrite
+	req.Filters[0].Operation = ACLOperationWrite
 
 	testRequest(t, "delete request", req, aclDeleteRequestv1)
 }

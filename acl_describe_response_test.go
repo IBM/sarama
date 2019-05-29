@@ -28,14 +28,14 @@ func TestAclDescribeResponse(t *testing.T) {
 		ResourceAcls: []*ResourceAcls{{
 			Resource: Resource{
 				ResourceName: "topic",
-				ResourceType: AclResourceTopic,
+				ResourceType: ACLResourceTopic,
 			},
-			Acls: []*Acl{
+			Acls: []*ACL{
 				{
 					Principal:      "principal",
 					Host:           "host",
-					Operation:      AclOperationWrite,
-					PermissionType: AclPermissionAllow,
+					Operation:      ACLOperationWrite,
+					PermissionType: ACLPermissionAllow,
 				},
 			},
 		}},

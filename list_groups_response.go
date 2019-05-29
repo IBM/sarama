@@ -1,17 +1,18 @@
 package sarama
 
+//ListGroupsResponse lists a group response
 type ListGroupsResponse struct {
 	Err    KError
 	Groups map[string]string
 }
 
-func (r *ListGroupsResponse) encode(pe packetEncoder) error {
-	pe.putInt16(int16(r.Err))
+func (l *ListGroupsResponse) encode(pe packetEncoder) error {
+	pe.putInt16(int16(l.Err))
 
-	if err := pe.putArrayLength(len(r.Groups)); err != nil {
+	if err := pe.putArrayLength(len(l.Groups)); err != nil {
 		return err
 	}
-	for groupID, protocolType := range r.Groups {
+	for groupID, protocolType := range l.Groups {
 		if err := pe.putString(groupID); err != nil {
 			return err
 		}
@@ -23,13 +24,13 @@ func (r *ListGroupsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
+func (l *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 	kerr, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
 
-	r.Err = KError(kerr)
+	l.Err = KError(kerr)
 
 	n, err := pd.getArrayLength()
 	if err != nil {
@@ -39,7 +40,7 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 		return nil
 	}
 
-	r.Groups = make(map[string]string)
+	l.Groups = make(map[string]string)
 	for i := 0; i < n; i++ {
 		groupID, err := pd.getString()
 		if err != nil {
@@ -50,20 +51,20 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 			return err
 		}
 
-		r.Groups[groupID] = protocolType
+		l.Groups[groupID] = protocolType
 	}
 
 	return nil
 }
 
-func (r *ListGroupsResponse) key() int16 {
+func (l *ListGroupsResponse) key() int16 {
 	return 16
 }
 
-func (r *ListGroupsResponse) version() int16 {
+func (l *ListGroupsResponse) version() int16 {
 	return 0
 }
 
-func (r *ListGroupsResponse) requiredVersion() KafkaVersion {
+func (l *ListGroupsResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }

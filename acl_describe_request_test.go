@@ -30,13 +30,13 @@ func TestAclDescribeRequestV0(t *testing.T) {
 	host := "host"
 
 	req := &DescribeAclsRequest{
-		AclFilter: AclFilter{
-			ResourceType:   AclResourceTopic,
+		ACLFilter: ACLFilter{
+			ResourceType:   ACLResourceTopic,
 			ResourceName:   &resourcename,
 			Principal:      &principal,
 			Host:           &host,
-			Operation:      AclOperationCreate,
-			PermissionType: AclPermissionAllow,
+			Operation:      ACLOperationCreate,
+			PermissionType: ACLPermissionAllow,
 		},
 	}
 
@@ -50,14 +50,14 @@ func TestAclDescribeRequestV1(t *testing.T) {
 
 	req := &DescribeAclsRequest{
 		Version: 1,
-		AclFilter: AclFilter{
-			ResourceType:              AclResourceTopic,
+		ACLFilter: ACLFilter{
+			ResourceType:              ACLResourceTopic,
 			ResourceName:              &resourcename,
-			ResourcePatternTypeFilter: AclPatternAny,
+			ResourcePatternTypeFilter: ACLPatternAny,
 			Principal:                 &principal,
 			Host:                      &host,
-			Operation:                 AclOperationCreate,
-			PermissionType:            AclPermissionAllow,
+			Operation:                 ACLOperationCreate,
+			PermissionType:            ACLPermissionAllow,
 		},
 	}
 

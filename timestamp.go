@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+//Timestamp is a kafka time stamp type
 type Timestamp struct {
 	*time.Time
 }

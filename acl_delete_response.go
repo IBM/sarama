@@ -64,7 +64,7 @@ func (d *DeleteAclsResponse) requiredVersion() KafkaVersion {
 type FilterResponse struct {
 	Err          KError
 	ErrMsg       *string
-	MatchingAcls []*MatchingAcl
+	MatchingAcls []*MatchingACL
 }
 
 func (f *FilterResponse) encode(pe packetEncoder, version int16) error {
@@ -76,8 +76,8 @@ func (f *FilterResponse) encode(pe packetEncoder, version int16) error {
 	if err := pe.putArrayLength(len(f.MatchingAcls)); err != nil {
 		return err
 	}
-	for _, matchingAcl := range f.MatchingAcls {
-		if err := matchingAcl.encode(pe, version); err != nil {
+	for _, matchingACL := range f.MatchingAcls {
+		if err := matchingACL.encode(pe, version); err != nil {
 			return err
 		}
 	}
@@ -100,9 +100,9 @@ func (f *FilterResponse) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	f.MatchingAcls = make([]*MatchingAcl, n)
+	f.MatchingAcls = make([]*MatchingACL, n)
 	for i := 0; i < n; i++ {
-		f.MatchingAcls[i] = new(MatchingAcl)
+		f.MatchingAcls[i] = new(MatchingACL)
 		if err := f.MatchingAcls[i].decode(pd, version); err != nil {
 			return err
 		}
@@ -111,15 +111,15 @@ func (f *FilterResponse) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-//MatchingAcl is a matching acl type
-type MatchingAcl struct {
+//MatchingACL is a matching acl type
+type MatchingACL struct {
 	Err    KError
 	ErrMsg *string
 	Resource
-	Acl
+	ACL
 }
 
-func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
+func (m *MatchingACL) encode(pe packetEncoder, version int16) error {
 	pe.putInt16(int16(m.Err))
 	if err := pe.putNullableString(m.ErrMsg); err != nil {
 		return err
@@ -129,14 +129,14 @@ func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
 		return err
 	}
 
-	if err := m.Acl.encode(pe); err != nil {
+	if err := m.ACL.encode(pe); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (m *MatchingAcl) decode(pd packetDecoder, version int16) (err error) {
+func (m *MatchingACL) decode(pd packetDecoder, version int16) (err error) {
 	kerr, err := pd.getInt16()
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func (m *MatchingAcl) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	if err := m.Acl.decode(pd, version); err != nil {
+	if err := m.ACL.decode(pd, version); err != nil {
 		return err
 	}
 

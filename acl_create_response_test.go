@@ -25,9 +25,9 @@ var (
 
 func TestCreateAclsResponse(t *testing.T) {
 	errmsg := "error"
-	resp := &CreateAclsResponse{
+	resp := &CreateACLsResponse{
 		ThrottleTime: 100 * time.Millisecond,
-		AclCreationResponses: []*AclCreationResponse{{
+		ACLCreationResponses: []*ACLCreationResponse{{
 			Err:    ErrInvalidRequest,
 			ErrMsg: &errmsg,
 		}},
@@ -35,7 +35,7 @@ func TestCreateAclsResponse(t *testing.T) {
 
 	testResponse(t, "response with error", resp, createResponseWithError)
 
-	resp.AclCreationResponses = append(resp.AclCreationResponses, new(AclCreationResponse))
+	resp.ACLCreationResponses = append(resp.ACLCreationResponses, new(ACLCreationResponse))
 
 	testResponse(t, "response array", resp, createResponseArray)
 }

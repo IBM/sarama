@@ -71,10 +71,12 @@ type Encoder interface {
 // as the Key or Value in a ProducerMessage.
 type StringEncoder string
 
+//Encode returns a byte slice of string encoder
 func (s StringEncoder) Encode() ([]byte, error) {
 	return []byte(s), nil
 }
 
+//Length returns strings encoder length
 func (s StringEncoder) Length() int {
 	return len(s)
 }
@@ -83,10 +85,12 @@ func (s StringEncoder) Length() int {
 // as the Key or Value in a ProducerMessage.
 type ByteEncoder []byte
 
+//Encode return a byte slice of byte encoder
 func (b ByteEncoder) Encode() ([]byte, error) {
 	return b, nil
 }
 
+//Length returns the lenth of byte encoder
 func (b ByteEncoder) Length() int {
 	return len(b)
 }
@@ -105,6 +109,7 @@ func newBufConn(conn net.Conn) *bufConn {
 	}
 }
 
+//Read satisfies io.Reader interface
 func (bc *bufConn) Read(b []byte) (n int, err error) {
 	return bc.buf.Read(b)
 }

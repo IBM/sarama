@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+//EndTxnResponse is a transaction end response type
 type EndTxnResponse struct {
 	ThrottleTime time.Duration
 	Err          KError

@@ -63,17 +63,17 @@ type ClusterAdmin interface {
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
 	// no changes will be made. This operation is supported by brokers with version 0.11.0.0 or higher.
-	CreateACL(resource Resource, acl Acl) error
+	CreateACL(resource Resource, acl ACL) error
 
 	// Lists access control lists (ACLs) according to the supplied filter.
 	// it may take some time for changes made by createAcls or deleteAcls to be reflected in the output of ListAcls
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
-	ListAcls(filter AclFilter) ([]ResourceAcls, error)
+	ListAcls(filter ACLFilter) ([]ResourceAcls, error)
 
 	// Deletes access control lists (ACLs) according to the supplied filters.
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
-	DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error)
+	DeleteACL(filter ACLFilter, validateOnly bool) ([]MatchingACL, error)
 
 	// List the consumer groups available in the cluster.
 	ListConsumerGroups() (map[string]string, error)
@@ -466,10 +466,10 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 	return nil
 }
 
-func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
-	var acls []*AclCreation
-	acls = append(acls, &AclCreation{resource, acl})
-	request := &CreateAclsRequest{AclCreations: acls}
+func (ca *clusterAdmin) CreateACL(resource Resource, acl ACL) error {
+	var acls []*ACLCreation
+	acls = append(acls, &ACLCreation{resource, acl})
+	request := &CreateACLsRequest{ACLCreations: acls}
 
 	b, err := ca.Controller()
 	if err != nil {
@@ -480,9 +480,9 @@ func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
 	return err
 }
 
-func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
+func (ca *clusterAdmin) ListAcls(filter ACLFilter) ([]ResourceAcls, error) {
 
-	request := &DescribeAclsRequest{AclFilter: filter}
+	request := &DescribeAclsRequest{ACLFilter: filter}
 
 	b, err := ca.Controller()
 	if err != nil {
@@ -495,14 +495,14 @@ func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 	}
 
 	var lAcls []ResourceAcls
-	for _, rAcl := range rsp.ResourceAcls {
-		lAcls = append(lAcls, *rAcl)
+	for _, rACL := range rsp.ResourceAcls {
+		lAcls = append(lAcls, *rACL)
 	}
 	return lAcls, nil
 }
 
-func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
-	var filters []*AclFilter
+func (ca *clusterAdmin) DeleteACL(filter ACLFilter, validateOnly bool) ([]MatchingACL, error) {
+	var filters []*ACLFilter
 	filters = append(filters, &filter)
 	request := &DeleteAclsRequest{Filters: filters}
 
@@ -516,7 +516,7 @@ func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]Matchi
 		return nil, err
 	}
 
-	var mAcls []MatchingAcl
+	var mAcls []MatchingACL
 	for _, fr := range rsp.FilterResponses {
 		for _, mACL := range fr.MatchingAcls {
 			mAcls = append(mAcls, *mACL)

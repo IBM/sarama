@@ -12,7 +12,7 @@ const (
 	ControlRecordUnknown
 )
 
-// Control records are returned as a record by fetchRequest
+// ControlRecord records are returned as a record by fetchRequest
 // However unlike "normal" records, they mean nothing application wise.
 // They only serve internal logic for supporting transactions.
 type ControlRecord struct {

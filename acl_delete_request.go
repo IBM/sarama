@@ -3,7 +3,7 @@ package sarama
 //DeleteAclsRequest is a delete acl request
 type DeleteAclsRequest struct {
 	Version int
-	Filters []*AclFilter
+	Filters []*ACLFilter
 }
 
 func (d *DeleteAclsRequest) encode(pe packetEncoder) error {
@@ -28,9 +28,9 @@ func (d *DeleteAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 		return err
 	}
 
-	d.Filters = make([]*AclFilter, n)
+	d.Filters = make([]*ACLFilter, n)
 	for i := 0; i < n; i++ {
-		d.Filters[i] = new(AclFilter)
+		d.Filters[i] = new(ACLFilter)
 		d.Filters[i].Version = int(version)
 		if err := d.Filters[i].decode(pd, version); err != nil {
 			return err

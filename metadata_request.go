@@ -1,5 +1,6 @@
 package sarama
 
+//MetadataRequest is a kafka metadata request type
 type MetadataRequest struct {
 	Version                int16
 	Topics                 []string

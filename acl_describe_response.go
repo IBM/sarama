@@ -23,8 +23,8 @@ func (d *DescribeAclsResponse) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for _, resourceAcl := range d.ResourceAcls {
-		if err := resourceAcl.encode(pe, d.Version); err != nil {
+	for _, resourceACL := range d.ResourceAcls {
+		if err := resourceACL.encode(pe, d.Version); err != nil {
 			return err
 		}
 	}
