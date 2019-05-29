@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1239,4 +1240,50 @@ ConsumerLoop:
 	}
 
 	log.Printf("Consumed: %d\n", consumed)
+}
+
+func Test_partitionConsumer_parseResponse(t *testing.T) {
+	type args struct {
+		response *FetchResponse
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    []*ConsumerMessage
+		wantErr bool
+	}{
+		{
+			name: "empty but throttled FetchResponse is not considered an error",
+			args: args{
+				response: &FetchResponse{
+					ThrottleTime: time.Millisecond,
+				},
+			},
+		},
+		{
+			name: "empty FetchResponse is considered an incomplete response by default",
+			args: args{
+				response: &FetchResponse{},
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			child := &partitionConsumer{
+				broker: &brokerConsumer{
+					broker: &Broker{},
+				},
+				conf: &Config{},
+			}
+			got, err := child.parseResponse(tt.args.response)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("partitionConsumer.parseResponse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("partitionConsumer.parseResponse() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
