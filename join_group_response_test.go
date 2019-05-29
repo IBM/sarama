@@ -63,14 +63,14 @@ func TestJoinGroupResponseV0(t *testing.T) {
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
-	if response.GenerationId != 66051 {
-		t.Error("Decoding GenerationId failed, found:", response.GenerationId)
+	if response.GenerationID != 66051 {
+		t.Error("Decoding GenerationId failed, found:", response.GenerationID)
 	}
-	if response.LeaderId != "foo" {
-		t.Error("Decoding LeaderId failed, found:", response.LeaderId)
+	if response.LeaderID != "foo" {
+		t.Error("Decoding LeaderId failed, found:", response.LeaderID)
 	}
-	if response.MemberId != "bar" {
-		t.Error("Decoding MemberId failed, found:", response.MemberId)
+	if response.MemberID != "bar" {
+		t.Error("Decoding MemberId failed, found:", response.MemberID)
 	}
 	if len(response.Members) != 0 {
 		t.Error("Decoding Members failed, found:", response.Members)
@@ -81,14 +81,14 @@ func TestJoinGroupResponseV0(t *testing.T) {
 	if response.Err != ErrInconsistentGroupProtocol {
 		t.Error("Decoding Err failed: ErrInconsistentGroupProtocol expected but found", response.Err)
 	}
-	if response.GenerationId != 0 {
-		t.Error("Decoding GenerationId failed, found:", response.GenerationId)
+	if response.GenerationID != 0 {
+		t.Error("Decoding GenerationId failed, found:", response.GenerationID)
 	}
-	if response.LeaderId != "" {
-		t.Error("Decoding LeaderId failed, found:", response.LeaderId)
+	if response.LeaderID != "" {
+		t.Error("Decoding LeaderId failed, found:", response.LeaderID)
 	}
-	if response.MemberId != "" {
-		t.Error("Decoding MemberId failed, found:", response.MemberId)
+	if response.MemberID != "" {
+		t.Error("Decoding MemberId failed, found:", response.MemberID)
 	}
 	if len(response.Members) != 0 {
 		t.Error("Decoding Members failed, found:", response.Members)
@@ -99,14 +99,14 @@ func TestJoinGroupResponseV0(t *testing.T) {
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: ErrNoError expected but found", response.Err)
 	}
-	if response.GenerationId != 66051 {
-		t.Error("Decoding GenerationId failed, found:", response.GenerationId)
+	if response.GenerationID != 66051 {
+		t.Error("Decoding GenerationId failed, found:", response.GenerationID)
 	}
-	if response.LeaderId != "foo" {
-		t.Error("Decoding LeaderId failed, found:", response.LeaderId)
+	if response.LeaderID != "foo" {
+		t.Error("Decoding LeaderId failed, found:", response.LeaderID)
 	}
-	if response.MemberId != "foo" {
-		t.Error("Decoding MemberId failed, found:", response.MemberId)
+	if response.MemberID != "foo" {
+		t.Error("Decoding MemberId failed, found:", response.MemberID)
 	}
 	if len(response.Members) != 1 {
 		t.Error("Decoding Members failed, found:", response.Members)
@@ -122,17 +122,17 @@ func TestJoinGroupResponseV1(t *testing.T) {
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
-	if response.GenerationId != 66051 {
-		t.Error("Decoding GenerationId failed, found:", response.GenerationId)
+	if response.GenerationID != 66051 {
+		t.Error("Decoding GenerationId failed, found:", response.GenerationID)
 	}
 	if response.GroupProtocol != "protocol" {
 		t.Error("Decoding GroupProtocol failed, found:", response.GroupProtocol)
 	}
-	if response.LeaderId != "foo" {
-		t.Error("Decoding LeaderId failed, found:", response.LeaderId)
+	if response.LeaderID != "foo" {
+		t.Error("Decoding LeaderId failed, found:", response.LeaderID)
 	}
-	if response.MemberId != "bar" {
-		t.Error("Decoding MemberId failed, found:", response.MemberId)
+	if response.MemberID != "bar" {
+		t.Error("Decoding MemberId failed, found:", response.MemberID)
 	}
 	if response.Version != 1 {
 		t.Error("Decoding Version failed, found:", response.Version)
@@ -151,17 +151,17 @@ func TestJoinGroupResponseV2(t *testing.T) {
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
-	if response.GenerationId != 66051 {
-		t.Error("Decoding GenerationId failed, found:", response.GenerationId)
+	if response.GenerationID != 66051 {
+		t.Error("Decoding GenerationId failed, found:", response.GenerationID)
 	}
 	if response.GroupProtocol != "protocol" {
 		t.Error("Decoding GroupProtocol failed, found:", response.GroupProtocol)
 	}
-	if response.LeaderId != "foo" {
-		t.Error("Decoding LeaderId failed, found:", response.LeaderId)
+	if response.LeaderID != "foo" {
+		t.Error("Decoding LeaderId failed, found:", response.LeaderID)
 	}
-	if response.MemberId != "bar" {
-		t.Error("Decoding MemberId failed, found:", response.MemberId)
+	if response.MemberID != "bar" {
+		t.Error("Decoding MemberId failed, found:", response.MemberID)
 	}
 	if response.Version != 2 {
 		t.Error("Decoding Version failed, found:", response.Version)

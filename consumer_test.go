@@ -265,7 +265,7 @@ func TestConsumerLeaderRefreshError(t *testing.T) {
 }
 
 func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
-	var calls int32 = 0
+	var calls int32
 
 	config := NewConfig()
 	config.Net.ReadTimeout = 100 * time.Millisecond

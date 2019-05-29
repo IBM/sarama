@@ -666,7 +666,7 @@ func TestDescribeConsumerGroup(t *testing.T) {
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"DescribeGroupsRequest": NewMockDescribeGroupsResponse(t).AddGroupDescription(expectedGroupID, &GroupDescription{
-			GroupId: expectedGroupID,
+			GroupID: expectedGroupID,
 		}),
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(seedBroker.BrokerID()).
@@ -691,8 +691,8 @@ func TestDescribeConsumerGroup(t *testing.T) {
 		t.Fatalf("Expected 1 result, got %v", len(result))
 	}
 
-	if result[0].GroupId != expectedGroupID {
-		t.Fatalf("Expected groupID %v, got %v", expectedGroupID, result[0].GroupId)
+	if result[0].GroupID != expectedGroupID {
+		t.Fatalf("Expected groupID %v, got %v", expectedGroupID, result[0].GroupID)
 	}
 
 	err = admin.Close()

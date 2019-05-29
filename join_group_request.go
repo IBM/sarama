@@ -26,24 +26,24 @@ func (p *GroupProtocol) encode(pe packetEncoder) (err error) {
 
 type JoinGroupRequest struct {
 	Version               int16
-	GroupId               string
+	GroupID               string
 	SessionTimeout        int32
 	RebalanceTimeout      int32
-	MemberId              string
+	MemberID              string
 	ProtocolType          string
 	GroupProtocols        map[string][]byte // deprecated; use OrderedGroupProtocols
 	OrderedGroupProtocols []*GroupProtocol
 }
 
 func (r *JoinGroupRequest) encode(pe packetEncoder) error {
-	if err := pe.putString(r.GroupId); err != nil {
+	if err := pe.putString(r.GroupID); err != nil {
 		return err
 	}
 	pe.putInt32(r.SessionTimeout)
 	if r.Version >= 1 {
 		pe.putInt32(r.RebalanceTimeout)
 	}
-	if err := pe.putString(r.MemberId); err != nil {
+	if err := pe.putString(r.MemberID); err != nil {
 		return err
 	}
 	if err := pe.putString(r.ProtocolType); err != nil {
@@ -83,7 +83,7 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 
-	if r.GroupId, err = pd.getString(); err != nil {
+	if r.GroupID, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -97,7 +97,7 @@ func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	if r.MemberId, err = pd.getString(); err != nil {
+	if r.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 

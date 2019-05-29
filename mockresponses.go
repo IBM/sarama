@@ -121,7 +121,7 @@ func (m *MockDescribeGroupsResponse) For(reqBody versionedDecoder) encoder {
 			// Mimic real kafka - if a group doesn't exist, return
 			// an entry with state "Dead"
 			response.Groups = append(response.Groups, &GroupDescription{
-				GroupId: requestedGroup,
+				GroupID: requestedGroup,
 				State:   "Dead",
 			})
 		}
