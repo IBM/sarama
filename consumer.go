@@ -561,6 +561,14 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 		consumerBatchSizeMetric = getOrRegisterHistogram("consumer-batch-size", metricRegistry)
 	}
 
+	// If request was throttled and empty we log and return without error
+	if response.ThrottleTime != time.Duration(0) && len(response.Blocks) == 0 {
+		Logger.Printf(
+			"consumer/broker/%d FetchResponse throttled %v\n",
+			child.broker.broker.ID(), response.ThrottleTime)
+		return nil, nil
+	}
+
 	block := response.GetBlock(child.topic, child.partition)
 	if block == nil {
 		return nil, ErrIncompleteResponse
