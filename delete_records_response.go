@@ -12,6 +12,7 @@ import (
 // where partition is:
 //  id(int32) low_watermark(int64) error_code(int16)
 
+//DeleteRecordsResponse is a delete records response type
 type DeleteRecordsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
@@ -84,36 +85,37 @@ func (d *DeleteRecordsResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+//DeleteRecordsResponseTopic is a delete records response for a topic
 type DeleteRecordsResponseTopic struct {
 	Partitions map[int32]*DeleteRecordsResponsePartition
 }
 
-func (t *DeleteRecordsResponseTopic) encode(pe packetEncoder) error {
-	if err := pe.putArrayLength(len(t.Partitions)); err != nil {
+func (d *DeleteRecordsResponseTopic) encode(pe packetEncoder) error {
+	if err := pe.putArrayLength(len(d.Partitions)); err != nil {
 		return err
 	}
-	keys := make([]int32, 0, len(t.Partitions))
-	for partition := range t.Partitions {
+	keys := make([]int32, 0, len(d.Partitions))
+	for partition := range d.Partitions {
 		keys = append(keys, partition)
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	for _, partition := range keys {
 		pe.putInt32(partition)
-		if err := t.Partitions[partition].encode(pe); err != nil {
+		if err := d.Partitions[partition].encode(pe); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (t *DeleteRecordsResponseTopic) decode(pd packetDecoder, version int16) error {
+func (d *DeleteRecordsResponseTopic) decode(pd packetDecoder, version int16) error {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
 	if n > 0 {
-		t.Partitions = make(map[int32]*DeleteRecordsResponsePartition, n)
+		d.Partitions = make(map[int32]*DeleteRecordsResponsePartition, n)
 		for i := 0; i < n; i++ {
 			partition, err := pd.getInt32()
 			if err != nil {
@@ -123,36 +125,37 @@ func (t *DeleteRecordsResponseTopic) decode(pd packetDecoder, version int16) err
 			if err = details.decode(pd, version); err != nil {
 				return err
 			}
-			t.Partitions[partition] = details
+			d.Partitions[partition] = details
 		}
 	}
 
 	return nil
 }
 
+//DeleteRecordsResponsePartition is a delete records response for partition
 type DeleteRecordsResponsePartition struct {
 	LowWatermark int64
 	Err          KError
 }
 
-func (t *DeleteRecordsResponsePartition) encode(pe packetEncoder) error {
-	pe.putInt64(t.LowWatermark)
-	pe.putInt16(int16(t.Err))
+func (d *DeleteRecordsResponsePartition) encode(pe packetEncoder) error {
+	pe.putInt64(d.LowWatermark)
+	pe.putInt16(int16(d.Err))
 	return nil
 }
 
-func (t *DeleteRecordsResponsePartition) decode(pd packetDecoder, version int16) error {
+func (d *DeleteRecordsResponsePartition) decode(pd packetDecoder, version int16) error {
 	lowWatermark, err := pd.getInt64()
 	if err != nil {
 		return err
 	}
-	t.LowWatermark = lowWatermark
+	d.LowWatermark = lowWatermark
 
 	kErr, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
-	t.Err = KError(kErr)
+	d.Err = KError(kErr)
 
 	return nil
 }

@@ -1,23 +1,25 @@
 package sarama
 
+//DescribeConfigsRequest is used to describe a config request
 type DescribeConfigsRequest struct {
 	Version         int16
 	Resources       []*ConfigResource
 	IncludeSynonyms bool
 }
 
+//ConfigResource is a config resource type
 type ConfigResource struct {
 	Type        ConfigResourceType
 	Name        string
 	ConfigNames []string
 }
 
-func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
-	if err := pe.putArrayLength(len(r.Resources)); err != nil {
+func (d *DescribeConfigsRequest) encode(pe packetEncoder) error {
+	if err := pe.putArrayLength(len(d.Resources)); err != nil {
 		return err
 	}
 
-	for _, c := range r.Resources {
+	for _, c := range d.Resources {
 		pe.putInt8(int8(c.Type))
 		if err := pe.putString(c.Name); err != nil {
 			return err
@@ -32,33 +34,33 @@ func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
 		}
 	}
 
-	if r.Version >= 1 {
-		pe.putBool(r.IncludeSynonyms)
+	if d.Version >= 1 {
+		pe.putBool(d.IncludeSynonyms)
 	}
 
 	return nil
 }
 
-func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err error) {
+func (d *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err error) {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	r.Resources = make([]*ConfigResource, n)
+	d.Resources = make([]*ConfigResource, n)
 
 	for i := 0; i < n; i++ {
-		r.Resources[i] = &ConfigResource{}
+		d.Resources[i] = &ConfigResource{}
 		t, err := pd.getInt8()
 		if err != nil {
 			return err
 		}
-		r.Resources[i].Type = ConfigResourceType(t)
+		d.Resources[i].Type = ConfigResourceType(t)
 		name, err := pd.getString()
 		if err != nil {
 			return err
 		}
-		r.Resources[i].Name = name
+		d.Resources[i].Name = name
 
 		confLength, err := pd.getArrayLength()
 
@@ -78,30 +80,30 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 			}
 			cfnames[i] = s
 		}
-		r.Resources[i].ConfigNames = cfnames
+		d.Resources[i].ConfigNames = cfnames
 	}
-	r.Version = version
-	if r.Version >= 1 {
+	d.Version = version
+	if d.Version >= 1 {
 		b, err := pd.getBool()
 		if err != nil {
 			return err
 		}
-		r.IncludeSynonyms = b
+		d.IncludeSynonyms = b
 	}
 
 	return nil
 }
 
-func (r *DescribeConfigsRequest) key() int16 {
+func (d *DescribeConfigsRequest) key() int16 {
 	return 32
 }
 
-func (r *DescribeConfigsRequest) version() int16 {
-	return r.Version
+func (d *DescribeConfigsRequest) version() int16 {
+	return d.Version
 }
 
-func (r *DescribeConfigsRequest) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (d *DescribeConfigsRequest) requiredVersion() KafkaVersion {
+	switch d.Version {
 	case 1:
 		return V1_1_0_0
 	case 2:

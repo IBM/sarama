@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+//TxnOffsetCommitResponse is a txn offset commit response type
 type TxnOffsetCommitResponse struct {
 	ThrottleTime time.Duration
 	Topics       map[string][]*PartitionError
@@ -70,14 +71,14 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 	return nil
 }
 
-func (a *TxnOffsetCommitResponse) key() int16 {
+func (t *TxnOffsetCommitResponse) key() int16 {
 	return 28
 }
 
-func (a *TxnOffsetCommitResponse) version() int16 {
+func (t *TxnOffsetCommitResponse) version() int16 {
 	return 0
 }
 
-func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
+func (t *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }

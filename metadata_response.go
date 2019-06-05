@@ -1,5 +1,6 @@
 package sarama
 
+//PartitionMetadata is for partition metadata
 type PartitionMetadata struct {
 	Err             KError
 	ID              int32
@@ -9,35 +10,35 @@ type PartitionMetadata struct {
 	OfflineReplicas []int32
 }
 
-func (pm *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) {
+func (p *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) {
 	tmp, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
-	pm.Err = KError(tmp)
+	p.Err = KError(tmp)
 
-	pm.ID, err = pd.getInt32()
+	p.ID, err = pd.getInt32()
 	if err != nil {
 		return err
 	}
 
-	pm.Leader, err = pd.getInt32()
+	p.Leader, err = pd.getInt32()
 	if err != nil {
 		return err
 	}
 
-	pm.Replicas, err = pd.getInt32Array()
+	p.Replicas, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
 
-	pm.Isr, err = pd.getInt32Array()
+	p.Isr, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
 
 	if version >= 5 {
-		pm.OfflineReplicas, err = pd.getInt32Array()
+		p.OfflineReplicas, err = pd.getInt32Array()
 		if err != nil {
 			return err
 		}
@@ -46,23 +47,23 @@ func (pm *PartitionMetadata) decode(pd packetDecoder, version int16) (err error)
 	return nil
 }
 
-func (pm *PartitionMetadata) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt16(int16(pm.Err))
-	pe.putInt32(pm.ID)
-	pe.putInt32(pm.Leader)
+func (p *PartitionMetadata) encode(pe packetEncoder, version int16) (err error) {
+	pe.putInt16(int16(p.Err))
+	pe.putInt32(p.ID)
+	pe.putInt32(p.Leader)
 
-	err = pe.putInt32Array(pm.Replicas)
+	err = pe.putInt32Array(p.Replicas)
 	if err != nil {
 		return err
 	}
 
-	err = pe.putInt32Array(pm.Isr)
+	err = pe.putInt32Array(p.Isr)
 	if err != nil {
 		return err
 	}
 
 	if version >= 5 {
-		err = pe.putInt32Array(pm.OfflineReplicas)
+		err = pe.putInt32Array(p.OfflineReplicas)
 		if err != nil {
 			return err
 		}
@@ -71,6 +72,7 @@ func (pm *PartitionMetadata) encode(pe packetEncoder, version int16) (err error)
 	return nil
 }
 
+//TopicMetadata is a topic metadata type
 type TopicMetadata struct {
 	Err        KError
 	Name       string
@@ -78,20 +80,20 @@ type TopicMetadata struct {
 	Partitions []*PartitionMetadata
 }
 
-func (tm *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
+func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	tmp, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
-	tm.Err = KError(tmp)
+	t.Err = KError(tmp)
 
-	tm.Name, err = pd.getString()
+	t.Name, err = pd.getString()
 	if err != nil {
 		return err
 	}
 
 	if version >= 1 {
-		tm.IsInternal, err = pd.getBool()
+		t.IsInternal, err = pd.getBool()
 		if err != nil {
 			return err
 		}
@@ -101,10 +103,10 @@ func (tm *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	tm.Partitions = make([]*PartitionMetadata, n)
+	t.Partitions = make([]*PartitionMetadata, n)
 	for i := 0; i < n; i++ {
-		tm.Partitions[i] = new(PartitionMetadata)
-		err = tm.Partitions[i].decode(pd, version)
+		t.Partitions[i] = new(PartitionMetadata)
+		err = t.Partitions[i].decode(pd, version)
 		if err != nil {
 			return err
 		}
@@ -113,24 +115,24 @@ func (tm *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-func (tm *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt16(int16(tm.Err))
+func (t *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
+	pe.putInt16(int16(t.Err))
 
-	err = pe.putString(tm.Name)
+	err = pe.putString(t.Name)
 	if err != nil {
 		return err
 	}
 
 	if version >= 1 {
-		pe.putBool(tm.IsInternal)
+		pe.putBool(t.IsInternal)
 	}
 
-	err = pe.putArrayLength(len(tm.Partitions))
+	err = pe.putArrayLength(len(t.Partitions))
 	if err != nil {
 		return err
 	}
 
-	for _, pm := range tm.Partitions {
+	for _, pm := range t.Partitions {
 		err = pm.encode(pe, version)
 		if err != nil {
 			return err
@@ -140,6 +142,7 @@ func (tm *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
 	return nil
 }
 
+//MetadataResponse is response for metadata request
 type MetadataResponse struct {
 	Version        int16
 	ThrottleTimeMs int32
@@ -149,11 +152,11 @@ type MetadataResponse struct {
 	Topics         []*TopicMetadata
 }
 
-func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (m *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
+	m.Version = version
 
 	if version >= 3 {
-		r.ThrottleTimeMs, err = pd.getInt32()
+		m.ThrottleTimeMs, err = pd.getInt32()
 		if err != nil {
 			return err
 		}
@@ -164,29 +167,29 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	r.Brokers = make([]*Broker, n)
+	m.Brokers = make([]*Broker, n)
 	for i := 0; i < n; i++ {
-		r.Brokers[i] = new(Broker)
-		err = r.Brokers[i].decode(pd, version)
+		m.Brokers[i] = new(Broker)
+		err = m.Brokers[i].decode(pd, version)
 		if err != nil {
 			return err
 		}
 	}
 
 	if version >= 2 {
-		r.ClusterID, err = pd.getNullableString()
+		m.ClusterID, err = pd.getNullableString()
 		if err != nil {
 			return err
 		}
 	}
 
 	if version >= 1 {
-		r.ControllerID, err = pd.getInt32()
+		m.ControllerID, err = pd.getInt32()
 		if err != nil {
 			return err
 		}
 	} else {
-		r.ControllerID = -1
+		m.ControllerID = -1
 	}
 
 	n, err = pd.getArrayLength()
@@ -194,10 +197,10 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	r.Topics = make([]*TopicMetadata, n)
+	m.Topics = make([]*TopicMetadata, n)
 	for i := 0; i < n; i++ {
-		r.Topics[i] = new(TopicMetadata)
-		err = r.Topics[i].decode(pd, version)
+		m.Topics[i] = new(TopicMetadata)
+		err = m.Topics[i].decode(pd, version)
 		if err != nil {
 			return err
 		}
@@ -206,39 +209,39 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-func (r *MetadataResponse) encode(pe packetEncoder) error {
-	if r.Version >= 3 {
-		pe.putInt32(r.ThrottleTimeMs)
+func (m *MetadataResponse) encode(pe packetEncoder) error {
+	if m.Version >= 3 {
+		pe.putInt32(m.ThrottleTimeMs)
 	}
 
-	err := pe.putArrayLength(len(r.Brokers))
+	err := pe.putArrayLength(len(m.Brokers))
 	if err != nil {
 		return err
 	}
-	for _, broker := range r.Brokers {
-		err = broker.encode(pe, r.Version)
+	for _, broker := range m.Brokers {
+		err = broker.encode(pe, m.Version)
 		if err != nil {
 			return err
 		}
 	}
 
-	if r.Version >= 2 {
-		err := pe.putNullableString(r.ClusterID)
+	if m.Version >= 2 {
+		err := pe.putNullableString(m.ClusterID)
 		if err != nil {
 			return err
 		}
 	}
 
-	if r.Version >= 1 {
-		pe.putInt32(r.ControllerID)
+	if m.Version >= 1 {
+		pe.putInt32(m.ControllerID)
 	}
 
-	err = pe.putArrayLength(len(r.Topics))
+	err = pe.putArrayLength(len(m.Topics))
 	if err != nil {
 		return err
 	}
-	for _, tm := range r.Topics {
-		err = tm.encode(pe, r.Version)
+	for _, tm := range m.Topics {
+		err = tm.encode(pe, m.Version)
 		if err != nil {
 			return err
 		}
@@ -247,16 +250,16 @@ func (r *MetadataResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *MetadataResponse) key() int16 {
+func (m *MetadataResponse) key() int16 {
 	return 3
 }
 
-func (r *MetadataResponse) version() int16 {
-	return r.Version
+func (m *MetadataResponse) version() int16 {
+	return m.Version
 }
 
-func (r *MetadataResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (m *MetadataResponse) requiredVersion() KafkaVersion {
+	switch m.Version {
 	case 1:
 		return V0_10_0_0
 	case 2:
@@ -272,14 +275,16 @@ func (r *MetadataResponse) requiredVersion() KafkaVersion {
 
 // testing API
 
-func (r *MetadataResponse) AddBroker(addr string, id int32) {
-	r.Brokers = append(r.Brokers, &Broker{id: id, addr: addr})
+//AddBroker is used to add broker to metadata response
+func (m *MetadataResponse) AddBroker(addr string, id int32) {
+	m.Brokers = append(m.Brokers, &Broker{id: id, addr: addr})
 }
 
-func (r *MetadataResponse) AddTopic(topic string, err KError) *TopicMetadata {
+//AddTopic is used to add topic to metadata response
+func (m *MetadataResponse) AddTopic(topic string, err KError) *TopicMetadata {
 	var tmatch *TopicMetadata
 
-	for _, tm := range r.Topics {
+	for _, tm := range m.Topics {
 		if tm.Name == topic {
 			tmatch = tm
 			goto foundTopic
@@ -288,7 +293,7 @@ func (r *MetadataResponse) AddTopic(topic string, err KError) *TopicMetadata {
 
 	tmatch = new(TopicMetadata)
 	tmatch.Name = topic
-	r.Topics = append(r.Topics, tmatch)
+	m.Topics = append(m.Topics, tmatch)
 
 foundTopic:
 
@@ -296,8 +301,9 @@ foundTopic:
 	return tmatch
 }
 
-func (r *MetadataResponse) AddTopicPartition(topic string, partition, brokerID int32, replicas, isr []int32, offline []int32, err KError) {
-	tmatch := r.AddTopic(topic, ErrNoError)
+//AddTopicPartition is used to add topic partition to a metadata response
+func (m *MetadataResponse) AddTopicPartition(topic string, partition, brokerID int32, replicas, isr []int32, offline []int32, err KError) {
+	tmatch := m.AddTopic(topic, ErrNoError)
 	var pmatch *PartitionMetadata
 
 	for _, pm := range tmatch.Partitions {

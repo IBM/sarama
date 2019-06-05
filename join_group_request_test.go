@@ -3,7 +3,7 @@ package sarama
 import "testing"
 
 var (
-	joinGroupRequestV0_NoProtocols = []byte{
+	joinGroupRequestV0NoProtocols = []byte{
 		0, 9, 'T', 'e', 's', 't', 'G', 'r', 'o', 'u', 'p', // Group ID
 		0, 0, 0, 100, // Session timeout
 		0, 0, // Member ID
@@ -11,7 +11,7 @@ var (
 		0, 0, 0, 0, // 0 protocol groups
 	}
 
-	joinGroupRequestV0_OneProtocol = []byte{
+	joinGroupRequestV0OneProtocol = []byte{
 		0, 9, 'T', 'e', 's', 't', 'G', 'r', 'o', 'u', 'p', // Group ID
 		0, 0, 0, 100, // Session timeout
 		0, 11, 'O', 'n', 'e', 'P', 'r', 'o', 't', 'o', 'c', 'o', 'l', // Member ID
@@ -38,7 +38,7 @@ func TestJoinGroupRequest(t *testing.T) {
 	request.GroupID = "TestGroup"
 	request.SessionTimeout = 100
 	request.ProtocolType = "consumer"
-	testRequest(t, "V0: no protocols", request, joinGroupRequestV0_NoProtocols)
+	testRequest(t, "V0: no protocols", request, joinGroupRequestV0NoProtocols)
 }
 
 func TestJoinGroupRequestV0_OneProtocol(t *testing.T) {
@@ -48,7 +48,7 @@ func TestJoinGroupRequestV0_OneProtocol(t *testing.T) {
 	request.MemberID = "OneProtocol"
 	request.ProtocolType = "consumer"
 	request.AddGroupProtocol("one", []byte{0x01, 0x02, 0x03})
-	packet := testRequestEncode(t, "V0: one protocol", request, joinGroupRequestV0_OneProtocol)
+	packet := testRequestEncode(t, "V0: one protocol", request, joinGroupRequestV0OneProtocol)
 	request.GroupProtocols = make(map[string][]byte)
 	request.GroupProtocols["one"] = []byte{0x01, 0x02, 0x03}
 	testRequestDecode(t, "V0: one protocol", request, packet)
@@ -62,7 +62,7 @@ func TestJoinGroupRequestDeprecatedEncode(t *testing.T) {
 	request.ProtocolType = "consumer"
 	request.GroupProtocols = make(map[string][]byte)
 	request.GroupProtocols["one"] = []byte{0x01, 0x02, 0x03}
-	packet := testRequestEncode(t, "V0: one protocol", request, joinGroupRequestV0_OneProtocol)
+	packet := testRequestEncode(t, "V0: one protocol", request, joinGroupRequestV0OneProtocol)
 	request.AddGroupProtocol("one", []byte{0x01, 0x02, 0x03})
 	testRequestDecode(t, "V0: one protocol", request, packet)
 }

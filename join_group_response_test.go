@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	joinGroupResponseV0_NoError = []byte{
+	joinGroupResponseV0NoError = []byte{
 		0x00, 0x00, // No error
 		0x00, 0x01, 0x02, 0x03, // Generation ID
 		0, 8, 'p', 'r', 'o', 't', 'o', 'c', 'o', 'l', // Protocol name chosen
@@ -15,7 +15,7 @@ var (
 		0, 0, 0, 0, // No member info
 	}
 
-	joinGroupResponseV0_WithError = []byte{
+	joinGroupResponseV0WithError = []byte{
 		0, 23, // Error: inconsistent group protocol
 		0x00, 0x00, 0x00, 0x00, // Generation ID
 		0, 0, // Protocol name chosen
@@ -24,7 +24,7 @@ var (
 		0, 0, 0, 0, // No member info
 	}
 
-	joinGroupResponseV0_Leader = []byte{
+	joinGroupResponseV0Leader = []byte{
 		0x00, 0x00, // No error
 		0x00, 0x01, 0x02, 0x03, // Generation ID
 		0, 8, 'p', 'r', 'o', 't', 'o', 'c', 'o', 'l', // Protocol name chosen
@@ -59,7 +59,7 @@ func TestJoinGroupResponseV0(t *testing.T) {
 	var response *JoinGroupResponse
 
 	response = new(JoinGroupResponse)
-	testVersionDecodable(t, "no error", response, joinGroupResponseV0_NoError, 0)
+	testVersionDecodable(t, "no error", response, joinGroupResponseV0NoError, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
@@ -77,7 +77,7 @@ func TestJoinGroupResponseV0(t *testing.T) {
 	}
 
 	response = new(JoinGroupResponse)
-	testVersionDecodable(t, "with error", response, joinGroupResponseV0_WithError, 0)
+	testVersionDecodable(t, "with error", response, joinGroupResponseV0WithError, 0)
 	if response.Err != ErrInconsistentGroupProtocol {
 		t.Error("Decoding Err failed: ErrInconsistentGroupProtocol expected but found", response.Err)
 	}
@@ -95,7 +95,7 @@ func TestJoinGroupResponseV0(t *testing.T) {
 	}
 
 	response = new(JoinGroupResponse)
-	testVersionDecodable(t, "with error", response, joinGroupResponseV0_Leader, 0)
+	testVersionDecodable(t, "with error", response, joinGroupResponseV0Leader, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding Err failed: ErrNoError expected but found", response.Err)
 	}

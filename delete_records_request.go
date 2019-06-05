@@ -12,6 +12,7 @@ import (
 // where partition is:
 //  id(int32) offset(int64)
 
+//DeleteRecordsRequest is used to create a delete records request
 type DeleteRecordsRequest struct {
 	Topics  map[string]*DeleteRecordsRequestTopic
 	Timeout time.Duration
@@ -81,34 +82,35 @@ func (d *DeleteRecordsRequest) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+//DeleteRecordsRequestTopic keeps partition offset for delete record request
 type DeleteRecordsRequestTopic struct {
 	PartitionOffsets map[int32]int64 // partition => offset
 }
 
-func (t *DeleteRecordsRequestTopic) encode(pe packetEncoder) error {
-	if err := pe.putArrayLength(len(t.PartitionOffsets)); err != nil {
+func (d *DeleteRecordsRequestTopic) encode(pe packetEncoder) error {
+	if err := pe.putArrayLength(len(d.PartitionOffsets)); err != nil {
 		return err
 	}
-	keys := make([]int32, 0, len(t.PartitionOffsets))
-	for partition := range t.PartitionOffsets {
+	keys := make([]int32, 0, len(d.PartitionOffsets))
+	for partition := range d.PartitionOffsets {
 		keys = append(keys, partition)
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	for _, partition := range keys {
 		pe.putInt32(partition)
-		pe.putInt64(t.PartitionOffsets[partition])
+		pe.putInt64(d.PartitionOffsets[partition])
 	}
 	return nil
 }
 
-func (t *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) error {
+func (d *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) error {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
 	if n > 0 {
-		t.PartitionOffsets = make(map[int32]int64, n)
+		d.PartitionOffsets = make(map[int32]int64, n)
 		for i := 0; i < n; i++ {
 			partition, err := pd.getInt32()
 			if err != nil {
@@ -118,7 +120,7 @@ func (t *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) erro
 			if err != nil {
 				return err
 			}
-			t.PartitionOffsets[partition] = offset
+			d.PartitionOffsets[partition] = offset
 		}
 	}
 

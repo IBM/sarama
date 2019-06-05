@@ -18,7 +18,8 @@ const (
 	expectationTimeout = 500 * time.Millisecond
 )
 
-type GSSApiHandlerFunc func([]byte) []byte
+//GSSAPIHandlerFunc ...
+type GSSAPIHandlerFunc func([]byte) []byte
 
 type requestHandlerFunc func(req *request) (res encoder)
 
@@ -63,7 +64,7 @@ type MockBroker struct {
 	notifier      RequestNotifierFunc
 	history       []RequestResponse
 	lock          sync.Mutex
-	gssApiHandler GSSApiHandlerFunc
+	gssAPIHandler GSSAPIHandlerFunc
 }
 
 // RequestResponse represents a Request/Response pair processed by MockBroker.
@@ -176,8 +177,9 @@ func (b *MockBroker) serverLoop() {
 	Logger.Printf("*** mockbroker/%d: listener closed, err=%v", b.BrokerID(), err)
 }
 
-func (b *MockBroker) SetGSSAPIHandler(handler GSSApiHandlerFunc) {
-	b.gssApiHandler = handler
+//SetGSSAPIHandler sets GSSAPI handler
+func (b *MockBroker) SetGSSAPIHandler(handler GSSAPIHandlerFunc) {
+	b.gssAPIHandler = handler
 }
 
 func (b *MockBroker) readToBytes(r io.Reader) ([]byte, error) {
@@ -299,7 +301,7 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 			// GSSAPI is not part of kafka protocol, but is supported for authentication proposes.
 			// Don't support history for this kind of request as is only used for test GSSAPI authentication mechanism
 			b.lock.Lock()
-			res := b.gssApiHandler(buffer)
+			res := b.gssAPIHandler(buffer)
 			b.lock.Unlock()
 			if res == nil {
 				Logger.Printf("*** mockbroker/%d/%d: ignored %v", b.brokerID, idx, spew.Sdump(buffer))
@@ -398,6 +400,7 @@ func NewMockBrokerListener(t TestReporter, brokerID int32, listener net.Listener
 	return broker
 }
 
+//Returns ...
 func (b *MockBroker) Returns(e encoder) {
 	b.expectations <- e
 }

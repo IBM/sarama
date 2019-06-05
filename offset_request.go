@@ -1,31 +1,33 @@
 package sarama
 
+//offsetRequestBlock is an offset request block type
 type offsetRequestBlock struct {
 	time       int64
 	maxOffsets int32 // Only used in version 0
 }
 
-func (b *offsetRequestBlock) encode(pe packetEncoder, version int16) error {
-	pe.putInt64(int64(b.time))
+func (o *offsetRequestBlock) encode(pe packetEncoder, version int16) error {
+	pe.putInt64(int64(o.time))
 	if version == 0 {
-		pe.putInt32(b.maxOffsets)
+		pe.putInt32(o.maxOffsets)
 	}
 
 	return nil
 }
 
-func (b *offsetRequestBlock) decode(pd packetDecoder, version int16) (err error) {
-	if b.time, err = pd.getInt64(); err != nil {
+func (o *offsetRequestBlock) decode(pd packetDecoder, version int16) (err error) {
+	if o.time, err = pd.getInt64(); err != nil {
 		return err
 	}
 	if version == 0 {
-		if b.maxOffsets, err = pd.getInt32(); err != nil {
+		if o.maxOffsets, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+//OffsetRequest is an offset request type
 type OffsetRequest struct {
 	Version        int16
 	replicaID      int32
@@ -33,19 +35,19 @@ type OffsetRequest struct {
 	blocks         map[string]map[int32]*offsetRequestBlock
 }
 
-func (r *OffsetRequest) encode(pe packetEncoder) error {
-	if r.isReplicaIDSet {
-		pe.putInt32(r.replicaID)
+func (o *OffsetRequest) encode(pe packetEncoder) error {
+	if o.isReplicaIDSet {
+		pe.putInt32(o.replicaID)
 	} else {
 		// default replica ID is always -1 for clients
 		pe.putInt32(-1)
 	}
 
-	err := pe.putArrayLength(len(r.blocks))
+	err := pe.putArrayLength(len(o.blocks))
 	if err != nil {
 		return err
 	}
-	for topic, partitions := range r.blocks {
+	for topic, partitions := range o.blocks {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -56,7 +58,7 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			if err = block.encode(pe, r.Version); err != nil {
+			if err = block.encode(pe, o.Version); err != nil {
 				return err
 			}
 		}
@@ -64,15 +66,15 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
-	r.Version = version
+func (o *OffsetRequest) decode(pd packetDecoder, version int16) error {
+	o.Version = version
 
 	replicaID, err := pd.getInt32()
 	if err != nil {
 		return err
 	}
 	if replicaID >= 0 {
-		r.SetReplicaID(replicaID)
+		o.SetReplicaID(replicaID)
 	}
 
 	blockCount, err := pd.getArrayLength()
@@ -82,7 +84,7 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 	if blockCount == 0 {
 		return nil
 	}
-	r.blocks = make(map[string]map[int32]*offsetRequestBlock)
+	o.blocks = make(map[string]map[int32]*offsetRequestBlock)
 	for i := 0; i < blockCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -92,7 +94,7 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 		if err != nil {
 			return err
 		}
-		r.blocks[topic] = make(map[int32]*offsetRequestBlock)
+		o.blocks[topic] = make(map[int32]*offsetRequestBlock)
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
 			if err != nil {
@@ -102,22 +104,22 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 			if err := block.decode(pd, version); err != nil {
 				return err
 			}
-			r.blocks[topic][partition] = block
+			o.blocks[topic][partition] = block
 		}
 	}
 	return nil
 }
 
-func (r *OffsetRequest) key() int16 {
+func (o *OffsetRequest) key() int16 {
 	return 2
 }
 
-func (r *OffsetRequest) version() int16 {
-	return r.Version
+func (o *OffsetRequest) version() int16 {
+	return o.Version
 }
 
-func (r *OffsetRequest) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (o *OffsetRequest) requiredVersion() KafkaVersion {
+	switch o.Version {
 	case 1:
 		return V0_10_1_0
 	default:
@@ -125,32 +127,35 @@ func (r *OffsetRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *OffsetRequest) SetReplicaID(id int32) {
-	r.replicaID = id
-	r.isReplicaIDSet = true
+//SetReplicaID sets a replica id
+func (o *OffsetRequest) SetReplicaID(id int32) {
+	o.replicaID = id
+	o.isReplicaIDSet = true
 }
 
-func (r *OffsetRequest) ReplicaID() int32 {
-	if r.isReplicaIDSet {
-		return r.replicaID
+//ReplicaID returns a replica id
+func (o *OffsetRequest) ReplicaID() int32 {
+	if o.isReplicaIDSet {
+		return o.replicaID
 	}
 	return -1
 }
 
-func (r *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {
-	if r.blocks == nil {
-		r.blocks = make(map[string]map[int32]*offsetRequestBlock)
+//AddBlock is used to add block to an offset request
+func (o *OffsetRequest) AddBlock(topic string, partitionID int32, time int64, maxOffsets int32) {
+	if o.blocks == nil {
+		o.blocks = make(map[string]map[int32]*offsetRequestBlock)
 	}
 
-	if r.blocks[topic] == nil {
-		r.blocks[topic] = make(map[int32]*offsetRequestBlock)
+	if o.blocks[topic] == nil {
+		o.blocks[topic] = make(map[int32]*offsetRequestBlock)
 	}
 
 	tmp := new(offsetRequestBlock)
 	tmp.time = time
-	if r.Version == 0 {
+	if o.Version == 0 {
 		tmp.maxOffsets = maxOffsets
 	}
 
-	r.blocks[topic][partitionID] = tmp
+	o.blocks[topic][partitionID] = tmp
 }

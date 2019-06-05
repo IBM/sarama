@@ -1,5 +1,6 @@
 package sarama
 
+//SyncGroupRequest is a sync group request
 type SyncGroupRequest struct {
 	GroupID          string
 	GenerationID     int32
@@ -7,21 +8,21 @@ type SyncGroupRequest struct {
 	GroupAssignments map[string][]byte
 }
 
-func (r *SyncGroupRequest) encode(pe packetEncoder) error {
-	if err := pe.putString(r.GroupID); err != nil {
+func (s *SyncGroupRequest) encode(pe packetEncoder) error {
+	if err := pe.putString(s.GroupID); err != nil {
 		return err
 	}
 
-	pe.putInt32(r.GenerationID)
+	pe.putInt32(s.GenerationID)
 
-	if err := pe.putString(r.MemberID); err != nil {
+	if err := pe.putString(s.MemberID); err != nil {
 		return err
 	}
 
-	if err := pe.putArrayLength(len(r.GroupAssignments)); err != nil {
+	if err := pe.putArrayLength(len(s.GroupAssignments)); err != nil {
 		return err
 	}
-	for memberID, memberAssignment := range r.GroupAssignments {
+	for memberID, memberAssignment := range s.GroupAssignments {
 		if err := pe.putString(memberID); err != nil {
 			return err
 		}
@@ -33,14 +34,14 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
-	if r.GroupID, err = pd.getString(); err != nil {
+func (s *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
+	if s.GroupID, err = pd.getString(); err != nil {
 		return
 	}
-	if r.GenerationID, err = pd.getInt32(); err != nil {
+	if s.GenerationID, err = pd.getInt32(); err != nil {
 		return
 	}
-	if r.MemberID, err = pd.getString(); err != nil {
+	if s.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -52,7 +53,7 @@ func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 		return nil
 	}
 
-	r.GroupAssignments = make(map[string][]byte)
+	s.GroupAssignments = make(map[string][]byte)
 	for i := 0; i < n; i++ {
 		memberID, err := pd.getString()
 		if err != nil {
@@ -63,38 +64,40 @@ func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 
-		r.GroupAssignments[memberID] = memberAssignment
+		s.GroupAssignments[memberID] = memberAssignment
 	}
 
 	return nil
 }
 
-func (r *SyncGroupRequest) key() int16 {
+func (s *SyncGroupRequest) key() int16 {
 	return 14
 }
 
-func (r *SyncGroupRequest) version() int16 {
+func (s *SyncGroupRequest) version() int16 {
 	return 0
 }
 
-func (r *SyncGroupRequest) requiredVersion() KafkaVersion {
+func (s *SyncGroupRequest) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }
 
-func (r *SyncGroupRequest) AddGroupAssignment(memberID string, memberAssignment []byte) {
-	if r.GroupAssignments == nil {
-		r.GroupAssignments = make(map[string][]byte)
+//AddGroupAssignment adds group member assignment
+func (s *SyncGroupRequest) AddGroupAssignment(memberID string, memberAssignment []byte) {
+	if s.GroupAssignments == nil {
+		s.GroupAssignments = make(map[string][]byte)
 	}
 
-	r.GroupAssignments[memberID] = memberAssignment
+	s.GroupAssignments[memberID] = memberAssignment
 }
 
-func (r *SyncGroupRequest) AddGroupAssignmentMember(memberID string, memberAssignment *ConsumerGroupMemberAssignment) error {
+//AddGroupAssignmentMember adds group member assignment member
+func (s *SyncGroupRequest) AddGroupAssignmentMember(memberID string, memberAssignment *ConsumerGroupMemberAssignment) error {
 	bin, err := encode(memberAssignment, nil)
 	if err != nil {
 		return err
 	}
 
-	r.AddGroupAssignment(memberID, bin)
+	s.AddGroupAssignment(memberID, bin)
 	return nil
 }

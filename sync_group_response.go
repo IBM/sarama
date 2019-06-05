@@ -1,41 +1,43 @@
 package sarama
 
+//SyncGroupResponse is a sync group response
 type SyncGroupResponse struct {
 	Err              KError
 	MemberAssignment []byte
 }
 
-func (r *SyncGroupResponse) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
+//GetMemberAssignment returns consumer group memeber assignment
+func (s *SyncGroupResponse) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
 	assignment := new(ConsumerGroupMemberAssignment)
-	err := decode(r.MemberAssignment, assignment)
+	err := decode(s.MemberAssignment, assignment)
 	return assignment, err
 }
 
-func (r *SyncGroupResponse) encode(pe packetEncoder) error {
-	pe.putInt16(int16(r.Err))
-	return pe.putBytes(r.MemberAssignment)
+func (s *SyncGroupResponse) encode(pe packetEncoder) error {
+	pe.putInt16(int16(s.Err))
+	return pe.putBytes(s.MemberAssignment)
 }
 
-func (r *SyncGroupResponse) decode(pd packetDecoder, version int16) (err error) {
+func (s *SyncGroupResponse) decode(pd packetDecoder, version int16) (err error) {
 	kerr, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
 
-	r.Err = KError(kerr)
+	s.Err = KError(kerr)
 
-	r.MemberAssignment, err = pd.getBytes()
+	s.MemberAssignment, err = pd.getBytes()
 	return
 }
 
-func (r *SyncGroupResponse) key() int16 {
+func (s *SyncGroupResponse) key() int16 {
 	return 14
 }
 
-func (r *SyncGroupResponse) version() int16 {
+func (s *SyncGroupResponse) version() int16 {
 	return 0
 }
 
-func (r *SyncGroupResponse) requiredVersion() KafkaVersion {
+func (s *SyncGroupResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }

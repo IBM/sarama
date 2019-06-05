@@ -5,8 +5,10 @@ import (
 	"time"
 )
 
+//ConfigSource is used to configure source
 type ConfigSource int8
 
+//String implement stringer interface
 func (s ConfigSource) String() string {
 	switch s {
 	case SourceUnknown:
@@ -26,20 +28,28 @@ func (s ConfigSource) String() string {
 }
 
 const (
+	//SourceUnknown is unknow config source
 	SourceUnknown ConfigSource = iota
+	//SourceTopic is a topic source
 	SourceTopic
+	//SourceDynamicBroker is a dynamic broker type
 	SourceDynamicBroker
+	//SourceDynamicDefaultBroker is default broker type
 	SourceDynamicDefaultBroker
+	//SourceStaticBroker is a static broker type
 	SourceStaticBroker
+	//SourceDefault is a default source
 	SourceDefault
 )
 
+//DescribeConfigsResponse is used to describe config response
 type DescribeConfigsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
 	Resources    []*ResourceResponse
 }
 
+//ResourceResponse is a resource response type
 type ResourceResponse struct {
 	ErrorCode int16
 	ErrorMsg  string
@@ -48,6 +58,7 @@ type ResourceResponse struct {
 	Configs   []*ConfigEntry
 }
 
+//ConfigEntry is an entry in config
 type ConfigEntry struct {
 	Name      string
 	Value     string
@@ -58,20 +69,21 @@ type ConfigEntry struct {
 	Synonyms  []*ConfigSynonym
 }
 
+//ConfigSynonym is a synonym for config
 type ConfigSynonym struct {
 	ConfigName  string
 	ConfigValue string
 	Source      ConfigSource
 }
 
-func (r *DescribeConfigsResponse) encode(pe packetEncoder) (err error) {
-	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
-	if err = pe.putArrayLength(len(r.Resources)); err != nil {
+func (d *DescribeConfigsResponse) encode(pe packetEncoder) (err error) {
+	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
+	if err = pe.putArrayLength(len(d.Resources)); err != nil {
 		return err
 	}
 
-	for _, c := range r.Resources {
-		if err = c.encode(pe, r.Version); err != nil {
+	for _, c := range d.Resources {
+		if err = c.encode(pe, d.Version); err != nil {
 			return err
 		}
 	}
@@ -79,41 +91,41 @@ func (r *DescribeConfigsResponse) encode(pe packetEncoder) (err error) {
 	return nil
 }
 
-func (r *DescribeConfigsResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (d *DescribeConfigsResponse) decode(pd packetDecoder, version int16) (err error) {
+	d.Version = version
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
 	}
-	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
+	d.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	r.Resources = make([]*ResourceResponse, n)
+	d.Resources = make([]*ResourceResponse, n)
 	for i := 0; i < n; i++ {
 		rr := &ResourceResponse{}
 		if err := rr.decode(pd, version); err != nil {
 			return err
 		}
-		r.Resources[i] = rr
+		d.Resources[i] = rr
 	}
 
 	return nil
 }
 
-func (r *DescribeConfigsResponse) key() int16 {
+func (d *DescribeConfigsResponse) key() int16 {
 	return 32
 }
 
-func (r *DescribeConfigsResponse) version() int16 {
-	return r.Version
+func (d *DescribeConfigsResponse) version() int16 {
+	return d.Version
 }
 
-func (r *DescribeConfigsResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (d *DescribeConfigsResponse) requiredVersion() KafkaVersion {
+	switch d.Version {
 	case 1:
 		return V1_0_0_0
 	case 2:
@@ -189,29 +201,29 @@ func (r *ResourceResponse) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-func (r *ConfigEntry) encode(pe packetEncoder, version int16) (err error) {
-	if err = pe.putString(r.Name); err != nil {
+func (c *ConfigEntry) encode(pe packetEncoder, version int16) (err error) {
+	if err = pe.putString(c.Name); err != nil {
 		return err
 	}
 
-	if err = pe.putString(r.Value); err != nil {
+	if err = pe.putString(c.Value); err != nil {
 		return err
 	}
 
-	pe.putBool(r.ReadOnly)
+	pe.putBool(c.ReadOnly)
 
 	if version <= 0 {
-		pe.putBool(r.Default)
-		pe.putBool(r.Sensitive)
+		pe.putBool(c.Default)
+		pe.putBool(c.Sensitive)
 	} else {
-		pe.putInt8(int8(r.Source))
-		pe.putBool(r.Sensitive)
+		pe.putInt8(int8(c.Source))
+		pe.putBool(c.Sensitive)
 
-		if err := pe.putArrayLength(len(r.Synonyms)); err != nil {
+		if err := pe.putArrayLength(len(c.Synonyms)); err != nil {
 			return err
 		}
-		for _, c := range r.Synonyms {
-			if err = c.encode(pe, version); err != nil {
+		for _, s := range c.Synonyms {
+			if err = s.encode(pe, version); err != nil {
 				return err
 			}
 		}
@@ -221,61 +233,61 @@ func (r *ConfigEntry) encode(pe packetEncoder, version int16) (err error) {
 }
 
 //https://cwiki.apache.org/confluence/display/KAFKA/KIP-226+-+Dynamic+Broker+Configuration
-func (r *ConfigEntry) decode(pd packetDecoder, version int16) (err error) {
+func (c *ConfigEntry) decode(pd packetDecoder, version int16) (err error) {
 	if version == 0 {
-		r.Source = SourceUnknown
+		c.Source = SourceUnknown
 	}
 	name, err := pd.getString()
 	if err != nil {
 		return err
 	}
-	r.Name = name
+	c.Name = name
 
 	value, err := pd.getString()
 	if err != nil {
 		return err
 	}
-	r.Value = value
+	c.Value = value
 
 	read, err := pd.getBool()
 	if err != nil {
 		return err
 	}
-	r.ReadOnly = read
+	c.ReadOnly = read
 
 	if version == 0 {
 		defaultB, err := pd.getBool()
 		if err != nil {
 			return err
 		}
-		r.Default = defaultB
+		c.Default = defaultB
 	} else {
 		source, err := pd.getInt8()
 		if err != nil {
 			return err
 		}
-		r.Source = ConfigSource(source)
+		c.Source = ConfigSource(source)
 	}
 
 	sensitive, err := pd.getBool()
 	if err != nil {
 		return err
 	}
-	r.Sensitive = sensitive
+	c.Sensitive = sensitive
 
 	if version > 0 {
 		n, err := pd.getArrayLength()
 		if err != nil {
 			return err
 		}
-		r.Synonyms = make([]*ConfigSynonym, n)
+		c.Synonyms = make([]*ConfigSynonym, n)
 
 		for i := 0; i < n; i++ {
 			s := &ConfigSynonym{}
 			if err := s.decode(pd, version); err != nil {
 				return err
 			}
-			r.Synonyms[i] = s
+			c.Synonyms[i] = s
 		}
 
 	}

@@ -2,6 +2,7 @@ package sarama
 
 import "time"
 
+//InitProducerIDRequest is used to initialize a producer if request
 type InitProducerIDRequest struct {
 	TransactionalID    *string
 	TransactionTimeout time.Duration

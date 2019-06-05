@@ -1,5 +1,6 @@
 package sarama
 
+//SaslAuthenticateRequest is SASL authenticate request type
 type SaslAuthenticateRequest struct {
 	SaslAuthBytes []byte
 }
@@ -7,23 +8,23 @@ type SaslAuthenticateRequest struct {
 // APIKeySASLAuth is the API key for the SaslAuthenticate Kafka API
 const APIKeySASLAuth = 36
 
-func (r *SaslAuthenticateRequest) encode(pe packetEncoder) error {
-	return pe.putBytes(r.SaslAuthBytes)
+func (s *SaslAuthenticateRequest) encode(pe packetEncoder) error {
+	return pe.putBytes(s.SaslAuthBytes)
 }
 
-func (r *SaslAuthenticateRequest) decode(pd packetDecoder, version int16) (err error) {
-	r.SaslAuthBytes, err = pd.getBytes()
+func (s *SaslAuthenticateRequest) decode(pd packetDecoder, version int16) (err error) {
+	s.SaslAuthBytes, err = pd.getBytes()
 	return err
 }
 
-func (r *SaslAuthenticateRequest) key() int16 {
+func (s *SaslAuthenticateRequest) key() int16 {
 	return APIKeySASLAuth
 }
 
-func (r *SaslAuthenticateRequest) version() int16 {
+func (s *SaslAuthenticateRequest) version() int16 {
 	return 0
 }
 
-func (r *SaslAuthenticateRequest) requiredVersion() KafkaVersion {
+func (s *SaslAuthenticateRequest) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }

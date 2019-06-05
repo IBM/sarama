@@ -5,36 +5,37 @@ import (
 	"time"
 )
 
+//AbortedTransaction is an aborted txn type
 type AbortedTransaction struct {
 	ProducerID  int64
 	FirstOffset int64
 }
 
-func (t *AbortedTransaction) decode(pd packetDecoder) (err error) {
-	if t.ProducerID, err = pd.getInt64(); err != nil {
+func (a *AbortedTransaction) decode(pd packetDecoder) (err error) {
+	if a.ProducerID, err = pd.getInt64(); err != nil {
 		return err
 	}
 
-	if t.FirstOffset, err = pd.getInt64(); err != nil {
+	if a.FirstOffset, err = pd.getInt64(); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (t *AbortedTransaction) encode(pe packetEncoder) (err error) {
-	pe.putInt64(t.ProducerID)
-	pe.putInt64(t.FirstOffset)
+func (a *AbortedTransaction) encode(pe packetEncoder) (err error) {
+	pe.putInt64(a.ProducerID)
+	pe.putInt64(a.FirstOffset)
 
 	return nil
 }
 
+//FetchResponseBlock is a fetched response block
 type FetchResponseBlock struct {
 	Err                 KError
 	HighWaterMarkOffset int64
 	LastStableOffset    int64
 	AbortedTransactions []*AbortedTransaction
-	Records             *Records // deprecated: use FetchResponseBlock.RecordsSet
 	RecordsSet          []*Records
 	Partial             bool
 }
@@ -113,9 +114,6 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		if n > 0 || (partial && len(b.RecordsSet) == 0) {
 			b.RecordsSet = append(b.RecordsSet, records)
 
-			if b.Records == nil {
-				b.Records = records
-			}
 		}
 
 		overflow, err := records.isOverflow()
@@ -197,6 +195,7 @@ func (b *FetchResponseBlock) getAbortedTransactions() []*AbortedTransaction {
 	return at
 }
 
+//FetchResponse is fetch response type
 type FetchResponse struct {
 	Blocks        map[string]map[int32]*FetchResponseBlock
 	ThrottleTime  time.Duration
@@ -205,15 +204,15 @@ type FetchResponse struct {
 	Timestamp     time.Time
 }
 
-func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (f *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
+	f.Version = version
 
-	if r.Version >= 1 {
+	if f.Version >= 1 {
 		throttle, err := pd.getInt32()
 		if err != nil {
 			return err
 		}
-		r.ThrottleTime = time.Duration(throttle) * time.Millisecond
+		f.ThrottleTime = time.Duration(throttle) * time.Millisecond
 	}
 
 	numTopics, err := pd.getArrayLength()
@@ -221,7 +220,7 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	r.Blocks = make(map[string]map[int32]*FetchResponseBlock, numTopics)
+	f.Blocks = make(map[string]map[int32]*FetchResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {
@@ -233,7 +232,7 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 
-		r.Blocks[name] = make(map[int32]*FetchResponseBlock, numBlocks)
+		f.Blocks[name] = make(map[int32]*FetchResponseBlock, numBlocks)
 
 		for j := 0; j < numBlocks; j++ {
 			id, err := pd.getInt32()
@@ -246,24 +245,24 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 			if err != nil {
 				return err
 			}
-			r.Blocks[name][id] = block
+			f.Blocks[name][id] = block
 		}
 	}
 
 	return nil
 }
 
-func (r *FetchResponse) encode(pe packetEncoder) (err error) {
-	if r.Version >= 1 {
-		pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+func (f *FetchResponse) encode(pe packetEncoder) (err error) {
+	if f.Version >= 1 {
+		pe.putInt32(int32(f.ThrottleTime / time.Millisecond))
 	}
 
-	err = pe.putArrayLength(len(r.Blocks))
+	err = pe.putArrayLength(len(f.Blocks))
 	if err != nil {
 		return err
 	}
 
-	for topic, partitions := range r.Blocks {
+	for topic, partitions := range f.Blocks {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -276,7 +275,7 @@ func (r *FetchResponse) encode(pe packetEncoder) (err error) {
 
 		for id, block := range partitions {
 			pe.putInt32(id)
-			err = block.encode(pe, r.Version)
+			err = block.encode(pe, f.Version)
 			if err != nil {
 				return err
 			}
@@ -286,16 +285,16 @@ func (r *FetchResponse) encode(pe packetEncoder) (err error) {
 	return nil
 }
 
-func (r *FetchResponse) key() int16 {
+func (f *FetchResponse) key() int16 {
 	return 1
 }
 
-func (r *FetchResponse) version() int16 {
-	return r.Version
+func (f *FetchResponse) version() int16 {
+	return f.Version
 }
 
-func (r *FetchResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (f *FetchResponse) requiredVersion() KafkaVersion {
+	switch f.Version {
 	case 1:
 		return V0_9_0_0
 	case 2:
@@ -309,26 +308,28 @@ func (r *FetchResponse) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseBlock {
-	if r.Blocks == nil {
+//GetBlock returns a fetch response block
+func (f *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseBlock {
+	if f.Blocks == nil {
 		return nil
 	}
 
-	if r.Blocks[topic] == nil {
+	if f.Blocks[topic] == nil {
 		return nil
 	}
 
-	return r.Blocks[topic][partition]
+	return f.Blocks[topic][partition]
 }
 
-func (r *FetchResponse) AddError(topic string, partition int32, err KError) {
-	if r.Blocks == nil {
-		r.Blocks = make(map[string]map[int32]*FetchResponseBlock)
+//AddError adds an error to fetch response
+func (f *FetchResponse) AddError(topic string, partition int32, err KError) {
+	if f.Blocks == nil {
+		f.Blocks = make(map[string]map[int32]*FetchResponseBlock)
 	}
-	partitions, ok := r.Blocks[topic]
+	partitions, ok := f.Blocks[topic]
 	if !ok {
 		partitions = make(map[int32]*FetchResponseBlock)
-		r.Blocks[topic] = partitions
+		f.Blocks[topic] = partitions
 	}
 	frb, ok := partitions[partition]
 	if !ok {
@@ -338,14 +339,14 @@ func (r *FetchResponse) AddError(topic string, partition int32, err KError) {
 	frb.Err = err
 }
 
-func (r *FetchResponse) getOrCreateBlock(topic string, partition int32) *FetchResponseBlock {
-	if r.Blocks == nil {
-		r.Blocks = make(map[string]map[int32]*FetchResponseBlock)
+func (f *FetchResponse) getOrCreateBlock(topic string, partition int32) *FetchResponseBlock {
+	if f.Blocks == nil {
+		f.Blocks = make(map[string]map[int32]*FetchResponseBlock)
 	}
-	partitions, ok := r.Blocks[topic]
+	partitions, ok := f.Blocks[topic]
 	if !ok {
 		partitions = make(map[int32]*FetchResponseBlock)
-		r.Blocks[topic] = partitions
+		f.Blocks[topic] = partitions
 	}
 	frb, ok := partitions[partition]
 	if !ok {
@@ -369,13 +370,14 @@ func encodeKV(key, value Encoder) ([]byte, []byte) {
 	return kb, vb
 }
 
-func (r *FetchResponse) AddMessageWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, timestamp time.Time, version int8) {
-	frb := r.getOrCreateBlock(topic, partition)
+//AddMessageWithTimestamp adds a timestamp to message
+func (f *FetchResponse) AddMessageWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, timestamp time.Time, version int8) {
+	frb := f.getOrCreateBlock(topic, partition)
 	kb, vb := encodeKV(key, value)
-	if r.LogAppendTime {
-		timestamp = r.Timestamp
+	if f.LogAppendTime {
+		timestamp = f.Timestamp
 	}
-	msg := &Message{Key: kb, Value: vb, LogAppendTime: r.LogAppendTime, Timestamp: timestamp, Version: version}
+	msg := &Message{Key: kb, Value: vb, LogAppendTime: f.LogAppendTime, Timestamp: timestamp, Version: version}
 	msgBlock := &MessageBlock{Msg: msg, Offset: offset}
 	if len(frb.RecordsSet) == 0 {
 		records := newLegacyRecords(&MessageSet{})
@@ -385,11 +387,12 @@ func (r *FetchResponse) AddMessageWithTimestamp(topic string, partition int32, k
 	set.Messages = append(set.Messages, msgBlock)
 }
 
-func (r *FetchResponse) AddRecordWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, timestamp time.Time) {
-	frb := r.getOrCreateBlock(topic, partition)
+//AddRecordWithTimestamp adds a timestamp to record
+func (f *FetchResponse) AddRecordWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, timestamp time.Time) {
+	frb := f.getOrCreateBlock(topic, partition)
 	kb, vb := encodeKV(key, value)
 	if len(frb.RecordsSet) == 0 {
-		records := newDefaultRecords(&RecordBatch{Version: 2, LogAppendTime: r.LogAppendTime, FirstTimestamp: timestamp, MaxTimestamp: r.Timestamp})
+		records := newDefaultRecords(&RecordBatch{Version: 2, LogAppendTime: f.LogAppendTime, FirstTimestamp: timestamp, MaxTimestamp: f.Timestamp})
 		frb.RecordsSet = []*Records{&records}
 	}
 	batch := frb.RecordsSet[0].RecordBatch
@@ -400,16 +403,16 @@ func (r *FetchResponse) AddRecordWithTimestamp(topic string, partition int32, ke
 // AddRecordBatchWithTimestamp is similar to AddRecordWithTimestamp
 // But instead of appending 1 record to a batch, it append a new batch containing 1 record to the fetchResponse
 // Since transaction are handled on batch level (the whole batch is either committed or aborted), use this to test transactions
-func (r *FetchResponse) AddRecordBatchWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool, timestamp time.Time) {
-	frb := r.getOrCreateBlock(topic, partition)
+func (f *FetchResponse) AddRecordBatchWithTimestamp(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool, timestamp time.Time) {
+	frb := f.getOrCreateBlock(topic, partition)
 	kb, vb := encodeKV(key, value)
 
-	records := newDefaultRecords(&RecordBatch{Version: 2, LogAppendTime: r.LogAppendTime, FirstTimestamp: timestamp, MaxTimestamp: r.Timestamp})
+	records := newDefaultRecords(&RecordBatch{Version: 2, LogAppendTime: f.LogAppendTime, FirstTimestamp: timestamp, MaxTimestamp: f.Timestamp})
 	batch := &RecordBatch{
 		Version:         2,
-		LogAppendTime:   r.LogAppendTime,
+		LogAppendTime:   f.LogAppendTime,
 		FirstTimestamp:  timestamp,
-		MaxTimestamp:    r.Timestamp,
+		MaxTimestamp:    f.Timestamp,
 		FirstOffset:     offset,
 		LastOffsetDelta: 0,
 		ProducerID:      producerID,
@@ -422,15 +425,16 @@ func (r *FetchResponse) AddRecordBatchWithTimestamp(topic string, partition int3
 	frb.RecordsSet = append(frb.RecordsSet, &records)
 }
 
-func (r *FetchResponse) AddControlRecordWithTimestamp(topic string, partition int32, offset int64, producerID int64, recordType ControlRecordType, timestamp time.Time) {
-	frb := r.getOrCreateBlock(topic, partition)
+//AddControlRecordWithTimestamp adds a control record with timestamp
+func (f *FetchResponse) AddControlRecordWithTimestamp(topic string, partition int32, offset int64, producerID int64, recordType ControlRecordType, timestamp time.Time) {
+	frb := f.getOrCreateBlock(topic, partition)
 
 	// batch
 	batch := &RecordBatch{
 		Version:         2,
-		LogAppendTime:   r.LogAppendTime,
+		LogAppendTime:   f.LogAppendTime,
 		FirstTimestamp:  timestamp,
-		MaxTimestamp:    r.Timestamp,
+		MaxTimestamp:    f.Timestamp,
 		FirstOffset:     offset,
 		LastOffsetDelta: 0,
 		ProducerID:      producerID,
@@ -456,25 +460,30 @@ func (r *FetchResponse) AddControlRecordWithTimestamp(topic string, partition in
 	frb.RecordsSet = append(frb.RecordsSet, &records)
 }
 
-func (r *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
-	r.AddMessageWithTimestamp(topic, partition, key, value, offset, time.Time{}, 0)
+//AddMessage is a wrapper for AddMessageWithTimestamp
+func (f *FetchResponse) AddMessage(topic string, partition int32, key, value Encoder, offset int64) {
+	f.AddMessageWithTimestamp(topic, partition, key, value, offset, time.Time{}, 0)
 }
 
-func (r *FetchResponse) AddRecord(topic string, partition int32, key, value Encoder, offset int64) {
-	r.AddRecordWithTimestamp(topic, partition, key, value, offset, time.Time{})
+//AddRecord is a wrapper for AddRecordWithTimestamp
+func (f *FetchResponse) AddRecord(topic string, partition int32, key, value Encoder, offset int64) {
+	f.AddRecordWithTimestamp(topic, partition, key, value, offset, time.Time{})
 }
 
-func (r *FetchResponse) AddRecordBatch(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool) {
-	r.AddRecordBatchWithTimestamp(topic, partition, key, value, offset, producerID, isTransactional, time.Time{})
+//AddRecordBatch is a wrapper for AddRecordBatchWithTimestamp
+func (f *FetchResponse) AddRecordBatch(topic string, partition int32, key, value Encoder, offset int64, producerID int64, isTransactional bool) {
+	f.AddRecordBatchWithTimestamp(topic, partition, key, value, offset, producerID, isTransactional, time.Time{})
 }
 
-func (r *FetchResponse) AddControlRecord(topic string, partition int32, offset int64, producerID int64, recordType ControlRecordType) {
+//AddControlRecord is a wrapper type for AddControlRecordWithTimestamp
+func (f *FetchResponse) AddControlRecord(topic string, partition int32, offset int64, producerID int64, recordType ControlRecordType) {
 	// define controlRecord key and value
-	r.AddControlRecordWithTimestamp(topic, partition, offset, producerID, recordType, time.Time{})
+	f.AddControlRecordWithTimestamp(topic, partition, offset, producerID, recordType, time.Time{})
 }
 
-func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
-	frb := r.getOrCreateBlock(topic, partition)
+//SetLastOffsetDelta sets last offset delta
+func (f *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset int32) {
+	frb := f.getOrCreateBlock(topic, partition)
 	if len(frb.RecordsSet) == 0 {
 		records := newDefaultRecords(&RecordBatch{Version: 2})
 		frb.RecordsSet = []*Records{&records}
@@ -483,7 +492,8 @@ func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset
 	batch.LastOffsetDelta = offset
 }
 
-func (r *FetchResponse) SetLastStableOffset(topic string, partition int32, offset int64) {
-	frb := r.getOrCreateBlock(topic, partition)
+//SetLastStableOffset sets last stable offset
+func (f *FetchResponse) SetLastStableOffset(topic string, partition int32, offset int64) {
+	frb := f.getOrCreateBlock(topic, partition)
 	frb.LastStableOffset = offset
 }

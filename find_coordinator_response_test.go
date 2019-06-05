@@ -52,7 +52,7 @@ func TestFindCoordinatorResponse(t *testing.T) {
 		response: &FindCoordinatorResponse{
 			Version:     0,
 			Err:         ErrConsumerCoordinatorNotAvailable,
-			Coordinator: NoNode,
+			Coordinator: noNodeCoordinator(),
 		},
 		encoded: []byte{
 			0, 15, // Err
@@ -67,7 +67,7 @@ func TestFindCoordinatorResponse(t *testing.T) {
 			ThrottleTime: 100 * time.Millisecond,
 			Err:          ErrConsumerCoordinatorNotAvailable,
 			ErrMsg:       &errMsg,
-			Coordinator:  NoNode,
+			Coordinator:  noNodeCoordinator(),
 		},
 		encoded: []byte{
 			0, 0, 0, 100, // ThrottleTime

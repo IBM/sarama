@@ -2,9 +2,10 @@ package sarama
 
 import (
 	"errors"
+	"testing"
+
 	krbcfg "gopkg.in/jcmturner/gokrb5.v7/config"
 	"gopkg.in/jcmturner/gokrb5.v7/test/testdata"
-	"testing"
 )
 
 /*
@@ -36,7 +37,7 @@ func TestFaildToCreateKerberosConfig(t *testing.T) {
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"
 	clientConfig.Net.SASL.GSSAPI.Realm = "EXAMPLE.COM"
 	clientConfig.Net.SASL.GSSAPI.Username = "client"
-	clientConfig.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+	clientConfig.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 	clientConfig.Net.SASL.GSSAPI.Password = "qwerty"
 	clientConfig.Net.SASL.GSSAPI.KerberosConfigPath = "krb5.conf"
 	_, err := NewKerberosClient(&clientConfig.Net.SASL.GSSAPI)
@@ -60,7 +61,7 @@ func TestCreateWithPassword(t *testing.T) {
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"
 	clientConfig.Net.SASL.GSSAPI.Realm = "EXAMPLE.COM"
 	clientConfig.Net.SASL.GSSAPI.Username = "client"
-	clientConfig.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+	clientConfig.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 	clientConfig.Net.SASL.GSSAPI.Password = "qwerty"
 	clientConfig.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
 	client, _ := createClient(&clientConfig.Net.SASL.GSSAPI, kerberosConfig)
@@ -89,7 +90,7 @@ func TestCreateWithKeyTab(t *testing.T) {
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"
 	clientConfig.Net.SASL.GSSAPI.Realm = "EXAMPLE.COM"
 	clientConfig.Net.SASL.GSSAPI.Username = "client"
-	clientConfig.Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH
+	clientConfig.Net.SASL.GSSAPI.AuthType = Krb5KeyTabAuth
 	clientConfig.Net.SASL.GSSAPI.KeyTabPath = "nonexist.keytab"
 	clientConfig.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
 	_, err = createClient(&clientConfig.Net.SASL.GSSAPI, kerberosConfig)

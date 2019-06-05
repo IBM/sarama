@@ -1,31 +1,33 @@
 package sarama
 
+//OffsetCommitResponse is an offset commit response type
 type OffsetCommitResponse struct {
 	Version        int16
 	ThrottleTimeMs int32
 	Errors         map[string]map[int32]KError
 }
 
-func (r *OffsetCommitResponse) AddError(topic string, partition int32, kerror KError) {
-	if r.Errors == nil {
-		r.Errors = make(map[string]map[int32]KError)
+//AddError adds error to a commit response
+func (o *OffsetCommitResponse) AddError(topic string, partition int32, kerror KError) {
+	if o.Errors == nil {
+		o.Errors = make(map[string]map[int32]KError)
 	}
-	partitions := r.Errors[topic]
+	partitions := o.Errors[topic]
 	if partitions == nil {
 		partitions = make(map[int32]KError)
-		r.Errors[topic] = partitions
+		o.Errors[topic] = partitions
 	}
 	partitions[partition] = kerror
 }
 
-func (r *OffsetCommitResponse) encode(pe packetEncoder) error {
-	if r.Version >= 3 {
-		pe.putInt32(r.ThrottleTimeMs)
+func (o *OffsetCommitResponse) encode(pe packetEncoder) error {
+	if o.Version >= 3 {
+		pe.putInt32(o.ThrottleTimeMs)
 	}
-	if err := pe.putArrayLength(len(r.Errors)); err != nil {
+	if err := pe.putArrayLength(len(o.Errors)); err != nil {
 		return err
 	}
-	for topic, partitions := range r.Errors {
+	for topic, partitions := range o.Errors {
 		if err := pe.putString(topic); err != nil {
 			return err
 		}
@@ -40,11 +42,11 @@ func (r *OffsetCommitResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (o *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err error) {
+	o.Version = version
 
 	if version >= 3 {
-		r.ThrottleTimeMs, err = pd.getInt32()
+		o.ThrottleTimeMs, err = pd.getInt32()
 		if err != nil {
 			return err
 		}
@@ -55,7 +57,7 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err erro
 		return err
 	}
 
-	r.Errors = make(map[string]map[int32]KError, numTopics)
+	o.Errors = make(map[string]map[int32]KError, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {
@@ -67,7 +69,7 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err erro
 			return err
 		}
 
-		r.Errors[name] = make(map[int32]KError, numErrors)
+		o.Errors[name] = make(map[int32]KError, numErrors)
 
 		for j := 0; j < numErrors; j++ {
 			id, err := pd.getInt32()
@@ -79,23 +81,23 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err erro
 			if err != nil {
 				return err
 			}
-			r.Errors[name][id] = KError(tmp)
+			o.Errors[name][id] = KError(tmp)
 		}
 	}
 
 	return nil
 }
 
-func (r *OffsetCommitResponse) key() int16 {
+func (o *OffsetCommitResponse) key() int16 {
 	return 8
 }
 
-func (r *OffsetCommitResponse) version() int16 {
-	return r.Version
+func (o *OffsetCommitResponse) version() int16 {
+	return o.Version
 }
 
-func (r *OffsetCommitResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (o *OffsetCommitResponse) requiredVersion() KafkaVersion {
+	switch o.Version {
 	case 1:
 		return V0_8_2_0
 	case 2:

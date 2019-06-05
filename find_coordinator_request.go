@@ -1,12 +1,16 @@
 package sarama
 
+//CoordinatorType is a coordinator type
 type CoordinatorType int8
 
 const (
+	//CoordinatorGroup is a group coordinator type
 	CoordinatorGroup CoordinatorType = iota
+	//CoordinatorTransaction is a transaction coordinator type
 	CoordinatorTransaction
 )
 
+//FindCoordinatorRequest is used to create a find coordinator request
 type FindCoordinatorRequest struct {
 	Version         int16
 	CoordinatorKey  string

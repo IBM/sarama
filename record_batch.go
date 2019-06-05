@@ -29,6 +29,7 @@ func (e recordsArray) decode(pd packetDecoder) error {
 	return nil
 }
 
+//RecordBatch is a record in a batch
 type RecordBatch struct {
 	FirstOffset           int64
 	PartitionLeaderEpoch  int32
@@ -51,44 +52,45 @@ type RecordBatch struct {
 	recordsLen        int // uncompressed records size
 }
 
-func (b *RecordBatch) LastOffset() int64 {
-	return b.FirstOffset + int64(b.LastOffsetDelta)
+//LastOffset return last offset in record batch
+func (r *RecordBatch) LastOffset() int64 {
+	return r.FirstOffset + int64(r.LastOffsetDelta)
 }
 
-func (b *RecordBatch) encode(pe packetEncoder) error {
-	if b.Version != 2 {
-		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", b.Codec)}
+func (r *RecordBatch) encode(pe packetEncoder) error {
+	if r.Version != 2 {
+		return PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", r.Codec)}
 	}
-	pe.putInt64(b.FirstOffset)
+	pe.putInt64(r.FirstOffset)
 	pe.push(&lengthField{})
-	pe.putInt32(b.PartitionLeaderEpoch)
-	pe.putInt8(b.Version)
+	pe.putInt32(r.PartitionLeaderEpoch)
+	pe.putInt8(r.Version)
 	pe.push(newCRC32Field(crcCastagnoli))
-	pe.putInt16(b.computeAttributes())
-	pe.putInt32(b.LastOffsetDelta)
+	pe.putInt16(r.computeAttributes())
+	pe.putInt32(r.LastOffsetDelta)
 
-	if err := (Timestamp{&b.FirstTimestamp}).encode(pe); err != nil {
+	if err := (Timestamp{&r.FirstTimestamp}).encode(pe); err != nil {
 		return err
 	}
 
-	if err := (Timestamp{&b.MaxTimestamp}).encode(pe); err != nil {
+	if err := (Timestamp{&r.MaxTimestamp}).encode(pe); err != nil {
 		return err
 	}
 
-	pe.putInt64(b.ProducerID)
-	pe.putInt16(b.ProducerEpoch)
-	pe.putInt32(b.FirstSequence)
+	pe.putInt64(r.ProducerID)
+	pe.putInt16(r.ProducerEpoch)
+	pe.putInt32(r.FirstSequence)
 
-	if err := pe.putArrayLength(len(b.Records)); err != nil {
+	if err := pe.putArrayLength(len(r.Records)); err != nil {
 		return err
 	}
 
-	if b.compressedRecords == nil {
-		if err := b.encodeRecords(pe); err != nil {
+	if r.compressedRecords == nil {
+		if err := r.encodeRecords(pe); err != nil {
 			return err
 		}
 	}
-	if err := pe.putRawBytes(b.compressedRecords); err != nil {
+	if err := pe.putRawBytes(r.compressedRecords); err != nil {
 		return err
 	}
 
@@ -98,8 +100,8 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 	return pe.pop()
 }
 
-func (b *RecordBatch) decode(pd packetDecoder) (err error) {
-	if b.FirstOffset, err = pd.getInt64(); err != nil {
+func (r *RecordBatch) decode(pd packetDecoder) (err error) {
+	if r.FirstOffset, err = pd.getInt64(); err != nil {
 		return err
 	}
 
@@ -108,11 +110,11 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if b.PartitionLeaderEpoch, err = pd.getInt32(); err != nil {
+	if r.PartitionLeaderEpoch, err = pd.getInt32(); err != nil {
 		return err
 	}
 
-	if b.Version, err = pd.getInt8(); err != nil {
+	if r.Version, err = pd.getInt8(); err != nil {
 		return err
 	}
 
@@ -124,32 +126,32 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	b.Codec = CompressionCodec(int8(attributes) & compressionCodecMask)
-	b.Control = attributes&controlMask == controlMask
-	b.LogAppendTime = attributes&timestampTypeMask == timestampTypeMask
-	b.IsTransactional = attributes&isTransactionalMask == isTransactionalMask
+	r.Codec = CompressionCodec(int8(attributes) & compressionCodecMask)
+	r.Control = attributes&controlMask == controlMask
+	r.LogAppendTime = attributes&timestampTypeMask == timestampTypeMask
+	r.IsTransactional = attributes&isTransactionalMask == isTransactionalMask
 
-	if b.LastOffsetDelta, err = pd.getInt32(); err != nil {
+	if r.LastOffsetDelta, err = pd.getInt32(); err != nil {
 		return err
 	}
 
-	if err = (Timestamp{&b.FirstTimestamp}).decode(pd); err != nil {
+	if err = (Timestamp{&r.FirstTimestamp}).decode(pd); err != nil {
 		return err
 	}
 
-	if err = (Timestamp{&b.MaxTimestamp}).decode(pd); err != nil {
+	if err = (Timestamp{&r.MaxTimestamp}).decode(pd); err != nil {
 		return err
 	}
 
-	if b.ProducerID, err = pd.getInt64(); err != nil {
+	if r.ProducerID, err = pd.getInt64(); err != nil {
 		return err
 	}
 
-	if b.ProducerEpoch, err = pd.getInt16(); err != nil {
+	if r.ProducerEpoch, err = pd.getInt16(); err != nil {
 		return err
 	}
 
-	if b.FirstSequence, err = pd.getInt32(); err != nil {
+	if r.FirstSequence, err = pd.getInt32(); err != nil {
 		return err
 	}
 
@@ -158,15 +160,15 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 	if numRecs >= 0 {
-		b.Records = make([]*Record, numRecs)
+		r.Records = make([]*Record, numRecs)
 	}
 
 	bufSize := int(batchLen) - recordBatchOverhead
 	recBuffer, err := pd.getRawBytes(bufSize)
 	if err != nil {
 		if err == ErrInsufficientData {
-			b.PartialTrailingRecord = true
-			b.Records = nil
+			r.PartialTrailingRecord = true
+			r.Records = nil
 			return nil
 		}
 		return err
@@ -176,47 +178,47 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	recBuffer, err = decompress(b.Codec, recBuffer)
+	recBuffer, err = decompress(r.Codec, recBuffer)
 	if err != nil {
 		return err
 	}
 
-	b.recordsLen = len(recBuffer)
-	err = decode(recBuffer, recordsArray(b.Records))
+	r.recordsLen = len(recBuffer)
+	err = decode(recBuffer, recordsArray(r.Records))
 	if err == ErrInsufficientData {
-		b.PartialTrailingRecord = true
-		b.Records = nil
+		r.PartialTrailingRecord = true
+		r.Records = nil
 		return nil
 	}
 	return err
 }
 
-func (b *RecordBatch) encodeRecords(pe packetEncoder) error {
+func (r *RecordBatch) encodeRecords(pe packetEncoder) error {
 	var raw []byte
 	var err error
-	if raw, err = encode(recordsArray(b.Records), pe.metricRegistry()); err != nil {
+	if raw, err = encode(recordsArray(r.Records), pe.metricRegistry()); err != nil {
 		return err
 	}
-	b.recordsLen = len(raw)
+	r.recordsLen = len(raw)
 
-	b.compressedRecords, err = compress(b.Codec, b.CompressionLevel, raw)
+	r.compressedRecords, err = compress(r.Codec, r.CompressionLevel, raw)
 	return err
 }
 
-func (b *RecordBatch) computeAttributes() int16 {
-	attr := int16(b.Codec) & int16(compressionCodecMask)
-	if b.Control {
+func (r *RecordBatch) computeAttributes() int16 {
+	attr := int16(r.Codec) & int16(compressionCodecMask)
+	if r.Control {
 		attr |= controlMask
 	}
-	if b.LogAppendTime {
+	if r.LogAppendTime {
 		attr |= timestampTypeMask
 	}
-	if b.IsTransactional {
+	if r.IsTransactional {
 		attr |= isTransactionalMask
 	}
 	return attr
 }
 
-func (b *RecordBatch) addRecord(r *Record) {
-	b.Records = append(b.Records, r)
+func (r *RecordBatch) addRecord(record *Record) {
+	r.Records = append(r.Records, record)
 }

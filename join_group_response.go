@@ -1,5 +1,6 @@
 package sarama
 
+//JoinGroupResponse is a join group response
 type JoinGroupResponse struct {
 	Version       int16
 	ThrottleTime  int32
@@ -11,9 +12,10 @@ type JoinGroupResponse struct {
 	Members       map[string][]byte
 }
 
-func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata, error) {
-	members := make(map[string]ConsumerGroupMemberMetadata, len(r.Members))
-	for id, bin := range r.Members {
+//GetMembers returns members from join group response
+func (j *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata, error) {
+	members := make(map[string]ConsumerGroupMemberMetadata, len(j.Members))
+	for id, bin := range j.Members {
 		meta := new(ConsumerGroupMemberMetadata)
 		if err := decode(bin, meta); err != nil {
 			return nil, err
@@ -23,28 +25,28 @@ func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata
 	return members, nil
 }
 
-func (r *JoinGroupResponse) encode(pe packetEncoder) error {
-	if r.Version >= 2 {
-		pe.putInt32(r.ThrottleTime)
+func (j *JoinGroupResponse) encode(pe packetEncoder) error {
+	if j.Version >= 2 {
+		pe.putInt32(j.ThrottleTime)
 	}
-	pe.putInt16(int16(r.Err))
-	pe.putInt32(r.GenerationID)
+	pe.putInt16(int16(j.Err))
+	pe.putInt32(j.GenerationID)
 
-	if err := pe.putString(r.GroupProtocol); err != nil {
+	if err := pe.putString(j.GroupProtocol); err != nil {
 		return err
 	}
-	if err := pe.putString(r.LeaderID); err != nil {
+	if err := pe.putString(j.LeaderID); err != nil {
 		return err
 	}
-	if err := pe.putString(r.MemberID); err != nil {
-		return err
-	}
-
-	if err := pe.putArrayLength(len(r.Members)); err != nil {
+	if err := pe.putString(j.MemberID); err != nil {
 		return err
 	}
 
-	for memberID, memberMetadata := range r.Members {
+	if err := pe.putArrayLength(len(j.Members)); err != nil {
+		return err
+	}
+
+	for memberID, memberMetadata := range j.Members {
 		if err := pe.putString(memberID); err != nil {
 			return err
 		}
@@ -57,11 +59,11 @@ func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (j *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) {
+	j.Version = version
 
 	if version >= 2 {
-		if r.ThrottleTime, err = pd.getInt32(); err != nil {
+		if j.ThrottleTime, err = pd.getInt32(); err != nil {
 			return
 		}
 	}
@@ -71,21 +73,21 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 		return err
 	}
 
-	r.Err = KError(kerr)
+	j.Err = KError(kerr)
 
-	if r.GenerationID, err = pd.getInt32(); err != nil {
+	if j.GenerationID, err = pd.getInt32(); err != nil {
 		return
 	}
 
-	if r.GroupProtocol, err = pd.getString(); err != nil {
+	if j.GroupProtocol, err = pd.getString(); err != nil {
 		return
 	}
 
-	if r.LeaderID, err = pd.getString(); err != nil {
+	if j.LeaderID, err = pd.getString(); err != nil {
 		return
 	}
 
-	if r.MemberID, err = pd.getString(); err != nil {
+	if j.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -97,7 +99,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 		return nil
 	}
 
-	r.Members = make(map[string][]byte)
+	j.Members = make(map[string][]byte)
 	for i := 0; i < n; i++ {
 		memberID, err := pd.getString()
 		if err != nil {
@@ -109,22 +111,22 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 			return err
 		}
 
-		r.Members[memberID] = memberMetadata
+		j.Members[memberID] = memberMetadata
 	}
 
 	return nil
 }
 
-func (r *JoinGroupResponse) key() int16 {
+func (j *JoinGroupResponse) key() int16 {
 	return 11
 }
 
-func (r *JoinGroupResponse) version() int16 {
-	return r.Version
+func (j *JoinGroupResponse) version() int16 {
+	return j.Version
 }
 
-func (r *JoinGroupResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (j *JoinGroupResponse) requiredVersion() KafkaVersion {
+	switch j.Version {
 	case 2:
 		return V0_11_0_0
 	case 1:

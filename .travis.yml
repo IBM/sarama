@@ -25,9 +25,10 @@ before_install:
 install: make install_dependencies
 
 script:
-- make test
+- make lint
 - make vet
 - make errcheck
+- make test
 - if [[ "$TRAVIS_GO_VERSION" == 1.12* ]]; then make fmt; fi
 
 after_success:

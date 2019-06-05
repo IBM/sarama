@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+//CreateTopicsRequest is used to create a topic request
 type CreateTopicsRequest struct {
 	Version int16
 
@@ -90,6 +91,7 @@ func (c *CreateTopicsRequest) requiredVersion() KafkaVersion {
 	}
 }
 
+//TopicDetail is used to keep topic detail
 type TopicDetail struct {
 	NumPartitions     int32
 	ReplicationFactor int16

@@ -18,19 +18,26 @@ type TestReporter interface {
 // allows generating a response based on a request body. MockResponses are used
 // to program behavior of MockBroker in tests.
 type MockResponse interface {
-	For(reqBody versionedDecoder) (res encoder)
+	For(reqBody versionedDecoder) (res MockEncoder)
 }
 
 // MockWrapper is a mock response builder that returns a particular concrete
 // response regardless of the actual request passed to the `For` method.
 type MockWrapper struct {
-	res encoder
+	res MockEncoder
 }
 
-func (mw *MockWrapper) For(reqBody versionedDecoder) (res encoder) {
+//MockEncoder wraps encoder type
+type MockEncoder interface {
+	encoder
+}
+
+//For ...
+func (mw *MockWrapper) For(reqBody versionedDecoder) (res MockEncoder) {
 	return mw.res
 }
 
+//NewMockWrapper ...
 func NewMockWrapper(res encoder) *MockWrapper {
 	return &MockWrapper{res: res}
 }
@@ -43,6 +50,7 @@ type MockSequence struct {
 	responses []MockResponse
 }
 
+//NewMockSequence ...
 func NewMockSequence(responses ...interface{}) *MockSequence {
 	ms := &MockSequence{}
 	ms.responses = make([]MockResponse, len(responses))
@@ -59,7 +67,8 @@ func NewMockSequence(responses ...interface{}) *MockSequence {
 	return ms
 }
 
-func (mc *MockSequence) For(reqBody versionedDecoder) (res encoder) {
+//For ...
+func (mc *MockSequence) For(reqBody versionedDecoder) (res MockEncoder) {
 	res = mc.responses[0].For(reqBody)
 	if len(mc.responses) > 1 {
 		mc.responses = mc.responses[1:]
@@ -67,11 +76,13 @@ func (mc *MockSequence) For(reqBody versionedDecoder) (res encoder) {
 	return res
 }
 
+//MockListGroupsResponse is mock list group response
 type MockListGroupsResponse struct {
 	groups map[string]string
 	t      TestReporter
 }
 
+//NewMockListGroupsResponse returns mock list group response type
 func NewMockListGroupsResponse(t TestReporter) *MockListGroupsResponse {
 	return &MockListGroupsResponse{
 		groups: make(map[string]string),
@@ -79,7 +90,8 @@ func NewMockListGroupsResponse(t TestReporter) *MockListGroupsResponse {
 	}
 }
 
-func (m *MockListGroupsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (m *MockListGroupsResponse) For(reqBody versionedDecoder) MockEncoder {
 	request := reqBody.(*ListGroupsRequest)
 	_ = request
 	response := &ListGroupsResponse{
@@ -88,16 +100,19 @@ func (m *MockListGroupsResponse) For(reqBody versionedDecoder) encoder {
 	return response
 }
 
+//AddGroup ...
 func (m *MockListGroupsResponse) AddGroup(groupID, protocolType string) *MockListGroupsResponse {
 	m.groups[groupID] = protocolType
 	return m
 }
 
+//MockDescribeGroupsResponse ...
 type MockDescribeGroupsResponse struct {
 	groups map[string]*GroupDescription
 	t      TestReporter
 }
 
+//NewMockDescribeGroupsResponse ...
 func NewMockDescribeGroupsResponse(t TestReporter) *MockDescribeGroupsResponse {
 	return &MockDescribeGroupsResponse{
 		t:      t,
@@ -105,12 +120,14 @@ func NewMockDescribeGroupsResponse(t TestReporter) *MockDescribeGroupsResponse {
 	}
 }
 
+//AddGroupDescription ...
 func (m *MockDescribeGroupsResponse) AddGroupDescription(groupID string, description *GroupDescription) *MockDescribeGroupsResponse {
 	m.groups[groupID] = description
 	return m
 }
 
-func (m *MockDescribeGroupsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (m *MockDescribeGroupsResponse) For(reqBody versionedDecoder) MockEncoder {
 	request := reqBody.(*DescribeGroupsRequest)
 
 	response := &DescribeGroupsResponse{}
@@ -138,6 +155,7 @@ type MockMetadataResponse struct {
 	t            TestReporter
 }
 
+//NewMockMetadataResponse ...
 func NewMockMetadataResponse(t TestReporter) *MockMetadataResponse {
 	return &MockMetadataResponse{
 		leaders: make(map[string]map[int32]int32),
@@ -146,6 +164,7 @@ func NewMockMetadataResponse(t TestReporter) *MockMetadataResponse {
 	}
 }
 
+//SetLeader ...
 func (mmr *MockMetadataResponse) SetLeader(topic string, partition, brokerID int32) *MockMetadataResponse {
 	partitions := mmr.leaders[topic]
 	if partitions == nil {
@@ -156,17 +175,20 @@ func (mmr *MockMetadataResponse) SetLeader(topic string, partition, brokerID int
 	return mmr
 }
 
+//SetBroker ...
 func (mmr *MockMetadataResponse) SetBroker(addr string, brokerID int32) *MockMetadataResponse {
 	mmr.brokers[addr] = brokerID
 	return mmr
 }
 
+//SetController ...
 func (mmr *MockMetadataResponse) SetController(brokerID int32) *MockMetadataResponse {
 	mmr.controllerID = brokerID
 	return mmr
 }
 
-func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) MockEncoder {
 	metadataRequest := reqBody.(*MetadataRequest)
 	metadataResponse := &MetadataResponse{
 		Version:      metadataRequest.version(),
@@ -206,6 +228,7 @@ type MockOffsetResponse struct {
 	version int16
 }
 
+//NewMockOffsetResponse ...
 func NewMockOffsetResponse(t TestReporter) *MockOffsetResponse {
 	return &MockOffsetResponse{
 		offsets: make(map[string]map[int32]map[int64]int64),
@@ -213,11 +236,13 @@ func NewMockOffsetResponse(t TestReporter) *MockOffsetResponse {
 	}
 }
 
+//SetVersion ...
 func (mor *MockOffsetResponse) SetVersion(version int16) *MockOffsetResponse {
 	mor.version = version
 	return mor
 }
 
+//SetOffset ...
 func (mor *MockOffsetResponse) SetOffset(topic string, partition int32, time, offset int64) *MockOffsetResponse {
 	partitions := mor.offsets[topic]
 	if partitions == nil {
@@ -233,7 +258,8 @@ func (mor *MockOffsetResponse) SetOffset(topic string, partition int32, time, of
 	return mor
 }
 
-func (mor *MockOffsetResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mor *MockOffsetResponse) For(reqBody versionedDecoder) MockEncoder {
 	offsetRequest := reqBody.(*OffsetRequest)
 	offsetResponse := &OffsetResponse{Version: mor.version}
 	for topic, partitions := range offsetRequest.blocks {
@@ -270,6 +296,7 @@ type MockFetchResponse struct {
 	version        int16
 }
 
+//NewMockFetchResponse ...
 func NewMockFetchResponse(t TestReporter, batchSize int) *MockFetchResponse {
 	return &MockFetchResponse{
 		messages:       make(map[string]map[int32]map[int64]Encoder),
@@ -279,11 +306,13 @@ func NewMockFetchResponse(t TestReporter, batchSize int) *MockFetchResponse {
 	}
 }
 
+//SetVersion ...
 func (mfr *MockFetchResponse) SetVersion(version int16) *MockFetchResponse {
 	mfr.version = version
 	return mfr
 }
 
+//SetMessage ...
 func (mfr *MockFetchResponse) SetMessage(topic string, partition int32, offset int64, msg Encoder) *MockFetchResponse {
 	partitions := mfr.messages[topic]
 	if partitions == nil {
@@ -299,6 +328,7 @@ func (mfr *MockFetchResponse) SetMessage(topic string, partition int32, offset i
 	return mfr
 }
 
+//SetHighWaterMark ...
 func (mfr *MockFetchResponse) SetHighWaterMark(topic string, partition int32, offset int64) *MockFetchResponse {
 	partitions := mfr.highWaterMarks[topic]
 	if partitions == nil {
@@ -309,7 +339,8 @@ func (mfr *MockFetchResponse) SetHighWaterMark(topic string, partition int32, of
 	return mfr
 }
 
-func (mfr *MockFetchResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mfr *MockFetchResponse) For(reqBody versionedDecoder) MockEncoder {
 	fetchRequest := reqBody.(*FetchRequest)
 	res := &FetchResponse{
 		Version: mfr.version,
@@ -376,6 +407,7 @@ type MockConsumerMetadataResponse struct {
 	t            TestReporter
 }
 
+//NewMockConsumerMetadataResponse ...
 func NewMockConsumerMetadataResponse(t TestReporter) *MockConsumerMetadataResponse {
 	return &MockConsumerMetadataResponse{
 		coordinators: make(map[string]interface{}),
@@ -383,17 +415,20 @@ func NewMockConsumerMetadataResponse(t TestReporter) *MockConsumerMetadataRespon
 	}
 }
 
+//SetCoordinator ...
 func (mr *MockConsumerMetadataResponse) SetCoordinator(group string, broker *MockBroker) *MockConsumerMetadataResponse {
 	mr.coordinators[group] = broker
 	return mr
 }
 
+//SetError ...
 func (mr *MockConsumerMetadataResponse) SetError(group string, kerror KError) *MockConsumerMetadataResponse {
 	mr.coordinators[group] = kerror
 	return mr
 }
 
-func (mr *MockConsumerMetadataResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockConsumerMetadataResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*ConsumerMetadataRequest)
 	group := req.ConsumerGroup
 	res := &ConsumerMetadataResponse{}
@@ -414,6 +449,7 @@ type MockFindCoordinatorResponse struct {
 	t                 TestReporter
 }
 
+//NewMockFindCoordinatorResponse ...
 func NewMockFindCoordinatorResponse(t TestReporter) *MockFindCoordinatorResponse {
 	return &MockFindCoordinatorResponse{
 		groupCoordinators: make(map[string]interface{}),
@@ -422,6 +458,7 @@ func NewMockFindCoordinatorResponse(t TestReporter) *MockFindCoordinatorResponse
 	}
 }
 
+//SetCoordinator ...
 func (mr *MockFindCoordinatorResponse) SetCoordinator(coordinatorType CoordinatorType, group string, broker *MockBroker) *MockFindCoordinatorResponse {
 	switch coordinatorType {
 	case CoordinatorGroup:
@@ -432,6 +469,7 @@ func (mr *MockFindCoordinatorResponse) SetCoordinator(coordinatorType Coordinato
 	return mr
 }
 
+//SetError ...
 func (mr *MockFindCoordinatorResponse) SetError(coordinatorType CoordinatorType, group string, kerror KError) *MockFindCoordinatorResponse {
 	switch coordinatorType {
 	case CoordinatorGroup:
@@ -442,7 +480,8 @@ func (mr *MockFindCoordinatorResponse) SetError(coordinatorType CoordinatorType,
 	return mr
 }
 
-func (mr *MockFindCoordinatorResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockFindCoordinatorResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*FindCoordinatorRequest)
 	res := &FindCoordinatorResponse{}
 	var v interface{}
@@ -467,10 +506,12 @@ type MockOffsetCommitResponse struct {
 	t      TestReporter
 }
 
+//NewMockOffsetCommitResponse ...
 func NewMockOffsetCommitResponse(t TestReporter) *MockOffsetCommitResponse {
 	return &MockOffsetCommitResponse{t: t}
 }
 
+//SetError ...
 func (mr *MockOffsetCommitResponse) SetError(group, topic string, partition int32, kerror KError) *MockOffsetCommitResponse {
 	if mr.errors == nil {
 		mr.errors = make(map[string]map[string]map[int32]KError)
@@ -489,7 +530,8 @@ func (mr *MockOffsetCommitResponse) SetError(group, topic string, partition int3
 	return mr
 }
 
-func (mr *MockOffsetCommitResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockOffsetCommitResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*OffsetCommitRequest)
 	group := req.ConsumerGroup
 	res := &OffsetCommitResponse{}
@@ -524,15 +566,18 @@ type MockProduceResponse struct {
 	t       TestReporter
 }
 
+//NewMockProduceResponse ...
 func NewMockProduceResponse(t TestReporter) *MockProduceResponse {
 	return &MockProduceResponse{t: t}
 }
 
+//SetVersion ...
 func (mr *MockProduceResponse) SetVersion(version int16) *MockProduceResponse {
 	mr.version = version
 	return mr
 }
 
+//SetError ...
 func (mr *MockProduceResponse) SetError(topic string, partition int32, kerror KError) *MockProduceResponse {
 	if mr.errors == nil {
 		mr.errors = make(map[string]map[int32]KError)
@@ -546,7 +591,8 @@ func (mr *MockProduceResponse) SetError(topic string, partition int32, kerror KE
 	return mr
 }
 
-func (mr *MockProduceResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockProduceResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*ProduceRequest)
 	res := &ProduceResponse{
 		Version: mr.version,
@@ -577,10 +623,12 @@ type MockOffsetFetchResponse struct {
 	t       TestReporter
 }
 
+//NewMockOffsetFetchResponse ...
 func NewMockOffsetFetchResponse(t TestReporter) *MockOffsetFetchResponse {
 	return &MockOffsetFetchResponse{t: t}
 }
 
+//SetOffset ...
 func (mr *MockOffsetFetchResponse) SetOffset(group, topic string, partition int32, offset int64, metadata string, kerror KError) *MockOffsetFetchResponse {
 	if mr.offsets == nil {
 		mr.offsets = make(map[string]map[string]map[int32]*OffsetFetchResponseBlock)
@@ -599,7 +647,8 @@ func (mr *MockOffsetFetchResponse) SetOffset(group, topic string, partition int3
 	return mr
 }
 
-func (mr *MockOffsetFetchResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockOffsetFetchResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*OffsetFetchRequest)
 	group := req.ConsumerGroup
 	res := &OffsetFetchResponse{}
@@ -611,15 +660,18 @@ func (mr *MockOffsetFetchResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockCreateTopicsResponse ...
 type MockCreateTopicsResponse struct {
 	t TestReporter
 }
 
+//NewMockCreateTopicsResponse ...
 func NewMockCreateTopicsResponse(t TestReporter) *MockCreateTopicsResponse {
 	return &MockCreateTopicsResponse{t: t}
 }
 
-func (mr *MockCreateTopicsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockCreateTopicsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*CreateTopicsRequest)
 	res := &CreateTopicsResponse{
 		Version: req.Version,
@@ -640,15 +692,18 @@ func (mr *MockCreateTopicsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockDeleteTopicsResponse ...
 type MockDeleteTopicsResponse struct {
 	t TestReporter
 }
 
+//NewMockDeleteTopicsResponse ...
 func NewMockDeleteTopicsResponse(t TestReporter) *MockDeleteTopicsResponse {
 	return &MockDeleteTopicsResponse{t: t}
 }
 
-func (mr *MockDeleteTopicsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockDeleteTopicsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*DeleteTopicsRequest)
 	res := &DeleteTopicsResponse{}
 	res.TopicErrorCodes = make(map[string]KError)
@@ -659,15 +714,18 @@ func (mr *MockDeleteTopicsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockCreatePartitionsResponse ...
 type MockCreatePartitionsResponse struct {
 	t TestReporter
 }
 
+//NewMockCreatePartitionsResponse ...
 func NewMockCreatePartitionsResponse(t TestReporter) *MockCreatePartitionsResponse {
 	return &MockCreatePartitionsResponse{t: t}
 }
 
-func (mr *MockCreatePartitionsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockCreatePartitionsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*CreatePartitionsRequest)
 	res := &CreatePartitionsResponse{}
 	res.TopicPartitionErrors = make(map[string]*TopicPartitionError)
@@ -686,15 +744,18 @@ func (mr *MockCreatePartitionsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockDeleteRecordsResponse ...
 type MockDeleteRecordsResponse struct {
 	t TestReporter
 }
 
+//NewMockDeleteRecordsResponse ...
 func NewMockDeleteRecordsResponse(t TestReporter) *MockDeleteRecordsResponse {
 	return &MockDeleteRecordsResponse{t: t}
 }
 
-func (mr *MockDeleteRecordsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockDeleteRecordsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*DeleteRecordsRequest)
 	res := &DeleteRecordsResponse{}
 	res.Topics = make(map[string]*DeleteRecordsResponseTopic)
@@ -709,15 +770,18 @@ func (mr *MockDeleteRecordsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockDescribeConfigsResponse ...
 type MockDescribeConfigsResponse struct {
 	t TestReporter
 }
 
+//NewMockDescribeConfigsResponse ...
 func NewMockDescribeConfigsResponse(t TestReporter) *MockDescribeConfigsResponse {
 	return &MockDescribeConfigsResponse{t: t}
 }
 
-func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*DescribeConfigsRequest)
 	res := &DescribeConfigsResponse{}
 
@@ -751,15 +815,18 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockAlterConfigsResponse ...
 type MockAlterConfigsResponse struct {
 	t TestReporter
 }
 
+//NewMockAlterConfigsResponse ...
 func NewMockAlterConfigsResponse(t TestReporter) *MockAlterConfigsResponse {
 	return &MockAlterConfigsResponse{t: t}
 }
 
-func (mr *MockAlterConfigsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockAlterConfigsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*AlterConfigsRequest)
 	res := &AlterConfigsResponse{}
 
@@ -772,15 +839,18 @@ func (mr *MockAlterConfigsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockCreateAclsResponse ...
 type MockCreateAclsResponse struct {
 	t TestReporter
 }
 
+//NewMockCreateAclsResponse ...
 func NewMockCreateAclsResponse(t TestReporter) *MockCreateAclsResponse {
 	return &MockCreateAclsResponse{t: t}
 }
 
-func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*CreateACLsRequest)
 	res := &CreateACLsResponse{}
 
@@ -790,15 +860,18 @@ func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockListAclsResponse ...
 type MockListAclsResponse struct {
 	t TestReporter
 }
 
+//NewMockListAclsResponse ...
 func NewMockListAclsResponse(t TestReporter) *MockListAclsResponse {
 	return &MockListAclsResponse{t: t}
 }
 
-func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockListAclsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*DescribeAclsRequest)
 	res := &DescribeAclsResponse{}
 
@@ -812,69 +885,82 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
 	return res
 }
 
+//MockSaslAuthenticateResponse ...
 type MockSaslAuthenticateResponse struct {
 	t             TestReporter
 	kerror        KError
 	saslAuthBytes []byte
 }
 
+//NewMockSaslAuthenticateResponse ...
 func NewMockSaslAuthenticateResponse(t TestReporter) *MockSaslAuthenticateResponse {
 	return &MockSaslAuthenticateResponse{t: t}
 }
 
-func (msar *MockSaslAuthenticateResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (msar *MockSaslAuthenticateResponse) For(reqBody versionedDecoder) MockEncoder {
 	res := &SaslAuthenticateResponse{}
 	res.Err = msar.kerror
 	res.SaslAuthBytes = msar.saslAuthBytes
 	return res
 }
 
+//SetError ...
 func (msar *MockSaslAuthenticateResponse) SetError(kerror KError) *MockSaslAuthenticateResponse {
 	msar.kerror = kerror
 	return msar
 }
 
+//SetAuthBytes ...
 func (msar *MockSaslAuthenticateResponse) SetAuthBytes(saslAuthBytes []byte) *MockSaslAuthenticateResponse {
 	msar.saslAuthBytes = saslAuthBytes
 	return msar
 }
 
+//MockDeleteAclsResponse ...
 type MockDeleteAclsResponse struct {
 	t TestReporter
 }
 
+//MockSaslHandshakeResponse ...
 type MockSaslHandshakeResponse struct {
 	enabledMechanisms []string
 	kerror            KError
 	t                 TestReporter
 }
 
+//NewMockSaslHandshakeResponse ...
 func NewMockSaslHandshakeResponse(t TestReporter) *MockSaslHandshakeResponse {
 	return &MockSaslHandshakeResponse{t: t}
 }
 
-func (mshr *MockSaslHandshakeResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mshr *MockSaslHandshakeResponse) For(reqBody versionedDecoder) MockEncoder {
 	res := &SaslHandshakeResponse{}
 	res.Err = mshr.kerror
 	res.EnabledMechanisms = mshr.enabledMechanisms
 	return res
 }
 
+//SetError ...
 func (mshr *MockSaslHandshakeResponse) SetError(kerror KError) *MockSaslHandshakeResponse {
 	mshr.kerror = kerror
 	return mshr
 }
 
+//SetEnabledMechanisms ...
 func (mshr *MockSaslHandshakeResponse) SetEnabledMechanisms(enabledMechanisms []string) *MockSaslHandshakeResponse {
 	mshr.enabledMechanisms = enabledMechanisms
 	return mshr
 }
 
+//NewMockDeleteAclsResponse ...
 func NewMockDeleteAclsResponse(t TestReporter) *MockDeleteAclsResponse {
 	return &MockDeleteAclsResponse{t: t}
 }
 
-func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) encoder {
+//For ...
+func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) MockEncoder {
 	req := reqBody.(*DeleteAclsRequest)
 	res := &DeleteAclsResponse{}
 

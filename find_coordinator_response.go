@@ -4,8 +4,7 @@ import (
 	"time"
 )
 
-var NoNode = &Broker{id: -1, addr: ":-1"}
-
+//FindCoordinatorResponse is response for find coordinator request
 type FindCoordinatorResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
@@ -66,7 +65,7 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 
 	coordinator := f.Coordinator
 	if coordinator == nil {
-		coordinator = NoNode
+		coordinator = noNodeCoordinator()
 	}
 	if err := coordinator.encode(pe, 0); err != nil {
 		return err
@@ -89,4 +88,8 @@ func (f *FindCoordinatorResponse) requiredVersion() KafkaVersion {
 	default:
 		return V0_8_2_0
 	}
+}
+
+func noNodeCoordinator() *Broker {
+	return &Broker{id: -1, addr: ":-1"}
 }

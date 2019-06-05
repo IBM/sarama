@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+//CreatePartitionsResponse is used to create a partition response
 type CreatePartitionsResponse struct {
 	ThrottleTime         time.Duration
 	TopicPartitionErrors map[string]*TopicPartitionError
@@ -55,18 +56,19 @@ func (c *CreatePartitionsResponse) decode(pd packetDecoder, version int16) (err 
 	return nil
 }
 
-func (r *CreatePartitionsResponse) key() int16 {
+func (c *CreatePartitionsResponse) key() int16 {
 	return 37
 }
 
-func (r *CreatePartitionsResponse) version() int16 {
+func (c *CreatePartitionsResponse) version() int16 {
 	return 0
 }
 
-func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {
+func (c *CreatePartitionsResponse) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }
 
+//TopicPartitionError is a topic partition error type
 type TopicPartitionError struct {
 	Err    KError
 	ErrMsg *string

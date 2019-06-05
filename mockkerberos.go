@@ -3,6 +3,7 @@ package sarama
 import (
 	"encoding/binary"
 	"encoding/hex"
+
 	"gopkg.in/jcmturner/gokrb5.v7/credentials"
 	"gopkg.in/jcmturner/gokrb5.v7/gssapi"
 	"gopkg.in/jcmturner/gokrb5.v7/iana/keyusage"
@@ -10,12 +11,14 @@ import (
 	"gopkg.in/jcmturner/gokrb5.v7/types"
 )
 
+//KafkaGSSAPIHandler ...
 type KafkaGSSAPIHandler struct {
 	client         *MockKerberosClient
 	badResponse    bool
 	badKeyChecksum bool
 }
 
+//MockKafkaGSSAPI ...
 func (h *KafkaGSSAPIHandler) MockKafkaGSSAPI(buffer []byte) []byte {
 	// Default payload used for verify
 	err := h.client.Login() // Mock client construct keys when login
@@ -27,7 +30,7 @@ func (h *KafkaGSSAPIHandler) MockKafkaGSSAPI(buffer []byte) []byte {
 	}
 
 	var pack = gssapi.WrapToken{
-		Flags:     KRB5_USER_AUTH,
+		Flags:     Krb5UserAuth,
 		EC:        12,
 		RRC:       0,
 		SndSeqNum: 3398292281,
@@ -54,6 +57,7 @@ func (h *KafkaGSSAPIHandler) MockKafkaGSSAPI(buffer []byte) []byte {
 	return response
 }
 
+//MockKerberosClient ...
 type MockKerberosClient struct {
 	asReqBytes  string
 	asRepBytes  string
@@ -63,6 +67,7 @@ type MockKerberosClient struct {
 	errorStage  string
 }
 
+//Login ...
 func (c *MockKerberosClient) Login() error {
 	if c.errorStage == "login" && c.mockError != nil {
 		return c.mockError
@@ -98,6 +103,7 @@ func (c *MockKerberosClient) Login() error {
 	return nil
 }
 
+//GetServiceTicket ...
 func (c *MockKerberosClient) GetServiceTicket(spn string) (messages.Ticket, types.EncryptionKey, error) {
 	if c.errorStage == "service_ticket" && c.mockError != nil {
 		return messages.Ticket{}, types.EncryptionKey{}, c.mockError
@@ -105,12 +111,15 @@ func (c *MockKerberosClient) GetServiceTicket(spn string) (messages.Ticket, type
 	return c.ASRep.Ticket, c.ASRep.DecryptedEncPart.Key, nil
 }
 
+//Domain ...
 func (c *MockKerberosClient) Domain() string {
 	return "EXAMPLE.COM"
 }
+
+//CName ...
 func (c *MockKerberosClient) CName() types.PrincipalName {
 	var p = types.PrincipalName{
-		NameType: KRB5_USER_AUTH,
+		NameType: Krb5UserAuth,
 		NameString: []string{
 			"kafka",
 			"kafka",
@@ -118,6 +127,8 @@ func (c *MockKerberosClient) CName() types.PrincipalName {
 	}
 	return p
 }
+
+//Destroy ...
 func (c *MockKerberosClient) Destroy() {
 	// Do nothing.
 }

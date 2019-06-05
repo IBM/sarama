@@ -3,11 +3,12 @@ package sarama
 import (
 	"errors"
 	"fmt"
-	"gopkg.in/jcmturner/gokrb5.v7/krberror"
 	"net"
 	"reflect"
 	"testing"
 	"time"
+
+	"gopkg.in/jcmturner/gokrb5.v7/krberror"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -550,7 +551,7 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 		conf.Net.SASL.GSSAPI.Username = "kafka"
 		conf.Net.SASL.GSSAPI.Password = "kafka"
 		conf.Net.SASL.GSSAPI.KeyTabPath = "kafka.keytab"
-		conf.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+		conf.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 		broker.conf = conf
 		broker.conf.Version = V1_0_0_0
 		dialer := net.Dialer{
@@ -860,8 +861,8 @@ var brokerTestTable = []struct {
 		"ApiVersionsRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
-			request := ApiVersionsRequest{}
-			response, err := broker.ApiVersions(&request)
+			request := APIVersionsRequest{}
+			response, err := broker.APIVersions(&request)
 			if err != nil {
 				t.Error(err)
 			}

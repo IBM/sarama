@@ -1,15 +1,16 @@
 package sarama
 
+//DescribeGroupsResponse is used to describe groups response
 type DescribeGroupsResponse struct {
 	Groups []*GroupDescription
 }
 
-func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
-	if err := pe.putArrayLength(len(r.Groups)); err != nil {
+func (d *DescribeGroupsResponse) encode(pe packetEncoder) error {
+	if err := pe.putArrayLength(len(d.Groups)); err != nil {
 		return err
 	}
 
-	for _, groupDescription := range r.Groups {
+	for _, groupDescription := range d.Groups {
 		if err := groupDescription.encode(pe); err != nil {
 			return err
 		}
@@ -18,16 +19,16 @@ func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err error) {
+func (d *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err error) {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	r.Groups = make([]*GroupDescription, n)
+	d.Groups = make([]*GroupDescription, n)
 	for i := 0; i < n; i++ {
-		r.Groups[i] = new(GroupDescription)
-		if err := r.Groups[i].decode(pd); err != nil {
+		d.Groups[i] = new(GroupDescription)
+		if err := d.Groups[i].decode(pd); err != nil {
 			return err
 		}
 	}
@@ -35,18 +36,19 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 	return nil
 }
 
-func (r *DescribeGroupsResponse) key() int16 {
+func (d *DescribeGroupsResponse) key() int16 {
 	return 15
 }
 
-func (r *DescribeGroupsResponse) version() int16 {
+func (d *DescribeGroupsResponse) version() int16 {
 	return 0
 }
 
-func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
+func (d *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }
 
+//GroupDescription describes a group
 type GroupDescription struct {
 	Err          KError
 	GroupID      string
@@ -56,27 +58,27 @@ type GroupDescription struct {
 	Members      map[string]*GroupMemberDescription
 }
 
-func (gd *GroupDescription) encode(pe packetEncoder) error {
-	pe.putInt16(int16(gd.Err))
+func (g *GroupDescription) encode(pe packetEncoder) error {
+	pe.putInt16(int16(g.Err))
 
-	if err := pe.putString(gd.GroupID); err != nil {
+	if err := pe.putString(g.GroupID); err != nil {
 		return err
 	}
-	if err := pe.putString(gd.State); err != nil {
+	if err := pe.putString(g.State); err != nil {
 		return err
 	}
-	if err := pe.putString(gd.ProtocolType); err != nil {
+	if err := pe.putString(g.ProtocolType); err != nil {
 		return err
 	}
-	if err := pe.putString(gd.Protocol); err != nil {
-		return err
-	}
-
-	if err := pe.putArrayLength(len(gd.Members)); err != nil {
+	if err := pe.putString(g.Protocol); err != nil {
 		return err
 	}
 
-	for memberID, groupMemberDescription := range gd.Members {
+	if err := pe.putArrayLength(len(g.Members)); err != nil {
+		return err
+	}
+
+	for memberID, groupMemberDescription := range g.Members {
 		if err := pe.putString(memberID); err != nil {
 			return err
 		}
@@ -88,24 +90,24 @@ func (gd *GroupDescription) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
+func (g *GroupDescription) decode(pd packetDecoder) (err error) {
 	kerr, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
 
-	gd.Err = KError(kerr)
+	g.Err = KError(kerr)
 
-	if gd.GroupID, err = pd.getString(); err != nil {
+	if g.GroupID, err = pd.getString(); err != nil {
 		return
 	}
-	if gd.State, err = pd.getString(); err != nil {
+	if g.State, err = pd.getString(); err != nil {
 		return
 	}
-	if gd.ProtocolType, err = pd.getString(); err != nil {
+	if g.ProtocolType, err = pd.getString(); err != nil {
 		return
 	}
-	if gd.Protocol, err = pd.getString(); err != nil {
+	if g.Protocol, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -117,15 +119,15 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 		return nil
 	}
 
-	gd.Members = make(map[string]*GroupMemberDescription)
+	g.Members = make(map[string]*GroupMemberDescription)
 	for i := 0; i < n; i++ {
 		memberID, err := pd.getString()
 		if err != nil {
 			return err
 		}
 
-		gd.Members[memberID] = new(GroupMemberDescription)
-		if err := gd.Members[memberID].decode(pd); err != nil {
+		g.Members[memberID] = new(GroupMemberDescription)
+		if err := g.Members[memberID].decode(pd); err != nil {
 			return err
 		}
 	}
@@ -133,6 +135,7 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
+//GroupMemberDescription is a group member description
 type GroupMemberDescription struct {
 	ClientID         string
 	ClientHost       string
@@ -140,48 +143,50 @@ type GroupMemberDescription struct {
 	MemberAssignment []byte
 }
 
-func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
-	if err := pe.putString(gmd.ClientID); err != nil {
+func (g *GroupMemberDescription) encode(pe packetEncoder) error {
+	if err := pe.putString(g.ClientID); err != nil {
 		return err
 	}
-	if err := pe.putString(gmd.ClientHost); err != nil {
+	if err := pe.putString(g.ClientHost); err != nil {
 		return err
 	}
-	if err := pe.putBytes(gmd.MemberMetadata); err != nil {
+	if err := pe.putBytes(g.MemberMetadata); err != nil {
 		return err
 	}
-	if err := pe.putBytes(gmd.MemberAssignment); err != nil {
+	if err := pe.putBytes(g.MemberAssignment); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (gmd *GroupMemberDescription) decode(pd packetDecoder) (err error) {
-	if gmd.ClientID, err = pd.getString(); err != nil {
+func (g *GroupMemberDescription) decode(pd packetDecoder) (err error) {
+	if g.ClientID, err = pd.getString(); err != nil {
 		return
 	}
-	if gmd.ClientHost, err = pd.getString(); err != nil {
+	if g.ClientHost, err = pd.getString(); err != nil {
 		return
 	}
-	if gmd.MemberMetadata, err = pd.getBytes(); err != nil {
+	if g.MemberMetadata, err = pd.getBytes(); err != nil {
 		return
 	}
-	if gmd.MemberAssignment, err = pd.getBytes(); err != nil {
+	if g.MemberAssignment, err = pd.getBytes(); err != nil {
 		return
 	}
 
 	return nil
 }
 
-func (gmd *GroupMemberDescription) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
+//GetMemberAssignment returns member assignment
+func (g *GroupMemberDescription) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
 	assignment := new(ConsumerGroupMemberAssignment)
-	err := decode(gmd.MemberAssignment, assignment)
+	err := decode(g.MemberAssignment, assignment)
 	return assignment, err
 }
 
-func (gmd *GroupMemberDescription) GetMemberMetadata() (*ConsumerGroupMemberMetadata, error) {
+//GetMemberMetadata returns member metadata
+func (g *GroupMemberDescription) GetMemberMetadata() (*ConsumerGroupMemberMetadata, error) {
 	metadata := new(ConsumerGroupMemberMetadata)
-	err := decode(gmd.MemberMetadata, metadata)
+	err := decode(g.MemberMetadata, metadata)
 	return metadata, err
 }

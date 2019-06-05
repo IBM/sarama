@@ -4,18 +4,19 @@ import (
 	"time"
 )
 
+//DeleteGroupsResponse is used to create a delete groups response
 type DeleteGroupsResponse struct {
 	ThrottleTime    time.Duration
 	GroupErrorCodes map[string]KError
 }
 
-func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+func (d *DeleteGroupsResponse) encode(pe packetEncoder) error {
+	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
 
-	if err := pe.putArrayLength(len(r.GroupErrorCodes)); err != nil {
+	if err := pe.putArrayLength(len(d.GroupErrorCodes)); err != nil {
 		return err
 	}
-	for groupID, errorCode := range r.GroupErrorCodes {
+	for groupID, errorCode := range d.GroupErrorCodes {
 		if err := pe.putString(groupID); err != nil {
 			return err
 		}
@@ -25,12 +26,12 @@ func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
+func (d *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
 	}
-	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
+	d.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	n, err := pd.getArrayLength()
 	if err != nil {
@@ -40,7 +41,7 @@ func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 		return nil
 	}
 
-	r.GroupErrorCodes = make(map[string]KError, n)
+	d.GroupErrorCodes = make(map[string]KError, n)
 	for i := 0; i < n; i++ {
 		groupID, err := pd.getString()
 		if err != nil {
@@ -51,20 +52,20 @@ func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 			return err
 		}
 
-		r.GroupErrorCodes[groupID] = KError(errorCode)
+		d.GroupErrorCodes[groupID] = KError(errorCode)
 	}
 
 	return nil
 }
 
-func (r *DeleteGroupsResponse) key() int16 {
+func (d *DeleteGroupsResponse) key() int16 {
 	return 42
 }
 
-func (r *DeleteGroupsResponse) version() int16 {
+func (d *DeleteGroupsResponse) version() int16 {
 	return 0
 }
 
-func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {
+func (d *DeleteGroupsResponse) requiredVersion() KafkaVersion {
 	return V1_1_0_0
 }

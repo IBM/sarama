@@ -1,44 +1,45 @@
 package sarama
 
+//SaslAuthenticateResponse is SASL authentication response
 type SaslAuthenticateResponse struct {
 	Err           KError
 	ErrorMessage  *string
 	SaslAuthBytes []byte
 }
 
-func (r *SaslAuthenticateResponse) encode(pe packetEncoder) error {
-	pe.putInt16(int16(r.Err))
-	if err := pe.putNullableString(r.ErrorMessage); err != nil {
+func (s *SaslAuthenticateResponse) encode(pe packetEncoder) error {
+	pe.putInt16(int16(s.Err))
+	if err := pe.putNullableString(s.ErrorMessage); err != nil {
 		return err
 	}
-	return pe.putBytes(r.SaslAuthBytes)
+	return pe.putBytes(s.SaslAuthBytes)
 }
 
-func (r *SaslAuthenticateResponse) decode(pd packetDecoder, version int16) error {
+func (s *SaslAuthenticateResponse) decode(pd packetDecoder, version int16) error {
 	kerr, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
 
-	r.Err = KError(kerr)
+	s.Err = KError(kerr)
 
-	if r.ErrorMessage, err = pd.getNullableString(); err != nil {
+	if s.ErrorMessage, err = pd.getNullableString(); err != nil {
 		return err
 	}
 
-	r.SaslAuthBytes, err = pd.getBytes()
+	s.SaslAuthBytes, err = pd.getBytes()
 
 	return err
 }
 
-func (r *SaslAuthenticateResponse) key() int16 {
+func (s *SaslAuthenticateResponse) key() int16 {
 	return APIKeySASLAuth
 }
 
-func (r *SaslAuthenticateResponse) version() int16 {
+func (s *SaslAuthenticateResponse) version() int16 {
 	return 0
 }
 
-func (r *SaslAuthenticateResponse) requiredVersion() KafkaVersion {
+func (s *SaslAuthenticateResponse) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }

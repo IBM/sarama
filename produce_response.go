@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+//ProduceResponseBlock is a produce response block
 type ProduceResponseBlock struct {
 	Err    KError
 	Offset int64
@@ -12,14 +13,14 @@ type ProduceResponseBlock struct {
 	Timestamp time.Time
 }
 
-func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err error) {
+func (p *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err error) {
 	tmp, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
-	b.Err = KError(tmp)
+	p.Err = KError(tmp)
 
-	b.Offset, err = pd.getInt64()
+	p.Offset, err = pd.getInt64()
 	if err != nil {
 		return err
 	}
@@ -28,23 +29,23 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 		if millis, err := pd.getInt64(); err != nil {
 			return err
 		} else if millis != -1 {
-			b.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
+			p.Timestamp = time.Unix(millis/1000, (millis%1000)*int64(time.Millisecond))
 		}
 	}
 
 	return nil
 }
 
-func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt16(int16(b.Err))
-	pe.putInt64(b.Offset)
+func (p *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err error) {
+	pe.putInt16(int16(p.Err))
+	pe.putInt64(p.Offset)
 
 	if version >= 2 {
 		timestamp := int64(-1)
-		if !b.Timestamp.Before(time.Unix(0, 0)) {
-			timestamp = b.Timestamp.UnixNano() / int64(time.Millisecond)
-		} else if !b.Timestamp.IsZero() {
-			return PacketEncodingError{fmt.Sprintf("invalid timestamp (%v)", b.Timestamp)}
+		if !p.Timestamp.Before(time.Unix(0, 0)) {
+			timestamp = p.Timestamp.UnixNano() / int64(time.Millisecond)
+		} else if !p.Timestamp.IsZero() {
+			return PacketEncodingError{fmt.Sprintf("invalid timestamp (%v)", p.Timestamp)}
 		}
 		pe.putInt64(timestamp)
 	}
@@ -52,21 +53,22 @@ func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err erro
 	return nil
 }
 
+//ProduceResponse is a produce response type
 type ProduceResponse struct {
 	Blocks       map[string]map[int32]*ProduceResponseBlock
 	Version      int16
 	ThrottleTime time.Duration // only provided if Version >= 1
 }
 
-func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (p *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
+	p.Version = version
 
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	r.Blocks = make(map[string]map[int32]*ProduceResponseBlock, numTopics)
+	p.Blocks = make(map[string]map[int32]*ProduceResponseBlock, numTopics)
 	for i := 0; i < numTopics; i++ {
 		name, err := pd.getString()
 		if err != nil {
@@ -78,7 +80,7 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 
-		r.Blocks[name] = make(map[int32]*ProduceResponseBlock, numBlocks)
+		p.Blocks[name] = make(map[int32]*ProduceResponseBlock, numBlocks)
 
 		for j := 0; j < numBlocks; j++ {
 			id, err := pd.getInt32()
@@ -91,28 +93,28 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 			if err != nil {
 				return err
 			}
-			r.Blocks[name][id] = block
+			p.Blocks[name][id] = block
 		}
 	}
 
-	if r.Version >= 1 {
+	if p.Version >= 1 {
 		millis, err := pd.getInt32()
 		if err != nil {
 			return err
 		}
 
-		r.ThrottleTime = time.Duration(millis) * time.Millisecond
+		p.ThrottleTime = time.Duration(millis) * time.Millisecond
 	}
 
 	return nil
 }
 
-func (r *ProduceResponse) encode(pe packetEncoder) error {
-	err := pe.putArrayLength(len(r.Blocks))
+func (p *ProduceResponse) encode(pe packetEncoder) error {
+	err := pe.putArrayLength(len(p.Blocks))
 	if err != nil {
 		return err
 	}
-	for topic, partitions := range r.Blocks {
+	for topic, partitions := range p.Blocks {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -123,28 +125,28 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 		}
 		for id, prb := range partitions {
 			pe.putInt32(id)
-			err = prb.encode(pe, r.Version)
+			err = prb.encode(pe, p.Version)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	if r.Version >= 1 {
-		pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+	if p.Version >= 1 {
+		pe.putInt32(int32(p.ThrottleTime / time.Millisecond))
 	}
 	return nil
 }
 
-func (r *ProduceResponse) key() int16 {
+func (p *ProduceResponse) key() int16 {
 	return 0
 }
 
-func (r *ProduceResponse) version() int16 {
-	return r.Version
+func (p *ProduceResponse) version() int16 {
+	return p.Version
 }
 
-func (r *ProduceResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (p *ProduceResponse) requiredVersion() KafkaVersion {
+	switch p.Version {
 	case 1:
 		return V0_9_0_0
 	case 2:
@@ -156,33 +158,35 @@ func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
-	if r.Blocks == nil {
+//GetBlock return a produce response block
+func (p *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
+	if p.Blocks == nil {
 		return nil
 	}
 
-	if r.Blocks[topic] == nil {
+	if p.Blocks[topic] == nil {
 		return nil
 	}
 
-	return r.Blocks[topic][partition]
+	return p.Blocks[topic][partition]
 }
 
 // Testing API
 
-func (r *ProduceResponse) AddTopicPartition(topic string, partition int32, err KError) {
-	if r.Blocks == nil {
-		r.Blocks = make(map[string]map[int32]*ProduceResponseBlock)
+//AddTopicPartition adds a given topic and partition
+func (p *ProduceResponse) AddTopicPartition(topic string, partition int32, err KError) {
+	if p.Blocks == nil {
+		p.Blocks = make(map[string]map[int32]*ProduceResponseBlock)
 	}
-	byTopic, ok := r.Blocks[topic]
+	byTopic, ok := p.Blocks[topic]
 	if !ok {
 		byTopic = make(map[int32]*ProduceResponseBlock)
-		r.Blocks[topic] = byTopic
+		p.Blocks[topic] = byTopic
 	}
 	block := &ProduceResponseBlock{
 		Err: err,
 	}
-	if r.Version >= 2 {
+	if p.Version >= 2 {
 		block.Timestamp = time.Now()
 	}
 	byTopic[partition] = block

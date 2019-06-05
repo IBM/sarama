@@ -534,12 +534,12 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.GSSAPI.ServiceName must not be empty when GSS-API mechanism is used")
 			}
 
-			if c.Net.SASL.GSSAPI.AuthType == KRB5_USER_AUTH {
+			if c.Net.SASL.GSSAPI.AuthType == Krb5UserAuth {
 				if c.Net.SASL.GSSAPI.Password == "" {
 					return ConfigurationError("Net.SASL.GSSAPI.Password must not be empty when GSS-API " +
 						"mechanism is used and Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH")
 				}
-			} else if c.Net.SASL.GSSAPI.AuthType == KRB5_KEYTAB_AUTH {
+			} else if c.Net.SASL.GSSAPI.AuthType == Krb5KeyTabAuth {
 				if c.Net.SASL.GSSAPI.KeyTabPath == "" {
 					return ConfigurationError("Net.SASL.GSSAPI.KeyTabPath must not be empty when GSS-API mechanism is used" +
 						" and  Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH")

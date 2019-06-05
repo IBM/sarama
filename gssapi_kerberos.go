@@ -3,6 +3,10 @@ package sarama
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
+	"strings"
+	"time"
+
 	"github.com/jcmturner/gofork/encoding/asn1"
 	"gopkg.in/jcmturner/gokrb5.v7/asn1tools"
 	"gopkg.in/jcmturner/gokrb5.v7/gssapi"
@@ -10,21 +14,26 @@ import (
 	"gopkg.in/jcmturner/gokrb5.v7/iana/keyusage"
 	"gopkg.in/jcmturner/gokrb5.v7/messages"
 	"gopkg.in/jcmturner/gokrb5.v7/types"
-	"io"
-	"strings"
-	"time"
 )
 
 const (
-	TOK_ID_KRB_AP_REQ   = 256
-	GSS_API_GENERIC_TAG = 0x60
-	KRB5_USER_AUTH      = 1
-	KRB5_KEYTAB_AUTH    = 2
-	GSS_API_INITIAL     = 1
-	GSS_API_VERIFY      = 2
-	GSS_API_FINISH      = 3
+	//TokIDKrbApReq ...
+	TokIDKrbApReq = 256
+	//GSSAPIGenericTag ...
+	GSSAPIGenericTag = 0x60
+	//Krb5UserAuth ...
+	Krb5UserAuth = 1
+	//Krb5KeyTabAuth ...
+	Krb5KeyTabAuth = 2
+	//GSSAPIInitial ...
+	GSSAPIInitial = 1
+	//GSSAPIVerify ...
+	GSSAPIVerify = 2
+	//GSSAPIFinish ...
+	GSSAPIFinish = 3
 )
 
+//GSSAPIConfig is a gss api config type
 type GSSAPIConfig struct {
 	AuthType           int
 	KeyTabPath         string
@@ -35,6 +44,7 @@ type GSSAPIConfig struct {
 	Realm              string
 }
 
+//GSSAPIKerberosAuth is gss api kerberos auth type
 type GSSAPIKerberosAuth struct {
 	Config                *GSSAPIConfig
 	ticket                messages.Ticket
@@ -43,6 +53,7 @@ type GSSAPIKerberosAuth struct {
 	step                  int
 }
 
+//KerberosClient is a kerberos client interface
 type KerberosClient interface {
 	Login() error
 	GetServiceTicket(spn string) (messages.Ticket, types.EncryptionKey, error)
@@ -132,7 +143,7 @@ func (krbAuth *GSSAPIKerberosAuth) createKrb5Token(
 		return nil, err
 	}
 	aprBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(aprBytes, TOK_ID_KRB_AP_REQ)
+	binary.BigEndian.PutUint16(aprBytes, TokIDKrbApReq)
 	tb, err := APReq.Marshal()
 	if err != nil {
 		return nil, err
@@ -157,7 +168,7 @@ func (krbAuth *GSSAPIKerberosAuth) appendGSSAPIHeader(payload []byte) ([]byte, e
 		return nil, err
 	}
 	tkoLengthBytes := asn1tools.MarshalLengthBytes(len(oidBytes) + len(payload))
-	GSSHeader := append([]byte{GSS_API_GENERIC_TAG}, tkoLengthBytes...)
+	GSSHeader := append([]byte{GSSAPIGenericTag}, tkoLengthBytes...)
 	GSSHeader = append(GSSHeader, oidBytes...)
 	GSSPackage := append(GSSHeader, payload...)
 	return GSSPackage, nil
@@ -165,7 +176,7 @@ func (krbAuth *GSSAPIKerberosAuth) appendGSSAPIHeader(payload []byte) ([]byte, e
 
 func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient KerberosClient) ([]byte, error) {
 	switch krbAuth.step {
-	case GSS_API_INITIAL:
+	case GSSAPIInitial:
 		aprBytes, err := krbAuth.createKrb5Token(
 			kerberosClient.Domain(),
 			kerberosClient.CName(),
@@ -174,9 +185,9 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 		if err != nil {
 			return nil, err
 		}
-		krbAuth.step = GSS_API_VERIFY
+		krbAuth.step = GSSAPIVerify
 		return krbAuth.appendGSSAPIHeader(aprBytes)
-	case GSS_API_VERIFY:
+	case GSSAPIVerify:
 		wrapTokenReq := gssapi.WrapToken{}
 		if err := wrapTokenReq.Unmarshal(bytes, true); err != nil {
 			return nil, err
@@ -191,13 +202,13 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 		if err != nil {
 			return nil, err
 		}
-		krbAuth.step = GSS_API_FINISH
+		krbAuth.step = GSSAPIFinish
 		return wrapTokenResponse.Marshal()
 	}
 	return nil, nil
 }
 
-/* This does the handshake for authorization */
+//Authorize does the handshake for authorization
 func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 
 	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
@@ -225,8 +236,8 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 	}
 	krbAuth.ticket = ticket
 	krbAuth.encKey = encKey
-	krbAuth.step = GSS_API_INITIAL
-	var receivedBytes []byte = nil
+	krbAuth.step = GSSAPIInitial
+	var receivedBytes []byte
 	defer kerberosClient.Destroy()
 	for {
 		packBytes, err := krbAuth.initSecContext(receivedBytes, kerberosClient)
@@ -241,7 +252,7 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 			return err
 		}
 		broker.updateOutgoingCommunicationMetrics(bytesWritten)
-		if krbAuth.step == GSS_API_VERIFY {
+		if krbAuth.step == GSSAPIVerify {
 			var bytesRead = 0
 			receivedBytes, bytesRead, err = krbAuth.readPackage(broker)
 			requestLatency := time.Since(requestTime)
@@ -250,7 +261,7 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 				Logger.Printf("Error while performing GSSAPI Kerberos Authentication: %s\n", err)
 				return err
 			}
-		} else if krbAuth.step == GSS_API_FINISH {
+		} else if krbAuth.step == GSSAPIFinish {
 			return nil
 		}
 	}

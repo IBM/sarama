@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+//CreateTopicsResponse is used to create topics responses
 type CreateTopicsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
@@ -81,6 +82,7 @@ func (c *CreateTopicsResponse) requiredVersion() KafkaVersion {
 	}
 }
 
+//TopicError is a topic error type
 type TopicError struct {
 	Err    KError
 	ErrMsg *string

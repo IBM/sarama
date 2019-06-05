@@ -1,5 +1,6 @@
 package sarama
 
+//TxnOffsetCommitRequest is a txn offset commit request type
 type TxnOffsetCommitRequest struct {
 	TransactionalID string
 	GroupID         string
@@ -83,18 +84,19 @@ func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err er
 	return nil
 }
 
-func (a *TxnOffsetCommitRequest) key() int16 {
+func (t *TxnOffsetCommitRequest) key() int16 {
 	return 28
 }
 
-func (a *TxnOffsetCommitRequest) version() int16 {
+func (t *TxnOffsetCommitRequest) version() int16 {
 	return 0
 }
 
-func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
+func (t *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+//PartitionOffsetMetadata is a partition offset metadata type
 type PartitionOffsetMetadata struct {
 	Partition int32
 	Offset    int64

@@ -33,28 +33,31 @@ type FetchRequest struct {
 	blocks      map[string]map[int32]*fetchRequestBlock
 }
 
+//IsolationLevel is used to define isolation level
 type IsolationLevel int8
 
 const (
+	//ReadUncommitted is an isolation level
 	ReadUncommitted IsolationLevel = iota
+	//ReadCommitted is an isolation level
 	ReadCommitted
 )
 
-func (r *FetchRequest) encode(pe packetEncoder) (err error) {
+func (f *FetchRequest) encode(pe packetEncoder) (err error) {
 	pe.putInt32(-1) // replica ID is always -1 for clients
-	pe.putInt32(r.MaxWaitTime)
-	pe.putInt32(r.MinBytes)
-	if r.Version >= 3 {
-		pe.putInt32(r.MaxBytes)
+	pe.putInt32(f.MaxWaitTime)
+	pe.putInt32(f.MinBytes)
+	if f.Version >= 3 {
+		pe.putInt32(f.MaxBytes)
 	}
-	if r.Version >= 4 {
-		pe.putInt8(int8(r.Isolation))
+	if f.Version >= 4 {
+		pe.putInt8(int8(f.Isolation))
 	}
-	err = pe.putArrayLength(len(r.blocks))
+	err = pe.putArrayLength(len(f.blocks))
 	if err != nil {
 		return err
 	}
-	for topic, blocks := range r.blocks {
+	for topic, blocks := range f.blocks {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -74,28 +77,28 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 	return nil
 }
 
-func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (f *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
+	f.Version = version
 	if _, err = pd.getInt32(); err != nil {
 		return err
 	}
-	if r.MaxWaitTime, err = pd.getInt32(); err != nil {
+	if f.MaxWaitTime, err = pd.getInt32(); err != nil {
 		return err
 	}
-	if r.MinBytes, err = pd.getInt32(); err != nil {
+	if f.MinBytes, err = pd.getInt32(); err != nil {
 		return err
 	}
-	if r.Version >= 3 {
-		if r.MaxBytes, err = pd.getInt32(); err != nil {
+	if f.Version >= 3 {
+		if f.MaxBytes, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
-	if r.Version >= 4 {
+	if f.Version >= 4 {
 		isolation, err := pd.getInt8()
 		if err != nil {
 			return err
 		}
-		r.Isolation = IsolationLevel(isolation)
+		f.Isolation = IsolationLevel(isolation)
 	}
 	topicCount, err := pd.getArrayLength()
 	if err != nil {
@@ -104,7 +107,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 	if topicCount == 0 {
 		return nil
 	}
-	r.blocks = make(map[string]map[int32]*fetchRequestBlock)
+	f.blocks = make(map[string]map[int32]*fetchRequestBlock)
 	for i := 0; i < topicCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -114,7 +117,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 		if err != nil {
 			return err
 		}
-		r.blocks[topic] = make(map[int32]*fetchRequestBlock)
+		f.blocks[topic] = make(map[int32]*fetchRequestBlock)
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
 			if err != nil {
@@ -124,22 +127,22 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 			if err = fetchBlock.decode(pd); err != nil {
 				return err
 			}
-			r.blocks[topic][partition] = fetchBlock
+			f.blocks[topic][partition] = fetchBlock
 		}
 	}
 	return nil
 }
 
-func (r *FetchRequest) key() int16 {
+func (f *FetchRequest) key() int16 {
 	return 1
 }
 
-func (r *FetchRequest) version() int16 {
-	return r.Version
+func (f *FetchRequest) version() int16 {
+	return f.Version
 }
 
-func (r *FetchRequest) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (f *FetchRequest) requiredVersion() KafkaVersion {
+	switch f.Version {
 	case 1:
 		return V0_9_0_0
 	case 2:
@@ -153,18 +156,19 @@ func (r *FetchRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
-	if r.blocks == nil {
-		r.blocks = make(map[string]map[int32]*fetchRequestBlock)
+//AddBlock is used to add a block to fetch request
+func (f *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
+	if f.blocks == nil {
+		f.blocks = make(map[string]map[int32]*fetchRequestBlock)
 	}
 
-	if r.blocks[topic] == nil {
-		r.blocks[topic] = make(map[int32]*fetchRequestBlock)
+	if f.blocks[topic] == nil {
+		f.blocks[topic] = make(map[int32]*fetchRequestBlock)
 	}
 
 	tmp := new(fetchRequestBlock)
 	tmp.maxBytes = maxBytes
 	tmp.fetchOffset = fetchOffset
 
-	r.blocks[topic][partitionID] = tmp
+	f.blocks[topic][partitionID] = tmp
 }

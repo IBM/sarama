@@ -1,29 +1,31 @@
 package sarama
 
+//GroupProtocol is a group protocol type
 type GroupProtocol struct {
 	Name     string
 	Metadata []byte
 }
 
-func (p *GroupProtocol) decode(pd packetDecoder) (err error) {
-	p.Name, err = pd.getString()
+func (g *GroupProtocol) decode(pd packetDecoder) (err error) {
+	g.Name, err = pd.getString()
 	if err != nil {
 		return err
 	}
-	p.Metadata, err = pd.getBytes()
+	g.Metadata, err = pd.getBytes()
 	return err
 }
 
-func (p *GroupProtocol) encode(pe packetEncoder) (err error) {
-	if err := pe.putString(p.Name); err != nil {
+func (g *GroupProtocol) encode(pe packetEncoder) (err error) {
+	if err := pe.putString(g.Name); err != nil {
 		return err
 	}
-	if err := pe.putBytes(p.Metadata); err != nil {
+	if err := pe.putBytes(g.Metadata); err != nil {
 		return err
 	}
 	return nil
 }
 
+//JoinGroupRequest is a join group request
 type JoinGroupRequest struct {
 	Version               int16
 	GroupID               string
@@ -35,30 +37,30 @@ type JoinGroupRequest struct {
 	OrderedGroupProtocols []*GroupProtocol
 }
 
-func (r *JoinGroupRequest) encode(pe packetEncoder) error {
-	if err := pe.putString(r.GroupID); err != nil {
+func (j *JoinGroupRequest) encode(pe packetEncoder) error {
+	if err := pe.putString(j.GroupID); err != nil {
 		return err
 	}
-	pe.putInt32(r.SessionTimeout)
-	if r.Version >= 1 {
-		pe.putInt32(r.RebalanceTimeout)
+	pe.putInt32(j.SessionTimeout)
+	if j.Version >= 1 {
+		pe.putInt32(j.RebalanceTimeout)
 	}
-	if err := pe.putString(r.MemberID); err != nil {
+	if err := pe.putString(j.MemberID); err != nil {
 		return err
 	}
-	if err := pe.putString(r.ProtocolType); err != nil {
+	if err := pe.putString(j.ProtocolType); err != nil {
 		return err
 	}
 
-	if len(r.GroupProtocols) > 0 {
-		if len(r.OrderedGroupProtocols) > 0 {
+	if len(j.GroupProtocols) > 0 {
+		if len(j.OrderedGroupProtocols) > 0 {
 			return PacketDecodingError{"cannot specify both GroupProtocols and OrderedGroupProtocols on JoinGroupRequest"}
 		}
 
-		if err := pe.putArrayLength(len(r.GroupProtocols)); err != nil {
+		if err := pe.putArrayLength(len(j.GroupProtocols)); err != nil {
 			return err
 		}
-		for name, metadata := range r.GroupProtocols {
+		for name, metadata := range j.GroupProtocols {
 			if err := pe.putString(name); err != nil {
 				return err
 			}
@@ -67,10 +69,10 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 			}
 		}
 	} else {
-		if err := pe.putArrayLength(len(r.OrderedGroupProtocols)); err != nil {
+		if err := pe.putArrayLength(len(j.OrderedGroupProtocols)); err != nil {
 			return err
 		}
-		for _, protocol := range r.OrderedGroupProtocols {
+		for _, protocol := range j.OrderedGroupProtocols {
 			if err := protocol.encode(pe); err != nil {
 				return err
 			}
@@ -80,28 +82,28 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (j *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
+	j.Version = version
 
-	if r.GroupID, err = pd.getString(); err != nil {
+	if j.GroupID, err = pd.getString(); err != nil {
 		return
 	}
 
-	if r.SessionTimeout, err = pd.getInt32(); err != nil {
+	if j.SessionTimeout, err = pd.getInt32(); err != nil {
 		return
 	}
 
 	if version >= 1 {
-		if r.RebalanceTimeout, err = pd.getInt32(); err != nil {
+		if j.RebalanceTimeout, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
 
-	if r.MemberID, err = pd.getString(); err != nil {
+	if j.MemberID, err = pd.getString(); err != nil {
 		return
 	}
 
-	if r.ProtocolType, err = pd.getString(); err != nil {
+	if j.ProtocolType, err = pd.getString(); err != nil {
 		return
 	}
 
@@ -113,29 +115,29 @@ func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 		return nil
 	}
 
-	r.GroupProtocols = make(map[string][]byte)
+	j.GroupProtocols = make(map[string][]byte)
 	for i := 0; i < n; i++ {
 		protocol := &GroupProtocol{}
 		if err := protocol.decode(pd); err != nil {
 			return err
 		}
-		r.GroupProtocols[protocol.Name] = protocol.Metadata
-		r.OrderedGroupProtocols = append(r.OrderedGroupProtocols, protocol)
+		j.GroupProtocols[protocol.Name] = protocol.Metadata
+		j.OrderedGroupProtocols = append(j.OrderedGroupProtocols, protocol)
 	}
 
 	return nil
 }
 
-func (r *JoinGroupRequest) key() int16 {
+func (j *JoinGroupRequest) key() int16 {
 	return 11
 }
 
-func (r *JoinGroupRequest) version() int16 {
-	return r.Version
+func (j *JoinGroupRequest) version() int16 {
+	return j.Version
 }
 
-func (r *JoinGroupRequest) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (j *JoinGroupRequest) requiredVersion() KafkaVersion {
+	switch j.Version {
 	case 2:
 		return V0_11_0_0
 	case 1:
@@ -145,19 +147,21 @@ func (r *JoinGroupRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *JoinGroupRequest) AddGroupProtocol(name string, metadata []byte) {
-	r.OrderedGroupProtocols = append(r.OrderedGroupProtocols, &GroupProtocol{
+//AddGroupProtocol is used to add group protocol
+func (j *JoinGroupRequest) AddGroupProtocol(name string, metadata []byte) {
+	j.OrderedGroupProtocols = append(j.OrderedGroupProtocols, &GroupProtocol{
 		Name:     name,
 		Metadata: metadata,
 	})
 }
 
-func (r *JoinGroupRequest) AddGroupProtocolMetadata(name string, metadata *ConsumerGroupMemberMetadata) error {
+//AddGroupProtocolMetadata is used to add group protocol metadata
+func (j *JoinGroupRequest) AddGroupProtocolMetadata(name string, metadata *ConsumerGroupMemberMetadata) error {
 	bin, err := encode(metadata, nil)
 	if err != nil {
 		return err
 	}
 
-	r.AddGroupProtocol(name, bin)
+	j.AddGroupProtocol(name, bin)
 	return nil
 }

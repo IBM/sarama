@@ -2,6 +2,7 @@ package sarama
 
 import "time"
 
+//DeleteTopicsRequest is a delete topics request type
 type DeleteTopicsRequest struct {
 	Version int16
 	Topics  []string

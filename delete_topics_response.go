@@ -2,6 +2,7 @@ package sarama
 
 import "time"
 
+//DeleteTopicsResponse is a delete topics response type
 type DeleteTopicsResponse struct {
 	Version         int16
 	ThrottleTime    time.Duration

@@ -121,7 +121,7 @@ func TestNetConfigValidates(t *testing.T) {
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
-				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 				cfg.Net.SASL.GSSAPI.Username = "sarama"
 				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
 				cfg.Net.SASL.GSSAPI.Realm = "kafka"
@@ -133,7 +133,7 @@ func TestNetConfigValidates(t *testing.T) {
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
-				cfg.Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH
+				cfg.Net.SASL.GSSAPI.AuthType = Krb5KeyTabAuth
 				cfg.Net.SASL.GSSAPI.Username = "sarama"
 				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
 				cfg.Net.SASL.GSSAPI.Realm = "kafka"
@@ -145,7 +145,7 @@ func TestNetConfigValidates(t *testing.T) {
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
-				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 				cfg.Net.SASL.GSSAPI.Password = "sarama"
 				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
 				cfg.Net.SASL.GSSAPI.Realm = "kafka"
@@ -156,7 +156,7 @@ func TestNetConfigValidates(t *testing.T) {
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
-				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 				cfg.Net.SASL.GSSAPI.Username = "sarama"
 				cfg.Net.SASL.GSSAPI.Password = "sarama"
 				cfg.Net.SASL.GSSAPI.Realm = "kafka"
@@ -179,7 +179,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
 				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
-				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 				cfg.Net.SASL.GSSAPI.Username = "sarama"
 				cfg.Net.SASL.GSSAPI.Password = "sarama"
 				cfg.Net.SASL.GSSAPI.Realm = "kafka"
@@ -190,7 +190,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Enable = true
 				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
 				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
-				cfg.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
+				cfg.Net.SASL.GSSAPI.AuthType = Krb5UserAuth
 				cfg.Net.SASL.GSSAPI.Username = "sarama"
 				cfg.Net.SASL.GSSAPI.Password = "sarama"
 				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"

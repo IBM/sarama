@@ -20,6 +20,7 @@ const (
 	WaitForAll RequiredAcks = -1
 )
 
+//ProduceRequest is a produce request
 type ProduceRequest struct {
 	TransactionalID *string
 	RequiredAcks    RequiredAcks
@@ -63,14 +64,14 @@ func updateBatchMetrics(recordBatch *RecordBatch, compressionRatioMetric metrics
 	return int64(len(recordBatch.Records))
 }
 
-func (r *ProduceRequest) encode(pe packetEncoder) error {
-	if r.Version >= 3 {
-		if err := pe.putNullableString(r.TransactionalID); err != nil {
+func (p *ProduceRequest) encode(pe packetEncoder) error {
+	if p.Version >= 3 {
+		if err := pe.putNullableString(p.TransactionalID); err != nil {
 			return err
 		}
 	}
-	pe.putInt16(int16(r.RequiredAcks))
-	pe.putInt32(r.Timeout)
+	pe.putInt16(int16(p.RequiredAcks))
+	pe.putInt32(p.Timeout)
 	metricRegistry := pe.metricRegistry()
 	var batchSizeMetric metrics.Histogram
 	var compressionRatioMetric metrics.Histogram
@@ -80,12 +81,12 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 	}
 	totalRecordCount := int64(0)
 
-	err := pe.putArrayLength(len(r.records))
+	err := pe.putArrayLength(len(p.records))
 	if err != nil {
 		return err
 	}
 
-	for topic, partitions := range r.records {
+	for topic, partitions := range p.records {
 		err = pe.putString(topic)
 		if err != nil {
 			return err
@@ -112,7 +113,7 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 				return err
 			}
 			if metricRegistry != nil {
-				if r.Version >= 3 {
+				if p.Version >= 3 {
 					topicRecordCount += updateBatchMetrics(records.RecordBatch, compressionRatioMetric, topicCompressionRatioMetric)
 				} else {
 					topicRecordCount += updateMsgSetMetrics(records.MsgSet, compressionRatioMetric, topicCompressionRatioMetric)
@@ -136,22 +137,22 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
-	r.Version = version
+func (p *ProduceRequest) decode(pd packetDecoder, version int16) error {
+	p.Version = version
 
 	if version >= 3 {
 		id, err := pd.getNullableString()
 		if err != nil {
 			return err
 		}
-		r.TransactionalID = id
+		p.TransactionalID = id
 	}
 	requiredAcks, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
-	r.RequiredAcks = RequiredAcks(requiredAcks)
-	if r.Timeout, err = pd.getInt32(); err != nil {
+	p.RequiredAcks = RequiredAcks(requiredAcks)
+	if p.Timeout, err = pd.getInt32(); err != nil {
 		return err
 	}
 	topicCount, err := pd.getArrayLength()
@@ -162,7 +163,7 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 		return nil
 	}
 
-	r.records = make(map[string]map[int32]Records)
+	p.records = make(map[string]map[int32]Records)
 	for i := 0; i < topicCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -172,7 +173,7 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 		if err != nil {
 			return err
 		}
-		r.records[topic] = make(map[int32]Records)
+		p.records[topic] = make(map[int32]Records)
 
 		for j := 0; j < partitionCount; j++ {
 			partition, err := pd.getInt32()
@@ -191,23 +192,23 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 			if err := records.decode(recordsDecoder); err != nil {
 				return err
 			}
-			r.records[topic][partition] = records
+			p.records[topic][partition] = records
 		}
 	}
 
 	return nil
 }
 
-func (r *ProduceRequest) key() int16 {
+func (p *ProduceRequest) key() int16 {
 	return 0
 }
 
-func (r *ProduceRequest) version() int16 {
-	return r.Version
+func (p *ProduceRequest) version() int16 {
+	return p.Version
 }
 
-func (r *ProduceRequest) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (p *ProduceRequest) requiredVersion() KafkaVersion {
+	switch p.Version {
 	case 1:
 		return V0_9_0_0
 	case 2:
@@ -219,34 +220,37 @@ func (r *ProduceRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *ProduceRequest) ensureRecords(topic string, partition int32) {
-	if r.records == nil {
-		r.records = make(map[string]map[int32]Records)
+func (p *ProduceRequest) ensureRecords(topic string, partition int32) {
+	if p.records == nil {
+		p.records = make(map[string]map[int32]Records)
 	}
 
-	if r.records[topic] == nil {
-		r.records[topic] = make(map[int32]Records)
+	if p.records[topic] == nil {
+		p.records[topic] = make(map[int32]Records)
 	}
 }
 
-func (r *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
-	r.ensureRecords(topic, partition)
-	set := r.records[topic][partition].MsgSet
+//AddMessage add a message to produce request
+func (p *ProduceRequest) AddMessage(topic string, partition int32, msg *Message) {
+	p.ensureRecords(topic, partition)
+	set := p.records[topic][partition].MsgSet
 
 	if set == nil {
 		set = new(MessageSet)
-		r.records[topic][partition] = newLegacyRecords(set)
+		p.records[topic][partition] = newLegacyRecords(set)
 	}
 
 	set.addMessage(msg)
 }
 
-func (r *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
-	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = newLegacyRecords(set)
+//AddSet adds a message to produce request
+func (p *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) {
+	p.ensureRecords(topic, partition)
+	p.records[topic][partition] = newLegacyRecords(set)
 }
 
-func (r *ProduceRequest) AddBatch(topic string, partition int32, batch *RecordBatch) {
-	r.ensureRecords(topic, partition)
-	r.records[topic][partition] = newDefaultRecords(batch)
+//AddBatch adds a batch to produce request
+func (p *ProduceRequest) AddBatch(topic string, partition int32, batch *RecordBatch) {
+	p.ensureRecords(topic, partition)
+	p.records[topic][partition] = newDefaultRecords(batch)
 }

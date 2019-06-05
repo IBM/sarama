@@ -1,5 +1,6 @@
 package sarama
 
+//OffsetFetchResponseBlock is an offset fetch response block
 type OffsetFetchResponseBlock struct {
 	Offset      int64
 	LeaderEpoch int32
@@ -7,20 +8,20 @@ type OffsetFetchResponseBlock struct {
 	Err         KError
 }
 
-func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
-	b.Offset, err = pd.getInt64()
+func (o *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
+	o.Offset, err = pd.getInt64()
 	if err != nil {
 		return err
 	}
 
 	if version >= 5 {
-		b.LeaderEpoch, err = pd.getInt32()
+		o.LeaderEpoch, err = pd.getInt32()
 		if err != nil {
 			return err
 		}
 	}
 
-	b.Metadata, err = pd.getString()
+	o.Metadata, err = pd.getString()
 	if err != nil {
 		return err
 	}
@@ -29,28 +30,29 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 	if err != nil {
 		return err
 	}
-	b.Err = KError(tmp)
+	o.Err = KError(tmp)
 
 	return nil
 }
 
-func (b *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt64(b.Offset)
+func (o *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err error) {
+	pe.putInt64(o.Offset)
 
 	if version >= 5 {
-		pe.putInt32(b.LeaderEpoch)
+		pe.putInt32(o.LeaderEpoch)
 	}
 
-	err = pe.putString(b.Metadata)
+	err = pe.putString(o.Metadata)
 	if err != nil {
 		return err
 	}
 
-	pe.putInt16(int16(b.Err))
+	pe.putInt16(int16(o.Err))
 
 	return nil
 }
 
+//OffsetFetchResponse is an offset fetch response type
 type OffsetFetchResponse struct {
 	Version        int16
 	ThrottleTimeMs int32
@@ -58,15 +60,15 @@ type OffsetFetchResponse struct {
 	Err            KError
 }
 
-func (r *OffsetFetchResponse) encode(pe packetEncoder) error {
-	if r.Version >= 3 {
-		pe.putInt32(r.ThrottleTimeMs)
+func (o *OffsetFetchResponse) encode(pe packetEncoder) error {
+	if o.Version >= 3 {
+		pe.putInt32(o.ThrottleTimeMs)
 	}
 
-	if err := pe.putArrayLength(len(r.Blocks)); err != nil {
+	if err := pe.putArrayLength(len(o.Blocks)); err != nil {
 		return err
 	}
-	for topic, partitions := range r.Blocks {
+	for topic, partitions := range o.Blocks {
 		if err := pe.putString(topic); err != nil {
 			return err
 		}
@@ -75,22 +77,22 @@ func (r *OffsetFetchResponse) encode(pe packetEncoder) error {
 		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			if err := block.encode(pe, r.Version); err != nil {
+			if err := block.encode(pe, o.Version); err != nil {
 				return err
 			}
 		}
 	}
-	if r.Version >= 2 {
-		pe.putInt16(int16(r.Err))
+	if o.Version >= 2 {
+		pe.putInt16(int16(o.Err))
 	}
 	return nil
 }
 
-func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
+func (o *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error) {
+	o.Version = version
 
 	if version >= 3 {
-		r.ThrottleTimeMs, err = pd.getInt32()
+		o.ThrottleTimeMs, err = pd.getInt32()
 		if err != nil {
 			return err
 		}
@@ -102,7 +104,7 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 	}
 
 	if numTopics > 0 {
-		r.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
+		o.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
 		for i := 0; i < numTopics; i++ {
 			name, err := pd.getString()
 			if err != nil {
@@ -115,10 +117,10 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 			}
 
 			if numBlocks == 0 {
-				r.Blocks[name] = nil
+				o.Blocks[name] = nil
 				continue
 			}
-			r.Blocks[name] = make(map[int32]*OffsetFetchResponseBlock, numBlocks)
+			o.Blocks[name] = make(map[int32]*OffsetFetchResponseBlock, numBlocks)
 
 			for j := 0; j < numBlocks; j++ {
 				id, err := pd.getInt32()
@@ -131,7 +133,7 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 				if err != nil {
 					return err
 				}
-				r.Blocks[name][id] = block
+				o.Blocks[name][id] = block
 			}
 		}
 	}
@@ -141,22 +143,22 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 		if err != nil {
 			return err
 		}
-		r.Err = KError(kerr)
+		o.Err = KError(kerr)
 	}
 
 	return nil
 }
 
-func (r *OffsetFetchResponse) key() int16 {
+func (o *OffsetFetchResponse) key() int16 {
 	return 9
 }
 
-func (r *OffsetFetchResponse) version() int16 {
-	return r.Version
+func (o *OffsetFetchResponse) version() int16 {
+	return o.Version
 }
 
-func (r *OffsetFetchResponse) requiredVersion() KafkaVersion {
-	switch r.Version {
+func (o *OffsetFetchResponse) requiredVersion() KafkaVersion {
+	switch o.Version {
 	case 1:
 		return V0_8_2_0
 	case 2:
@@ -172,26 +174,28 @@ func (r *OffsetFetchResponse) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *OffsetFetchResponse) GetBlock(topic string, partition int32) *OffsetFetchResponseBlock {
-	if r.Blocks == nil {
+//GetBlock is used to get a block from offset fetch response
+func (o *OffsetFetchResponse) GetBlock(topic string, partition int32) *OffsetFetchResponseBlock {
+	if o.Blocks == nil {
 		return nil
 	}
 
-	if r.Blocks[topic] == nil {
+	if o.Blocks[topic] == nil {
 		return nil
 	}
 
-	return r.Blocks[topic][partition]
+	return o.Blocks[topic][partition]
 }
 
-func (r *OffsetFetchResponse) AddBlock(topic string, partition int32, block *OffsetFetchResponseBlock) {
-	if r.Blocks == nil {
-		r.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock)
+//AddBlock is used to add a block  to offset fetch response
+func (o *OffsetFetchResponse) AddBlock(topic string, partition int32, block *OffsetFetchResponseBlock) {
+	if o.Blocks == nil {
+		o.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock)
 	}
-	partitions := r.Blocks[topic]
+	partitions := o.Blocks[topic]
 	if partitions == nil {
 		partitions = make(map[int32]*OffsetFetchResponseBlock)
-		r.Blocks[topic] = partitions
+		o.Blocks[topic] = partitions
 	}
 	partitions[partition] = block
 }

@@ -1,30 +1,32 @@
 package sarama
 
+//DeleteGroupsRequest is  used to create delete group request
 type DeleteGroupsRequest struct {
 	Groups []string
 }
 
-func (r *DeleteGroupsRequest) encode(pe packetEncoder) error {
-	return pe.putStringArray(r.Groups)
+func (d *DeleteGroupsRequest) encode(pe packetEncoder) error {
+	return pe.putStringArray(d.Groups)
 }
 
-func (r *DeleteGroupsRequest) decode(pd packetDecoder, version int16) (err error) {
-	r.Groups, err = pd.getStringArray()
+func (d *DeleteGroupsRequest) decode(pd packetDecoder, version int16) (err error) {
+	d.Groups, err = pd.getStringArray()
 	return
 }
 
-func (r *DeleteGroupsRequest) key() int16 {
+func (d *DeleteGroupsRequest) key() int16 {
 	return 42
 }
 
-func (r *DeleteGroupsRequest) version() int16 {
+func (d *DeleteGroupsRequest) version() int16 {
 	return 0
 }
 
-func (r *DeleteGroupsRequest) requiredVersion() KafkaVersion {
+func (d *DeleteGroupsRequest) requiredVersion() KafkaVersion {
 	return V1_1_0_0
 }
 
-func (r *DeleteGroupsRequest) AddGroup(group string) {
-	r.Groups = append(r.Groups, group)
+//AddGroup adds a given group to group requests
+func (d *DeleteGroupsRequest) AddGroup(group string) {
+	d.Groups = append(d.Groups, group)
 }

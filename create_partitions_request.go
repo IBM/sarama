@@ -2,6 +2,7 @@ package sarama
 
 import "time"
 
+//CreatePartitionsRequest creates a partition request
 type CreatePartitionsRequest struct {
 	TopicPartitions map[string]*TopicPartition
 	Timeout         time.Duration
@@ -59,18 +60,19 @@ func (c *CreatePartitionsRequest) decode(pd packetDecoder, version int16) (err e
 	return nil
 }
 
-func (r *CreatePartitionsRequest) key() int16 {
+func (c *CreatePartitionsRequest) key() int16 {
 	return 37
 }
 
-func (r *CreatePartitionsRequest) version() int16 {
+func (c *CreatePartitionsRequest) version() int16 {
 	return 0
 }
 
-func (r *CreatePartitionsRequest) requiredVersion() KafkaVersion {
+func (c *CreatePartitionsRequest) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }
 
+//TopicPartition holds a topic partition info
 type TopicPartition struct {
 	Count      int32
 	Assignment [][]int32

@@ -2,6 +2,7 @@ package sarama
 
 import "time"
 
+//InitProducerIDResponse is used to cerate init producer id response
 type InitProducerIDResponse struct {
 	ThrottleTime  time.Duration
 	Err           KError

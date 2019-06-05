@@ -463,9 +463,9 @@ func (b *Broker) DescribeGroups(request *DescribeGroupsRequest) (*DescribeGroups
 	return response, nil
 }
 
-//ApiVersions return api version response or error
-func (b *Broker) ApiVersions(request *ApiVersionsRequest) (*ApiVersionsResponse, error) {
-	response := new(ApiVersionsResponse)
+//APIVersions return api version response or error
+func (b *Broker) APIVersions(request *APIVersionsRequest) (*APIVersionsResponse, error) {
+	response := new(APIVersionsResponse)
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {
