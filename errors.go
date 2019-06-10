@@ -337,7 +337,7 @@ func (err KError) Error() string {
 	case ErrPreferredLeaderNotAvailable:
 		return "kafka server: The preferred leader was not available"
 	case ErrGroupMaxSizeReached:
-		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members."
+		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members. "
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
