@@ -161,8 +161,8 @@ const (
 	ErrFencedLeaderEpoch                  KError = 74
 	ErrUnknownLeaderEpoch                 KError = 75
 	ErrUnsupportedCompressionType         KError = 76
-	ErrStaleBrokerEpoch					  KError = 77
-	ErrOffsetNotAvailable				  KError = 78
+	ErrStaleBrokerEpoch                   KError = 77
+	ErrOffsetNotAvailable                 KError = 78
 	ErrMemberIdRequired                   KError = 79
 	ErrPreferredLeaderNotAvailable        KError = 80
 	ErrGroupMaxSizeReached                KError = 81
