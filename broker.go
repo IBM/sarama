@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"fmt"
-	metrics "github.com/rcrowley/go-metrics"
 	"io"
 	"net"
 	"sort"
@@ -13,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 // Broker represents a single Kafka broker connection. All operations on this object are entirely concurrency-safe.
@@ -944,19 +945,16 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 	// default to V0 to allow for backward compatability when SASL is enabled
 	// but not the handshake
-	saslHandshake := SASLHandshakeV0
 	if b.conf.Net.SASL.Handshake {
-		if b.conf.Version.IsAtLeast(V1_0_0_0) {
-			saslHandshake = SASLHandshakeV1
-		}
-		handshakeErr := b.sendAndReceiveSASLHandshake(SASLTypePlaintext, saslHandshake)
+
+		handshakeErr := b.sendAndReceiveSASLHandshake(SASLTypePlaintext, b.conf.Net.SASL.Version)
 		if handshakeErr != nil {
 			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
 			return handshakeErr
 		}
 	}
 
-	if saslHandshake == SASLHandshakeV1 {
+	if b.conf.Net.SASL.Version == SASLHandshakeV1 {
 		return b.sendAndReceiveV1SASLPlainAuth()
 	}
 	return b.sendAndReceiveV0SASLPlainAuth()
