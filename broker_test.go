@@ -441,6 +441,7 @@ func TestSASLPlainAuth(t *testing.T) {
 		conf.Net.SASL.Mechanism = SASLTypePlaintext
 		conf.Net.SASL.User = "token"
 		conf.Net.SASL.Password = "password"
+		conf.Net.SASL.Version = SASLHandshakeV1
 
 		broker.conf = conf
 		broker.conf.Version = V1_0_0_0

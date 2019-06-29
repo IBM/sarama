@@ -58,6 +58,9 @@ type Config struct {
 			// SASLMechanism is the name of the enabled SASL mechanism.
 			// Possible values: OAUTHBEARER, PLAIN (defaults to PLAIN).
 			Mechanism SASLMechanism
+			// Version is the SASL Protocol Version to use
+			// Kafka > 1.x should use V1, except on Azure EventHub which use V0
+			Version int16
 			// Whether or not to send the Kafka SASL handshake first if enabled
 			// (defaults to true). You should only set this to false if you're using
 			// a non-Kafka SASL proxy.
@@ -398,6 +401,7 @@ func NewConfig() *Config {
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
 	c.Net.SASL.Handshake = true
+	c.Net.SASL.Version = SASLHandshakeV0
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
