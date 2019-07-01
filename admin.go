@@ -102,9 +102,14 @@ func NewClusterAdmin(addrs []string, conf *Config) (ClusterAdmin, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewClusterAdminFromClient(client)
+}
 
+// NewClusterAdminFromClient creates a new ClusterAdmin using the given client.
+// Note that underlying client will also be closed on admin's Close() call.
+func NewClusterAdminFromClient(client Client) (ClusterAdmin, error) {
 	//make sure we can retrieve the controller
-	_, err = client.Controller()
+	_, err := client.Controller()
 	if err != nil {
 		return nil, err
 	}
