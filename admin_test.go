@@ -859,3 +859,33 @@ func TestListConsumerGroupOffsets(t *testing.T) {
 	}
 
 }
+
+func TestDeleteConsumerGroup(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	group := "my-group"
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		// "OffsetFetchRequest":  NewMockOffsetFetchResponse(t).SetOffset(group, "my-topic", partition, expectedOffset, "", ErrNoError),
+		"DeleteGroupsRequest": NewMockDeleteGroupsRequest(t).SetDeletedGroups([]string{group}),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
+	})
+
+	config := NewConfig()
+	config.Version = V1_1_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.DeleteConsumerGroup(group)
+	if err != nil {
+		t.Fatalf("DeleteConsumerGroup failed with error %v", err)
+	}
+
+}
