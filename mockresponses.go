@@ -885,3 +885,26 @@ func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) encoder {
 	}
 	return res
 }
+
+type MockDeleteGroupsResponse struct {
+	deletedGroups []string
+}
+
+func NewMockDeleteGroupsRequest(t TestReporter) *MockDeleteGroupsResponse {
+	return &MockDeleteGroupsResponse{}
+}
+
+func (m *MockDeleteGroupsResponse) SetDeletedGroups(groups []string) *MockDeleteGroupsResponse {
+	m.deletedGroups = groups
+	return m
+}
+
+func (m *MockDeleteGroupsResponse) For(reqBody versionedDecoder) encoder {
+	resp := &DeleteGroupsResponse{
+		GroupErrorCodes: map[string]KError{},
+	}
+	for _, group := range m.deletedGroups {
+		resp.GroupErrorCodes[group] = ErrNoError
+	}
+	return resp
+}
