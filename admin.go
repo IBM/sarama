@@ -611,7 +611,9 @@ func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions m
 		partitions:    topicPartitions,
 	}
 
-	if ca.conf.Version.IsAtLeast(V0_8_2_2) {
+	if ca.conf.Version.IsAtLeast(V0_10_2_0) {
+		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V0_8_2_2) {
 		request.Version = 1
 	}
 
