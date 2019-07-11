@@ -6,6 +6,15 @@ import (
 )
 
 const (
+	// RangeBalanceStrategyName identifies strategies that use the range partition assignment strategy
+	RangeBalanceStrategyName = "range"
+
+	// RoundRobinBalanceStrategyName identifies strategies that use the round-robin partition assignment strategy
+	RoundRobinBalanceStrategyName = "roundrobin"
+
+	// StickyBalanceStrategyName identifies strategies that use the sticky-partition assignment strategy
+	StickyBalanceStrategyName = "sticky"
+
 	defaultGeneration = -1
 )
 
@@ -45,7 +54,7 @@ type BalanceStrategy interface {
 //   M1: {T: [0, 1, 2]}
 //   M2: {T: [3, 4, 5]}
 var BalanceStrategyRange = &balanceStrategy{
-	name: "range",
+	name: RangeBalanceStrategyName,
 	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
 		step := float64(len(partitions)) / float64(len(memberIDs))
 
@@ -63,7 +72,7 @@ var BalanceStrategyRange = &balanceStrategy{
 //   M1: {T: [0, 2, 4]}
 //   M2: {T: [1, 3, 5]}
 var BalanceStrategyRoundRobin = &balanceStrategy{
-	name: "roundrobin",
+	name: RoundRobinBalanceStrategyName,
 	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
 		for i, part := range partitions {
 			memberID := memberIDs[i%len(memberIDs)]
@@ -150,7 +159,7 @@ type stickyBalanceStrategy struct {
 }
 
 // Name implements BalanceStrategy.
-func (s *stickyBalanceStrategy) Name() string { return "sticky" }
+func (s *stickyBalanceStrategy) Name() string { return StickyBalanceStrategyName }
 
 // Plan implements BalanceStrategy.
 func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error) {

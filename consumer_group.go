@@ -333,7 +333,7 @@ func (c *consumerGroup) syncGroupRequest(coordinator *Broker, plan BalanceStrate
 		assignment := &ConsumerGroupMemberAssignment{Topics: topics}
 
 		// Include topic assignments in group-assignment userdata for each consumer-group member
-		if c.config.Consumer.Group.Rebalance.Strategy == BalanceStrategySticky {
+		if c.config.Consumer.Group.Rebalance.Strategy.Name() == StickyBalanceStrategyName {
 			userDataBytes, err := encode(&StickyAssignorUserDataV1{
 				Topics:     topics,
 				Generation: generationID,
