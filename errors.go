@@ -161,6 +161,11 @@ const (
 	ErrFencedLeaderEpoch                  KError = 74
 	ErrUnknownLeaderEpoch                 KError = 75
 	ErrUnsupportedCompressionType         KError = 76
+	ErrStaleBrokerEpoch                   KError = 77
+	ErrOffsetNotAvailable                 KError = 78
+	ErrMemberIdRequired                   KError = 79
+	ErrPreferredLeaderNotAvailable        KError = 80
+	ErrGroupMaxSizeReached                KError = 81
 )
 
 func (err KError) Error() string {
@@ -323,6 +328,16 @@ func (err KError) Error() string {
 		return "kafka server: The leader epoch in the request is newer than the epoch on the broker."
 	case ErrUnsupportedCompressionType:
 		return "kafka server: The requesting client does not support the compression type of given partition."
+	case ErrStaleBrokerEpoch:
+		return "kafka server: Broker epoch has changed"
+	case ErrOffsetNotAvailable:
+		return "kafka server: The leader high watermark has not caught up from a recent leader election so the offsets cannot be guaranteed to be monotonically increasing"
+	case ErrMemberIdRequired:
+		return "kafka server: The group member needs to have a valid member id before actually entering a consumer group"
+	case ErrPreferredLeaderNotAvailable:
+		return "kafka server: The preferred leader was not available"
+	case ErrGroupMaxSizeReached:
+		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members."
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)

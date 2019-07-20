@@ -84,7 +84,10 @@ type ClusterAdmin interface {
 	// List the consumer group offsets available in the cluster.
 	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
 
-	// Get information about the nodes in the cluster.
+	// Delete a consumer group.
+	DeleteConsumerGroup(group string) error
+
+	// Get information about the nodes in the cluster
 	DescribeCluster() (brokers []*Broker, controllerID int32, err error)
 
 	// Close shuts down the admin and closes underlying client.
@@ -608,9 +611,38 @@ func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions m
 		partitions:    topicPartitions,
 	}
 
-	if ca.conf.Version.IsAtLeast(V0_8_2_2) {
+	if ca.conf.Version.IsAtLeast(V0_10_2_0) {
+		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V0_8_2_2) {
 		request.Version = 1
 	}
 
 	return coordinator.FetchOffset(request)
+}
+
+func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
+	coordinator, err := ca.client.Coordinator(group)
+	if err != nil {
+		return err
+	}
+
+	request := &DeleteGroupsRequest{
+		Groups: []string{group},
+	}
+
+	resp, err := coordinator.DeleteGroups(request)
+	if err != nil {
+		return err
+	}
+
+	groupErr, ok := resp.GroupErrorCodes[group]
+	if !ok {
+		return ErrIncompleteResponse
+	}
+
+	if groupErr != ErrNoError {
+		return groupErr
+	}
+
+	return nil
 }
