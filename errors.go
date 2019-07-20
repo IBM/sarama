@@ -81,6 +81,28 @@ func (err ConfigurationError) Error() string {
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
 
+// MultiError is used to contain multi error.
+type MultiError struct {
+	Errors *[]error
+}
+
+func (mErr MultiError) Error() string {
+	var errString = ""
+	for _, err := range *mErr.Errors {
+		errString += err.Error() + ","
+	}
+	return errString
+}
+
+// ErrDeleteRecords is the type of error returned when fail to delete the required records
+type ErrDeleteRecords struct {
+	MultiError
+}
+
+func (err ErrDeleteRecords) Error() string {
+	return "kafka server: failed to delete records " + err.MultiError.Error()
+}
+
 // Numeric error codes returned by the Kafka server.
 const (
 	ErrNoError                            KError = 0

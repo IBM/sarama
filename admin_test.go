@@ -333,13 +333,17 @@ func TestClusterAdminCreatePartitionsWithoutAuthorization(t *testing.T) {
 }
 
 func TestClusterAdminDeleteRecords(t *testing.T) {
+	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 1),
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
@@ -350,12 +354,70 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	partitionOffsetFake := make(map[int32]int64)
+	partitionOffsetFake[4] = 1000
+	errFake := admin.DeleteRecords(topicName, partitionOffsetFake)
+	if errFake == nil {
+		t.Fatal(err)
+	}
+
 	partitionOffset := make(map[int32]int64)
 	partitionOffset[1] = 1000
 	partitionOffset[2] = 1000
 	partitionOffset[3] = 1000
 
-	err = admin.DeleteRecords("my_topic", partitionOffset)
+	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminDeleteRecordsWithInCorrectBroker(t *testing.T) {
+	topicName := "my_topic"
+	seedBroker := NewMockBroker(t, 1)
+	secondBroker := NewMockBroker(t, 2)
+	defer seedBroker.Close()
+	defer secondBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.brokerID).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 2),
+		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.brokerID).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 2),
+		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partitionOffset := make(map[int32]int64)
+	partitionOffset[1] = 1000
+	partitionOffset[2] = 1000
+	partitionOffset[3] = 1000
+
+	err = admin.DeleteRecords(topicName, partitionOffset)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -367,13 +429,17 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 }
 
 func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
+	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 1),
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
@@ -389,9 +455,20 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	partitionOffset[2] = 1000
 	partitionOffset[3] = 1000
 
-	err = admin.DeleteRecords("my_topic", partitionOffset)
-	if err != ErrUnsupportedVersion {
+	err = admin.DeleteRecords(topicName, partitionOffset)
+	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
 		t.Fatal(err)
+	}
+	deleteRecordsError, ok := err.(ErrDeleteRecords)
+
+	if !ok {
+		t.Fatal(err)
+	}
+
+	for _, err := range *deleteRecordsError.Errors {
+		if err != ErrUnsupportedVersion {
+			t.Fatal(err)
+		}
 	}
 
 	err = admin.Close()
