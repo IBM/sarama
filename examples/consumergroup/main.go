@@ -72,7 +72,7 @@ func main() {
 	 * Setup a new Sarama consumer group
 	 */
 	consumer := Consumer{
-		ready: make(chan bool, 0),
+		ready: make(chan bool),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -82,8 +82,8 @@ func main() {
 	}
 
 	wg := &sync.WaitGroup{}
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		for {
 			if err := client.Consume(ctx, strings.Split(topics, ","), &consumer); err != nil {
@@ -93,7 +93,7 @@ func main() {
 			if ctx.Err() != nil {
 				return
 			}
-			consumer.ready = make(chan bool, 0)
+			consumer.ready = make(chan bool)
 		}
 	}()
 
