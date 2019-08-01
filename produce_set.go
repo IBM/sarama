@@ -127,6 +127,11 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		req.Version = 3
 	}
+	// TODO: check for Version cases between 4-6 inclusive.
+	// No protocol changes are introduced to the request, but the response changes.
+	if ps.parent.conf.Version.IsAtLeast(V2_1_0_0) {
+		req.Version = 7
+	}
 
 	for topic, partitionSets := range ps.msgs {
 		for partition, set := range partitionSets {
