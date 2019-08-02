@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type JoinGroupResponse struct {
 	Version       int16
 	ThrottleTime  int32
@@ -70,6 +72,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 	if err != nil {
 		return err
 	}
+	fmt.Print("******************* hello")
 
 	r.Err = KError(kerr)
 
