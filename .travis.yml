@@ -32,6 +32,7 @@ script:
 - if [[ "$TRAVIS_GO_VERSION" == 1.12* ]]; then make fmt; fi
 
 after_success:
+- go tool cover -func coverage.txt
 - bash <(curl -s https://codecov.io/bash)
 
 after_script: vagrant/halt_cluster.sh
