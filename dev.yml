@@ -2,7 +2,8 @@ name: sarama
 
 up:
   - go:
-      version: '1.11'
+      version: '1.12'
+      modules: on
 
 commands:
   test:
