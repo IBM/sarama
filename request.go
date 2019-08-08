@@ -131,7 +131,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 17:
 		return &SaslHandshakeRequest{}
 	case 18:
-		return &ApiVersionsRequest{}
+		return &APIVersionsRequest{}
 	case 19:
 		return &CreateTopicsRequest{}
 	case 20:

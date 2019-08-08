@@ -875,8 +875,8 @@ var brokerTestTable = []struct {
 		"ApiVersionsRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
-			request := ApiVersionsRequest{}
-			response, err := broker.ApiVersions(&request)
+			request := APIVersionsRequest{}
+			response, err := broker.APIVersions(&request)
 			if err != nil {
 				t.Error(err)
 			}

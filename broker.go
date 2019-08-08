@@ -63,7 +63,8 @@ const (
 	SASLTypeSCRAMSHA256 = "SCRAM-SHA-256"
 	// SASLTypeSCRAMSHA512 represents the SCRAM-SHA-512 mechanism.
 	SASLTypeSCRAMSHA512 = "SCRAM-SHA-512"
-	SASLTypeGSSAPI      = "GSSAPI"
+	// SASLTypeGSSAPI represents the SASLTypeGSSAPI mechanism.
+	SASLTypeGSSAPI = "GSSAPI"
 	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL auth using opaque packets.
 	SASLHandshakeV0 = int16(0)
@@ -462,9 +463,9 @@ func (b *Broker) DescribeGroups(request *DescribeGroupsRequest) (*DescribeGroups
 	return response, nil
 }
 
-//ApiVersions return api version response or error
-func (b *Broker) ApiVersions(request *ApiVersionsRequest) (*ApiVersionsResponse, error) {
-	response := new(ApiVersionsResponse)
+//APIVersions return api version response or error
+func (b *Broker) APIVersions(request *APIVersionsRequest) (*APIVersionsResponse, error) {
+	response := new(APIVersionsResponse)
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {
