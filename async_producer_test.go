@@ -9,6 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/fortytw2/leaktest"
+	metrics "github.com/rcrowley/go-metrics"
 )
 
 const TestMessage = "ABC THE MESSAGE"
@@ -308,6 +311,22 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	closeProducer(t, producer)
 }
 
+type testLogger struct {
+	t *testing.T
+}
+
+func (l *testLogger) Print(v ...interface{}) {
+	l.t.Log(v...)
+}
+
+func (l *testLogger) Printf(format string, v ...interface{}) {
+	l.t.Logf(format, v...)
+}
+
+func (l *testLogger) Println(v ...interface{}) {
+	l.t.Log(v...)
+}
+
 func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 
 	tt := func(t *testing.T, kErr KError) {
@@ -331,7 +350,6 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		seedBroker.Close()
 
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 0}
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 1}
@@ -356,6 +374,7 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 		leader2.Returns(prodSuccess)
 		expectResults(t, producer, 2, 0)
 
+		seedBroker.Close()
 		leader1.Close()
 		leader2.Close()
 		closeProducer(t, producer)
@@ -1126,6 +1145,37 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 
 	broker.Close()
 	closeProducer(t, producer)
+}
+
+// TestBrokerProducerShutdown ensures that a call to shutdown stops the
+// brokerProducer run() loop and doesn't leak any goroutines
+func TestBrokerProducerShutdown(t *testing.T) {
+	defer leaktest.Check(t)()
+	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
+	defer func() {
+		metrics.UseNilMetrics = false
+	}()
+
+	mockBroker := NewMockBroker(t, 1)
+	metadataResponse := &MetadataResponse{}
+	metadataResponse.AddBroker(mockBroker.Addr(), mockBroker.BrokerID())
+	metadataResponse.AddTopicPartition(
+		"my_topic", 0, mockBroker.BrokerID(), nil, nil, nil, ErrNoError)
+	mockBroker.Returns(metadataResponse)
+
+	producer, err := NewAsyncProducer([]string{mockBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	broker := &Broker{
+		addr: mockBroker.Addr(),
+		id:   mockBroker.BrokerID(),
+	}
+	bp := producer.(*asyncProducer).newBrokerProducer(broker)
+
+	bp.shutdown()
+	_ = producer.Close()
+	mockBroker.Close()
 }
 
 // This example shows how to use the producer while simultaneously
