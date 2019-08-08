@@ -255,7 +255,7 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 	}
 
 	batch := req.records["t1"][0].RecordBatch
-	if batch.FirstTimestamp != now {
+	if batch.FirstTimestamp != now.Truncate(time.Millisecond) {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
 	}
 	for i := 0; i < 10; i++ {
@@ -334,7 +334,7 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 	}
 
 	batch := req.records["t1"][0].RecordBatch
-	if batch.FirstTimestamp != now {
+	if batch.FirstTimestamp != now.Truncate(time.Millisecond) {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
 	}
 	if batch.ProducerID != pID {
@@ -366,5 +366,62 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 				t.Errorf("Wrong header value, expected %v, got %v", exp, h.Value)
 			}
 		}
+	}
+}
+
+func TestProduceSetConsistentTimestamps(t *testing.T) {
+	parent, ps1 := makeProduceSet()
+	ps2 := newProduceSet(parent)
+	parent.conf.Producer.RequiredAcks = WaitForAll
+	parent.conf.Producer.Timeout = 10 * time.Second
+	parent.conf.Version = V0_11_0_0
+
+	msg1 := &ProducerMessage{
+		Topic:          "t1",
+		Partition:      0,
+		Key:            StringEncoder(TestMessage),
+		Value:          StringEncoder(TestMessage),
+		Timestamp:      time.Unix(1555718400, 500000000),
+		sequenceNumber: 123,
+	}
+	msg2 := &ProducerMessage{
+		Topic:          "t1",
+		Partition:      0,
+		Key:            StringEncoder(TestMessage),
+		Value:          StringEncoder(TestMessage),
+		Timestamp:      time.Unix(1555718400, 500900000),
+		sequenceNumber: 123,
+	}
+	msg3 := &ProducerMessage{
+		Topic:          "t1",
+		Partition:      0,
+		Key:            StringEncoder(TestMessage),
+		Value:          StringEncoder(TestMessage),
+		Timestamp:      time.Unix(1555718400, 600000000),
+		sequenceNumber: 123,
+	}
+
+	safeAddMessage(t, ps1, msg1)
+	safeAddMessage(t, ps1, msg3)
+	req1 := ps1.buildRequest()
+	if req1.Version != 3 {
+		t.Error("Wrong request version")
+	}
+	batch1 := req1.records["t1"][0].RecordBatch
+	ft1 := batch1.FirstTimestamp.Unix()*1000 + int64(batch1.FirstTimestamp.Nanosecond()/1000000)
+	time1 := ft1 + int64(batch1.Records[1].TimestampDelta/time.Millisecond)
+
+	safeAddMessage(t, ps2, msg2)
+	safeAddMessage(t, ps2, msg3)
+	req2 := ps2.buildRequest()
+	if req2.Version != 3 {
+		t.Error("Wrong request version")
+	}
+	batch2 := req2.records["t1"][0].RecordBatch
+	ft2 := batch2.FirstTimestamp.Unix()*1000 + int64(batch2.FirstTimestamp.Nanosecond()/1000000)
+	time2 := ft2 + int64(batch2.Records[1].TimestampDelta/time.Millisecond)
+
+	if time1 != time2 {
+		t.Errorf("Message timestamps do not match: %v, %v", time1, time2)
 	}
 }
