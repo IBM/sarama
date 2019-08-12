@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"container/heap"
 	"math"
 	"sort"
 )
@@ -507,22 +508,14 @@ func canTopicPartitionParticipateInReassignment(partition topicPartitionAssignme
 
 // The assignment should improve the overall balance of the partition assignments to consumers.
 func assignPartition(partition topicPartitionAssignment, sortedCurrentSubscriptions []string, currentAssignment map[string][]topicPartitionAssignment, consumer2AllPotentialPartitions map[string][]topicPartitionAssignment, currentPartitionConsumer map[topicPartitionAssignment]string) []string {
-	updatedSubscriptions := make([]string, len(sortedCurrentSubscriptions))
-	for i, s := range sortedCurrentSubscriptions {
-		updatedSubscriptions[i] = s
-	}
-	i := 0
 	for _, memberID := range sortedCurrentSubscriptions {
 		if memberAssignmentsIncludeTopicPartition(consumer2AllPotentialPartitions[memberID], partition) {
-			updatedSubscriptions = removeIndexFromStringSlice(updatedSubscriptions, i)
 			currentAssignment[memberID] = append(currentAssignment[memberID], partition)
 			currentPartitionConsumer[partition] = memberID
-			updatedSubscriptions = append(updatedSubscriptions, memberID)
 			break
 		}
-		i++
 	}
-	return updatedSubscriptions
+	return sortMemberIDsByPartitionAssignments(currentAssignment)
 }
 
 // Deserialize topic partition assignment data to aid with creation of a sticky assignment.
@@ -599,44 +592,52 @@ func sortPartitions(currentAssignment map[string][]topicPartitionAssignment, par
 		// most assigned partitions to those with least)
 		assignments := filterAssignedPartitions(currentAssignment, partition2AllPotentialConsumers)
 
-		// sortedMemberIDs contains a descending-sorted list of consumers based on how many valid partitions are currently assigned to them
-		sortedMemberIDs := sortMemberIDsByPartitionAssignments(assignments)
-		for i := len(sortedMemberIDs)/2 - 1; i >= 0; i-- {
-			opp := len(sortedMemberIDs) - 1 - i
-			sortedMemberIDs[i], sortedMemberIDs[opp] = sortedMemberIDs[opp], sortedMemberIDs[i]
+		// use priority-queue to evaluate consumer group members in descending-order based on
+		// the number of topic partition assignments (i.e. consumers with most assignments first)
+		pq := make(assignmentPriorityQueue, len(assignments))
+		i := 0
+		for consumerID, consumerAssignments := range assignments {
+			pq[i] = &consumerGroupMember{
+				id:          consumerID,
+				assignments: consumerAssignments,
+				index:       i,
+			}
+			i++
 		}
+		heap.Init(&pq)
+
 		for {
 			// loop until no consumer-group members remain
-			if len(sortedMemberIDs) == 0 {
+			if pq.Len() == 0 {
 				break
 			}
-			updatedMemberIDs := make([]string, 0)
-			for _, memberID := range sortedMemberIDs {
-				// partitions that were assigned to a different consumer last time
-				prevPartitions := make([]topicPartitionAssignment, 0)
-				for partition := range partitionsWithADifferentPreviousAssignment {
-					// from partitions that had a different consumer before, keep only those that are assigned to this consumer now
-					if memberAssignmentsIncludeTopicPartition(assignments[memberID], partition) {
-						prevPartitions = append(prevPartitions, partition)
-					}
-				}
+			member := pq[0]
 
-				if len(prevPartitions) > 0 {
-					// if there is a partition on this consumer that was assigned to another consumer before mark it as good options for reassignment
-					partition := prevPartitions[0]
-					prevPartitions = append(prevPartitions[:0], prevPartitions[1:]...)
-					assignments[memberID] = removeTopicPartitionFromMemberAssignments(assignments[memberID], partition)
-					sortedPartitions = append(sortedPartitions, partition)
-					updatedMemberIDs = append(updatedMemberIDs, memberID)
-				} else if len(assignments[memberID]) > 0 {
-					// otherwise, mark any other one of the current partitions as a reassignment candidate
-					partition := assignments[memberID][0]
-					assignments[memberID] = append(assignments[memberID][:0], assignments[memberID][1:]...)
-					sortedPartitions = append(sortedPartitions, partition)
-					updatedMemberIDs = append(updatedMemberIDs, memberID)
+			// partitions that were assigned to a different consumer last time
+			prevPartitions := make([]topicPartitionAssignment, 0)
+			for partition := range partitionsWithADifferentPreviousAssignment {
+				// from partitions that had a different consumer before, keep only those that are assigned to this consumer now
+				if memberAssignmentsIncludeTopicPartition(member.assignments, partition) {
+					prevPartitions = append(prevPartitions, partition)
 				}
 			}
-			sortedMemberIDs = updatedMemberIDs
+
+			if len(prevPartitions) > 0 {
+				// if there is a partition on this consumer that was assigned to another consumer before mark it as good options for reassignment
+				partition := prevPartitions[0]
+				prevPartitions = append(prevPartitions[:0], prevPartitions[1:]...)
+				member.assignments = removeTopicPartitionFromMemberAssignments(member.assignments, partition)
+				sortedPartitions = append(sortedPartitions, partition)
+				heap.Fix(&pq, member.index)
+			} else if len(member.assignments) > 0 {
+				// otherwise, mark any other one of the current partitions as a reassignment candidate
+				partition := member.assignments[0]
+				member.assignments = append(member.assignments[:0], member.assignments[1:]...)
+				sortedPartitions = append(sortedPartitions, partition)
+				heap.Fix(&pq, member.index)
+			} else {
+				heap.Remove(&pq, 0)
+			}
 		}
 
 		for partition := range partition2AllPotentialConsumers {
@@ -1033,4 +1034,42 @@ nextCand:
 		return candidate
 	}
 	return -1
+}
+
+type consumerGroupMember struct {
+	index       int // the index of the item in the heap
+	id          string
+	assignments []topicPartitionAssignment
+}
+
+// A assignmentPriorityQueue implements heap.Interface and holds Items.
+type assignmentPriorityQueue []*consumerGroupMember
+
+func (pq assignmentPriorityQueue) Len() int { return len(pq) }
+
+func (pq assignmentPriorityQueue) Less(i, j int) bool {
+	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
+	return len(pq[i].assignments) > len(pq[j].assignments)
+}
+
+func (pq assignmentPriorityQueue) Swap(i, j int) {
+	pq[i], pq[j] = pq[j], pq[i]
+	pq[i].index = i
+	pq[j].index = j
+}
+
+func (pq *assignmentPriorityQueue) Push(x interface{}) {
+	n := len(*pq)
+	member := x.(*consumerGroupMember)
+	member.index = n
+	*pq = append(*pq, member)
+}
+
+func (pq *assignmentPriorityQueue) Pop() interface{} {
+	old := *pq
+	n := len(old)
+	member := old[n-1]
+	member.index = -1 // for safety
+	*pq = old[0 : n-1]
+	return member
 }
