@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"math"
 	"sort"
+	"strings"
 )
 
 const (
@@ -1048,7 +1049,10 @@ type assignmentPriorityQueue []*consumerGroupMember
 func (pq assignmentPriorityQueue) Len() int { return len(pq) }
 
 func (pq assignmentPriorityQueue) Less(i, j int) bool {
-	// We want Pop to give us the highest, not lowest, priority so we use greater than here.
+	// order asssignment priority queue in descending order using assignment-count/member-id
+	if len(pq[i].assignments) == len(pq[j].assignments) {
+		return strings.Compare(pq[i].id, pq[j].id) > 0
+	}
 	return len(pq[i].assignments) > len(pq[j].assignments)
 }
 
