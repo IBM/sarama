@@ -1038,12 +1038,13 @@ nextCand:
 }
 
 type consumerGroupMember struct {
-	index       int // the index of the item in the heap
+	index       int // the index of the consumer group member on the heap
 	id          string
 	assignments []topicPartitionAssignment
 }
 
-// A assignmentPriorityQueue implements heap.Interface and holds Items.
+// assignmentPriorityQueue is a priority-queue of consumer group members that is sorted
+// in descending order (most assignments to least assignments).
 type assignmentPriorityQueue []*consumerGroupMember
 
 func (pq assignmentPriorityQueue) Len() int { return len(pq) }
