@@ -187,7 +187,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 	partition2AllPotentialConsumers := make(map[topicPartitionAssignment][]string)
 	for topic, partitions := range topics {
 		for _, partition := range partitions {
-			partition2AllPotentialConsumers[topicPartitionAssignment{Topic: topic, Partition: partition}] = make([]string, 0)
+			partition2AllPotentialConsumers[topicPartitionAssignment{Topic: topic, Partition: partition}] = []string{}
 		}
 	}
 
