@@ -880,102 +880,6 @@ func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
 	}
 }
 
-func Test_removeIndexFromStringSlice(t *testing.T) {
-	type args struct {
-		s []string
-		i int
-	}
-	tests := []struct {
-		name string
-		args args
-		want []string
-	}{
-		{
-			name: "Empty slice",
-			args: args{
-				s: make([]string, 0),
-				i: 0,
-			},
-			want: make([]string, 0),
-		},
-		{
-			name: "Slice with single entry",
-			args: args{
-				s: []string{"foo"},
-				i: 0,
-			},
-			want: make([]string, 0),
-		},
-		{
-			name: "Slice with multiple entries",
-			args: args{
-				s: []string{"a", "b", "c"},
-				i: 0,
-			},
-			want: []string{"b", "c"},
-		},
-		{
-			name: "Slice with multiple entries and index is in the middle",
-			args: args{
-				s: []string{"a", "b", "c"},
-				i: 1,
-			},
-			want: []string{"a", "c"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := removeIndexFromStringSlice(tt.args.s, tt.args.i); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("removeIndexFromSlice() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func Test_removeValueFromStringSlice(t *testing.T) {
-	type args struct {
-		s []string
-		e string
-	}
-	tests := []struct {
-		name string
-		args args
-		want []string
-	}{
-		{
-			name: "Empty input slice",
-			args: args{
-				s: []string{},
-				e: "",
-			},
-			want: []string{},
-		},
-		{
-			name: "Input slice with one entry that doesn't match",
-			args: args{
-				s: []string{"a"},
-				e: "b",
-			},
-			want: []string{"a"},
-		},
-		{
-			name: "Input slice with multiple entries and a positive match",
-			args: args{
-				s: []string{"a", "b", "c"},
-				e: "b",
-			},
-			want: []string{"a", "c"},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := removeValueFromStringSlice(tt.args.s, tt.args.e); !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("removeValueFromSlice() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
 func Test_assignPartition(t *testing.T) {
 	type args struct {
 		partition                       topicPartitionAssignment
@@ -2275,4 +2179,90 @@ func getRandomSublist(r *rand.Rand, s []string) []string {
 		i++
 	}
 	return subList
+}
+
+func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
+	type args struct {
+		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
+	}
+	tests := []struct {
+		name string
+		args args
+		want []topicPartitionAssignment
+	}{
+		{
+			name: "Single topic partition",
+			args: args{
+				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
+					topicPartitionAssignment{
+						Topic:     "t1",
+						Partition: 0,
+					}: []string{"c1", "c2"},
+				},
+			},
+			want: []topicPartitionAssignment{
+				topicPartitionAssignment{
+					Topic:     "t1",
+					Partition: 0,
+				},
+			},
+		},
+		{
+			name: "Multiple topic partitions with the same number of consumers but different topic names",
+			args: args{
+				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
+					topicPartitionAssignment{
+						Topic:     "t1",
+						Partition: 0,
+					}: []string{"c1", "c2"},
+					topicPartitionAssignment{
+						Topic:     "t2",
+						Partition: 0,
+					}: []string{"c1", "c2"},
+				},
+			},
+			want: []topicPartitionAssignment{
+				topicPartitionAssignment{
+					Topic:     "t1",
+					Partition: 0,
+				},
+				topicPartitionAssignment{
+					Topic:     "t2",
+					Partition: 0,
+				},
+			},
+		},
+		{
+			name: "Multiple topic partitions with the same number of consumers and topic names",
+			args: args{
+				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
+					topicPartitionAssignment{
+						Topic:     "t1",
+						Partition: 0,
+					}: []string{"c1", "c2"},
+					topicPartitionAssignment{
+						Topic:     "t1",
+						Partition: 1,
+					}: []string{"c1", "c2"},
+				},
+			},
+			want: []topicPartitionAssignment{
+				topicPartitionAssignment{
+					Topic:     "t1",
+					Partition: 0,
+				},
+				topicPartitionAssignment{
+					Topic:     "t1",
+					Partition: 1,
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := sortPartitionsByPotentialConsumerAssignments(tt.args.partition2AllPotentialConsumers); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("sortPartitionsByPotentialConsumerAssignments() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
