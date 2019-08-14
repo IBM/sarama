@@ -513,6 +513,10 @@ func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 
 	request := &DescribeAclsRequest{AclFilter: filter}
 
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 1
+	}
+
 	b, err := ca.Controller()
 	if err != nil {
 		return nil, err
