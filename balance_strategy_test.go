@@ -1188,6 +1188,40 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "One consumer that is no longer subscribed to a topic that it had previously been consuming from",
+			args: args{
+				members: map[string]ConsumerGroupMemberMetadata{
+					"consumer1": ConsumerGroupMemberMetadata{
+						Topics:   []string{"topic2"},
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0}}, 1),
+					},
+				},
+				topics: map[string][]int32{
+					"topic1": []int32{0},
+					"topic2": []int32{0},
+				},
+			},
+		},
+		{
+			name: "Two consumers where one is no longer interested in consuming from a topic that it had been consuming from",
+			args: args{
+				members: map[string]ConsumerGroupMemberMetadata{
+					"consumer1": ConsumerGroupMemberMetadata{
+						Topics:   []string{"topic2"},
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0}}, 1),
+					},
+					"consumer2": ConsumerGroupMemberMetadata{
+						Topics:   []string{"topic1", "topic2"},
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{1}}, 1),
+					},
+				},
+				topics: map[string][]int32{
+					"topic1": []int32{0, 1},
+					"topic2": []int32{0, 1},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
