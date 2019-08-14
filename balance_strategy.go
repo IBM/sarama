@@ -215,9 +215,9 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 
 	// create a mapping of each partition to its current consumer, where possible
 	currentPartitionConsumers := make(map[topicPartitionAssignment]string, len(currentAssignment))
-	unvisitedPartitions := make(map[topicPartitionAssignment][]string, len(partition2AllPotentialConsumers))
+	unvisitedPartitions := make(map[topicPartitionAssignment]bool, len(partition2AllPotentialConsumers))
 	for partition := range partition2AllPotentialConsumers {
-		unvisitedPartitions[partition] = []string{}
+		unvisitedPartitions[partition] = true
 	}
 	var unassignedPartitions []topicPartitionAssignment
 	for memberID, partitions := range currentAssignment {
