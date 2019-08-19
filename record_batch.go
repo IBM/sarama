@@ -92,9 +92,6 @@ func (b *RecordBatch) encode(pe packetEncoder) error {
 		return err
 	}
 
-	if err := pe.pop(); err != nil {
-		return err
-	}
 	return pe.pop()
 }
 
