@@ -535,6 +535,10 @@ func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]Matchi
 	filters = append(filters, &filter)
 	request := &DeleteAclsRequest{Filters: filters}
 
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 1
+	}
+
 	b, err := ca.Controller()
 	if err != nil {
 		return nil, err
