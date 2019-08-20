@@ -804,8 +804,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				return err
 			}
 
-			if err.(KError) == ErrGroupAuthorizationFailed {
-				Logger.Println("client is not authorized to access this group.")
+			if err.(KError) == ErrTopicAuthorizationFailed {
+				Logger.Println("client is not authorized to access this topic. The topics were: ", topics)
+				return err
 			}
 			// else remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
