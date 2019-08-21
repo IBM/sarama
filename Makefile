@@ -50,3 +50,7 @@ get:
 .PHONY: clean
 clean:
 	go clean ./...
+
+.PHONY: tidy
+tidy:
+	go mod tidy -v
