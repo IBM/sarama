@@ -1,5 +1,10 @@
 # Changelog
 
+#### Next version (unreleased)
+
+ - Please **don't** use Zstd, as it doesn't work right now.
+   See https://github.com/Shopify/sarama/issues/1252
+
 #### Version 1.23.1 (2019-07-22)
 
 Bug Fixes:
