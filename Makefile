@@ -45,7 +45,7 @@ install_dependencies: get
 
 .PHONY: get
 get:
-	go get -t -v ./...
+	go get -v ./...
 
 .PHONY: clean
 clean:
