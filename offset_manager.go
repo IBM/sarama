@@ -58,7 +58,6 @@ func newOffsetManagerFromClient(group, memberID string, generation int32, client
 		client: client,
 		conf:   conf,
 		group:  group,
-		ticker: time.NewTicker(conf.Consumer.Offsets.CommitInterval),
 		poms:   make(map[string]map[int32]*partitionOffsetManager),
 
 		memberID:   memberID,
@@ -67,7 +66,10 @@ func newOffsetManagerFromClient(group, memberID string, generation int32, client
 		closing: make(chan none),
 		closed:  make(chan none),
 	}
-	go withRecover(om.mainLoop)
+	if conf.Consumer.Offsets.Enable {
+		om.ticker = time.NewTicker(conf.Consumer.Offsets.CommitInterval)
+		go withRecover(om.mainLoop)
+	}
 
 	return om, nil
 }
@@ -96,6 +98,10 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 }
 
 func (om *offsetManager) Close() error {
+	if !om.conf.Consumer.Offsets.Enable {
+		return nil
+	}
+
 	om.closeOnce.Do(func() {
 		// exit the mainLoop
 		close(om.closing)
