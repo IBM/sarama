@@ -1,8 +1,10 @@
 package sarama
 
 import (
+	"fmt"
 	"io"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -36,8 +38,8 @@ func TestCachedPartitions(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker("localhost:12345", 2)
-	metadataResponse.AddTopicPartition("my_topic", 0, 2, replicas, isr, ErrNoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, 2, replicas, isr, ErrLeaderNotAvailable)
+	metadataResponse.AddTopicPartition("my_topic", 0, 2, replicas, isr, []int32{}, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, 2, replicas, isr, []int32{}, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
@@ -74,8 +76,8 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 1, replicas[0], replicas, replicas, ErrNoError)
-	metadataResponse.AddTopicPartition("my_topic", 2, replicas[0], replicas, replicas, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, replicas[0], replicas, replicas, []int32{}, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 2, replicas[0], replicas, replicas, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
@@ -146,8 +148,8 @@ func TestClientMetadata(t *testing.T) {
 
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), replicas, isr, ErrNoError)
-	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, ErrLeaderNotAvailable)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), replicas, isr, []int32{}, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, []int32{}, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
 	config := NewConfig()
@@ -212,13 +214,101 @@ func TestClientMetadata(t *testing.T) {
 	safeClose(t, client)
 }
 
+func TestClientMetadataWithOfflineReplicas(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 5)
+
+	replicas := []int32{1, 2, 3}
+	isr := []int32{1, 2}
+	offlineReplicas := []int32{3}
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), replicas, isr, offlineReplicas, ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, []int32{}, ErrNoError)
+	metadataResponse.Version = 5
+
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	config.Metadata.Retry.Max = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topics, err := client.Topics()
+	if err != nil {
+		t.Error(err)
+	} else if len(topics) != 1 || topics[0] != "my_topic" {
+		t.Error("Client returned incorrect topics:", topics)
+	}
+
+	parts, err := client.Partitions("my_topic")
+	if err != nil {
+		t.Error(err)
+	} else if len(parts) != 2 || parts[0] != 0 || parts[1] != 1 {
+		t.Error("Client returned incorrect partitions for my_topic:", parts)
+	}
+
+	parts, err = client.WritablePartitions("my_topic")
+	if err != nil {
+		t.Error(err)
+	} else if len(parts) != 2 {
+		t.Error("Client returned incorrect writable partitions for my_topic:", parts)
+	}
+
+	tst, err := client.Leader("my_topic", 0)
+	if err != nil {
+		t.Error(err)
+	} else if tst.ID() != 5 {
+		t.Error("Leader for my_topic had incorrect ID.")
+	}
+
+	replicas, err = client.Replicas("my_topic", 0)
+	if err != nil {
+		t.Error(err)
+	} else if replicas[0] != 1 {
+		t.Error("Incorrect (or sorted) replica")
+	} else if replicas[1] != 2 {
+		t.Error("Incorrect (or sorted) replica")
+	} else if replicas[2] != 3 {
+		t.Error("Incorrect (or sorted) replica")
+	}
+
+	isr, err = client.InSyncReplicas("my_topic", 0)
+	if err != nil {
+		t.Error(err)
+	} else if len(isr) != 2 {
+		t.Error("Client returned incorrect ISRs for partition:", isr)
+	} else if isr[0] != 1 {
+		t.Error("Incorrect (or sorted) ISR:", isr)
+	} else if isr[1] != 2 {
+		t.Error("Incorrect (or sorted) ISR:", isr)
+	}
+
+	offlineReplicas, err = client.OfflineReplicas("my_topic", 0)
+	if err != nil {
+		t.Error(err)
+	} else if len(offlineReplicas) != 1 {
+		t.Error("Client returned incorrect offline replicas for partition:", offlineReplicas)
+	} else if offlineReplicas[0] != 3 {
+		t.Error("Incorrect offline replica:", offlineReplicas)
+	}
+
+	leader.Close()
+	seedBroker.Close()
+	safeClose(t, client)
+}
+
 func TestClientGetOffset(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 	leaderAddr := leader.Addr()
 
 	metadata := new(MetadataResponse)
-	metadata.AddTopicPartition("foo", 0, leader.BrokerID(), nil, nil, ErrNoError)
+	metadata.AddTopicPartition("foo", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	metadata.AddBroker(leaderAddr, leader.BrokerID())
 	seedBroker.Returns(metadata)
 
@@ -258,6 +348,43 @@ func TestClientGetOffset(t *testing.T) {
 	seedBroker.Close()
 	leader.Close()
 	safeClose(t, client)
+}
+
+func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse1 := new(MetadataResponse)
+	seedBroker.Returns(metadataResponse1)
+
+	retryCount := int32(0)
+
+	config := NewConfig()
+	config.Metadata.Retry.Max = 1
+	config.Metadata.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		atomic.AddInt32(&retryCount, 1)
+		return 0
+	}
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	metadataUnknownTopic := new(MetadataResponse)
+	metadataUnknownTopic.AddTopic("new_topic", ErrUnknownTopicOrPartition)
+	seedBroker.Returns(metadataUnknownTopic)
+	seedBroker.Returns(metadataUnknownTopic)
+
+	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
+		t.Error("ErrUnknownTopicOrPartition expected, got", err)
+	}
+
+	safeClose(t, client)
+	seedBroker.Close()
+
+	actualRetryCount := atomic.LoadInt32(&retryCount)
+	if actualRetryCount != 1 {
+		t.Fatalf("Expected BackoffFunc to be called exactly once, but saw %d", actualRetryCount)
+	}
 }
 
 func TestClientReceivingUnknownTopic(t *testing.T) {
@@ -315,8 +442,8 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 
 	metadataPartial := new(MetadataResponse)
 	metadataPartial.AddTopic("new_topic", ErrLeaderNotAvailable)
-	metadataPartial.AddTopicPartition("new_topic", 0, leader.BrokerID(), replicas, replicas, ErrNoError)
-	metadataPartial.AddTopicPartition("new_topic", 1, -1, replicas, []int32{}, ErrLeaderNotAvailable)
+	metadataPartial.AddTopicPartition("new_topic", 0, leader.BrokerID(), replicas, replicas, []int32{}, ErrNoError)
+	metadataPartial.AddTopicPartition("new_topic", 1, -1, replicas, []int32{}, []int32{}, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataPartial)
 
 	if err := client.RefreshMetadata("new_topic"); err != nil {
@@ -358,7 +485,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	seedBroker.Returns(metadataResponse1)
 
 	metadataResponse2 := new(MetadataResponse)
-	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, ErrNoError)
+	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
 	client, err := NewClient([]string{seedBroker.Addr()}, nil)
@@ -486,6 +613,75 @@ func TestClientController(t *testing.T) {
 	}
 }
 
+func TestClientMetadataTimeout(t *testing.T) {
+	for _, timeout := range []time.Duration{
+		250 * time.Millisecond, // Will cut the first retry pass
+		500 * time.Millisecond, // Will cut the second retry pass
+		750 * time.Millisecond, // Will cut the third retry pass
+		900 * time.Millisecond, // Will stop after the three retries
+	} {
+		t.Run(fmt.Sprintf("timeout=%v", timeout), func(t *testing.T) {
+			// Use a responsive broker to create a working client
+			initialSeed := NewMockBroker(t, 0)
+			emptyMetadata := new(MetadataResponse)
+			initialSeed.Returns(emptyMetadata)
+
+			conf := NewConfig()
+			// Speed up the metadata request failure because of a read timeout
+			conf.Net.ReadTimeout = 100 * time.Millisecond
+			// Disable backoff and refresh
+			conf.Metadata.Retry.Backoff = 0
+			conf.Metadata.RefreshFrequency = 0
+			// But configure a "global" timeout
+			conf.Metadata.Timeout = timeout
+			c, err := NewClient([]string{initialSeed.Addr()}, conf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			initialSeed.Close()
+
+			client := c.(*client)
+
+			// Start seed brokers that do not reply to anything and therefore a read
+			// on the TCP connection will timeout to simulate unresponsive brokers
+			seed1 := NewMockBroker(t, 1)
+			defer seed1.Close()
+			seed2 := NewMockBroker(t, 2)
+			defer seed2.Close()
+
+			// Overwrite the seed brokers with a fixed ordering to make this test deterministic
+			safeClose(t, client.seedBrokers[0])
+			client.seedBrokers = []*Broker{NewBroker(seed1.Addr()), NewBroker(seed2.Addr())}
+			client.deadSeeds = []*Broker{}
+
+			// Start refreshing metadata in the background
+			errChan := make(chan error)
+			start := time.Now()
+			go func() {
+				errChan <- c.RefreshMetadata()
+			}()
+
+			// Check that the refresh fails fast enough (less than twice the configured timeout)
+			// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
+			maxRefreshDuration := 2 * timeout
+			select {
+			case err := <-errChan:
+				t.Logf("Got err: %v after waiting for: %v", err, time.Since(start))
+				if err == nil {
+					t.Fatal("Expected failed RefreshMetadata, got nil")
+				}
+				if err != ErrOutOfBrokers {
+					t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
+				}
+			case <-time.After(maxRefreshDuration):
+				t.Fatalf("RefreshMetadata did not fail fast enough after waiting for %v", maxRefreshDuration)
+			}
+
+			safeClose(t, c)
+		})
+	}
+}
+
 func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	staleCoordinator := NewMockBroker(t, 2)
@@ -495,7 +691,7 @@ func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 	metadataResponse1 := new(MetadataResponse)
 	metadataResponse1.AddBroker(staleCoordinator.Addr(), staleCoordinator.BrokerID())
 	metadataResponse1.AddBroker(freshCoordinator.Addr(), freshCoordinator.BrokerID())
-	metadataResponse1.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, ErrNoError)
+	metadataResponse1.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse1)
 
 	client, err := NewClient([]string{seedBroker.Addr()}, nil)
@@ -590,7 +786,7 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 
 	replicas := []int32{coordinator.BrokerID()}
 	metadataResponse3 := new(MetadataResponse)
-	metadataResponse3.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, ErrNoError)
+	metadataResponse3.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse3)
 
 	coordinatorResponse2 := new(ConsumerMetadataResponse)
@@ -649,7 +845,7 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 	// Then return some metadata to the still-running background thread
 	leader := NewMockBroker(t, 2)
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("foo", 0, leader.BrokerID(), []int32{2}, []int32{2}, ErrNoError)
+	metadataResponse.AddTopicPartition("foo", 0, leader.BrokerID(), []int32{2}, []int32{2}, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
 	<-done

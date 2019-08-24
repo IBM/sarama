@@ -7,8 +7,11 @@ import (
 )
 
 func makeProduceSet() (*asyncProducer, *produceSet) {
+	conf := NewConfig()
+	txnmgr, _ := newTransactionManager(conf, nil)
 	parent := &asyncProducer{
-		conf: NewConfig(),
+		conf:   conf,
+		txnmgr: txnmgr,
 	}
 	return parent, newProduceSet(parent)
 }
@@ -32,10 +35,9 @@ func TestProduceSetInitial(t *testing.T) {
 }
 
 func TestProduceSetAddingMessages(t *testing.T) {
-	parent, ps := makeProduceSet()
-	parent.conf.Producer.Flush.MaxMessages = 1000
-
+	_, ps := makeProduceSet()
 	msg := &ProducerMessage{Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
+
 	safeAddMessage(t, ps, msg)
 
 	if ps.empty() {
@@ -45,8 +47,15 @@ func TestProduceSetAddingMessages(t *testing.T) {
 	if !ps.readyToFlush() {
 		t.Error("by default set should be ready to flush when any message is in place")
 	}
+}
 
-	for i := 0; i < 999; i++ {
+func TestProduceSetAddingMessagesOverflowMessagesLimit(t *testing.T) {
+	parent, ps := makeProduceSet()
+	parent.conf.Producer.Flush.MaxMessages = 1000
+
+	msg := &ProducerMessage{Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
+
+	for i := 0; i < 1000; i++ {
 		if ps.wouldOverflow(msg) {
 			t.Error("set shouldn't fill up after only", i+1, "messages")
 		}
@@ -55,6 +64,24 @@ func TestProduceSetAddingMessages(t *testing.T) {
 
 	if !ps.wouldOverflow(msg) {
 		t.Error("set should be full after 1000 messages")
+	}
+}
+
+func TestProduceSetAddingMessagesOverflowBytesLimit(t *testing.T) {
+	parent, ps := makeProduceSet()
+	parent.conf.Producer.MaxMessageBytes = 1000
+
+	msg := &ProducerMessage{Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
+
+	for ps.bufferBytes+msg.byteSize(2) < parent.conf.Producer.MaxMessageBytes {
+		if ps.wouldOverflow(msg) {
+			t.Error("set shouldn't fill up before 1000 bytes")
+		}
+		safeAddMessage(t, ps, msg)
+	}
+
+	if !ps.wouldOverflow(msg) {
+		t.Error("set should be full after 1000 bytes")
 	}
 }
 
@@ -72,8 +99,8 @@ func TestProduceSetPartitionTracking(t *testing.T) {
 	seenT1P1 := false
 	seenT2P0 := false
 
-	ps.eachPartition(func(topic string, partition int32, msgs []*ProducerMessage) {
-		if len(msgs) != 1 {
+	ps.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+		if len(pSet.msgs) != 1 {
 			t.Error("Wrong message count")
 		}
 
@@ -230,6 +257,94 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 	batch := req.records["t1"][0].RecordBatch
 	if batch.FirstTimestamp != now {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
+	}
+	for i := 0; i < 10; i++ {
+		rec := batch.Records[i]
+		if rec.TimestampDelta != time.Duration(i)*time.Second {
+			t.Errorf("Wrong timestamp delta: %v", rec.TimestampDelta)
+		}
+
+		if rec.OffsetDelta != int64(i) {
+			t.Errorf("Wrong relative inner offset, expected %d, got %d", i, rec.OffsetDelta)
+		}
+
+		for j, h := range batch.Records[i].Headers {
+			exp := fmt.Sprintf("header-%d", j+1)
+			if string(h.Key) != exp {
+				t.Errorf("Wrong header key, expected %v, got %v", exp, h.Key)
+			}
+			exp = fmt.Sprintf("value-%d", j+1)
+			if string(h.Value) != exp {
+				t.Errorf("Wrong header value, expected %v, got %v", exp, h.Value)
+			}
+		}
+	}
+}
+
+func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
+	const pID = 1000
+	const pEpoch = 1234
+
+	config := NewConfig()
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Idempotent = true
+	config.Version = V0_11_0_0
+
+	parent := &asyncProducer{
+		conf: config,
+		txnmgr: &transactionManager{
+			producerID:    pID,
+			producerEpoch: pEpoch,
+		},
+	}
+	ps := newProduceSet(parent)
+
+	now := time.Now()
+	msg := &ProducerMessage{
+		Topic:     "t1",
+		Partition: 0,
+		Key:       StringEncoder(TestMessage),
+		Value:     StringEncoder(TestMessage),
+		Headers: []RecordHeader{
+			RecordHeader{
+				Key:   []byte("header-1"),
+				Value: []byte("value-1"),
+			},
+			RecordHeader{
+				Key:   []byte("header-2"),
+				Value: []byte("value-2"),
+			},
+			RecordHeader{
+				Key:   []byte("header-3"),
+				Value: []byte("value-3"),
+			},
+		},
+		Timestamp:      now,
+		sequenceNumber: 123,
+	}
+	for i := 0; i < 10; i++ {
+		safeAddMessage(t, ps, msg)
+		msg.Timestamp = msg.Timestamp.Add(time.Second)
+	}
+
+	req := ps.buildRequest()
+
+	if req.Version != 3 {
+		t.Error("Wrong request version")
+	}
+
+	batch := req.records["t1"][0].RecordBatch
+	if batch.FirstTimestamp != now {
+		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
+	}
+	if batch.ProducerID != pID {
+		t.Errorf("Wrong producerID: %v", batch.ProducerID)
+	}
+	if batch.ProducerEpoch != pEpoch {
+		t.Errorf("Wrong producerEpoch: %v", batch.ProducerEpoch)
+	}
+	if batch.FirstSequence != 123 {
+		t.Errorf("Wrong first sequence: %v", batch.FirstSequence)
 	}
 	for i := 0; i < 10; i++ {
 		rec := batch.Records[i]

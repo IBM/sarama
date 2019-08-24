@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -96,7 +97,7 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 	}
 
 	err = admin.CreateTopic("my_topic", nil, false)
-	if err.Error() != "You must specify topic details" {
+	if err.Error() != "you must specify topic details" {
 		t.Fatal(err)
 	}
 	err = admin.Close()
@@ -105,7 +106,7 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 	}
 }
 
-func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
+func TestClusterAdminCreateTopicWithoutAuthorization(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
@@ -118,19 +119,71 @@ func TestClusterAdminCreateTopicWithDiffVersion(t *testing.T) {
 
 	config := NewConfig()
 	config.Version = V0_11_0_0
+
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
-	if err != ErrInsufficientData {
+	err = admin.CreateTopic("_internal_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+	want := "insufficient permissions to create topic with reserved prefix"
+	if !strings.HasSuffix(err.Error(), want) {
 		t.Fatal(err)
+	}
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminListTopics(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader("my_topic", 0, seedBroker.BrokerID()),
+		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := admin.ListTopics()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(entries) <= 0 {
+		t.Fatal(errors.New("no resource present"))
+	}
+
+	topic, found := entries["my_topic"]
+	if !found {
+		t.Fatal(errors.New("topic not found in response"))
+	}
+	_, found = topic.ConfigEntries["max.message.bytes"]
+	if found {
+		t.Fatal(errors.New("default topic config entry incorrectly found in response"))
+	}
+	value, _ := topic.ConfigEntries["retention.ms"]
+	if value == nil || *value != "5000" {
+		t.Fatal(errors.New("non-default topic config entry not found in response"))
 	}
 
 	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if topic.ReplicaAssignment == nil || topic.ReplicaAssignment[0][0] != 1 {
+		t.Fatal(errors.New("replica assignment not found in response"))
 	}
 }
 
@@ -250,7 +303,7 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 	}
 }
 
-func TestClusterAdminDeleteRecords(t *testing.T) {
+func TestClusterAdminCreatePartitionsWithoutAuthorization(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
@@ -258,6 +311,39 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(seedBroker.BrokerID()).
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.CreatePartitions("_internal_topic", 3, nil, false)
+	want := "insufficient permissions to create partition on topic with reserved prefix"
+	if !strings.HasSuffix(err.Error(), want) {
+		t.Fatal(err)
+	}
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminDeleteRecords(t *testing.T) {
+	topicName := "my_topic"
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 1),
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
@@ -268,12 +354,70 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	partitionOffsetFake := make(map[int32]int64)
+	partitionOffsetFake[4] = 1000
+	errFake := admin.DeleteRecords(topicName, partitionOffsetFake)
+	if errFake == nil {
+		t.Fatal(err)
+	}
+
 	partitionOffset := make(map[int32]int64)
 	partitionOffset[1] = 1000
 	partitionOffset[2] = 1000
 	partitionOffset[3] = 1000
 
-	err = admin.DeleteRecords("my_topic", partitionOffset)
+	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminDeleteRecordsWithInCorrectBroker(t *testing.T) {
+	topicName := "my_topic"
+	seedBroker := NewMockBroker(t, 1)
+	secondBroker := NewMockBroker(t, 2)
+	defer seedBroker.Close()
+	defer secondBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.brokerID).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 2),
+		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.brokerID).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 2),
+		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partitionOffset := make(map[int32]int64)
+	partitionOffset[1] = 1000
+	partitionOffset[2] = 1000
+	partitionOffset[3] = 1000
+
+	err = admin.DeleteRecords(topicName, partitionOffset)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,13 +429,17 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 }
 
 func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
+	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader(topicName, 1, 1).
+			SetLeader(topicName, 2, 1).
+			SetLeader(topicName, 3, 1),
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
@@ -307,9 +455,20 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	partitionOffset[2] = 1000
 	partitionOffset[3] = 1000
 
-	err = admin.DeleteRecords("my_topic", partitionOffset)
-	if err != ErrUnsupportedVersion {
+	err = admin.DeleteRecords(topicName, partitionOffset)
+	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
 		t.Fatal(err)
+	}
+	deleteRecordsError, ok := err.(ErrDeleteRecords)
+
+	if !ok {
+		t.Fatal(err)
+	}
+
+	for _, err := range *deleteRecordsError.Errors {
+		if err != ErrUnsupportedVersion {
+			t.Fatal(err)
+		}
 	}
 
 	err = admin.Close()
@@ -498,4 +657,312 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestDescribeTopic(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetLeader("my_topic", 0, seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topics, err := admin.DescribeTopics([]string{"my_topic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(topics) != 1 {
+		t.Fatalf("Expected 1 result, got %v", len(topics))
+	}
+
+	if topics[0].Name != "my_topic" {
+		t.Fatalf("Incorrect topic name: %v", topics[0].Name)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDescribeTopicWithVersion0_11(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetLeader("my_topic", 0, seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewConfig()
+	config.Version = V0_11_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topics, err := admin.DescribeTopics([]string{"my_topic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(topics) != 1 {
+		t.Fatalf("Expected 1 result, got %v", len(topics))
+	}
+
+	if topics[0].Name != "my_topic" {
+		t.Fatalf("Incorrect topic name: %v", topics[0].Name)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestDescribeConsumerGroup(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	expectedGroupID := "my-group"
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"DescribeGroupsRequest": NewMockDescribeGroupsResponse(t).AddGroupDescription(expectedGroupID, &GroupDescription{
+			GroupId: expectedGroupID,
+		}),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, expectedGroupID, seedBroker),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := admin.DescribeConsumerGroups([]string{expectedGroupID})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("Expected 1 result, got %v", len(result))
+	}
+
+	if result[0].GroupId != expectedGroupID {
+		t.Fatalf("Expected groupID %v, got %v", expectedGroupID, result[0].GroupId)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListConsumerGroups(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"ListGroupsRequest": NewMockListGroupsResponse(t).
+			AddGroup("my-group", "consumer"),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := admin.ListConsumerGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(groups) != 1 {
+		t.Fatalf("Expected %v results, got %v", 1, len(groups))
+	}
+
+	protocolType, ok := groups["my-group"]
+
+	if !ok {
+		t.Fatal("Expected group to be returned, but it did not")
+	}
+
+	if protocolType != "consumer" {
+		t.Fatalf("Expected protocolType %v, got %v", "consumer", protocolType)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+func TestListConsumerGroupsMultiBroker(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	secondBroker := NewMockBroker(t, 2)
+	defer secondBroker.Close()
+
+	firstGroup := "first"
+	secondGroup := "second"
+	nonExistingGroup := "non-existing-group"
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+		"ListGroupsRequest": NewMockListGroupsResponse(t).
+			AddGroup(firstGroup, "consumer"),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+		"ListGroupsRequest": NewMockListGroupsResponse(t).
+			AddGroup(secondGroup, "consumer"),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err := admin.ListConsumerGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(groups) != 2 {
+		t.Fatalf("Expected %v results, got %v", 1, len(groups))
+	}
+
+	if _, found := groups[firstGroup]; !found {
+		t.Fatalf("Expected group %v to be present in result set, but it isn't", firstGroup)
+	}
+
+	if _, found := groups[secondGroup]; !found {
+		t.Fatalf("Expected group %v to be present in result set, but it isn't", secondGroup)
+	}
+
+	if _, found := groups[nonExistingGroup]; found {
+		t.Fatalf("Expected group %v to not exist, but it exists", nonExistingGroup)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+func TestListConsumerGroupOffsets(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	group := "my-group"
+	topic := "my-topic"
+	partition := int32(0)
+	expectedOffset := int64(0)
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"OffsetFetchRequest": NewMockOffsetFetchResponse(t).SetOffset(group, "my-topic", partition, expectedOffset, "", ErrNoError).SetError(ErrNoError),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	response, err := admin.ListConsumerGroupOffsets(group, map[string][]int32{
+		topic: []int32{0},
+	})
+	if err != nil {
+		t.Fatalf("ListConsumerGroupOffsets failed with error %v", err)
+	}
+
+	block := response.GetBlock(topic, partition)
+	if block == nil {
+		t.Fatalf("Expected block for topic %v and partition %v to exist, but it doesn't", topic, partition)
+	}
+
+	if block.Offset != expectedOffset {
+		t.Fatalf("Expected offset %v, got %v", expectedOffset, block.Offset)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+}
+
+func TestDeleteConsumerGroup(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	group := "my-group"
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		// "OffsetFetchRequest":  NewMockOffsetFetchResponse(t).SetOffset(group, "my-topic", partition, expectedOffset, "", ErrNoError),
+		"DeleteGroupsRequest": NewMockDeleteGroupsRequest(t).SetDeletedGroups([]string{group}),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
+	})
+
+	config := NewConfig()
+	config.Version = V1_1_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.DeleteConsumerGroup(group)
+	if err != nil {
+		t.Fatalf("DeleteConsumerGroup failed with error %v", err)
+	}
+
 }
