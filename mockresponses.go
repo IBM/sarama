@@ -812,14 +812,28 @@ func NewMockListAclsResponse(t TestReporter) *MockListAclsResponse {
 func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*DescribeAclsRequest)
 	res := &DescribeAclsResponse{}
-
 	res.Err = ErrNoError
 	acl := &ResourceAcls{}
-	acl.Resource.ResourceName = *req.ResourceName
+	if req.ResourceName != nil {
+	    acl.Resource.ResourceName = *req.ResourceName
+	}
+	acl.Resource.ResourcePatternType = req.ResourcePatternTypeFilter
 	acl.Resource.ResourceType = req.ResourceType
-	acl.Acls = append(acl.Acls, &Acl{})
+	host := "*"
+	if req.Host != nil {
+	    host = *req.Host
+	}
+	principal := "User:test"
+	if req.Principal != nil {
+	    principal = *req.Principal
+	}
+	permissionType := req.PermissionType
+	if permissionType == AclPermissionAny {
+	    permissionType = AclPermissionAllow
+	}
+	acl.Acls = append(acl.Acls, &Acl{Operation: req.Operation, PermissionType: permissionType, Host: host, Principal: principal})
 	res.ResourceAcls = append(res.ResourceAcls, acl)
-
+	res.Version = int16(req.Version)
 	return res
 }
 
