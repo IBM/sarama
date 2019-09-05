@@ -22,7 +22,7 @@ func zstdDecompress(dst, src []byte) ([]byte, error) {
 
 func zstdCompress(dst, src []byte) ([]byte, error) {
 	zstdEncOnce.Do(func() {
-		zstdEnc, _ = zstd.NewWriter(nil)
+		zstdEnc, _ = zstd.NewWriter(nil, zstd.WithZeroFrames(true))
 	})
 	return zstdEnc.EncodeAll(src, dst), nil
 }
