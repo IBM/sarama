@@ -12,7 +12,6 @@ var (
 	zstdEncOnce, zstdDecOnce sync.Once
 )
 
-
 func zstdDecompress(dst, src []byte) ([]byte, error) {
 	zstdDecOnce.Do(func() {
 		zstdDec, _ = zstd.NewReader(nil)
