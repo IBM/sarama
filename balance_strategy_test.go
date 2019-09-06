@@ -203,7 +203,7 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 		wantErr                bool
 	}{
 		{
-			name:                   "Empty map",
+			name: "Empty map",
 			wantCurrentAssignments: map[string][]topicPartitionAssignment{},
 			wantPrevAssignments:    map[topicPartitionAssignment]consumerGenerationPair{},
 		},

@@ -815,21 +815,21 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoder {
 	res.Err = ErrNoError
 	acl := &ResourceAcls{}
 	if req.ResourceName != nil {
-	    acl.Resource.ResourceName = *req.ResourceName
+		acl.Resource.ResourceName = *req.ResourceName
 	}
 	acl.Resource.ResourcePatternType = req.ResourcePatternTypeFilter
 	acl.Resource.ResourceType = req.ResourceType
 	host := "*"
 	if req.Host != nil {
-	    host = *req.Host
+		host = *req.Host
 	}
 	principal := "User:test"
 	if req.Principal != nil {
-	    principal = *req.Principal
+		principal = *req.Principal
 	}
 	permissionType := req.PermissionType
 	if permissionType == AclPermissionAny {
-	    permissionType = AclPermissionAllow
+		permissionType = AclPermissionAllow
 	}
 	acl.Acls = append(acl.Acls, &Acl{Operation: req.Operation, PermissionType: permissionType, Host: host, Principal: principal})
 	res.ResourceAcls = append(res.ResourceAcls, acl)
