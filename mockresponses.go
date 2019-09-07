@@ -913,6 +913,7 @@ func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) encoder {
 		response.MatchingAcls = append(response.MatchingAcls, &MatchingAcl{Err: ErrNoError})
 		res.FilterResponses = append(res.FilterResponses, response)
 	}
+	res.Version = int16(req.Version)
 	return res
 }
 
