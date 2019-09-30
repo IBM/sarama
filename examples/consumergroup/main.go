@@ -13,7 +13,7 @@ import (
 	"github.com/Shopify/sarama"
 )
 
-// Sarma configuration options
+// Sarama configuration options
 var (
 	brokers  = ""
 	version  = ""
