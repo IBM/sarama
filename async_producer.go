@@ -3,6 +3,7 @@ package sarama
 import (
 	"encoding/binary"
 	"fmt"
+	"github.com/pkg/errors"
 	"sync"
 	"time"
 
@@ -17,7 +18,6 @@ import (
 // leaks: it will not be garbage-collected automatically when it passes out of
 // scope.
 type AsyncProducer interface {
-
 	// AsyncClose triggers a shutdown of the producer. The shutdown has completed
 	// when both the Errors and Successes channels have been closed. When calling
 	// AsyncClose, you *must* continue to read from those channels in order to
@@ -45,20 +45,37 @@ type AsyncProducer interface {
 	// you can set Producer.Return.Errors in your config to false, which prevents
 	// errors to be returned.
 	Errors() <-chan *ProducerError
+
+	IsTransactional() bool
+	CommitTxn() error
+	AbortTxn() error
 }
 
 // transactionManager keeps the state necessary to ensure idempotent production
 type transactionManager struct {
-	producerID      int64
-	producerEpoch   int16
-	sequenceNumbers map[string]int32
-	mutex           sync.Mutex
+	producerID             int64
+	producerEpoch          int16
+	transactionalID        string
+	sequenceNumbers        map[string]int32
+	mutex                  sync.Mutex
+	transactionCoordinator *Broker
+	client                 Client
+
+	partitionsInCurrentTxn topicPartitionSet
 }
 
 const (
 	noProducerID    = -1
 	noProducerEpoch = -1
 )
+
+func (t *transactionManager) GetProducerID() int64 {
+	return t.producerID
+}
+
+func (t *transactionManager) GetProducerEpoch() int16 {
+	return t.producerEpoch
+}
 
 func (t *transactionManager) getAndIncrementSequenceNumber(topic string, partition int32) int32 {
 	key := fmt.Sprintf("%s-%d", topic, partition)
@@ -71,15 +88,34 @@ func (t *transactionManager) getAndIncrementSequenceNumber(topic string, partiti
 
 func newTransactionManager(conf *Config, client Client) (*transactionManager, error) {
 	txnmgr := &transactionManager{
-		producerID:    noProducerID,
-		producerEpoch: noProducerEpoch,
+		producerID:             noProducerID,
+		producerEpoch:          noProducerEpoch,
+		client:                 client,
+		partitionsInCurrentTxn: topicPartitionSet{},
 	}
 
 	if conf.Producer.Idempotent {
-		initProducerIDResponse, err := client.InitProducerID()
+		if conf.Producer.TransactionalID != nil {
+			txnmgr.transactionalID = *conf.Producer.TransactionalID
+
+			// We need to a "FindCoordinator" request before trying to initiate the producerID
+			// When the transactionalID is new for the brokers, this actually assign a broker as coordinator of this transactionalID
+			// An optimisation could be to try "InitProducerID" first and retry after a call to "FindCoordinator" only when we get "broker is not coordinator" error
+			transactionCoordinator, err := txnmgr.getCoordinator()
+			if err != nil {
+				return nil, err
+			}
+			txnmgr.transactionCoordinator = transactionCoordinator
+		}
+
+		initProducerIDResponse, err := client.InitProducerID(conf)
 		if err != nil {
 			return nil, err
 		}
+		if initProducerIDResponse.Err != ErrNoError {
+			return nil, errors.Errorf("error while initialazing producer ID %s", initProducerIDResponse.Err)
+		}
+
 		txnmgr.producerID = initProducerIDResponse.ProducerID
 		txnmgr.producerEpoch = initProducerIDResponse.ProducerEpoch
 		txnmgr.sequenceNumbers = make(map[string]int32)
@@ -89,6 +125,156 @@ func newTransactionManager(conf *Config, client Client) (*transactionManager, er
 	}
 
 	return txnmgr, nil
+}
+
+// addPartitionToCurrentTxn add this topicPartition couple to the current transaction
+// If this is the first time this topicPartition is added, a request is send to the transaction coordinator immediately
+// This can be optimized later by grouping different topicPartitions into a single request. uh, TODO
+//
+// addPartitionToCurrentTxn needs to be called before actually producing a message, else the transactionCoordinator will
+// not be able to abort the transaction properly in case of non-graceful interruption
+func (t *transactionManager) addPartitionToCurrentTxn(topic string, partition int32) error {
+	if _, ok := t.partitionsInCurrentTxn[topicPartitionCouple{topic: topic, partition: partition}]; ok {
+		// partition is already added
+		return nil
+	}
+	err := t.publishTxnPartitions([]topicPartitionCouple{{topic: topic, partition: partition}})
+	if err != nil {
+		return err
+	}
+
+	t.partitionsInCurrentTxn[topicPartitionCouple{topic: topic, partition: partition}] = struct{}{}
+	return nil
+}
+
+func (t *transactionManager) finishTransaction(commit bool) (err error) {
+	var lastError error
+	for i := 0; i <= t.client.Config().Producer.Retry.Max; i++ {
+		// call
+		endTxnResp, err := t.transactionCoordinator.EndTxn(&EndTxnRequest{
+			TransactionalID:   t.transactionalID,
+			ProducerEpoch:     t.producerEpoch,
+			ProducerID:        t.producerID,
+			TransactionResult: commit,
+		})
+		if err == nil && endTxnResp.Err == ErrNoError {
+			lastError = nil
+			break // success
+		}
+
+		if err != nil {
+			lastError = err
+		}
+		if endTxnResp.Err != ErrNoError {
+			lastError = endTxnResp.Err
+		}
+
+		// backoff and retry
+		time.Sleep(t.client.Config().Producer.Retry.Backoff)
+	}
+
+	// clear all current partition from current transaction
+	t.partitionsInCurrentTxn = topicPartitionSet{}
+
+	return lastError
+}
+
+// Makes a request to kafka to add a list of partitions ot the current transaction
+func (t *transactionManager) publishTxnPartitions(partitionsToAdd []topicPartitionCouple) (err error) {
+	// TransactionCoordinator is associated to the transactionalID.
+	// It should stay the same for the whole life of this producer or until the broker gracefully give this task to an other broker.
+	// For such scenario we just have to fetch the new coordinator when we receive ErrConsumerCoordinatorNotAvailable or ErrNotCoordinatorForConsumer
+	if t.transactionCoordinator == nil {
+		t.transactionCoordinator, err = t.getCoordinator()
+		if err != nil {
+			return err
+		}
+	}
+
+	// Publish to kafka the list of partitions that are part of the current transaction.
+	// Try this up to `Config.Producer.Retry.Max` times with a backoff of `Config.Producer.Retry.Backoff`
+	var lastError KError
+	for i := 0; i <= t.client.Config().Producer.Retry.Max; i++ {
+		// call
+		addPartResponse, err := t.transactionCoordinator.AddPartitionsToTxn(&AddPartitionsToTxnRequest{
+			TransactionalID: t.transactionalID,
+			ProducerID:      t.producerID,
+			ProducerEpoch:   t.producerEpoch,
+			TopicPartitions: GetClassicTopicPartitionFromCoupleList(partitionsToAdd),
+		})
+		if err != nil {
+			return err
+		}
+
+		// remove from the list partitions that have been successfully updated
+		var failedTxn []topicPartitionCouple
+		needToUpdateCoordinator := false
+		for topic, results := range addPartResponse.Errors {
+			for _, partitionResult := range results {
+				switch partitionResult.Err {
+				case ErrNoError:
+				// nothing to do
+				case ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer:
+					// That might happen during maintenance
+					needToUpdateCoordinator = true
+					fallthrough
+				default:
+					lastError = partitionResult.Err
+					failedTxn = append(failedTxn, topicPartitionCouple{topic: topic, partition: partitionResult.Partition})
+				}
+			}
+		}
+		partitionsToAdd = failedTxn
+
+		// handle success
+		if len(partitionsToAdd) <= 0 {
+			break
+		}
+
+		// special error case: update transaction coordinator before retry
+		if needToUpdateCoordinator {
+			t.transactionCoordinator, err = t.getCoordinator()
+			if err != nil {
+				return err
+			}
+		}
+
+		// backoff and retry
+		time.Sleep(t.client.Config().Producer.Retry.Backoff)
+	}
+
+	if len(partitionsToAdd) > 0 {
+		return errors.Errorf("could not add partitions to transaction %s", lastError)
+	}
+	return nil
+}
+
+func (t *transactionManager) getCoordinator() (*Broker, error) {
+	controller, err := t.client.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	var transactionCoordinator *Broker
+	{
+		result, err := controller.FindCoordinator(&FindCoordinatorRequest{
+			Version:         1,
+			CoordinatorKey:  t.transactionalID,
+			CoordinatorType: CoordinatorTransaction,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if result.Err != ErrNoError {
+			return nil, errors.Errorf("could not get coordinator for transactionalID %s got %s", t.transactionalID, result.Err)
+		}
+		transactionCoordinator = result.Coordinator
+		err = transactionCoordinator.Open(t.client.Config())
+		if err != nil {
+			return nil, errors.Errorf("could not open coordinator for transactionalID %s got %s", t.transactionalID, result.Err)
+		}
+	}
+	return transactionCoordinator, nil
 }
 
 type asyncProducer struct {
@@ -295,6 +481,26 @@ func (p *asyncProducer) Close() error {
 
 func (p *asyncProducer) AsyncClose() {
 	go withRecover(p.shutdown)
+}
+
+func (p *asyncProducer) IsTransactional() bool {
+	return p.conf.Producer.TransactionalID != nil
+}
+
+func (p *asyncProducer) CommitTxn() error {
+	err := p.finishTransaction(true)
+	if err != nil {
+		return errors.Wrap(err, "commit error")
+	}
+	return nil
+}
+
+func (p *asyncProducer) AbortTxn() error {
+	err := p.finishTransaction(false)
+	if err != nil {
+		return errors.Wrap(err, "abort error")
+	}
+	return nil
 }
 
 // singleton
@@ -530,6 +736,14 @@ func (pp *partitionProducer) dispatch() {
 				time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
 			default:
 				// producer connection is still open.
+			}
+		}
+
+		if pp.parent.IsTransactional() {
+			err := pp.parent.txnmgr.addPartitionToCurrentTxn(pp.topic, pp.partition)
+			if err != nil {
+				pp.parent.returnError(msg, err)
+				continue
 			}
 		}
 
@@ -1113,4 +1327,44 @@ func (p *asyncProducer) abandonBrokerConnection(broker *Broker) {
 	}
 
 	delete(p.brokers, broker)
+}
+
+func (p *asyncProducer) finishTransaction(commit bool) error {
+	timedOut := waitWithTimeout(&p.inFlight, p.conf.Producer.TransactionTimeout)
+	if timedOut {
+		return errors.New("timed out while waiting for messages to be processed before committing transaction")
+	}
+
+	return p.txnmgr.finishTransaction(commit)
+}
+
+func waitWithTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait() // yes there is technically a go routine leak here when there is a timeout
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
+type topicPartitionCouple struct {
+	topic     string
+	partition int32
+}
+
+// I need collection of unique topic/partition
+// map[string][]int32 is easier to use but I would need to check with a full scan every time I add a partition
+type topicPartitionSet map[topicPartitionCouple]struct{}
+
+func GetClassicTopicPartitionFromCoupleList(list []topicPartitionCouple) map[string][]int32 {
+	result := make(map[string][]int32, len(list))
+	for _, couple := range list {
+		result[couple.topic] = append(result[couple.topic], couple.partition)
+	}
+	return result
 }

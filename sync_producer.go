@@ -30,6 +30,9 @@ type SyncProducer interface {
 	// scope, as it may otherwise leak memory. You must call this before calling
 	// Close on the underlying client.
 	Close() error
+
+	CommitTxn() error
+	AbortTxn() error
 }
 
 type syncProducer struct {
@@ -146,4 +149,11 @@ func (sp *syncProducer) Close() error {
 	sp.producer.AsyncClose()
 	sp.wg.Wait()
 	return nil
+}
+
+func (sp *syncProducer) CommitTxn() error {
+	return sp.producer.CommitTxn()
+}
+func (sp *syncProducer) AbortTxn() error {
+	return sp.producer.AbortTxn()
 }

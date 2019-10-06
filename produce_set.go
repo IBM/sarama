@@ -126,6 +126,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	}
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		req.Version = 3
+		req.TransactionalID = ps.parent.conf.Producer.TransactionalID
 	}
 
 	for topic, partitionSets := range ps.msgs {
@@ -145,6 +146,10 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 						record.OffsetDelta = int64(i)
 					}
 				}
+
+				// Set the batch as transactional when a transactionalID is set
+				rb.IsTransactional = ps.parent.IsTransactional()
+
 				req.AddBatch(topic, partition, rb)
 				continue
 			}

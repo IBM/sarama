@@ -166,6 +166,13 @@ type Config struct {
 		// written.
 		Idempotent bool
 
+		// Used in transactions to identify an instance of a producer through restarts
+		TransactionalID *string
+
+		// Amount of time a transaction can remain unresolved (neither committed nor aborted)
+		// default is 1 min
+		TransactionTimeout time.Duration
+
 		// Return specifies what channels will be populated. If they are set to true,
 		// you must read from the respective channels to prevent deadlock. If,
 		// however, this config is used to create a `SyncProducer`, both must be set
@@ -219,7 +226,6 @@ type Config struct {
 	// Consumer is the namespace for configuration related to consuming messages,
 	// used by the Consumer.
 	Consumer struct {
-
 		// Group is the namespace for configuring consumer group.
 		Group struct {
 			Session struct {
@@ -416,6 +422,7 @@ func NewConfig() *Config {
 	c.Producer.Retry.Backoff = 100 * time.Millisecond
 	c.Producer.Return.Errors = true
 	c.Producer.CompressionLevel = CompressionLevelDefault
+	c.Producer.TransactionTimeout = 1 * time.Minute
 
 	c.Consumer.Fetch.Min = 1
 	c.Consumer.Fetch.Default = 1024 * 1024
