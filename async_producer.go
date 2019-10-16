@@ -695,6 +695,37 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		for set := range bridge {
 			request := set.buildRequest()
 
+			// Use AsyncProduce if pipelining is enabled to not block on waiting for the response
+			// so that we can pipeline multiple produce requests and achieve higher throughput, see:
+			// https://kafka.apache.org/protocol#protocol_network
+			if bp.parent.conf.Producer.Pipeline {
+				// Capture the current set to forward in the callback
+				sendResponse := func(set *produceSet) ProduceCallback {
+					return func(response *ProduceResponse, err error) {
+						responses <- &brokerProducerResponse{
+							set: set,
+							err: err,
+							res: response,
+						}
+					}
+				}(set)
+
+				err := broker.AsyncProduce(request, sendResponse)
+				if err != nil {
+					// Request failed to be sent
+					sendResponse(nil, err)
+					continue
+				}
+				// Callback is not called when using NoResponse
+				if p.conf.Producer.RequiredAcks == NoResponse {
+					// Provide the expected nil response
+					sendResponse(nil, nil)
+				}
+				continue
+			}
+
+			// Otherwise use Produce, Net.MaxOpenRequests might not be honored
+			// because we block the next Produce request till we have a response
 			response, err := broker.Produce(request)
 
 			responses <- &brokerProducerResponse{
