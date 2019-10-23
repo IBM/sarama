@@ -217,6 +217,7 @@ func TestSASLOAuthBearer(t *testing.T) {
 		broker.responseSize = metrics.NilHistogram{}
 		broker.responseRate = metrics.NilMeter{}
 		broker.requestLatency = metrics.NilHistogram{}
+		broker.requestsInFlight = metrics.NilCounter{}
 
 		conf := NewConfig()
 		conf.Net.SASL.Mechanism = SASLTypeOAuth
@@ -335,6 +336,7 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 		broker.responseSize = metrics.NilHistogram{}
 		broker.responseRate = metrics.NilMeter{}
 		broker.requestLatency = metrics.NilHistogram{}
+		broker.requestsInFlight = metrics.NilCounter{}
 
 		mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).SetAuthBytes([]byte(test.scramChallengeResp))
 		mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).SetEnabledMechanisms([]string{SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512})
@@ -453,6 +455,7 @@ func TestSASLPlainAuth(t *testing.T) {
 		broker.responseSize = metrics.NilHistogram{}
 		broker.responseRate = metrics.NilMeter{}
 		broker.requestLatency = metrics.NilHistogram{}
+		broker.requestsInFlight = metrics.NilCounter{}
 
 		conf := NewConfig()
 		conf.Net.SASL.Mechanism = SASLTypePlaintext
@@ -536,6 +539,7 @@ func TestSASLReadTimeout(t *testing.T) {
 		broker.responseSize = metrics.NilHistogram{}
 		broker.responseRate = metrics.NilMeter{}
 		broker.requestLatency = metrics.NilHistogram{}
+		broker.requestsInFlight = metrics.NilCounter{}
 	}
 
 	conf := NewConfig()
@@ -626,6 +630,7 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 		broker.responseSize = metrics.NilHistogram{}
 		broker.responseRate = metrics.NilMeter{}
 		broker.requestLatency = metrics.NilHistogram{}
+		broker.requestsInFlight = metrics.NilCounter{}
 		conf := NewConfig()
 		conf.Net.SASL.Mechanism = SASLTypeGSSAPI
 		conf.Net.SASL.GSSAPI.ServiceName = "kafka"
@@ -989,6 +994,9 @@ func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics broke
 	metricValidators.registerForAllBrokers(broker, countMeterValidator("request-rate", 1))
 	metricValidators.registerForAllBrokers(broker, countHistogramValidator("request-size", 1))
 	metricValidators.registerForAllBrokers(broker, minMaxHistogramValidator("request-size", mockBrokerBytesRead, mockBrokerBytesRead))
+
+	// Check that there is no more requests in flight
+	metricValidators.registerForAllBrokers(broker, counterValidator("requests-in-flight", 0))
 
 	// Run the validators
 	metricValidators.run(t, broker.conf.MetricRegistry)
