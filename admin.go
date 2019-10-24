@@ -214,6 +214,10 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32
 		Topics: []string{},
 	}
 
+	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+		request.Version = 1
+	}
+
 	response, err := controller.GetMetadata(request)
 	if err != nil {
 		return nil, int32(0), err
