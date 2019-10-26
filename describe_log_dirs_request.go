@@ -17,7 +17,13 @@ type DescribeLogDirsRequestTopic struct {
 }
 
 func (r *DescribeLogDirsRequest) encode(pe packetEncoder) error {
-	if err := pe.putArrayLength(len(r.DescribeTopics)); err != nil {
+	length := len(r.DescribeTopics)
+	if length == 0 {
+		// In order to query all topics we must send null
+		length = -1
+	}
+
+	if err := pe.putArrayLength(length); err != nil {
 		return err
 	}
 
@@ -38,6 +44,9 @@ func (r *DescribeLogDirsRequest) decode(pd packetDecoder, version int16) error {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n == -1 {
+		n = 0
 	}
 
 	topics := make([]DescribeLogDirsRequestTopic, n)
