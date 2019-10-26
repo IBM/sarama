@@ -65,6 +65,7 @@ func (r *DescribeLogDirsRequest) decode(pd packetDecoder, version int16) error {
 		}
 		topics[i].PartitionIDs = pIDs
 	}
+	r.DescribeTopics = topics
 
 	return nil
 }
