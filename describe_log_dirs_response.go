@@ -66,7 +66,7 @@ func (r *DescribeLogDirsResponse) requiredVersion() KafkaVersion {
 }
 
 type DescribeLogDirsResponseDirMetadata struct {
-	ErrorCode int16
+	ErrorCode KError
 
 	// The absolute log directory path
 	Path   string
@@ -74,7 +74,7 @@ type DescribeLogDirsResponseDirMetadata struct {
 }
 
 func (r *DescribeLogDirsResponseDirMetadata) encode(pe packetEncoder) error {
-	pe.putInt16(r.ErrorCode)
+	pe.putInt16(int16(r.ErrorCode))
 
 	if err := pe.putString(r.Path); err != nil {
 		return err
@@ -94,7 +94,7 @@ func (r *DescribeLogDirsResponseDirMetadata) decode(pd packetDecoder, version in
 	if err != nil {
 		return err
 	}
-	r.ErrorCode = errCode
+	r.ErrorCode = KError(errCode)
 
 	path, err := pd.getString()
 	if err != nil {
