@@ -159,6 +159,7 @@ func (r *DescribeLogDirsResponseTopic) decode(pd packetDecoder, version int16) e
 		if err := p.decode(pd, version); err != nil {
 			return err
 		}
+		r.Partitions[i] = p
 	}
 
 	return nil
