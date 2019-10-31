@@ -493,6 +493,55 @@ func TestSASLPlainAuth(t *testing.T) {
 	}
 }
 
+// TestSASLReadTimeout ensures that the broker connection won't block forever
+// if the remote end never responds after the handshake
+func TestSASLReadTimeout(t *testing.T) {
+	mockBroker := NewMockBroker(t, 0)
+	defer mockBroker.Close()
+
+	mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
+		SetAuthBytes([]byte(`response_payload`))
+
+	mockBroker.SetHandlerByMap(map[string]MockResponse{
+		"SaslAuthenticateRequest": mockSASLAuthResponse,
+	})
+
+	broker := NewBroker(mockBroker.Addr())
+	{
+		broker.requestRate = metrics.NilMeter{}
+		broker.outgoingByteRate = metrics.NilMeter{}
+		broker.incomingByteRate = metrics.NilMeter{}
+		broker.requestSize = metrics.NilHistogram{}
+		broker.responseSize = metrics.NilHistogram{}
+		broker.responseRate = metrics.NilMeter{}
+		broker.requestLatency = metrics.NilHistogram{}
+	}
+
+	conf := NewConfig()
+	{
+		conf.Net.ReadTimeout = time.Millisecond
+		conf.Net.SASL.Mechanism = SASLTypePlaintext
+		conf.Net.SASL.User = "token"
+		conf.Net.SASL.Password = "password"
+		conf.Net.SASL.Version = SASLHandshakeV1
+	}
+
+	broker.conf = conf
+	broker.conf.Version = V1_0_0_0
+	dialer := net.Dialer{}
+
+	conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	broker.conn = conn
+	err = broker.authenticateViaSASL()
+	if err == nil {
+		t.Errorf("should never happen - expected read timeout")
+	}
+}
+
 func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 
 	testTable := []struct {
