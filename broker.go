@@ -333,6 +333,19 @@ func (b *Broker) GetAvailableOffsets(request *OffsetRequest) (*OffsetResponse, e
 	return response, nil
 }
 
+//ListOffsets return an list offset response or erorr
+func (b *Broker) ListOffsets(request *OffsetRequest) (*ListOffsetResponse, error) {
+	response := new(ListOffsetResponse)
+
+	err := b.sendAndReceive(request, response)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 //Produce returns a produce response or error
 func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 	var (
