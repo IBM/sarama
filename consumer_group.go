@@ -417,12 +417,6 @@ func (c *consumerGroup) leave() error {
 }
 
 func (c *consumerGroup) handleError(err error, topic string, partition int32) {
-	select {
-	case <-c.closed:
-		return
-	default:
-	}
-
 	if _, ok := err.(*ConsumerError); !ok && topic != "" && partition > -1 {
 		err = &ConsumerError{
 			Topic:     topic,
@@ -431,13 +425,25 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 		}
 	}
 
-	if c.config.Consumer.Return.Errors {
-		select {
-		case c.errors <- err:
-		default:
-		}
-	} else {
+	if !c.config.Consumer.Return.Errors {
 		Logger.Println(err)
+		return
+	}
+
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	select {
+	case <-c.closed:
+		//consumer is closed
+		return
+	default:
+	}
+
+	select {
+	case c.errors <- err:
+	default:
+		// no error listener
 	}
 }
 
