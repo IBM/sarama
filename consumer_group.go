@@ -435,6 +435,7 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 
 	select {
 	case <-c.closed:
+		//consumer is closed
 		return
 	default:
 	}
@@ -442,6 +443,7 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 	select {
 	case c.errors <- err:
 	default:
+		// no error listener
 	}
 }
 
