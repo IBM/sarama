@@ -66,8 +66,8 @@ func newOffsetManagerFromClient(group, memberID string, generation int32, client
 		closing: make(chan none),
 		closed:  make(chan none),
 	}
-	if conf.Consumer.Offsets.Enable {
-		om.ticker = time.NewTicker(conf.Consumer.Offsets.CommitInterval)
+	if conf.Consumer.Offsets.AutoCommit.Enable {
+		om.ticker = time.NewTicker(conf.Consumer.Offsets.AutoCommit.Interval)
 		go withRecover(om.mainLoop)
 	}
 
@@ -98,7 +98,7 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 }
 
 func (om *offsetManager) Close() error {
-	if !om.conf.Consumer.Offsets.Enable {
+	if !om.conf.Consumer.Offsets.AutoCommit.Enable {
 		return nil
 	}
 
@@ -240,10 +240,6 @@ func (om *offsetManager) mainLoop() {
 }
 
 func (om *offsetManager) flushToBroker() {
-	if om.conf.Consumer.Offsets.Enable == false {
-		return
-	}
-
 	req := om.constructRequest()
 	if req == nil {
 		return
