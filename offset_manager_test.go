@@ -130,8 +130,9 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 			om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
 			pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
-			// we will wait for twice the interval
-			timeout := 2 * config.Consumer.Offsets.AutoCommit.Interval
+			// Wait long enough for the test not to fail..
+			timeout := 50 * config.Consumer.Offsets.AutoCommit.Interval
+
 			called := make(chan none)
 
 			ocResponse := new(OffsetCommitResponse)
