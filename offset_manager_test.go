@@ -121,47 +121,53 @@ var offsetsautocommitTestTable = []struct {
 func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
-		config := NewConfig()
-		if tt.set {
-			config.Consumer.Offsets.AutoCommit.Enable = tt.enable
-		}
-		om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
-		pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+		t.Run(tt.name, func(t *testing.T) {
 
-		// we will wait for twice the interval
-		timeout := 2 * config.Consumer.Offsets.AutoCommit.Interval
-		called := make(chan none)
-
-		ocResponse := new(OffsetCommitResponse)
-		ocResponse.AddError("my_topic", 0, ErrNoError)
-		handler := func(req *request) (res encoder) {
-			close(called)
-			return ocResponse
-		}
-		coordinator.setHandler(handler)
-
-		// Should force an offset commit, if auto-commit is enabled.
-		expected := int64(1)
-		pom.ResetOffset(expected, "modified_meta")
-		_, _ = pom.NextOffset()
-
-		select {
-		case <-called:
-			// OffsetManager called on the wire.
-			if !config.Consumer.Offsets.AutoCommit.Enable {
-				t.Errorf("Received request for: %s when AutoCommit is disabled", tt.name)
+			config := NewConfig()
+			if tt.set {
+				config.Consumer.Offsets.AutoCommit.Enable = tt.enable
 			}
-		case <-time.After(timeout):
-			// Timeout waiting for OffsetManager to call on the wire.
-			if config.Consumer.Offsets.AutoCommit.Enable {
-				t.Errorf("No request received for: %s after waiting for %v", tt.name, timeout)
+			om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
+			pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+
+			// we will wait for twice the interval
+			timeout := 2 * config.Consumer.Offsets.AutoCommit.Interval
+			called := make(chan none)
+
+			ocResponse := new(OffsetCommitResponse)
+			ocResponse.AddError("my_topic", 0, ErrNoError)
+			handler := func(req *request) (res encoder) {
+				close(called)
+				return ocResponse
 			}
-		}
-		safeClose(t, pom)
-		safeClose(t, om)
-		safeClose(t, testClient)
-		broker.Close()
-		coordinator.Close()
+			coordinator.setHandler(handler)
+
+			// Should force an offset commit, if auto-commit is enabled.
+			expected := int64(1)
+			pom.ResetOffset(expected, "modified_meta")
+			_, _ = pom.NextOffset()
+
+			select {
+			case <-called:
+				// OffsetManager called on the wire.
+				if !config.Consumer.Offsets.AutoCommit.Enable {
+					t.Errorf("Received request for: %s when AutoCommit is disabled", tt.name)
+				}
+			case <-time.After(timeout):
+				// Timeout waiting for OffsetManager to call on the wire.
+				if config.Consumer.Offsets.AutoCommit.Enable {
+					t.Errorf("No request received for: %s after waiting for %v", tt.name, timeout)
+				}
+			}
+
+			broker.Close()
+			coordinator.Close()
+
+			// !! om must be closed before the pom so pom.release() is called before pom.Close()
+			safeClose(t, om)
+			safeClose(t, pom)
+			safeClose(t, testClient)
+		})
 	}
 }
 
