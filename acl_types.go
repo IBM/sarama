@@ -32,7 +32,7 @@ const (
 	AclOperationIdempotentWrite
 )
 
-func (a AclOperation) String() string {
+func (a *AclOperation) String() string {
 	mapping := map[AclOperation]string{
 		AclOperationUnknown:         "Unknown",
 		AclOperationAny:             "Any",
@@ -95,7 +95,7 @@ const (
 	AclPermissionAllow
 )
 
-func (a AclPermissionType) String() string {
+func (a *AclPermissionType) String() string {
 	mapping := map[AclPermissionType]string{
 		AclPermissionUnknown: "Unknown",
 		AclPermissionAny:     "Any",
@@ -143,7 +143,7 @@ const (
 	AclResourceTransactionalID
 )
 
-func (a AclResourceType) String() string {
+func (a *AclResourceType) String() string {
 	mapping := map[AclResourceType]string{
 		AclResourceUnknown:         "Unknown",
 		AclResourceAny:             "Any",
@@ -194,7 +194,7 @@ const (
 	AclPatternPrefixed
 )
 
-func (a AclResourcePatternType) String() string {
+func (a *AclResourcePatternType) String() string {
 	mapping := map[AclResourcePatternType]string{
 		AclPatternUnknown:  "Unknown",
 		AclPatternAny:      "Any",
