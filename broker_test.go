@@ -715,6 +715,69 @@ func TestBuildClientFirstMessage(t *testing.T) {
 	}
 }
 
+// TestFetchOffsetAddsMissingEntries checks that FetchOffset returns an
+// initial offset entry for requested partitions that are absent in the
+// OffsetFetchResponse, as is done in Azure's Kafka implementation (Event Hubs)
+// to indicate that a partition has not yet committed an offset.
+func TestFetchOffsetAddsMissingEntries(t *testing.T) {
+	const topic = "test"
+	mockResponse := []byte{
+		0x00, 0x00, 0x00, 0x01, // one topic
+		0x00, 0x04, 0x74, 0x65, 0x73, 0x74, // "test"
+		0x00, 0x00, 0x00, 0x01, // one partition response
+		0x00, 0x00, 0x00, 0x01, // partition 1
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, // offset 10
+		0x00, 0x00, 0x00, 0x00, // empty metadata and error code
+	}
+	mb := NewMockBroker(t, 0)
+	mb.Returns(&mockEncoder{mockResponse})
+	broker := NewBroker(mb.Addr())
+	conf := NewConfig()
+	conf.Version = V0_10_0_0
+	err := broker.Open(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a fetch request for 3 partitions. The response from FetchOffset
+	// should have entries for all 3, even though the raw data from the broker
+	// only includes partition 1.
+	request := OffsetFetchRequest{}
+	request.AddPartition("test", 0)
+	request.AddPartition("test", 1)
+	request.AddPartition("test", 2)
+	response, err := broker.FetchOffset(&request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Blocks[topic] == nil {
+		t.Fatalf("Expected response entry for topic '%s'", topic)
+	}
+	// We expect the returned offset (10) for partition 1, and the initial
+	// offset (-1) for the other partitions which were not included in the
+	// response.
+	expected := []struct {
+		partition int32
+		offset    int64
+	}{
+		{partition: 0, offset: -1},
+		{partition: 1, offset: 10},
+		{partition: 2, offset: -1},
+	}
+	for _, e := range expected {
+		partitionResponse := response.Blocks[topic][e.partition]
+		if partitionResponse == nil {
+			t.Errorf("Expected nonempty result for topic '%v' partition %d",
+				topic, e.partition)
+			continue
+		}
+		if partitionResponse.Offset != e.offset {
+			t.Errorf("Topic '%s' partition %d: expected offset %d, got %d",
+				topic, e.partition, e.offset, partitionResponse.Offset)
+		}
+	}
+}
+
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
 var brokerTestTable = []struct {
 	version  KafkaVersion
