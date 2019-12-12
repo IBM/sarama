@@ -442,6 +442,10 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 		Resources: resources,
 	}
 
+	if ca.conf.Version.IsAtLeast(V1_1_1_0) {
+		request.Version = 1
+	}
+
 	b, err := ca.Controller()
 	if err != nil {
 		return nil, err
