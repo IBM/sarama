@@ -888,6 +888,10 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
 	}
 
+	if bc.consumer.conf.Version.IsAtLeast(V2_1_0_0) {
+		request.Version = 10
+	}
+
 	for child := range bc.subscriptions {
 		request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
 	}

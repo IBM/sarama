@@ -629,6 +629,10 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.Producer.Compression == CompressionZSTD && !c.Version.IsAtLeast(V2_1_0_0) {
+		return ConfigurationError("zstd compression requires Version >= V2_1_0_0")
+	}
+
 	if c.Producer.Idempotent {
 		if !c.Version.IsAtLeast(V0_11_0_0) {
 			return ConfigurationError("Idempotent producer requires Version >= V0_11_0_0")
