@@ -1,4 +1,4 @@
-dist: xenial
+dist: bionic
 language: go
 go:
 - 1.12.x
@@ -22,13 +22,12 @@ before_install:
 - vagrant/create_topics.sh
 - vagrant/run_java_producer.sh
 
-install: make install_dependencies
+before_script:
+- curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.1
 
 script:
 - make test
-- make vet
-- make errcheck
-- if [[ "$TRAVIS_GO_VERSION" == 1.13* ]]; then make fmt; fi
+- make lint
 
 after_success:
 - go tool cover -func coverage.txt
