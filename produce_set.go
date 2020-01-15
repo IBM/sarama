@@ -129,6 +129,10 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		req.Version = 3
 	}
 
+	if ps.parent.conf.Producer.Compression == CompressionZSTD && ps.parent.conf.Version.IsAtLeast(V2_1_0_0) {
+		req.Version = 7
+	}
+
 	for topic, partitionSets := range ps.msgs {
 		for partition, set := range partitionSets {
 			if req.Version >= 3 {
