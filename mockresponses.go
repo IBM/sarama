@@ -731,7 +731,11 @@ func NewMockDescribeConfigsResponse(t TestReporter) *MockDescribeConfigsResponse
 
 func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
 	req := reqBody.(*DescribeConfigsRequest)
-	res := &DescribeConfigsResponse{}
+	res := &DescribeConfigsResponse{
+		Version: req.Version,
+	}
+
+	includeSynonyms := (req.Version > 0)
 
 	for _, r := range req.Resources {
 		var configEntries []*ConfigEntry
@@ -763,23 +767,42 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
 				Configs: configEntries,
 			})
 		case TopicResource:
-			configEntries = append(configEntries,
-				&ConfigEntry{Name: "max.message.bytes",
-					Value:     "1000000",
-					ReadOnly:  false,
-					Default:   true,
-					Sensitive: false,
-				}, &ConfigEntry{Name: "retention.ms",
-					Value:     "5000",
-					ReadOnly:  false,
-					Default:   false,
-					Sensitive: false,
-				}, &ConfigEntry{Name: "password",
-					Value:     "12345",
-					ReadOnly:  false,
-					Default:   false,
-					Sensitive: true,
-				})
+			maxMessageBytes := &ConfigEntry{Name: "max.message.bytes",
+				Value:     "1000000",
+				ReadOnly:  false,
+				Default:   true,
+				Sensitive: false,
+			}
+			if includeSynonyms {
+				maxMessageBytes.Synonyms = []*ConfigSynonym{
+					{
+						ConfigName:  "max.message.bytes",
+						ConfigValue: "500000",
+					},
+				}
+			}
+			retentionMs := &ConfigEntry{Name: "retention.ms",
+				Value:     "5000",
+				ReadOnly:  false,
+				Default:   false,
+				Sensitive: false,
+			}
+			if includeSynonyms {
+				retentionMs.Synonyms = []*ConfigSynonym{
+					{
+						ConfigName:  "log.retention.ms",
+						ConfigValue: "2500",
+					},
+				}
+			}
+			password := &ConfigEntry{Name: "password",
+				Value:     "12345",
+				ReadOnly:  false,
+				Default:   false,
+				Sensitive: true,
+			}
+			configEntries = append(
+				configEntries, maxMessageBytes, retentionMs, password)
 			res.Resources = append(res.Resources, &ResourceResponse{
 				Name:    r.Name,
 				Configs: configEntries,
