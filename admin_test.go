@@ -492,26 +492,58 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
 	})
 
-	config := NewConfig()
-	config.Version = V1_0_0_0
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
+	var tests = []struct {
+		saramaVersion   KafkaVersion
+		requestVersion  int16
+		includeSynonyms bool
+	}{
+		{V1_0_0_0, 0, false},
+		{V1_1_0_0, 1, true},
+		{V1_1_1_0, 1, true},
+		{V2_0_0_0, 2, true},
 	}
+	for _, tt := range tests {
+		config := NewConfig()
+		config.Version = tt.saramaVersion
+		admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			_ = admin.Close()
+		}()
 
-	resource := ConfigResource{Name: "r1", Type: TopicResource, ConfigNames: []string{"my_topic"}}
-	entries, err := admin.DescribeConfig(resource)
-	if err != nil {
-		t.Fatal(err)
-	}
+		resource := ConfigResource{
+			Name:        "r1",
+			Type:        TopicResource,
+			ConfigNames: []string{"my_topic"},
+		}
 
-	if len(entries) <= 0 {
-		t.Fatal(errors.New("no resource present"))
-	}
+		entries, err := admin.DescribeConfig(resource)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
+		history := seedBroker.History()
+		describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
+		if !ok {
+			t.Fatal("failed to find DescribeConfigsRequest in mockBroker history")
+		}
+
+		if describeReq.Version != tt.requestVersion {
+			t.Fatalf(
+				"requestVersion %v did not match expected %v",
+				describeReq.Version, tt.requestVersion)
+		}
+
+		if len(entries) <= 0 {
+			t.Fatal(errors.New("no resource present"))
+		}
+		if tt.includeSynonyms {
+			if len(entries[0].Synonyms) == 0 {
+				t.Fatal("expected synonyms to have been included")
+			}
+		}
 	}
 }
 
