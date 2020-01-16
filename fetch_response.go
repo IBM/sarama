@@ -33,6 +33,7 @@ type FetchResponseBlock struct {
 	Err                 KError
 	HighWaterMarkOffset int64
 	LastStableOffset    int64
+	LogStartOffset      int64
 	AbortedTransactions []*AbortedTransaction
 	Records             *Records // deprecated: use FetchResponseBlock.RecordsSet
 	RecordsSet          []*Records
@@ -55,6 +56,13 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		b.LastStableOffset, err = pd.getInt64()
 		if err != nil {
 			return err
+		}
+
+		if version >= 5 {
+			b.LogStartOffset, err = pd.getInt64()
+			if err != nil {
+				return err
+			}
 		}
 
 		numTransact, err := pd.getArrayLength()
@@ -166,6 +174,10 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 	if version >= 4 {
 		pe.putInt64(b.LastStableOffset)
 
+		if version >= 5 {
+			pe.putInt64(b.LogStartOffset)
+		}
+
 		if err = pe.putArrayLength(len(b.AbortedTransactions)); err != nil {
 			return err
 		}
@@ -200,7 +212,9 @@ func (b *FetchResponseBlock) getAbortedTransactions() []*AbortedTransaction {
 type FetchResponse struct {
 	Blocks        map[string]map[int32]*FetchResponseBlock
 	ThrottleTime  time.Duration
-	Version       int16 // v1 requires 0.9+, v2 requires 0.10+
+	ErrorCode     int16
+	SessionID     int32
+	Version       int16
 	LogAppendTime bool
 	Timestamp     time.Time
 }
@@ -214,6 +228,17 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 		r.ThrottleTime = time.Duration(throttle) * time.Millisecond
+	}
+
+	if r.Version >= 7 {
+		r.ErrorCode, err = pd.getInt16()
+		if err != nil {
+			return err
+		}
+		r.SessionID, err = pd.getInt32()
+		if err != nil {
+			return err
+		}
 	}
 
 	numTopics, err := pd.getArrayLength()
@@ -258,6 +283,11 @@ func (r *FetchResponse) encode(pe packetEncoder) (err error) {
 		pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
 	}
 
+	if r.Version >= 7 {
+		pe.putInt16(r.ErrorCode)
+		pe.putInt32(r.SessionID)
+	}
+
 	err = pe.putArrayLength(len(r.Blocks))
 	if err != nil {
 		return err
@@ -296,16 +326,28 @@ func (r *FetchResponse) version() int16 {
 
 func (r *FetchResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 0:
+		return MinVersion
 	case 1:
 		return V0_9_0_0
 	case 2:
 		return V0_10_0_0
 	case 3:
 		return V0_10_1_0
-	case 4:
+	case 4, 5:
 		return V0_11_0_0
+	case 6:
+		return V1_0_0_0
+	case 7:
+		return V1_1_0_0
+	case 8:
+		return V2_0_0_0
+	case 9, 10:
+		return V2_1_0_0
+	case 11:
+		return V2_3_0_0
 	default:
-		return MinVersion
+		return MaxVersion
 	}
 }
 
