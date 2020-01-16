@@ -2,10 +2,6 @@ package sarama
 
 import (
 	"errors"
-	"fmt"
-	"io/ioutil"
-	"log"
-	"os"
 	"strings"
 	"testing"
 )
@@ -550,9 +546,6 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 // TestClusterAdminDescribeBrokerConfig ensures that a describe broker config
 // is sent to the broker in the resource struct, _not_ the controller
 func TestClusterAdminDescribeBrokerConfig(t *testing.T) {
-	Logger = log.New(os.Stdout, fmt.Sprintf("[%s] ", t.Name()), log.LstdFlags)
-	defer func() { Logger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags) }()
-
 	controllerBroker := NewMockBroker(t, 1)
 	defer controllerBroker.Close()
 	configBroker := NewMockBroker(t, 2)
