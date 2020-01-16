@@ -452,13 +452,20 @@ func dependsOnSpecificNode(resource ConfigResource) bool {
 }
 
 func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, error) {
-
 	var entries []ConfigEntry
 	var resources []*ConfigResource
 	resources = append(resources, &resource)
 
 	request := &DescribeConfigsRequest{
 		Resources: resources,
+	}
+
+	if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+		request.Version = 1
+	}
+
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 2
 	}
 
 	var (
