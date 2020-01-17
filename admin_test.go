@@ -488,21 +488,105 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
 	})
 
+	var tests = []struct {
+		saramaVersion   KafkaVersion
+		requestVersion  int16
+		includeSynonyms bool
+	}{
+		{V1_0_0_0, 0, false},
+		{V1_1_0_0, 1, true},
+		{V1_1_1_0, 1, true},
+		{V2_0_0_0, 2, true},
+	}
+	for _, tt := range tests {
+		config := NewConfig()
+		config.Version = tt.saramaVersion
+		admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			_ = admin.Close()
+		}()
+
+		resource := ConfigResource{
+			Name:        "r1",
+			Type:        TopicResource,
+			ConfigNames: []string{"my_topic"},
+		}
+
+		entries, err := admin.DescribeConfig(resource)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		history := seedBroker.History()
+		describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
+		if !ok {
+			t.Fatal("failed to find DescribeConfigsRequest in mockBroker history")
+		}
+
+		if describeReq.Version != tt.requestVersion {
+			t.Fatalf(
+				"requestVersion %v did not match expected %v",
+				describeReq.Version, tt.requestVersion)
+		}
+
+		if len(entries) <= 0 {
+			t.Fatal(errors.New("no resource present"))
+		}
+		if tt.includeSynonyms {
+			if len(entries[0].Synonyms) == 0 {
+				t.Fatal("expected synonyms to have been included")
+			}
+		}
+	}
+}
+
+// TestClusterAdminDescribeBrokerConfig ensures that a describe broker config
+// is sent to the broker in the resource struct, _not_ the controller
+func TestClusterAdminDescribeBrokerConfig(t *testing.T) {
+	controllerBroker := NewMockBroker(t, 1)
+	defer controllerBroker.Close()
+	configBroker := NewMockBroker(t, 2)
+	defer configBroker.Close()
+
+	controllerBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+	})
+
+	configBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
+	})
+
 	config := NewConfig()
 	config.Version = V1_0_0_0
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	admin, err := NewClusterAdmin(
+		[]string{
+			controllerBroker.Addr(),
+			configBroker.Addr(),
+		}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	resource := ConfigResource{Name: "r1", Type: TopicResource, ConfigNames: []string{"my_topic"}}
-	entries, err := admin.DescribeConfig(resource)
-	if err != nil {
-		t.Fatal(err)
-	}
+	for _, resourceType := range []ConfigResourceType{BrokerResource, BrokerLoggerResource} {
+		resource := ConfigResource{Name: "2", Type: resourceType}
+		entries, err := admin.DescribeConfig(resource)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if len(entries) <= 0 {
-		t.Fatal(errors.New("no resource present"))
+		if len(entries) <= 0 {
+			t.Fatal(errors.New("no resource present"))
+		}
 	}
 
 	err = admin.Close()
@@ -536,6 +620,60 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 	err = admin.AlterConfig(TopicResource, "my_topic", entries, false)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminAlterBrokerConfig(t *testing.T) {
+	controllerBroker := NewMockBroker(t, 1)
+	defer controllerBroker.Close()
+	configBroker := NewMockBroker(t, 2)
+	defer configBroker.Close()
+
+	controllerBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+	})
+	configBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+		"AlterConfigsRequest": NewMockAlterConfigsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin(
+		[]string{
+			controllerBroker.Addr(),
+			configBroker.Addr(),
+		}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var value string
+	entries := make(map[string]*string)
+	value = "3"
+	entries["min.insync.replicas"] = &value
+
+	for _, resourceType := range []ConfigResourceType{BrokerResource, BrokerLoggerResource} {
+		resource := ConfigResource{Name: "2", Type: resourceType}
+		err = admin.AlterConfig(
+			resource.Type,
+			resource.Name,
+			entries,
+			false)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	err = admin.Close()

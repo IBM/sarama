@@ -2,7 +2,9 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
+	"strconv"
 	"sync"
 )
 
@@ -214,7 +216,7 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32
 		Topics: []string{},
 	}
 
-	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+	if ca.conf.Version.IsAtLeast(V0_10_0_0) {
 		request.Version = 1
 	}
 
@@ -224,6 +226,16 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32
 	}
 
 	return response.Brokers, response.ControllerID, nil
+}
+
+func (ca *clusterAdmin) findBroker(id int32) (*Broker, error) {
+	brokers := ca.client.Brokers()
+	for _, b := range brokers {
+		if b.ID() == id {
+			return b, nil
+		}
+	}
+	return nil, fmt.Errorf("could not find broker id %d", id)
 }
 
 func (ca *clusterAdmin) findAnyBroker() (*Broker, error) {
@@ -432,8 +444,14 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	return nil
 }
 
-func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, error) {
+// Returns a bool indicating whether the resource request needs to go to a
+// specific broker
+func dependsOnSpecificNode(resource ConfigResource) bool {
+	return (resource.Type == BrokerResource && resource.Name != "") ||
+		resource.Type == BrokerLoggerResource
+}
 
+func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, error) {
 	var entries []ConfigEntry
 	var resources []*ConfigResource
 	resources = append(resources, &resource)
@@ -442,11 +460,31 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 		Resources: resources,
 	}
 
-	b, err := ca.Controller()
+	if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+		request.Version = 1
+	}
+
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 2
+	}
+
+	var (
+		b   *Broker
+		err error
+	)
+
+	// DescribeConfig of broker/broker logger must be sent to the broker in question
+	if dependsOnSpecificNode(resource) {
+		id, _ := strconv.Atoi(resource.Name)
+		b, err = ca.findBroker(int32(id))
+	} else {
+		b, err = ca.findAnyBroker()
+	}
 	if err != nil {
 		return nil, err
 	}
 
+	_ = b.Open(ca.client.Config())
 	rsp, err := b.DescribeConfigs(request)
 	if err != nil {
 		return nil, err
@@ -479,11 +517,23 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		ValidateOnly: validateOnly,
 	}
 
-	b, err := ca.Controller()
+	var (
+		b   *Broker
+		err error
+	)
+
+	// AlterConfig of broker/broker logger must be sent to the broker in question
+	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
+		id, _ := strconv.Atoi(name)
+		b, err = ca.findBroker(int32(id))
+	} else {
+		b, err = ca.findAnyBroker()
+	}
 	if err != nil {
 		return err
 	}
 
+	_ = b.Open(ca.client.Config())
 	rsp, err := b.AlterConfigs(request)
 	if err != nil {
 		return err
