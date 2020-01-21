@@ -29,20 +29,32 @@ var (
 )
 
 func TestFetchRequest(t *testing.T) {
-	request := new(FetchRequest)
-	testRequest(t, "no blocks", request, fetchRequestNoBlocks)
+	t.Run("no blocks", func(t *testing.T) {
+		request := new(FetchRequest)
+		testRequest(t, "no blocks", request, fetchRequestNoBlocks)
+	})
 
-	request.MaxWaitTime = 0x20
-	request.MinBytes = 0xEF
-	testRequest(t, "with properties", request, fetchRequestWithProperties)
+	t.Run("with properties", func(t *testing.T) {
+		request := new(FetchRequest)
+		request.MaxWaitTime = 0x20
+		request.MinBytes = 0xEF
+		testRequest(t, "with properties", request, fetchRequestWithProperties)
+	})
 
-	request.MaxWaitTime = 0
-	request.MinBytes = 0
-	request.AddBlock("topic", 0x12, 0x34, 0x56)
-	testRequest(t, "one block", request, fetchRequestOneBlock)
+	t.Run("one block", func(t *testing.T) {
+		request := new(FetchRequest)
+		request.MaxWaitTime = 0
+		request.MinBytes = 0
+		request.AddBlock("topic", 0x12, 0x34, 0x56)
+		testRequest(t, "one block", request, fetchRequestOneBlock)
+	})
 
-	request.Version = 4
-	request.MaxBytes = 0xFF
-	request.Isolation = ReadCommitted
-	testRequest(t, "one block v4", request, fetchRequestOneBlockV4)
+	t.Run("one block v4", func(t *testing.T) {
+		request := new(FetchRequest)
+		request.Version = 4
+		request.MaxBytes = 0xFF
+		request.Isolation = ReadCommitted
+		request.AddBlock("topic", 0x12, 0x34, 0x56)
+		testRequest(t, "one block v4", request, fetchRequestOneBlockV4)
+	})
 }
