@@ -106,6 +106,21 @@ func TestVersionMatrixLZ4(t *testing.T) {
 	consumeMsgs(t, testVersions, producedMessages)
 }
 
+// Support for zstd codec was introduced in v2.1.0.0
+func TestVersionMatrixZstd(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	// Produce lot's of message with all possible combinations of supported
+	// protocol versions starting with v2.1.0.0 (first where zstd was supported)
+	testVersions := versionRange(V2_1_0_0)
+	allCodecs := []CompressionCodec{CompressionZSTD}
+	producedMessages := produceMsgs(t, testVersions, allCodecs, 17, 100, false)
+
+	// When/Then
+	consumeMsgs(t, testVersions, producedMessages)
+}
+
 func TestVersionMatrixIdempotent(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)

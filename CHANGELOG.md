@@ -1,5 +1,13 @@
 # Changelog
 
+
+#### Unreleased
+
+Improvements:
+- Enable zstd compression
+  ([1574](https://github.com/Shopify/sarama/pull/1574),
+  [1582](https://github.com/Shopify/sarama/pull/1582))
+
 #### Version 1.25.0 (2020-01-13)
 
 New Features:
