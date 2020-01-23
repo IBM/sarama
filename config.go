@@ -21,6 +21,13 @@ var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)
 type Config struct {
 	// Admin is the namespace for ClusterAdmin properties used by the administrative Kafka client.
 	Admin struct {
+		Retry struct {
+			// The total number of times to retry sending (retriable) admin requests (default 5).
+			// Similar to the `retries` setting of the JVM AdminClientConfig.
+			Max int
+			// Backoff time between retries of a failed request (default 100ms)
+			Backoff time.Duration
+		}
 		// The maximum duration the administrative Kafka client will wait for ClusterAdmin operations,
 		// including topics, brokers, configurations and ACLs (defaults to 3 seconds).
 		Timeout time.Duration
@@ -408,6 +415,8 @@ type Config struct {
 func NewConfig() *Config {
 	c := &Config{}
 
+	c.Admin.Retry.Max = 5
+	c.Admin.Retry.Backoff = 100 * time.Millisecond
 	c.Admin.Timeout = 3 * time.Second
 
 	c.Net.MaxOpenRequests = 5
