@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -133,6 +134,7 @@ func TestSASLOAuthBearer(t *testing.T) {
 
 	testTable := []struct {
 		name                      string
+		authidentity              string
 		mockSASLHandshakeResponse MockResponse // Mock SaslHandshakeRequest response from broker
 		mockSASLAuthResponse      MockResponse // Mock SaslAuthenticateRequest response from broker
 		expectClientErr           bool         // Expect an internal client-side error
@@ -396,12 +398,19 @@ func TestSASLPlainAuth(t *testing.T) {
 
 	testTable := []struct {
 		name             string
+		authidentity     string
 		mockAuthErr      KError // Mock and expect error returned from SaslAuthenticateRequest
 		mockHandshakeErr KError // Mock and expect error returned from SaslHandshakeRequest
 		expectClientErr  bool   // Expect an internal client-side error
 	}{
 		{
 			name:             "SASL Plain OK server response",
+			mockAuthErr:      ErrNoError,
+			mockHandshakeErr: ErrNoError,
+		},
+		{
+			name:             "SASL Plain OK server response with authidentity",
+			authidentity:     "authid",
 			mockAuthErr:      ErrNoError,
 			mockHandshakeErr: ErrNoError,
 		},
@@ -453,6 +462,7 @@ func TestSASLPlainAuth(t *testing.T) {
 
 		conf := NewConfig()
 		conf.Net.SASL.Mechanism = SASLTypePlaintext
+		conf.Net.SASL.AuthIdentity = test.authidentity
 		conf.Net.SASL.User = "token"
 		conf.Net.SASL.Password = "password"
 		conf.Net.SASL.Version = SASLHandshakeV1
@@ -474,6 +484,23 @@ func TestSASLPlainAuth(t *testing.T) {
 		broker.conn = conn
 
 		err = broker.authenticateViaSASL()
+		if err == nil {
+			for _, rr := range mockBroker.History() {
+				switch r := rr.Request.(type) {
+				case *SaslAuthenticateRequest:
+					x := bytes.SplitN(r.SaslAuthBytes, []byte("\x00"), 3)
+					if string(x[0]) != conf.Net.SASL.AuthIdentity {
+						t.Errorf("[%d]:[%s] expected %s auth identity, got %s\n", i, test.name, conf.Net.SASL.AuthIdentity, x[0])
+					}
+					if string(x[1]) != conf.Net.SASL.User {
+						t.Errorf("[%d]:[%s] expected %s user, got %s\n", i, test.name, conf.Net.SASL.User, x[1])
+					}
+					if string(x[2]) != conf.Net.SASL.Password {
+						t.Errorf("[%d]:[%s] expected %s password, got %s\n", i, test.name, conf.Net.SASL.Password, x[2])
+					}
+				}
+			}
+		}
 
 		if test.mockAuthErr != ErrNoError {
 			if test.mockAuthErr != err {
