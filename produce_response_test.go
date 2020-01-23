@@ -10,8 +10,8 @@ var (
 	produceResponseNoBlocksV0 = []byte{
 		0x00, 0x00, 0x00, 0x00}
 
-	produceResponseManyBlocksVersions = [][]byte{
-		{
+	produceResponseManyBlocksVersions = map[int][]byte{
+		0: {
 			0x00, 0x00, 0x00, 0x01,
 
 			0x00, 0x03, 'f', 'o', 'o',
@@ -20,7 +20,9 @@ var (
 			0x00, 0x00, 0x00, 0x01, // Partition 1
 			0x00, 0x02, // ErrInvalidMessage
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
-		}, {
+		},
+
+		1: {
 			0x00, 0x00, 0x00, 0x01,
 
 			0x00, 0x03, 'f', 'o', 'o',
@@ -31,7 +33,8 @@ var (
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
 
 			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
-		}, {
+		},
+		2: {
 			0x00, 0x00, 0x00, 0x01,
 
 			0x00, 0x03, 'f', 'o', 'o',
@@ -41,6 +44,20 @@ var (
 			0x00, 0x02, // ErrInvalidMessage
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
 			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8, // Timestamp January 1st 0001 at 00:00:01,000 UTC (LogAppendTime was used)
+
+			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
+		},
+		7: { // version 7 adds StartOffset
+			0x00, 0x00, 0x00, 0x01,
+
+			0x00, 0x03, 'f', 'o', 'o',
+			0x00, 0x00, 0x00, 0x01,
+
+			0x00, 0x00, 0x00, 0x01, // Partition 1
+			0x00, 0x02, // ErrInvalidMessage
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8, // Timestamp January 1st 0001 at 00:00:01,000 UTC (LogAppendTime was used)
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, // StartOffset 50
 
 			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
 		},
@@ -69,14 +86,19 @@ func TestProduceResponseDecode(t *testing.T) {
 			t.Error("Decoding did not produce a block for foo/1")
 		} else {
 			if block.Err != ErrInvalidMessage {
-				t.Error("Decoding failed for foo/2/Err, got:", int16(block.Err))
+				t.Error("Decoding failed for foo/1/Err, got:", int16(block.Err))
 			}
 			if block.Offset != 255 {
 				t.Error("Decoding failed for foo/1/Offset, got:", block.Offset)
 			}
 			if v >= 2 {
 				if block.Timestamp != time.Unix(1, 0) {
-					t.Error("Decoding failed for foo/2/Timestamp, got:", block.Timestamp)
+					t.Error("Decoding failed for foo/1/Timestamp, got:", block.Timestamp)
+				}
+			}
+			if v >= 7 {
+				if block.StartOffset != 50 {
+					t.Error("Decoding failed for foo/1/StartOffset, got:", block.StartOffset)
 				}
 			}
 		}
@@ -95,9 +117,10 @@ func TestProduceResponseEncode(t *testing.T) {
 
 	response.Blocks["foo"] = make(map[int32]*ProduceResponseBlock)
 	response.Blocks["foo"][1] = &ProduceResponseBlock{
-		Err:       ErrInvalidMessage,
-		Offset:    255,
-		Timestamp: time.Unix(1, 0),
+		Err:         ErrInvalidMessage,
+		Offset:      255,
+		Timestamp:   time.Unix(1, 0),
+		StartOffset: 50,
 	}
 	response.ThrottleTime = 100 * time.Millisecond
 	for v, produceResponseManyBlocks := range produceResponseManyBlocksVersions {

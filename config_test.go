@@ -405,6 +405,18 @@ func TestLZ4ConfigValidation(t *testing.T) {
 	}
 }
 
+func TestZstdConfigValidation(t *testing.T) {
+	config := NewConfig()
+	config.Producer.Compression = CompressionZSTD
+	if err := config.Validate(); string(err.(ConfigurationError)) != "zstd compression requires Version >= V2_1_0_0" {
+		t.Error("Expected invalid zstd/kafka version error, got ", err)
+	}
+	config.Version = V2_1_0_0
+	if err := config.Validate(); err != nil {
+		t.Error("Expected zstd to work, got ", err)
+	}
+}
+
 // This example shows how to integrate with an existing registry as well as publishing metrics
 // on the standard output
 func ExampleConfig_metrics() {
