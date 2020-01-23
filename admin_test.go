@@ -1104,3 +1104,51 @@ func TestDeleteConsumerGroup(t *testing.T) {
 	}
 
 }
+
+// TestRefreshMetaDataWithDifferentController ensures that the cached
+// controller can be forcibly updated from Metadata by the admin client
+func TestRefreshMetaDataWithDifferentController(t *testing.T) {
+	seedBroker1 := NewMockBroker(t, 1)
+	seedBroker2 := NewMockBroker(t, 2)
+	defer seedBroker1.Close()
+	defer seedBroker2.Close()
+
+	seedBroker1.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker1.BrokerID()).
+			SetBroker(seedBroker1.Addr(), seedBroker1.BrokerID()).
+			SetBroker(seedBroker2.Addr(), seedBroker2.BrokerID()),
+	})
+
+	config := NewConfig()
+	config.Version = V1_1_0_0
+
+	client, err := NewClient([]string{seedBroker1.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ca := clusterAdmin{client: client, conf: config}
+
+	if b, _ := ca.Controller(); seedBroker1.BrokerID() != b.ID() {
+		t.Fatalf("expected cached controller to be %d rather than %d",
+			seedBroker1.BrokerID(), b.ID())
+	}
+
+	seedBroker1.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker2.BrokerID()).
+			SetBroker(seedBroker1.Addr(), seedBroker1.BrokerID()).
+			SetBroker(seedBroker2.Addr(), seedBroker2.BrokerID()),
+	})
+
+	if b, _ := ca.refreshController(); seedBroker2.BrokerID() != b.ID() {
+		t.Fatalf("expected refreshed controller to be %d rather than %d",
+			seedBroker2.BrokerID(), b.ID())
+	}
+
+	if b, _ := ca.Controller(); seedBroker2.BrokerID() != b.ID() {
+		t.Fatalf("expected cached controller to be %d rather than %d",
+			seedBroker2.BrokerID(), b.ID())
+	}
+}
