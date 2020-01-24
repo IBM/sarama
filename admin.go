@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"strconv"
 	"sync"
+	"time"
 )
 
 // ClusterAdmin is the administrative client for Kafka, which supports managing and inspecting topics,
@@ -134,8 +135,45 @@ func (ca *clusterAdmin) Controller() (*Broker, error) {
 	return ca.client.Controller()
 }
 
-func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error {
+func (ca *clusterAdmin) refreshController() (*Broker, error) {
+	return ca.client.RefreshController()
+}
 
+// isErrNoController returns `true` if the given error type unwraps to an
+// `ErrNotController` response from Kafka
+func isErrNoController(err error) bool {
+	switch e := err.(type) {
+	case *TopicError:
+		return e.Err == ErrNotController
+	case *TopicPartitionError:
+		return e.Err == ErrNotController
+	case KError:
+		return e == ErrNotController
+	}
+	return false
+}
+
+// retryOnError will repeatedly call the given (error-returning) func in the
+// case that its response is non-nil and retriable (as determined by the
+// provided retriable func) up to the maximum number of tries permitted by
+// the admin client configuration
+func (ca *clusterAdmin) retryOnError(retriable func(error) bool, fn func() error) error {
+	var err error
+	for attempt := 0; attempt < ca.conf.Admin.Retry.Max; attempt++ {
+		err = fn()
+		if err == nil || !retriable(err) {
+			return err
+		}
+		Logger.Printf(
+			"admin/request retrying after %dms... (%d attempts remaining)\n",
+			ca.conf.Admin.Retry.Backoff/time.Millisecond, ca.conf.Admin.Retry.Max-attempt)
+		time.Sleep(ca.conf.Admin.Retry.Backoff)
+		continue
+	}
+	return err
+}
+
+func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error {
 	if topic == "" {
 		return ErrInvalidTopic
 	}
@@ -160,26 +198,31 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 		request.Version = 2
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return err
-	}
+	return ca.retryOnError(isErrNoController, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	rsp, err := b.CreateTopics(request)
-	if err != nil {
-		return err
-	}
+		rsp, err := b.CreateTopics(request)
+		if err != nil {
+			return err
+		}
 
-	topicErr, ok := rsp.TopicErrors[topic]
-	if !ok {
-		return ErrIncompleteResponse
-	}
+		topicErr, ok := rsp.TopicErrors[topic]
+		if !ok {
+			return ErrIncompleteResponse
+		}
 
-	if topicErr.Err != ErrNoError {
-		return topicErr
-	}
+		if topicErr.Err != ErrNoError {
+			if topicErr.Err == ErrNotController {
+				_, _ = ca.refreshController()
+			}
+			return topicErr
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetadata, err error) {
@@ -320,7 +363,6 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 }
 
 func (ca *clusterAdmin) DeleteTopic(topic string) error {
-
 	if topic == "" {
 		return ErrInvalidTopic
 	}
@@ -334,25 +376,31 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		request.Version = 1
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return err
-	}
+	return ca.retryOnError(isErrNoController, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	rsp, err := b.DeleteTopics(request)
-	if err != nil {
-		return err
-	}
+		rsp, err := b.DeleteTopics(request)
+		if err != nil {
+			return err
+		}
 
-	topicErr, ok := rsp.TopicErrorCodes[topic]
-	if !ok {
-		return ErrIncompleteResponse
-	}
+		topicErr, ok := rsp.TopicErrorCodes[topic]
+		if !ok {
+			return ErrIncompleteResponse
+		}
 
-	if topicErr != ErrNoError {
-		return topicErr
-	}
-	return nil
+		if topicErr != ErrNoError {
+			if topicErr == ErrNotController {
+				_, _ = ca.refreshController()
+			}
+			return topicErr
+		}
+
+		return nil
+	})
 }
 
 func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [][]int32, validateOnly bool) error {
@@ -368,26 +416,31 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		Timeout:         ca.conf.Admin.Timeout,
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return err
-	}
+	return ca.retryOnError(isErrNoController, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	rsp, err := b.CreatePartitions(request)
-	if err != nil {
-		return err
-	}
+		rsp, err := b.CreatePartitions(request)
+		if err != nil {
+			return err
+		}
 
-	topicErr, ok := rsp.TopicPartitionErrors[topic]
-	if !ok {
-		return ErrIncompleteResponse
-	}
+		topicErr, ok := rsp.TopicPartitionErrors[topic]
+		if !ok {
+			return ErrIncompleteResponse
+		}
 
-	if topicErr.Err != ErrNoError {
-		return topicErr
-	}
+		if topicErr.Err != ErrNoError {
+			if topicErr.Err == ErrNotController {
+				_, _ = ca.refreshController()
+			}
+			return topicErr
+		}
 
-	return nil
+		return nil
+	})
 }
 
 func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]int64) error {
