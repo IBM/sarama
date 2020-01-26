@@ -19,7 +19,7 @@ func TestAddPartitionsToTxnRequest(t *testing.T) {
 		ProducerID:      8000,
 		ProducerEpoch:   0,
 		TopicPartitions: map[string][]int32{
-			"topic": []int32{1},
+			"topic": {1},
 		},
 	}
 

@@ -51,7 +51,7 @@ func TestAlterConfigsRequest(t *testing.T) {
 	configValue := "1000"
 	request = &AlterConfigsRequest{
 		Resources: []*AlterConfigsResource{
-			&AlterConfigsResource{
+			{
 				Type: TopicResource,
 				Name: "foo",
 				ConfigEntries: map[string]*string{
@@ -65,14 +65,14 @@ func TestAlterConfigsRequest(t *testing.T) {
 
 	request = &AlterConfigsRequest{
 		Resources: []*AlterConfigsResource{
-			&AlterConfigsResource{
+			{
 				Type: TopicResource,
 				Name: "foo",
 				ConfigEntries: map[string]*string{
 					"segment.ms": &configValue,
 				},
 			},
-			&AlterConfigsResource{
+			{
 				Type: TopicResource,
 				Name: "bar",
 				ConfigEntries: map[string]*string{

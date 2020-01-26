@@ -22,7 +22,7 @@ func TestDescribeLogDirsRequest(t *testing.T) {
 	testRequest(t, "no topics", request, emptyDescribeLogDirsRequest)
 
 	request.DescribeTopics = []DescribeLogDirsRequestTopic{
-		DescribeLogDirsRequestTopic{
+		{
 			Topic:        "random",
 			PartitionIDs: []int32{25, 26},
 		},

@@ -31,7 +31,7 @@ var (
 func TestCreateTopicsResponse(t *testing.T) {
 	resp := &CreateTopicsResponse{
 		TopicErrors: map[string]*TopicError{
-			"topic": &TopicError{
+			"topic": {
 				Err: ErrInvalidRequest,
 			},
 		},

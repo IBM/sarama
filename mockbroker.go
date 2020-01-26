@@ -235,7 +235,6 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 	var bytesWritten int
 	var bytesRead int
 	for {
-
 		buffer, err := b.readToBytes(conn)
 		if err != nil {
 			Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(buffer))
@@ -245,7 +244,6 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 
 		bytesWritten = 0
 		if !b.isGSSAPI(buffer) {
-
 			req, br, err := decodeRequest(bytes.NewReader(buffer))
 			bytesRead = br
 			if err != nil {
@@ -294,7 +292,6 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 				break
 			}
 			bytesWritten = len(resHeader) + len(encodedRes)
-
 		} else {
 			// GSSAPI is not part of kafka protocol, but is supported for authentication proposes.
 			// Don't support history for this kind of request as is only used for test GSSAPI authentication mechanism
@@ -317,7 +314,6 @@ func (b *MockBroker) handleRequests(conn net.Conn, idx int, wg *sync.WaitGroup) 
 			b.notifier(bytesRead, bytesWritten)
 		}
 		b.lock.Unlock()
-
 	}
 	Logger.Printf("*** mockbroker/%d/%d: connection closed, err=%v", b.BrokerID(), idx, err)
 }

@@ -32,7 +32,7 @@ var (
 func TestCreatePartitionsRequest(t *testing.T) {
 	req := &CreatePartitionsRequest{
 		TopicPartitions: map[string]*TopicPartition{
-			"topic": &TopicPartition{
+			"topic": {
 				Count: 3,
 			},
 		},

@@ -109,7 +109,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 			t.Error(err)
 		}
 	}
-
 }
 
 var ErrTokenFailure = errors.New("Failure generating token")
@@ -131,7 +130,6 @@ func newTokenProvider(token *AccessToken, err error) *TokenProvider {
 }
 
 func TestSASLOAuthBearer(t *testing.T) {
-
 	testTable := []struct {
 		name                      string
 		authidentity              string
@@ -202,7 +200,6 @@ func TestSASLOAuthBearer(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-
 		// mockBroker mocks underlying network logic and broker responses
 		mockBroker := NewMockBroker(t, 0)
 
@@ -327,7 +324,6 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-
 		// mockBroker mocks underlying network logic and broker responses
 		mockBroker := NewMockBroker(t, 0)
 		broker := NewBroker(mockBroker.Addr())
@@ -395,7 +391,6 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 }
 
 func TestSASLPlainAuth(t *testing.T) {
-
 	testTable := []struct {
 		name             string
 		authidentity     string
@@ -427,7 +422,6 @@ func TestSASLPlainAuth(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-
 		// mockBroker mocks underlying network logic and broker responses
 		mockBroker := NewMockBroker(t, 0)
 
@@ -570,7 +564,6 @@ func TestSASLReadTimeout(t *testing.T) {
 }
 
 func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
-
 	testTable := []struct {
 		name               string
 		error              error
@@ -686,11 +679,9 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 
 		mockBroker.Close()
 	}
-
 }
 
 func TestBuildClientFirstMessage(t *testing.T) {
-
 	testTable := []struct {
 		name        string
 		token       *AccessToken
@@ -727,7 +718,6 @@ func TestBuildClientFirstMessage(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-
 		actual, err := buildClientFirstMessage(test.token)
 
 		if !reflect.DeepEqual(test.expected, actual) {

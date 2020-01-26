@@ -20,7 +20,7 @@ func TestAddPartitionsToTxnResponse(t *testing.T) {
 	resp := &AddPartitionsToTxnResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Errors: map[string][]*PartitionError{
-			"topic": []*PartitionError{&PartitionError{
+			"topic": {{
 				Err:       ErrInvalidTxnState,
 				Partition: 2,
 			}},
