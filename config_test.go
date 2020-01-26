@@ -194,7 +194,6 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.GSSAPI.Username = "sarama"
 				cfg.Net.SASL.GSSAPI.Password = "sarama"
 				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
-
 			},
 			"Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used"},
 	}

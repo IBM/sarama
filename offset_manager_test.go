@@ -9,7 +9,6 @@ import (
 func initOffsetManagerWithBackoffFunc(t *testing.T, retention time.Duration,
 	backoffFunc func(retries, maxRetries int) time.Duration, config *Config) (om OffsetManager,
 	testClient Client, broker, coordinator *MockBroker) {
-
 	config.Metadata.Retry.Max = 1
 	if backoffFunc != nil {
 		config.Metadata.Retry.BackoffFunc = backoffFunc
@@ -56,7 +55,6 @@ func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 	coordinator *MockBroker, initialOffset int64, metadata string) PartitionOffsetManager {
-
 	fetchResponse := new(OffsetFetchResponse)
 	fetchResponse.AddBlock("my_topic", 0, &OffsetFetchResponseBlock{
 		Err:      ErrNoError,
@@ -122,7 +120,6 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
 		t.Run(tt.name, func(t *testing.T) {
-
 			config := NewConfig()
 			if tt.set {
 				config.Consumer.Offsets.AutoCommit.Enable = tt.enable

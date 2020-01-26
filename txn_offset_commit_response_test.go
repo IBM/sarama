@@ -20,7 +20,7 @@ func TestTxnOffsetCommitResponse(t *testing.T) {
 	resp := &TxnOffsetCommitResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Topics: map[string][]*PartitionError{
-			"topic": []*PartitionError{{
+			"topic": {{
 				Partition: 2,
 				Err:       ErrInvalidProducerEpoch,
 			}},

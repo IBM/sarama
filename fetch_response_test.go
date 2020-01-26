@@ -146,7 +146,6 @@ func TestEmptyFetchResponse(t *testing.T) {
 	if len(response.Blocks) != 0 {
 		t.Error("Decoding produced topic blocks where there were none.")
 	}
-
 }
 
 func TestOneMessageFetchResponse(t *testing.T) {

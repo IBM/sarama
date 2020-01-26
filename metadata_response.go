@@ -318,5 +318,4 @@ foundPartition:
 	pmatch.Isr = isr
 	pmatch.OfflineReplicas = offline
 	pmatch.Err = err
-
 }

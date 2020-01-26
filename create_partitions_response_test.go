@@ -28,7 +28,7 @@ func TestCreatePartitionsResponse(t *testing.T) {
 	resp := &CreatePartitionsResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		TopicPartitionErrors: map[string]*TopicPartitionError{
-			"topic": &TopicPartitionError{},
+			"topic": {},
 		},
 	}
 

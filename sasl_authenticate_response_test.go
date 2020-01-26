@@ -11,7 +11,6 @@ var (
 )
 
 func TestSaslAuthenticateResponse(t *testing.T) {
-
 	response := new(SaslAuthenticateResponse)
 	response.Err = ErrSASLAuthenticationFailed
 	msg := "err"

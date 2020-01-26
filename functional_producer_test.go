@@ -173,7 +173,6 @@ func testProducingMessages(t *testing.T, config *Config) {
 				t.Fatalf("Unexpected message with index %d: %s", i, message.Value)
 			}
 		}
-
 	}
 	safeClose(t, consumer)
 	safeClose(t, client)

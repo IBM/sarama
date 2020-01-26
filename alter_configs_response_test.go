@@ -33,7 +33,7 @@ func TestAlterConfigsResponse(t *testing.T) {
 
 	response = &AlterConfigsResponse{
 		Resources: []*AlterConfigsResourceResponse{
-			&AlterConfigsResourceResponse{
+			{
 				ErrorCode: 0,
 				ErrorMsg:  "",
 				Type:      TopicResource,

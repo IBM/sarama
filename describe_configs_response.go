@@ -277,7 +277,6 @@ func (r *ConfigEntry) decode(pd packetDecoder, version int16) (err error) {
 			}
 			r.Synonyms[i] = s
 		}
-
 	}
 	return nil
 }

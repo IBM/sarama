@@ -328,7 +328,6 @@ func (l *testLogger) Println(v ...interface{}) {
 }
 
 func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
-
 	tt := func(t *testing.T, kErr KError) {
 		seedBroker := NewMockBroker(t, 1)
 		leader1 := NewMockBroker(t, 2)

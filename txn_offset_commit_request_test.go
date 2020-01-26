@@ -24,7 +24,7 @@ func TestTxnOffsetCommitRequest(t *testing.T) {
 		ProducerID:      8000,
 		ProducerEpoch:   1,
 		Topics: map[string][]*PartitionOffsetMetadata{
-			"topic": []*PartitionOffsetMetadata{{
+			"topic": {{
 				Offset:    123,
 				Partition: 2,
 			}},
