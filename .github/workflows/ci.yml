@@ -4,12 +4,13 @@ on: push
 
 jobs:
   test:
-    name: Go ${{ matrix.go-version }} on Ubuntu
+    name: Go ${{ matrix.go-version }} with Kafka ${{ matrix.kafka-version }} on Ubuntu
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         go-version: [1.12.x, 1.13.x]
+        kafka-version: [2.3.1, 2.4.0]
         platform: [ubuntu-latest]
 
     env:
@@ -18,7 +19,7 @@ jobs:
       KAFKA_INSTALL_ROOT: /home/runner/kafka
       KAFKA_HOSTNAME: localhost
       DEBUG: true
-      KAFKA_VERSION: 2.3.0
+      KAFKA_VERSION: ${{ matrix.kafka-version }}
       KAFKA_SCALA_VERSION: 2.12
 
     steps:
