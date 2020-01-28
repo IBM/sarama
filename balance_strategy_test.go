@@ -144,7 +144,7 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 			want: &StickyAssignorUserDataV0{
 				Topics: map[string][]int32{"t03": {5}},
 				topicPartitions: []topicPartitionAssignment{
-					topicPartitionAssignment{
+					{
 						Topic:     "t03",
 						Partition: 5,
 					},
@@ -165,11 +165,11 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 				Topics:     map[string][]int32{"t06": {0, 4}},
 				Generation: -1,
 				topicPartitions: []topicPartitionAssignment{
-					topicPartitionAssignment{
+					{
 						Topic:     "t06",
 						Partition: 0,
 					},
-					topicPartitionAssignment{
+					{
 						Topic:     "t06",
 						Partition: 4,
 					},
@@ -211,7 +211,7 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 			name: "Single consumer",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"c01": ConsumerGroupMemberMetadata{
+					"c01": {
 						Version: 2,
 						UserData: []byte{
 							0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x74, 0x30,
@@ -223,12 +223,12 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 				},
 			},
 			wantCurrentAssignments: map[string][]topicPartitionAssignment{
-				"c01": []topicPartitionAssignment{
-					topicPartitionAssignment{
+				"c01": {
+					{
 						Topic:     "t06",
 						Partition: 0,
 					},
-					topicPartitionAssignment{
+					{
 						Topic:     "t06",
 						Partition: 4,
 					},
@@ -240,7 +240,7 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 			name: "Duplicate consumer assignments in metadata",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"c01": ConsumerGroupMemberMetadata{
+					"c01": {
 						Version: 2,
 						UserData: []byte{
 							0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x74, 0x30,
@@ -249,7 +249,7 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 							0xff,
 						},
 					},
-					"c02": ConsumerGroupMemberMetadata{
+					"c02": {
 						Version: 2,
 						UserData: []byte{
 							0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x74, 0x30,
@@ -261,12 +261,12 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 				},
 			},
 			wantCurrentAssignments: map[string][]topicPartitionAssignment{
-				"c01": []topicPartitionAssignment{
-					topicPartitionAssignment{
+				"c01": {
+					{
 						Topic:     "t06",
 						Partition: 0,
 					},
-					topicPartitionAssignment{
+					{
 						Topic:     "t06",
 						Partition: 4,
 					},
@@ -278,7 +278,7 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 			name: "Different generations (5, 6) of consumer assignments in metadata",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"c01": ConsumerGroupMemberMetadata{
+					"c01": {
 						Version: 2,
 						UserData: []byte{
 							0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x74, 0x30,
@@ -287,7 +287,7 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 							0x05,
 						},
 					},
-					"c02": ConsumerGroupMemberMetadata{
+					"c02": {
 						Version: 2,
 						UserData: []byte{
 							0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x74, 0x30,
@@ -299,29 +299,29 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 				},
 			},
 			wantCurrentAssignments: map[string][]topicPartitionAssignment{
-				"c01": []topicPartitionAssignment{
-					topicPartitionAssignment{
+				"c01": {
+					{
 						Topic:     "t06",
 						Partition: 0,
 					},
-					topicPartitionAssignment{
+					{
 						Topic:     "t06",
 						Partition: 4,
 					},
 				},
 			},
 			wantPrevAssignments: map[topicPartitionAssignment]consumerGenerationPair{
-				topicPartitionAssignment{
+				{
 					Topic:     "t06",
 					Partition: 0,
-				}: consumerGenerationPair{
+				}: {
 					Generation: 5,
 					MemberID:   "c01",
 				},
-				topicPartitionAssignment{
+				{
 					Topic:     "t06",
 					Partition: 4,
-				}: consumerGenerationPair{
+				}: {
 					Generation: 5,
 					MemberID:   "c01",
 				},
@@ -365,9 +365,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			name: "Topic partitions with identical consumer entries",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 2}: {"c1", "c2", "c3"},
 				},
 				consumer2AllPotentialPartitions: make(map[string][]topicPartitionAssignment),
 			},
@@ -377,9 +377,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			name: "Topic partitions with mixed up consumer entries",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c3", "c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"c3", "c1", "c2"},
 				},
 				consumer2AllPotentialPartitions: make(map[string][]topicPartitionAssignment),
 			},
@@ -389,9 +389,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			name: "Topic partitions with different consumer entries",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"cX", "c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"cX", "c1", "c2"},
 				},
 				consumer2AllPotentialPartitions: make(map[string][]topicPartitionAssignment),
 			},
@@ -401,9 +401,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			name: "Topic partitions with different number of consumer entries",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"c1", "c2"},
 				},
 				consumer2AllPotentialPartitions: make(map[string][]topicPartitionAssignment),
 			},
@@ -414,9 +414,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			args: args{
 				partition2AllPotentialConsumers: make(map[topicPartitionAssignment][]string),
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c3": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
 				},
 			},
 			want: true,
@@ -426,9 +426,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			args: args{
 				partition2AllPotentialConsumers: make(map[topicPartitionAssignment][]string),
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}, topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 2}, topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}, {Topic: "t1", Partition: 0}},
+					"c3": {{Topic: "t1", Partition: 2}, {Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}},
 				},
 			},
 			want: true,
@@ -438,9 +438,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			args: args{
 				partition2AllPotentialConsumers: make(map[topicPartitionAssignment][]string),
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}, topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "tX", Partition: 2}, topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}, {Topic: "t1", Partition: 0}},
+					"c3": {{Topic: "tX", Partition: 2}, {Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}},
 				},
 			},
 			want: false,
@@ -450,9 +450,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 			args: args{
 				partition2AllPotentialConsumers: make(map[topicPartitionAssignment][]string),
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}, topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}, {Topic: "t1", Partition: 0}},
+					"c3": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}},
 				},
 			},
 			want: false,
@@ -484,10 +484,10 @@ func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
 			name: "Single assignment",
 			args: args{
 				assignments: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
+						{Topic: "t1", Partition: 2},
 					},
 				},
 			},
@@ -497,17 +497,17 @@ func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
 			name: "Multiple assignments with different partition counts",
 			args: args{
 				assignments: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
+					"c1": {
+						{Topic: "t1", Partition: 0},
 					},
-					"c2": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c2": {
+						{Topic: "t1", Partition: 1},
+						{Topic: "t1", Partition: 2},
 					},
-					"c3": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 3},
-						topicPartitionAssignment{Topic: "t1", Partition: 4},
-						topicPartitionAssignment{Topic: "t1", Partition: 5},
+					"c3": {
+						{Topic: "t1", Partition: 3},
+						{Topic: "t1", Partition: 4},
+						{Topic: "t1", Partition: 5},
 					},
 				},
 			},
@@ -544,19 +544,19 @@ func Test_sortPartitions(t *testing.T) {
 			name: "Base case",
 			args: args{
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}},
+					"c2": {{Topic: "t1", Partition: 1}},
+					"c3": {{Topic: "t1", Partition: 2}},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c3": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c3", "c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"c3", "c1", "c2"},
 				},
 			},
 		},
@@ -564,20 +564,20 @@ func Test_sortPartitions(t *testing.T) {
 			name: "Partitions assigned to a different consumer last time",
 			args: args{
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
+					"c1": {{Topic: "t1", Partition: 0}},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c3": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c3", "c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"c3", "c1", "c2"},
 				},
 				partitionsWithADifferentPreviousAssignment: map[topicPartitionAssignment]consumerGenerationPair{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: consumerGenerationPair{Generation: 1, MemberID: "c2"},
+					{Topic: "t1", Partition: 0}: {Generation: 1, MemberID: "c2"},
 				},
 			},
 		},
@@ -585,21 +585,21 @@ func Test_sortPartitions(t *testing.T) {
 			name: "Partitions assigned to a different consumer last time",
 			args: args{
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}},
+					"c1": {{Topic: "t1", Partition: 0}},
+					"c2": {{Topic: "t1", Partition: 1}},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c3": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c3", "c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"c3", "c1", "c2"},
 				},
 				partitionsWithADifferentPreviousAssignment: map[topicPartitionAssignment]consumerGenerationPair{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: consumerGenerationPair{Generation: 1, MemberID: "c2"},
+					{Topic: "t1", Partition: 0}: {Generation: 1, MemberID: "c2"},
 				},
 			},
 		},
@@ -609,17 +609,17 @@ func Test_sortPartitions(t *testing.T) {
 				isFreshAssignment: true,
 				currentAssignment: map[string][]topicPartitionAssignment{},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}, topicPartitionAssignment{Topic: "t1", Partition: 1}, topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c2": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
+					"c3": {{Topic: "t1", Partition: 0}, {Topic: "t1", Partition: 1}, {Topic: "t1", Partition: 2}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2", "c3"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2", "c3", "c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c3", "c1", "c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2", "c3"},
+					{Topic: "t1", Partition: 1}: {"c2", "c3", "c1"},
+					{Topic: "t1", Partition: 2}: {"c3", "c1", "c2"},
 				},
 				partitionsWithADifferentPreviousAssignment: map[topicPartitionAssignment]consumerGenerationPair{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: consumerGenerationPair{Generation: 1, MemberID: "c2"},
+					{Topic: "t1", Partition: 0}: {Generation: 1, MemberID: "c2"},
 				},
 			},
 		},
@@ -648,52 +648,52 @@ func Test_filterAssignedPartitions(t *testing.T) {
 			name: "All partitions accounted for",
 			args: args{
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}},
+					"c1": {{Topic: "t1", Partition: 0}},
+					"c2": {{Topic: "t1", Partition: 1}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c2"},
+					{Topic: "t1", Partition: 0}: {"c1"},
+					{Topic: "t1", Partition: 1}: {"c2"},
 				},
 			},
 			want: map[string][]topicPartitionAssignment{
-				"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-				"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}},
+				"c1": {{Topic: "t1", Partition: 0}},
+				"c2": {{Topic: "t1", Partition: 1}},
 			},
 		},
 		{
 			name: "One consumer using an unrecognized partition",
 			args: args{
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}},
+					"c1": {{Topic: "t1", Partition: 0}},
+					"c2": {{Topic: "t1", Partition: 1}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1"},
+					{Topic: "t1", Partition: 0}: {"c1"},
 				},
 			},
 			want: map[string][]topicPartitionAssignment{
-				"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-				"c2": []topicPartitionAssignment{},
+				"c1": {{Topic: "t1", Partition: 0}},
+				"c2": {},
 			},
 		},
 		{
 			name: "Interleaved consumer removal",
 			args: args{
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-					"c2": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 1}},
-					"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 2}},
+					"c1": {{Topic: "t1", Partition: 0}},
+					"c2": {{Topic: "t1", Partition: 1}},
+					"c3": {{Topic: "t1", Partition: 2}},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c3"},
+					{Topic: "t1", Partition: 0}: {"c1"},
+					{Topic: "t1", Partition: 2}: {"c3"},
 				},
 			},
 			want: map[string][]topicPartitionAssignment{
-				"c1": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 0}},
-				"c2": []topicPartitionAssignment{},
-				"c3": []topicPartitionAssignment{topicPartitionAssignment{Topic: "t1", Partition: 2}},
+				"c1": {{Topic: "t1", Partition: 0}},
+				"c2": {},
+				"c3": {{Topic: "t1", Partition: 2}},
 			},
 		},
 	}
@@ -723,28 +723,28 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 			args: args{
 				memberID: "c1",
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
+						{Topic: "t1", Partition: 2},
 					},
-					"c2": []topicPartitionAssignment{},
+					"c2": {},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
 					},
-					"c2": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c2": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
+						{Topic: "t1", Partition: 2},
 					},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1", "c2"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c1", "c2"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c2"},
+					{Topic: "t1", Partition: 0}: {"c1", "c2"},
+					{Topic: "t1", Partition: 1}: {"c1", "c2"},
+					{Topic: "t1", Partition: 2}: {"c2"},
 				},
 			},
 			want: true,
@@ -754,20 +754,20 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 			args: args{
 				memberID: "c1",
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
 					},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
 					},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c1"},
+					{Topic: "t1", Partition: 0}: {"c1"},
+					{Topic: "t1", Partition: 1}: {"c1"},
 				},
 			},
 			want: false,
@@ -777,22 +777,22 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 			args: args{
 				memberID: "c1",
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
 					},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c1": {
+						{Topic: "t1", Partition: 0},
+						{Topic: "t1", Partition: 1},
+						{Topic: "t1", Partition: 2},
 					},
 				},
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: []string{"c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: []string{"c1"},
-					topicPartitionAssignment{Topic: "t1", Partition: 2}: []string{"c1"},
+					{Topic: "t1", Partition: 0}: {"c1"},
+					{Topic: "t1", Partition: 1}: {"c1"},
+					{Topic: "t1", Partition: 2}: {"c1"},
 				},
 			},
 			want: true,
@@ -829,45 +829,45 @@ func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
 			name: "Remove first entry",
 			args: args{
 				assignments: []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 0},
-					topicPartitionAssignment{Topic: "t1", Partition: 1},
-					topicPartitionAssignment{Topic: "t1", Partition: 2},
+					{Topic: "t1", Partition: 0},
+					{Topic: "t1", Partition: 1},
+					{Topic: "t1", Partition: 2},
 				},
 				topic: topicPartitionAssignment{Topic: "t1", Partition: 0},
 			},
 			want: []topicPartitionAssignment{
-				topicPartitionAssignment{Topic: "t1", Partition: 1},
-				topicPartitionAssignment{Topic: "t1", Partition: 2},
+				{Topic: "t1", Partition: 1},
+				{Topic: "t1", Partition: 2},
 			},
 		},
 		{
 			name: "Remove middle entry",
 			args: args{
 				assignments: []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 0},
-					topicPartitionAssignment{Topic: "t1", Partition: 1},
-					topicPartitionAssignment{Topic: "t1", Partition: 2},
+					{Topic: "t1", Partition: 0},
+					{Topic: "t1", Partition: 1},
+					{Topic: "t1", Partition: 2},
 				},
 				topic: topicPartitionAssignment{Topic: "t1", Partition: 1},
 			},
 			want: []topicPartitionAssignment{
-				topicPartitionAssignment{Topic: "t1", Partition: 0},
-				topicPartitionAssignment{Topic: "t1", Partition: 2},
+				{Topic: "t1", Partition: 0},
+				{Topic: "t1", Partition: 2},
 			},
 		},
 		{
 			name: "Remove last entry",
 			args: args{
 				assignments: []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 0},
-					topicPartitionAssignment{Topic: "t1", Partition: 1},
-					topicPartitionAssignment{Topic: "t1", Partition: 2},
+					{Topic: "t1", Partition: 0},
+					{Topic: "t1", Partition: 1},
+					{Topic: "t1", Partition: 2},
 				},
 				topic: topicPartitionAssignment{Topic: "t1", Partition: 2},
 			},
 			want: []topicPartitionAssignment{
-				topicPartitionAssignment{Topic: "t1", Partition: 0},
-				topicPartitionAssignment{Topic: "t1", Partition: 1},
+				{Topic: "t1", Partition: 0},
+				{Topic: "t1", Partition: 1},
 			},
 		},
 	}
@@ -901,46 +901,46 @@ func Test_assignPartition(t *testing.T) {
 				partition:                  topicPartitionAssignment{Topic: "t1", Partition: 2},
 				sortedCurrentSubscriptions: []string{"c3", "c1", "c2"},
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
+					"c1": {
+						{Topic: "t1", Partition: 0},
 					},
-					"c2": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c2": {
+						{Topic: "t1", Partition: 1},
 					},
-					"c3": []topicPartitionAssignment{},
+					"c3": {},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
+					"c1": {
+						{Topic: "t1", Partition: 0},
 					},
-					"c2": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c2": {
+						{Topic: "t1", Partition: 1},
 					},
-					"c3": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c3": {
+						{Topic: "t1", Partition: 2},
 					},
 				},
 				currentPartitionConsumer: map[topicPartitionAssignment]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: "c1",
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: "c2",
+					{Topic: "t1", Partition: 0}: "c1",
+					{Topic: "t1", Partition: 1}: "c2",
 				},
 			},
 			want: []string{"c1", "c2", "c3"},
 			wantCurrentAssignment: map[string][]topicPartitionAssignment{
-				"c1": []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 0},
+				"c1": {
+					{Topic: "t1", Partition: 0},
 				},
-				"c2": []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 1},
+				"c2": {
+					{Topic: "t1", Partition: 1},
 				},
-				"c3": []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 2},
+				"c3": {
+					{Topic: "t1", Partition: 2},
 				},
 			},
 			wantCurrentPartitionConsumer: map[topicPartitionAssignment]string{
-				topicPartitionAssignment{Topic: "t1", Partition: 0}: "c1",
-				topicPartitionAssignment{Topic: "t1", Partition: 1}: "c2",
-				topicPartitionAssignment{Topic: "t1", Partition: 2}: "c3",
+				{Topic: "t1", Partition: 0}: "c1",
+				{Topic: "t1", Partition: 1}: "c2",
+				{Topic: "t1", Partition: 2}: "c3",
 			},
 		},
 		{
@@ -949,43 +949,43 @@ func Test_assignPartition(t *testing.T) {
 				partition:                  topicPartitionAssignment{Topic: "t1", Partition: 3},
 				sortedCurrentSubscriptions: []string{"c3", "c1", "c2"},
 				currentAssignment: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
+					"c1": {
+						{Topic: "t1", Partition: 0},
 					},
-					"c2": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c2": {
+						{Topic: "t1", Partition: 1},
 					},
-					"c3": []topicPartitionAssignment{},
+					"c3": {},
 				},
 				consumer2AllPotentialPartitions: map[string][]topicPartitionAssignment{
-					"c1": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 0},
+					"c1": {
+						{Topic: "t1", Partition: 0},
 					},
-					"c2": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 1},
+					"c2": {
+						{Topic: "t1", Partition: 1},
 					},
-					"c3": []topicPartitionAssignment{
-						topicPartitionAssignment{Topic: "t1", Partition: 2},
+					"c3": {
+						{Topic: "t1", Partition: 2},
 					},
 				},
 				currentPartitionConsumer: map[topicPartitionAssignment]string{
-					topicPartitionAssignment{Topic: "t1", Partition: 0}: "c1",
-					topicPartitionAssignment{Topic: "t1", Partition: 1}: "c2",
+					{Topic: "t1", Partition: 0}: "c1",
+					{Topic: "t1", Partition: 1}: "c2",
 				},
 			},
 			want: []string{"c3", "c1", "c2"},
 			wantCurrentAssignment: map[string][]topicPartitionAssignment{
-				"c1": []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 0},
+				"c1": {
+					{Topic: "t1", Partition: 0},
 				},
-				"c2": []topicPartitionAssignment{
-					topicPartitionAssignment{Topic: "t1", Partition: 1},
+				"c2": {
+					{Topic: "t1", Partition: 1},
 				},
-				"c3": []topicPartitionAssignment{},
+				"c3": {},
 			},
 			wantCurrentPartitionConsumer: map[topicPartitionAssignment]string{
-				topicPartitionAssignment{Topic: "t1", Partition: 0}: "c1",
-				topicPartitionAssignment{Topic: "t1", Partition: 1}: "c2",
+				{Topic: "t1", Partition: 0}: "c1",
+				{Topic: "t1", Partition: 1}: "c2",
 			},
 		},
 	}
@@ -1018,7 +1018,7 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "One consumer with no topics",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer": ConsumerGroupMemberMetadata{},
+					"consumer": {},
 				},
 				topics: make(map[string][]int32),
 			},
@@ -1027,7 +1027,7 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "One consumer with non-existent topic",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer": ConsumerGroupMemberMetadata{
+					"consumer": {
 						Topics: []string{"topic"},
 					},
 				},
@@ -1040,12 +1040,12 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "One consumer with one topic",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer": ConsumerGroupMemberMetadata{
+					"consumer": {
 						Topics: []string{"topic"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic": []int32{0, 1, 2},
+					"topic": {0, 1, 2},
 				},
 			},
 		},
@@ -1053,13 +1053,13 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Only assigns partitions from subscribed topics",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer": ConsumerGroupMemberMetadata{
+					"consumer": {
 						Topics: []string{"topic"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic": []int32{0, 1, 2},
-					"other": []int32{0, 1, 2},
+					"topic": {0, 1, 2},
+					"other": {0, 1, 2},
 				},
 			},
 		},
@@ -1067,13 +1067,13 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "One consumer with multiple topics",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer": ConsumerGroupMemberMetadata{
+					"consumer": {
 						Topics: []string{"topic1", "topic2"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0},
-					"topic2": []int32{0, 1},
+					"topic1": {0},
+					"topic2": {0, 1},
 				},
 			},
 		},
@@ -1081,15 +1081,15 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Two consumers with one topic and one partition",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics: []string{"topic"},
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics: []string{"topic"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic": []int32{0},
+					"topic": {0},
 				},
 			},
 		},
@@ -1097,15 +1097,15 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Two consumers with one topic and two partitions",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics: []string{"topic"},
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics: []string{"topic"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic": []int32{0, 1},
+					"topic": {0, 1},
 				},
 			},
 		},
@@ -1113,19 +1113,19 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Multiple consumers with mixed topic subscriptions",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics: []string{"topic1"},
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics: []string{"topic1", "topic2"},
 					},
-					"consumer3": ConsumerGroupMemberMetadata{
+					"consumer3": {
 						Topics: []string{"topic1"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0, 1, 2},
-					"topic2": []int32{0, 1},
+					"topic1": {0, 1, 2},
+					"topic2": {0, 1},
 				},
 			},
 		},
@@ -1133,16 +1133,16 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Two consumers with two topics and six partitions",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics: []string{"topic1", "topic2"},
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics: []string{"topic1", "topic2"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0, 1, 2},
-					"topic2": []int32{0, 1, 2},
+					"topic1": {0, 1, 2},
+					"topic2": {0, 1, 2},
 				},
 			},
 		},
@@ -1150,20 +1150,20 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Three consumers (two old, one new) with one topic and twelve partitions",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics:   []string{"topic1"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{4, 11, 8, 5, 9, 2}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {4, 11, 8, 5, 9, 2}}, 1),
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics:   []string{"topic1"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{1, 3, 0, 7, 10, 6}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {1, 3, 0, 7, 10, 6}}, 1),
 					},
-					"consumer3": ConsumerGroupMemberMetadata{
+					"consumer3": {
 						Topics: []string{"topic1"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+					"topic1": {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
 				},
 			},
 		},
@@ -1171,20 +1171,20 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Three consumers (two old, one new) with one topic and 13 partitions",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics:   []string{"topic1"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{4, 11, 8, 5, 9, 2, 6}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {4, 11, 8, 5, 9, 2, 6}}, 1),
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics:   []string{"topic1"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{1, 3, 0, 7, 10, 12}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {1, 3, 0, 7, 10, 12}}, 1),
 					},
-					"consumer3": ConsumerGroupMemberMetadata{
+					"consumer3": {
 						Topics: []string{"topic1"},
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+					"topic1": {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12},
 				},
 			},
 		},
@@ -1192,14 +1192,14 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "One consumer that is no longer subscribed to a topic that it had previously been consuming from",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics:   []string{"topic2"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0}}, 1),
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0},
-					"topic2": []int32{0},
+					"topic1": {0},
+					"topic2": {0},
 				},
 			},
 		},
@@ -1207,18 +1207,18 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 			name: "Two consumers where one is no longer interested in consuming from a topic that it had been consuming from",
 			args: args{
 				members: map[string]ConsumerGroupMemberMetadata{
-					"consumer1": ConsumerGroupMemberMetadata{
+					"consumer1": {
 						Topics:   []string{"topic2"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0}}, 1),
 					},
-					"consumer2": ConsumerGroupMemberMetadata{
+					"consumer2": {
 						Topics:   []string{"topic1", "topic2"},
-						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{1}}, 1),
+						UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {1}}, 1),
 					},
 				},
 				topics: map[string][]int32{
-					"topic1": []int32{0, 1},
-					"topic2": []int32{0, 1},
+					"topic1": {0, 1},
+					"topic2": {0, 1},
 				},
 			},
 		},
@@ -1238,21 +1238,21 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleOne(t *testing.T) {
 
 	// PLAN 1
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{
+		"consumer1": {
 			Topics: []string{"topic1", "topic2", "topic3", "topic4"},
 		},
-		"consumer2": ConsumerGroupMemberMetadata{
+		"consumer2": {
 			Topics: []string{"topic1", "topic2", "topic3", "topic4"},
 		},
-		"consumer3": ConsumerGroupMemberMetadata{
+		"consumer3": {
 			Topics: []string{"topic1", "topic2", "topic3", "topic4"},
 		},
 	}
 	topics := map[string][]int32{
-		"topic1": []int32{0, 1},
-		"topic2": []int32{0, 1},
-		"topic3": []int32{0, 1},
-		"topic4": []int32{0, 1},
+		"topic1": {0, 1},
+		"topic2": {0, 1},
+		"topic3": {0, 1},
+		"topic4": {0, 1},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1278,20 +1278,20 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleTwo(t *testing.T) {
 
 	// PLAN 1
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{
+		"consumer1": {
 			Topics: []string{"topic1"},
 		},
-		"consumer2": ConsumerGroupMemberMetadata{
+		"consumer2": {
 			Topics: []string{"topic1", "topic2"},
 		},
-		"consumer3": ConsumerGroupMemberMetadata{
+		"consumer3": {
 			Topics: []string{"topic1", "topic2", "topic3"},
 		},
 	}
 	topics := map[string][]int32{
-		"topic1": []int32{0},
-		"topic2": []int32{0, 1},
-		"topic3": []int32{0, 1, 2},
+		"topic1": {0},
+		"topic2": {0, 1},
+		"topic3": {0, 1, 2},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1323,16 +1323,16 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleThree(t *testing.T) {
 
 	// PLAN 1
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{
+		"consumer1": {
 			Topics: topicNames,
 		},
-		"consumer2": ConsumerGroupMemberMetadata{
+		"consumer2": {
 			Topics: topicNames,
 		},
 	}
 	topics := map[string][]int32{
-		"topic1": []int32{0, 1},
-		"topic2": []int32{0, 1},
+		"topic1": {0, 1},
+		"topic2": {0, 1},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1359,12 +1359,12 @@ func Test_stickyBalanceStrategy_Plan_AddRemoveConsumerOneTopic(t *testing.T) {
 
 	// PLAN 1
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{
+		"consumer1": {
 			Topics: []string{"topic"},
 		},
 	}
 	topics := map[string][]int32{
-		"topic": []int32{0, 1, 2},
+		"topic": {0, 1, 2},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1395,16 +1395,16 @@ func Test_stickyBalanceStrategy_Plan_PoorRoundRobinAssignmentScenario(t *testing
 
 	// PLAN 1
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{
+		"consumer1": {
 			Topics: []string{"topic1", "topic2", "topic3", "topic4", "topic5"},
 		},
-		"consumer2": ConsumerGroupMemberMetadata{
+		"consumer2": {
 			Topics: []string{"topic1", "topic3", "topic5"},
 		},
-		"consumer3": ConsumerGroupMemberMetadata{
+		"consumer3": {
 			Topics: []string{"topic1", "topic3", "topic5"},
 		},
-		"consumer4": ConsumerGroupMemberMetadata{
+		"consumer4": {
 			Topics: []string{"topic1", "topic2", "topic3", "topic4", "topic5"},
 		},
 	}
@@ -1426,15 +1426,15 @@ func Test_stickyBalanceStrategy_Plan_AddRemoveTopicTwoConsumers(t *testing.T) {
 
 	// PLAN 1
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{
+		"consumer1": {
 			Topics: []string{"topic1"},
 		},
-		"consumer2": ConsumerGroupMemberMetadata{
+		"consumer2": {
 			Topics: []string{"topic1"},
 		},
 	}
 	topics := map[string][]int32{
-		"topic1": []int32{0, 1, 2},
+		"topic1": {0, 1, 2},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1700,15 +1700,15 @@ func Test_stickyBalanceStrategy_Plan_MoveExistingAssignments(t *testing.T) {
 	members := make(map[string]ConsumerGroupMemberMetadata, 3)
 	members["consumer1"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1", "topic2"},
-		UserData: encodeSubscriberPlan(t, map[string][]int32{"topic1": []int32{0}}),
+		UserData: encodeSubscriberPlan(t, map[string][]int32{"topic1": {0}}),
 	}
 	members["consumer2"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1", "topic2", "topic3", "topic4"},
-		UserData: encodeSubscriberPlan(t, map[string][]int32{"topic2": []int32{0}, "topic3": []int32{0}}),
+		UserData: encodeSubscriberPlan(t, map[string][]int32{"topic2": {0}, "topic3": {0}}),
 	}
 	members["consumer3"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic2", "topic3", "topic4", "topic5", "topic6"},
-		UserData: encodeSubscriberPlan(t, map[string][]int32{"topic4": []int32{0}, "topic5": []int32{0}, "topic6": []int32{0}}),
+		UserData: encodeSubscriberPlan(t, map[string][]int32{"topic4": {0}, "topic5": {0}, "topic6": {0}}),
 	}
 
 	plan, err := s.Plan(members, topics)
@@ -1718,12 +1718,12 @@ func Test_stickyBalanceStrategy_Plan_MoveExistingAssignments(t *testing.T) {
 func Test_stickyBalanceStrategy_Plan_Stickiness(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1, 2}}
+	topics := map[string][]int32{"topic1": {0, 1, 2}}
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer2": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer3": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer4": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
+		"consumer1": {Topics: []string{"topic1"}},
+		"consumer2": {Topics: []string{"topic1"}},
+		"consumer3": {Topics: []string{"topic1"}},
+		"consumer4": {Topics: []string{"topic1"}},
 	}
 
 	plan1, err := s.Plan(members, topics)
@@ -1753,7 +1753,7 @@ func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing
 		topics["topic3"][i] = int32(i)
 	}
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{Topics: []string{"topic1", "topic2", "topic3"}},
+		"consumer1": {Topics: []string{"topic1", "topic2", "topic3"}},
 	}
 
 	plan, err := s.Plan(members, topics)
@@ -1768,9 +1768,9 @@ func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing
 func Test_stickyBalanceStrategy_Plan_NoExceptionRaisedWhenOnlySubscribedTopicDeleted(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1, 2}}
+	topics := map[string][]int32{"topic1": {0, 1, 2}}
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
+		"consumer1": {Topics: []string{"topic1"}},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1796,11 +1796,11 @@ func Test_stickyBalanceStrategy_Plan_NoExceptionRaisedWhenOnlySubscribedTopicDel
 func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations1(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1, 2, 3, 4, 5}}
+	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer2": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer3": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
+		"consumer1": {Topics: []string{"topic1"}},
+		"consumer2": {Topics: []string{"topic1"}},
+		"consumer3": {Topics: []string{"topic1"}},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1846,11 +1846,11 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations1(t *testi
 func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1, 2, 3, 4, 5}}
+	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
 	members := map[string]ConsumerGroupMemberMetadata{
-		"consumer1": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer2": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
-		"consumer3": ConsumerGroupMemberMetadata{Topics: []string{"topic1"}},
+		"consumer1": {Topics: []string{"topic1"}},
+		"consumer2": {Topics: []string{"topic1"}},
+		"consumer3": {Topics: []string{"topic1"}},
 	}
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
@@ -1891,19 +1891,19 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testi
 func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGenerations(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1, 2, 3, 4, 5}}
+	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
 	members := make(map[string]ConsumerGroupMemberMetadata, 3)
 	members["consumer1"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0, 1, 4}}, 1),
+		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0, 1, 4}}, 1),
 	}
 	members["consumer2"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0, 2, 3}}, 1),
+		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0, 2, 3}}, 1),
 	}
 	members["consumer3"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{3, 4, 5}}, 2),
+		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {3, 4, 5}}, 2),
 	}
 
 	plan, err := s.Plan(members, topics)
@@ -1914,15 +1914,15 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGeneration
 func Test_stickyBalanceStrategy_Plan_SchemaBackwardCompatibility(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1, 2}}
+	topics := map[string][]int32{"topic1": {0, 1, 2}}
 	members := make(map[string]ConsumerGroupMemberMetadata, 3)
 	members["consumer1"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0, 2}}, 1),
+		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0, 2}}, 1),
 	}
 	members["consumer2"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithOldSchema(t, map[string][]int32{"topic1": []int32{1}}),
+		UserData: encodeSubscriberPlanWithOldSchema(t, map[string][]int32{"topic1": {1}}),
 	}
 	members["consumer3"] = ConsumerGroupMemberMetadata{Topics: []string{"topic1"}}
 
@@ -1934,15 +1934,15 @@ func Test_stickyBalanceStrategy_Plan_SchemaBackwardCompatibility(t *testing.T) {
 func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
-	topics := map[string][]int32{"topic1": []int32{0, 1}}
+	topics := map[string][]int32{"topic1": {0, 1}}
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
 	members["consumer1"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0, 1}}, 1),
+		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0, 1}}, 1),
 	}
 	members["consumer2"] = ConsumerGroupMemberMetadata{
 		Topics:   []string{"topic1"},
-		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": []int32{0, 1}}, 1),
+		UserData: encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0, 1}}, 1),
 	}
 
 	plan, err := s.Plan(members, topics)
@@ -2228,14 +2228,14 @@ func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
 			name: "Single topic partition",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{
+					{
 						Topic:     "t1",
 						Partition: 0,
-					}: []string{"c1", "c2"},
+					}: {"c1", "c2"},
 				},
 			},
 			want: []topicPartitionAssignment{
-				topicPartitionAssignment{
+				{
 					Topic:     "t1",
 					Partition: 0,
 				},
@@ -2245,22 +2245,22 @@ func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
 			name: "Multiple topic partitions with the same number of consumers but different topic names",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{
+					{
 						Topic:     "t1",
 						Partition: 0,
-					}: []string{"c1", "c2"},
-					topicPartitionAssignment{
+					}: {"c1", "c2"},
+					{
 						Topic:     "t2",
 						Partition: 0,
-					}: []string{"c1", "c2"},
+					}: {"c1", "c2"},
 				},
 			},
 			want: []topicPartitionAssignment{
-				topicPartitionAssignment{
+				{
 					Topic:     "t1",
 					Partition: 0,
 				},
-				topicPartitionAssignment{
+				{
 					Topic:     "t2",
 					Partition: 0,
 				},
@@ -2270,22 +2270,22 @@ func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
 			name: "Multiple topic partitions with the same number of consumers and topic names",
 			args: args{
 				partition2AllPotentialConsumers: map[topicPartitionAssignment][]string{
-					topicPartitionAssignment{
+					{
 						Topic:     "t1",
 						Partition: 0,
-					}: []string{"c1", "c2"},
-					topicPartitionAssignment{
+					}: {"c1", "c2"},
+					{
 						Topic:     "t1",
 						Partition: 1,
-					}: []string{"c1", "c2"},
+					}: {"c1", "c2"},
 				},
 			},
 			want: []topicPartitionAssignment{
-				topicPartitionAssignment{
+				{
 					Topic:     "t1",
 					Partition: 0,
 				},
-				topicPartitionAssignment{
+				{
 					Topic:     "t1",
 					Partition: 1,
 				},

@@ -86,7 +86,7 @@ func TestTLS(t *testing.T) {
 
 	// Keep server the same - it's the client that we're testing
 	serverTLSConfig := &tls.Config{
-		Certificates: []tls.Certificate{tls.Certificate{
+		Certificates: []tls.Certificate{{
 			Certificate: [][]byte{hostDer},
 			PrivateKey:  hostkey,
 		}},
@@ -103,7 +103,7 @@ func TestTLS(t *testing.T) {
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
 				RootCAs: systemCerts,
-				Certificates: []tls.Certificate{tls.Certificate{
+				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
 				}},
@@ -114,7 +114,7 @@ func TestTLS(t *testing.T) {
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
 				RootCAs: pool,
-				Certificates: []tls.Certificate{tls.Certificate{
+				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  hostkey,
 				}},
@@ -125,7 +125,7 @@ func TestTLS(t *testing.T) {
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
 				RootCAs: pool,
-				Certificates: []tls.Certificate{tls.Certificate{
+				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{hostDer},
 					PrivateKey:  clientkey,
 				}},
@@ -135,7 +135,7 @@ func TestTLS(t *testing.T) {
 			Succeed: false,
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
-				Certificates: []tls.Certificate{tls.Certificate{
+				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
 				}},
@@ -153,7 +153,7 @@ func TestTLS(t *testing.T) {
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
 				RootCAs: pool,
-				Certificates: []tls.Certificate{tls.Certificate{
+				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
 				}},

@@ -199,7 +199,6 @@ func (client *client) Brokers() []*Broker {
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 	var err error
 	for broker := client.any(); broker != nil; broker = client.any() {
-
 		req := &InitProducerIDRequest{}
 
 		response, err := broker.InitProducerID(req)

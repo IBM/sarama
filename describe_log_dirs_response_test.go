@@ -42,20 +42,20 @@ func TestDescribeLogDirsResponse(t *testing.T) {
 	}
 
 	response.LogDirs = []DescribeLogDirsResponseDirMetadata{
-		DescribeLogDirsResponseDirMetadata{
+		{
 			ErrorCode: 0,
 			Path:      "/kafka",
 			Topics: []DescribeLogDirsResponseTopic{
-				DescribeLogDirsResponseTopic{
+				{
 					Topic: "random",
 					Partitions: []DescribeLogDirsResponsePartition{
-						DescribeLogDirsResponsePartition{
+						{
 							PartitionID: 25,
 							Size:        125,
 							OffsetLag:   0,
 							IsTemporary: false,
 						},
-						DescribeLogDirsResponsePartition{
+						{
 							PartitionID: 26,
 							Size:        100,
 							OffsetLag:   0,

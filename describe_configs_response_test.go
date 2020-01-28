@@ -74,13 +74,13 @@ func TestDescribeConfigsResponsev0(t *testing.T) {
 
 	response = &DescribeConfigsResponse{
 		Version: 0, Resources: []*ResourceResponse{
-			&ResourceResponse{
+			{
 				ErrorCode: 0,
 				ErrorMsg:  "",
 				Type:      TopicResource,
 				Name:      "foo",
 				Configs: []*ConfigEntry{
-					&ConfigEntry{
+					{
 						Name:      "segment.ms",
 						Value:     "1000",
 						ReadOnly:  false,
@@ -108,13 +108,13 @@ func TestDescribeConfigsResponsev1(t *testing.T) {
 	response = &DescribeConfigsResponse{
 		Version: 1,
 		Resources: []*ResourceResponse{
-			&ResourceResponse{
+			{
 				ErrorCode: 0,
 				ErrorMsg:  "",
 				Type:      TopicResource,
 				Name:      "foo",
 				Configs: []*ConfigEntry{
-					&ConfigEntry{
+					{
 						Name:      "segment.ms",
 						Value:     "1000",
 						ReadOnly:  false,
@@ -143,13 +143,13 @@ func TestDescribeConfigsResponseWithSynonym(t *testing.T) {
 	response = &DescribeConfigsResponse{
 		Version: 1,
 		Resources: []*ResourceResponse{
-			&ResourceResponse{
+			{
 				ErrorCode: 0,
 				ErrorMsg:  "",
 				Type:      TopicResource,
 				Name:      "foo",
 				Configs: []*ConfigEntry{
-					&ConfigEntry{
+					{
 						Name:      "segment.ms",
 						Value:     "1000",
 						ReadOnly:  false,

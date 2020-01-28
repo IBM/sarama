@@ -61,7 +61,7 @@ func TestDescribeConfigsRequestv0(t *testing.T) {
 	request = &DescribeConfigsRequest{
 		Version: 0,
 		Resources: []*ConfigResource{
-			&ConfigResource{
+			{
 				Type:        TopicResource,
 				Name:        "foo",
 				ConfigNames: configs,
@@ -74,12 +74,12 @@ func TestDescribeConfigsRequestv0(t *testing.T) {
 	request = &DescribeConfigsRequest{
 		Version: 0,
 		Resources: []*ConfigResource{
-			&ConfigResource{
+			{
 				Type:        TopicResource,
 				Name:        "foo",
 				ConfigNames: []string{"segment.ms", "retention.ms"},
 			},
-			&ConfigResource{
+			{
 				Type:        TopicResource,
 				Name:        "bar",
 				ConfigNames: []string{"segment.ms"},
@@ -91,7 +91,7 @@ func TestDescribeConfigsRequestv0(t *testing.T) {
 	request = &DescribeConfigsRequest{
 		Version: 0,
 		Resources: []*ConfigResource{
-			&ConfigResource{
+			{
 				Type: TopicResource,
 				Name: "foo",
 			},

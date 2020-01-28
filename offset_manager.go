@@ -280,7 +280,6 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 			ConsumerID:              om.memberID,
 			ConsumerGroupGeneration: om.generation,
 		}
-
 	}
 
 	om.pomsLock.RLock()
