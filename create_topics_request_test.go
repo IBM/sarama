@@ -31,7 +31,7 @@ func TestCreateTopicsRequest(t *testing.T) {
 				NumPartitions:     -1,
 				ReplicationFactor: -1,
 				ReplicaAssignment: map[int32][]int32{
-					0: []int32{0, 1, 2},
+					0: {0, 1, 2},
 				},
 				ConfigEntries: map[string]*string{
 					"retention.ms": &retention,

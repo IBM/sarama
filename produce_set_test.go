@@ -228,15 +228,15 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 		Key:       StringEncoder(TestMessage),
 		Value:     StringEncoder(TestMessage),
 		Headers: []RecordHeader{
-			RecordHeader{
+			{
 				Key:   []byte("header-1"),
 				Value: []byte("value-1"),
 			},
-			RecordHeader{
+			{
 				Key:   []byte("header-2"),
 				Value: []byte("value-2"),
 			},
-			RecordHeader{
+			{
 				Key:   []byte("header-3"),
 				Value: []byte("value-3"),
 			},
@@ -306,15 +306,15 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 		Key:       StringEncoder(TestMessage),
 		Value:     StringEncoder(TestMessage),
 		Headers: []RecordHeader{
-			RecordHeader{
+			{
 				Key:   []byte("header-1"),
 				Value: []byte("value-1"),
 			},
-			RecordHeader{
+			{
 				Key:   []byte("header-2"),
 				Value: []byte("value-2"),
 			},
-			RecordHeader{
+			{
 				Key:   []byte("header-3"),
 				Value: []byte("value-3"),
 			},
