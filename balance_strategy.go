@@ -50,7 +50,7 @@ type BalanceStrategy interface {
 
 	// AssignmentData returns the serialized assignment data for the specified
 	// memberID
-	AssignmentData(plan BalanceStrategyPlan, memberID string, generationID int32) ([]byte, error)
+	AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error)
 }
 
 // --------------------------------------------------------------------
@@ -137,7 +137,7 @@ func (s *balanceStrategy) Plan(members map[string]ConsumerGroupMemberMetadata, t
 }
 
 // AssignmentData simple strategies do not require any shared assignment data
-func (s *balanceStrategy) AssignmentData(plan BalanceStrategyPlan, memberID string, generationID int32) ([]byte, error) {
+func (s *balanceStrategy) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
 	return nil, nil
 }
 
@@ -279,11 +279,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 
 // AssignmentData serializes the set of topics currently assigned to the
 // specified member as part of the supplied balance plan
-func (s *stickyBalanceStrategy) AssignmentData(plan BalanceStrategyPlan, memberID string, generationID int32) ([]byte, error) {
-	topics, ok := plan[memberID]
-	if !ok {
-		return nil, nil
-	}
+func (s *stickyBalanceStrategy) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
 	return encode(&StickyAssignorUserDataV1{
 		Topics:     topics,
 		Generation: generationID,

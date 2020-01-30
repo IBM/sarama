@@ -334,7 +334,7 @@ func (c *consumerGroup) syncGroupRequest(coordinator *Broker, plan BalanceStrate
 	strategy := c.config.Consumer.Group.Rebalance.Strategy
 	for memberID, topics := range plan {
 		assignment := &ConsumerGroupMemberAssignment{Topics: topics}
-		userDataBytes, err := strategy.AssignmentData(plan, memberID, generationID)
+		userDataBytes, err := strategy.AssignmentData(memberID, topics, generationID)
 		if err != nil {
 			return nil, err
 		}

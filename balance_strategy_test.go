@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"math/rand"
@@ -59,6 +60,27 @@ func TestBalanceStrategyRange(t *testing.T) {
 		} else if !reflect.DeepEqual(actual, test.expected) {
 			t.Errorf("Plan does not match expectation\nexpected: %#v\nactual: %#v", test.expected, actual)
 		}
+	}
+}
+
+func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
+
+	strategy := BalanceStrategyRange
+
+	members := make(map[string]ConsumerGroupMemberMetadata, 2)
+	members["consumer1"] = ConsumerGroupMemberMetadata{
+		Topics: []string{"topic1"},
+	}
+	members["consumer2"] = ConsumerGroupMemberMetadata{
+		Topics: []string{"topic1"},
+	}
+
+	actual, err := strategy.AssignmentData("consumer1", map[string][]int32{"topic1": {0, 1}}, 1)
+	if err != nil {
+		t.Errorf("Error building assignment data: %v", err)
+	}
+	if actual != nil {
+		t.Error("Invalid assignment data returned from AssignmentData")
 	}
 }
 
@@ -188,6 +210,27 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 				t.Errorf("deserializeTopicPartitionAssignment() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
+
+	strategy := BalanceStrategyRoundRobin
+
+	members := make(map[string]ConsumerGroupMemberMetadata, 2)
+	members["consumer1"] = ConsumerGroupMemberMetadata{
+		Topics: []string{"topic1"},
+	}
+	members["consumer2"] = ConsumerGroupMemberMetadata{
+		Topics: []string{"topic1"},
+	}
+
+	actual, err := strategy.AssignmentData("consumer1", map[string][]int32{"topic1": {0, 1}}, 1)
+	if err != nil {
+		t.Errorf("Error building assignment data: %v", err)
+	}
+	if actual != nil {
+		t.Error("Invalid assignment data returned from AssignmentData")
 	}
 }
 
@@ -1948,6 +1991,29 @@ func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T
 	plan, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan, err)
 	verifyFullyBalanced(t, plan)
+}
+
+func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
+
+	s := &stickyBalanceStrategy{}
+
+	members := make(map[string]ConsumerGroupMemberMetadata, 2)
+	members["consumer1"] = ConsumerGroupMemberMetadata{
+		Topics: []string{"topic1"},
+	}
+	members["consumer2"] = ConsumerGroupMemberMetadata{
+		Topics: []string{"topic1"},
+	}
+
+	expected := encodeSubscriberPlanWithGeneration(t, map[string][]int32{"topic1": {0, 1}}, 1)
+
+	actual, err := s.AssignmentData("consumer1", map[string][]int32{"topic1": {0, 1}}, 1)
+	if err != nil {
+		t.Errorf("Error building assignment data: %v", err)
+	}
+	if bytes.Compare(expected, actual) != 0 {
+		t.Error("Invalid assignment data returned from AssignmentData")
+	}
 }
 
 func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopics(b *testing.B) {
