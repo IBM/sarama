@@ -48,7 +48,7 @@ type BalanceStrategy interface {
 	// and returns a distribution plan.
 	Plan(members map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error)
 
-	// Assignment data returns the serialized assignment data for the specified
+	// AssignmentData returns the serialized assignment data for the specified
 	// memberID
 	AssignmentData(plan BalanceStrategyPlan, memberID string, generationID int32) ([]byte, error)
 }
