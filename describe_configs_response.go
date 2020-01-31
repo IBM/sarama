@@ -249,6 +249,9 @@ func (r *ConfigEntry) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 		r.Default = defaultB
+		if defaultB {
+			r.Source = SourceDefault
+		}
 	} else {
 		source, err := pd.getInt8()
 		if err != nil {
