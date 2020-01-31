@@ -338,6 +338,15 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 	describeConfigsReq := &DescribeConfigsRequest{
 		Resources: describeConfigsResources,
 	}
+
+	if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+		describeConfigsReq.Version = 1
+	}
+
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		describeConfigsReq.Version = 2
+	}
+
 	describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
 	if err != nil {
 		return nil, err
