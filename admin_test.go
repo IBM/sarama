@@ -615,8 +615,8 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 
 	var value string
 	entries := make(map[string]*string)
-	value = "3"
-	entries["ReplicationFactor"] = &value
+	value = "60000"
+	entries["retention.ms"] = &value
 	err = admin.AlterConfig(TopicResource, "my_topic", entries, false)
 	if err != nil {
 		t.Fatal(err)
