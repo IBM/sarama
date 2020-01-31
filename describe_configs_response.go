@@ -255,6 +255,7 @@ func (r *ConfigEntry) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 		r.Source = ConfigSource(source)
+		r.Default = r.Source == SourceDefault
 	}
 
 	sensitive, err := pd.getBool()
