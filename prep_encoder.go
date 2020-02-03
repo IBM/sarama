@@ -67,6 +67,11 @@ func (pe *prepEncoder) putVarintBytes(in []byte) error {
 	return pe.putRawBytes(in)
 }
 
+func (pe *prepEncoder) putCompactString(in string) error {
+	pe.putVarint(int64(len(in) + 1))
+	return pe.putRawBytes([]byte(in))
+}
+
 func (pe *prepEncoder) putRawBytes(in []byte) error {
 	if len(in) > math.MaxInt32 {
 		return PacketEncodingError{fmt.Sprintf("byteslice too long (%d)", len(in))}

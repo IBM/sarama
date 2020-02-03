@@ -42,6 +42,13 @@ type ClusterAdmin interface {
 	// new partitions. This operation is supported by brokers with version 1.0.0 or higher.
 	CreatePartitions(topic string, count int32, assignment [][]int32, validateOnly bool) error
 
+	// Update the configuration for the specified resources with the default options.
+	// This operation is supported by brokers with version 0.11.0.0 or higher.
+	// The resources with their configs (topic is the only resource type with configs
+	// that can be updated currently Updates are not transactional so they may succeed
+	// for some resources while fail for others. The configs for a particular resource are updated automatically.
+	AlterPartitionReassignments(topic string, assignment [][]int32) error
+
 	// Delete records whose offset is smaller than the given offset of the corresponding partition.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
 	DeleteRecords(topic string, partitionOffsets map[int32]int64) error
@@ -438,6 +445,43 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 			}
 			return topicErr
 		}
+
+		return nil
+	})
+}
+
+func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][]int32) error {
+	if topic == "" {
+		return ErrInvalidTopic
+	}
+
+	request := &AlterPartitionReassignmentsRequest{
+		TimeoutMs: int32(10000),
+		Version:   int16(0),
+	}
+
+	for i := 0; i < len(assignment); i++ {
+		for j := 0; j < len(assignment[i]); j++ {
+			// TODO
+			request.AddBlock(topic, int32(i), assignment[i][j])
+		}
+	}
+
+	return ca.retryOnError(isErrNoController, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
+
+		rsp, err := b.AlterPartitionReassignments(request)
+
+		_ = rsp
+
+		if err != nil {
+			return err
+		}
+
+		// TODO error handling
 
 		return nil
 	})

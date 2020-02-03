@@ -78,6 +78,11 @@ func (re *realEncoder) putVarintBytes(in []byte) error {
 	return re.putRawBytes(in)
 }
 
+func (re *realEncoder) putCompactString(in string) error {
+	re.putVarint(int64(len(in) + 1))
+	return re.putRawBytes([]byte(in))
+}
+
 func (re *realEncoder) putString(in string) error {
 	re.putInt16(int16(len(in)))
 	copy(re.raw[re.off:], in)
