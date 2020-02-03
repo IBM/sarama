@@ -77,6 +77,10 @@ func (d *DescribeAclsResponse) version() int16 {
 	return d.Version
 }
 
+func (d *DescribeAclsResponse) headerVersion() int16 {
+	return 0
+}
+
 func (d *DescribeAclsResponse) requiredVersion() KafkaVersion {
 	switch d.Version {
 	case 1:
