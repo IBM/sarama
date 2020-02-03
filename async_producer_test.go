@@ -988,7 +988,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 		lastBatchFirstSeq := -1
 		lastBatchSize := -1
 		lastSequenceWrittenToDisk := -1
-		handlerFailBeforeWrite := func(req *request) (res encoder) {
+		handlerFailBeforeWrite := func(req *request) (res encoderWithHeader) {
 			switch req.body.key() {
 			case 3:
 				return metadataResponse

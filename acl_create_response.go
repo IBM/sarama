@@ -55,6 +55,10 @@ func (c *CreateAclsResponse) version() int16 {
 	return 0
 }
 
+func (c *CreateAclsResponse) headerVersion() int16 {
+	return 0
+}
+
 func (c *CreateAclsResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
