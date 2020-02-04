@@ -260,6 +260,9 @@ func validateMetrics(t *testing.T, client Client) {
 		metricValidators.registerForBroker(broker, minValHistogramValidator("response-size", 1))
 	}
 
+	// There should be no requests in flight anymore
+	metricValidators.registerForAllBrokers(broker, counterValidator("requests-in-flight", 0))
+
 	// Run the validators
 	metricValidators.run(t, client.Config().MetricRegistry)
 }
