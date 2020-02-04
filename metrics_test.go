@@ -170,3 +170,19 @@ func maxValHistogramValidator(name string, maxMax int) *metricValidator {
 		}
 	})
 }
+
+func counterValidator(name string, expectedCount int) *metricValidator {
+	return &metricValidator{
+		name: name,
+		validator: func(t *testing.T, metric interface{}) {
+			if counter, ok := metric.(metrics.Counter); !ok {
+				t.Errorf("Expected counter metric for '%s', got %T", name, metric)
+			} else {
+				count := counter.Count()
+				if count != int64(expectedCount) {
+					t.Errorf("Expected counter metric '%s' count = %d, got %d", name, expectedCount, count)
+				}
+			}
+		},
+	}
+}
