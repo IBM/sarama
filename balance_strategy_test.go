@@ -64,7 +64,6 @@ func TestBalanceStrategyRange(t *testing.T) {
 }
 
 func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
-
 	strategy := BalanceStrategyRange
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -214,7 +213,6 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 }
 
 func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
-
 	strategy := BalanceStrategyRoundRobin
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -1994,7 +1992,6 @@ func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
-
 	s := &stickyBalanceStrategy{}
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
