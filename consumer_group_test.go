@@ -18,20 +18,11 @@ func (h exampleConsumerGroupHandler) ConsumeClaim(sess ConsumerGroupSession, cla
 }
 
 func ExampleConsumerGroup() {
-	// Init config, specify appropriate version
 	config := NewConfig()
-	config.Version = V1_0_0_0
+	config.Version = V2_0_0_0 // specify appropriate version
 	config.Consumer.Return.Errors = true
 
-	// Start with a client
-	client, err := NewClient([]string{"localhost:9092"}, config)
-	if err != nil {
-		panic(err)
-	}
-	defer func() { _ = client.Close() }()
-
-	// Start a new consumer group
-	group, err := NewConsumerGroupFromClient("my-group", client)
+	group, err := NewConsumerGroup([]string{"localhost:9092"}, "my-group", config)
 	if err != nil {
 		panic(err)
 	}
@@ -50,6 +41,9 @@ func ExampleConsumerGroup() {
 		topics := []string{"my-topic"}
 		handler := exampleConsumerGroupHandler{}
 
+		// `Consume` should be called inside an infinite loop, when a
+		// server-side rebalance happens, the consumer session will need to be
+		// recreated to get the new claims
 		err := group.Consume(ctx, topics, handler)
 		if err != nil {
 			panic(err)
