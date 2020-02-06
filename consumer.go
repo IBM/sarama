@@ -887,9 +887,12 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		request.Version = 4
 		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
 	}
-
 	if bc.consumer.conf.Version.IsAtLeast(V2_1_0_0) {
 		request.Version = 10
+	}
+	if bc.consumer.conf.Version.IsAtLeast(V2_3_0_0) {
+		request.Version = 11
+		request.RackID = bc.consumer.conf.RackID
 	}
 
 	for child := range bc.subscriptions {

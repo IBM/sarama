@@ -30,14 +30,15 @@ func (t *AbortedTransaction) encode(pe packetEncoder) (err error) {
 }
 
 type FetchResponseBlock struct {
-	Err                 KError
-	HighWaterMarkOffset int64
-	LastStableOffset    int64
-	LogStartOffset      int64
-	AbortedTransactions []*AbortedTransaction
-	Records             *Records // deprecated: use FetchResponseBlock.RecordsSet
-	RecordsSet          []*Records
-	Partial             bool
+	Err                  KError
+	HighWaterMarkOffset  int64
+	LastStableOffset     int64
+	LogStartOffset       int64
+	AbortedTransactions  []*AbortedTransaction
+	PreferredReadReplica int32
+	Records              *Records // deprecated: use FetchResponseBlock.RecordsSet
+	RecordsSet           []*Records
+	Partial              bool
 }
 
 func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
@@ -80,6 +81,13 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 				return err
 			}
 			b.AbortedTransactions[i] = transact
+		}
+	}
+
+	if version >= 11 {
+		b.PreferredReadReplica, err = pd.getInt32()
+		if err != nil {
+			return err
 		}
 	}
 
@@ -186,6 +194,10 @@ func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error)
 				return err
 			}
 		}
+	}
+
+	if version >= 11 {
+		pe.putInt32(b.PreferredReadReplica)
 	}
 
 	pe.push(&lengthField{})
