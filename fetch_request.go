@@ -55,6 +55,7 @@ type FetchRequest struct {
 	SessionEpoch int32
 	blocks       map[string]map[int32]*fetchRequestBlock
 	forgotten    map[string][]int32
+	RackID       string
 }
 
 type IsolationLevel int8
@@ -116,6 +117,12 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 			for _, partition := range partitions {
 				pe.putInt32(partition)
 			}
+		}
+	}
+	if r.Version >= 11 {
+		err = pe.putString(r.RackID)
+		if err != nil {
+			return err
 		}
 	}
 
@@ -192,9 +199,6 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 		if err != nil {
 			return err
 		}
-		if forgottenCount == 0 {
-			return nil
-		}
 		r.forgotten = make(map[string][]int32)
 		for i := 0; i < forgottenCount; i++ {
 			topic, err := pd.getString()
@@ -214,6 +218,13 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 				}
 				r.forgotten[topic][j] = partition
 			}
+		}
+	}
+
+	if r.Version >= 11 {
+		r.RackID, err = pd.getString()
+		if err != nil {
+			return err
 		}
 	}
 
