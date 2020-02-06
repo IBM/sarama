@@ -830,13 +830,11 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 	// Wait for the background refresh to kick in
 	time.Sleep(110 * time.Millisecond)
 
-	done := make(chan none)
+	errCh := make(chan error, 1)
 	go func() {
 		// Close the client
-		if err := client.Close(); err != nil {
-			t.Fatal(err)
-		}
-		close(done)
+		errCh <- client.Close()
+		close(errCh)
 	}()
 
 	// Wait for the Close to kick in
@@ -848,7 +846,10 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 	metadataResponse.AddTopicPartition("foo", 0, leader.BrokerID(), []int32{2}, []int32{2}, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	<-done
+	err = <-errCh
+	if err != nil {
+		t.Fatalf("goroutine client.Close():%s", err)
+	}
 
 	seedBroker.Close()
 
