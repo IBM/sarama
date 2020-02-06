@@ -99,6 +99,9 @@ func main() {
 	go func() {
 		defer wg.Done()
 		for {
+			// `Consume` should be called inside an infinite loop, when a
+			// server-side rebalance happens, the consumer session will need to be
+			// recreated to get the new claims
 			if err := client.Consume(ctx, strings.Split(topics, ","), &consumer); err != nil {
 				log.Panicf("Error from consumer: %v", err)
 			}
