@@ -1,2 +1,3 @@
 enabled:
-  - cla
+- cla
+- probot-stale
