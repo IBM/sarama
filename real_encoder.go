@@ -49,7 +49,7 @@ func (re *realEncoder) putArrayLength(in int) error {
 }
 
 func (re *realEncoder) putUVarIntArrayLength(in int) {
-	re.putUVarint(uint64(in+1))
+	re.putUVarint(uint64(in + 1))
 }
 
 func (re *realEncoder) putBool(in bool) {
@@ -122,7 +122,7 @@ func (re *realEncoder) putStringArray(in []string) error {
 }
 
 func (re *realEncoder) putCompactInt32Array(in []int32) error {
-	re.putUVarint(uint64(len(in))+1)
+	re.putUVarint(uint64(len(in)) + 1)
 	for _, val := range in {
 		re.putInt32(val)
 	}

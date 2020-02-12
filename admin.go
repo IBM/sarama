@@ -472,13 +472,14 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 
 		rsp, err := b.AlterPartitionReassignments(request)
 
-		_ = rsp
-
 		if err != nil {
 			return err
 		}
 
-		// TODO error handling
+		if rsp.ErrorCode > 0 || len(rsp.Errors) > 0 {
+			// TODO pretty error from response
+			return errors.New("Kafka server returned errors during replication-factor assignment")
+		}
 
 		return nil
 	})
