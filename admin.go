@@ -461,10 +461,7 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 	}
 
 	for i := 0; i < len(assignment); i++ {
-		for j := 0; j < len(assignment[i]); j++ {
-			// TODO
-			request.AddBlock(topic, int32(i), assignment[i][j])
-		}
+		request.AddBlock(topic, int32(i), assignment[i])
 	}
 
 	return ca.retryOnError(isErrNoController, func() error {

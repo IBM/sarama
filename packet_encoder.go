@@ -12,6 +12,8 @@ type packetEncoder interface {
 	putInt32(in int32)
 	putInt64(in int64)
 	putVarint(in int64)
+	putUVarint(in uint64)
+	putUVarIntArrayLength(in int)
 	putArrayLength(in int) error
 	putBool(in bool)
 
@@ -23,6 +25,7 @@ type packetEncoder interface {
 	putString(in string) error
 	putNullableString(in *string) error
 	putStringArray(in []string) error
+	putCompactInt32Array(in []int32) error
 	putInt32Array(in []int32) error
 	putInt64Array(in []int64) error
 

@@ -11,6 +11,7 @@ type protocolBody interface {
 	versionedDecoder
 	key() int16
 	version() int16
+	headerVersion() int16
 	requiredVersion() KafkaVersion
 }
 
@@ -26,12 +27,19 @@ func (r *request) encode(pe packetEncoder) error {
 	pe.putInt16(r.body.version())
 	pe.putInt32(r.correlationID)
 
-	err := pe.putString(r.clientID)
-	if err != nil {
-		return err
+	if r.body.headerVersion() >= 1 {
+		err := pe.putString(r.clientID)
+		if err != nil {
+			return err
+		}
 	}
 
-	err = r.body.encode(pe)
+	if r.body.headerVersion() >= 2 {
+		// we don't use tag headers at the moment so we just put an array length of 0
+		pe.putUVarint(0);
+	}
+
+	err := r.body.encode(pe)
 	if err != nil {
 		return err
 	}

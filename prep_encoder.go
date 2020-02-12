@@ -36,12 +36,21 @@ func (pe *prepEncoder) putVarint(in int64) {
 	pe.length += binary.PutVarint(buf[:], in)
 }
 
+func (pe *prepEncoder) putUVarint(in uint64) {
+	var buf [binary.MaxVarintLen64]byte
+	pe.length += binary.PutUvarint(buf[:], in)
+}
+
 func (pe *prepEncoder) putArrayLength(in int) error {
 	if in > math.MaxInt32 {
 		return PacketEncodingError{fmt.Sprintf("array too long (%d)", in)}
 	}
 	pe.length += 4
 	return nil
+}
+
+func (pe *prepEncoder) putUVarIntArrayLength(in int) {
+	pe.putUVarint(uint64(in+1))
 }
 
 func (pe *prepEncoder) putBool(in bool) {
@@ -68,7 +77,7 @@ func (pe *prepEncoder) putVarintBytes(in []byte) error {
 }
 
 func (pe *prepEncoder) putCompactString(in string) error {
-	pe.putVarint(int64(len(in) + 1))
+	pe.putUVarint(uint64(len(in) + 1))
 	return pe.putRawBytes([]byte(in))
 }
 
@@ -109,6 +118,12 @@ func (pe *prepEncoder) putStringArray(in []string) error {
 		}
 	}
 
+	return nil
+}
+
+func (pe *prepEncoder) putCompactInt32Array(in []int32) error {
+	pe.putUVarint(uint64(len(in))+1)
+	pe.length += 4 * len(in)
 	return nil
 }
 

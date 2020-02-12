@@ -39,9 +39,17 @@ func (re *realEncoder) putVarint(in int64) {
 	re.off += binary.PutVarint(re.raw[re.off:], in)
 }
 
+func (re *realEncoder) putUVarint(in uint64) {
+	re.off += binary.PutUvarint(re.raw[re.off:], in)
+}
+
 func (re *realEncoder) putArrayLength(in int) error {
 	re.putInt32(int32(in))
 	return nil
+}
+
+func (re *realEncoder) putUVarIntArrayLength(in int) {
+	re.putUVarint(uint64(in+1))
 }
 
 func (re *realEncoder) putBool(in bool) {
@@ -79,7 +87,7 @@ func (re *realEncoder) putVarintBytes(in []byte) error {
 }
 
 func (re *realEncoder) putCompactString(in string) error {
-	re.putVarint(int64(len(in) + 1))
+	re.putUVarint(uint64(len(in) + 1))
 	return re.putRawBytes([]byte(in))
 }
 
@@ -110,6 +118,14 @@ func (re *realEncoder) putStringArray(in []string) error {
 		}
 	}
 
+	return nil
+}
+
+func (re *realEncoder) putCompactInt32Array(in []int32) error {
+	re.putUVarint(uint64(len(in))+1)
+	for _, val := range in {
+		re.putInt32(val)
+	}
 	return nil
 }
 

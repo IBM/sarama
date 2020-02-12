@@ -130,6 +130,10 @@ func (r *AlterPartitionReassignmentsResponse) version() int16 {
 	return r.Version
 }
 
+func (r *AlterPartitionReassignmentsResponse) headerVersion() int16 {
+	return 1
+}
+
 func (r *AlterPartitionReassignmentsResponse) requiredVersion() KafkaVersion {
 	return MinVersion
 }
