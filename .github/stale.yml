@@ -12,21 +12,23 @@ exemptLabels: ["stale/exempt", "pinned"]
 staleLabel: stale
 
 # Comment to post when marking as stale. Set to `false` to disable.
-markComment: >
-  Thank you for taking the time to raise this issue. However, it has
-  not had any activity on it in the past 90 days and will be closed in
-  30 days if no updates occur.
+issues:
+  markComment: >
+    Thank you for taking the time to raise this issue. However, it has
+    not had any activity on it in the past 90 days and will be closed in
+    30 days if no updates occur.
 
-  Please check if the master branch has already resolved the issue
-  since it was raised. If you believe the issue is still valid and you
-  would like input from the maintainers then please comment to ask for
-  it to be reviewed.
+    Please check if the master branch has already resolved the issue
+    since it was raised. If you believe the issue is still valid and you
+    would like input from the maintainers then please comment to ask for
+    it to be reviewed.
 
-closeComment: >
-  Thank you for your contribution! However, this pull request has not
-  had any activity in the past 90 days and will be closed in 30 days if
-  no updates occur.
+pulls:
+  markComment: >
+    Thank you for your contribution! However, this pull request has not
+    had any activity in the past 90 days and will be closed in 30 days if
+    no updates occur.
 
-  If you believe the changes are still valid then please verify your
-  branch has no conflicts with master and rebase if needed. If you
-  are awaiting a (re-)review then please let us know.
+    If you believe the changes are still valid then please verify your
+    branch has no conflicts with master and rebase if needed. If you
+    are awaiting a (re-)review then please let us know.
