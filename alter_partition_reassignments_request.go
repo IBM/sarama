@@ -1,19 +1,33 @@
 package sarama
 
-import "errors"
-
 type alterPartitionReassignmentsBlock struct {
 	replicas []int32
 }
 
 func (b *alterPartitionReassignmentsBlock) encode(pe packetEncoder, version int16) error {
 	pe.putCompactInt32Array(b.replicas)
+	// tagged field
+	pe.putInt8(0)
 	return nil
 }
 
 func (b *alterPartitionReassignmentsBlock) decode(pd packetDecoder, version int16) (err error) {
-	//b.replicas, err = pd.getInt32()
-	return errors.New("bla")
+
+	replicaCount, err := pd.getCompactArrayLength()
+	if err != nil {
+		return err
+	}
+
+	b.replicas = make([]int32, replicaCount)
+
+	for i := 0; i < replicaCount; i++ {
+		if replica, err := pd.getInt32(); err != nil {
+			return err
+		} else {
+			b.replicas[i] = replica
+		}
+	}
+	return nil
 }
 
 type AlterPartitionReassignmentsRequest struct {
@@ -23,30 +37,27 @@ type AlterPartitionReassignmentsRequest struct {
 }
 
 func (r *AlterPartitionReassignmentsRequest) encode(pe packetEncoder) error {
-
 	pe.putInt32(r.TimeoutMs)
 
-	pe.putUVarIntArrayLength(len(r.blocks))
+	pe.putCompactArrayLength(len(r.blocks))
 
 	for topic, partitions := range r.blocks {
 		if err := pe.putCompactString(topic); err != nil {
 			return err
 		}
-		pe.putUVarIntArrayLength(len(partitions))
+		pe.putCompactArrayLength(len(partitions))
 		for partition, block := range partitions {
 			pe.putInt32(partition)
 			if err := block.encode(pe, r.Version); err != nil {
 				return err
 			}
-			//another tagged field
-			pe.putInt8(0);
 		}
 		//another tagged field
-		pe.putInt8(0);
+		pe.putInt8(0)
 	}
 
 	//another tagged field
-	pe.putInt8(0);
+	pe.putInt8(0)
 
 	return nil
 }
@@ -58,35 +69,51 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 		return err
 	}
 
-	topicCount, err := pd.getArrayLength()
+	topicCount, err := pd.getCompactArrayLength()
 	if err != nil {
 		return err
 	}
-	if topicCount == 0 {
-		return nil
-	}
-	r.blocks = make(map[string]map[int32]*alterPartitionReassignmentsBlock)
-	for i := 0; i < topicCount; i++ {
-		topic, err := pd.getString()
-		if err != nil {
-			return err
-		}
-		partitionCount, err := pd.getArrayLength()
-		if err != nil {
-			return err
-		}
-		r.blocks[topic] = make(map[int32]*alterPartitionReassignmentsBlock)
-		for j := 0; j < partitionCount; j++ {
-			partition, err := pd.getInt32()
+	if topicCount > 0 {
+		r.blocks = make(map[string]map[int32]*alterPartitionReassignmentsBlock)
+		for i := 0; i < topicCount; i++ {
+			topic, err := pd.getCompactString()
 			if err != nil {
 				return err
 			}
-			block := &alterPartitionReassignmentsBlock{}
-			if err := block.decode(pd, r.Version); err != nil {
+			partitionCount, err := pd.getCompactArrayLength()
+			if err != nil {
 				return err
 			}
-			r.blocks[topic][partition] = block
+			r.blocks[topic] = make(map[int32]*alterPartitionReassignmentsBlock)
+			for j := 0; j < partitionCount; j++ {
+				partition, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				block := &alterPartitionReassignmentsBlock{}
+				if err := block.decode(pd, r.Version); err != nil {
+					return err
+				}
+				r.blocks[topic][partition] = block
+
+				// empty tagged fields array
+				_, err = pd.getUVarint()
+				if err != nil {
+					return err
+				}
+			}
+			// empty tagged fields array
+			_, err = pd.getUVarint()
+			if err != nil {
+				return err
+			}
 		}
+	}
+
+	// empty tagged fields array
+	_, err = pd.getUVarint()
+	if err != nil {
+		return err
 	}
 
 	return

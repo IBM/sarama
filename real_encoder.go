@@ -48,7 +48,8 @@ func (re *realEncoder) putArrayLength(in int) error {
 	return nil
 }
 
-func (re *realEncoder) putUVarIntArrayLength(in int) {
+func (re *realEncoder) putCompactArrayLength(in int) {
+	// 0 represents a null array, so +1 has to be added
 	re.putUVarint(uint64(in + 1))
 }
 
@@ -87,8 +88,16 @@ func (re *realEncoder) putVarintBytes(in []byte) error {
 }
 
 func (re *realEncoder) putCompactString(in string) error {
-	re.putUVarint(uint64(len(in) + 1))
+	re.putCompactArrayLength(len(in))
 	return re.putRawBytes([]byte(in))
+}
+
+func (re *realEncoder) putNullableCompactString(in *string) error {
+	if in == nil {
+		re.putInt8(0)
+		return nil
+	}
+	return re.putCompactString(*in)
 }
 
 func (re *realEncoder) putString(in string) error {
@@ -122,6 +131,7 @@ func (re *realEncoder) putStringArray(in []string) error {
 }
 
 func (re *realEncoder) putCompactInt32Array(in []int32) error {
+	// 0 represents a null array, so +1 has to be added
 	re.putUVarint(uint64(len(in)) + 1)
 	for _, val := range in {
 		re.putInt32(val)

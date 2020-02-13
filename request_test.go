@@ -45,7 +45,18 @@ func testRequest(t *testing.T, name string, rb protocolBody, expected []byte) {
 func testRequestEncode(t *testing.T, name string, rb protocolBody, expected []byte) []byte {
 	req := &request{correlationID: 123, clientID: "foo", body: rb}
 	packet, err := encode(req, nil)
-	headerSize := 14 + len("foo")
+
+	headerSize := 0
+
+	switch rb.headerVersion() {
+	case 1:
+		headerSize = 14 + len("foo")
+	case 2:
+		headerSize = 14 + len("foo") + 1
+	default:
+		t.Error("Encoding", name, "failed\nheaderVersion", rb.headerVersion(), "not implemented")
+	}
+
 	if err != nil {
 		t.Error(err)
 	} else if !bytes.Equal(packet[headerSize:], expected) {

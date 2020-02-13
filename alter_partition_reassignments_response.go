@@ -2,12 +2,16 @@ package sarama
 
 type alterPartitionReassignmentsErrorBlock struct {
 	errorCode    KError
-	errorMessage string
+	errorMessage *string
 }
 
 func (b *alterPartitionReassignmentsErrorBlock) encode(pe packetEncoder) error {
-	pe.putInt32(int32(b.errorCode))
-	pe.putString(b.errorMessage)
+	pe.putInt16(int16(b.errorCode))
+	if err := pe.putNullableCompactString(b.errorMessage); err != nil {
+		return err
+	}
+	// tagged field
+	pe.putUVarint(0)
 
 	return nil
 }
@@ -18,7 +22,7 @@ func (b *alterPartitionReassignmentsErrorBlock) decode(pd packetDecoder) (err er
 		return err
 	}
 	b.errorCode = KError(errorCode)
-	b.errorMessage, err = pd.getString()
+	b.errorMessage, err = pd.getCompactNullableString()
 	return err
 }
 
@@ -40,31 +44,36 @@ func (r *AlterPartitionReassignmentsResponse) AddError(topic string, partition i
 		r.Errors[topic] = partitions
 	}
 
-	partitions[partition] = &alterPartitionReassignmentsErrorBlock{errorCode: kerror, errorMessage: *message}
+	partitions[partition] = &alterPartitionReassignmentsErrorBlock{errorCode: kerror, errorMessage: message}
 }
 
 func (r *AlterPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
 	pe.putInt16(int16(r.ErrorCode))
-	if err := pe.putNullableString(r.ErrorMessage); err != nil {
+	if err := pe.putNullableCompactString(r.ErrorMessage); err != nil {
 		return err
 	}
 
-	if err := pe.putArrayLength(len(r.Errors)); err != nil {
-		return err
-	}
+	pe.putCompactArrayLength(len(r.Errors))
 	for topic, partitions := range r.Errors {
-		if err := pe.putString(topic); err != nil {
+		if err := pe.putCompactString(topic); err != nil {
 			return err
 		}
-		if err := pe.putArrayLength(len(partitions)); err != nil {
-			return err
-		}
-		for partition, kerror := range partitions {
+		pe.putCompactArrayLength(len(partitions))
+		for partition, block := range partitions {
 			pe.putInt32(partition)
-			pe.putInt16(int16(kerror.errorCode))
+
+			if err := block.encode(pe); err != nil {
+				return err
+			}
 		}
+		// tagged field
+		pe.putUVarint(0)
 	}
+
+	// tagged field
+	pe.putUVarint(0)
+
 	return nil
 }
 
@@ -127,14 +136,23 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 				r.AddError(name, partition, KError(errorCode), errorMessage)
 			}
 
-			// Tag buffer?
-			pd.getInt8()
+			// empty tagged fields array
+			_, err = pd.getUVarint()
+			if err != nil {
+				return err
+			}
 		}
-		// Tag buffer?
-		pd.getInt8()
+		// empty tagged fields array
+		_, err = pd.getUVarint()
+		if err != nil {
+			return err
+		}
 	}
-	// Tag buffer?
-	pd.getInt8()
+	// empty tagged fields array
+	_, err = pd.getUVarint()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

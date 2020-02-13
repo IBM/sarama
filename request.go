@@ -36,7 +36,7 @@ func (r *request) encode(pe packetEncoder) error {
 
 	if r.body.headerVersion() >= 2 {
 		// we don't use tag headers at the moment so we just put an array length of 0
-		pe.putUVarint(0);
+		pe.putUVarint(0)
 	}
 
 	err := r.body.encode(pe)
@@ -71,6 +71,14 @@ func (r *request) decode(pd packetDecoder) (err error) {
 	r.body = allocateBody(key, version)
 	if r.body == nil {
 		return PacketDecodingError{fmt.Sprintf("unknown request key (%d)", key)}
+	}
+
+	if r.body.headerVersion() >= 2 {
+		// tagged field
+		_, err = pd.getUVarint()
+		if err != nil {
+			return err
+		}
 	}
 
 	return r.body.decode(pd, version)

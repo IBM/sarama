@@ -49,8 +49,8 @@ func (pe *prepEncoder) putArrayLength(in int) error {
 	return nil
 }
 
-func (pe *prepEncoder) putUVarIntArrayLength(in int) {
-	pe.putUVarint(uint64(in+1))
+func (pe *prepEncoder) putCompactArrayLength(in int) {
+	pe.putUVarint(uint64(in + 1))
 }
 
 func (pe *prepEncoder) putBool(in bool) {
@@ -77,8 +77,17 @@ func (pe *prepEncoder) putVarintBytes(in []byte) error {
 }
 
 func (pe *prepEncoder) putCompactString(in string) error {
-	pe.putUVarint(uint64(len(in) + 1))
+	pe.putCompactArrayLength(len(in))
 	return pe.putRawBytes([]byte(in))
+}
+
+func (pe *prepEncoder) putNullableCompactString(in *string) error {
+	if in == nil {
+		pe.putUVarint(0)
+		return nil
+	} else {
+		return pe.putCompactString(*in)
+	}
 }
 
 func (pe *prepEncoder) putRawBytes(in []byte) error {
@@ -122,7 +131,7 @@ func (pe *prepEncoder) putStringArray(in []string) error {
 }
 
 func (pe *prepEncoder) putCompactInt32Array(in []int32) error {
-	pe.putUVarint(uint64(len(in))+1)
+	pe.putUVarint(uint64(len(in)) + 1)
 	pe.length += 4 * len(in)
 	return nil
 }
