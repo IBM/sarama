@@ -9,6 +9,7 @@ var errInvalidArrayLength = PacketDecodingError{"invalid array length"}
 var errInvalidByteSliceLength = PacketDecodingError{"invalid byteslice length"}
 var errInvalidStringLength = PacketDecodingError{"invalid string length"}
 var errVarintOverflow = PacketDecodingError{"varint overflow"}
+var errUVarintOverflow = PacketDecodingError{"uvarint overflow"}
 var errInvalidBool = PacketDecodingError{"invalid bool"}
 
 type realDecoder struct {
@@ -79,10 +80,12 @@ func (rd *realDecoder) getUVarint() (uint64, error) {
 		rd.off = int(len(rd.raw))
 		return 0, ErrInsufficientData
 	}
+
 	if n < 0 {
 		rd.off -= n
-		return 0, errVarintOverflow
+		return 0, errUVarintOverflow
 	}
+
 	rd.off += n
 	return tmp, nil
 }
@@ -217,7 +220,6 @@ func (rd *realDecoder) getCompactNullableString() (*string, error) {
 	var length = int(n - 1)
 
 	if length < 0 {
-		rd.off += 1
 		return nil, err
 	}
 
