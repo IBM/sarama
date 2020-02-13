@@ -163,14 +163,6 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ProduceResponse) key() int16 {
-	return 0
-}
-
-func (r *ProduceResponse) version() int16 {
-	return r.Version
-}
-
 func (r *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
 	if r.Blocks == nil {
 		return nil
