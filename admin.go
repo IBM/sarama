@@ -490,7 +490,6 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 					}
 				}
 			}
-
 		}
 
 		if len(errs) > 0 {

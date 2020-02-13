@@ -332,6 +332,69 @@ func TestClusterAdminCreatePartitionsWithoutAuthorization(t *testing.T) {
 	}
 }
 
+func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V2_4_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var topicAssignment = make([][]int32, 0, 3)
+
+	err = admin.AlterPartitionReassignments("my_topic", topicAssignment)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var topicAssignment = make([][]int32, 0, 3)
+
+	err = admin.AlterPartitionReassignments("my_topic", topicAssignment)
+
+	if !strings.ContainsAny(err.Error(), ErrUnsupportedVersion.Error()) {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminDeleteRecords(t *testing.T) {
 	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)
