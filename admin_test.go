@@ -149,7 +149,7 @@ func TestClusterAdminListTopics(t *testing.T) {
 	})
 
 	config := NewConfig()
-	config.Version = V1_0_0_0
+	config.Version = V1_1_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)

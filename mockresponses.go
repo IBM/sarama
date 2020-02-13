@@ -736,6 +736,7 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
 	}
 
 	includeSynonyms := (req.Version > 0)
+	includeSource := (req.Version > 0)
 
 	for _, r := range req.Resources {
 		var configEntries []*ConfigEntry
@@ -770,8 +771,11 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoder {
 			maxMessageBytes := &ConfigEntry{Name: "max.message.bytes",
 				Value:     "1000000",
 				ReadOnly:  false,
-				Default:   true,
+				Default:   !includeSource,
 				Sensitive: false,
+			}
+			if includeSource {
+				maxMessageBytes.Source = SourceDefault
 			}
 			if includeSynonyms {
 				maxMessageBytes.Synonyms = []*ConfigSynonym{
