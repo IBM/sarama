@@ -470,15 +470,31 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 			return err
 		}
 
+		errs := make([]error, 0)
+
 		rsp, err := b.AlterPartitionReassignments(request)
 
 		if err != nil {
-			return err
+			errs = append(errs, err)
+		} else {
+
+			if rsp.ErrorCode > 0 {
+				errs = append(errs, errors.New(rsp.ErrorCode.Error()))
+			}
+
+			for topic, topicErrors := range rsp.Errors {
+				for partition, partitionError := range topicErrors {
+					if partitionError.errorCode != ErrNoError {
+						errStr := fmt.Sprintf("[%s-%d]: %s", topic, partition, partitionError.errorCode.Error())
+						errs = append(errs, errors.New(errStr))
+					}
+				}
+			}
+
 		}
 
-		if rsp.ErrorCode > 0 || len(rsp.Errors) > 0 {
-			// TODO pretty error from response
-			return errors.New("Kafka server returned errors during replication-factor assignment")
+		if len(errs) > 0 {
+			return ErrReassignPartitions{MultiError{&errs}}
 		}
 
 		return nil
