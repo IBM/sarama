@@ -154,6 +154,10 @@ func (pe *prepEncoder) putInt64Array(in []int64) error {
 	return nil
 }
 
+func (pe *prepEncoder) putEmptyTaggedFieldArray() {
+	pe.putUVarint(0)
+}
+
 func (pe *prepEncoder) offset() int {
 	return pe.length
 }

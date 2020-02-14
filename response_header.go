@@ -22,7 +22,7 @@ func (r *responseHeader) decode(pd packetDecoder, version int16) (err error) {
 	r.correlationID, err = pd.getInt32()
 
 	if version >= 1 {
-		if _, err := pd.getEmptyTaggedFields(); err != nil {
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
 	}

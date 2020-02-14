@@ -20,12 +20,10 @@ func (r *ListPartitionReassignmentsRequest) encode(pe packetEncoder) error {
 			return err
 		}
 
-		//another tagged field
-		pe.putInt8(0)
+		pe.putEmptyTaggedFieldArray()
 	}
 
-	//another tagged field
-	pe.putInt8(0)
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -60,17 +58,13 @@ func (r *ListPartitionReassignmentsRequest) decode(pd packetDecoder, version int
 				}
 				r.blocks[topic][j] = partition
 			}
-			// empty tagged fields array
-			_, err = pd.getUVarint()
-			if err != nil {
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
 			}
 		}
 	}
 
-	// empty tagged fields array
-	_, err = pd.getUVarint()
-	if err != nil {
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 		return err
 	}
 

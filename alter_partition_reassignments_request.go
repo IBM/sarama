@@ -4,28 +4,20 @@ type alterPartitionReassignmentsBlock struct {
 	replicas []int32
 }
 
-func (b *alterPartitionReassignmentsBlock) encode(pe packetEncoder, version int16) error {
-	pe.putCompactInt32Array(b.replicas)
-	// tagged field
-	pe.putInt8(0)
-	return nil
-}
+func (b *alterPartitionReassignmentsBlock) encode(pe packetEncoder) error {
 
-func (b *alterPartitionReassignmentsBlock) decode(pd packetDecoder, version int16) (err error) {
-
-	replicaCount, err := pd.getCompactArrayLength()
-	if err != nil {
+	if err := pe.putCompactInt32Array(b.replicas); err != nil {
 		return err
 	}
 
-	b.replicas = make([]int32, replicaCount)
+	pe.putEmptyTaggedFieldArray()
+	return nil
+}
 
-	for i := 0; i < replicaCount; i++ {
-		if replica, err := pd.getInt32(); err != nil {
-			return err
-		} else {
-			b.replicas[i] = replica
-		}
+func (b *alterPartitionReassignmentsBlock) decode(pd packetDecoder) (err error) {
+
+	if b.replicas, err = pd.getCompactInt32Array(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -48,16 +40,14 @@ func (r *AlterPartitionReassignmentsRequest) encode(pe packetEncoder) error {
 		pe.putCompactArrayLength(len(partitions))
 		for partition, block := range partitions {
 			pe.putInt32(partition)
-			if err := block.encode(pe, r.Version); err != nil {
+			if err := block.encode(pe); err != nil {
 				return err
 			}
 		}
-		//another tagged field
-		pe.putInt8(0)
+		pe.putEmptyTaggedFieldArray()
 	}
 
-	//another tagged field
-	pe.putInt8(0)
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -91,28 +81,22 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 					return err
 				}
 				block := &alterPartitionReassignmentsBlock{}
-				if err := block.decode(pd, r.Version); err != nil {
+				if err := block.decode(pd); err != nil {
 					return err
 				}
 				r.blocks[topic][partition] = block
 
-				// empty tagged fields array
-				_, err = pd.getUVarint()
-				if err != nil {
+				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 					return err
 				}
 			}
-			// empty tagged fields array
-			_, err = pd.getUVarint()
-			if err != nil {
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
 			}
 		}
 	}
 
-	// empty tagged fields array
-	_, err = pd.getUVarint()
-	if err != nil {
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 		return err
 	}
 

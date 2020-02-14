@@ -10,19 +10,22 @@ func (b *alterPartitionReassignmentsErrorBlock) encode(pe packetEncoder) error {
 	if err := pe.putNullableCompactString(b.errorMessage); err != nil {
 		return err
 	}
-	// tagged field
-	pe.putUVarint(0)
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
 
 func (b *alterPartitionReassignmentsErrorBlock) decode(pd packetDecoder) (err error) {
-	errorCode, err := pd.getInt32()
+	errorCode, err := pd.getInt16()
 	if err != nil {
 		return err
 	}
 	b.errorCode = KError(errorCode)
 	b.errorMessage, err = pd.getCompactNullableString()
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return err
 }
 
@@ -67,13 +70,10 @@ func (r *AlterPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
-		// tagged field
-		pe.putUVarint(0)
+		pe.putEmptyTaggedFieldArray()
 	}
 
-	// tagged field
-	pe.putUVarint(0)
-
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -96,55 +96,44 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 	}
 
 	numTopics, err := pd.getCompactArrayLength()
-	if err != nil || numTopics == 0 {
+	if err != nil {
 		return err
 	}
 
-	r.Errors = make(map[string]map[int32]*alterPartitionReassignmentsErrorBlock, numTopics)
-	for i := 0; i < int(numTopics); i++ {
-		name, err := pd.getCompactString()
-		if err != nil {
-			return err
-		}
-
-		ongoingPartitionReassignments, err := pd.getCompactArrayLength()
-		if err != nil {
-			return err
-		}
-
-		r.Errors[name] = make(map[int32]*alterPartitionReassignmentsErrorBlock, ongoingPartitionReassignments)
-
-		for j := 0; j < ongoingPartitionReassignments; j++ {
-			partition, err := pd.getInt32()
-			if err != nil {
-				return err
-			}
-			errorCode, err := pd.getInt16()
-			if err != nil {
-				return err
-			}
-			errorMessage, err := pd.getCompactNullableString()
+	if numTopics > 0 {
+		r.Errors = make(map[string]map[int32]*alterPartitionReassignmentsErrorBlock, numTopics)
+		for i := 0; i < numTopics; i++ {
+			topic, err := pd.getCompactString()
 			if err != nil {
 				return err
 			}
 
-			if errorCode != 0 {
-				if errorMessage == nil {
-					errorMessage = new(string)
+			ongoingPartitionReassignments, err := pd.getCompactArrayLength()
+			if err != nil {
+				return err
+			}
+
+			r.Errors[topic] = make(map[int32]*alterPartitionReassignmentsErrorBlock, ongoingPartitionReassignments)
+
+			for j := 0; j < ongoingPartitionReassignments; j++ {
+				partition, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				block := &alterPartitionReassignmentsErrorBlock{}
+				if err := block.decode(pd); err != nil {
+					return err
 				}
 
-				r.AddError(name, partition, KError(errorCode), errorMessage)
+				r.Errors[topic][partition] = block
 			}
-
-			if _, err = pd.getEmptyTaggedFields(); err != nil {
+			if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
 			}
 		}
-		if _, err = pd.getEmptyTaggedFields(); err != nil {
-			return err
-		}
 	}
-	if _, err = pd.getEmptyTaggedFields(); err != nil {
+
+	if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
 		return err
 	}
 

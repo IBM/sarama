@@ -161,6 +161,10 @@ func (re *realEncoder) putInt64Array(in []int64) error {
 	return nil
 }
 
+func (re *realEncoder) putEmptyTaggedFieldArray() {
+	re.putUVarint(0)
+}
+
 func (re *realEncoder) offset() int {
 	return re.off
 }

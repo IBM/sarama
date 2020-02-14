@@ -131,7 +131,7 @@ func (rd *realDecoder) getBool() (bool, error) {
 	return true, nil
 }
 
-func (rd *realDecoder) getEmptyTaggedFields() (int, error) {
+func (rd *realDecoder) getEmptyTaggedFieldArray() (int, error) {
 	tagCount, err := rd.getUVarint()
 	if err != nil {
 		return 0, err
@@ -240,6 +240,28 @@ func (rd *realDecoder) getCompactNullableString() (*string, error) {
 	tmpStr := string(rd.raw[rd.off : rd.off+length])
 	rd.off += length
 	return &tmpStr, err
+}
+
+func (rd *realDecoder) getCompactInt32Array() ([]int32, error) {
+
+	n, err := rd.getUVarint()
+	if err != nil {
+		return nil, err
+	}
+
+	if n == 0 {
+		return nil, nil
+	}
+
+	arrayLength := int(n) - 1
+
+	ret := make([]int32, arrayLength)
+
+	for i := range ret {
+		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+		rd.off += 4
+	}
+	return ret, nil
 }
 
 func (rd *realDecoder) getInt32Array() ([]int32, error) {

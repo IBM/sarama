@@ -527,6 +527,19 @@ func (b *Broker) AlterPartitionReassignments(request *AlterPartitionReassignment
 	return response, nil
 }
 
+//ListPartitionReassignments sends a list partition reassignments request and
+//returns list partition reassignments response
+func (b *Broker) ListPartitionReassignments(request *ListPartitionReassignmentsRequest) (*ListPartitionReassignmentsResponse, error) {
+	response := new(ListPartitionReassignmentsResponse)
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 //DeleteRecords send a request to delete records and return delete record
 //response or error
 func (b *Broker) DeleteRecords(request *DeleteRecordsRequest) (*DeleteRecordsResponse, error) {
