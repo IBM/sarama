@@ -64,7 +64,7 @@ func (r *CreatePartitionsResponse) version() int16 {
 }
 
 func (r *CreatePartitionsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {

@@ -336,7 +336,7 @@ func (r *FetchResponse) version() int16 {
 }
 
 func (r *FetchResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *FetchResponse) requiredVersion() KafkaVersion {

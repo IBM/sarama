@@ -34,7 +34,7 @@ func (r *SaslHandshakeResponse) version() int16 {
 }
 
 func (r *SaslHandshakeResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *SaslHandshakeResponse) requiredVersion() KafkaVersion {

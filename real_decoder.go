@@ -11,6 +11,7 @@ var errInvalidStringLength = PacketDecodingError{"invalid string length"}
 var errVarintOverflow = PacketDecodingError{"varint overflow"}
 var errUVarintOverflow = PacketDecodingError{"uvarint overflow"}
 var errInvalidBool = PacketDecodingError{"invalid bool"}
+var errUnsupportedTaggedFields = PacketDecodingError{"non-empty tagged fields are not supported yet"}
 
 type realDecoder struct {
 	raw   []byte
@@ -128,6 +129,19 @@ func (rd *realDecoder) getBool() (bool, error) {
 		return false, errInvalidBool
 	}
 	return true, nil
+}
+
+func (rd *realDecoder) getEmptyTaggedFields() (int, error) {
+	tagCount, err := rd.getUVarint()
+	if err != nil {
+		return 0, err
+	}
+
+	if tagCount != 0 {
+		return 0, errUnsupportedTaggedFields
+	}
+
+	return 0, nil
 }
 
 // collections

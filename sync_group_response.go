@@ -37,7 +37,7 @@ func (r *SyncGroupResponse) version() int16 {
 }
 
 func (r *SyncGroupResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *SyncGroupResponse) requiredVersion() KafkaVersion {

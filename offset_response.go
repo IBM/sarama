@@ -151,7 +151,7 @@ func (r *OffsetResponse) version() int16 {
 }
 
 func (r *OffsetResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *OffsetResponse) requiredVersion() KafkaVersion {

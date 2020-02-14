@@ -14,6 +14,7 @@ type packetDecoder interface {
 	getArrayLength() (int, error)
 	getCompactArrayLength() (int, error)
 	getBool() (bool, error)
+	getEmptyTaggedFields() (int, error)
 
 	// Collections
 	getBytes() ([]byte, error)

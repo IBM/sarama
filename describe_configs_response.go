@@ -113,7 +113,7 @@ func (r *DescribeConfigsResponse) version() int16 {
 }
 
 func (r *DescribeConfigsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *DescribeConfigsResponse) requiredVersion() KafkaVersion {

@@ -66,7 +66,7 @@ func (r *DeleteGroupsResponse) version() int16 {
 }
 
 func (r *DeleteGroupsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {

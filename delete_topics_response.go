@@ -69,7 +69,7 @@ func (d *DeleteTopicsResponse) version() int16 {
 }
 
 func (d *DeleteTopicsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (d *DeleteTopicsResponse) requiredVersion() KafkaVersion {

@@ -85,7 +85,7 @@ func (r *ApiVersionsResponse) version() int16 {
 }
 
 func (a *ApiVersionsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *ApiVersionsResponse) requiredVersion() KafkaVersion {

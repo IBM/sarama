@@ -65,7 +65,7 @@ func (r *ListGroupsResponse) version() int16 {
 }
 
 func (r *ListGroupsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (r *ListGroupsResponse) requiredVersion() KafkaVersion {

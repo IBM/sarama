@@ -71,7 +71,7 @@ func (c *CreateTopicsResponse) version() int16 {
 }
 
 func (c *CreateTopicsResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (c *CreateTopicsResponse) requiredVersion() KafkaVersion {

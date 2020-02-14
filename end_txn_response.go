@@ -40,7 +40,7 @@ func (e *EndTxnResponse) version() int16 {
 }
 
 func (r *EndTxnResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (e *EndTxnResponse) requiredVersion() KafkaVersion {

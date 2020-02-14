@@ -136,21 +136,15 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 				r.AddError(name, partition, KError(errorCode), errorMessage)
 			}
 
-			// empty tagged fields array
-			_, err = pd.getUVarint()
-			if err != nil {
+			if _, err = pd.getEmptyTaggedFields(); err != nil {
 				return err
 			}
 		}
-		// empty tagged fields array
-		_, err = pd.getUVarint()
-		if err != nil {
+		if _, err = pd.getEmptyTaggedFields(); err != nil {
 			return err
 		}
 	}
-	// empty tagged fields array
-	_, err = pd.getUVarint()
-	if err != nil {
+	if _, err = pd.getEmptyTaggedFields(); err != nil {
 		return err
 	}
 
@@ -166,7 +160,7 @@ func (r *AlterPartitionReassignmentsResponse) version() int16 {
 }
 
 func (r *AlterPartitionReassignmentsResponse) headerVersion() int16 {
-	return 2
+	return 1
 }
 
 func (r *AlterPartitionReassignmentsResponse) requiredVersion() KafkaVersion {

@@ -80,7 +80,7 @@ func (a *AddPartitionsToTxnResponse) version() int16 {
 }
 
 func (a *AddPartitionsToTxnResponse) headerVersion() int16 {
-	return 1
+	return 0
 }
 
 func (a *AddPartitionsToTxnResponse) requiredVersion() KafkaVersion {
