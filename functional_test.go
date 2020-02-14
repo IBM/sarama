@@ -23,10 +23,8 @@ var (
 	kafkaAvailable, kafkaRequired bool
 	kafkaBrokers                  []string
 
-	proxyClient  *toxiproxy.Client
-	Proxies      map[string]*toxiproxy.Proxy
-	ZKProxies    = []string{"zk1", "zk2", "zk3", "zk4", "zk5"}
-	KafkaProxies = []string{"kafka1", "kafka2", "kafka3", "kafka4", "kafka5"}
+	proxyClient *toxiproxy.Client
+	Proxies     map[string]*toxiproxy.Proxy
 )
 
 func init() {
