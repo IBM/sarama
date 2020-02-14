@@ -184,6 +184,8 @@ func allocateBody(key, version int16) protocolBody {
 		return &DeleteGroupsRequest{}
 	case 45:
 		return &AlterPartitionReassignmentsRequest{}
+	case 46:
+		return &ListPartitionReassignmentsRequest{}
 	}
 	return nil
 }
