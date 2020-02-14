@@ -765,7 +765,13 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersi
 }
 
 func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
-	promise, err := b.send(req, res != nil, res.headerVersion())
+
+	responseHeaderVersion := int16(-1)
+	if res != nil {
+		responseHeaderVersion = res.headerVersion()
+	}
+
+	promise, err := b.send(req, res != nil, responseHeaderVersion)
 	if err != nil {
 		return err
 	}
