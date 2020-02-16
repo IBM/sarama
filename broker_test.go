@@ -42,6 +42,10 @@ func (m mockEncoder) encode(pe packetEncoder) error {
 	return pe.putRawBytes(m.bytes)
 }
 
+func (m mockEncoder) headerVersion() int16 {
+	return 0
+}
+
 type brokerMetrics struct {
 	bytesRead    int
 	bytesWritten int
