@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -131,6 +132,22 @@ func (re *realEncoder) putStringArray(in []string) error {
 }
 
 func (re *realEncoder) putCompactInt32Array(in []int32) error {
+	if in == nil {
+		return errors.New("expected int32 array to be non null")
+	}
+	// 0 represents a null array, so +1 has to be added
+	re.putUVarint(uint64(len(in)) + 1)
+	for _, val := range in {
+		re.putInt32(val)
+	}
+	return nil
+}
+
+func (re *realEncoder) putNullableCompactInt32Array(in []int32) error {
+	if in == nil {
+		re.putUVarint(0)
+		return nil
+	}
 	// 0 represents a null array, so +1 has to be added
 	re.putUVarint(uint64(len(in)) + 1)
 	for _, val := range in {

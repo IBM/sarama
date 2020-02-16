@@ -27,6 +27,7 @@ type packetEncoder interface {
 	putNullableString(in *string) error
 	putStringArray(in []string) error
 	putCompactInt32Array(in []int32) error
+	putNullableCompactInt32Array(in []int32) error
 	putInt32Array(in []int32) error
 	putInt64Array(in []int64) error
 	putEmptyTaggedFieldArray()

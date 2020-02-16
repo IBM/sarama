@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"math"
 
@@ -131,6 +132,23 @@ func (pe *prepEncoder) putStringArray(in []string) error {
 }
 
 func (pe *prepEncoder) putCompactInt32Array(in []int32) error {
+
+	if in == nil {
+		return errors.New("expected int32 array to be non null")
+	}
+
+	pe.putUVarint(uint64(len(in)) + 1)
+	pe.length += 4 * len(in)
+	return nil
+}
+
+func (pe *prepEncoder) putNullableCompactInt32Array(in []int32) error {
+
+	if in == nil {
+		pe.putUVarint(0)
+		return nil
+	}
+
 	pe.putUVarint(uint64(len(in)) + 1)
 	pe.length += 4 * len(in)
 	return nil

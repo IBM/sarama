@@ -6,7 +6,7 @@ type alterPartitionReassignmentsBlock struct {
 
 func (b *alterPartitionReassignmentsBlock) encode(pe packetEncoder) error {
 
-	if err := pe.putCompactInt32Array(b.replicas); err != nil {
+	if err := pe.putNullableCompactInt32Array(b.replicas); err != nil {
 		return err
 	}
 
