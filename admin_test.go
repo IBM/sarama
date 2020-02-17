@@ -395,6 +395,76 @@ func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
 	}
 }
 
+func TestClusterAdminListPartitionReassignments(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V2_4_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	response, err := admin.ListPartitionReassignments("my_topic", []int32{0, 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	partitionStatus, ok := response["my_topic"]
+	if !ok {
+		t.Fatalf("topic missing in response")
+	} else {
+		if len(partitionStatus) != 2 {
+			t.Fatalf("partition missing in response")
+		}
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminListPartitionReassignmentsWithDiffVersion(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
+	})
+
+	config := NewConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var partitions = make([]int32, 0)
+
+	_, err = admin.ListPartitionReassignments("my_topic", partitions)
+
+	if !strings.ContainsAny(err.Error(), ErrUnsupportedVersion.Error()) {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminDeleteRecords(t *testing.T) {
 	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)

@@ -713,6 +713,29 @@ func (mr *MockAlterPartitionReassignmentsResponse) For(reqBody versionedDecoder)
 	return res
 }
 
+type MockListPartitionReassignmentsResponse struct {
+	t TestReporter
+}
+
+func NewMockListPartitionReassignmentsResponse(t TestReporter) *MockListPartitionReassignmentsResponse {
+	return &MockListPartitionReassignmentsResponse{t: t}
+}
+
+func (mr *MockListPartitionReassignmentsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*ListPartitionReassignmentsRequest)
+	_ = req
+	res := &ListPartitionReassignmentsResponse{}
+
+	for topic, partitions := range req.blocks {
+
+		for _, partition := range partitions {
+			res.AddBlock(topic, partition, []int32{0}, []int32{1}, []int32{2})
+		}
+	}
+
+	return res
+}
+
 type MockDeleteRecordsResponse struct {
 	t TestReporter
 }

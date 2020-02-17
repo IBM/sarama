@@ -1,12 +1,12 @@
 package sarama
 
-type listPartitionReassignmentsResponseBlock struct {
+type PartitionReplicaReassignmentsStatus struct {
 	replicas         []int32
 	addingReplicas   []int32
 	removingReplicas []int32
 }
 
-func (b *listPartitionReassignmentsResponseBlock) encode(pe packetEncoder) error {
+func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
 
 	if err := pe.putCompactInt32Array(b.replicas); err != nil {
 		return err
@@ -23,7 +23,7 @@ func (b *listPartitionReassignmentsResponseBlock) encode(pe packetEncoder) error
 	return nil
 }
 
-func (b *listPartitionReassignmentsResponseBlock) decode(pd packetDecoder) (err error) {
+func (b *PartitionReplicaReassignmentsStatus) decode(pd packetDecoder) (err error) {
 
 	if b.replicas, err = pd.getCompactInt32Array(); err != nil {
 		return err
@@ -49,20 +49,20 @@ type ListPartitionReassignmentsResponse struct {
 	ThrottleTimeMs int32
 	ErrorCode      KError
 	ErrorMessage   *string
-	blocks         map[string]map[int32]*listPartitionReassignmentsResponseBlock
+	TopicStatus    map[string]map[int32]*PartitionReplicaReassignmentsStatus
 }
 
 func (r *ListPartitionReassignmentsResponse) AddBlock(topic string, partition int32, replicas, addingReplicas, removingReplicas []int32) {
-	if r.blocks == nil {
-		r.blocks = make(map[string]map[int32]*listPartitionReassignmentsResponseBlock)
+	if r.TopicStatus == nil {
+		r.TopicStatus = make(map[string]map[int32]*PartitionReplicaReassignmentsStatus)
 	}
-	partitions := r.blocks[topic]
+	partitions := r.TopicStatus[topic]
 	if partitions == nil {
-		partitions = make(map[int32]*listPartitionReassignmentsResponseBlock)
-		r.blocks[topic] = partitions
+		partitions = make(map[int32]*PartitionReplicaReassignmentsStatus)
+		r.TopicStatus[topic] = partitions
 	}
 
-	partitions[partition] = &listPartitionReassignmentsResponseBlock{replicas: replicas, addingReplicas: addingReplicas, removingReplicas: removingReplicas}
+	partitions[partition] = &PartitionReplicaReassignmentsStatus{replicas: replicas, addingReplicas: addingReplicas, removingReplicas: removingReplicas}
 }
 
 func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
@@ -72,8 +72,8 @@ func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 		return err
 	}
 
-	pe.putCompactArrayLength(len(r.blocks))
-	for topic, partitions := range r.blocks {
+	pe.putCompactArrayLength(len(r.TopicStatus))
+	for topic, partitions := range r.TopicStatus {
 		if err := pe.putCompactString(topic); err != nil {
 			return err
 		}
@@ -116,7 +116,7 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 		return err
 	}
 
-	r.blocks = make(map[string]map[int32]*listPartitionReassignmentsResponseBlock, numTopics)
+	r.TopicStatus = make(map[string]map[int32]*PartitionReplicaReassignmentsStatus, numTopics)
 	for i := 0; i < numTopics; i++ {
 		topic, err := pd.getCompactString()
 		if err != nil {
@@ -128,7 +128,7 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 			return err
 		}
 
-		r.blocks[topic] = make(map[int32]*listPartitionReassignmentsResponseBlock, ongoingPartitionReassignments)
+		r.TopicStatus[topic] = make(map[int32]*PartitionReplicaReassignmentsStatus, ongoingPartitionReassignments)
 
 		for j := 0; j < ongoingPartitionReassignments; j++ {
 			partition, err := pd.getInt32()
@@ -136,11 +136,11 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 				return err
 			}
 
-			block := &listPartitionReassignmentsResponseBlock{}
+			block := &PartitionReplicaReassignmentsStatus{}
 			if err := block.decode(pd); err != nil {
 				return err
 			}
-			r.blocks[topic][partition] = block
+			r.TopicStatus[topic][partition] = block
 		}
 
 		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {

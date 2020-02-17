@@ -42,12 +42,13 @@ type ClusterAdmin interface {
 	// new partitions. This operation is supported by brokers with version 1.0.0 or higher.
 	CreatePartitions(topic string, count int32, assignment [][]int32, validateOnly bool) error
 
-	// Update the configuration for the specified resources with the default options.
-	// This operation is supported by brokers with version 0.11.0.0 or higher.
-	// The resources with their configs (topic is the only resource type with configs
-	// that can be updated currently Updates are not transactional so they may succeed
-	// for some resources while fail for others. The configs for a particular resource are updated automatically.
+	// Alter the replica assignment for partitions.
+	// This operation is supported by brokers with version 2.4.0.0 or higher.
 	AlterPartitionReassignments(topic string, assignment [][]int32) error
+
+	// Provides info on ongoing partitions replica reassignments.
+	// This operation is supported by brokers with version 2.4.0.0 or higher.
+	ListPartitionReassignments(topics string, partitions []int32) (topicStatus map[string]map[int32]*PartitionReplicaReassignmentsStatus, err error)
 
 	// Delete records whose offset is smaller than the given offset of the corresponding partition.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
@@ -498,6 +499,33 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 
 		return nil
 	})
+}
+
+func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []int32) (topicStatus map[string]map[int32]*PartitionReplicaReassignmentsStatus, err error) {
+	if topic == "" {
+		return nil, ErrInvalidTopic
+	}
+
+	request := &ListPartitionReassignmentsRequest{
+		TimeoutMs: int32(10000),
+		Version:   int16(0),
+	}
+
+	request.AddBlock(topic, partitions)
+
+	b, err := ca.findAnyBroker()
+	if err != nil {
+		return nil, err
+	}
+	_ = b.Open(ca.client.Config())
+
+	rsp, err := b.ListPartitionReassignments(request)
+
+	if err == nil && rsp != nil {
+		return rsp.TopicStatus, nil
+	} else {
+		return nil, err
+	}
 }
 
 func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]int64) error {
