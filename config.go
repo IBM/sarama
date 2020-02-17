@@ -457,6 +457,7 @@ func NewConfig() *Config {
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.AutoCommit.Enable = true
 	c.Consumer.Offsets.AutoCommit.Interval = 1 * time.Second
+	c.Consumer.Offsets.CommitInterval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 	c.Consumer.Offsets.Retry.Max = 3
 
