@@ -130,16 +130,6 @@ var (
 		0,
 		"The maximum number of messages the producer will send in a single request.",
 	)
-	retryMax = flag.Int(
-		"retry-max",
-		3,
-		"The total number of times to retry sending a message.",
-	)
-	retryBackoff = flag.Duration(
-		"retry-backoff",
-		100*time.Millisecond,
-		"The duration the producer will wait for the cluster to settle between retries.",
-	)
 	clientID = flag.String(
 		"client-id",
 		"sarama",
