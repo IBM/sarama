@@ -8,21 +8,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-type testRequestBody struct {
-}
-
-func (s *testRequestBody) key() int16 {
-	return 0x666
-}
-
-func (s *testRequestBody) version() int16 {
-	return 0xD2
-}
-
-func (s *testRequestBody) encode(pe packetEncoder) error {
-	return pe.putString("abc")
-}
-
 // not specific to request tests, just helper functions for testing structures that
 // implement the encoder or decoder interfaces that needed somewhere to live
 
