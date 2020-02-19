@@ -104,6 +104,9 @@ func TestMetadataRequestV3(t *testing.T) {
 
 	request.Topics = []string{"topic1"}
 	testRequest(t, "one topic", request, metadataRequestOneTopicV3)
+
+	request.Topics = []string{"foo", "bar", "baz"}
+	testRequest(t, "three topics", request, metadataRequestThreeTopicsV3)
 }
 
 func TestMetadataRequestV4(t *testing.T) {
@@ -123,7 +126,7 @@ func TestMetadataRequestV4(t *testing.T) {
 func TestMetadataRequestV5(t *testing.T) {
 	request := new(MetadataRequest)
 	request.Version = 5
-	testRequest(t, "no topics", request, metadataRequestNoTopicsV4)
+	testRequest(t, "no topics", request, metadataRequestNoTopicsV5)
 
 	request.Topics = []string{"topic1"}
 
