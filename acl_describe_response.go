@@ -74,7 +74,7 @@ func (d *DescribeAclsResponse) key() int16 {
 }
 
 func (d *DescribeAclsResponse) version() int16 {
-	return int16(d.Version)
+	return d.Version
 }
 
 func (d *DescribeAclsResponse) requiredVersion() KafkaVersion {

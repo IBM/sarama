@@ -667,7 +667,7 @@ func (mr *MockDeleteTopicsResponse) For(reqBody versionedDecoder) encoder {
 	for _, topic := range req.Topics {
 		res.TopicErrorCodes[topic] = ErrNoError
 	}
-	res.Version = int16(req.Version)
+	res.Version = req.Version
 	return res
 }
 

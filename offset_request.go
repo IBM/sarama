@@ -6,7 +6,7 @@ type offsetRequestBlock struct {
 }
 
 func (b *offsetRequestBlock) encode(pe packetEncoder, version int16) error {
-	pe.putInt64(int64(b.time))
+	pe.putInt64(b.time)
 	if version == 0 {
 		pe.putInt32(b.maxOffsets)
 	}
