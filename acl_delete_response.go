@@ -53,7 +53,7 @@ func (d *DeleteAclsResponse) key() int16 {
 }
 
 func (d *DeleteAclsResponse) version() int16 {
-	return int16(d.Version)
+	return d.Version
 }
 
 func (d *DeleteAclsResponse) requiredVersion() KafkaVersion {

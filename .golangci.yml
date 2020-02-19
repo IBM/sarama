@@ -61,8 +61,8 @@ linters:
     - structcheck
     # - stylecheck
     - typecheck
-    # - unconvert
-    # - unused
+    - unconvert
+    - unused
     # - varcheck
     - whitespace
     # - goconst
