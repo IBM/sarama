@@ -63,7 +63,7 @@ linters:
     - typecheck
     - unconvert
     - unused
-    # - varcheck
+    - varcheck
     - whitespace
     # - goconst
     # - gochecknoinits
