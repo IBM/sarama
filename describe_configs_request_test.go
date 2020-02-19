@@ -102,9 +102,7 @@ func TestDescribeConfigsRequestv0(t *testing.T) {
 }
 
 func TestDescribeConfigsRequestv1(t *testing.T) {
-	var request *DescribeConfigsRequest
-
-	request = &DescribeConfigsRequest{
+	request := &DescribeConfigsRequest{
 		Version: 1,
 		Resources: []*ConfigResource{
 			{

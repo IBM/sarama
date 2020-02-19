@@ -9,9 +9,7 @@ var (
 )
 
 func TestSaslAuthenticateRequest(t *testing.T) {
-	var request *SaslAuthenticateRequest
-
-	request = new(SaslAuthenticateRequest)
+	request := new(SaslAuthenticateRequest)
 	request.SaslAuthBytes = []byte(`foo`)
 	testRequest(t, "basic", request, saslAuthenticateRequest)
 }
