@@ -7,9 +7,7 @@ import (
 
 var errInvalidArrayLength = PacketDecodingError{"invalid array length"}
 var errInvalidByteSliceLength = PacketDecodingError{"invalid byteslice length"}
-var errInvalidByteSliceLengthType = PacketDecodingError{"invalid byteslice length type"}
 var errInvalidStringLength = PacketDecodingError{"invalid string length"}
-var errInvalidSubsetSize = PacketDecodingError{"invalid subset size"}
 var errVarintOverflow = PacketDecodingError{"varint overflow"}
 var errInvalidBool = PacketDecodingError{"invalid bool"}
 

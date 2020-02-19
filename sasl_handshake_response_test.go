@@ -11,9 +11,7 @@ var (
 )
 
 func TestSaslHandshakeResponse(t *testing.T) {
-	var response *SaslHandshakeResponse
-
-	response = new(SaslHandshakeResponse)
+	response := new(SaslHandshakeResponse)
 	testVersionDecodable(t, "no error", response, saslHandshakeResponse, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding error failed: no error expected but found", response.Err)

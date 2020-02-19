@@ -411,7 +411,7 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 	var partitions []int32
 
 	err := tp.breaker.Run(func() (err error) {
-		var requiresConsistency = false
+		requiresConsistency := false
 		if ep, ok := tp.partitioner.(DynamicConsistencyPartitioner); ok {
 			requiresConsistency = ep.MessageRequiresConsistency(msg)
 		} else {

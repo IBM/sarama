@@ -267,7 +267,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 	plan := make(BalanceStrategyPlan, len(currentAssignment))
 	for memberID, assignments := range currentAssignment {
 		if len(assignments) == 0 {
-			plan[memberID] = make(map[string][]int32, 0)
+			plan[memberID] = make(map[string][]int32)
 		} else {
 			for _, assignment := range assignments {
 				plan.Add(memberID, assignment.Topic, assignment.Partition)
@@ -689,14 +689,6 @@ func sortPartitionsByPotentialConsumerAssignments(partition2AllPotentialConsumer
 	return sortedPartionIDs
 }
 
-func deepCopyPartitions(src []topicPartitionAssignment) []topicPartitionAssignment {
-	dst := make([]topicPartitionAssignment, len(src))
-	for i, partition := range src {
-		dst[i] = partition
-	}
-	return dst
-}
-
 func deepCopyAssignment(assignment map[string][]topicPartitionAssignment) map[string][]topicPartitionAssignment {
 	copy := make(map[string][]topicPartitionAssignment, len(assignment))
 	for memberID, subscriptions := range assignment {
@@ -956,9 +948,7 @@ func (p *partitionMovements) in(cycle []string, cycles [][]string) bool {
 	for i := 0; i < len(cycle)-1; i++ {
 		superCycle[i] = cycle[i]
 	}
-	for _, c := range cycle {
-		superCycle = append(superCycle, c)
-	}
+	superCycle = append(superCycle, cycle...)
 	for _, foundCycle := range cycles {
 		if len(foundCycle) == len(cycle) && indexOfSubList(superCycle, foundCycle) != -1 {
 			return true

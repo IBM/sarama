@@ -38,32 +38,32 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    # - deadcode
+    - deadcode
     - depguard
     - dogsled
     # - dupl
-    # - errcheck
+    - errcheck
     - funlen
     # - gocritic
     - gocyclo
     - gofmt
-    # - goimports
+    - goimports
     # - golint
-    # - gosec
+    - gosec
     # - gosimple
     - govet
     # - ineffassign
-    # - interfacer
+    - interfacer
     # - misspell
     # - nakedret
     # - scopelint
     # - staticcheck
-    # - structcheck
+    - structcheck
     # - stylecheck
     - typecheck
-    # - unconvert
-    # - unused
-    # - varcheck
+    - unconvert
+    - unused
+    - varcheck
     - whitespace
     # - goconst
     # - gochecknoinits

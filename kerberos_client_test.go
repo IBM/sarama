@@ -2,9 +2,10 @@ package sarama
 
 import (
 	"errors"
+	"testing"
+
 	krbcfg "gopkg.in/jcmturner/gokrb5.v7/config"
 	"gopkg.in/jcmturner/gokrb5.v7/test/testdata"
-	"testing"
 )
 
 /*
