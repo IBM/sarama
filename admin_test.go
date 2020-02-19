@@ -172,7 +172,7 @@ func TestClusterAdminListTopics(t *testing.T) {
 	if found {
 		t.Fatal(errors.New("default topic config entry incorrectly found in response"))
 	}
-	value, _ := topic.ConfigEntries["retention.ms"]
+	value := topic.ConfigEntries["retention.ms"]
 	if value == nil || *value != "5000" {
 		t.Fatal(errors.New("non-default topic config entry not found in response"))
 	}
