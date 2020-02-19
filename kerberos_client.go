@@ -1,10 +1,10 @@
 package sarama
 
 import (
-	krb5client "gopkg.in/jcmturner/gokrb5.v7/client"
-	krb5config "gopkg.in/jcmturner/gokrb5.v7/config"
-	"gopkg.in/jcmturner/gokrb5.v7/keytab"
-	"gopkg.in/jcmturner/gokrb5.v7/types"
+	krb5client "github.com/jcmturner/gokrb5/v8/client"
+	krb5conf "github.com/jcmturner/gokrb5/v8/config"
+	"github.com/jcmturner/gokrb5/v8/keytab"
+	"github.com/jcmturner/gokrb5/v8/types"
 )
 
 type KerberosGoKrb5Client struct {
@@ -28,23 +28,23 @@ func (c *KerberosGoKrb5Client) CName() types.PrincipalName {
 *
  */
 func NewKerberosClient(config *GSSAPIConfig) (KerberosClient, error) {
-	cfg, err := krb5config.Load(config.KerberosConfigPath)
+	cfg, err := krb5conf.Load(config.KerberosConfigPath)
 	if err != nil {
 		return nil, err
 	}
 	return createClient(config, cfg)
 }
 
-func createClient(config *GSSAPIConfig, cfg *krb5config.Config) (KerberosClient, error) {
+func createClient(config *GSSAPIConfig, cfg *krb5conf.Config) (KerberosClient, error) {
 	var client *krb5client.Client
 	if config.AuthType == KRB5_KEYTAB_AUTH {
 		kt, err := keytab.Load(config.KeyTabPath)
 		if err != nil {
 			return nil, err
 		}
-		client = krb5client.NewClientWithKeytab(config.Username, config.Realm, kt, cfg)
+		client = krb5client.NewWithKeytab(config.Username, config.Realm, kt, cfg)
 	} else {
-		client = krb5client.NewClientWithPassword(config.Username,
+		client = krb5client.NewWithPassword(config.Username,
 			config.Realm, config.Password, cfg)
 	}
 	return &KerberosGoKrb5Client{*client}, nil
