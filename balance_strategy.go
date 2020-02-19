@@ -689,14 +689,6 @@ func sortPartitionsByPotentialConsumerAssignments(partition2AllPotentialConsumer
 	return sortedPartionIDs
 }
 
-func deepCopyPartitions(src []topicPartitionAssignment) []topicPartitionAssignment {
-	dst := make([]topicPartitionAssignment, len(src))
-	for i, partition := range src {
-		dst[i] = partition
-	}
-	return dst
-}
-
 func deepCopyAssignment(assignment map[string][]topicPartitionAssignment) map[string][]topicPartitionAssignment {
 	copy := make(map[string][]topicPartitionAssignment, len(assignment))
 	for memberID, subscriptions := range assignment {

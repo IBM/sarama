@@ -1016,7 +1016,6 @@ func TestConsumerTimestamps(t *testing.T) {
 	now := time.Now().Truncate(time.Millisecond)
 	type testMessage struct {
 		key       Encoder
-		value     Encoder
 		offset    int64
 		timestamp time.Time
 	}
@@ -1027,32 +1026,32 @@ func TestConsumerTimestamps(t *testing.T) {
 		expectedTimestamp []time.Time
 	}{
 		{MinVersion, false, []testMessage{
-			{nil, testMsg, 1, now},
-			{nil, testMsg, 2, now},
+			{testMsg, 1, now},
+			{testMsg, 2, now},
 		}, []time.Time{{}, {}}},
 		{V0_9_0_0, false, []testMessage{
-			{nil, testMsg, 1, now},
-			{nil, testMsg, 2, now},
+			{testMsg, 1, now},
+			{testMsg, 2, now},
 		}, []time.Time{{}, {}}},
 		{V0_10_0_0, false, []testMessage{
-			{nil, testMsg, 1, now},
-			{nil, testMsg, 2, now},
+			{testMsg, 1, now},
+			{testMsg, 2, now},
 		}, []time.Time{{}, {}}},
 		{V0_10_2_1, false, []testMessage{
-			{nil, testMsg, 1, now.Add(time.Second)},
-			{nil, testMsg, 2, now.Add(2 * time.Second)},
+			{testMsg, 1, now.Add(time.Second)},
+			{testMsg, 2, now.Add(2 * time.Second)},
 		}, []time.Time{now.Add(time.Second), now.Add(2 * time.Second)}},
 		{V0_10_2_1, true, []testMessage{
-			{nil, testMsg, 1, now.Add(time.Second)},
-			{nil, testMsg, 2, now.Add(2 * time.Second)},
+			{testMsg, 1, now.Add(time.Second)},
+			{testMsg, 2, now.Add(2 * time.Second)},
 		}, []time.Time{now, now}},
 		{V0_11_0_0, false, []testMessage{
-			{nil, testMsg, 1, now.Add(time.Second)},
-			{nil, testMsg, 2, now.Add(2 * time.Second)},
+			{testMsg, 1, now.Add(time.Second)},
+			{testMsg, 2, now.Add(2 * time.Second)},
 		}, []time.Time{now.Add(time.Second), now.Add(2 * time.Second)}},
 		{V0_11_0_0, true, []testMessage{
-			{nil, testMsg, 1, now.Add(time.Second)},
-			{nil, testMsg, 2, now.Add(2 * time.Second)},
+			{testMsg, 1, now.Add(time.Second)},
+			{testMsg, 2, now.Add(2 * time.Second)},
 		}, []time.Time{now, now}},
 	} {
 		var fr *FetchResponse
