@@ -38,16 +38,16 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    # - deadcode
+    - deadcode
     - depguard
     - dogsled
     # - dupl
-    # - errcheck
+    - errcheck
     - funlen
     # - gocritic
     - gocyclo
     - gofmt
-    # - goimports
+    - goimports
     # - golint
     # - gosec
     # - gosimple
