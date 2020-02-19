@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 
 	"github.com/Shopify/sarama"
 	"github.com/Shopify/sarama/tools/tls"
@@ -85,7 +86,7 @@ func main() {
 
 	go func() {
 		signals := make(chan os.Signal, 1)
-		signal.Notify(signals, os.Kill, os.Interrupt)
+		signal.Notify(signals, syscall.SIGTERM, os.Interrupt)
 		<-signals
 		logger.Println("Initiating shutdown of consumer...")
 		close(closing)
