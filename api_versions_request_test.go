@@ -7,8 +7,6 @@ var (
 )
 
 func TestApiVersionsRequest(t *testing.T) {
-	var request *ApiVersionsRequest
-
-	request = new(ApiVersionsRequest)
+	request := new(ApiVersionsRequest)
 	testRequest(t, "basic", request, apiVersionRequest)
 }

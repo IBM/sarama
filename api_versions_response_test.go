@@ -13,9 +13,7 @@ var (
 )
 
 func TestApiVersionsResponse(t *testing.T) {
-	var response *ApiVersionsResponse
-
-	response = new(ApiVersionsResponse)
+	response := new(ApiVersionsResponse)
 	testVersionDecodable(t, "no error", response, apiVersionResponse, 0)
 	if response.Err != ErrNoError {
 		t.Error("Decoding error failed: no error expected but found", response.Err)
