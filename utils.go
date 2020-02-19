@@ -26,9 +26,7 @@ func (slice int32Slice) Swap(i, j int) {
 
 func dupInt32Slice(input []int32) []int32 {
 	ret := make([]int32, 0, len(input))
-	for _, val := range input {
-		ret = append(ret, val)
-	}
+	ret = append(ret, input...)
 	return ret
 }
 
