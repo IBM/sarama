@@ -2008,7 +2008,7 @@ func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
 	if err != nil {
 		t.Errorf("Error building assignment data: %v", err)
 	}
-	if bytes.Compare(expected, actual) != 0 {
+	if !bytes.Equal(expected, actual) {
 		t.Error("Invalid assignment data returned from AssignmentData")
 	}
 }
