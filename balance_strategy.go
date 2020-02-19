@@ -956,9 +956,7 @@ func (p *partitionMovements) in(cycle []string, cycles [][]string) bool {
 	for i := 0; i < len(cycle)-1; i++ {
 		superCycle[i] = cycle[i]
 	}
-	for _, c := range cycle {
-		superCycle = append(superCycle, c)
-	}
+	superCycle = append(superCycle, cycle...)
 	for _, foundCycle := range cycles {
 		if len(foundCycle) == len(cycle) && indexOfSubList(superCycle, foundCycle) != -1 {
 			return true
