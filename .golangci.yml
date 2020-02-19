@@ -49,16 +49,16 @@ linters:
     - gofmt
     - goimports
     # - golint
-    # - gosec
+    - gosec
     # - gosimple
     - govet
     # - ineffassign
-    # - interfacer
+    - interfacer
     # - misspell
     # - nakedret
     # - scopelint
     # - staticcheck
-    # - structcheck
+    - structcheck
     # - stylecheck
     - typecheck
     # - unconvert
