@@ -555,6 +555,11 @@ func (client *client) RefreshCoordinator(consumerGroup string) error {
 
 	client.lock.Lock()
 	defer client.lock.Unlock()
+
+	if client.brokers == nil {
+		return ErrClosedClient
+	}
+
 	client.registerBroker(response.Coordinator)
 	client.coordinators[consumerGroup] = response.Coordinator.ID()
 	return nil
@@ -875,12 +880,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 // if no fatal error, returns a list of topics that need retrying due to ErrLeaderNotAvailable
 func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bool) (retry bool, err error) {
-	if client.Closed() {
-		return
-	}
-
 	client.lock.Lock()
 	defer client.lock.Unlock()
+
+	if client.brokers == nil {
+		return false, ErrClosedClient
+	}
 
 	// For all the brokers we received:
 	// - if it is a new ID, save it
