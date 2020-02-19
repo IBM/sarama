@@ -245,10 +245,6 @@ func TestSASLOAuthBearer(t *testing.T) {
 			if test.expectedBrokerError != err {
 				t.Errorf("[%d]:[%s] Expected %s auth error, got %s\n", i, test.name, test.expectedBrokerError, err)
 			}
-		} else if test.expectedBrokerError != ErrNoError {
-			if test.expectedBrokerError != err {
-				t.Errorf("[%d]:[%s] Expected %s handshake error, got %s\n", i, test.name, test.expectedBrokerError, err)
-			}
 		} else if test.expectClientErr && err == nil {
 			t.Errorf("[%d]:[%s] Expected a client error and got none\n", i, test.name)
 		} else if !test.expectClientErr && err != nil {
