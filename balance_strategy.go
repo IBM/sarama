@@ -267,7 +267,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 	plan := make(BalanceStrategyPlan, len(currentAssignment))
 	for memberID, assignments := range currentAssignment {
 		if len(assignments) == 0 {
-			plan[memberID] = make(map[string][]int32, 0)
+			plan[memberID] = make(map[string][]int32)
 		} else {
 			for _, assignment := range assignments {
 				plan.Add(memberID, assignment.Topic, assignment.Partition)
