@@ -78,7 +78,7 @@ func (rd *realDecoder) getVarint() (int64, error) {
 func (rd *realDecoder) getUVarint() (uint64, error) {
 	tmp, n := binary.Uvarint(rd.raw[rd.off:])
 	if n == 0 {
-		rd.off = int(len(rd.raw))
+		rd.off = len(rd.raw)
 		return 0, ErrInsufficientData
 	}
 
@@ -243,7 +243,6 @@ func (rd *realDecoder) getCompactNullableString() (*string, error) {
 }
 
 func (rd *realDecoder) getCompactInt32Array() ([]int32, error) {
-
 	n, err := rd.getUVarint()
 	if err != nil {
 		return nil, err

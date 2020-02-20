@@ -478,7 +478,6 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 		if err != nil {
 			errs = append(errs, err)
 		} else {
-
 			if rsp.ErrorCode > 0 {
 				errs = append(errs, errors.New(rsp.ErrorCode.Error()))
 			}

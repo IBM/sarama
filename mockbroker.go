@@ -317,7 +317,6 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 }
 
 func (b *MockBroker) encodeHeader(headerVersion int16, correlationId int32, payloadLength uint32) []byte {
-
 	headerLength := uint32(8)
 
 	if headerVersion >= 1 {

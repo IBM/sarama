@@ -727,7 +727,6 @@ func (mr *MockListPartitionReassignmentsResponse) For(reqBody versionedDecoder) 
 	res := &ListPartitionReassignmentsResponse{}
 
 	for topic, partitions := range req.blocks {
-
 		for _, partition := range partitions {
 			res.AddBlock(topic, partition, []int32{0}, []int32{1}, []int32{2})
 		}

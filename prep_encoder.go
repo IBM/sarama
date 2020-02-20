@@ -132,7 +132,6 @@ func (pe *prepEncoder) putStringArray(in []string) error {
 }
 
 func (pe *prepEncoder) putCompactInt32Array(in []int32) error {
-
 	if in == nil {
 		return errors.New("expected int32 array to be non null")
 	}
@@ -143,7 +142,6 @@ func (pe *prepEncoder) putCompactInt32Array(in []int32) error {
 }
 
 func (pe *prepEncoder) putNullableCompactInt32Array(in []int32) error {
-
 	if in == nil {
 		pe.putUVarint(0)
 		return nil

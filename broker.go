@@ -765,7 +765,6 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersi
 }
 
 func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
-
 	responseHeaderVersion := int16(-1)
 	if res != nil {
 		responseHeaderVersion = res.headerVersion()
@@ -905,7 +904,6 @@ func (b *Broker) responseReceiver() {
 }
 
 func getHeaderLength(headerVersion int16) int8 {
-
 	if headerVersion < 1 {
 		return 8
 	} else {

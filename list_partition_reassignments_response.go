@@ -7,7 +7,6 @@ type PartitionReplicaReassignmentsStatus struct {
 }
 
 func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
-
 	if err := pe.putCompactInt32Array(b.replicas); err != nil {
 		return err
 	}
@@ -24,7 +23,6 @@ func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
 }
 
 func (b *PartitionReplicaReassignmentsStatus) decode(pd packetDecoder) (err error) {
-
 	if b.replicas, err = pd.getCompactInt32Array(); err != nil {
 		return err
 	}
