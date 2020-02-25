@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jcmturner/gokrb5/v8/krberror"
 	"github.com/rcrowley/go-metrics"
+	"gopkg.in/jcmturner/gokrb5.v7/krberror"
 )
 
 func ExampleBroker() {
