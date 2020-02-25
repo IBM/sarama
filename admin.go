@@ -457,7 +457,7 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 	}
 
 	request := &AlterPartitionReassignmentsRequest{
-		TimeoutMs: int32(10000),
+		TimeoutMs: int32(60000),
 		Version:   int16(0),
 	}
 
@@ -506,7 +506,7 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 	}
 
 	request := &ListPartitionReassignmentsRequest{
-		TimeoutMs: int32(10000),
+		TimeoutMs: int32(60000),
 		Version:   int16(0),
 	}
 
