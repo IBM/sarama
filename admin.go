@@ -512,7 +512,7 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 
 	request.AddBlock(topic, partitions)
 
-	b, err := ca.findAnyBroker()
+	b, err := ca.Controller()
 	if err != nil {
 		return nil, err
 	}

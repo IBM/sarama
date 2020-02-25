@@ -336,10 +336,17 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
+	secondBroker := NewMockBroker(t, 2)
+	defer secondBroker.Close()
+
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetController(secondBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
 		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
 	})
 
@@ -367,10 +374,17 @@ func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
+	secondBroker := NewMockBroker(t, 2)
+	defer secondBroker.Close()
+
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetController(secondBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
 		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
 	})
 
@@ -399,10 +413,17 @@ func TestClusterAdminListPartitionReassignments(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
+	secondBroker := NewMockBroker(t, 2)
+	defer secondBroker.Close()
+
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetController(secondBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
 		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
 	})
 
@@ -437,10 +458,17 @@ func TestClusterAdminListPartitionReassignmentsWithDiffVersion(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 
+	secondBroker := NewMockBroker(t, 2)
+	defer secondBroker.Close()
+
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+			SetController(secondBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+	})
+
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
 		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
 	})
 
