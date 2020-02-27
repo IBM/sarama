@@ -46,7 +46,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.3
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.6
         export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
         vagrant/install_cluster.sh
         vagrant/boot_cluster.sh
