@@ -9,8 +9,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.12.x, 1.13.x]
-        kafka-version: [2.2.2, 2.3.1, 2.4.0]
+        go-version: [1.12.x, 1.13.x, 1.14.x]
+        kafka-version: [2.3.1, 2.4.0]
         platform: [ubuntu-latest]
 
     env:
@@ -46,7 +46,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.3
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.6
         export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
         vagrant/install_cluster.sh
         vagrant/boot_cluster.sh
