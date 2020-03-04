@@ -42,6 +42,14 @@ func testRequest(t *testing.T, name string, rb protocolBody, expected []byte) {
 	testRequestDecode(t, name, rb, packet)
 }
 
+func testRequestWithoutByteComparison(t *testing.T, name string, rb protocolBody) {
+	if !rb.requiredVersion().IsAtLeast(MinVersion) {
+		t.Errorf("Request %s has invalid required version", name)
+	}
+	packet := testRequestEncode(t, name, rb, nil)
+	testRequestDecode(t, name, rb, packet)
+}
+
 func testRequestEncode(t *testing.T, name string, rb protocolBody, expected []byte) []byte {
 	req := &request{correlationID: 123, clientID: "foo", body: rb}
 	packet, err := encode(req, nil)
@@ -59,7 +67,7 @@ func testRequestEncode(t *testing.T, name string, rb protocolBody, expected []by
 
 	if err != nil {
 		t.Error(err)
-	} else if !bytes.Equal(packet[headerSize:], expected) {
+	} else if expected != nil && !bytes.Equal(packet[headerSize:], expected) {
 		t.Error("Encoding", name, "failed\ngot ", packet[headerSize:], "\nwant", expected)
 	}
 	return packet
