@@ -239,6 +239,10 @@ func (r *FetchRequest) version() int16 {
 	return r.Version
 }
 
+func (r *FetchRequest) headerVersion() int16 {
+	return 1
+}
+
 func (r *FetchRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 0:
