@@ -119,6 +119,7 @@ type SCRAMClient interface {
 type responsePromise struct {
 	requestTime   time.Time
 	correlationID int32
+	headerVersion int16
 	packets       chan []byte
 	errors        chan error
 }
@@ -513,6 +514,32 @@ func (b *Broker) CreatePartitions(request *CreatePartitionsRequest) (*CreatePart
 	return response, nil
 }
 
+//AlterPartitionReassignments sends a alter partition reassignments request and
+//returns alter partition reassignments response
+func (b *Broker) AlterPartitionReassignments(request *AlterPartitionReassignmentsRequest) (*AlterPartitionReassignmentsResponse, error) {
+	response := new(AlterPartitionReassignmentsResponse)
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+//ListPartitionReassignments sends a list partition reassignments request and
+//returns list partition reassignments response
+func (b *Broker) ListPartitionReassignments(request *ListPartitionReassignmentsRequest) (*ListPartitionReassignmentsResponse, error) {
+	response := new(ListPartitionReassignmentsResponse)
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 //DeleteRecords send a request to delete records and return delete record
 //response or error
 func (b *Broker) DeleteRecords(request *DeleteRecordsRequest) (*DeleteRecordsResponse, error) {
@@ -693,7 +720,7 @@ func (b *Broker) write(buf []byte) (n int, err error) {
 	return b.conn.Write(buf)
 }
 
-func (b *Broker) send(rb protocolBody, promiseResponse bool) (*responsePromise, error) {
+func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersion int16) (*responsePromise, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -731,14 +758,19 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool) (*responsePromise, 
 		return nil, nil
 	}
 
-	promise := responsePromise{requestTime, req.correlationID, make(chan []byte), make(chan error)}
+	promise := responsePromise{requestTime, req.correlationID, responseHeaderVersion, make(chan []byte), make(chan error)}
 	b.responses <- promise
 
 	return &promise, nil
 }
 
-func (b *Broker) sendAndReceive(req protocolBody, res versionedDecoder) error {
-	promise, err := b.send(req, res != nil)
+func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
+	responseHeaderVersion := int16(-1)
+	if res != nil {
+		responseHeaderVersion = res.headerVersion()
+	}
+
+	promise, err := b.send(req, res != nil, responseHeaderVersion)
 	if err != nil {
 		return err
 	}
@@ -818,7 +850,6 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 func (b *Broker) responseReceiver() {
 	var dead error
-	header := make([]byte, 8)
 
 	for response := range b.responses {
 		if dead != nil {
@@ -828,6 +859,9 @@ func (b *Broker) responseReceiver() {
 			response.errors <- dead
 			continue
 		}
+
+		var headerLength = getHeaderLength(response.headerVersion)
+		header := make([]byte, headerLength)
 
 		bytesReadHeader, err := b.readFull(header)
 		requestLatency := time.Since(response.requestTime)
@@ -839,7 +873,7 @@ func (b *Broker) responseReceiver() {
 		}
 
 		decodedHeader := responseHeader{}
-		err = decode(header, &decodedHeader)
+		err = versionedDecode(header, &decodedHeader, response.headerVersion)
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
@@ -855,7 +889,7 @@ func (b *Broker) responseReceiver() {
 			continue
 		}
 
-		buf := make([]byte, decodedHeader.length-4)
+		buf := make([]byte, decodedHeader.length-int32(headerLength)+4)
 		bytesReadBody, err := b.readFull(buf)
 		b.updateIncomingCommunicationMetrics(bytesReadHeader+bytesReadBody, requestLatency)
 		if err != nil {
@@ -867,6 +901,15 @@ func (b *Broker) responseReceiver() {
 		response.packets <- buf
 	}
 	close(b.done)
+}
+
+func getHeaderLength(headerVersion int16) int8 {
+	if headerVersion < 1 {
+		return 8
+	} else {
+		// header contains additional tagged field length (0), we don't support actual tags yet.
+		return 9
+	}
 }
 
 func (b *Broker) authenticateViaSASL() error {
@@ -1180,7 +1223,7 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 	}
 
 	header := responseHeader{}
-	err = decode(buf, &header)
+	err = versionedDecode(buf, &header, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -1269,7 +1312,7 @@ func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correl
 	}
 
 	header := responseHeader{}
-	err = decode(buf, &header)
+	err = versionedDecode(buf, &header, 0)
 	if err != nil {
 		return bytesRead, err
 	}
