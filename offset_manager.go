@@ -225,8 +225,12 @@ func (om *offsetManager) mainLoop() {
 	for {
 		select {
 		case <-om.ticker.C:
-			om.flushToBroker()
-			om.releasePOMs(false)
+			for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
+				om.flushToBroker()
+				if om.releasePOMs(false) == 0 {
+					break
+				}
+			}
 		case <-om.closing:
 			return
 		}
