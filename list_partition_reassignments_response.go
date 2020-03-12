@@ -110,7 +110,7 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 	}
 
 	numTopics, err := pd.getCompactArrayLength()
-	if err != nil || numTopics == 0 {
+	if err != nil {
 		return err
 	}
 
