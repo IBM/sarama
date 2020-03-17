@@ -67,11 +67,6 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.WriteTimeout = 0
 			},
 			"Net.WriteTimeout must be > 0"},
-		{"KeepAlive",
-			func(cfg *Config) {
-				cfg.Net.KeepAlive = -1
-			},
-			"Net.KeepAlive must be >= 0"},
 		{"SASL.User",
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
