@@ -96,8 +96,9 @@ type Config struct {
 			GSSAPI GSSAPIConfig
 		}
 
-		// KeepAlive specifies the keep-alive period for an active network connection.
-		// If zero, keep-alives are disabled. (default is 0: disabled).
+		// KeepAlive specifies the keep-alive period for an active network connection (defaults to 0).
+		// If zero or positive, keep-alives are enabled.
+		// If negative, keep-alives are disabled.
 		KeepAlive time.Duration
 
 		// LocalAddr is the local address to use when dialing an
