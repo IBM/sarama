@@ -101,6 +101,9 @@ type ClusterAdmin interface {
 	// Get information about the nodes in the cluster
 	DescribeCluster() (brokers []*Broker, controllerID int32, err error)
 
+	// Get information about all log directories on the given set of brokers
+	DescribeLogDirs(brokers []int32) (map[int32][]DescribeLogDirsResponseDirMetadata, error)
+
 	// Close shuts down the admin and closes underlying client.
 	Close() error
 }
@@ -877,4 +880,49 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 	}
 
 	return nil
+}
+
+func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32][]DescribeLogDirsResponseDirMetadata, err error) {
+	allLogDirs = make(map[int32][]DescribeLogDirsResponseDirMetadata)
+
+	// Query brokers in parallel, since we may have to query multiple brokers
+	logDirsMaps := make(chan map[int32][]DescribeLogDirsResponseDirMetadata, len(brokerIds))
+	errors := make(chan error, len(brokerIds))
+	wg := sync.WaitGroup{}
+
+	for _, b := range brokerIds {
+		wg.Add(1)
+		broker, err := ca.findBroker(b)
+		if err != nil {
+			Logger.Printf("Unable to find broker with ID = %v\n", b)
+			continue
+		}
+		go func(b *Broker, conf *Config) {
+			defer wg.Done()
+			_ = b.Open(conf) // Ensure that broker is opened
+
+			response, err := b.DescribeLogDirs(&DescribeLogDirsRequest{})
+			if err != nil {
+				errors <- err
+				return
+			}
+			logDirs := make(map[int32][]DescribeLogDirsResponseDirMetadata)
+			logDirs[b.ID()] = response.LogDirs
+			logDirsMaps <- logDirs
+		}(broker, ca.conf)
+	}
+
+	wg.Wait()
+	close(logDirsMaps)
+	close(errors)
+
+	for logDirsMap := range logDirsMaps {
+		for id, logDirs := range logDirsMap {
+			allLogDirs[id] = logDirs
+		}
+	}
+
+	// Intentionally return only the first error for simplicity
+	err = <-errors
+	return
 }

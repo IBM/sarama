@@ -1309,3 +1309,51 @@ func TestRefreshMetaDataWithDifferentController(t *testing.T) {
 			seedBroker2.BrokerID(), b.ID())
 	}
 }
+
+func TestDescribeLogDirs(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DescribeLogDirsRequest": NewMockDescribeLogDirsResponse(t).
+			SetLogDirs("/tmp/logs", map[string]int{"topic1": 2, "topic2": 2}),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	logDirsPerBroker, err := admin.DescribeLogDirs([]int32{seedBroker.BrokerID()})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(logDirsPerBroker) != 1 {
+		t.Fatalf("Expected %v results, got %v", 1, len(logDirsPerBroker))
+	}
+	logDirs := logDirsPerBroker[seedBroker.BrokerID()]
+	if len(logDirs) != 1 {
+		t.Fatalf("Expected log dirs for broker %v to be returned, but it did not, got %v", seedBroker.BrokerID(), len(logDirs))
+	}
+	logDirsBroker := logDirs[0]
+	if logDirsBroker.ErrorCode != ErrNoError {
+		t.Fatalf("Expected no error for broker %v, but it was %v", seedBroker.BrokerID(), logDirsBroker.ErrorCode)
+	}
+	if logDirsBroker.Path != "/tmp/logs" {
+		t.Fatalf("Expected log dirs for broker %v to be '/tmp/logs', but it was %v", seedBroker.BrokerID(), logDirsBroker.Path)
+	}
+	if len(logDirsBroker.Topics) != 2 {
+		t.Fatalf("Expected log dirs for broker %v to have 2 topics, but it had %v", seedBroker.BrokerID(), len(logDirsBroker.Topics))
+	}
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
