@@ -640,6 +640,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetBroker(leader0.Addr(), leader0.BrokerID()).
 			SetBroker(leader1.Addr(), leader1.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
 			SetLeader("my_topic", 0, leader0.BrokerID()).
 			SetLeader("my_topic", 1, leader1.BrokerID()),
 	})
@@ -720,7 +721,10 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetLeader("my_topic", 0, leader1.BrokerID()).
-			SetLeader("my_topic", 1, leader1.BrokerID()),
+			SetLeader("my_topic", 1, leader1.BrokerID()).
+			SetBroker(leader0.Addr(), leader0.BrokerID()).
+			SetBroker(leader1.Addr(), leader1.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
 	// leader0 says no longer leader of partition 0
@@ -759,7 +763,10 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetLeader("my_topic", 0, leader1.BrokerID()).
-			SetLeader("my_topic", 1, leader0.BrokerID()),
+			SetLeader("my_topic", 1, leader0.BrokerID()).
+			SetBroker(leader0.Addr(), leader0.BrokerID()).
+			SetBroker(leader1.Addr(), leader1.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
 	// leader1 provides three more messages on partition0, says no longer leader of partition1
