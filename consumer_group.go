@@ -760,7 +760,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		case ErrRebalanceInProgress, ErrUnknownMemberId, ErrIllegalGeneration:
 			return
 		default:
-			s.parent.handleError(err, "", -1)
+			s.parent.handleError(resp.Err, "", -1)
 			return
 		}
 
