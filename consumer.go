@@ -128,16 +128,17 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
 	child := &partitionConsumer{
-		consumer:  c,
-		conf:      c.conf,
-		topic:     topic,
-		partition: partition,
-		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
-		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
-		feeder:    make(chan *FetchResponse, 1),
-		trigger:   make(chan none, 1),
-		dying:     make(chan none),
-		fetchSize: c.conf.Consumer.Fetch.Default,
+		consumer:      c,
+		conf:          c.conf,
+		topic:         topic,
+		partition:     partition,
+		messages:      make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
+		stopConsuming: make(chan struct{}, 1),
+		errors:        make(chan *ConsumerError, c.conf.ChannelBufferSize),
+		feeder:        make(chan *FetchResponse, 1),
+		trigger:       make(chan none, 1),
+		dying:         make(chan none),
+		fetchSize:     c.conf.Consumer.Fetch.Default,
 	}
 
 	if err := child.chooseStartingOffset(offset); err != nil {
@@ -287,17 +288,21 @@ type PartitionConsumer interface {
 	// i.e. the offset that will be used for the next message that will be produced.
 	// You can use this to determine how far behind the processing is.
 	HighWaterMarkOffset() int64
+
+	// StopConsuming forces an immediate stop of consumption, in addition to closing the Messages() channel
+	StopConsuming() <-chan struct{}
 }
 
 type partitionConsumer struct {
 	highWaterMarkOffset int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
 
-	consumer *consumer
-	conf     *Config
-	broker   *brokerConsumer
-	messages chan *ConsumerMessage
-	errors   chan *ConsumerError
-	feeder   chan *FetchResponse
+	consumer      *consumer
+	conf          *Config
+	broker        *brokerConsumer
+	messages      chan *ConsumerMessage
+	errors        chan *ConsumerError
+	feeder        chan *FetchResponse
+	stopConsuming chan struct{}
 
 	trigger, dying chan none
 	closeOnce      sync.Once
@@ -356,6 +361,7 @@ func (child *partitionConsumer) dispatcher() {
 		child.consumer.unrefBrokerConsumer(child.broker)
 	}
 	child.consumer.removeChild(child)
+
 	close(child.feeder)
 }
 
@@ -405,6 +411,10 @@ func (child *partitionConsumer) Messages() <-chan *ConsumerMessage {
 	return child.messages
 }
 
+func (child *partitionConsumer) StopConsuming() <-chan struct{} {
+	return child.stopConsuming
+}
+
 func (child *partitionConsumer) Errors() <-chan *ConsumerError {
 	return child.errors
 }
@@ -441,6 +451,7 @@ func (child *partitionConsumer) responseFeeder() {
 	var msgs []*ConsumerMessage
 	expiryTicker := time.NewTicker(child.conf.Consumer.MaxProcessingTime)
 	firstAttempt := true
+
 
 feederLoop:
 	for response := range child.feeder {
@@ -485,6 +496,7 @@ feederLoop:
 	}
 
 	expiryTicker.Stop()
+	child.stopConsuming <- struct{}{}
 	close(child.messages)
 	close(child.errors)
 }
@@ -708,7 +720,7 @@ func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
 	bc := &brokerConsumer{
 		consumer:         c,
 		broker:           broker,
-		input:            make(chan *partitionConsumer),
+		input:            make(chan *partitionConsumer, 4096),
 		newSubscriptions: make(chan []*partitionConsumer),
 		wait:             make(chan none),
 		subscriptions:    make(map[*partitionConsumer]none),
@@ -727,36 +739,56 @@ func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
 // it nil if no new subscriptions are available. We also write to `wait` only when new subscriptions is available,
 // so the main goroutine can block waiting for work if it has none.
 func (bc *brokerConsumer) subscriptionManager() {
-	var buffer []*partitionConsumer
+	var subscribingPartitionConsumers []*partitionConsumer
 
 	for {
-		if len(buffer) > 0 {
-			select {
-			case event, ok := <-bc.input:
-				if !ok {
-					goto done
-				}
-				buffer = append(buffer, event)
-			case bc.newSubscriptions <- buffer:
-				buffer = nil
-			case bc.wait <- none{}:
+
+		// get a partition consumer asking to subscribe. if there isn't any,
+		// kick off the network request by shoving "nil" to the newSubscriptions
+		// channel
+		select {
+
+		case subscribingPartitionConsumer, ok := <-bc.input:
+			if !ok {
+				goto done
 			}
-		} else {
-			select {
-			case event, ok := <-bc.input:
-				if !ok {
-					goto done
+
+			// add to list of subscribing
+			subscribingPartitionConsumers = append(subscribingPartitionConsumers, subscribingPartitionConsumer)
+
+			batchComplete := false
+
+			// drain input, if there's more stuff in there. wait half a second for this
+			for !batchComplete {
+				select {
+				case subscribingPartitionConsumer, ok := <-bc.input:
+					if !ok {
+						goto done
+					}
+
+					// shove new consumer to consumers
+					subscribingPartitionConsumers = append(subscribingPartitionConsumers, subscribingPartitionConsumer)
+				case <-time.After(250 * time.Millisecond):
+					batchComplete = true
 				}
-				buffer = append(buffer, event)
-			case bc.newSubscriptions <- nil:
 			}
+
+			Logger.Printf("Accumulated %d new subscriptions", len(subscribingPartitionConsumers))
+
+			bc.wait <- none{}
+			bc.newSubscriptions <- subscribingPartitionConsumers
+
+			// clear out the batch
+			subscribingPartitionConsumers = nil
+
+		case bc.newSubscriptions <- nil:
 		}
 	}
 
 done:
 	close(bc.wait)
-	if len(buffer) > 0 {
-		bc.newSubscriptions <- buffer
+	if len(subscribingPartitionConsumers) > 0 {
+		bc.newSubscriptions <- subscribingPartitionConsumers
 	}
 	close(bc.newSubscriptions)
 }

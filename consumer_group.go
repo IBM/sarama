@@ -763,7 +763,10 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		switch resp.Err {
 		case ErrNoError:
 			retries = s.parent.config.Metadata.Retry.Max
-		case ErrRebalanceInProgress, ErrUnknownMemberId, ErrIllegalGeneration:
+		case ErrRebalanceInProgress:
+			retries = s.parent.config.Metadata.Retry.Max
+			s.cancel()
+		case ErrUnknownMemberId, ErrIllegalGeneration:
 			return
 		default:
 			s.parent.handleError(err, "", -1)
@@ -822,6 +825,9 @@ type ConsumerGroupClaim interface {
 	// Config.Consumer.Group.Session.Timeout before the topic/partition is eventually
 	// re-assigned to another group member.
 	Messages() <-chan *ConsumerMessage
+
+	// StopConsuming forces an immediate stop of consumption, in addition to closing the Messages() channel
+	StopConsuming() <-chan struct{}
 }
 
 type consumerGroupClaim struct {

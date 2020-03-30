@@ -27,12 +27,15 @@ type BalanceStrategyPlan map[string]map[string][]int32
 
 // Add assigns a topic with a number partitions to a member.
 func (p BalanceStrategyPlan) Add(memberID, topic string, partitions ...int32) {
-	if len(partitions) == 0 {
-		return
-	}
 	if _, ok := p[memberID]; !ok {
 		p[memberID] = make(map[string][]int32, 1)
 	}
+
+	if len(partitions) == 0 {
+		p[memberID][topic] = []int32{}
+		return
+	}
+
 	p[memberID][topic] = append(p[memberID][topic], partitions...)
 }
 
