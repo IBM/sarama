@@ -654,6 +654,15 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 		offset, _ = pom.NextOffset()
 	}
 
+	if s.parent.config.Consumer.Group.Rebalance.EnableSkipPast {
+		newestOffset, err := s.parent.client.GetOffset(topic, partition, OffsetNewest)
+		if nil != err {
+			s.parent.handleError(err, topic, partition)
+			return
+		}
+		offset = newestOffset
+	}
+
 	// create new claim
 	claim, err := newConsumerGroupClaim(s, topic, partition, offset)
 	if err != nil {

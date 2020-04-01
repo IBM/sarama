@@ -273,6 +273,9 @@ type Config struct {
 					// Backoff time between retries during rebalance (default 2s)
 					Backoff time.Duration
 				}
+				// EnableSkipPast enable after rebalance occurred to skip messages that were produced before
+				// rebalance and start consuming only "fresh" messages that were produced after rebalance occurred
+				EnableSkipPast bool
 			}
 			Member struct {
 				// Custom metadata to include when joining the group. The user data for all joined members
