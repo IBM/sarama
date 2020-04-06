@@ -1,19 +1,19 @@
 package sarama
 
 type PartitionReplicaReassignmentsStatus struct {
-	replicas         []int32
-	addingReplicas   []int32
-	removingReplicas []int32
+	Replicas         []int32
+	AddingReplicas   []int32
+	RemovingReplicas []int32
 }
 
 func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
-	if err := pe.putCompactInt32Array(b.replicas); err != nil {
+	if err := pe.putCompactInt32Array(b.Replicas); err != nil {
 		return err
 	}
-	if err := pe.putCompactInt32Array(b.addingReplicas); err != nil {
+	if err := pe.putCompactInt32Array(b.AddingReplicas); err != nil {
 		return err
 	}
-	if err := pe.putCompactInt32Array(b.removingReplicas); err != nil {
+	if err := pe.putCompactInt32Array(b.RemovingReplicas); err != nil {
 		return err
 	}
 
@@ -23,15 +23,15 @@ func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
 }
 
 func (b *PartitionReplicaReassignmentsStatus) decode(pd packetDecoder) (err error) {
-	if b.replicas, err = pd.getCompactInt32Array(); err != nil {
+	if b.Replicas, err = pd.getCompactInt32Array(); err != nil {
 		return err
 	}
 
-	if b.addingReplicas, err = pd.getCompactInt32Array(); err != nil {
+	if b.AddingReplicas, err = pd.getCompactInt32Array(); err != nil {
 		return err
 	}
 
-	if b.removingReplicas, err = pd.getCompactInt32Array(); err != nil {
+	if b.RemovingReplicas, err = pd.getCompactInt32Array(); err != nil {
 		return err
 	}
 
@@ -60,7 +60,7 @@ func (r *ListPartitionReassignmentsResponse) AddBlock(topic string, partition in
 		r.TopicStatus[topic] = partitions
 	}
 
-	partitions[partition] = &PartitionReplicaReassignmentsStatus{replicas: replicas, addingReplicas: addingReplicas, removingReplicas: removingReplicas}
+	partitions[partition] = &PartitionReplicaReassignmentsStatus{Replicas: replicas, AddingReplicas: addingReplicas, RemovingReplicas: removingReplicas}
 }
 
 func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
@@ -110,7 +110,7 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 	}
 
 	numTopics, err := pd.getCompactArrayLength()
-	if err != nil || numTopics == 0 {
+	if err != nil {
 		return err
 	}
 
