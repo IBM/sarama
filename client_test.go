@@ -441,6 +441,8 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 	replicas := []int32{leader.BrokerID(), seedBroker.BrokerID()}
 
 	metadataPartial := new(MetadataResponse)
+	metadataPartial.AddBroker(seedBroker.Addr(), 1)
+	metadataPartial.AddBroker(leader.Addr(), 5)
 	metadataPartial.AddTopic("new_topic", ErrLeaderNotAvailable)
 	metadataPartial.AddTopicPartition("new_topic", 0, leader.BrokerID(), replicas, replicas, []int32{}, ErrNoError)
 	metadataPartial.AddTopicPartition("new_topic", 1, -1, replicas, []int32{}, []int32{}, ErrLeaderNotAvailable)
@@ -485,6 +487,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	seedBroker.Returns(metadataResponse1)
 
 	metadataResponse2 := new(MetadataResponse)
+	metadataResponse2.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
@@ -510,6 +513,36 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	leader.Close()
 	seedBroker.Close()
 	safeClose(t, client)
+}
+
+func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 5)
+
+	metadataResponse1 := new(MetadataResponse)
+	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse1.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse1)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(client.Brokers()) != 2 {
+		t.Error("Meta broker is not 2")
+	}
+
+	metadataResponse2 := new(MetadataResponse)
+	metadataResponse2.AddBroker(leader.Addr(), leader.BrokerID())
+	seedBroker.Returns(metadataResponse2)
+
+	if err := client.RefreshMetadata(); err != nil {
+		t.Error(err)
+	}
+	if len(client.Brokers()) != 1 {
+		t.Error("Meta broker is not 1")
+	}
 }
 
 func TestClientResurrectDeadSeeds(t *testing.T) {
@@ -656,7 +689,6 @@ func TestClientMetadataTimeout(t *testing.T) {
 
 			// Start refreshing metadata in the background
 			errChan := make(chan error)
-			start := time.Now()
 			go func() {
 				errChan <- c.RefreshMetadata()
 			}()
@@ -666,7 +698,6 @@ func TestClientMetadataTimeout(t *testing.T) {
 			maxRefreshDuration := 2 * timeout
 			select {
 			case err := <-errChan:
-				t.Logf("Got err: %v after waiting for: %v", err, time.Since(start))
 				if err == nil {
 					t.Fatal("Expected failed RefreshMetadata, got nil")
 				}

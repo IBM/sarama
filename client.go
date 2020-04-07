@@ -562,6 +562,30 @@ func (client *client) RefreshCoordinator(consumerGroup string) error {
 
 // private broker management helpers
 
+func (client *client) updateBroker(brokers []*Broker) {
+	var currentBroker = make(map[int32]*Broker, len(brokers))
+
+	for _, broker := range brokers {
+		currentBroker[broker.ID()] = broker
+		if client.brokers[broker.ID()] == nil { // add new broker
+			client.brokers[broker.ID()] = broker
+			Logger.Printf("client/brokers registered new broker #%d at %s", broker.ID(), broker.Addr())
+		} else if broker.Addr() != client.brokers[broker.ID()].Addr() { // replace broker with new address
+			safeAsyncClose(client.brokers[broker.ID()])
+			client.brokers[broker.ID()] = broker
+			Logger.Printf("client/brokers replaced registered broker #%d with %s", broker.ID(), broker.Addr())
+		}
+	}
+
+	for id, broker := range client.brokers {
+		if _, exist := currentBroker[id]; !exist { // remove old broker
+			safeAsyncClose(broker)
+			delete(client.brokers, id)
+			Logger.Printf("client/broker remove invalid broker #%d with %s", broker.ID(), broker.Addr())
+		}
+	}
+}
+
 // registerBroker makes sure a broker received by a Metadata or Coordinator request is registered
 // in the brokers map. It returns the broker that is registered, which may be the provided broker,
 // or a previously registered Broker instance. You must hold the write lock before calling this function.
@@ -885,10 +909,9 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 	// For all the brokers we received:
 	// - if it is a new ID, save it
 	// - if it is an existing ID, but the address we have is stale, discard the old one and save it
+	// - if some brokers is not exist in it, remove old broker
 	// - otherwise ignore it, replacing our existing one would just bounce the connection
-	for _, broker := range data.Brokers {
-		client.registerBroker(broker)
-	}
+	client.updateBroker(data.Brokers)
 
 	client.controllerID = data.ControllerID
 
