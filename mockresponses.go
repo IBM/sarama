@@ -314,25 +314,25 @@ func (mfr *MockFetchResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	res := &FetchResponse{
 		Version: mfr.version,
 	}
-	for topic, partitions := range fetchRequest.blocks {
-		for partition, block := range partitions {
-			initialOffset := block.fetchOffset
+	for _, topic := range fetchRequest.Topics {
+		for _, partition := range topic.FetchPartitions {
+			initialOffset := partition.FetchOffset
 			offset := initialOffset
-			maxOffset := initialOffset + int64(mfr.getMessageCount(topic, partition))
+			maxOffset := initialOffset + int64(mfr.getMessageCount(topic.Name, partition.PartitionIndex))
 			for i := 0; i < mfr.batchSize && offset < maxOffset; {
-				msg := mfr.getMessage(topic, partition, offset)
+				msg := mfr.getMessage(topic.Name, partition.PartitionIndex, offset)
 				if msg != nil {
-					res.AddMessage(topic, partition, nil, msg, offset)
+					res.AddMessage(topic.Name, partition.PartitionIndex, nil, msg, offset)
 					i++
 				}
 				offset++
 			}
-			fb := res.GetBlock(topic, partition)
+			fb := res.GetBlock(topic.Name, partition.PartitionIndex)
 			if fb == nil {
-				res.AddError(topic, partition, ErrNoError)
-				fb = res.GetBlock(topic, partition)
+				res.AddError(topic.Name, partition.PartitionIndex, ErrNoError)
+				fb = res.GetBlock(topic.Name, partition.PartitionIndex)
 			}
-			fb.HighWaterMarkOffset = mfr.getHighWaterMark(topic, partition)
+			fb.HighWaterMarkOffset = mfr.getHighWaterMark(topic.Name, partition.PartitionIndex)
 		}
 	}
 	return res

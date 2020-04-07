@@ -613,7 +613,7 @@ func TestConsumeMessageWithSessionIDs(t *testing.T) {
 	broker0.Close()
 
 	fetchReq := broker0.History()[3].Request.(*FetchRequest)
-	if fetchReq.SessionID != 0 || fetchReq.SessionEpoch != -1 {
+	if fetchReq.SessionID != 0 || fetchReq.Epoch != -1 {
 		t.Error("Expected session ID to be zero & Epoch to be -1")
 	}
 }

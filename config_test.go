@@ -372,7 +372,7 @@ func TestConsumerConfigValidates(t *testing.T) {
 		{"Incorrect isolation level",
 			func(cfg *Config) {
 				cfg.Version = V0_11_0_0
-				cfg.Consumer.IsolationLevel = IsolationLevel(42)
+				cfg.Consumer.IsolationLevel = int8(42)
 			},
 			"Consumer.IsolationLevel must be ReadUncommitted or ReadCommitted",
 		},

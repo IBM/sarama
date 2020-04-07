@@ -870,8 +870,9 @@ func (bc *brokerConsumer) abort(err error) {
 
 func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
-		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
-		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
+		ReplicaID: -1,
+		MinBytes:  bc.consumer.conf.Consumer.Fetch.Min,
+		MaxWait:   int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_9_0_0) {
 		request.Version = 1
@@ -885,7 +886,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 4
-		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
+		request.IsolationLevel = bc.consumer.conf.Consumer.IsolationLevel
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V1_1_0_0) {
 		request.Version = 7
@@ -893,7 +894,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		// and the epoch to -1 tells the broker not to generate as session ID we're going
 		// to just ignore anyway.
 		request.SessionID = 0
-		request.SessionEpoch = -1
+		request.Epoch = -1
 	}
 	if bc.consumer.conf.Version.IsAtLeast(V2_1_0_0) {
 		request.Version = 10
@@ -903,8 +904,29 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		request.RackID = bc.consumer.conf.RackID
 	}
 
+	topics := map[string]FetchableTopic{}
+
 	for child := range bc.subscriptions {
-		request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
+		topic, found := topics[child.topic]
+		if !found {
+			topic = FetchableTopic{
+				Version: request.Version,
+				Name:    child.topic,
+			}
+		}
+		partition := FetchPartition{
+			Version:            request.Version,
+			PartitionIndex:     child.partition,
+			CurrentLeaderEpoch: -1,
+			FetchOffset:        child.offset,
+			MaxBytes:           child.fetchSize,
+		}
+		topic.FetchPartitions = append(topic.FetchPartitions, partition)
+		topics[child.topic] = topic
+	}
+
+	for _, t := range topics {
+		request.Topics = append(request.Topics, t)
 	}
 
 	return bc.broker.Fetch(request)

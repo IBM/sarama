@@ -49,41 +49,88 @@ var (
 func TestFetchRequest(t *testing.T) {
 	t.Run("no blocks", func(t *testing.T) {
 		request := new(FetchRequest)
+		request.ReplicaID = -1
+		request.Topics = []FetchableTopic{}
 		testRequest(t, "no blocks", request, fetchRequestNoBlocks)
 	})
 
 	t.Run("with properties", func(t *testing.T) {
 		request := new(FetchRequest)
-		request.MaxWaitTime = 0x20
+		request.ReplicaID = -1
+		request.MaxWait = 0x20
 		request.MinBytes = 0xEF
+		request.Topics = []FetchableTopic{}
 		testRequest(t, "with properties", request, fetchRequestWithProperties)
 	})
 
+	// AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
 	t.Run("one block", func(t *testing.T) {
 		request := new(FetchRequest)
-		request.MaxWaitTime = 0
+		request.ReplicaID = -1
+		request.MaxWait = 0
 		request.MinBytes = 0
-		request.AddBlock("topic", 0x12, 0x34, 0x56)
+		request.Topics = []FetchableTopic{
+			{
+				Name: "topic",
+				FetchPartitions: []FetchPartition{
+					{
+						PartitionIndex: 0x12,
+						FetchOffset:    0x34,
+						MaxBytes:       0x56,
+					},
+				},
+			},
+		}
 		testRequest(t, "one block", request, fetchRequestOneBlock)
 	})
 
 	t.Run("one block v4", func(t *testing.T) {
 		request := new(FetchRequest)
 		request.Version = 4
+		request.ReplicaID = -1
 		request.MaxBytes = 0xFF
-		request.Isolation = ReadCommitted
-		request.AddBlock("topic", 0x12, 0x34, 0x56)
+		request.IsolationLevel = ReadCommitted
+		request.Topics = []FetchableTopic{
+			{
+				Version: 4,
+				Name:    "topic",
+				FetchPartitions: []FetchPartition{
+					{
+						Version:        4,
+						PartitionIndex: 0x12,
+						FetchOffset:    0x34,
+						MaxBytes:       0x56,
+					},
+				},
+			},
+		}
 		testRequest(t, "one block v4", request, fetchRequestOneBlockV4)
 	})
 
 	t.Run("one block v11 rackid", func(t *testing.T) {
 		request := new(FetchRequest)
 		request.Version = 11
+		request.ReplicaID = -1
 		request.MaxBytes = 0xFF
-		request.Isolation = ReadCommitted
+		request.IsolationLevel = ReadCommitted
 		request.SessionID = 0xAA
-		request.SessionEpoch = 0xEE
-		request.AddBlock("topic", 0x12, 0x34, 0x56)
+		request.Epoch = 0xEE
+		request.Topics = []FetchableTopic{
+			{
+				Version: 11,
+				Name:    "topic",
+				FetchPartitions: []FetchPartition{
+					{
+						Version:            11,
+						PartitionIndex:     0x12,
+						CurrentLeaderEpoch: -1,
+						FetchOffset:        0x34,
+						MaxBytes:           0x56,
+					},
+				},
+			},
+		}
+		request.Forgotten = []ForgottenTopic{}
 		request.RackID = "rack01"
 		testRequest(t, "one block v11 rackid", request, fetchRequestOneBlockV11)
 	})
