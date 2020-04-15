@@ -154,25 +154,20 @@ func (b *Broker) Open(conf *Config) error {
 	go withRecover(func() {
 		defer b.lock.Unlock()
 
-		dialer := net.Dialer{
-			Timeout:   conf.Net.DialTimeout,
-			KeepAlive: conf.Net.KeepAlive,
-			LocalAddr: conf.Net.LocalAddr,
-		}
-
-		if conf.Net.TLS.Enable {
-			b.conn, b.connErr = tls.DialWithDialer(&dialer, "tcp", b.addr, conf.Net.TLS.Config)
-		} else if conf.Net.Proxy.Enable {
-			b.conn, b.connErr = conf.Net.Proxy.Dialer.Dial("tcp", b.addr)
-		} else {
-			b.conn, b.connErr = dialer.Dial("tcp", b.addr)
-		}
+		dialer := conf.getDialer()
+		b.conn, b.connErr = dialer.Dial("tcp", b.addr)
 		if b.connErr != nil {
 			Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, b.connErr)
 			b.conn = nil
 			atomic.StoreInt32(&b.opened, 0)
 			return
 		}
+
+		if conf.Net.TLS.Enable {
+			Logger.Printf("Using tls")
+			b.conn = tls.Client(b.conn, conf.Net.TLS.Config)
+		}
+
 		b.conn = newBufConn(b.conn)
 
 		b.conf = conf
