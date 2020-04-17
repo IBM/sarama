@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.12.x, 1.13.x, 1.14.x]
-        kafka-version: [2.3.1, 2.4.0]
+        kafka-version: [2.3.1, 2.4.1, 2.5.0]
         platform: [ubuntu-latest]
 
     env:
