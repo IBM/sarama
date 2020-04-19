@@ -283,7 +283,7 @@ func TestRecordBatchDecoding(t *testing.T) {
 			r.length = varintLengthField{}
 		}
 		// The compression level is not restored on decoding. It is not needed
-		// anyway. We only set it here to ensure that comparision succeeds.
+		// anyway. We only set it here to ensure that comparison succeeds.
 		batch.CompressionLevel = tc.batch.CompressionLevel
 		if !reflect.DeepEqual(batch, tc.batch) {
 			t.Errorf(spew.Sprintf("invalid decode of %s\ngot %+v\nwanted %+v", tc.name, batch, tc.batch))

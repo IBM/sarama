@@ -642,7 +642,7 @@ func TestClientController(t *testing.T) {
 	}
 	defer safeClose(t, client2)
 	if _, err = client2.Controller(); err != ErrUnsupportedVersion {
-		t.Errorf("Expected Contoller() to return %s, found %s", ErrUnsupportedVersion, err)
+		t.Errorf("Expected Controller() to return %s, found %s", ErrUnsupportedVersion, err)
 	}
 }
 

@@ -295,7 +295,7 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 		scramChallengeResp string
 	}{
 		{
-			name:               "SASL/SCRAMSHAXXX successfull authentication",
+			name:               "SASL/SCRAMSHAXXX successful authentication",
 			mockHandshakeErr:   ErrNoError,
 			scramClient:        &MockSCRAMClient{},
 			scramChallengeResp: "pong",
