@@ -853,6 +853,31 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 	return res
 }
 
+type MockDescribeConfigsResponseWithErrorCode struct {
+	t TestReporter
+}
+
+func NewMockDescribeConfigsResponseWithErrorCode(t TestReporter) *MockDescribeConfigsResponseWithErrorCode {
+	return &MockDescribeConfigsResponseWithErrorCode{t: t}
+}
+
+func (mr *MockDescribeConfigsResponseWithErrorCode) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*DescribeConfigsRequest)
+	res := &DescribeConfigsResponse{
+		Version: req.Version,
+	}
+
+	for _, r := range req.Resources {
+		res.Resources = append(res.Resources, &ResourceResponse{
+			Name:      r.Name,
+			Type:      r.Type,
+			ErrorCode: 83,
+			ErrorMsg:  "",
+		})
+	}
+	return res
+}
+
 type MockAlterConfigsResponse struct {
 	t TestReporter
 }
@@ -869,6 +894,29 @@ func (mr *MockAlterConfigsResponse) For(reqBody versionedDecoder) encoderWithHea
 		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{Name: r.Name,
 			Type:     r.Type,
 			ErrorMsg: "",
+		})
+	}
+	return res
+}
+
+type MockAlterConfigsResponseWithErrorCode struct {
+	t TestReporter
+}
+
+func NewMockAlterConfigsResponseWithErrorCode(t TestReporter) *MockAlterConfigsResponseWithErrorCode {
+	return &MockAlterConfigsResponseWithErrorCode{t: t}
+}
+
+func (mr *MockAlterConfigsResponseWithErrorCode) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*AlterConfigsRequest)
+	res := &AlterConfigsResponse{}
+
+	for _, r := range req.Resources {
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:      r.Name,
+			Type:      r.Type,
+			ErrorCode: 83,
+			ErrorMsg:  "",
 		})
 	}
 	return res
