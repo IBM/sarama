@@ -2,7 +2,7 @@ package sarama
 
 import "time"
 
-//CreateAclsResponse is a an acl reponse creation type
+//CreateAclsResponse is a an acl response creation type
 type CreateAclsResponse struct {
 	ThrottleTime         time.Duration
 	AclCreationResponses []*AclCreationResponse

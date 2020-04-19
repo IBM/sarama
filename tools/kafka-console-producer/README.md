@@ -25,7 +25,7 @@ A simple command line tool to produce a single message to Kafka.
     # Partitioning: by default, kafka-console-producer will partition as follows:
     # - manual partitioning if a -partition is provided
     # - hash partitioning by key if a -key is provided
-    # - random partioning otherwise.
+    # - random partitioning otherwise.
     #
     # You can override this using the -partitioner argument:
     echo "hello world" | kafka-console-producer -topic=test -key=key -partitioner=random

@@ -28,7 +28,7 @@ func init() {
 	flag.StringVar(&brokers, "brokers", "", "Kafka bootstrap brokers to connect to, as a comma separated list")
 	flag.StringVar(&group, "group", "", "Kafka consumer group definition")
 	flag.StringVar(&version, "version", "2.1.1", "Kafka cluster version")
-	flag.StringVar(&topics, "topics", "", "Kafka topics to be consumed, as a comma seperated list")
+	flag.StringVar(&topics, "topics", "", "Kafka topics to be consumed, as a comma separated list")
 	flag.StringVar(&assignor, "assignor", "range", "Consumer group partition assignment strategy (range, roundrobin, sticky)")
 	flag.BoolVar(&oldest, "oldest", true, "Kafka consumer consume initial offset from oldest")
 	flag.BoolVar(&verbose, "verbose", false, "Sarama logging")

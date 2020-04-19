@@ -73,7 +73,7 @@ const (
 	// server negotiate SASL by wrapping tokens with Kafka protocol headers.
 	SASLHandshakeV1 = int16(1)
 	// SASLExtKeyAuth is the reserved extension key name sent as part of the
-	// SASL/OAUTHBEARER intial client response
+	// SASL/OAUTHBEARER initial client response
 	SASLExtKeyAuth = "auth"
 )
 
@@ -369,7 +369,7 @@ func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
 	return response, nil
 }
 
-//CommitOffset return an Offset commit reponse or error
+//CommitOffset return an Offset commit response or error
 func (b *Broker) CommitOffset(request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
 	response := new(OffsetCommitResponse)
 
@@ -1014,7 +1014,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 // When credentials are invalid, Kafka replies with a SaslAuthenticate response
 // containing an error code and message detailing the authentication failure.
 func (b *Broker) sendAndReceiveSASLPlainAuth() error {
-	// default to V0 to allow for backward compatability when SASL is enabled
+	// default to V0 to allow for backward compatibility when SASL is enabled
 	// but not the handshake
 	if b.conf.Net.SASL.Handshake {
 		handshakeErr := b.sendAndReceiveSASLHandshake(SASLTypePlaintext, b.conf.Net.SASL.Version)
