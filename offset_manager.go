@@ -235,10 +235,6 @@ func (om *offsetManager) mainLoop() {
 
 // flushToBroker is ignored if auto-commit offsets is disabled
 func (om *offsetManager) flushToBroker() {
-	if !om.conf.Consumer.Offsets.AutoCommit.Enable {
-		return
-	}
-
 	req := om.constructRequest()
 	if req == nil {
 		return
