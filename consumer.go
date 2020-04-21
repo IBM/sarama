@@ -128,16 +128,17 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
 	child := &partitionConsumer{
-		consumer:  c,
-		conf:      c.conf,
-		topic:     topic,
-		partition: partition,
-		messages:  make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
-		errors:    make(chan *ConsumerError, c.conf.ChannelBufferSize),
-		feeder:    make(chan *FetchResponse, 1),
-		trigger:   make(chan none, 1),
-		dying:     make(chan none),
-		fetchSize: c.conf.Consumer.Fetch.Default,
+		consumer:      c,
+		conf:          c.conf,
+		topic:         topic,
+		partition:     partition,
+		messages:      make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
+		errors:        make(chan *ConsumerError, c.conf.ChannelBufferSize),
+		feeder:        make(chan *FetchResponse, 1),
+		trigger:       make(chan none, 1),
+		dying:         make(chan none),
+		fetchSize:     c.conf.Consumer.Fetch.Default,
+		offsetFetched: make(chan int64, 1),
 	}
 
 	if err := child.chooseStartingOffset(offset); err != nil {
@@ -277,6 +278,9 @@ type PartitionConsumer interface {
 	// the broker.
 	Messages() <-chan *ConsumerMessage
 
+	// Messages offset fetched.
+	OffsetFetched() <-chan int64
+
 	// Errors returns a read channel of errors that occurred during consuming, if
 	// enabled. By default, errors are logged and not returned over this channel.
 	// If you want to implement any custom error handling, set your config's
@@ -307,6 +311,7 @@ type partitionConsumer struct {
 	fetchSize      int32
 	offset         int64
 	retries        int32
+	offsetFetched  chan int64
 }
 
 var errTimedOut = errors.New("timed out feeding messages to the user") // not user-facing
@@ -403,6 +408,10 @@ func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
 
 func (child *partitionConsumer) Messages() <-chan *ConsumerMessage {
 	return child.messages
+}
+
+func (child *partitionConsumer) OffsetFetched() <-chan int64 {
+	return child.offsetFetched
 }
 
 func (child *partitionConsumer) Errors() <-chan *ConsumerError {
@@ -514,6 +523,7 @@ func (child *partitionConsumer) parseMessages(msgSet *MessageSet) ([]*ConsumerMe
 				Timestamp:      timestamp,
 				BlockTimestamp: msgBlock.Msg.Timestamp,
 			})
+			child.offsetFetched <- child.offset
 			child.offset = offset + 1
 		}
 	}
@@ -544,6 +554,7 @@ func (child *partitionConsumer) parseRecords(batch *RecordBatch) ([]*ConsumerMes
 			Timestamp: timestamp,
 			Headers:   rec.Headers,
 		})
+		child.offsetFetched <- child.offset
 		child.offset = offset + 1
 	}
 	if len(messages) == 0 {
@@ -585,7 +596,6 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	}
 
 	consumerBatchSizeMetric.Update(int64(nRecs))
-
 	if nRecs == 0 {
 		partialTrailingMessage, err := block.isPartial()
 		if err != nil {
