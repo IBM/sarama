@@ -190,6 +190,7 @@ type PartitionConsumer struct {
 	consumed                bool
 	errorsShouldBeDrained   bool
 	messagesShouldBeDrained bool
+	offsetFetched           chan int64
 }
 
 ///////////////////////////////////////////////////
@@ -262,6 +263,12 @@ func (pc *PartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return pc.messages
 }
+
+// Messages offset fetched.
+func (pc *PartitionConsumer) OffsetFetched() <-chan int64 {
+	return pc.offsetFetched
+}
+
 
 func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
 	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
