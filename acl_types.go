@@ -48,7 +48,7 @@ func (a *AclOperation) String() string {
 		AclOperationAlterConfigs:    "AlterConfigs",
 		AclOperationIdempotentWrite: "IdempotentWrite",
 	}
-	s, ok := mapping[a]
+	s, ok := mapping[*a]
 	if !ok {
 		s = mapping[AclOperationUnknown]
 	}
@@ -102,7 +102,7 @@ func (a *AclPermissionType) String() string {
 		AclPermissionDeny:    "Deny",
 		AclPermissionAllow:   "Allow",
 	}
-	s, ok := mapping[a]
+	s, ok := mapping[*a]
 	if !ok {
 		s = mapping[AclPermissionUnknown]
 	}
@@ -152,7 +152,7 @@ func (a *AclResourceType) String() string {
 		AclResourceCluster:         "Cluster",
 		AclResourceTransactionalID: "TransactionalID",
 	}
-	s, ok := mapping[a]
+	s, ok := mapping[*a]
 	if !ok {
 		s = mapping[AclResourceUnknown]
 	}
@@ -202,7 +202,7 @@ func (a *AclResourcePatternType) String() string {
 		AclPatternLiteral:  "Literal",
 		AclPatternPrefixed: "Prefixed",
 	}
-	s, ok := mapping[a]
+	s, ok := mapping[*a]
 	if !ok {
 		s = mapping[AclPatternUnknown]
 	}
