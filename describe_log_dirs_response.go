@@ -84,6 +84,9 @@ func (r *DescribeLogDirsResponseDirMetadata) encode(pe packetEncoder) error {
 		return err
 	}
 
+	if err := pe.putArrayLength(len(r.Topics)); err != nil {
+		return err
+	}
 	for _, topic := range r.Topics {
 		if err := topic.encode(pe); err != nil {
 			return err
@@ -137,6 +140,9 @@ func (r *DescribeLogDirsResponseTopic) encode(pe packetEncoder) error {
 		return err
 	}
 
+	if err := pe.putArrayLength(len(r.Partitions)); err != nil {
+		return err
+	}
 	for _, partition := range r.Partitions {
 		if err := partition.encode(pe); err != nil {
 			return err
