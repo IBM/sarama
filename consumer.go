@@ -277,6 +277,9 @@ type PartitionConsumer interface {
 	// the broker.
 	Messages() <-chan *ConsumerMessage
 
+	// Messages offset fetched.
+	OffsetFetched() int64
+
 	// Errors returns a read channel of errors that occurred during consuming, if
 	// enabled. By default, errors are logged and not returned over this channel.
 	// If you want to implement any custom error handling, set your config's
@@ -403,6 +406,10 @@ func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
 
 func (child *partitionConsumer) Messages() <-chan *ConsumerMessage {
 	return child.messages
+}
+
+func (child *partitionConsumer) OffsetFetched() int64 {
+	return child.offset
 }
 
 func (child *partitionConsumer) Errors() <-chan *ConsumerError {

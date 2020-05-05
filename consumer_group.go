@@ -682,6 +682,19 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 		s.parent.handleError(err, topic, partition)
 	}
 
+	// update offset when auto commit
+	go func() {
+		for {
+			if !s.parent.config.Consumer.Offsets.AutoCommit.Enable {
+				continue
+			}
+			offsetFetched := claim.PartitionConsumer.OffsetFetched()
+			s.MarkOffset(topic, partition, offsetFetched, "")
+			time.Sleep(time.Second)
+		}
+	}()
+
+
 	// ensure consumer is closed & drained
 	claim.AsyncClose()
 	for _, err := range claim.waitClosed() {

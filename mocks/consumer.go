@@ -263,6 +263,11 @@ func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return pc.messages
 }
 
+// Messages offset fetched.
+func (pc *PartitionConsumer) OffsetFetched() int64 {
+	return pc.offset
+}
+
 func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
 	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
 }
