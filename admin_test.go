@@ -704,6 +704,39 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 	}
 }
 
+func TestClusterAdminDescribeConfigWithErrorCode(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DescribeConfigsRequest": NewMockDescribeConfigsResponseWithErrorCode(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_1_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = admin.Close()
+	}()
+
+	resource := ConfigResource{
+		Name:        "r1",
+		Type:        TopicResource,
+		ConfigNames: []string{"my_topic"},
+	}
+
+	_, err = admin.DescribeConfig(resource)
+	if err == nil {
+		t.Fatal(errors.New("ErrorCode present but no Error returned"))
+	}
+}
+
 // TestClusterAdminDescribeBrokerConfig ensures that a describe broker config
 // is sent to the broker in the resource struct, _not_ the controller
 func TestClusterAdminDescribeBrokerConfig(t *testing.T) {
@@ -786,6 +819,37 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminAlterConfigWithErrorCode(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"AlterConfigsRequest": NewMockAlterConfigsResponseWithErrorCode(t),
+	})
+
+	config := NewConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = admin.Close()
+	}()
+
+	var value string
+	entries := make(map[string]*string)
+	value = "60000"
+	entries["retention.ms"] = &value
+	err = admin.AlterConfig(TopicResource, "my_topic", entries, false)
+	if err == nil {
+		t.Fatal(errors.New("ErrorCode present but no Error returned"))
 	}
 }
 

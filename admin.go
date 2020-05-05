@@ -643,6 +643,9 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 			if rspResource.ErrorMsg != "" {
 				return nil, errors.New(rspResource.ErrorMsg)
 			}
+			if rspResource.ErrorCode != 0 {
+				return nil, KError(rspResource.ErrorCode)
+			}
 			for _, cfgEntry := range rspResource.Configs {
 				entries = append(entries, *cfgEntry)
 			}
@@ -690,6 +693,9 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		if rspResource.Name == name {
 			if rspResource.ErrorMsg != "" {
 				return errors.New(rspResource.ErrorMsg)
+			}
+			if rspResource.ErrorCode != 0 {
+				return KError(rspResource.ErrorCode)
 			}
 		}
 	}
