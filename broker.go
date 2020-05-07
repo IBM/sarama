@@ -165,6 +165,17 @@ func (b *Broker) Open(conf *Config) error {
 
 		if conf.Net.TLS.Enable {
 			Logger.Printf("Using tls")
+
+			// If no ServerName is set, infer the ServerName
+			// from the hostname we're connecting to.
+			if conf.Net.TLS.Config.ServerName == "" {
+				colonPos := strings.LastIndex(b.addr, ":")
+				if colonPos == -1 {
+					colonPos = len(b.addr)
+				}
+				hostname := b.addr[:colonPos]
+				conf.Net.TLS.Config.ServerName = hostname
+			}
 			b.conn = tls.Client(b.conn, conf.Net.TLS.Config)
 		}
 

@@ -158,8 +158,7 @@ func TestTLS(t *testing.T) {
 			Succeed: true,
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
-				RootCAs:    pool,
-				ServerName: "127.0.0.1",
+				RootCAs: pool,
 				Certificates: []tls.Certificate{{
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
