@@ -8,6 +8,8 @@ while ! nc -q 1 localhost 2185 </dev/null; do echo "Waiting"; sleep 1; done
 while ! nc -q 1 localhost 9095 </dev/null; do echo "Waiting"; sleep 1; done
 
 # Launch and wait for Zookeeper
+KAFKA_HEAP_OPTS="-Xmx192m -Dzookeeper.admin.enableServer=false"
+export KAFKA_HEAP_OPTS
 for i in 1 2 3 4 5; do
     KAFKA_PORT=`expr $i + 9090`
     cd ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_PORT} && bin/zookeeper-server-start.sh -daemon config/zookeeper.properties
@@ -15,6 +17,8 @@ done
 while ! nc -q 1 localhost 21805 </dev/null; do echo "Waiting"; sleep 1; done
 
 # Launch and wait for Kafka
+KAFKA_HEAP_OPTS="-Xmx320m"
+export KAFKA_HEAP_OPTS
 for i in 1 2 3 4 5; do
     KAFKA_PORT=`expr $i + 9090`
     cd ${KAFKA_INSTALL_ROOT}/kafka-${KAFKA_PORT} && bash bin/kafka-server-start.sh -daemon config/server.properties
