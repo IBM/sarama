@@ -1,3 +1,5 @@
+//+build functional
+
 package sarama
 
 import (
@@ -53,7 +55,7 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	config.Producer.Flush.Frequency = 50 * time.Millisecond
 	config.Producer.Flush.Messages = 200
 	config.Producer.Return.Successes = true
-	producer, err := NewSyncProducer(kafkaBrokers, config)
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +83,7 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	producer, err := NewSyncProducer(kafkaBrokers, nil)
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +115,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 	config.Version = V0_11_0_0
 
-	producer, err := NewSyncProducer(kafkaBrokers, config)
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +133,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	}
 
 	// break the brokers.
-	for proxyName, proxy := range Proxies {
+	for proxyName, proxy := range FunctionalTestEnv.Proxies {
 		if !strings.Contains(proxyName, "kafka") {
 			continue
 		}
@@ -152,7 +154,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	}
 
 	// Now bring the proxy back up
-	for proxyName, proxy := range Proxies {
+	for proxyName, proxy := range FunctionalTestEnv.Proxies {
 		if !strings.Contains(proxyName, "kafka") {
 			continue
 		}
@@ -179,7 +181,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 	defer teardownFunctionalTest(t)
 
 	// Configure some latency in order to properly validate the request latency metric
-	for _, proxy := range Proxies {
+	for _, proxy := range FunctionalTestEnv.Proxies {
 		if _, err := proxy.AddToxic("", "latency", "", 1, toxiproxy.Attributes{"latency": 10}); err != nil {
 			t.Fatal("Unable to configure latency toxicity", err)
 		}
@@ -188,7 +190,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
 
-	client, err := NewClient(kafkaBrokers, config)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,7 +382,7 @@ func benchmarkProducer(b *testing.B, conf *Config, topic string, value Encoder) 
 		}()
 	}
 
-	producer, err := NewAsyncProducer(kafkaBrokers, conf)
+	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, conf)
 	if err != nil {
 		b.Fatal(err)
 	}

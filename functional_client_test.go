@@ -1,3 +1,5 @@
+//+build functional
+
 package sarama
 
 import (
@@ -10,13 +12,13 @@ func TestFuncConnectionFailure(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	Proxies["kafka1"].Enabled = false
+	FunctionalTestEnv.Proxies["kafka1"].Enabled = false
 	SaveProxy(t, "kafka1")
 
 	config := NewConfig()
 	config.Metadata.Retry.Max = 1
 
-	_, err := NewClient([]string{kafkaBrokers[0]}, config)
+	_, err := NewClient([]string{FunctionalTestEnv.KafkaBrokerAddrs[0]}, config)
 	if err != ErrOutOfBrokers {
 		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
 	}
@@ -29,7 +31,7 @@ func TestFuncClientMetadata(t *testing.T) {
 	config := NewConfig()
 	config.Metadata.Retry.Max = 1
 	config.Metadata.Retry.Backoff = 10 * time.Millisecond
-	client, err := NewClient(kafkaBrokers, config)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,7 +72,7 @@ func TestFuncClientCoordinator(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	client, err := NewClient(kafkaBrokers, nil)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

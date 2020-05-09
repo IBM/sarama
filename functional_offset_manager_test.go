@@ -1,3 +1,5 @@
+//+build functional
+
 package sarama
 
 import (
@@ -9,7 +11,7 @@ func TestFuncOffsetManager(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	client, err := NewClient(kafkaBrokers, nil)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

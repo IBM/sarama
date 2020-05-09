@@ -1,4 +1,4 @@
-// +build go1.9
+//+build functional
 
 package sarama
 
@@ -153,7 +153,7 @@ func testFuncConsumerGroupID(t *testing.T) string {
 }
 
 func testFuncConsumerGroupFuzzySeed(topic string) error {
-	client, err := NewClient(kafkaBrokers, nil)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		return err
 	}
@@ -245,7 +245,7 @@ func runTestFuncConsumerGroupMember(t *testing.T, groupID, clientID string, maxM
 	config.Consumer.Offsets.Initial = OffsetOldest
 	config.Consumer.Group.Rebalance.Timeout = 10 * time.Second
 
-	group, err := NewConsumerGroup(kafkaBrokers, groupID, config)
+	group, err := NewConsumerGroup(FunctionalTestEnv.KafkaBrokerAddrs, groupID, config)
 	if err != nil {
 		t.Fatal(err)
 		return nil

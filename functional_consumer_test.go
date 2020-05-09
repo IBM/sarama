@@ -1,3 +1,5 @@
+//+build functional
+
 package sarama
 
 import (
@@ -16,7 +18,7 @@ func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	consumer, err := NewConsumer(kafkaBrokers, nil)
+	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +38,7 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	p, err := NewSyncProducer(kafkaBrokers, nil)
+	p, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,7 +49,7 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := NewConsumer(kafkaBrokers, nil)
+	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +145,7 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Version = V0_11_0_0
 
-	consumer, err := NewConsumer(kafkaBrokers, config)
+	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +207,7 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 				prodCfg.Net.MaxOpenRequests = 1
 			}
 
-			p, err := NewSyncProducer(kafkaBrokers, prodCfg)
+			p, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, prodCfg)
 			if err != nil {
 				t.Errorf("Failed to create producer: version=%s, compression=%s, err=%v", prodVer, codec, err)
 				continue
@@ -251,7 +253,7 @@ consumerVersionLoop:
 		// message.
 		consCfg := NewConfig()
 		consCfg.Version = consVer
-		c, err := NewConsumer(kafkaBrokers, consCfg)
+		c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consCfg)
 		if err != nil {
 			t.Fatal(err)
 		}
