@@ -25,3 +25,7 @@ lint:
 
 test:
 	$(GOTEST) ./...
+
+.PHONY: test_functional
+test_functional:
+	$(GOTEST) -tags=functional ./...
