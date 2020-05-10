@@ -21,7 +21,7 @@ fmt:
 	gofmt -s -l -w $(FILES) $(TESTS)
 
 lint:
-	golangci-lint run
+	GOFLAGS="-tags=functional" golangci-lint run
 
 test:
 	$(GOTEST) ./...
