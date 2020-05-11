@@ -299,6 +299,9 @@ type partitionConsumer struct {
 	errors   chan *ConsumerError
 	feeder   chan *FetchResponse
 
+	replicaInited        bool
+	preferredReadReplica int32
+
 	trigger, dying chan none
 	closeOnce      sync.Once
 	topic          string
@@ -359,21 +362,29 @@ func (child *partitionConsumer) dispatcher() {
 	close(child.feeder)
 }
 
+func (child *partitionConsumer) preferedBroker() (*Broker, error) {
+	if child.replicaInited {
+		broker, err := child.consumer.client.Broker(child.preferredReadReplica)
+		if err == nil {
+			return broker, nil
+		}
+	}
+
+	// if prefered replica cannot be found fallback to leader
+	return child.consumer.client.Leader(child.topic, child.partition)
+}
+
 func (child *partitionConsumer) dispatch() error {
 	if err := child.consumer.client.RefreshMetadata(child.topic); err != nil {
 		return err
 	}
-
-	var leader *Broker
+	var node *Broker
 	var err error
-	if leader, err = child.consumer.client.Leader(child.topic, child.partition); err != nil {
+	if node, err = child.preferedBroker(); err != nil {
 		return err
 	}
-
-	child.broker = child.consumer.refBrokerConsumer(leader)
-
+	child.broker = child.consumer.refBrokerConsumer(node)
 	child.broker.input <- child
-
 	return nil
 }
 
@@ -445,7 +456,6 @@ func (child *partitionConsumer) responseFeeder() {
 feederLoop:
 	for response := range child.feeder {
 		msgs, child.responseResult = child.parseResponse(response)
-
 		if child.responseResult == nil {
 			atomic.StoreInt32(&child.retries, 0)
 		}
@@ -480,7 +490,6 @@ feederLoop:
 				}
 			}
 		}
-
 		child.broker.acks.Done()
 	}
 
@@ -616,6 +625,12 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	// we got messages, reset our fetch size in case it was increased for a previous request
 	child.fetchSize = child.conf.Consumer.Fetch.Default
 	atomic.StoreInt64(&child.highWaterMarkOffset, block.HighWaterMarkOffset)
+
+	if response.Version == 11 && len(child.consumer.conf.RackID) > 0 {
+		// we got a valid response with messages. update child's preferredReadReplica from the FetchResponseBlock
+		child.replicaInited = true
+		child.preferredReadReplica = block.PreferredReadReplica
+	}
 
 	// abortedProducerIDs contains producerID which message should be ignored as uncommitted
 	// - producerID are added when the partitionConsumer iterate over the offset at which an aborted transaction begins (abortedTransaction.FirstOffset)
@@ -815,10 +830,16 @@ func (bc *brokerConsumer) handleResponses() {
 	for child := range bc.subscriptions {
 		result := child.responseResult
 		child.responseResult = nil
-
 		switch result {
 		case nil:
-			// no-op
+			if !child.replicaInited {
+				return
+			}
+			if bc.broker.ID() != child.preferredReadReplica {
+				// not an error but needs redispatching to consume from prefered replica
+				child.trigger <- none{}
+				delete(bc.subscriptions, child)
+			}
 		case errTimedOut:
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because consuming was taking too long\n",
 				bc.broker.ID(), child.topic, child.partition)
@@ -834,6 +855,7 @@ func (bc *brokerConsumer) handleResponses() {
 			// not an error, but does need redispatching
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because %s\n",
 				bc.broker.ID(), child.topic, child.partition, result)
+			child.replicaInited = false
 			child.trigger <- none{}
 			delete(bc.subscriptions, child)
 		default:

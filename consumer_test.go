@@ -618,6 +618,73 @@ func TestConsumeMessageWithSessionIDs(t *testing.T) {
 	}
 }
 
+func TestConsumeMessagesFromReadReplica(t *testing.T) {
+	// Given
+	fetchResponse1 := &FetchResponse{Version: 11}
+	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
+	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 2)
+	block1 := fetchResponse1.GetBlock("my_topic", 0)
+	block1.PreferredReadReplica = 1
+
+	fetchResponse2 := &FetchResponse{Version: 11}
+	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 3)
+	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 4)
+	block2 := fetchResponse2.GetBlock("my_topic", 0)
+	block2.PreferredReadReplica = 1
+
+	cfg := NewConfig()
+	cfg.Version = V2_3_0_0
+	cfg.RackID = "consumer_rack"
+
+	leader := NewMockBroker(t, 0)
+	broker0 := NewMockBroker(t, 1)
+
+	leader.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetBroker(leader.Addr(), leader.BrokerID()).
+			SetLeader("my_topic", 0, leader.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetVersion(1).
+			SetOffset("my_topic", 0, OffsetNewest, 1234).
+			SetOffset("my_topic", 0, OffsetOldest, 0),
+		"FetchRequest": NewMockSequence(fetchResponse1),
+	})
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetBroker(leader.Addr(), leader.BrokerID()).
+			SetLeader("my_topic", 0, leader.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetVersion(1).
+			SetOffset("my_topic", 0, OffsetNewest, 1234).
+			SetOffset("my_topic", 0, OffsetOldest, 0),
+		"FetchRequest": NewMockSequence(fetchResponse2),
+	})
+
+	master, err := NewConsumer([]string{broker0.Addr()}, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// When
+	consumer, err := master.ConsumePartition("my_topic", 0, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assertMessageOffset(t, <-consumer.Messages(), 1)
+	assertMessageOffset(t, <-consumer.Messages(), 2)
+	assertMessageOffset(t, <-consumer.Messages(), 3)
+	assertMessageOffset(t, <-consumer.Messages(), 4)
+
+	safeClose(t, consumer)
+	safeClose(t, master)
+	broker0.Close()
+	leader.Close()
+}
+
 // It is fine if offsets of fetched messages are not sequential (although
 // strictly increasing!).
 func TestConsumerNonSequentialOffsets(t *testing.T) {

@@ -545,6 +545,42 @@ func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 	}
 }
 
+func TestClientGetBroker(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 5)
+
+	metadataResponse1 := new(MetadataResponse)
+	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse1.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse1)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	broker, err := client.Broker(leader.BrokerID())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if broker.Addr() != leader.Addr() {
+		t.Errorf("Expected broker to have address %s, found %s", leader.Addr(), broker.Addr())
+	}
+
+	metadataResponse2 := new(MetadataResponse)
+	metadataResponse2.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse2)
+
+	if err := client.RefreshMetadata(); err != nil {
+		t.Error(err)
+	}
+	broker, err = client.Broker(leader.BrokerID())
+	if err != ErrBrokerNotFound {
+		t.Errorf("Expected Broker(brokerID) to return %v found %v", ErrBrokerNotFound, err)
+	}
+}
+
 func TestClientResurrectDeadSeeds(t *testing.T) {
 	initialSeed := NewMockBroker(t, 0)
 	emptyMetadata := new(MetadataResponse)
