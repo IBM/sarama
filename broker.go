@@ -162,29 +162,11 @@ func (b *Broker) Open(conf *Config) error {
 			atomic.StoreInt32(&b.opened, 0)
 			return
 		}
-
 		if conf.Net.TLS.Enable {
-			Logger.Printf("Using tls")
-			cfg := conf.Net.TLS.Config
-			if cfg == nil {
-				cfg = &tls.Config{}
-			}
-			// If no ServerName is set, infer the ServerName
-			// from the hostname we're connecting to.
-			// Gets the hostname as tls.DialWithDialer does it.
-			if cfg.ServerName == "" {
-				colonPos := strings.LastIndex(b.addr, ":")
-				if colonPos == -1 {
-					colonPos = len(b.addr)
-				}
-				hostname := b.addr[:colonPos]
-				cfg.ServerName = hostname
-			}
-			b.conn = tls.Client(b.conn, cfg)
+			b.conn = tls.Client(b.conn, validServerNameTLS(b.addr, conf.Net.TLS.Config))
 		}
 
 		b.conn = newBufConn(b.conn)
-
 		b.conf = conf
 
 		// Create or reuse the global metrics shared between brokers
@@ -1439,4 +1421,26 @@ func (b *Broker) registerCounter(name string) metrics.Counter {
 	nameForBroker := getMetricNameForBroker(name, b)
 	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
 	return metrics.GetOrRegisterCounter(nameForBroker, b.conf.MetricRegistry)
+}
+
+func validServerNameTLS(addr string, conf *tls.Config) *tls.Config {
+	cfg := conf
+	if cfg == nil {
+		cfg = &tls.Config{}
+	}
+	// If no ServerName is set, infer the ServerName
+	// from the hostname we're connecting to.
+	// Gets the hostname as tls.DialWithDialer does it.
+	if cfg.ServerName == "" {
+		colonPos := strings.LastIndex(addr, ":")
+		if colonPos == -1 {
+			colonPos = len(addr)
+		}
+		hostname := addr[:colonPos]
+		// Make a copy to avoid polluting argument or default.
+		c := cfg.Clone()
+		c.ServerName = hostname
+		cfg = c
+	}
+	return cfg
 }

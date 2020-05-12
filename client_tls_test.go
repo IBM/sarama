@@ -210,3 +210,18 @@ func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientCon
 		}
 	}
 }
+
+func TestSetServerName(t *testing.T) {
+	if validServerNameTLS("kafka-server.domain.com", nil).ServerName != "kafka-server.domain.com" {
+		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config is nil")
+	}
+
+	if validServerNameTLS("kafka-server.domain.com", &tls.Config{}).ServerName != "kafka-server.domain.com" {
+		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config ServerName is not provided")
+	}
+
+	c := &tls.Config{ServerName: "kafka-server-other.domain.com"}
+	if validServerNameTLS("", c).ServerName != "kafka-server-other.domain.com" {
+		t.Fatal("Expected kafka-server-other.domain.com as tls.ServerName when tls config ServerName is provided")
+	}
+}
