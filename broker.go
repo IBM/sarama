@@ -1427,14 +1427,15 @@ func validServerNameTLS(addr string, cfg *tls.Config) *tls.Config {
 	if cfg == nil {
 		cfg = &tls.Config{}
 	}
-	if cfg.ServerName == "" {
-		c := cfg.Clone()
-		sn, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			Logger.Println(fmt.Errorf("failed to get ServerName from addr %w", err))
-		}
-		c.ServerName = sn
-		cfg = c
+	if cfg.ServerName != "" {
+		return cfg
 	}
-	return cfg
+
+	c := cfg.Clone()
+	sn, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		Logger.Println(fmt.Errorf("failed to get ServerName from addr %w", err))
+	}
+	c.ServerName = sn
+	return c
 }
