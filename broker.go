@@ -1423,23 +1423,17 @@ func (b *Broker) registerCounter(name string) metrics.Counter {
 	return metrics.GetOrRegisterCounter(nameForBroker, b.conf.MetricRegistry)
 }
 
-func validServerNameTLS(addr string, conf *tls.Config) *tls.Config {
-	cfg := conf
+func validServerNameTLS(addr string, cfg *tls.Config) *tls.Config {
 	if cfg == nil {
 		cfg = &tls.Config{}
 	}
-	// If no ServerName is set, infer the ServerName
-	// from the hostname we're connecting to.
-	// Gets the hostname as tls.DialWithDialer does it.
 	if cfg.ServerName == "" {
-		colonPos := strings.LastIndex(addr, ":")
-		if colonPos == -1 {
-			colonPos = len(addr)
-		}
-		hostname := addr[:colonPos]
-		// Make a copy to avoid polluting argument or default.
 		c := cfg.Clone()
-		c.ServerName = hostname
+		sn, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			Logger.Println(fmt.Errorf("failed to get ServerName from addr %w", err))
+		}
+		c.ServerName = sn
 		cfg = c
 	}
 	return cfg
