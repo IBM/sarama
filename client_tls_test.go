@@ -210,3 +210,22 @@ func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientCon
 		}
 	}
 }
+
+func TestSetServerName(t *testing.T) {
+	if validServerNameTLS("kafka-server.domain.com:9093", nil).ServerName != "kafka-server.domain.com" {
+		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config is nil")
+	}
+
+	if validServerNameTLS("kafka-server.domain.com:9093", &tls.Config{}).ServerName != "kafka-server.domain.com" {
+		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config ServerName is not provided")
+	}
+
+	c := &tls.Config{ServerName: "kafka-server-other.domain.com"}
+	if validServerNameTLS("", c).ServerName != "kafka-server-other.domain.com" {
+		t.Fatal("Expected kafka-server-other.domain.com as tls.ServerName when tls config ServerName is provided")
+	}
+
+	if validServerNameTLS("host-no-port", nil).ServerName != "" {
+		t.Fatal("Expected empty ServerName as the broker addr is missing the port")
+	}
+}
