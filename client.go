@@ -44,6 +44,10 @@ type Client interface {
 	// topic/partition, as determined by querying the cluster metadata.
 	Leader(topic string, partitionID int32) (*Broker, error)
 
+	// RefreshBrokers refresh broker list of this client, and it removes
+	// brokers went missing.
+	RefreshBrokers()
+
 	// Replicas returns the set of all replica IDs for the given partition.
 	Replicas(topic string, partitionID int32) ([]int32, error)
 
@@ -427,6 +431,29 @@ func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
 	}
 
 	return leader, err
+}
+
+func (client *client) RefreshBrokers() {
+	var wg = sync.WaitGroup{}
+
+	refresh := func(broker *Broker) {
+		defer wg.Done()
+
+		err := broker.Open(client.conf)
+		if err != nil {
+			Logger.Println("Error on open broker:", err)
+		}
+		rs, _ := broker.Connected()
+		if !rs {
+			client.deregisterBroker(broker)
+		}
+	}
+	for _, broker := range client.brokers {
+		wg.Add(1)
+		go refresh(broker)
+	}
+
+	wg.Wait()
 }
 
 func (client *client) RefreshMetadata(topics ...string) error {

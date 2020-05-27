@@ -545,6 +545,30 @@ func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 	}
 }
 
+func TestRefreshBrokersOffline(t *testing.T) {
+	leader := NewMockBroker(t, 1)
+	brokerMissing := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddBroker(brokerMissing.Addr(), brokerMissing.BrokerID())
+	brokerMissing.Returns(metadataResponse)
+
+	client, err := NewClient([]string{brokerMissing.Addr()}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(client.Brokers()) != 2 {
+		t.Error("Meta broker is not 2")
+	}
+
+	brokerMissing.Close()
+	client.RefreshBrokers()
+	if len(client.Brokers()) != 1 {
+		t.Error("Meta broker is not 1")
+	}
+}
+
 func TestClientResurrectDeadSeeds(t *testing.T) {
 	initialSeed := NewMockBroker(t, 0)
 	emptyMetadata := new(MetadataResponse)
