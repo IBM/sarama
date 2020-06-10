@@ -535,6 +535,7 @@ func (pp *partitionProducer) dispatch() {
 		}
 	}()
 
+	leaderRetries := 0
 	for msg := range pp.input {
 		if pp.brokerProducer != nil && pp.brokerProducer.abandoned != nil {
 			select {
@@ -580,9 +581,12 @@ func (pp *partitionProducer) dispatch() {
 		if pp.brokerProducer == nil {
 			if err := pp.updateLeader(); err != nil {
 				pp.parent.returnError(msg, err)
-				pp.backoff(msg.retries)
+				pp.backoff(leaderRetries)
+				leaderRetries++
 				continue
 			}
+			// On success, reset the retry count to 0.
+			leaderRetries = 0
 			Logger.Printf("producer/leader/%s/%d selected broker %d\n", pp.topic, pp.partition, pp.leader.ID())
 		}
 
