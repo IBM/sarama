@@ -2151,7 +2151,7 @@ func verifyValidityAndBalance(t *testing.T, consumers map[string]ConsumerGroupMe
 		for assignedTopic := range plan[memberID] {
 			found := false
 			for _, assignableTopic := range consumers[memberID].Topics {
-				if assignableTopic == assignableTopic {
+				if assignedTopic == assignableTopic {
 					found = true
 					break
 				}
