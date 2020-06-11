@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1228,6 +1229,126 @@ func TestBrokerProducerShutdown(t *testing.T) {
 	bp.shutdown()
 	_ = producer.Close()
 	mockBroker.Close()
+}
+
+type appendInterceptor struct {
+	i int
+}
+
+func (b *appendInterceptor) onSend(msg *ProducerMessage) {
+	if b.i < 0 {
+		panic("hey, the interceptor have failed")
+	}
+	v, _ := msg.Value.Encode()
+	msg.Value = StringEncoder(string(v) + strconv.Itoa(b.i))
+	b.i++
+}
+
+func (b *appendInterceptor) onConsume(msg *ConsumerMessage) {
+	if b.i < 0 {
+		panic("hey, the interceptor have failed")
+	}
+	msg.Value = []byte(string(msg.Value) + strconv.Itoa(b.i))
+	b.i++
+}
+
+func testProducerInterceptor(
+	t *testing.T,
+	interceptors []ProducerInterceptor,
+	expectationFn func(*testing.T, int, *ProducerMessage),
+) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataLeader)
+
+	config := NewConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.Return.Successes = true
+	config.Producer.Interceptors = interceptors
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case msg := <-producer.Successes():
+			expectationFn(t, i, msg)
+		}
+	}
+
+	closeProducer(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
+func TestAsyncProducerInterceptors(t *testing.T) {
+	tests := []struct {
+		name          string
+		interceptors  []ProducerInterceptor
+		expectationFn func(*testing.T, int, *ProducerMessage)
+	}{
+		{
+			name:         "intercept messages",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: 0}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage + strconv.Itoa(i)
+				if string(v) != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+1000)
+				if string(v) != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain with one interceptor failing",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: 1000}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage + strconv.Itoa(i+1000)
+				if string(v) != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain with all interceptors failing",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage
+				if string(v) != expected {
+					t.Errorf("Interceptor should have not changed the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { testProducerInterceptor(t, tt.interceptors, tt.expectationFn) })
+	}
 }
 
 // This example shows how to use the producer while simultaneously
