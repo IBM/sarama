@@ -31,6 +31,13 @@ func TestFuncProducingSnappy(t *testing.T) {
 	testProducingMessages(t, config)
 }
 
+func TestFuncProducingZstd(t *testing.T) {
+	config := NewConfig()
+	config.Version = V2_1_0_0
+	config.Producer.Compression = CompressionZSTD
+	testProducingMessages(t, config)
+}
+
 func TestFuncProducingNoResponse(t *testing.T) {
 	config := NewConfig()
 	config.Producer.RequiredAcks = NoResponse
