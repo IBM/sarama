@@ -526,6 +526,54 @@ func TestConsumerReceivingFetchResponseWithTooOldRecords(t *testing.T) {
 	broker0.Close()
 }
 
+func TestConsumerSelector(t *testing.T) {
+	broker0 := NewMockBroker(t, 0)
+	broker1 := NewMockBroker(t, 1)
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetNewest, 10).
+			SetOffset("my_topic", 0, OffsetOldest, 7),
+		"FetchRequest": NewMockFetchResponse(t, 1).
+			SetMessage("my_topic", 0, 9, testMsg).
+			SetMessage("my_topic", 0, 10, testMsg).
+			SetMessage("my_topic", 0, 11, testMsg).
+			SetHighWaterMark("my_topic", 0, 14),
+	})
+	broker1.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker1.Addr(), broker1.BrokerID()).
+			SetLeader("my_topic", 0, broker1.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetNewest, 10).
+			SetOffset("my_topic", 0, OffsetOldest, 7),
+		"FetchRequest": NewMockFetchResponse(t, 1).
+			SetMessage("my_topic", 0, 9, testMsg).
+			SetMessage("my_topic", 0, 10, testMsg).
+			SetMessage("my_topic", 0, 11, testMsg).
+			SetHighWaterMark("my_topic", 0, 14),
+	})
+
+	cfg := NewConfig()
+	cfg.Consumer.ReplicaSelector = func(topic string, partition int32, client Client) (*Broker, error) {
+		return client.Broker(1)
+	}
+	master, err := NewConsumer([]string{broker0.Addr(),broker1.Addr()}, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// When
+	consumer, err := master.ConsumePartition("my_topic", 0, OffsetNewest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if id := consumer.(*partitionConsumer).broker.broker.id; id != 1 {t.Fatalf("Unexpected broker id %v", id)}
+}
+
 func TestConsumeMessageWithNewerFetchAPIVersion(t *testing.T) {
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 4}

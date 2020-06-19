@@ -391,6 +391,10 @@ type Config struct {
 		// 	- use `ReadUncommitted` (default) to consume and return all messages in message channel
 		//	- use `ReadCommitted` to hide messages that are part of an aborted transaction
 		IsolationLevel IsolationLevel
+
+		// Called to select the consumer's replica dynamically. Defaults to the
+		// partition leader.
+		ReplicaSelector func(topic string, partition int32, client Client) (*Broker, error)
 	}
 
 	// A user-provided string sent with every request to the brokers for logging,
