@@ -247,7 +247,7 @@ func TestInterceptors(t *testing.T) {
 			// consumer interceptor: strconv.Itoa(i+20)
 			expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+100) + strconv.Itoa(i+20)
 			v := string(msg.Value)
-			if string(v) != expected {
+			if v != expected {
 				t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
 			}
 		}

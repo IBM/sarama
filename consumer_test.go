@@ -1406,7 +1406,7 @@ func TestConsumerInterceptors(t *testing.T) {
 				ev, _ := testMsg.Encode()
 				expected := string(ev) + strconv.Itoa(i)
 				v := string(msg.Value)
-				if string(v) != expected {
+				if v != expected {
 					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
 				}
 			},
@@ -1418,7 +1418,7 @@ func TestConsumerInterceptors(t *testing.T) {
 				ev, _ := testMsg.Encode()
 				expected := string(ev) + strconv.Itoa(i) + strconv.Itoa(i+1000)
 				v := string(msg.Value)
-				if string(v) != expected {
+				if v != expected {
 					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
 				}
 			},
@@ -1430,7 +1430,7 @@ func TestConsumerInterceptors(t *testing.T) {
 				ev, _ := testMsg.Encode()
 				expected := string(ev) + strconv.Itoa(i+1000)
 				v := string(msg.Value)
-				if string(v) != expected {
+				if v != expected {
 					t.Errorf("Interceptor should have not changed the value, got %s, expected %s", v, expected)
 				}
 			},
@@ -1442,7 +1442,7 @@ func TestConsumerInterceptors(t *testing.T) {
 				ev, _ := testMsg.Encode()
 				expected := string(ev)
 				v := string(msg.Value)
-				if string(v) != expected {
+				if v != expected {
 					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
 				}
 			},
