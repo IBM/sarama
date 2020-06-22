@@ -243,9 +243,9 @@ func TestInterceptors(t *testing.T) {
 		case err := <-consumer.Errors():
 			t.Error(err)
 		case msg := <-consumer.Messages():
-			// producer interceptors: strconv.Itoa(i) + strconv.Itoa(i+100)
-			// consumer interceptor: strconv.Itoa(i+20)
-			expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+100) + strconv.Itoa(i+20)
+			prodInteExpectation := strconv.Itoa(i) + strconv.Itoa(i+100)
+			consInteExpectation := strconv.Itoa(i + 20)
+			expected := TestMessage + prodInteExpectation + consInteExpectation
 			v := string(msg.Value)
 			if v != expected {
 				t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
