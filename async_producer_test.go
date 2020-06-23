@@ -1237,7 +1237,7 @@ type appendInterceptor struct {
 
 func (b *appendInterceptor) onSend(msg *ProducerMessage) {
 	if b.i < 0 {
-		panic("hey, the interceptor have failed")
+		panic("hey, the interceptor has failed")
 	}
 	v, _ := msg.Value.Encode()
 	msg.Value = StringEncoder(string(v) + strconv.Itoa(b.i))
@@ -1246,7 +1246,7 @@ func (b *appendInterceptor) onSend(msg *ProducerMessage) {
 
 func (b *appendInterceptor) onConsume(msg *ConsumerMessage) {
 	if b.i < 0 {
-		panic("hey, the interceptor have failed")
+		panic("hey, the interceptor has failed")
 	}
 	msg.Value = []byte(string(msg.Value) + strconv.Itoa(b.i))
 	b.i++
