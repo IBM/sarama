@@ -513,6 +513,11 @@ type ConsumerGroupSession interface {
 	// message twice, and your processing should ideally be idempotent.
 	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
+	// Commit the offset to the backend
+	//
+	// Note: calling Commit performs a blocking synchronous operation.
+	Commit()
+
 	// ResetOffset resets to the provided offset, alongside a metadata string that
 	// represents the state of the partition consumer at that point in time. Reset
 	// acts as a counterpart to MarkOffset, the difference being that it allows to
@@ -622,6 +627,10 @@ func (s *consumerGroupSession) MarkOffset(topic string, partition int32, offset 
 	if pom := s.offsets.findPOM(topic, partition); pom != nil {
 		pom.MarkOffset(offset, metadata)
 	}
+}
+
+func (s *consumerGroupSession) Commit() {
+	s.offsets.Commit()
 }
 
 func (s *consumerGroupSession) ResetOffset(topic string, partition int32, offset int64, metadata string) {
