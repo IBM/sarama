@@ -153,11 +153,6 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 		env.KafkaBrokerAddrs = append(env.KafkaBrokerAddrs, fmt.Sprintf("127.0.0.1:%d", 29090+i))
 	}
 
-	// the mapping of confluent platform docker image vesions -> kafka versions can be
-	// found here: https://docs.confluent.io/current/installation/versions-interoperability.html
-	// We have cp-5.5.0 in the docker-compose file, so that's kafka 2.5.0.
-	env.KafkaVersion = "2.5.0"
-
 	// Wait for the kafka broker to come up
 	allBrokersUp := false
 	for i := 0; i < 45 && !allBrokersUp; i++ {
