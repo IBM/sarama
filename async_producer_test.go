@@ -1235,7 +1235,7 @@ type appendInterceptor struct {
 	i int
 }
 
-func (b *appendInterceptor) onSend(msg *ProducerMessage) {
+func (b *appendInterceptor) OnSend(msg *ProducerMessage) {
 	if b.i < 0 {
 		panic("hey, the interceptor has failed")
 	}
@@ -1244,7 +1244,7 @@ func (b *appendInterceptor) onSend(msg *ProducerMessage) {
 	b.i++
 }
 
-func (b *appendInterceptor) onConsume(msg *ConsumerMessage) {
+func (b *appendInterceptor) OnConsume(msg *ConsumerMessage) {
 	if b.i < 0 {
 		panic("hey, the interceptor has failed")
 	}

@@ -5,10 +5,10 @@ package sarama
 // https://cwiki.apache.org/confluence/display/KAFKA/KIP-42%3A+Add+Producer+and+Consumer+Interceptors#KIP42:AddProducerandConsumerInterceptors-Motivation
 type ProducerInterceptor interface {
 
-	// onSend is called when the producer message is intercepted. Please avoid
+	// OnSend is called when the producer message is intercepted. Please avoid
 	// modifying the message until it's safe to do so, as this is _not_ a copy
 	// of the message.
-	onSend(*ProducerMessage)
+	OnSend(*ProducerMessage)
 }
 
 // ConsumerInterceptor allows you to intercept (and possibly mutate) the records
@@ -16,10 +16,10 @@ type ProducerInterceptor interface {
 // https://cwiki.apache.org/confluence/display/KAFKA/KIP-42%3A+Add+Producer+and+Consumer+Interceptors#KIP42:AddProducerandConsumerInterceptors-Motivation
 type ConsumerInterceptor interface {
 
-	// onConsume is called when the consumed message is intercepted. Please
+	// OnConsume is called when the consumed message is intercepted. Please
 	// avoid modifying the message until it's safe to do so, as this is _not_ a
 	// copy of the message.
-	onConsume(*ConsumerMessage)
+	OnConsume(*ConsumerMessage)
 }
 
 func (msg *ProducerMessage) safelyApplyInterceptor(interceptor ProducerInterceptor) {
@@ -29,7 +29,7 @@ func (msg *ProducerMessage) safelyApplyInterceptor(interceptor ProducerIntercept
 		}
 	}()
 
-	interceptor.onSend(msg)
+	interceptor.OnSend(msg)
 }
 
 func (msg *ConsumerMessage) safelyApplyInterceptor(interceptor ConsumerInterceptor) {
@@ -39,5 +39,5 @@ func (msg *ConsumerMessage) safelyApplyInterceptor(interceptor ConsumerIntercept
 		}
 	}()
 
-	interceptor.onConsume(msg)
+	interceptor.OnConsume(msg)
 }

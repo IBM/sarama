@@ -234,7 +234,7 @@ type Config struct {
 		// message for the first time. Interceptors allows to intercept and
 		// possible mutate the message before they are published to Kafka
 		// cluster. *ProducerMessage modified by the first interceptor's
-		// onSend() is passed to the second interceptor onSend(), and so on in
+		// OnSend() is passed to the second interceptor OnSend(), and so on in
 		// the interceptor chain.
 		Interceptors []ProducerInterceptor
 	}
@@ -403,8 +403,8 @@ type Config struct {
 		// Interceptors to be called just before the record is sent to the
 		// messages channel. Interceptors allows to intercept and possible
 		// mutate the message before they are returned to the client.
-		// *ConsumerMessage modified by the first interceptor's onConsume() is
-		// passed to the second interceptor onConsume(), and so on in the
+		// *ConsumerMessage modified by the first interceptor's OnConsume() is
+		// passed to the second interceptor OnConsume(), and so on in the
 		// interceptor chain.
 		Interceptors []ConsumerInterceptor
 	}
