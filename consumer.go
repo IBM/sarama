@@ -146,14 +146,8 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 
 	var replica *Broker
 	var err error
-	if c.conf.Consumer.ReplicaSelector == nil {
-		if replica, err = c.client.Leader(child.topic, child.partition); err != nil {
-			return nil, err
-		}
-	} else {
-		if replica, err = c.conf.Consumer.ReplicaSelector(child.topic, child.partition, c.client); err != nil {
-			return nil, err
-		}
+	if replica, err = c.conf.Consumer.ReplicaSelector(topic, partition, c.client); err != nil {
+		return nil, err
 	}
 
 	if err := c.addChild(child); err != nil {
@@ -372,14 +366,8 @@ func (child *partitionConsumer) dispatch() error {
 
 	var replica *Broker
 	var err error
-	if child.conf.Consumer.ReplicaSelector == nil {
-		if replica, err = child.consumer.client.Leader(child.topic, child.partition); err != nil {
-			return err
-		}
-	} else {
-		if replica, err = child.conf.Consumer.ReplicaSelector(child.topic, child.partition, child.consumer.client); err != nil {
-			return err
-		}
+	if replica, err = child.conf.Consumer.ReplicaSelector(child.topic, child.partition, child.consumer.client); err != nil {
+		return err
 	}
 
 	child.broker = child.consumer.refBrokerConsumer(replica)

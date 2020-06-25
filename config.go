@@ -471,6 +471,9 @@ func NewConfig() *Config {
 	c.Consumer.Group.Rebalance.Timeout = 60 * time.Second
 	c.Consumer.Group.Rebalance.Retry.Max = 4
 	c.Consumer.Group.Rebalance.Retry.Backoff = 2 * time.Second
+	c.Consumer.ReplicaSelector = func(topic string, partition int32, client Client) (*Broker, error) {
+	  return client.Leader(topic, partition)
+	}
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
