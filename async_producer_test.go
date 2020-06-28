@@ -1248,7 +1248,7 @@ func ExampleAsyncProducer_select() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
-	var enqueued, errors int
+	var enqueued, producerError int
 ProducerLoop:
 	for {
 		select {
@@ -1256,13 +1256,13 @@ ProducerLoop:
 			enqueued++
 		case err := <-producer.Errors():
 			log.Println("Failed to produce message", err)
-			errors++
+			producerError++
 		case <-signals:
 			break ProducerLoop
 		}
 	}
 
-	log.Printf("Enqueued: %d; errors: %d\n", enqueued, errors)
+	log.Printf("Enqueued: %d; producerError: %d\n", enqueued, producerError)
 }
 
 // This example shows how to use the producer with separate goroutines
@@ -1282,8 +1282,8 @@ func ExampleAsyncProducer_goroutines() {
 	signal.Notify(signals, os.Interrupt)
 
 	var (
-		wg                          sync.WaitGroup
-		enqueued, successes, errors int
+		wg                                 sync.WaitGroup
+		enqueued, successes, producerError int
 	)
 
 	wg.Add(1)
@@ -1299,7 +1299,7 @@ func ExampleAsyncProducer_goroutines() {
 		defer wg.Done()
 		for err := range producer.Errors() {
 			log.Println(err)
-			errors++
+			producerError++
 		}
 	}()
 
@@ -1318,5 +1318,5 @@ ProducerLoop:
 
 	wg.Wait()
 
-	log.Printf("Successfully produced: %d; errors: %d\n", successes, errors)
+	log.Printf("Successfully produced: %d; producerError: %d\n", successes, producerError)
 }

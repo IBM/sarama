@@ -690,11 +690,11 @@ func sortPartitionsByPotentialConsumerAssignments(partition2AllPotentialConsumer
 }
 
 func deepCopyAssignment(assignment map[string][]topicPartitionAssignment) map[string][]topicPartitionAssignment {
-	copy := make(map[string][]topicPartitionAssignment, len(assignment))
+	m := make(map[string][]topicPartitionAssignment, len(assignment))
 	for memberID, subscriptions := range assignment {
-		copy[memberID] = append(subscriptions[:0:0], subscriptions...)
+		m[memberID] = append(subscriptions[:0:0], subscriptions...)
 	}
-	return copy
+	return m
 }
 
 func areSubscriptionsIdentical(partition2AllPotentialConsumers map[topicPartitionAssignment][]string, consumer2AllPotentialPartitions map[string][]topicPartitionAssignment) bool {
