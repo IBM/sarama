@@ -194,7 +194,7 @@ func TestInterceptors(t *testing.T) {
 	config.Producer.Interceptors = []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 100}}
 	config.Consumer.Interceptors = []ConsumerInterceptor{&appendInterceptor{i: 20}}
 
-	client, err := NewClient(kafkaBrokers, config)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
