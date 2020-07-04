@@ -505,11 +505,9 @@ func (pom *partitionOffsetManager) MarkOffset(offset int64, metadata string) {
 	pom.lock.Lock()
 	defer pom.lock.Unlock()
 
-	if offset > pom.offset {
-		pom.offset = offset
-		pom.metadata = metadata
-		pom.dirty = true
-	}
+	pom.offset = offset
+	pom.metadata = metadata
+	pom.dirty = true
 }
 
 func (pom *partitionOffsetManager) ResetOffset(offset int64, metadata string) {
