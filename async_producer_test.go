@@ -1282,7 +1282,7 @@ func ExampleAsyncProducer_goroutines() {
 	signal.Notify(signals, os.Interrupt)
 
 	var (
-		wg                                 sync.WaitGroup
+		wg                                  sync.WaitGroup
 		enqueued, successes, producerErrors int
 	)
 
