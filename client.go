@@ -788,7 +788,7 @@ func (client *client) backgroundMetadataUpdater() {
 }
 
 func (client *client) refreshMetadata() error {
-	topics := []string{}
+	var topics []string
 
 	if !client.conf.Metadata.Full {
 		if specificTopics, err := client.MetadataTopics(); err != nil {
