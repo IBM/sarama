@@ -14,7 +14,7 @@ require (
 	github.com/google/go-cmp v0.4.1 // indirect
 	github.com/hashicorp/go-uuid v1.0.2 // indirect
 	github.com/jcmturner/gofork v1.0.0
-	github.com/klauspost/compress v1.10.7
+	github.com/klauspost/compress v1.10.10
 	github.com/kr/text v0.2.0 // indirect
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible
