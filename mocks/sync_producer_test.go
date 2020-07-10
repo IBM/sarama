@@ -161,6 +161,13 @@ func TestSyncProducerWithCheckerFunctionForSendMessagesWithoutError(t *testing.T
 		t.Error("No error expected on SendMessages call, found: ", err)
 	}
 
+	for i, msg := range msgs {
+		offset := int64(i + 1)
+		if offset != msg.Offset {
+			t.Errorf("The message should have been assigned offset %d, but got %d", offset, msg.Offset)
+		}
+	}
+
 	if err := sp.Close(); err != nil {
 		t.Error(err)
 	}
