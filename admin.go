@@ -802,7 +802,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 	// Query brokers in parallel, since we have to query *all* brokers
 	brokers := ca.client.Brokers()
 	groupMaps := make(chan map[string]string, len(brokers))
-	errors := make(chan error, len(brokers))
+	errChan := make(chan error, len(brokers))
 	wg := sync.WaitGroup{}
 
 	for _, b := range brokers {
@@ -813,7 +813,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 
 			response, err := b.ListGroups(&ListGroupsRequest{})
 			if err != nil {
-				errors <- err
+				errChan <- err
 				return
 			}
 
@@ -828,7 +828,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 
 	wg.Wait()
 	close(groupMaps)
-	close(errors)
+	close(errChan)
 
 	for groupMap := range groupMaps {
 		for group, protocolType := range groupMap {
@@ -837,7 +837,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 	}
 
 	// Intentionally return only the first error for simplicity
-	err = <-errors
+	err = <-errChan
 	return
 }
 
@@ -893,7 +893,7 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 
 	// Query brokers in parallel, since we may have to query multiple brokers
 	logDirsMaps := make(chan map[int32][]DescribeLogDirsResponseDirMetadata, len(brokerIds))
-	errors := make(chan error, len(brokerIds))
+	errChan := make(chan error, len(brokerIds))
 	wg := sync.WaitGroup{}
 
 	for _, b := range brokerIds {
@@ -909,7 +909,7 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 
 			response, err := b.DescribeLogDirs(&DescribeLogDirsRequest{})
 			if err != nil {
-				errors <- err
+				errChan <- err
 				return
 			}
 			logDirs := make(map[int32][]DescribeLogDirsResponseDirMetadata)
@@ -920,7 +920,7 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 
 	wg.Wait()
 	close(logDirsMaps)
-	close(errors)
+	close(errChan)
 
 	for logDirsMap := range logDirsMaps {
 		for id, logDirs := range logDirsMap {
@@ -929,6 +929,6 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 	}
 
 	// Intentionally return only the first error for simplicity
-	err = <-errors
+	err = <-errChan
 	return
 }
