@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1340,5 +1341,114 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 				t.Errorf("partitionConsumer.parseResponse() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func testConsumerInterceptor(
+	t *testing.T,
+	interceptors []ConsumerInterceptor,
+	expectationFn func(*testing.T, int, *ConsumerMessage),
+) {
+	// Given
+	broker0 := NewMockBroker(t, 0)
+
+	mockFetchResponse := NewMockFetchResponse(t, 1)
+	for i := 0; i < 10; i++ {
+		mockFetchResponse.SetMessage("my_topic", 0, int64(i), testMsg)
+	}
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetOldest, 0).
+			SetOffset("my_topic", 0, OffsetNewest, 0),
+		"FetchRequest": mockFetchResponse,
+	})
+	config := NewConfig()
+	config.Consumer.Interceptors = interceptors
+	// When
+	master, err := NewConsumer([]string{broker0.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-consumer.Messages():
+			expectationFn(t, i, msg)
+		case err := <-consumer.Errors():
+			t.Error(err)
+		}
+	}
+
+	safeClose(t, consumer)
+	safeClose(t, master)
+	broker0.Close()
+}
+
+func TestConsumerInterceptors(t *testing.T) {
+	tests := []struct {
+		name          string
+		interceptors  []ConsumerInterceptor
+		expectationFn func(*testing.T, int, *ConsumerMessage)
+	}{
+		{
+			name:         "intercept messages",
+			interceptors: []ConsumerInterceptor{&appendInterceptor{i: 0}},
+			expectationFn: func(t *testing.T, i int, msg *ConsumerMessage) {
+				ev, _ := testMsg.Encode()
+				expected := string(ev) + strconv.Itoa(i)
+				v := string(msg.Value)
+				if v != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain",
+			interceptors: []ConsumerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}},
+			expectationFn: func(t *testing.T, i int, msg *ConsumerMessage) {
+				ev, _ := testMsg.Encode()
+				expected := string(ev) + strconv.Itoa(i) + strconv.Itoa(i+1000)
+				v := string(msg.Value)
+				if v != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain with one interceptor failing",
+			interceptors: []ConsumerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: 1000}},
+			expectationFn: func(t *testing.T, i int, msg *ConsumerMessage) {
+				ev, _ := testMsg.Encode()
+				expected := string(ev) + strconv.Itoa(i+1000)
+				v := string(msg.Value)
+				if v != expected {
+					t.Errorf("Interceptor should have not changed the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain with all interceptors failing",
+			interceptors: []ConsumerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}},
+			expectationFn: func(t *testing.T, i int, msg *ConsumerMessage) {
+				ev, _ := testMsg.Encode()
+				expected := string(ev)
+				v := string(msg.Value)
+				if v != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { testConsumerInterceptor(t, tt.interceptors, tt.expectationFn) })
 	}
 }

@@ -348,6 +348,10 @@ func (p *asyncProducer) dispatcher() {
 			p.inFlight.Add(1)
 		}
 
+		for _, interceptor := range p.conf.Producer.Interceptors {
+			msg.safelyApplyInterceptor(interceptor)
+		}
+
 		version := 1
 		if p.conf.Version.IsAtLeast(V0_11_0_0) {
 			version = 2

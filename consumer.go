@@ -451,6 +451,9 @@ feederLoop:
 		}
 
 		for i, msg := range msgs {
+			for _, interceptor := range child.conf.Consumer.Interceptors {
+				msg.safelyApplyInterceptor(interceptor)
+			}
 		messageSelect:
 			select {
 			case <-child.dying:

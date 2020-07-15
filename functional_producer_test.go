@@ -5,6 +5,7 @@ package sarama
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -181,6 +182,78 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestInterceptors(t *testing.T) {
+	config := NewConfig()
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config.Producer.Return.Successes = true
+	config.Consumer.Return.Errors = true
+	config.Producer.Interceptors = []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 100}}
+	config.Consumer.Interceptors = []ConsumerInterceptor{&appendInterceptor{i: 20}}
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	producer, err := NewAsyncProducerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "test.1", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case msg := <-producer.Successes():
+			v, _ := msg.Value.Encode()
+			expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+100)
+			if string(v) != expected {
+				t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+			}
+		}
+	}
+	safeClose(t, producer)
+
+	master, err := NewConsumerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer, err := master.ConsumePartition("test.1", 0, initialOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case <-time.After(10 * time.Second):
+			t.Fatal("Not received any more events in the last 10 seconds.")
+		case err := <-consumer.Errors():
+			t.Error(err)
+		case msg := <-consumer.Messages():
+			prodInteExpectation := strconv.Itoa(i) + strconv.Itoa(i+100)
+			consInteExpectation := strconv.Itoa(i + 20)
+			expected := TestMessage + prodInteExpectation + consInteExpectation
+			v := string(msg.Value)
+			if v != expected {
+				t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+			}
+		}
+	}
+	safeClose(t, consumer)
+	safeClose(t, client)
 }
 
 func testProducingMessages(t *testing.T, config *Config) {
