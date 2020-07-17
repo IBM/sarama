@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -155,10 +156,17 @@ func (consumer *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 	// Do not move the code below to a goroutine.
 	// The `ConsumeClaim` itself is called within a goroutine, see:
 	// https://github.com/Shopify/sarama/blob/master/consumer_group.go#L27-L29
+	id := goroutineID()
 	for message := range claim.Messages() {
-		log.Printf("Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
+		log.Printf("Message claimed: value = %s, goroutineID = %s, timestamp = %v, topic = %s, partition = %d", string(message.Value), id, message.Timestamp, message.Topic, message.Partition)
 		session.MarkMessage(message, "")
 	}
 
 	return nil
+}
+
+func goroutineID() string {
+	var buf [64]byte
+	n := runtime.Stack(buf[:], false)
+	return strings.Fields(string(buf[:n]))[1]
 }
