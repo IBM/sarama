@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	krbcfg "gopkg.in/jcmturner/gokrb5.v7/config"
-	"gopkg.in/jcmturner/gokrb5.v7/test/testdata"
+	krbcfg "github.com/jcmturner/gokrb5/v8/config"
+	"github.com/jcmturner/gokrb5/v8/test/testdata"
 )
 
 /*
@@ -34,7 +34,7 @@ func TestFaildToCreateKerberosConfig(t *testing.T) {
 }
 
 func TestCreateWithPassword(t *testing.T) {
-	kerberosConfig, err := krbcfg.NewConfigFromString(testdata.TEST_KRB5CONF)
+	kerberosConfig, err := krbcfg.NewFromString(testdata.KRB5_CONF)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +64,7 @@ func TestCreateWithPassword(t *testing.T) {
 }
 
 func TestCreateWithKeyTab(t *testing.T) {
-	kerberosConfig, err := krbcfg.NewConfigFromString(testdata.TEST_KRB5CONF)
+	kerberosConfig, err := krbcfg.NewFromString(testdata.KRB5_CONF)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestCreateWithKeyTab(t *testing.T) {
 }
 
 func TestCreateWithDisablePAFXFAST(t *testing.T) {
-	kerberosConfig, err := krbcfg.NewConfigFromString(testdata.TEST_KRB5CONF)
+	kerberosConfig, err := krbcfg.NewFromString(testdata.KRB5_CONF)
 	if err != nil {
 		t.Fatal(err)
 	}
