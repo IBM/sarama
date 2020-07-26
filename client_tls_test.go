@@ -171,9 +171,6 @@ func TestTLS(t *testing.T) {
 }
 
 func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientConfig *tls.Config) {
-	serverConfig.BuildNameToCertificate()
-	clientConfig.BuildNameToCertificate()
-
 	seedListener, err := tls.Listen("tcp", "127.0.0.1:0", serverConfig)
 	if err != nil {
 		t.Fatal("cannot open listener", err)
