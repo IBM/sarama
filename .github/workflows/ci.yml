@@ -10,7 +10,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.14.x]
-        kafka-version: [2.4.1, 2.5.0]
+        kafka-version: [2.4.1, 2.6.0]
         platform: [ubuntu-latest]
 
     env:
@@ -41,7 +41,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.27.0
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.30.0
         export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
 
     - name: Run test suite
