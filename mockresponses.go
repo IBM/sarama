@@ -177,8 +177,8 @@ func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoderWithHeader
 	}
 
 	// Generate set of replicas
-	replicas := []int32{}
-	offlineReplicas := []int32{}
+	var replicas []int32
+	var offlineReplicas []int32
 	for _, brokerID := range mmr.brokers {
 		replicas = append(replicas, brokerID)
 	}
@@ -772,8 +772,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 		Version: req.Version,
 	}
 
-	includeSynonyms := (req.Version > 0)
-	includeSource := (req.Version > 0)
+	includeSynonyms := req.Version > 0
+	includeSource := req.Version > 0
 
 	for _, r := range req.Resources {
 		var configEntries []*ConfigEntry
@@ -1088,9 +1088,9 @@ func NewMockDescribeLogDirsResponse(t TestReporter) *MockDescribeLogDirsResponse
 }
 
 func (m *MockDescribeLogDirsResponse) SetLogDirs(logDirPath string, topicPartitions map[string]int) *MockDescribeLogDirsResponse {
-	topics := []DescribeLogDirsResponseTopic{}
+	var topics []DescribeLogDirsResponseTopic
 	for topic := range topicPartitions {
-		partitions := []DescribeLogDirsResponsePartition{}
+		var partitions []DescribeLogDirsResponsePartition
 		for i := 0; i < topicPartitions[topic]; i++ {
 			partitions = append(partitions, DescribeLogDirsResponsePartition{
 				PartitionID: int32(i),

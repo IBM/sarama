@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	metrics "github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics"
 )
 
 const TestMessage = "ABC THE MESSAGE"
@@ -92,7 +92,7 @@ func (f flakyEncoder) Length() int {
 }
 
 func (f flakyEncoder) Encode() ([]byte, error) {
-	if !bool(f) {
+	if !f {
 		return nil, errors.New("flaky encoding error")
 	}
 	return []byte(TestMessage), nil
