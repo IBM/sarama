@@ -8,3 +8,6 @@ In these examples, we use `github.com/Shopify/sarama` as import path. We do this
 
 [http_server](./http_server) is a simple HTTP server uses both the sync producer to produce data as part of the request handling cycle, as well as the async producer to maintain an access log. It also uses the [mocks subpackage](https://godoc.org/github.com/Shopify/sarama/mocks) to test both.
 
+#### Interceptors
+
+Basic example to use a producer interceptor that produces oTel spans and add some headers for each intercepted message.
