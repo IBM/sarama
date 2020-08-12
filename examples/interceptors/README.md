@@ -1,6 +1,6 @@
 # Interceptors Example
 
-It creates a *Producer* interceptor to produce some oTel spans and also modifies
+It creates a *Producer* interceptor to produce some [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-go/) spans and also modifies
 the intercepted message to include some headers.
 
 ``` go
@@ -19,7 +19,7 @@ Usage of ./interceptors:
         The Kafka topic to use (default "default_topic")
 ```
 
-App will output oTel spans for every intercepted message, i.e:
+App will output OpenTelemetry spans for every intercepted message, i.e:
 
 ```
 go run main.go trace_interceptor.go
