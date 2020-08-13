@@ -77,6 +77,18 @@ func (err ConfigurationError) Error() string {
 	return "kafka: invalid configuration (" + string(err) + ")"
 }
 
+// SkippedMessagesError is returned when AutoSkipLostMessages is turned on, a consumer fell behind the retention log
+// and advanced its offset without having consumed messages.
+type SkippedMessagesError struct {
+	Topic     string
+	Partition int32
+	Skipped   int64
+}
+
+func (err SkippedMessagesError) Error() string {
+	return fmt.Sprintf("consumer/%s/%d is not keeping up and skipped %d messages", err.Topic, err.Partition, err.Skipped)
+}
+
 // KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16

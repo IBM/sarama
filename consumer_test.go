@@ -1027,6 +1027,77 @@ func TestConsumerOffsetOutOfRange(t *testing.T) {
 	broker0.Close()
 }
 
+func TestConsumerAutoSkipLostMessages(t *testing.T) {
+	broker0 := NewMockBroker(t, 0)
+	fetchResponse1 := &FetchResponse{}
+	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 0)
+	fetchResponse2 := &FetchResponse{}
+	fetchResponse2.AddError("my_topic", 0, ErrOffsetOutOfRange)
+	fetchResponse3 := &FetchResponse{}
+	fetchResponse3.AddMessage("my_topic", 0, nil, testMsg, 10)
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetNewest, 1234).
+			SetOffset("my_topic", 0, OffsetOldest, 0),
+		"FetchRequest": NewMockSequence(fetchResponse1),
+	})
+
+	// config requires OffsetOldest as well
+	config := NewConfig()
+	config.Consumer.AutoSkipLostMessages = true
+	_, err := NewConsumer([]string{broker0.Addr()}, config)
+	if _, ok := err.(ConfigurationError); !ok {
+		t.Fatalf("expected configuration error, got %v", err)
+	}
+
+	config.Consumer.Offsets.Initial = OffsetOldest
+	config.Consumer.Return.Errors = true
+	master, err := NewConsumer([]string{broker0.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, OffsetOldest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m, ok := <-consumer.Messages()
+	if !ok {
+		t.Fatal("not received first message")
+	}
+	assertMessageOffset(t, m, 0)
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetNewest, 1234).
+			SetOffset("my_topic", 0, OffsetOldest, 10),
+		"FetchRequest": NewMockSequence(fetchResponse2, fetchResponse3),
+	})
+
+	m, ok = <-consumer.Messages()
+	if !ok {
+		t.Fatal("not received second message")
+	}
+	assertMessageOffset(t, m, 10)
+
+	cerr := <-consumer.Errors()
+	if err, ok := cerr.Err.(SkippedMessagesError); !ok {
+		t.Fatal("not a SkippedMessagesErr")
+	} else if err.Skipped != 9 {
+		t.Fatalf("should have skipped 9, not %d", err.Skipped)
+	}
+
+	safeClose(t, master)
+	broker0.Close()
+}
+
 func TestConsumerExpiryTicker(t *testing.T) {
 	// Given
 	broker0 := NewMockBroker(t, 0)

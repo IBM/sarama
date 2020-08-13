@@ -827,6 +827,19 @@ func (bc *brokerConsumer) handleResponses() {
 				bc.broker.ID(), child.topic, child.partition)
 			delete(bc.subscriptions, child)
 		case ErrOffsetOutOfRange:
+			if conf := child.conf.Consumer; conf.AutoSkipLostMessages && OffsetOldest == conf.Offsets.Initial {
+				prev := child.offset
+				err := child.chooseStartingOffset(OffsetOldest)
+				if err == nil {
+					if skipped := child.offset - prev; skipped > 0 {
+						child.sendError(SkippedMessagesError{Topic: child.topic, Partition: child.partition, Skipped: skipped})
+						break
+					} else {
+						err = fmt.Errorf("offset was not advanced and instead moved by %v", skipped)
+					}
+				}
+				Logger.Printf("consumer/%s/%d failed to skip lost messages because it could not reset its offset: %v\n", child.topic, child.partition, err)
+			}
 			// there's no point in retrying this it will just fail the same way again
 			// shut it down and force the user to choose what to do
 			child.sendError(result)

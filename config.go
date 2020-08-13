@@ -395,6 +395,12 @@ type Config struct {
 			}
 		}
 
+		// AutoSkipLostMessages requires Offsets.Initial to be set to OffsetOldest.
+		// If set to true, a consumer that fails to keep up with the retention log will
+		// try to advance its offset to the new oldest available message and only emit an error
+		// instead of bailing out.
+		AutoSkipLostMessages bool
+
 		// IsolationLevel support 2 mode:
 		// 	- use `ReadUncommitted` (default) to consume and return all messages in message channel
 		//	- use `ReadCommitted` to hide messages that are part of an aborted transaction
@@ -476,6 +482,7 @@ func NewConfig() *Config {
 	c.Consumer.Offsets.AutoCommit.Interval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 	c.Consumer.Offsets.Retry.Max = 3
+	c.Consumer.AutoSkipLostMessages = false
 
 	c.Consumer.Group.Session.Timeout = 10 * time.Second
 	c.Consumer.Group.Heartbeat.Interval = 3 * time.Second
@@ -706,6 +713,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.Offsets.AutoCommit.Interval must be > 0")
 	case c.Consumer.Offsets.Initial != OffsetOldest && c.Consumer.Offsets.Initial != OffsetNewest:
 		return ConfigurationError("Consumer.Offsets.Initial must be OffsetOldest or OffsetNewest")
+	case c.Consumer.AutoSkipLostMessages && c.Consumer.Offsets.Initial != OffsetOldest:
+		return ConfigurationError("Consumer.AutoSkipLostMessages requires Consumer.Offsets.Initial = OffsetOldest")
 	case c.Consumer.Offsets.Retry.Max < 0:
 		return ConfigurationError("Consumer.Offsets.Retry.Max must be >= 0")
 	case c.Consumer.IsolationLevel != ReadUncommitted && c.Consumer.IsolationLevel != ReadCommitted:
