@@ -1029,20 +1029,27 @@ func TestConsumerOffsetOutOfRange(t *testing.T) {
 
 func TestConsumerAutoSkipLostMessages(t *testing.T) {
 	broker0 := NewMockBroker(t, 0)
+
+	mockOffsets1 := NewMockOffsetResponse(t).
+		SetOffset("my_topic", 0, OffsetNewest, 1234).
+		SetOffset("my_topic", 0, OffsetOldest, 0)
+	mockOffsets2 := NewMockOffsetResponse(t).
+		SetOffset("my_topic", 0, OffsetNewest, 1234).
+		SetOffset("my_topic", 0, OffsetOldest, 10)
+
 	fetchResponse1 := &FetchResponse{}
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 0)
 	fetchResponse2 := &FetchResponse{}
 	fetchResponse2.AddError("my_topic", 0, ErrOffsetOutOfRange)
 	fetchResponse3 := &FetchResponse{}
 	fetchResponse3.AddMessage("my_topic", 0, nil, testMsg, 10)
+
 	broker0.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetBroker(broker0.Addr(), broker0.BrokerID()).
 			SetLeader("my_topic", 0, broker0.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse1),
+		"OffsetRequest": NewMockSequence(mockOffsets1, mockOffsets1, mockOffsets2, mockOffsets2),
+		"FetchRequest":  NewMockSequence(fetchResponse1, fetchResponse2, fetchResponse3),
 	})
 
 	// config requires OffsetOldest as well
@@ -1071,16 +1078,6 @@ func TestConsumerAutoSkipLostMessages(t *testing.T) {
 	}
 	assertMessageOffset(t, m, 0)
 
-	broker0.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetLeader("my_topic", 0, broker0.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 10),
-		"FetchRequest": NewMockSequence(fetchResponse2, fetchResponse3),
-	})
-
 	m, ok = <-consumer.Messages()
 	if !ok {
 		t.Fatal("not received second message")
@@ -1089,7 +1086,7 @@ func TestConsumerAutoSkipLostMessages(t *testing.T) {
 
 	cerr := <-consumer.Errors()
 	if err, ok := cerr.Err.(SkippedMessagesError); !ok {
-		t.Fatal("not a SkippedMessagesErr")
+		t.Fatalf("not a SkippedMessagesErr: %v", cerr.Err)
 	} else if err.Skipped != 9 {
 		t.Fatalf("should have skipped 9, not %d", err.Skipped)
 	}
