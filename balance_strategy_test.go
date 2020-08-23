@@ -136,7 +136,7 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 	}
 }
 
-func TestBalanceStrategyEvenRoundRobin(t *testing.T) {
+func TestBalanceStrategyFairRoundRobin(t *testing.T) {
 	tests := []struct {
 		members  map[string][]string
 		topics   map[string][]int32
@@ -198,9 +198,9 @@ func TestBalanceStrategyEvenRoundRobin(t *testing.T) {
 		},
 	}
 
-	strategy := BalanceStrategyEvenRoundRobin
-	if strategy.Name() != "even_roundrobin" {
-		t.Errorf("Unexpected stategy name\nexpected: even_roundrobin\nactual: %v", strategy.Name())
+	strategy := BalanceStrategyFairRoundRound
+	if strategy.Name() != "fair_roundrobin" {
+		t.Errorf("Unexpected stategy name\nexpected: fail_roundrobin\nactual: %v", strategy.Name())
 	}
 
 	for _, test := range tests {

@@ -16,9 +16,9 @@ const (
 	// RoundRobinBalanceStrategyName identifies strategies that use the round-robin partition assignment strategy
 	RoundRobinBalanceStrategyName = "roundrobin"
 
-	// EvenRoundRobinBalanceStrategyName identifies strategies that use the round-robin partition assignment strategy base on all topic's partitions,
+	// FairRoundRobinBalanceStrategyName identifies strategies that use the round-robin partition assignment strategy base on all topic's partitions,
 	// which assigns partitions more evenly in comparison to the`RoundRobinBalanceStrategyName` strategy
-	EvenRoundRobinBalanceStrategyName = "even_roundrobin"
+	FairRoundRobinBalanceStrategyName = "fair_roundrobin"
 
 	// StickyBalanceStrategyName identifies strategies that use the sticky-partition assignment strategy
 	StickyBalanceStrategyName = "sticky"
@@ -359,19 +359,19 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	}
 }
 
-// BalanceStrategyEvenRoundRobin assigns partitions to members in alternating order.
+// BalanceStrategyFairRoundRound assigns partitions to members in alternating order.
 // For example, there are two topics (t0, t1) and two consumer (m0, m1), and each topic has three partitions (p0, p1, p2):
 // M0: [t0p0, t0p2, t1p1]
 // M1: [t0p1, t1p0, t1p2]
-var BalanceStrategyEvenRoundRobin = new(evenRoundRobinBalancer)
+var BalanceStrategyFairRoundRound = new(fairRoundRobinBalancer)
 
-type evenRoundRobinBalancer struct{}
+type fairRoundRobinBalancer struct{}
 
-func (b *evenRoundRobinBalancer) Name() string {
-	return EvenRoundRobinBalanceStrategyName
+func (b *fairRoundRobinBalancer) Name() string {
+	return FairRoundRobinBalanceStrategyName
 }
 
-func (b *evenRoundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error) {
+func (b *fairRoundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error) {
 	if len(memberAndMetadata) == 0 || len(topics) == 0 {
 		return nil, errors.New("members and topics are not provided")
 	}
@@ -422,7 +422,7 @@ func (b *evenRoundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroup
 	return plan, nil
 }
 
-func (b *evenRoundRobinBalancer) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
+func (b *fairRoundRobinBalancer) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
 	return nil, nil // do nothing for now
 }
 
