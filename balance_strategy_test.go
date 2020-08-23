@@ -105,11 +105,102 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 				"M2": map[string][]int32{"T1": {1}, "T2": {0, 2}},
 			},
 		},
+		{
+			// case that partitions are assigned unevenly:
+			// there are three members and topics, however all the topics and partitions are assign to a single member
+			members: map[string][]string{"M": {"T1", "T2", "TT2"}, "M2": {"T1", "T2", "TT2"}, "M3": {"T1", "T2", "TT2"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0}, "TT2": {0}},
+			expected: BalanceStrategyPlan{
+				"M": map[string][]int32{"T1": {0}, "T2": {0}, "TT2": {0}},
+			},
+		},
 	}
 
 	strategy := BalanceStrategyRoundRobin
 	if strategy.Name() != "roundrobin" {
 		t.Errorf("Unexpected stategy name\nexpected: range\nactual: %v", strategy.Name())
+	}
+
+	for _, test := range tests {
+		members := make(map[string]ConsumerGroupMemberMetadata)
+		for memberID, topics := range test.members {
+			members[memberID] = ConsumerGroupMemberMetadata{Topics: topics}
+		}
+
+		actual, err := strategy.Plan(members, test.topics)
+		if err != nil {
+			t.Errorf("Unexpected error %v", err)
+		} else if !reflect.DeepEqual(actual, test.expected) {
+			t.Errorf("Plan does not match expectation\nexpected: %#v\nactual: %#v", test.expected, actual)
+		}
+	}
+}
+
+func TestBalanceStrategyEvenRoundRobin(t *testing.T) {
+	tests := []struct {
+		members  map[string][]string
+		topics   map[string][]int32
+		expected BalanceStrategyPlan
+	}{
+		{
+			members: map[string][]string{"M1": {"T1", "T2", "T3"}, "M2": {"T1", "T2", "T3"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0}, "T3": {0}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}, "T3": {0}},
+				"M2": map[string][]int32{"T2": {0}},
+			},
+		},
+		{
+			members: map[string][]string{"M1": {"T1", "T2", "T3"}, "M2": {"T1", "T2", "T3"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0, 1}, "T3": {0, 1, 2, 3}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}, "T2": {1}, "T3": {1, 3}},
+				"M2": map[string][]int32{"T2": {0}, "T3": {0, 2}},
+			},
+		},
+		{
+			members: map[string][]string{"M1": {"T1"}, "M2": {"T1"}},
+			topics:  map[string][]int32{"T1": {0}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}},
+			},
+		},
+		{
+			members: map[string][]string{"M1": {"T1", "T2", "T3"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0}, "T3": {0, 1, 2}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}, "T2": {0}, "T3": {0, 1, 2}},
+			},
+		},
+		{
+			members: map[string][]string{"M1": {"T1", "T2", "T3"}, "M2": {"T1"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0}, "T3": {0}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}, "T2": {0}, "T3": {0}},
+			},
+		},
+		{
+			members: map[string][]string{"M1": {"T1", "T2", "T3"}, "M2": {"T1", "T3"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0}, "T3": {0}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}, "T2": {0}},
+				"M2": map[string][]int32{"T3": {0}},
+			},
+		},
+		{
+			members: map[string][]string{"M": {"T1", "T2", "TT2"}, "M2": {"T1", "T2", "TT2"}, "M3": {"T1", "T2", "TT2"}},
+			topics:  map[string][]int32{"T1": {0}, "T2": {0}, "TT2": {0}},
+			expected: BalanceStrategyPlan{
+				"M":  map[string][]int32{"T1": {0}},
+				"M2": map[string][]int32{"T2": {0}},
+				"M3": map[string][]int32{"TT2": {0}},
+			},
+		},
+	}
+
+	strategy := BalanceStrategyEvenRoundRobin
+	if strategy.Name() != "even_roundrobin" {
+		t.Errorf("Unexpected stategy name\nexpected: even_roundrobin\nactual: %v", strategy.Name())
 	}
 
 	for _, test := range tests {
