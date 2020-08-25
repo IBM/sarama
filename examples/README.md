@@ -10,4 +10,4 @@ In these examples, we use `github.com/Shopify/sarama` as import path. We do this
 
 #### Interceptors
 
-Basic example to use a producer interceptor that produces oTel spans and add some headers for each intercepted message.
+Basic example to use a producer interceptor that produces [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-go/) spans and add some headers for each intercepted message.
