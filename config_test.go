@@ -8,7 +8,7 @@ import (
 )
 
 func TestDefaultConfigValidates(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	if err := config.Validate(); err != nil {
 		t.Error(err)
 	}
@@ -18,7 +18,7 @@ func TestDefaultConfigValidates(t *testing.T) {
 }
 
 func TestInvalidClientIDConfigValidates(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ClientID = "foo:bar"
 	if err := config.Validate(); string(err.(ConfigurationError)) != "ClientID is invalid" {
 		t.Error("Expected invalid ClientID, got ", err)
@@ -26,7 +26,7 @@ func TestInvalidClientIDConfigValidates(t *testing.T) {
 }
 
 func TestEmptyClientIDConfigValidates(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ClientID = ""
 	if err := config.Validate(); string(err.(ConfigurationError)) != "ClientID is invalid" {
 		t.Error("Expected invalid ClientID, got ", err)
@@ -194,7 +194,7 @@ func TestNetConfigValidates(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		c := NewConfig()
+		c := NewTestConfig()
 		test.cfg(c)
 		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
@@ -227,7 +227,7 @@ func TestMetadataConfigValidates(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		c := NewConfig()
+		c := NewTestConfig()
 		test.cfg(c)
 		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
@@ -249,7 +249,7 @@ func TestAdminConfigValidates(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		c := NewConfig()
+		c := NewTestConfig()
 		test.cfg(c)
 		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
@@ -349,7 +349,7 @@ func TestProducerConfigValidates(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		c := NewConfig()
+		c := NewTestConfig()
 		test.cfg(c)
 		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
@@ -379,7 +379,7 @@ func TestConsumerConfigValidates(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		c := NewConfig()
+		c := NewTestConfig()
 		test.cfg(c)
 		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
@@ -388,7 +388,7 @@ func TestConsumerConfigValidates(t *testing.T) {
 }
 
 func TestLZ4ConfigValidation(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Compression = CompressionLZ4
 	if err := config.Validate(); string(err.(ConfigurationError)) != "lz4 compression requires Version >= V0_10_0_0" {
 		t.Error("Expected invalid lz4/kafka version error, got ", err)
@@ -400,7 +400,7 @@ func TestLZ4ConfigValidation(t *testing.T) {
 }
 
 func TestZstdConfigValidation(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Compression = CompressionZSTD
 	if err := config.Validate(); string(err.(ConfigurationError)) != "zstd compression requires Version >= V2_1_0_0" {
 		t.Error("Expected invalid zstd/kafka version error, got ", err)
@@ -419,7 +419,7 @@ func ExampleConfig_metrics() {
 	appGauge := metrics.GetOrRegisterGauge("m1", appMetricRegistry)
 	appGauge.Update(1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	// Use a prefix registry instead of the default local one
 	config.MetricRegistry = metrics.NewPrefixedChildRegistry(appMetricRegistry, "sarama.")
 

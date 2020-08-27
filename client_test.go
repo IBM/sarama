@@ -21,7 +21,7 @@ func TestSimpleClient(t *testing.T) {
 
 	seedBroker.Returns(new(MetadataResponse))
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func TestCachedPartitions(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, 2, replicas, isr, []int32{}, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 0
 	c, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -80,7 +80,7 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 2, replicas[0], replicas, replicas, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -130,7 +130,7 @@ func TestClientSeedBrokers(t *testing.T) {
 	metadataResponse.AddBroker("localhost:12345", 2)
 	seedBroker.Returns(metadataResponse)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +152,7 @@ func TestClientMetadata(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), replicas, isr, []int32{}, ErrLeaderNotAvailable)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -230,7 +230,7 @@ func TestClientMetadataWithOfflineReplicas(t *testing.T) {
 
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
@@ -312,7 +312,7 @@ func TestClientGetOffset(t *testing.T) {
 	metadata.AddBroker(leaderAddr, leader.BrokerID())
 	seedBroker.Returns(metadata)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
 
 	retryCount := int32(0)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 1
 	config.Metadata.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
 		atomic.AddInt32(&retryCount, 1)
@@ -393,7 +393,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	metadataResponse1 := new(MetadataResponse)
 	seedBroker.Returns(metadataResponse1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 1
 	config.Metadata.Retry.Backoff = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
@@ -431,7 +431,7 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
 	seedBroker.Returns(metadataResponse1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -491,7 +491,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 	metadataResponse2.AddTopicPartition("my_topic", 0xb, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse2)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -524,7 +524,7 @@ func TestClientRefreshBrokers(t *testing.T) {
 	metadataResponse1.AddBroker(initialSeed.Addr(), initialSeed.BrokerID())
 	initialSeed.Returns(metadataResponse1)
 
-	c, err := NewClient([]string{initialSeed.Addr()}, nil)
+	c, err := NewClient([]string{initialSeed.Addr()}, NewTestConfig())
 	client := c.(*client)
 
 	if err != nil {
@@ -555,7 +555,7 @@ func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 	metadataResponse1.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
 	seedBroker.Returns(metadataResponse1)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -581,7 +581,7 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 	emptyMetadata := new(MetadataResponse)
 	initialSeed.Returns(emptyMetadata)
 
-	conf := NewConfig()
+	conf := NewTestConfig()
 	conf.Metadata.Retry.Backoff = 0
 	conf.Metadata.RefreshFrequency = 0
 	c, err := NewClient([]string{initialSeed.Addr()}, conf)
@@ -648,7 +648,7 @@ func TestClientController(t *testing.T) {
 			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
 	})
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 
 	// test kafka version greater than 0.10.0.0
 	cfg.Version = V0_10_0_0
@@ -690,7 +690,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 			emptyMetadata := new(MetadataResponse)
 			initialSeed.Returns(emptyMetadata)
 
-			conf := NewConfig()
+			conf := NewTestConfig()
 			// Speed up the metadata request failure because of a read timeout
 			conf.Net.ReadTimeout = 100 * time.Millisecond
 			// Disable backoff and refresh
@@ -756,7 +756,7 @@ func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 	metadataResponse1.AddTopicPartition("__consumer_offsets", 0, replicas[0], replicas, replicas, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse1)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -830,7 +830,7 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 	metadataResponse1 := new(MetadataResponse)
 	seedBroker.Returns(metadataResponse1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 1
 	config.Metadata.Retry.Backoff = 0
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
@@ -882,7 +882,7 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 	metadataResponse := new(MetadataResponse)
 	seedBroker.Returns(metadataResponse)
 
-	conf := NewConfig()
+	conf := NewTestConfig()
 	conf.Metadata.RefreshFrequency = 100 * time.Millisecond
 	client, err := NewClient([]string{seedBroker.Addr()}, conf)
 	if err != nil {

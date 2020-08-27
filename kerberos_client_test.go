@@ -17,7 +17,7 @@ import (
 
 func TestFaildToCreateKerberosConfig(t *testing.T) {
 	expectedErr := errors.New("configuration file could not be opened: krb5.conf open krb5.conf: no such file or directory")
-	clientConfig := NewConfig()
+	clientConfig := NewTestConfig()
 	clientConfig.Net.SASL.Mechanism = SASLTypeGSSAPI
 	clientConfig.Net.SASL.Enable = true
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"
@@ -41,7 +41,7 @@ func TestCreateWithPassword(t *testing.T) {
 	expectedDoman := "EXAMPLE.COM"
 	expectedCName := "client"
 
-	clientConfig := NewConfig()
+	clientConfig := NewTestConfig()
 	clientConfig.Net.SASL.Mechanism = SASLTypeGSSAPI
 	clientConfig.Net.SASL.Enable = true
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"
@@ -70,7 +70,7 @@ func TestCreateWithKeyTab(t *testing.T) {
 	}
 	// Expect to try to create a client with keytab and fails with "o such file or directory" error
 	expectedErr := errors.New("open nonexist.keytab: no such file or directory")
-	clientConfig := NewConfig()
+	clientConfig := NewTestConfig()
 	clientConfig.Net.SASL.Mechanism = SASLTypeGSSAPI
 	clientConfig.Net.SASL.Enable = true
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"
@@ -92,7 +92,7 @@ func TestCreateWithDisablePAFXFAST(t *testing.T) {
 	}
 	// Expect to try to create a client with keytab and fails with "o such file or directory" error
 	expectedErr := errors.New("open nonexist.keytab: no such file or directory")
-	clientConfig := NewConfig()
+	clientConfig := NewTestConfig()
 	clientConfig.Net.SASL.Mechanism = SASLTypeGSSAPI
 	clientConfig.Net.SASL.Enable = true
 	clientConfig.Net.SASL.GSSAPI.ServiceName = "kafka"

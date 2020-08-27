@@ -92,7 +92,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 			broker := NewBroker(mb.Addr())
 			// Set the broker id in order to validate local broker metrics
 			broker.id = 0
-			conf := NewConfig()
+			conf := NewTestConfig()
 			conf.Version = tt.version
 			err := broker.Open(conf)
 			if err != nil {
@@ -226,7 +226,7 @@ func TestSASLOAuthBearer(t *testing.T) {
 			broker.requestLatency = metrics.NilHistogram{}
 			broker.requestsInFlight = metrics.NilCounter{}
 
-			conf := NewConfig()
+			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeOAuth
 			conf.Net.SASL.TokenProvider = test.tokProvider
 
@@ -358,7 +358,7 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 				"SaslHandshakeRequest":    mockSASLHandshakeResponse,
 			})
 
-			conf := NewConfig()
+			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
 			conf.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient { return test.scramClient }
 
@@ -464,7 +464,7 @@ func TestSASLPlainAuth(t *testing.T) {
 			broker.requestLatency = metrics.NilHistogram{}
 			broker.requestsInFlight = metrics.NilCounter{}
 
-			conf := NewConfig()
+			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypePlaintext
 			conf.Net.SASL.AuthIdentity = test.authidentity
 			conf.Net.SASL.User = "token"
@@ -550,7 +550,7 @@ func TestSASLReadTimeout(t *testing.T) {
 		broker.requestsInFlight = metrics.NilCounter{}
 	}
 
-	conf := NewConfig()
+	conf := NewTestConfig()
 	{
 		conf.Net.ReadTimeout = time.Millisecond
 		conf.Net.SASL.Mechanism = SASLTypePlaintext
@@ -640,7 +640,7 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			broker.responseRate = metrics.NilMeter{}
 			broker.requestLatency = metrics.NilHistogram{}
 			broker.requestsInFlight = metrics.NilCounter{}
-			conf := NewConfig()
+			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeGSSAPI
 			conf.Net.SASL.GSSAPI.ServiceName = "kafka"
 			conf.Net.SASL.GSSAPI.KerberosConfigPath = "krb5.conf"

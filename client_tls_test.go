@@ -188,7 +188,7 @@ func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientCon
 
 	seedBroker.Returns(new(MetadataResponse))
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Net.TLS.Enable = true
 	config.Net.TLS.Config = clientConfig
 

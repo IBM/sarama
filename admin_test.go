@@ -16,7 +16,7 @@ func TestClusterAdmin(t *testing.T) {
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -38,7 +38,7 @@ func TestClusterAdminInvalidController(t *testing.T) {
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	_, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err == nil {
@@ -61,7 +61,7 @@ func TestClusterAdminCreateTopic(t *testing.T) {
 		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_10_2_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -89,7 +89,7 @@ func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
 		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_10_2_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -117,7 +117,7 @@ func TestClusterAdminCreateTopicWithoutAuthorization(t *testing.T) {
 		"CreateTopicsRequest": NewMockCreateTopicsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_11_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -148,7 +148,7 @@ func TestClusterAdminListTopics(t *testing.T) {
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_1_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -198,7 +198,7 @@ func TestClusterAdminDeleteTopic(t *testing.T) {
 		"DeleteTopicsRequest": NewMockDeleteTopicsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_10_2_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -227,7 +227,7 @@ func TestClusterAdminDeleteEmptyTopic(t *testing.T) {
 		"DeleteTopicsRequest": NewMockDeleteTopicsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_10_2_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -256,7 +256,7 @@ func TestClusterAdminCreatePartitions(t *testing.T) {
 		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -285,7 +285,7 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_10_2_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -314,7 +314,7 @@ func TestClusterAdminCreatePartitionsWithoutAuthorization(t *testing.T) {
 		"CreatePartitionsRequest": NewMockCreatePartitionsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -350,7 +350,7 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V2_4_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -388,7 +388,7 @@ func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
 		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V2_3_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -427,7 +427,7 @@ func TestClusterAdminListPartitionReassignments(t *testing.T) {
 		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V2_4_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -472,7 +472,7 @@ func TestClusterAdminListPartitionReassignmentsWithDiffVersion(t *testing.T) {
 		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V2_3_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -508,7 +508,7 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -567,7 +567,7 @@ func TestClusterAdminDeleteRecordsWithInCorrectBroker(t *testing.T) {
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -604,7 +604,7 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 		"DeleteRecordsRequest": NewMockDeleteRecordsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_10_2_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -660,7 +660,7 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		{V2_0_0_0, 2, true},
 	}
 	for _, tt := range tests {
-		config := NewConfig()
+		config := NewTestConfig()
 		config.Version = tt.saramaVersion
 		admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 		if err != nil {
@@ -715,7 +715,7 @@ func TestClusterAdminDescribeConfigWithErrorCode(t *testing.T) {
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponseWithErrorCode(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_1_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -760,7 +760,7 @@ func TestClusterAdminDescribeBrokerConfig(t *testing.T) {
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin(
 		[]string{
@@ -800,7 +800,7 @@ func TestClusterAdminAlterConfig(t *testing.T) {
 		"AlterConfigsRequest": NewMockAlterConfigsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -833,7 +833,7 @@ func TestClusterAdminAlterConfigWithErrorCode(t *testing.T) {
 		"AlterConfigsRequest": NewMockAlterConfigsResponseWithErrorCode(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -873,7 +873,7 @@ func TestClusterAdminAlterBrokerConfig(t *testing.T) {
 		"AlterConfigsRequest": NewMockAlterConfigsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin(
 		[]string{
@@ -918,7 +918,7 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 		"CreateAclsRequest": NewMockCreateAclsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -951,7 +951,7 @@ func TestClusterAdminListAcls(t *testing.T) {
 		"CreateAclsRequest":   NewMockCreateAclsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -997,7 +997,7 @@ func TestClusterAdminDeleteAcl(t *testing.T) {
 		"DeleteAclsRequest": NewMockDeleteAclsResponse(t),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -1033,7 +1033,7 @@ func TestDescribeTopic(t *testing.T) {
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1071,7 +1071,7 @@ func TestDescribeTopicWithVersion0_11(t *testing.T) {
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V0_11_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1114,7 +1114,7 @@ func TestDescribeConsumerGroup(t *testing.T) {
 		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, expectedGroupID, seedBroker),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1153,7 +1153,7 @@ func TestListConsumerGroups(t *testing.T) {
 			AddGroup("my-group", "consumer"),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1215,7 +1215,7 @@ func TestListConsumerGroupsMultiBroker(t *testing.T) {
 			AddGroup(secondGroup, "consumer"),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1267,7 +1267,7 @@ func TestListConsumerGroupOffsets(t *testing.T) {
 		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1312,7 +1312,7 @@ func TestDeleteConsumerGroup(t *testing.T) {
 		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_1_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
@@ -1341,7 +1341,7 @@ func TestRefreshMetaDataWithDifferentController(t *testing.T) {
 			SetBroker(seedBroker2.Addr(), seedBroker2.BrokerID()),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_1_0_0
 
 	client, err := NewClient([]string{seedBroker1.Addr()}, config)
@@ -1386,7 +1386,7 @@ func TestDescribeLogDirs(t *testing.T) {
 			SetLogDirs("/tmp/logs", map[string]int{"topic1": 2, "topic2": 2}),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V1_0_0_0
 
 	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)

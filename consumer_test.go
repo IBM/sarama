@@ -36,7 +36,7 @@ func TestConsumerOffsetManual(t *testing.T) {
 	})
 
 	// When
-	master, err := NewConsumer([]string{broker0.Addr()}, nil)
+	master, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestConsumerOffsetNewest(t *testing.T) {
 			SetHighWaterMark("my_topic", 0, 14),
 	})
 
-	master, err := NewConsumer([]string{broker0.Addr()}, nil)
+	master, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +118,7 @@ func TestConsumerRecreate(t *testing.T) {
 			SetMessage("my_topic", 0, 10, testMsg),
 	})
 
-	c, err := NewConsumer([]string{broker0.Addr()}, nil)
+	c, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestConsumerDuplicate(t *testing.T) {
 		"FetchRequest": NewMockFetchResponse(t, 1),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ChannelBufferSize = 0
 	c, err := NewConsumer([]string{broker0.Addr()}, config)
 	if err != nil {
@@ -257,7 +257,7 @@ func runConsumerLeaderRefreshErrorTestWithConfig(t *testing.T, config *Config) {
 // If consumer fails to refresh metadata it keeps retrying with frequency
 // specified by `Config.Consumer.Retry.Backoff`.
 func TestConsumerLeaderRefreshError(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Net.ReadTimeout = 100 * time.Millisecond
 	config.Consumer.Retry.Backoff = 200 * time.Millisecond
 	config.Consumer.Return.Errors = true
@@ -269,7 +269,7 @@ func TestConsumerLeaderRefreshError(t *testing.T) {
 func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
 	var calls int32 = 0
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Net.ReadTimeout = 100 * time.Millisecond
 	config.Consumer.Retry.BackoffFunc = func(retries int) time.Duration {
 		atomic.AddInt32(&calls, 1)
@@ -294,7 +294,7 @@ func TestConsumerInvalidTopic(t *testing.T) {
 			SetBroker(broker0.Addr(), broker0.BrokerID()),
 	})
 
-	c, err := NewConsumer([]string{broker0.Addr()}, nil)
+	c, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestConsumerClosePartitionWithoutLeader(t *testing.T) {
 			SetMessage("my_topic", 0, 123, testMsg),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Net.ReadTimeout = 100 * time.Millisecond
 	config.Consumer.Retry.Backoff = 100 * time.Millisecond
 	config.Consumer.Return.Errors = true
@@ -382,7 +382,7 @@ func TestConsumerShutsDownOutOfRange(t *testing.T) {
 		"FetchRequest": NewMockWrapper(fetchResponse),
 	})
 
-	master, err := NewConsumer([]string{broker0.Addr()}, nil)
+	master, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -421,7 +421,7 @@ func TestConsumerExtraOffsets(t *testing.T) {
 	newFetchResponse.SetLastStableOffset("my_topic", 0, 4)
 	for _, fetchResponse1 := range []*FetchResponse{legacyFetchResponse, newFetchResponse} {
 		var offsetResponseVersion int16
-		cfg := NewConfig()
+		cfg := NewTestConfig()
 		cfg.Consumer.Return.Errors = true
 		if fetchResponse1.Version >= 4 {
 			cfg.Version = V0_11_0_0
@@ -487,7 +487,7 @@ func TestConsumerReceivingFetchResponseWithTooOldRecords(t *testing.T) {
 	fetchResponse2 := &FetchResponse{Version: 4}
 	fetchResponse2.AddRecord("my_topic", 0, nil, testMsg, 1000000)
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Consumer.Return.Errors = true
 	cfg.Version = V0_11_0_0
 
@@ -533,7 +533,7 @@ func TestConsumeMessageWithNewerFetchAPIVersion(t *testing.T) {
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 2)
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V0_11_0_0
 
 	broker0 := NewMockBroker(t, 0)
@@ -576,7 +576,7 @@ func TestConsumeMessageWithSessionIDs(t *testing.T) {
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 2)
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V1_1_0_0
 
 	broker0 := NewMockBroker(t, 0)
@@ -635,7 +635,7 @@ func TestConsumerNonSequentialOffsets(t *testing.T) {
 	newFetchResponse.SetLastStableOffset("my_topic", 0, 11)
 	for _, fetchResponse1 := range []*FetchResponse{legacyFetchResponse, newFetchResponse} {
 		var offsetResponseVersion int16
-		cfg := NewConfig()
+		cfg := NewTestConfig()
 		if fetchResponse1.Version >= 4 {
 			cfg.Version = V0_11_0_0
 			offsetResponseVersion = 1
@@ -710,7 +710,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	})
 
 	// launch test goroutines
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Consumer.Retry.Backoff = 50
 	master, err := NewConsumer([]string{seedBroker.Addr()}, config)
 	if err != nil {
@@ -869,7 +869,7 @@ func TestConsumerInterleavedClose(t *testing.T) {
 			SetMessage("my_topic", 1, 2000, testMsg),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ChannelBufferSize = 0
 	master, err := NewConsumer([]string{broker0.Addr()}, config)
 	if err != nil {
@@ -930,7 +930,7 @@ func TestConsumerBounceWithReferenceOpen(t *testing.T) {
 		"FetchRequest":    mockFetchResponse,
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Consumer.Return.Errors = true
 	config.Consumer.Retry.Backoff = 100 * time.Millisecond
 	config.ChannelBufferSize = 1
@@ -1007,7 +1007,7 @@ func TestConsumerOffsetOutOfRange(t *testing.T) {
 			SetOffset("my_topic", 0, OffsetOldest, 2345),
 	})
 
-	master, err := NewConsumer([]string{broker0.Addr()}, nil)
+	master, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1044,7 +1044,7 @@ func TestConsumerExpiryTicker(t *testing.T) {
 		"FetchRequest": NewMockSequence(fetchResponse1),
 	})
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ChannelBufferSize = 0
 	config.Consumer.MaxProcessingTime = 10 * time.Millisecond
 	master, err := NewConsumer([]string{broker0.Addr()}, config)
@@ -1113,7 +1113,7 @@ func TestConsumerTimestamps(t *testing.T) {
 	} {
 		var fr *FetchResponse
 		var offsetResponseVersion int16
-		cfg := NewConfig()
+		cfg := NewTestConfig()
 		cfg.Version = d.kversion
 		switch {
 		case d.kversion.IsAtLeast(V0_11_0_0):
@@ -1213,7 +1213,7 @@ func TestExcludeUncommitted(t *testing.T) {
 		"FetchRequest": NewMockWrapper(fetchResponse),
 	})
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Consumer.Return.Errors = true
 	cfg.Version = V0_11_0_0
 	cfg.Consumer.IsolationLevel = ReadCommitted
@@ -1257,7 +1257,7 @@ func assertMessageOffset(t *testing.T, msg *ConsumerMessage, expectedOffset int6
 // This example shows how to use the consumer to read messages
 // from a single partition.
 func ExampleConsumer() {
-	consumer, err := NewConsumer([]string{"localhost:9092"}, nil)
+	consumer, err := NewConsumer([]string{"localhost:9092"}, NewTestConfig())
 	if err != nil {
 		panic(err)
 	}
@@ -1366,7 +1366,7 @@ func testConsumerInterceptor(
 			SetOffset("my_topic", 0, OffsetNewest, 0),
 		"FetchRequest": mockFetchResponse,
 	})
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Consumer.Interceptors = interceptors
 	// When
 	master, err := NewConsumer([]string{broker0.Addr()}, config)

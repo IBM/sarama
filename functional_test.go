@@ -158,7 +158,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	for i := 0; i < 45 && !allBrokersUp; i++ {
 		Logger.Println("waiting for kafka brokers to come up")
 		time.Sleep(1 * time.Second)
-		config := NewConfig()
+		config := NewTestConfig()
 		config.Version, err = ParseKafkaVersion(env.KafkaVersion)
 		if err != nil {
 			return err
@@ -267,7 +267,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	}
 
 	Logger.Println("Creating topics")
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-tests"

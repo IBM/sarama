@@ -111,7 +111,7 @@ func TestAsyncProducer(t *testing.T) {
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
@@ -162,7 +162,7 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 	leader.Returns(prodSuccess)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
@@ -202,7 +202,7 @@ func TestAsyncProducerMultipleBrokers(t *testing.T) {
 	prodResponse1.AddTopicPartition("my_topic", 1, ErrNoError)
 	leader1.Returns(prodResponse1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewRoundRobinPartitioner
@@ -235,7 +235,7 @@ func TestAsyncProducerCustomPartitioner(t *testing.T) {
 	prodResponse.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 2
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = func(topic string) Partitioner {
@@ -274,7 +274,7 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -324,7 +324,7 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 		metadataLeader1.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 		seedBroker.Returns(metadataLeader1)
 
-		config := NewConfig()
+		config := NewTestConfig()
 		config.Producer.Flush.Messages = 2
 		config.Producer.Return.Successes = true
 		config.Producer.Retry.Max = 0 // disable!
@@ -388,7 +388,7 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 	leader.Returns(prodSuccess)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewManualPartitioner
@@ -425,7 +425,7 @@ func TestAsyncProducerBrokerBounce(t *testing.T) {
 	prodSuccess := new(ProduceResponse)
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -462,7 +462,7 @@ func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 3
@@ -505,7 +505,7 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
@@ -561,7 +561,7 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
@@ -629,7 +629,7 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -686,7 +686,7 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	config.Producer.Retry.Max = 1
@@ -742,7 +742,7 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -807,7 +807,7 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -856,7 +856,7 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = false
 	config.Producer.Return.Errors = false
@@ -905,7 +905,7 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 	}
 	broker.Returns(initProducerID)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
@@ -1049,7 +1049,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 			return nil
 		}
 
-		config := NewConfig()
+		config := NewTestConfig()
 		config.Version = V0_11_0_0
 		config.Producer.Idempotent = true
 		config.Net.MaxOpenRequests = 1
@@ -1100,7 +1100,7 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 	}
 	broker.Returns(initProducerID)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 400000
@@ -1150,7 +1150,7 @@ func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
 	}
 	broker.Returns(initProducerID)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Flush.Frequency = 10 * time.Millisecond
 	config.Producer.Return.Successes = true
@@ -1216,7 +1216,7 @@ func TestBrokerProducerShutdown(t *testing.T) {
 		"my_topic", 0, mockBroker.BrokerID(), nil, nil, nil, ErrNoError)
 	mockBroker.Returns(metadataResponse)
 
-	producer, err := NewAsyncProducer([]string{mockBroker.Addr()}, nil)
+	producer, err := NewAsyncProducer([]string{mockBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1264,7 +1264,7 @@ func testProducerInterceptor(
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Interceptors = interceptors
@@ -1391,7 +1391,7 @@ ProducerLoop:
 // for the Successes channel to be populated, you have to set
 // config.Producer.Return.Successes to true.
 func ExampleAsyncProducer_goroutines() {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{"localhost:9092"}, config)
 	if err != nil {
@@ -1440,4 +1440,13 @@ ProducerLoop:
 	wg.Wait()
 
 	log.Printf("Successfully produced: %d; errors: %d\n", successes, producerErrors)
+}
+
+// NewTestConfig returns a config meant to be used by tests.
+// Due to inconsistencies with the request versions the clients send using the default Kafka version
+// and the response versions our mocks use, we default to the minimum Kafka version in most tests
+func NewTestConfig() *Config {
+	config := NewConfig()
+	config.Version = MinVersion
+	return config
 }

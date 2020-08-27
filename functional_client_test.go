@@ -15,7 +15,7 @@ func TestFuncConnectionFailure(t *testing.T) {
 	FunctionalTestEnv.Proxies["kafka1"].Enabled = false
 	SaveProxy(t, "kafka1")
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 1
 
 	_, err := NewClient([]string{FunctionalTestEnv.KafkaBrokerAddrs[0]}, config)
@@ -28,7 +28,7 @@ func TestFuncClientMetadata(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 1
 	config.Metadata.Retry.Backoff = 10 * time.Millisecond
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
@@ -72,7 +72,7 @@ func TestFuncClientCoordinator(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, nil)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

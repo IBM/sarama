@@ -18,37 +18,37 @@ import (
 const TestBatchSize = 1000
 
 func TestFuncProducing(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingGzip(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Compression = CompressionGZIP
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingSnappy(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Compression = CompressionSnappy
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingZstd(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V2_1_0_0
 	config.Producer.Compression = CompressionZSTD
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingNoResponse(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.RequiredAcks = NoResponse
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingFlushing(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = TestBatchSize / 8
 	config.Producer.Flush.Frequency = 250 * time.Millisecond
 	testProducingMessages(t, config)
@@ -58,7 +58,7 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ChannelBufferSize = 20
 	config.Producer.Flush.Frequency = 50 * time.Millisecond
 	config.Producer.Flush.Messages = 200
@@ -111,7 +111,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Frequency = 250 * time.Millisecond
 	config.Producer.Idempotent = true
 	config.Producer.Timeout = 500 * time.Millisecond
@@ -185,7 +185,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 }
 
 func TestInterceptors(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -442,7 +442,7 @@ func BenchmarkProducerSmallSinglePartition(b *testing.B) {
 	benchmarkProducer(b, nil, "test.1", ByteEncoder(make([]byte, 128)))
 }
 func BenchmarkProducerMediumSnappy(b *testing.B) {
-	conf := NewConfig()
+	conf := NewTestConfig()
 	conf.Producer.Compression = CompressionSnappy
 	benchmarkProducer(b, conf, "test.1", ByteEncoder(make([]byte, 1024)))
 }
