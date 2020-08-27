@@ -22,7 +22,7 @@ func initOffsetManagerWithBackoffFunc(t *testing.T, retention time.Duration,
 	broker = NewMockBroker(t, 1)
 	coordinator = NewMockBroker(t, 2)
 
-	seedMeta := new(MetadataResponse)
+	seedMeta := newMetadataResponse()
 	seedMeta.AddBroker(coordinator.Addr(), coordinator.BrokerID())
 	seedMeta.AddTopicPartition("my_topic", 0, 1, []int32{}, []int32{}, []int32{}, ErrNoError)
 	seedMeta.AddTopicPartition("my_topic", 1, 1, []int32{}, []int32{}, []int32{}, ErrNoError)
@@ -73,7 +73,7 @@ func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 
 func TestNewOffsetManager(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	seedBroker.Returns(new(MetadataResponse))
+	seedBroker.Returns(newMetadataResponse())
 	defer seedBroker.Close()
 
 	testClient, err := NewClient([]string{seedBroker.Addr()}, nil)

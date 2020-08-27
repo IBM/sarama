@@ -10,7 +10,7 @@ func TestSyncProducer(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
-	metadataResponse := new(MetadataResponse)
+	metadataResponse := newMetadataResponse()
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
@@ -58,7 +58,7 @@ func TestSyncProducerBatch(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
-	metadataResponse := new(MetadataResponse)
+	metadataResponse := newMetadataResponse()
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
@@ -106,7 +106,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
-	metadataResponse := new(MetadataResponse)
+	metadataResponse := newMetadataResponse()
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
@@ -149,7 +149,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 func TestSyncProducerToNonExistingTopic(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
-	metadataResponse := new(MetadataResponse)
+	metadataResponse := newMetadataResponse()
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
 	broker.Returns(metadataResponse)
@@ -164,7 +164,7 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	metadataResponse = new(MetadataResponse)
+	metadataResponse = newMetadataResponse()
 	metadataResponse.AddTopic("unknown", ErrUnknownTopicOrPartition)
 	broker.Returns(metadataResponse)
 
@@ -182,7 +182,7 @@ func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
 
-	metadataLeader1 := new(MetadataResponse)
+	metadataLeader1 := newMetadataResponse()
 	metadataLeader1.AddBroker(leader1.Addr(), leader1.BrokerID())
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
@@ -205,7 +205,7 @@ func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	metadataLeader2 := new(MetadataResponse)
+	metadataLeader2 := newMetadataResponse()
 	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
 	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, nil, ErrNoError)
 	leader1.Returns(metadataLeader2)

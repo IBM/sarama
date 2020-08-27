@@ -102,6 +102,12 @@ var (
 	}
 )
 
+func newMetadataResponse() *MetadataResponse {
+	resp := new(MetadataResponse)
+	resp.Version = 5
+	return resp
+}
+
 func TestEmptyMetadataResponseV0(t *testing.T) {
 	response := MetadataResponse{}
 
