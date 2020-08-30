@@ -929,13 +929,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 // if no fatal error, returns a list of topics that need retrying due to ErrLeaderNotAvailable
 func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bool) (retry bool, err error) {
-	if client.Closed() {
-		return
-	}
-
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
+	if client.brokers == nil {
+		return
+	}
 	// For all the brokers we received:
 	// - if it is a new ID, save it
 	// - if it is an existing ID, but the address we have is stale, discard the old one and save it
