@@ -237,7 +237,7 @@ func TestConsumerTopicMetadata(t *testing.T) {
 
 func TestConsumerUnexpectedTopicMetadata(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, sarama.NewTestConfig())
+	consumer := NewConsumer(trm, NewTestConfig())
 
 	if _, err := consumer.Topics(); err != sarama.ErrOutOfBrokers {
 		t.Error("Expected sarama.ErrOutOfBrokers, found", err)
