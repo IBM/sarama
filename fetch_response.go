@@ -3,6 +3,8 @@ package sarama
 import (
 	"sort"
 	"time"
+
+	"bitbucket.org/ffxblue/bp-gateway/pkg/monolog"
 )
 
 type AbortedTransaction struct {
@@ -450,7 +452,15 @@ func (r *FetchResponse) AddRecordWithTimestamp(topic string, partition int32, ke
 		frb.RecordsSet = []*Records{&records}
 	}
 	batch := frb.RecordsSet[0].RecordBatch
-	rec := &Record{Key: kb, Value: vb, OffsetDelta: offset, TimestampDelta: timestamp.Sub(batch.FirstTimestamp)}
+	rec := &Record{Key: kb, Value: vb, OffsetDelta: offset, TimestampDelta: timestamp.Sub(batch.FirstTimestamp), Headers: []*RecordHeader{
+		&RecordHeader{
+			Key: monolog.HeaderCommandID.Bytes(), Value: []byte("cid"),
+		},
+		{Key: monolog.HeaderCreated.Bytes(), Value: []byte(time.Now().Format(time.RFC3339))},
+		{Key: monolog.HeaderEventID.Bytes(), Value: []byte("wea7b810-9dad-11d1-80b4-00c04fd43qsw")},
+		{Key: monolog.HeaderSource.Bytes(), Value: []byte("api-content")},
+		{Key: monolog.HeaderEventType.Bytes(), Value: []byte(monolog.EventBrandSaved)},
+	}}
 	batch.addRecord(rec)
 }
 

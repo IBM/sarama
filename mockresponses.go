@@ -322,7 +322,7 @@ func (mfr *MockFetchResponse) For(reqBody versionedDecoder) encoderWithHeader {
 			for i := 0; i < mfr.batchSize && offset < maxOffset; {
 				msg := mfr.getMessage(topic, partition, offset)
 				if msg != nil {
-					res.AddMessage(topic, partition, nil, msg, offset)
+					res.AddRecord(topic, partition, StringEncoder("09-monolog.BrandSaved"), msg, offset)
 					i++
 				}
 				offset++
@@ -1118,4 +1118,155 @@ func (m *MockDescribeLogDirsResponse) For(reqBody versionedDecoder) encoderWithH
 		LogDirs: m.logDirs,
 	}
 	return resp
+}
+
+type MockJoinGroupResponse struct {
+	t TestReporter
+
+	ThrottleTime  int32
+	Err           KError
+	GenerationId  int32
+	GroupProtocol string
+	LeaderId      string
+	MemberId      string
+	Members       map[string][]byte
+}
+
+func NewMockJoinGroupResponse(t TestReporter) *MockJoinGroupResponse {
+	return &MockJoinGroupResponse{
+		t: t,
+
+		Members: make(map[string][]byte),
+	}
+}
+
+func (m *MockJoinGroupResponse) For(reqBody versionedDecoder) encoder {
+	req := reqBody.(*JoinGroupRequest)
+	resp := &JoinGroupResponse{
+		Version:       req.Version,
+		ThrottleTime:  m.ThrottleTime,
+		Err:           m.Err,
+		GenerationId:  m.GenerationId,
+		GroupProtocol: m.GroupProtocol,
+		LeaderId:      m.LeaderId,
+		MemberId:      m.MemberId,
+		Members:       m.Members,
+	}
+	return resp
+}
+
+func (m *MockJoinGroupResponse) SetThrottleTime(t int32) *MockJoinGroupResponse {
+	m.ThrottleTime = t
+	return m
+}
+
+func (m *MockJoinGroupResponse) SetError(kerr KError) *MockJoinGroupResponse {
+	m.Err = kerr
+	return m
+}
+
+func (m *MockJoinGroupResponse) SetGenerationId(id int32) *MockJoinGroupResponse {
+	m.GenerationId = id
+	return m
+}
+
+func (m *MockJoinGroupResponse) SetGroupProtocol(proto string) *MockJoinGroupResponse {
+	m.GroupProtocol = proto
+	return m
+}
+
+func (m *MockJoinGroupResponse) SetLeaderId(id string) *MockJoinGroupResponse {
+	m.LeaderId = id
+	return m
+}
+
+func (m *MockJoinGroupResponse) SetMemberId(id string) *MockJoinGroupResponse {
+	m.MemberId = id
+	return m
+}
+
+func (m *MockJoinGroupResponse) SetMember(id string, meta *ConsumerGroupMemberMetadata) *MockJoinGroupResponse {
+	bin, err := encode(meta, nil)
+	if err != nil {
+		panic(fmt.Sprintf("error encoding member metadata: %v", err))
+	}
+	m.Members[id] = bin
+	return m
+}
+
+type MockLeaveGroupResponse struct {
+	t TestReporter
+
+	Err KError
+}
+
+func NewMockLeaveGroupResponse(t TestReporter) *MockLeaveGroupResponse {
+	return &MockLeaveGroupResponse{t: t}
+}
+
+func (m *MockLeaveGroupResponse) For(reqBody versionedDecoder) encoder {
+	resp := &LeaveGroupResponse{
+		Err: m.Err,
+	}
+	return resp
+}
+
+func (m *MockLeaveGroupResponse) SetError(kerr KError) *MockLeaveGroupResponse {
+	m.Err = kerr
+	return m
+}
+
+type MockSyncGroupResponse struct {
+	t TestReporter
+
+	Err              KError
+	MemberAssignment []byte
+}
+
+func NewMockSyncGroupResponse(t TestReporter) *MockSyncGroupResponse {
+	return &MockSyncGroupResponse{t: t}
+}
+
+func (m *MockSyncGroupResponse) For(reqBody versionedDecoder) encoder {
+	resp := &SyncGroupResponse{
+		Err:              m.Err,
+		MemberAssignment: m.MemberAssignment,
+	}
+	return resp
+}
+
+func (m *MockSyncGroupResponse) SetError(kerr KError) *MockSyncGroupResponse {
+	m.Err = kerr
+	return m
+}
+
+func (m *MockSyncGroupResponse) SetMemberAssignment(assignment *ConsumerGroupMemberAssignment) *MockSyncGroupResponse {
+	bin, err := encode(assignment, nil)
+	if err != nil {
+		panic(fmt.Sprintf("error encoding member assignment: %v", err))
+	}
+	m.MemberAssignment = bin
+	return m
+}
+
+type MockHeartbeatResponse struct {
+	t TestReporter
+
+	Err KError
+}
+
+func NewMockHeartbeatResponse(t TestReporter) *MockHeartbeatResponse {
+	return &MockHeartbeatResponse{t: t}
+}
+
+func (m *MockHeartbeatResponse) For(reqBody versionedDecoder) encoder {
+	resp := &HeartbeatResponse{
+		Err: m.Err,
+	}
+	return resp
+}
+
+func (m *MockHeartbeatResponse) SetError(kerr KError) *MockHeartbeatResponse {
+	m.Err = kerr
+	return m
 }
