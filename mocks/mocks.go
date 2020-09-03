@@ -15,6 +15,7 @@ package mocks
 
 import (
 	"errors"
+
 	"github.com/Shopify/sarama"
 )
 
