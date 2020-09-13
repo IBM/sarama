@@ -1,6 +1,6 @@
 module github.com/Shopify/sarama/examples/interceptors
 
-go 1.14
+go 1.15
 
 replace github.com/Shopify/sarama => ../../
 
