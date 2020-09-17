@@ -267,6 +267,10 @@ func (pe ProducerError) Error() string {
 	return fmt.Sprintf("kafka: Failed to produce message to topic %s: %s", pe.Msg.Topic, pe.Err)
 }
 
+func (pe ProducerError) Unwrap() error {
+	return pe.Err
+}
+
 // ProducerErrors is a type that wraps a batch of "ProducerError"s and implements the Error interface.
 // It can be returned from the Producer's Close method to avoid the need to manually drain the Errors channel
 // when closing a producer.
