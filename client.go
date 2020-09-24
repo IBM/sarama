@@ -93,6 +93,9 @@ type Client interface {
 
 	// Closed returns true if the client has already had Close called on it
 	Closed() bool
+
+	// A private method to prevent users implementing the interface for compatibility
+	private()
 }
 
 const (
@@ -183,6 +186,8 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 
 	return client, nil
 }
+
+func (client *client) private() {}
 
 func (client *client) Config() *Config {
 	return client.conf
