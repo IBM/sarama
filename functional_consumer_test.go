@@ -18,7 +18,7 @@ func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
+	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,7 +49,7 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
+	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Version = V0_11_0_0
 
@@ -195,7 +195,7 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 	var producedMessages []*ProducerMessage
 	for _, prodVer := range clientVersions {
 		for _, codec := range codecs {
-			prodCfg := NewConfig()
+			prodCfg := NewTestConfig()
 			prodCfg.Version = prodVer
 			prodCfg.Producer.Return.Successes = true
 			prodCfg.Producer.Return.Errors = true
@@ -251,7 +251,7 @@ consumerVersionLoop:
 		t.Logf("*** Consuming with client version %s\n", consVer)
 		// Create a partition consumer that should start from the first produced
 		// message.
-		consCfg := NewConfig()
+		consCfg := NewTestConfig()
 		consCfg.Version = consVer
 		c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consCfg)
 		if err != nil {

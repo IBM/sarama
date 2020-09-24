@@ -50,7 +50,7 @@ func initOffsetManagerWithBackoffFunc(t *testing.T, retention time.Duration,
 
 func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
 	testClient Client, broker, coordinator *MockBroker) {
-	return initOffsetManagerWithBackoffFunc(t, retention, nil, NewConfig())
+	return initOffsetManagerWithBackoffFunc(t, retention, nil, NewTestConfig())
 }
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
@@ -76,7 +76,7 @@ func TestNewOffsetManager(t *testing.T) {
 	seedBroker.Returns(new(MetadataResponse))
 	defer seedBroker.Close()
 
-	testClient, err := NewClient([]string{seedBroker.Addr()}, nil)
+	testClient, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewConfig()
+			config := NewTestConfig()
 			if tt.set {
 				config.Consumer.Offsets.AutoCommit.Enable = tt.enable
 			}
@@ -171,7 +171,7 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 
 func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
 	// Tests to validate configuration when `Consumer.Offsets.AutoCommit.Enable` is false
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Consumer.Offsets.AutoCommit.Enable = false
 
 	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
@@ -278,7 +278,7 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 		atomic.AddInt32(&retryCount, 1)
 		return 0
 	}
-	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff, NewConfig())
+	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff, NewTestConfig())
 
 	// Error on first fetchInitialOffset call
 	responseBlock := OffsetFetchResponseBlock{

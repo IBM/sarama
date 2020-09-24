@@ -43,7 +43,7 @@ func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
 }
 
 func TestProducerReturnsExpectationsToChannels(t *testing.T) {
-	config := sarama.NewConfig()
+	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	mp := NewAsyncProducer(t, config)
 

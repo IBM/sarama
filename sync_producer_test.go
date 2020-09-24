@@ -21,7 +21,9 @@ func TestSyncProducer(t *testing.T) {
 		leader.Returns(prodSuccess)
 	}
 
-	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, nil)
+	config := NewTestConfig()
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +69,7 @@ func TestSyncProducerBatch(t *testing.T) {
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 3
 	config.Producer.Return.Successes = true
 	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
@@ -115,7 +117,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 100
 	config.Producer.Return.Successes = true
 	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
@@ -154,7 +156,7 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
 	broker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Metadata.Retry.Max = 0
 	config.Producer.Retry.Max = 0
 	config.Producer.Return.Successes = true
@@ -187,7 +189,7 @@ func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Retry.Max = 0 // disable!
 	config.Producer.Retry.Backoff = 0
 	config.Producer.Return.Successes = true

@@ -7,7 +7,7 @@ import (
 )
 
 func makeProduceSet() (*asyncProducer, *produceSet) {
-	conf := NewConfig()
+	conf := NewTestConfig()
 	txnmgr, _ := newTransactionManager(conf, nil)
 	parent := &asyncProducer{
 		conf:   conf,
@@ -285,7 +285,7 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 	const pID = 1000
 	const pEpoch = 1234
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.RequiredAcks = WaitForAll
 	config.Producer.Idempotent = true
 	config.Version = V0_11_0_0
