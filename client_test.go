@@ -585,7 +585,7 @@ func TestClientGetBroker(t *testing.T) {
 	metadataResponse1.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
 	seedBroker.Returns(metadataResponse1)
 
-	client, err := NewClient([]string{seedBroker.Addr()}, nil)
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -195,6 +195,9 @@ func TestOneMessageFetchResponse(t *testing.T) {
 	if block.HighWaterMarkOffset != 0x10101010 {
 		t.Error("Decoding didn't produce correct high water mark offset.")
 	}
+	if block.PreferredReadReplica != -1 {
+		t.Error("Decoding didn't produce correct preferred read replica.")
+	}
 	partial, err := block.isPartial()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -308,6 +311,9 @@ func TestOneRecordFetchResponse(t *testing.T) {
 	if block.HighWaterMarkOffset != 0x10101010 {
 		t.Error("Decoding didn't produce correct high water mark offset.")
 	}
+	if block.PreferredReadReplica != -1 {
+		t.Error("Decoding didn't produce correct preferred read replica.")
+	}
 	partial, err := block.isPartial()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -354,6 +360,9 @@ func TestPartailFetchResponse(t *testing.T) {
 	if block.HighWaterMarkOffset != 0x10101010 {
 		t.Error("Decoding didn't produce correct high water mark offset.")
 	}
+	if block.PreferredReadReplica != -1 {
+		t.Error("Decoding didn't produce correct preferred read replica.")
+	}
 	partial, err := block.isPartial()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -392,6 +401,9 @@ func TestOneMessageFetchResponseV4(t *testing.T) {
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
 		t.Error("Decoding didn't produce correct high water mark offset.")
+	}
+	if block.PreferredReadReplica != -1 {
+		t.Error("Decoding didn't produce correct preferred read replica.")
 	}
 	partial, err := block.isPartial()
 	if err != nil {

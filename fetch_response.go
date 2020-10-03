@@ -89,6 +89,8 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		if err != nil {
 			return err
 		}
+	} else {
+		b.PreferredReadReplica = -1
 	}
 
 	recordsSize, err := pd.getInt32()
