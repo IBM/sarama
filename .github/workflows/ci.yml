@@ -9,18 +9,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.14.x]
-        kafka-version: [2.4.1, 2.5.0]
+        go-version: [1.15.x]
+        kafka-version: [2.5.1, 2.6.0]
         platform: [ubuntu-latest]
 
     env:
-      KAFKA_PEERS: localhost:9091,localhost:9092,localhost:9093,localhost:9094,localhost:9095
-      TOXIPROXY_ADDR: http://localhost:8474
-      KAFKA_INSTALL_ROOT: /home/runner/kafka
-      KAFKA_HOSTNAME: localhost
       DEBUG: true
       KAFKA_VERSION: ${{ matrix.kafka-version }}
-      KAFKA_SCALA_VERSION: 2.12
 
     steps:
     - uses: actions/checkout@v1
@@ -46,18 +41,11 @@ jobs:
 
     - name: Install dependencies
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.6
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.31.0
         export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
-        vagrant/install_cluster.sh
-        vagrant/boot_cluster.sh
-        vagrant/create_topics.sh
-        vagrant/run_java_producer.sh
 
     - name: Run test suite
-      run: make test
+      run: make test_functional
 
     - name: Run linter
       run: make lint
-
-    - name: Teardown
-      run: vagrant/halt_cluster.sh

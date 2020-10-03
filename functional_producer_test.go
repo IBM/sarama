@@ -1,8 +1,11 @@
+//+build functional
+
 package sarama
 
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -15,30 +18,37 @@ import (
 const TestBatchSize = 1000
 
 func TestFuncProducing(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingGzip(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Compression = CompressionGZIP
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingSnappy(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Compression = CompressionSnappy
 	testProducingMessages(t, config)
 }
 
+func TestFuncProducingZstd(t *testing.T) {
+	config := NewTestConfig()
+	config.Version = V2_1_0_0
+	config.Producer.Compression = CompressionZSTD
+	testProducingMessages(t, config)
+}
+
 func TestFuncProducingNoResponse(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.RequiredAcks = NoResponse
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingFlushing(t *testing.T) {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = TestBatchSize / 8
 	config.Producer.Flush.Frequency = 250 * time.Millisecond
 	testProducingMessages(t, config)
@@ -48,12 +58,12 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.ChannelBufferSize = 20
 	config.Producer.Flush.Frequency = 50 * time.Millisecond
 	config.Producer.Flush.Messages = 200
 	config.Producer.Return.Successes = true
-	producer, err := NewSyncProducer(kafkaBrokers, config)
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +91,7 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	producer, err := NewSyncProducer(kafkaBrokers, nil)
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +111,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Frequency = 250 * time.Millisecond
 	config.Producer.Idempotent = true
 	config.Producer.Timeout = 500 * time.Millisecond
@@ -113,7 +123,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 	config.Version = V0_11_0_0
 
-	producer, err := NewSyncProducer(kafkaBrokers, config)
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +141,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	}
 
 	// break the brokers.
-	for proxyName, proxy := range Proxies {
+	for proxyName, proxy := range FunctionalTestEnv.Proxies {
 		if !strings.Contains(proxyName, "kafka") {
 			continue
 		}
@@ -152,7 +162,7 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	}
 
 	// Now bring the proxy back up
-	for proxyName, proxy := range Proxies {
+	for proxyName, proxy := range FunctionalTestEnv.Proxies {
 		if !strings.Contains(proxyName, "kafka") {
 			continue
 		}
@@ -174,12 +184,84 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	}
 }
 
+func TestInterceptors(t *testing.T) {
+	config := NewTestConfig()
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config.Producer.Return.Successes = true
+	config.Consumer.Return.Errors = true
+	config.Producer.Interceptors = []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 100}}
+	config.Consumer.Interceptors = []ConsumerInterceptor{&appendInterceptor{i: 20}}
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	producer, err := NewAsyncProducerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "test.1", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case msg := <-producer.Successes():
+			v, _ := msg.Value.Encode()
+			expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+100)
+			if string(v) != expected {
+				t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+			}
+		}
+	}
+	safeClose(t, producer)
+
+	master, err := NewConsumerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer, err := master.ConsumePartition("test.1", 0, initialOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		select {
+		case <-time.After(10 * time.Second):
+			t.Fatal("Not received any more events in the last 10 seconds.")
+		case err := <-consumer.Errors():
+			t.Error(err)
+		case msg := <-consumer.Messages():
+			prodInteExpectation := strconv.Itoa(i) + strconv.Itoa(i+100)
+			consInteExpectation := strconv.Itoa(i + 20)
+			expected := TestMessage + prodInteExpectation + consInteExpectation
+			v := string(msg.Value)
+			if v != expected {
+				t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+			}
+		}
+	}
+	safeClose(t, consumer)
+	safeClose(t, client)
+}
+
 func testProducingMessages(t *testing.T, config *Config) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
 	// Configure some latency in order to properly validate the request latency metric
-	for _, proxy := range Proxies {
+	for _, proxy := range FunctionalTestEnv.Proxies {
 		if _, err := proxy.AddToxic("", "latency", "", 1, toxiproxy.Attributes{"latency": 10}); err != nil {
 			t.Fatal("Unable to configure latency toxicity", err)
 		}
@@ -188,7 +270,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
 
-	client, err := NewClient(kafkaBrokers, config)
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -360,7 +442,7 @@ func BenchmarkProducerSmallSinglePartition(b *testing.B) {
 	benchmarkProducer(b, nil, "test.1", ByteEncoder(make([]byte, 128)))
 }
 func BenchmarkProducerMediumSnappy(b *testing.B) {
-	conf := NewConfig()
+	conf := NewTestConfig()
 	conf.Producer.Compression = CompressionSnappy
 	benchmarkProducer(b, conf, "test.1", ByteEncoder(make([]byte, 1024)))
 }
@@ -380,7 +462,7 @@ func benchmarkProducer(b *testing.B, conf *Config, topic string, value Encoder) 
 		}()
 	}
 
-	producer, err := NewAsyncProducer(kafkaBrokers, conf)
+	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, conf)
 	if err != nil {
 		b.Fatal(err)
 	}

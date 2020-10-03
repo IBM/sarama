@@ -212,7 +212,7 @@ func TestManualPartitioner(t *testing.T) {
 // This example shows how you can partition messages randomly, even when a key is set,
 // by overriding Config.Producer.Partitioner.
 func ExamplePartitioner_random() {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Partitioner = NewRandomPartitioner
 
 	producer, err := NewSyncProducer([]string{"localhost:9092"}, config)
@@ -236,7 +236,7 @@ func ExamplePartitioner_random() {
 
 // This example shows how to assign partitions to your messages manually.
 func ExamplePartitioner_manual() {
-	config := NewConfig()
+	config := NewTestConfig()
 
 	// First, we tell the producer that we are going to partition ourselves.
 	config.Producer.Partitioner = NewManualPartitioner
@@ -268,7 +268,7 @@ func ExamplePartitioner_manual() {
 
 // This example shows how to set a different partitioner depending on the topic.
 func ExamplePartitioner_per_topic() {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Partitioner = func(topic string) Partitioner {
 		switch topic {
 		case "access_log", "error_log":

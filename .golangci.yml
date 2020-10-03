@@ -66,9 +66,12 @@ linters:
     - varcheck
     - whitespace
     # - goconst
-    # - gochecknoinits
+    - gochecknoinits
 
 issues:
   exclude:
     - consider giving a name to these results
     - include an explanation for nolint directive
+    - Potential Integer overflow made by strconv.Atoi result conversion to int16/32
+    - Use of weak random number generator
+    - TLS MinVersion too low

@@ -1,13 +1,13 @@
 package sarama
 
 import (
-	"encoding/asn1"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"strings"
 	"time"
 
+	"github.com/jcmturner/gofork/encoding/asn1"
 	"gopkg.in/jcmturner/gokrb5.v7/asn1tools"
 	"gopkg.in/jcmturner/gokrb5.v7/gssapi"
 	"gopkg.in/jcmturner/gokrb5.v7/iana/chksumtype"
@@ -34,6 +34,7 @@ type GSSAPIConfig struct {
 	Username           string
 	Password           string
 	Realm              string
+	DisablePAFXFAST    bool
 }
 
 type GSSAPIKerberosAuth struct {

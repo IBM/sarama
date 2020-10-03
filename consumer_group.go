@@ -255,36 +255,36 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	// Sync consumer group
-	sync, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
+	groupRequest, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
 	if err != nil {
 		_ = coordinator.Close()
 		return nil, err
 	}
-	switch sync.Err {
+	switch groupRequest.Err {
 	case ErrNoError:
 	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately
 		c.memberID = ""
 		return c.newSession(ctx, topics, handler, retries)
 	case ErrNotCoordinatorForConsumer: // retry after backoff with coordinator refresh
 		if retries <= 0 {
-			return nil, sync.Err
+			return nil, groupRequest.Err
 		}
 
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	case ErrRebalanceInProgress: // retry after backoff
 		if retries <= 0 {
-			return nil, sync.Err
+			return nil, groupRequest.Err
 		}
 
 		return c.retryNewSession(ctx, topics, handler, retries, false)
 	default:
-		return nil, sync.Err
+		return nil, groupRequest.Err
 	}
 
 	// Retrieve and sort claims
 	var claims map[string][]int32
-	if len(sync.MemberAssignment) > 0 {
-		members, err := sync.GetMemberAssignment()
+	if len(groupRequest.MemberAssignment) > 0 {
+		members, err := groupRequest.GetMemberAssignment()
 		if err != nil {
 			return nil, err
 		}
@@ -513,6 +513,11 @@ type ConsumerGroupSession interface {
 	// message twice, and your processing should ideally be idempotent.
 	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
+	// Commit the offset to the backend
+	//
+	// Note: calling Commit performs a blocking synchronous operation.
+	Commit()
+
 	// ResetOffset resets to the provided offset, alongside a metadata string that
 	// represents the state of the partition consumer at that point in time. Reset
 	// acts as a counterpart to MarkOffset, the difference being that it allows to
@@ -622,6 +627,10 @@ func (s *consumerGroupSession) MarkOffset(topic string, partition int32, offset 
 	if pom := s.offsets.findPOM(topic, partition); pom != nil {
 		pom.MarkOffset(offset, metadata)
 	}
+}
+
+func (s *consumerGroupSession) Commit() {
+	s.offsets.Commit()
 }
 
 func (s *consumerGroupSession) ResetOffset(topic string, partition int32, offset int64, metadata string) {

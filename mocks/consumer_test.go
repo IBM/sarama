@@ -20,7 +20,7 @@ func TestMockConsumerImplementsConsumerInterface(t *testing.T) {
 }
 
 func TestConsumerHandlesExpectations(t *testing.T) {
-	consumer := NewConsumer(t, nil)
+	consumer := NewConsumer(t, NewTestConfig())
 	defer func() {
 		if err := consumer.Close(); err != nil {
 			t.Error(err)
@@ -65,7 +65,7 @@ func TestConsumerHandlesExpectations(t *testing.T) {
 }
 
 func TestConsumerReturnsNonconsumedErrorsOnClose(t *testing.T) {
-	consumer := NewConsumer(t, nil)
+	consumer := NewConsumer(t, NewTestConfig())
 	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
 	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
 
@@ -91,7 +91,7 @@ func TestConsumerReturnsNonconsumedErrorsOnClose(t *testing.T) {
 
 func TestConsumerWithoutExpectationsOnPartition(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 
 	_, err := consumer.ConsumePartition("test", 1, sarama.OffsetOldest)
 	if err != errOutOfExpectations {
@@ -109,7 +109,7 @@ func TestConsumerWithoutExpectationsOnPartition(t *testing.T) {
 
 func TestConsumerWithExpectationsOnUnconsumedPartition(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
 
 	if err := consumer.Close(); err != nil {
@@ -123,7 +123,7 @@ func TestConsumerWithExpectationsOnUnconsumedPartition(t *testing.T) {
 
 func TestConsumerWithWrongOffsetExpectation(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
 
 	_, err := consumer.ConsumePartition("test", 0, sarama.OffsetNewest)
@@ -142,7 +142,7 @@ func TestConsumerWithWrongOffsetExpectation(t *testing.T) {
 
 func TestConsumerViolatesMessagesDrainedExpectation(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
 	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
 	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
@@ -167,7 +167,7 @@ func TestConsumerViolatesMessagesDrainedExpectation(t *testing.T) {
 
 func TestConsumerMeetsErrorsDrainedExpectation(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 
 	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
 	pcmock.YieldError(sarama.ErrInvalidMessage)
@@ -194,7 +194,7 @@ func TestConsumerMeetsErrorsDrainedExpectation(t *testing.T) {
 
 func TestConsumerTopicMetadata(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 
 	consumer.SetTopicMetadata(map[string][]int32{
 		"test1": {0, 1, 2, 3},
@@ -237,7 +237,7 @@ func TestConsumerTopicMetadata(t *testing.T) {
 
 func TestConsumerUnexpectedTopicMetadata(t *testing.T) {
 	trm := newTestReporterMock()
-	consumer := NewConsumer(trm, nil)
+	consumer := NewConsumer(trm, NewTestConfig())
 
 	if _, err := consumer.Topics(); err != sarama.ErrOutOfBrokers {
 		t.Error("Expected sarama.ErrOutOfBrokers, found", err)

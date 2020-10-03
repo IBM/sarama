@@ -18,7 +18,7 @@ func (h exampleConsumerGroupHandler) ConsumeClaim(sess ConsumerGroupSession, cla
 }
 
 func ExampleConsumerGroup() {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Version = V2_0_0_0 // specify appropriate version
 	config.Consumer.Return.Errors = true
 

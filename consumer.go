@@ -35,6 +35,10 @@ func (ce ConsumerError) Error() string {
 	return fmt.Sprintf("kafka: error while consuming %s/%d: %s", ce.Topic, ce.Partition, ce.Err)
 }
 
+func (ce ConsumerError) Unwrap() error {
+	return ce.Err
+}
+
 // ConsumerErrors is a type that wraps a batch of errors and implements the Error interface.
 // It can be returned from the PartitionConsumer's Close methods to avoid the need to manually drain errors
 // when stopping.
@@ -433,13 +437,13 @@ func (child *partitionConsumer) AsyncClose() {
 func (child *partitionConsumer) Close() error {
 	child.AsyncClose()
 
-	var errors ConsumerErrors
+	var consumerErrors ConsumerErrors
 	for err := range child.errors {
-		errors = append(errors, err)
+		consumerErrors = append(consumerErrors, err)
 	}
 
-	if len(errors) > 0 {
-		return errors
+	if len(consumerErrors) > 0 {
+		return consumerErrors
 	}
 	return nil
 }
@@ -461,6 +465,9 @@ feederLoop:
 		}
 
 		for i, msg := range msgs {
+			for _, interceptor := range child.conf.Consumer.Interceptors {
+				msg.safelyApplyInterceptor(interceptor)
+			}
 		messageSelect:
 			select {
 			case <-child.dying:
@@ -638,7 +645,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 	abortedProducerIDs := make(map[int64]struct{}, len(block.AbortedTransactions))
 	abortedTransactions := block.getAbortedTransactions()
 
-	messages := []*ConsumerMessage{}
+	var messages []*ConsumerMessage
 	for _, records := range block.RecordsSet {
 		switch records.recordsType {
 		case legacyRecords:

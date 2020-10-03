@@ -15,6 +15,8 @@ package mocks
 
 import (
 	"errors"
+
+	"github.com/Shopify/sarama"
 )
 
 // ErrorReporter is a simple interface that includes the testing.T methods we use to report
@@ -38,4 +40,13 @@ const AnyOffset int64 = -1000
 type producerExpectation struct {
 	Result        error
 	CheckFunction ValueChecker
+}
+
+// NewTestConfig returns a config meant to be used by tests.
+// Due to inconsistencies with the request versions the clients send using the default Kafka version
+// and the response versions our mocks use, we default to the minimum Kafka version in most tests
+func NewTestConfig() *sarama.Config {
+	config := sarama.NewConfig()
+	config.Version = sarama.MinVersion
+	return config
 }

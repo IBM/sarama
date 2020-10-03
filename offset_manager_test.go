@@ -50,7 +50,7 @@ func initOffsetManagerWithBackoffFunc(t *testing.T, retention time.Duration,
 
 func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
 	testClient Client, broker, coordinator *MockBroker) {
-	return initOffsetManagerWithBackoffFunc(t, retention, nil, NewConfig())
+	return initOffsetManagerWithBackoffFunc(t, retention, nil, NewTestConfig())
 }
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
@@ -76,7 +76,7 @@ func TestNewOffsetManager(t *testing.T) {
 	seedBroker.Returns(new(MetadataResponse))
 	defer seedBroker.Close()
 
-	testClient, err := NewClient([]string{seedBroker.Addr()}, nil)
+	testClient, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
 		t.Run(tt.name, func(t *testing.T) {
-			config := NewConfig()
+			config := NewTestConfig()
 			if tt.set {
 				config.Consumer.Offsets.AutoCommit.Enable = tt.enable
 			}
@@ -167,6 +167,64 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 			safeClose(t, testClient)
 		})
 	}
+}
+
+func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
+	// Tests to validate configuration when `Consumer.Offsets.AutoCommit.Enable` is false
+	config := NewTestConfig()
+	config.Consumer.Offsets.AutoCommit.Enable = false
+
+	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+
+	// Wait long enough for the test not to fail..
+	timeout := 50 * config.Consumer.Offsets.AutoCommit.Interval
+
+	ocResponse := new(OffsetCommitResponse)
+	ocResponse.AddError("my_topic", 0, ErrNoError)
+	called := make(chan none)
+	handler := func(req *request) (res encoderWithHeader) {
+		close(called)
+		return ocResponse
+	}
+	coordinator.setHandler(handler)
+
+	// Should not trigger an auto-commit
+	expected := int64(1)
+	pom.ResetOffset(expected, "modified_meta")
+	_, _ = pom.NextOffset()
+
+	select {
+	case <-called:
+		// OffsetManager called on the wire.
+		t.Errorf("Received request when AutoCommit is disabled")
+	case <-time.After(timeout):
+		// Timeout waiting for OffsetManager to call on the wire.
+		// OK
+	}
+
+	// Setup again to test manual commit
+	called = make(chan none)
+
+	om.Commit()
+
+	select {
+	case <-called:
+		// OffsetManager called on the wire.
+		// OK
+	case <-time.After(timeout):
+		// Timeout waiting for OffsetManager to call on the wire.
+		t.Errorf("No request received for after waiting for %v", timeout)
+	}
+
+	// Close up
+	broker.Close()
+	coordinator.Close()
+
+	// !! om must be closed before the pom so pom.release() is called before pom.Close()
+	safeClose(t, om)
+	safeClose(t, pom)
+	safeClose(t, testClient)
 }
 
 // Test recovery from ErrNotCoordinatorForConsumer
@@ -220,7 +278,7 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 		atomic.AddInt32(&retryCount, 1)
 		return 0
 	}
-	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff, NewConfig())
+	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff, NewTestConfig())
 
 	// Error on first fetchInitialOffset call
 	responseBlock := OffsetFetchResponseBlock{

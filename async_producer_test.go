@@ -5,13 +5,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/fortytw2/leaktest"
-	metrics "github.com/rcrowley/go-metrics"
+	"github.com/rcrowley/go-metrics"
 )
 
 const TestMessage = "ABC THE MESSAGE"
@@ -91,7 +92,7 @@ func (f flakyEncoder) Length() int {
 }
 
 func (f flakyEncoder) Encode() ([]byte, error) {
-	if !bool(f) {
+	if !f {
 		return nil, errors.New("flaky encoding error")
 	}
 	return []byte(TestMessage), nil
@@ -110,7 +111,7 @@ func TestAsyncProducer(t *testing.T) {
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
@@ -161,7 +162,7 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 	leader.Returns(prodSuccess)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
@@ -201,7 +202,7 @@ func TestAsyncProducerMultipleBrokers(t *testing.T) {
 	prodResponse1.AddTopicPartition("my_topic", 1, ErrNoError)
 	leader1.Returns(prodResponse1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewRoundRobinPartitioner
@@ -234,7 +235,7 @@ func TestAsyncProducerCustomPartitioner(t *testing.T) {
 	prodResponse.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 2
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = func(topic string) Partitioner {
@@ -273,7 +274,7 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -323,7 +324,7 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 		metadataLeader1.AddTopicPartition("my_topic", 1, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 		seedBroker.Returns(metadataLeader1)
 
-		config := NewConfig()
+		config := NewTestConfig()
 		config.Producer.Flush.Messages = 2
 		config.Producer.Return.Successes = true
 		config.Producer.Retry.Max = 0 // disable!
@@ -387,7 +388,7 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 	leader.Returns(prodSuccess)
 	leader.Returns(prodSuccess)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Partitioner = NewManualPartitioner
@@ -424,7 +425,7 @@ func TestAsyncProducerBrokerBounce(t *testing.T) {
 	prodSuccess := new(ProduceResponse)
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -461,7 +462,7 @@ func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 3
@@ -504,7 +505,7 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
@@ -560,7 +561,7 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	metadataLeader1.AddTopicPartition("my_topic", 0, leader1.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader1)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
@@ -628,7 +629,7 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -685,7 +686,7 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
 	config.Producer.Retry.Max = 1
@@ -741,7 +742,7 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 	metadataResponse.AddTopicPartition("my_topic", 1, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataResponse)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 5
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -806,7 +807,7 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Backoff = 0
@@ -855,7 +856,7 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = false
 	config.Producer.Return.Errors = false
@@ -904,7 +905,7 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 	}
 	broker.Returns(initProducerID)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
@@ -1048,7 +1049,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 			return nil
 		}
 
-		config := NewConfig()
+		config := NewTestConfig()
 		config.Version = V0_11_0_0
 		config.Producer.Idempotent = true
 		config.Net.MaxOpenRequests = 1
@@ -1099,7 +1100,7 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 	}
 	broker.Returns(initProducerID)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 400000
@@ -1149,7 +1150,7 @@ func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
 	}
 	broker.Returns(initProducerID)
 
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Flush.Frequency = 10 * time.Millisecond
 	config.Producer.Return.Successes = true
@@ -1215,7 +1216,7 @@ func TestBrokerProducerShutdown(t *testing.T) {
 		"my_topic", 0, mockBroker.BrokerID(), nil, nil, nil, ErrNoError)
 	mockBroker.Returns(metadataResponse)
 
-	producer, err := NewAsyncProducer([]string{mockBroker.Addr()}, nil)
+	producer, err := NewAsyncProducer([]string{mockBroker.Addr()}, NewTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1228,6 +1229,126 @@ func TestBrokerProducerShutdown(t *testing.T) {
 	bp.shutdown()
 	_ = producer.Close()
 	mockBroker.Close()
+}
+
+type appendInterceptor struct {
+	i int
+}
+
+func (b *appendInterceptor) OnSend(msg *ProducerMessage) {
+	if b.i < 0 {
+		panic("hey, the interceptor has failed")
+	}
+	v, _ := msg.Value.Encode()
+	msg.Value = StringEncoder(string(v) + strconv.Itoa(b.i))
+	b.i++
+}
+
+func (b *appendInterceptor) OnConsume(msg *ConsumerMessage) {
+	if b.i < 0 {
+		panic("hey, the interceptor has failed")
+	}
+	msg.Value = []byte(string(msg.Value) + strconv.Itoa(b.i))
+	b.i++
+}
+
+func testProducerInterceptor(
+	t *testing.T,
+	interceptors []ProducerInterceptor,
+	expectationFn func(*testing.T, int, *ProducerMessage),
+) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataLeader)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.Return.Successes = true
+	config.Producer.Interceptors = interceptors
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+
+	for i := 0; i < 10; i++ {
+		select {
+		case msg := <-producer.Errors():
+			t.Error(msg.Err)
+		case msg := <-producer.Successes():
+			expectationFn(t, i, msg)
+		}
+	}
+
+	closeProducer(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
+func TestAsyncProducerInterceptors(t *testing.T) {
+	tests := []struct {
+		name          string
+		interceptors  []ProducerInterceptor
+		expectationFn func(*testing.T, int, *ProducerMessage)
+	}{
+		{
+			name:         "intercept messages",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: 0}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage + strconv.Itoa(i)
+				if string(v) != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+1000)
+				if string(v) != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain with one interceptor failing",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: 1000}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage + strconv.Itoa(i+1000)
+				if string(v) != expected {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+		{
+			name:         "interceptor chain with all interceptors failing",
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}},
+			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
+				v, _ := msg.Value.Encode()
+				expected := TestMessage
+				if string(v) != expected {
+					t.Errorf("Interceptor should have not changed the value, got %s, expected %s", v, expected)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) { testProducerInterceptor(t, tt.interceptors, tt.expectationFn) })
+	}
 }
 
 // This example shows how to use the producer while simultaneously
@@ -1248,7 +1369,7 @@ func ExampleAsyncProducer_select() {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, os.Interrupt)
 
-	var enqueued, errors int
+	var enqueued, producerErrors int
 ProducerLoop:
 	for {
 		select {
@@ -1256,13 +1377,13 @@ ProducerLoop:
 			enqueued++
 		case err := <-producer.Errors():
 			log.Println("Failed to produce message", err)
-			errors++
+			producerErrors++
 		case <-signals:
 			break ProducerLoop
 		}
 	}
 
-	log.Printf("Enqueued: %d; errors: %d\n", enqueued, errors)
+	log.Printf("Enqueued: %d; errors: %d\n", enqueued, producerErrors)
 }
 
 // This example shows how to use the producer with separate goroutines
@@ -1270,7 +1391,7 @@ ProducerLoop:
 // for the Successes channel to be populated, you have to set
 // config.Producer.Return.Successes to true.
 func ExampleAsyncProducer_goroutines() {
-	config := NewConfig()
+	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	producer, err := NewAsyncProducer([]string{"localhost:9092"}, config)
 	if err != nil {
@@ -1282,8 +1403,8 @@ func ExampleAsyncProducer_goroutines() {
 	signal.Notify(signals, os.Interrupt)
 
 	var (
-		wg                          sync.WaitGroup
-		enqueued, successes, errors int
+		wg                                  sync.WaitGroup
+		enqueued, successes, producerErrors int
 	)
 
 	wg.Add(1)
@@ -1299,7 +1420,7 @@ func ExampleAsyncProducer_goroutines() {
 		defer wg.Done()
 		for err := range producer.Errors() {
 			log.Println(err)
-			errors++
+			producerErrors++
 		}
 	}()
 
@@ -1318,5 +1439,14 @@ ProducerLoop:
 
 	wg.Wait()
 
-	log.Printf("Successfully produced: %d; errors: %d\n", successes, errors)
+	log.Printf("Successfully produced: %d; errors: %d\n", successes, producerErrors)
+}
+
+// NewTestConfig returns a config meant to be used by tests.
+// Due to inconsistencies with the request versions the clients send using the default Kafka version
+// and the response versions our mocks use, we default to the minimum Kafka version in most tests
+func NewTestConfig() *Config {
+	config := NewConfig()
+	config.Version = MinVersion
+	return config
 }

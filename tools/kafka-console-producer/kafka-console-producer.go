@@ -102,7 +102,7 @@ func main() {
 	}
 
 	if *headers != "" {
-		hdrs := []sarama.RecordHeader{}
+		var hdrs []sarama.RecordHeader
 		arrHdrs := strings.Split(*headers, ",")
 		for _, h := range arrHdrs {
 			if header := strings.Split(h, ":"); len(header) != 2 {

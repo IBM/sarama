@@ -3,7 +3,7 @@ package sarama
 import "testing"
 
 var (
-	apiVersionRequest = []byte{}
+	apiVersionRequest []byte
 )
 
 func TestApiVersionsRequest(t *testing.T) {
