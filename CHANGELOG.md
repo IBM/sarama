@@ -2,6 +2,22 @@
 
 #### Unreleased
 
+#### Version 1.27.1 (2020-10-07)
+
+# Improvements
+
+#1775 - @d1egoaz - Adds a Producer Interceptor example
+#1781 - @justin-chen - Refresh brokers given list of seed brokers
+#1784 - @justin-chen - Add randomize seed broker method
+#1790 - @d1egoaz - remove example binary
+#1798 - @bai - Test against Go 1.15
+#1785 - @justin-chen - Add private method to Client interface to prevent implementation
+#1802 - @uvw - Support Go 1.13 error unwrapping
+
+# Fixes
+
+#1791 - @stanislavkozlovski - bump default version to 1.0.0
+
 #### Version 1.27.0 (2020-08-11)
 
 # Improvements
