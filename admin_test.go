@@ -168,13 +168,66 @@ func TestClusterAdminListTopics(t *testing.T) {
 	if !found {
 		t.Fatal(errors.New("topic not found in response"))
 	}
-	_, found = topic.ConfigEntries["max.message.bytes"]
+	_, found = topic.ConfigEntries["min.insync.replicas"]
 	if found {
 		t.Fatal(errors.New("default topic config entry incorrectly found in response"))
 	}
 	value := topic.ConfigEntries["retention.ms"]
 	if value == nil || *value != "5000" {
 		t.Fatal(errors.New("non-default topic config entry not found in response"))
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if topic.ReplicaAssignment == nil || topic.ReplicaAssignment[0][0] != 1 {
+		t.Fatal(errors.New("replica assignment not found in response"))
+	}
+}
+
+func TestClusterAdminListTopicsAndFilterConfigEntries(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader("my_topic", 0, seedBroker.BrokerID()),
+		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_1_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	filter := func(entry *ConfigEntry) bool {
+		return entry.Source == SourceTopic
+	}
+	entries, err := admin.ListTopicsAndFilterConfigEntries(filter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) <= 0 {
+		t.Fatal(errors.New("no resource present"))
+	}
+
+	topic, found := entries["my_topic"]
+	if !found {
+		t.Fatal(errors.New("topic not found in response"))
+	}
+	_, found = topic.ConfigEntries["max.message.bytes"]
+	if !found {
+		t.Fatal(errors.New("dynamic topic config entry max.message.bytes should be in the response"))
+	}
+
+	if len(topic.ConfigEntries) != 1 {
+		t.Fatal(errors.New("it should have only returned 1 dynamic topic config"))
 	}
 
 	err = admin.Close()

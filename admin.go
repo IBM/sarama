@@ -23,6 +23,9 @@ type ClusterAdmin interface {
 	// List the topics available in the cluster with the default options.
 	ListTopics() (map[string]TopicDetail, error)
 
+	// List the topics available in the cluster, topic config options depends on the passed filter.
+	ListTopicsAndFilterConfigEntries(filterEntry func(*ConfigEntry) bool) (map[string]TopicDetail, error)
+
 	// Describe some topics in the cluster.
 	DescribeTopics(topics []string) (metadata []*TopicMetadata, err error)
 
@@ -302,6 +305,13 @@ func (ca *clusterAdmin) findAnyBroker() (*Broker, error) {
 }
 
 func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
+	filter := func(entry *ConfigEntry) bool {
+		return !entry.Default && !entry.Sensitive
+	}
+	return ca.ListTopicsAndFilterConfigEntries(filter)
+}
+
+func (ca *clusterAdmin) ListTopicsAndFilterConfigEntries(filterEntry func(*ConfigEntry) bool) (map[string]TopicDetail, error) {
 	// In order to build TopicDetails we need to first get the list of all
 	// topics using a MetadataRequest and then get their configs using a
 	// DescribeConfigsRequest request. To avoid sending many requests to the
@@ -370,7 +380,8 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 		for _, entry := range resource.Configs {
 			// only include non-default non-sensitive config
 			// (don't actually think topic config will ever be sensitive)
-			if entry.Default || entry.Sensitive {
+
+			if !filterEntry(entry) {
 				continue
 			}
 			topicDetails.ConfigEntries[entry.Name] = &entry.Value

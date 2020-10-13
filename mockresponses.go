@@ -784,7 +784,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 					Name:     "min.insync.replicas",
 					Value:    "2",
 					ReadOnly: false,
-					Default:  false,
+					Default:  true,
+					Source:   SourceDefault,
 				},
 			)
 			res.Resources = append(res.Resources, &ResourceResponse{
@@ -808,12 +809,14 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 			maxMessageBytes := &ConfigEntry{Name: "max.message.bytes",
 				Value:     "1000000",
 				ReadOnly:  false,
-				Default:   !includeSource,
+				Source:    SourceTopic,
 				Sensitive: false,
 			}
-			if includeSource {
-				maxMessageBytes.Source = SourceDefault
+			if !includeSource {
+				maxMessageBytes.Source = SourceUnknown
 			}
+			maxMessageBytes.Default = maxMessageBytes.Source == SourceDefault
+
 			if includeSynonyms {
 				maxMessageBytes.Synonyms = []*ConfigSynonym{
 					{
