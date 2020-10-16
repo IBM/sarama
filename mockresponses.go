@@ -1092,7 +1092,7 @@ type MockJoinGroupResponse struct {
 
 func NewMockJoinGroupResponse(t TestReporter) *MockJoinGroupResponse {
 	return &MockJoinGroupResponse{
-		t: t,
+		t:       t,
 		Members: make(map[string][]byte),
 	}
 }
