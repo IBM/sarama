@@ -9,6 +9,9 @@ import (
 // or otherwise failed to respond.
 var ErrOutOfBrokers = errors.New("kafka: client has run out of available brokers to talk to (Is your cluster reachable?)")
 
+// ErrBrokerNotFound is the error returned when there's no broker found for the requested ID.
+var ErrBrokerNotFound = errors.New("kafka: broker for ID is not found")
+
 // ErrClosedClient is the error returned when a method is called on a client that has been closed.
 var ErrClosedClient = errors.New("kafka: tried to use a client that was closed")
 

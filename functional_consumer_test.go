@@ -246,42 +246,41 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 func consumeMsgs(t *testing.T, clientVersions []KafkaVersion, producedMessages []*ProducerMessage) {
 	// Consume all produced messages with all client versions supported by the
 	// cluster.
-consumerVersionLoop:
 	for _, consVer := range clientVersions {
-		t.Logf("*** Consuming with client version %s\n", consVer)
-		// Create a partition consumer that should start from the first produced
-		// message.
-		consCfg := NewTestConfig()
-		consCfg.Version = consVer
-		c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consCfg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer safeClose(t, c)
-		pc, err := c.ConsumePartition("test.1", 0, producedMessages[0].Offset)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer safeClose(t, pc)
-
-		// Consume as many messages as there have been produced and make sure that
-		// order is preserved.
-		for i, prodMsg := range producedMessages {
-			select {
-			case consMsg := <-pc.Messages():
-				if consMsg.Offset != prodMsg.Offset {
-					t.Errorf("Consumed unexpected offset: version=%s, index=%d, want=%s, got=%s",
-						consVer, i, prodMsg2Str(prodMsg), consMsg2Str(consMsg))
-					continue consumerVersionLoop
-				}
-				if string(consMsg.Value) != string(prodMsg.Value.(StringEncoder)) {
-					t.Errorf("Consumed unexpected msg: version=%s, index=%d, want=%s, got=%s",
-						consVer, i, prodMsg2Str(prodMsg), consMsg2Str(consMsg))
-					continue consumerVersionLoop
-				}
-			case <-time.After(3 * time.Second):
-				t.Fatalf("Timeout waiting for: index=%d, offset=%d, msg=%s", i, prodMsg.Offset, prodMsg.Value)
+		t.Run(consVer.String(), func(t *testing.T) {
+			t.Logf("*** Consuming with client version %s\n", consVer)
+			// Create a partition consumer that should start from the first produced
+			// message.
+			consCfg := NewTestConfig()
+			consCfg.Version = consVer
+			c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consCfg)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
+			defer safeClose(t, c)
+			pc, err := c.ConsumePartition("test.1", 0, producedMessages[0].Offset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer safeClose(t, pc)
+
+			// Consume as many messages as there have been produced and make sure that
+			// order is preserved.
+			for i, prodMsg := range producedMessages {
+				select {
+				case consMsg := <-pc.Messages():
+					if consMsg.Offset != prodMsg.Offset {
+						t.Fatalf("Consumed unexpected offset: version=%s, index=%d, want=%s, got=%s",
+							consVer, i, prodMsg2Str(prodMsg), consMsg2Str(consMsg))
+					}
+					if string(consMsg.Value) != string(prodMsg.Value.(StringEncoder)) {
+						t.Fatalf("Consumed unexpected msg: version=%s, index=%d, want=%s, got=%s",
+							consVer, i, prodMsg2Str(prodMsg), consMsg2Str(consMsg))
+					}
+				case <-time.After(3 * time.Second):
+					t.Fatalf("Timeout waiting for: index=%d, offset=%d, msg=%s", i, prodMsg.Offset, prodMsg.Value)
+				}
+			}
+		})
 	}
 }

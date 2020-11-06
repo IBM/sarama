@@ -29,6 +29,9 @@ type Client interface {
 	// Brokers returns the current set of active brokers as retrieved from cluster metadata.
 	Brokers() []*Broker
 
+	// Broker returns the active Broker if available for the broker ID.
+	Broker(brokerID int32) (*Broker, error)
+
 	// Topics returns the set of available topics as retrieved from cluster metadata.
 	Topics() ([]string, error)
 
@@ -196,6 +199,17 @@ func (client *client) Brokers() []*Broker {
 		brokers = append(brokers, broker)
 	}
 	return brokers
+}
+
+func (client *client) Broker(brokerID int32) (*Broker, error) {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+	broker, ok := client.brokers[brokerID]
+	if !ok {
+		return nil, ErrBrokerNotFound
+	}
+	_ = broker.Open(client.conf)
+	return broker, nil
 }
 
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
