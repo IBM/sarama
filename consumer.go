@@ -775,7 +775,11 @@ func (bc *brokerConsumer) subscriptionManager() {
 
 			Logger.Printf("Accumulated %d new subscriptions", len(subscribingPartitionConsumers))
 
-			bc.wait <- none{}
+			select {
+				case bc.wait <- none{}:
+				default:
+			}
+
 			bc.newSubscriptions <- subscribingPartitionConsumers
 
 			// clear out the batch
@@ -807,12 +811,35 @@ func (bc *brokerConsumer) subscriptionConsumer() {
 			continue
 		}
 
+		if bc.consumer.conf.LogLevel > 5 {
+			Logger.Printf("[%s] Getting records", bc.broker.addr)
+		}
+
 		response, err := bc.fetchNewMessages()
 
 		if err != nil {
 			Logger.Printf("consumer/broker/%d disconnecting due to error processing FetchRequest: %s\n", bc.broker.ID(), err)
 			bc.abort(err)
 			return
+		}
+
+		if bc.consumer.conf.LogLevel > 5 {
+			numRecords := 0
+			numBytes := 0
+
+			for _, partitionFetchResponseBlock := range response.Blocks {
+				for _, fetchResponseBlock := range partitionFetchResponseBlock {
+					numRecords += len(fetchResponseBlock.RecordsSet)
+
+					for _, records := range fetchResponseBlock.RecordsSet {
+						for _, record := range records.RecordBatch.Records {
+							numBytes += len(record.Value)
+						}
+					}
+				}
+			}
+
+			Logger.Printf("[%s] Got records. num(%d) size(%d)", bc.broker.addr, numRecords, numBytes)
 		}
 
 		bc.acks.Add(len(bc.subscriptions))
