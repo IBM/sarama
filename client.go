@@ -823,12 +823,17 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		} else if client.conf.Version.IsAtLeast(V0_10_0_0) {
 			req.Version = 1
 		}
+		Logger.Printf("Before getMetadata")
 		response, err := broker.GetMetadata(req)
+		Logger.Printf("After getMetadata")
 		switch err.(type) {
 		case nil:
+			Logger.Printf("Switch nil")
 			allKnownMetaData := len(topics) == 0
+			Logger.Printf("allKnownMetadata: %d", allKnownMetaData)
 			// valid response, use it
 			shouldRetry, err := client.updateMetadata(response, allKnownMetaData)
+			Logger.Printf("After updateMetadata")
 			if shouldRetry {
 				Logger.Println("client/metadata found some partitions to be leaderless")
 				return retry(err) // note: err can be nil
@@ -837,9 +842,11 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 		case PacketEncodingError:
 			// didn't even send, return the error
+			Logger.Printf("PacketEncodingError")
 			return err
 
 		case KError:
+			Logger.Printf("KError")
 			// if SASL auth error return as this _should_ be a non retryable err for all brokers
 			if err.(KError) == ErrSASLAuthenticationFailed {
 				Logger.Println("client/metadata failed SASL authentication")
