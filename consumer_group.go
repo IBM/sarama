@@ -659,8 +659,13 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 
 	// get next offset
 	offset := s.parent.config.Consumer.Offsets.Initial
-	if pom := s.offsets.findPOM(topic, partition); pom != nil {
-		offset, _ = pom.NextOffset()
+
+	if c, ok := s.handler.(ConsumerManagesOffsets); ok {
+		offset = c.GetOffset(topic, partition)
+	} else {
+		if pom := s.offsets.findPOM(topic, partition); pom != nil {
+			offset, _ = pom.NextOffset()
+		}
 	}
 
 	// create new claim
@@ -801,6 +806,12 @@ type ConsumerGroupHandler interface {
 	// Once the Messages() channel is closed, the Handler must finish its processing
 	// loop and exit.
 	ConsumeClaim(ConsumerGroupSession, ConsumerGroupClaim) error
+}
+
+// ConsumerManagesOffsets used to manage offsets from your application.
+type ConsumerManagesOffsets interface {
+	// GetOffset returns initial offset for consume.
+	GetOffset(topic string, partition int32) int64
 }
 
 // ConsumerGroupClaim processes Kafka messages from a given topic and partition within a consumer group.
