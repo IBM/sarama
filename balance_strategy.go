@@ -16,10 +16,6 @@ const (
 	// RoundRobinBalanceStrategyName identifies strategies that use the round-robin partition assignment strategy
 	RoundRobinBalanceStrategyName = "roundrobin"
 
-	// FairRoundRobinBalanceStrategyName identifies strategies that use the round-robin partition assignment strategy base on all topic's partitions,
-	// which assigns partitions more evenly in comparison to the`RoundRobinBalanceStrategyName` strategy
-	FairRoundRobinBalanceStrategyName = "fair_roundrobin"
-
 	// StickyBalanceStrategyName identifies strategies that use the sticky-partition assignment strategy
 	StickyBalanceStrategyName = "sticky"
 
@@ -75,20 +71,6 @@ var BalanceStrategyRange = &balanceStrategy{
 			min := int(math.Floor(pos*step + 0.5))
 			max := int(math.Floor((pos+1)*step + 0.5))
 			plan.Add(memberID, topic, partitions[min:max]...)
-		}
-	},
-}
-
-// BalanceStrategyRoundRobin assigns partitions to members in alternating order.
-// Example with topic T with six partitions (0..5) and two members (M1, M2):
-//   M1: {T: [0, 2, 4]}
-//   M2: {T: [1, 3, 5]}
-var BalanceStrategyRoundRobin = &balanceStrategy{
-	name: RoundRobinBalanceStrategyName,
-	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
-		for i, part := range partitions {
-			memberID := memberIDs[i%len(memberIDs)]
-			plan.Add(memberID, topic, part)
 		}
 	},
 }
@@ -359,19 +341,19 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	}
 }
 
-// BalanceStrategyFairRoundRound assigns partitions to members in alternating order.
+// BalanceStrategyRoundRobin assigns partitions to members in alternating order.
 // For example, there are two topics (t0, t1) and two consumer (m0, m1), and each topic has three partitions (p0, p1, p2):
 // M0: [t0p0, t0p2, t1p1]
 // M1: [t0p1, t1p0, t1p2]
-var BalanceStrategyFairRoundRound = new(fairRoundRobinBalancer)
+var BalanceStrategyRoundRobin = new(roundRobinBalancer)
 
-type fairRoundRobinBalancer struct{}
+type roundRobinBalancer struct{}
 
-func (b *fairRoundRobinBalancer) Name() string {
-	return FairRoundRobinBalanceStrategyName
+func (b *roundRobinBalancer) Name() string {
+	return RoundRobinBalanceStrategyName
 }
 
-func (b *fairRoundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error) {
+func (b *roundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error) {
 	if len(memberAndMetadata) == 0 || len(topics) == 0 {
 		return nil, errors.New("members and topics are not provided")
 	}
@@ -422,7 +404,7 @@ func (b *fairRoundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroup
 	return plan, nil
 }
 
-func (b *fairRoundRobinBalancer) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
+func (b *roundRobinBalancer) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
 	return nil, nil // do nothing for now
 }
 
