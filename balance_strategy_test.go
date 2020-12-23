@@ -147,7 +147,7 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 
 	strategy := BalanceStrategyRoundRobin
 	if strategy.Name() != "roundrobin" {
-		t.Errorf("Unexpected stategy name\nexpected: fail_roundrobin\nactual: %v", strategy.Name())
+		t.Errorf("Unexpected strategy name\nexpected: roundrobin\nactual: %v", strategy.Name())
 	}
 
 	for _, test := range tests {
