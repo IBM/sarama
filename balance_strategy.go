@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"container/heap"
+	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -69,20 +71,6 @@ var BalanceStrategyRange = &balanceStrategy{
 			min := int(math.Floor(pos*step + 0.5))
 			max := int(math.Floor((pos+1)*step + 0.5))
 			plan.Add(memberID, topic, partitions[min:max]...)
-		}
-	},
-}
-
-// BalanceStrategyRoundRobin assigns partitions to members in alternating order.
-// Example with topic T with six partitions (0..5) and two members (M1, M2):
-//   M1: {T: [0, 2, 4]}
-//   M2: {T: [1, 3, 5]}
-var BalanceStrategyRoundRobin = &balanceStrategy{
-	name: RoundRobinBalanceStrategyName,
-	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
-		for i, part := range partitions {
-			memberID := memberIDs[i%len(memberIDs)]
-			plan.Add(memberID, topic, part)
 		}
 	},
 }
@@ -351,6 +339,92 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	for consumer, assignments := range fixedAssignments {
 		currentAssignment[consumer] = assignments
 	}
+}
+
+// BalanceStrategyRoundRobin assigns partitions to members in alternating order.
+// For example, there are two topics (t0, t1) and two consumer (m0, m1), and each topic has three partitions (p0, p1, p2):
+// M0: [t0p0, t0p2, t1p1]
+// M1: [t0p1, t1p0, t1p2]
+var BalanceStrategyRoundRobin = new(roundRobinBalancer)
+
+type roundRobinBalancer struct{}
+
+func (b *roundRobinBalancer) Name() string {
+	return RoundRobinBalanceStrategyName
+}
+
+func (b *roundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroupMemberMetadata, topics map[string][]int32) (BalanceStrategyPlan, error) {
+	if len(memberAndMetadata) == 0 || len(topics) == 0 {
+		return nil, errors.New("members and topics are not provided")
+	}
+	// sort partitions
+	var topicPartitions []topicAndPartition
+	for topic, partitions := range topics {
+		for _, partition := range partitions {
+			topicPartitions = append(topicPartitions, topicAndPartition{topic: topic, partition: partition})
+		}
+	}
+	sort.SliceStable(topicPartitions, func(i, j int) bool {
+		pi := topicPartitions[i]
+		pj := topicPartitions[j]
+		return pi.comparedValue() < pj.comparedValue()
+	})
+
+	// sort members
+	var members []memberAndTopic
+	for memberID, meta := range memberAndMetadata {
+		m := memberAndTopic{
+			memberID: memberID,
+			topics:   make(map[string]struct{}),
+		}
+		for _, t := range meta.Topics {
+			m.topics[t] = struct{}{}
+		}
+		members = append(members, m)
+	}
+	sort.SliceStable(members, func(i, j int) bool {
+		mi := members[i]
+		mj := members[j]
+		return mi.memberID < mj.memberID
+	})
+
+	// assign partitions
+	plan := make(BalanceStrategyPlan, len(members))
+	i := 0
+	n := len(members)
+	for _, tp := range topicPartitions {
+		m := members[i%n]
+		for !m.hasTopic(tp.topic) {
+			i++
+			m = members[i%n]
+		}
+		plan.Add(m.memberID, tp.topic, tp.partition)
+		i++
+	}
+	return plan, nil
+}
+
+func (b *roundRobinBalancer) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
+	return nil, nil // do nothing for now
+}
+
+type topicAndPartition struct {
+	topic     string
+	partition int32
+}
+
+func (tp *topicAndPartition) comparedValue() string {
+	return fmt.Sprintf("%s-%d", tp.topic, tp.partition)
+}
+
+type memberAndTopic struct {
+	memberID string
+	topics   map[string]struct{}
+}
+
+func (m *memberAndTopic) hasTopic(topic string) bool {
+	_, isExist := m.topics[topic]
+	return isExist
 }
 
 // Calculate the balance score of the given assignment, as the sum of assigned partitions size difference of all consumer pairs.
