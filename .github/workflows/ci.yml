@@ -18,14 +18,14 @@ jobs:
       KAFKA_VERSION: ${{ matrix.kafka-version }}
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
 
     - name: Setup Go
       uses: actions/setup-go@v2
       with:
         go-version: ${{ matrix.go-version }}
 
-    - uses: actions/cache@v1
+    - uses: actions/cache@v2
       with:
         path: ~/go/pkg/mod
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
