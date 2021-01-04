@@ -111,16 +111,18 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	if version, ok := os.LookupEnv("KAFKA_VERSION"); ok {
 		env.KafkaVersion = version
 	} else {
-		// We have cp-5.5.0 as the default in the docker-compose file, so that's kafka 2.5.0.
-		env.KafkaVersion = "2.5.0"
+		// We have cp-6.0.1 as the default in the docker-compose file, so that's kafka 2.6.0.
+		env.KafkaVersion = "2.6.0"
 	}
 
 	// the mapping of confluent platform docker image versions -> kafka versions can be
 	// found here: https://docs.confluent.io/current/installation/versions-interoperability.html
 	var confluentPlatformVersion string
 	switch env.KafkaVersion {
+	case "2.7.0":
+		confluentPlatformVersion = "6.0.1"
 	case "2.6.0":
-		confluentPlatformVersion = "5.5.0"
+		confluentPlatformVersion = "6.0.1"
 	case "2.5.1":
 		confluentPlatformVersion = "5.5.0"
 	default:
