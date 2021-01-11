@@ -1,10 +1,10 @@
 package sarama
 
 import (
-	krb5client "gopkg.in/jcmturner/gokrb5.v7/client"
-	krb5config "gopkg.in/jcmturner/gokrb5.v7/config"
-	"gopkg.in/jcmturner/gokrb5.v7/keytab"
-	"gopkg.in/jcmturner/gokrb5.v7/types"
+	krb5client "github.com/jcmturner/gokrb5/v8/client"
+	krb5config "github.com/jcmturner/gokrb5/v8/config"
+	"github.com/jcmturner/gokrb5/v8/keytab"
+	"github.com/jcmturner/gokrb5/v8/types"
 )
 
 type KerberosGoKrb5Client struct {
@@ -37,9 +37,9 @@ func createClient(config *GSSAPIConfig, cfg *krb5config.Config) (KerberosClient,
 		if err != nil {
 			return nil, err
 		}
-		client = krb5client.NewClientWithKeytab(config.Username, config.Realm, kt, cfg, krb5client.DisablePAFXFAST(config.DisablePAFXFAST))
+		client = krb5client.NewWithKeytab(config.Username, config.Realm, kt, cfg, krb5client.DisablePAFXFAST(config.DisablePAFXFAST))
 	} else {
-		client = krb5client.NewClientWithPassword(config.Username,
+		client = krb5client.NewWithPassword(config.Username,
 			config.Realm, config.Password, cfg, krb5client.DisablePAFXFAST(config.DisablePAFXFAST))
 	}
 	return &KerberosGoKrb5Client{*client}, nil
