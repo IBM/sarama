@@ -97,6 +97,8 @@ func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 			if expectation.Result != errProduceSuccess {
 				return expectation.Result
 			}
+			sp.lastOffset++
+			msgs[i].Offset = sp.lastOffset
 		}
 		return nil
 	}
