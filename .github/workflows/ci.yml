@@ -34,7 +34,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.33.0
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.35.2
         export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
 
     - name: Run test suite

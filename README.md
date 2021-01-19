@@ -1,6 +1,6 @@
 # sarama
 
-[![GoDoc](https://godoc.org/github.com/Shopify/sarama?status.svg)](https://pkg.go.dev/github.com/Shopify/sarama)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Shopify/sarama.svg)](https://pkg.go.dev/github.com/Shopify/sarama)
 [![Build Status](https://travis-ci.org/Shopify/sarama.svg?branch=master)](https://travis-ci.org/Shopify/sarama)
 [![Coverage](https://codecov.io/gh/Shopify/sarama/branch/master/graph/badge.svg)](https://codecov.io/gh/Shopify/sarama)
 
@@ -8,7 +8,7 @@ Sarama is an MIT-licensed Go client library for [Apache Kafka](https://kafka.apa
 
 ## Getting started
 
-- API documentation and examples are available via [godoc](https://godoc.org/github.com/Shopify/sarama).
+- API documentation and examples are available via [pkg.go.dev](https://pkg.go.dev/github.com/Shopify/sarama).
 - Mocks for testing are available in the [mocks](./mocks) subpackage.
 - The [examples](./examples) directory contains more elaborate example applications.
 - The [tools](./tools) directory contains command line tools that can be useful for testing, diagnostics, and instrumentation.
@@ -20,7 +20,7 @@ You might also want to look at the [Frequently Asked Questions](https://github.c
 Sarama provides a "2 releases + 2 months" compatibility guarantee: we support
 the two latest stable releases of Kafka and Go, and we provide a two month
 grace period for older releases. This means we currently officially support
-Go 1.13 through 1.14, and Kafka 2.4 through 2.6, although older releases are
+Go 1.14 through 1.15, and Kafka 2.5 through 2.7, although older releases are
 still likely to work.
 
 Sarama follows semantic versioning and provides API stability via the gopkg.in service.
