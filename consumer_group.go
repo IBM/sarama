@@ -295,6 +295,9 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 			sort.Sort(int32Slice(partitions))
 		}
 	}
+	if len(claims) == 0{
+		panic("got.no.claims")
+	}
 
 	return newConsumerGroupSession(ctx, c, claims, join.MemberId, join.GenerationId, handler)
 }
