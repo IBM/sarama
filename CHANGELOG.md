@@ -2,6 +2,20 @@
 
 #### Unreleased
 
+#### Version 1.28.0 (2021-02-15)
+
+**Note that with this release we change `RoundRobinBalancer` strategy to match Java client behavior. See #1788 for details.**
+
+- #1870 - @kvch - Update Kerberos library to latest major
+- #1876 - @bai - Update docs, reference pkg.go.dev
+- #1846 - @wclaeys - Do not ignore Consumer.Offsets.AutoCommit.Enable config on Close
+- #1747 - @XSAM - fix: mock sync producer does not handle the offset while sending messages
+- #1863 - @bai - Add support for Kafka 2.7.0 + update lz4 and klauspost/compress dependencies
+- #1788 - @kzinglzy - feat[balance_strategy]: announcing a new round robin balance strategy
+- #1862 - @bai - Fix CI setenv permissions issues
+- #1832 - @ilyakaznacheev - Update Godoc link to pkg.go.dev
+- #1822 - @danp - KIP-392: Allow consumers to fetch from closest replica
+
 #### Version 1.27.2 (2020-10-21)
 
 # Improvements
@@ -72,7 +86,7 @@ This release has been marked as not ready for production and may be unstable, pl
 
 - #1560 - @iyacontrol - add sync pool for gzip 1-9
 - #1605 - @dnwe - feat: protocol support for V11 fetch w/ rackID
-- #1617 - @sladkoff / @dwi-di / @random-dwi - Add support for alter/list partition reassignements APIs 
+- #1617 - @sladkoff / @dwi-di / @random-dwi - Add support for alter/list partition reassignements APIs
 - #1632 - @bai - Add support for Go 1.14
 - #1640 - @random-dwi - Feature/fix list partition reassignments
 - #1646 - @mimaison - Add DescribeLogDirs to admin client
