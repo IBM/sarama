@@ -42,7 +42,7 @@ func TestCollectSuccessfully(t *testing.T) {
 		t.Errorf("Expected HTTP status 200, found %d", res.Code)
 	}
 
-	if string(res.Body.Bytes()) != "Your data is stored with unique identifier important/0/1" {
+	if res.Body.String() != "Your data is stored with unique identifier important/0/1" {
 		t.Error("Unexpected response body", res.Body)
 	}
 }
