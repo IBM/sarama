@@ -892,7 +892,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			req.Version = 1
 		}
 		response, err := broker.GetMetadata(req)
-		switch err.(type) {
+		switch err := err.(type) {
 		case nil:
 			allKnownMetaData := len(topics) == 0
 			// valid response, use it
@@ -909,12 +909,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 		case KError:
 			// if SASL auth error return as this _should_ be a non retryable err for all brokers
-			if err.(KError) == ErrSASLAuthenticationFailed {
+			if err == ErrSASLAuthenticationFailed {
 				Logger.Println("client/metadata failed SASL authentication")
 				return err
 			}
 
-			if err.(KError) == ErrTopicAuthorizationFailed {
+			if err == ErrTopicAuthorizationFailed {
 				Logger.Println("client is not authorized to access this topic. The topics were: ", topics)
 				return err
 			}
