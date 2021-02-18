@@ -19,9 +19,7 @@ var (
 )
 
 func TestListPartitionReassignmentResponse(t *testing.T) {
-	var response *ListPartitionReassignmentsResponse
-
-	response = &ListPartitionReassignmentsResponse{
+	var response *ListPartitionReassignmentsResponse = &ListPartitionReassignmentsResponse{
 		ThrottleTimeMs: int32(10000),
 		Version:        int16(0),
 	}
