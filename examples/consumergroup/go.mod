@@ -1,6 +1,6 @@
 module github.com/Shopify/sarama/examples/consumer
 
-go 1.15
+go 1.16
 
 replace github.com/Shopify/sarama => ../../
 
