@@ -23,16 +23,6 @@ type ControlRecord struct {
 
 func (cr *ControlRecord) decode(key, value packetDecoder) error {
 	var err error
-	cr.Version, err = value.getInt16()
-	if err != nil {
-		return err
-	}
-
-	cr.CoordinatorEpoch, err = value.getInt32()
-	if err != nil {
-		return err
-	}
-
 	// There a version for the value part AND the key part. And I have no idea if they are supposed to match or not
 	// Either way, all these version can only be 0 for now
 	cr.Version, err = key.getInt16()
@@ -54,6 +44,18 @@ func (cr *ControlRecord) decode(key, value packetDecoder) error {
 		// from JAVA implementation:
 		// UNKNOWN is used to indicate a control type which the client is not aware of and should be ignored
 		cr.Type = ControlRecordUnknown
+	}
+	// we want to parse value only if we are decoding control record of known type
+	if cr.Type != ControlRecordUnknown {
+		cr.Version, err = value.getInt16()
+		if err != nil {
+			return err
+		}
+
+		cr.CoordinatorEpoch, err = value.getInt32()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
