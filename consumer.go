@@ -750,6 +750,7 @@ func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
 // so the main goroutine can block waiting for work if it has none.
 func (bc *brokerConsumer) subscriptionManager() {
 	var buffer []*partitionConsumer
+	flushTicker := time.NewTicker(5 * time.Second)
 
 	for {
 		if len(buffer) > 0 {
@@ -759,8 +760,12 @@ func (bc *brokerConsumer) subscriptionManager() {
 					goto done
 				}
 				buffer = append(buffer, event)
-			case bc.newSubscriptions <- buffer:
-				buffer = nil
+			case <-flushTicker.C:
+				select {
+				default:
+				case bc.newSubscriptions <- buffer:
+					buffer = nil
+				}
 			case bc.wait <- none{}:
 			}
 		} else {
