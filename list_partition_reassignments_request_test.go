@@ -14,9 +14,7 @@ var (
 )
 
 func TestListPartitionReassignmentRequest(t *testing.T) {
-	var request *ListPartitionReassignmentsRequest
-
-	request = &ListPartitionReassignmentsRequest{
+	var request *ListPartitionReassignmentsRequest = &ListPartitionReassignmentsRequest{
 		TimeoutMs: int32(10000),
 		Version:   int16(0),
 	}

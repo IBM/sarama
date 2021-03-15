@@ -61,7 +61,7 @@ func TestCachedPartitions(t *testing.T) {
 	// Verify we actually use the cache at all!
 	tmp[allPartitions] = []int32{1, 2, 3, 4}
 	client.cachedPartitionsResults["my_topic"] = tmp
-	if 4 != len(client.cachedPartitions("my_topic", allPartitions)) {
+	if len(client.cachedPartitions("my_topic", allPartitions)) != 4 {
 		t.Fatal("Not using the cache!")
 	}
 
