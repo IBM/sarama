@@ -170,6 +170,16 @@ func (rd *realDecoder) getVarintBytes() ([]byte, error) {
 	return rd.getRawBytes(int(tmp))
 }
 
+func (rd *realDecoder) getCompactBytes() ([]byte, error) {
+	n, err := rd.getUVarint()
+	if err != nil {
+		return nil, err
+	}
+
+	var length = int(n - 1)
+	return rd.getRawBytes(length)
+}
+
 func (rd *realDecoder) getStringLength() (int, error) {
 	length, err := rd.getInt16()
 	if err != nil {
