@@ -13,7 +13,7 @@ get:
 	$(GO) mod tidy
 
 update:
-	$(GO) get -u -v all
+	$(GO) get -u -v ./...
 	$(GO) mod verify
 	$(GO) mod tidy
 
