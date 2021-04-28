@@ -816,7 +816,7 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 		return err
 	}
 
-	port, err := strconv.Atoi(portstr)
+	port, err := strconv.ParseInt(portstr, 10, 32)
 	if err != nil {
 		return err
 	}

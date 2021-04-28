@@ -619,7 +619,11 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 
 	// DescribeConfig of broker/broker logger must be sent to the broker in question
 	if dependsOnSpecificNode(resource) {
-		id, _ := strconv.Atoi(resource.Name)
+		var id int64
+		id, err = strconv.ParseInt(resource.Name, 10, 32)
+		if err != nil {
+			return nil, err
+		}
 		b, err = ca.findBroker(int32(id))
 	} else {
 		b, err = ca.findAnyBroker()
@@ -670,7 +674,11 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 
 	// AlterConfig of broker/broker logger must be sent to the broker in question
 	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
-		id, _ := strconv.Atoi(name)
+		var id int64
+		id, err = strconv.ParseInt(name, 10, 32)
+		if err != nil {
+			return err
+		}
 		b, err = ca.findBroker(int32(id))
 	} else {
 		b, err = ca.findAnyBroker()
