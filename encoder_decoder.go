@@ -45,7 +45,7 @@ func encode(e encoder, metricRegistry metrics.Registry) ([]byte, error) {
 	return realEnc.raw, nil
 }
 
-// Decoder is the interface that wraps the basic Decode method.
+// decoder is the interface that wraps the basic Decode method.
 // Anything implementing Decoder can be extracted from bytes using Kafka's encoding rules.
 type decoder interface {
 	decode(pd packetDecoder) error
@@ -55,7 +55,7 @@ type versionedDecoder interface {
 	decode(pd packetDecoder, version int16) error
 }
 
-// Decode takes bytes and a Decoder and fills the fields of the decoder from the bytes,
+// decode takes bytes and a decoder and fills the fields of the decoder from the bytes,
 // interpreted using Kafka's encoding rules.
 func decode(buf []byte, in decoder) error {
 	if buf == nil {
