@@ -165,14 +165,14 @@ func isErrNoController(err error) bool {
 }
 
 // retryOnError will repeatedly call the given (error-returning) func in the
-// case that its response is non-nil and retriable (as determined by the
-// provided retriable func) up to the maximum number of tries permitted by
+// case that its response is non-nil and retryable (as determined by the
+// provided retryable func) up to the maximum number of tries permitted by
 // the admin client configuration
-func (ca *clusterAdmin) retryOnError(retriable func(error) bool, fn func() error) error {
+func (ca *clusterAdmin) retryOnError(retryable func(error) bool, fn func() error) error {
 	var err error
 	for attempt := 0; attempt < ca.conf.Admin.Retry.Max; attempt++ {
 		err = fn()
-		if err == nil || !retriable(err) {
+		if err == nil || !retryable(err) {
 			return err
 		}
 		Logger.Printf(
