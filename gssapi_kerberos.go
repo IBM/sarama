@@ -3,8 +3,10 @@ package sarama
 import (
 	"encoding/asn1"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"strings"
 	"time"
 
@@ -53,15 +55,14 @@ type KerberosClient interface {
 	Destroy()
 }
 
-/*
-*
-* Appends length in big endian before payload, and send it to kafka
-*
- */
-
+// writePackage appends length in big endian before the payload, and sends it to kafka
 func (krbAuth *GSSAPIKerberosAuth) writePackage(broker *Broker, payload []byte) (int, error) {
 	length := len(payload)
-	finalPackage := make([]byte, length+4) //4 byte length header + payload
+	size := length + 4 // 4 byte length header + payload
+	if size > math.MaxUint32 {
+		return 0, errors.New("payload too large, will overflow uint32")
+	}
+	finalPackage := make([]byte, size)
 	copy(finalPackage[4:], payload)
 	binary.BigEndian.PutUint32(finalPackage, uint32(length))
 	bytes, err := broker.conn.Write(finalPackage)
@@ -71,12 +72,7 @@ func (krbAuth *GSSAPIKerberosAuth) writePackage(broker *Broker, payload []byte) 
 	return bytes, nil
 }
 
-/*
-*
-* Read length (4 bytes) and then read the payload
-*
- */
-
+// readPackage reads payload length (4 bytes) and then reads the payload into []byte
 func (krbAuth *GSSAPIKerberosAuth) readPackage(broker *Broker) ([]byte, int, error) {
 	bytesRead := 0
 	lengthInBytes := make([]byte, 4)
