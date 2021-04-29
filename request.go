@@ -129,7 +129,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 8:
 		return &OffsetCommitRequest{Version: version}
 	case 9:
-		return &OffsetFetchRequest{}
+		return &OffsetFetchRequest{Version: version}
 	case 10:
 		return &FindCoordinatorRequest{}
 	case 11:

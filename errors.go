@@ -208,6 +208,12 @@ const (
 	ErrPreferredLeaderNotAvailable        KError = 80
 	ErrGroupMaxSizeReached                KError = 81
 	ErrFencedInstancedId                  KError = 82
+	ErrEligibleLeadersNotAvailable        KError = 83
+	ErrElectionNotNeeded                  KError = 84
+	ErrNoReassignmentInProgress           KError = 85
+	ErrGroupSubscribedToTopic             KError = 86
+	ErrInvalidRecord                      KError = 87
+	ErrUnstableOffsetCommit               KError = 88
 )
 
 func (err KError) Error() string {
@@ -382,6 +388,18 @@ func (err KError) Error() string {
 		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members."
 	case ErrFencedInstancedId:
 		return "kafka server: The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id."
+	case ErrEligibleLeadersNotAvailable:
+		return "kafka server: Eligible topic partition leaders are not available."
+	case ErrElectionNotNeeded:
+		return "kafka server: Leader election not needed for topic partition."
+	case ErrNoReassignmentInProgress:
+		return "kafka server: No partition reassignment is in progress."
+	case ErrGroupSubscribedToTopic:
+		return "kafka server: Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it."
+	case ErrInvalidRecord:
+		return "kafka server: This record has failed the validation on broker and hence will be rejected."
+	case ErrUnstableOffsetCommit:
+		return "kafka server: There are unstable offsets that need to be cleared."
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
