@@ -28,6 +28,7 @@ func (b *offsetRequestBlock) decode(pd packetDecoder, version int16) (err error)
 
 type OffsetRequest struct {
 	Version        int16
+	IsolationLevel IsolationLevel
 	replicaID      int32
 	isReplicaIDSet bool
 	blocks         map[string]map[int32]*offsetRequestBlock
@@ -39,6 +40,10 @@ func (r *OffsetRequest) encode(pe packetEncoder) error {
 	} else {
 		// default replica ID is always -1 for clients
 		pe.putInt32(-1)
+	}
+
+	if r.Version >= 2 {
+		pe.putBool(r.IsolationLevel == ReadCommitted)
 	}
 
 	err := pe.putArrayLength(len(r.blocks))
@@ -73,6 +78,18 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 	}
 	if replicaID >= 0 {
 		r.SetReplicaID(replicaID)
+	}
+
+	if r.Version >= 2 {
+		tmp, err := pd.getBool()
+		if err != nil {
+			return err
+		}
+
+		r.IsolationLevel = ReadUncommitted
+		if tmp {
+			r.IsolationLevel = ReadCommitted
+		}
 	}
 
 	blockCount, err := pd.getArrayLength()
@@ -124,6 +141,8 @@ func (r *OffsetRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
 		return V0_10_1_0
+	case 2:
+		return V0_11_0_0
 	default:
 		return MinVersion
 	}

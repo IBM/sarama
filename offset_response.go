@@ -50,11 +50,19 @@ func (b *OffsetResponseBlock) encode(pe packetEncoder, version int16) (err error
 }
 
 type OffsetResponse struct {
-	Version int16
-	Blocks  map[string]map[int32]*OffsetResponseBlock
+	Version        int16
+	ThrottleTimeMs int32
+	Blocks         map[string]map[int32]*OffsetResponseBlock
 }
 
 func (r *OffsetResponse) decode(pd packetDecoder, version int16) (err error) {
+	if version >= 2 {
+		r.ThrottleTimeMs, err = pd.getInt32()
+		if err != nil {
+			return err
+		}
+	}
+
 	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -120,6 +128,10 @@ func (r *OffsetResponse) GetBlock(topic string, partition int32) *OffsetResponse
 
 */
 func (r *OffsetResponse) encode(pe packetEncoder) (err error) {
+	if r.Version >= 2 {
+		pe.putInt32(r.ThrottleTimeMs)
+	}
+
 	if err = pe.putArrayLength(len(r.Blocks)); err != nil {
 		return err
 	}
@@ -158,6 +170,8 @@ func (r *OffsetResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
 		return V0_10_1_0
+	case 2:
+		return V0_11_0_0
 	default:
 		return MinVersion
 	}

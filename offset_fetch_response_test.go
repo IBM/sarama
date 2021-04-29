@@ -17,6 +17,10 @@ var (
 		0x00, 0x00, 0x00, 0x09,
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x2A}
+
+	emptyOffsetFetchResponseV6 = []byte{
+		0x00, 0x00, 0x00, 0x09,
+		0x01, 0x00, 0x2A, 0x00}
 )
 
 func TestEmptyOffsetFetchResponse(t *testing.T) {
@@ -31,6 +35,11 @@ func TestEmptyOffsetFetchResponse(t *testing.T) {
 	for version := 3; version <= 5; version++ {
 		responseV3 := OffsetFetchResponse{Version: int16(version), Err: ErrInvalidRequest, ThrottleTimeMs: 9}
 		testResponse(t, fmt.Sprintf("empty v%d", version), &responseV3, emptyOffsetFetchResponseV3)
+	}
+
+	for version := 6; version <= 7; version++ {
+		responseV6 := OffsetFetchResponse{Version: int16(version), Err: ErrInvalidRequest, ThrottleTimeMs: 9}
+		testResponse(t, fmt.Sprintf("empty v%d", version), &responseV6, emptyOffsetFetchResponseV6)
 	}
 }
 
@@ -58,8 +67,10 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 		testResponse(t, fmt.Sprintf("Normal v%d", version), &responseV3, nil)
 	}
 
-	responseV5 := OffsetFetchResponse{Version: 5, Err: ErrInvalidRequest, ThrottleTimeMs: 9}
-	responseV5.AddBlock("t", 0, &OffsetFetchResponseBlock{Offset: 10, LeaderEpoch: 100, Metadata: "md", Err: ErrRequestTimedOut})
-	responseV5.Blocks["m"] = nil
-	testResponse(t, "normal V5", &responseV5, nil)
+	for version := 5; version <= 7; version++ {
+		res := OffsetFetchResponse{Version: int16(version), Err: ErrInvalidRequest, ThrottleTimeMs: 9}
+		res.AddBlock("t", 0, &OffsetFetchResponseBlock{Offset: 10, LeaderEpoch: 100, Metadata: "md", Err: ErrRequestTimedOut})
+		res.Blocks["m"] = nil
+		testResponse(t, fmt.Sprintf("normal V%d", version), &res, nil)
+	}
 }
