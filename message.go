@@ -146,7 +146,7 @@ func (m *Message) decode(pd packetDecoder) (err error) {
 	// for future metrics about the compression ratio in fetch requests
 	m.compressedSize = len(m.Value)
 
-	if m.Value != nil && m.Codec == CompressionNone {
+	if m.Value != nil && m.Codec != CompressionNone {
 		m.Value, err = decompress(m.Codec, m.Value)
 		if err != nil {
 			return err
