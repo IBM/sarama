@@ -2,10 +2,9 @@ package sarama
 
 import "testing"
 
-var (
-	heartbeatResponseNoError = []byte{
-		0x00, 0x00}
-)
+var heartbeatResponseNoError = []byte{
+	0x00, 0x00,
+}
 
 func TestHeartbeatResponse(t *testing.T) {
 	response := new(HeartbeatResponse)

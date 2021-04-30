@@ -1,8 +1,6 @@
 package main
 
 import (
-	"github.com/Shopify/sarama"
-
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -14,6 +12,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/Shopify/sarama"
 )
 
 var (
@@ -163,7 +163,6 @@ func (ale *accessLogEntry) Encode() ([]byte, error) {
 }
 
 func (s *Server) withAccessLog(next http.Handler) http.Handler {
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
 
@@ -189,7 +188,6 @@ func (s *Server) withAccessLog(next http.Handler) http.Handler {
 }
 
 func newDataCollector(brokerList []string) sarama.SyncProducer {
-
 	// For the data collector, we are looking for strong consistency semantics.
 	// Because we don't change the flush settings, sarama will try to produce messages
 	// as fast as possible to keep latency low.
@@ -217,7 +215,6 @@ func newDataCollector(brokerList []string) sarama.SyncProducer {
 }
 
 func newAccessLogProducer(brokerList []string) sarama.AsyncProducer {
-
 	// For the access log, we are looking for AP semantics, with high throughput.
 	// By creating batches of compressed messages, we reduce network I/O at a cost of more latency.
 	config := sarama.NewConfig()

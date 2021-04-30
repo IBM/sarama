@@ -961,7 +961,7 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
-	//Logger = log.New(os.Stderr, "", log.LstdFlags)
+	// Logger = log.New(os.Stderr, "", log.LstdFlags)
 	tests := []struct {
 		name           string
 		failAfterWrite bool
@@ -1028,9 +1028,9 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 				batchFirstSeq := int(batch.FirstSequence)
 				batchSize := len(batch.Records)
 
-				if lastSequenceWrittenToDisk == batchFirstSeq-1 { //in sequence append
-					if lastBatchFirstSeq == batchFirstSeq { //is a batch retry
-						if lastBatchSize == batchSize { //good retry
+				if lastSequenceWrittenToDisk == batchFirstSeq-1 { // in sequence append
+					if lastBatchFirstSeq == batchFirstSeq { // is a batch retry
+						if lastBatchSize == batchSize { // good retry
 							// mock write to disk
 							lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
 							return prodSuccessResponse
@@ -1060,7 +1060,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 					// mock write to disk
 					lastSequenceWrittenToDisk = batchFirstSeq + batchSize - 1
 					return prodSuccessResponse
-				} //out of sequence / bad retried batch
+				} // out of sequence / bad retried batch
 				if lastBatchFirstSeq == batchFirstSeq && lastBatchSize != batchSize {
 					t.Errorf("[%s] Retried Batch firstSeq=%d with different size old=%d new=%d", test.name, batchFirstSeq, lastBatchSize, batchSize)
 				} else if lastSequenceWrittenToDisk+1 != batchFirstSeq {

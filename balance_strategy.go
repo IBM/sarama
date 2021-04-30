@@ -138,6 +138,7 @@ func (p balanceStrategySortable) Len() int { return len(p.memberIDs) }
 func (p balanceStrategySortable) Swap(i, j int) {
 	p.memberIDs[i], p.memberIDs[j] = p.memberIDs[j], p.memberIDs[i]
 }
+
 func (p balanceStrategySortable) Less(i, j int) bool {
 	return balanceStrategyHashValue(p.topic, p.memberIDs[i]) < balanceStrategyHashValue(p.topic, p.memberIDs[j])
 }

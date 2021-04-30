@@ -166,5 +166,4 @@ func main() {
 		_ = syncProducer.Close()
 	}
 	logger.Println("Bye now !")
-
 }

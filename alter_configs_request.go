@@ -1,12 +1,12 @@
 package sarama
 
-//AlterConfigsRequest is an alter config request type
+// AlterConfigsRequest is an alter config request type
 type AlterConfigsRequest struct {
 	Resources    []*AlterConfigsResource
 	ValidateOnly bool
 }
 
-//AlterConfigsResource is an alter config resource type
+// AlterConfigsResource is an alter config resource type
 type AlterConfigsResource struct {
 	Type          ConfigResourceType
 	Name          string

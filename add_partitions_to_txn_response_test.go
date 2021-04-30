@@ -5,16 +5,14 @@ import (
 	"time"
 )
 
-var (
-	addPartitionsToTxnResponse = []byte{
-		0, 0, 0, 100,
-		0, 0, 0, 1,
-		0, 5, 't', 'o', 'p', 'i', 'c',
-		0, 0, 0, 1, // 1 partition error
-		0, 0, 0, 2, // partition 2
-		0, 48, // error
-	}
-)
+var addPartitionsToTxnResponse = []byte{
+	0, 0, 0, 100,
+	0, 0, 0, 1,
+	0, 5, 't', 'o', 'p', 'i', 'c',
+	0, 0, 0, 1, // 1 partition error
+	0, 0, 0, 2, // partition 2
+	0, 48, // error
+}
 
 func TestAddPartitionsToTxnResponse(t *testing.T) {
 	resp := &AddPartitionsToTxnResponse{

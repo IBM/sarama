@@ -5,10 +5,9 @@ import (
 	"testing"
 )
 
-var (
-	emptyOffsetCommitResponse = []byte{
-		0x00, 0x00, 0x00, 0x00}
-)
+var emptyOffsetCommitResponse = []byte{
+	0x00, 0x00, 0x00, 0x00,
+}
 
 func TestEmptyOffsetCommitResponse(t *testing.T) {
 	response := OffsetCommitResponse{}

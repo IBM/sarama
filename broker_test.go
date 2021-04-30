@@ -239,7 +239,6 @@ func TestSASLOAuthBearer(t *testing.T) {
 			}
 
 			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -370,7 +369,6 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 			}
 
 			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -480,7 +478,6 @@ func TestSASLPlainAuth(t *testing.T) {
 			}
 
 			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -658,7 +655,6 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			}
 
 			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
-
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -756,7 +752,8 @@ var brokerTestTable = []struct {
 	response []byte
 	runner   func(*testing.T, *Broker)
 }{
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"MetadataRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -768,9 +765,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("Metadata request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"ConsumerMetadataRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 't', 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -782,9 +781,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("Consumer Metadata request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"ProduceRequest (NoResponse)",
 		[]byte{},
 		func(t *testing.T, broker *Broker) {
@@ -797,9 +798,11 @@ var brokerTestTable = []struct {
 			if response != nil {
 				t.Error("Produce request with NoResponse got a response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"ProduceRequest (WaitForLocal)",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -812,9 +815,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("Produce request without NoResponse got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"FetchRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -826,9 +831,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("Fetch request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"OffsetFetchRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -840,9 +847,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("OffsetFetch request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"OffsetCommitRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -854,9 +863,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("OffsetCommit request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"OffsetRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -868,9 +879,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("Offset request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"JoinGroupRequest",
 		[]byte{0x00, 0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -882,9 +895,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("JoinGroup request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"SyncGroupRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -896,9 +911,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("SyncGroup request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"LeaveGroupRequest",
 		[]byte{0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -910,9 +927,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("LeaveGroup request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"HeartbeatRequest",
 		[]byte{0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -924,9 +943,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("Heartbeat request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"ListGroupsRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -938,9 +959,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("ListGroups request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"DescribeGroupsRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -952,9 +975,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("DescribeGroups request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V0_10_0_0,
+	{
+		V0_10_0_0,
 		"ApiVersionsRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -966,9 +991,11 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("ApiVersions request got no response!")
 			}
-		}},
+		},
+	},
 
-	{V1_1_0_0,
+	{
+		V1_1_0_0,
 		"DeleteGroupsRequest",
 		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
@@ -980,7 +1007,8 @@ var brokerTestTable = []struct {
 			if response == nil {
 				t.Error("DeleteGroups request got no response!")
 			}
-		}},
+		},
+	},
 }
 
 func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics brokerMetrics) {

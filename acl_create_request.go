@@ -1,6 +1,6 @@
 package sarama
 
-//CreateAclsRequest is an acl creation request
+// CreateAclsRequest is an acl creation request
 type CreateAclsRequest struct {
 	Version      int16
 	AclCreations []*AclCreation
@@ -60,7 +60,7 @@ func (c *CreateAclsRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-//AclCreation is a wrapper around Resource and Acl type
+// AclCreation is a wrapper around Resource and Acl type
 type AclCreation struct {
 	Resource
 	Acl

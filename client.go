@@ -493,7 +493,6 @@ func (client *client) GetOffset(topic string, partitionID int32, time int64) (in
 	}
 
 	offset, err := client.getOffset(topic, partitionID, time)
-
 	if err != nil {
 		if err := client.RefreshMetadata(topic); err != nil {
 			return -1, err
@@ -607,7 +606,7 @@ func (client *client) randomizeSeedBrokers(addrs []string) {
 }
 
 func (client *client) updateBroker(brokers []*Broker) {
-	var currentBroker = make(map[int32]*Broker, len(brokers))
+	currentBroker := make(map[int32]*Broker, len(brokers))
 
 	for _, broker := range brokers {
 		currentBroker[broker.ID()] = broker
@@ -1053,7 +1052,6 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 		request.CoordinatorType = CoordinatorGroup
 
 		response, err := broker.FindCoordinator(request)
-
 		if err != nil {
 			Logger.Printf("client/coordinator request to broker %s failed: %s\n", broker.Addr(), err)
 

@@ -134,7 +134,7 @@ func NewClusterAdmin(addrs []string, conf *Config) (ClusterAdmin, error) {
 // NewClusterAdminFromClient creates a new ClusterAdmin using the given client.
 // Note that underlying client will also be closed on admin's Close() call.
 func NewClusterAdminFromClient(client Client) (ClusterAdmin, error) {
-	//make sure we can retrieve the controller
+	// make sure we can retrieve the controller
 	_, err := client.Controller()
 	if err != nil {
 		return nil, err
@@ -592,8 +592,8 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	if len(errs) > 0 {
 		return ErrDeleteRecords{MultiError{&errs}}
 	}
-	//todo since we are dealing with couple of partitions it would be good if we return slice of errors
-	//for each partition instead of one error
+	// todo since we are dealing with couple of partitions it would be good if we return slice of errors
+	// for each partition instead of one error
 	return nil
 }
 

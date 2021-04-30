@@ -61,7 +61,6 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 		r.Resources[i].Name = name
 
 		confLength, err := pd.getArrayLength()
-
 		if err != nil {
 			return err
 		}

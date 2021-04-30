@@ -27,7 +27,7 @@ func (h *KafkaGSSAPIHandler) MockKafkaGSSAPI(buffer []byte) []byte {
 		return []byte{0x00, 0x00, 0x00, 0x01, 0xAD}
 	}
 
-	var pack = gssapi.WrapToken{
+	pack := gssapi.WrapToken{
 		Flags:     KRB5_USER_AUTH,
 		EC:        12,
 		RRC:       0,
@@ -108,8 +108,9 @@ func (c *MockKerberosClient) GetServiceTicket(spn string) (messages.Ticket, type
 func (c *MockKerberosClient) Domain() string {
 	return "EXAMPLE.COM"
 }
+
 func (c *MockKerberosClient) CName() types.PrincipalName {
-	var p = types.PrincipalName{
+	p := types.PrincipalName{
 		NameType: KRB5_USER_AUTH,
 		NameString: []string{
 			"kafka",
@@ -118,6 +119,7 @@ func (c *MockKerberosClient) CName() types.PrincipalName {
 	}
 	return p
 }
+
 func (c *MockKerberosClient) Destroy() {
 	// Do nothing.
 }

@@ -1,8 +1,7 @@
 package sarama
 
-//ApiVersionsRequest ...
-type ApiVersionsRequest struct {
-}
+// ApiVersionsRequest ...
+type ApiVersionsRequest struct{}
 
 func (a *ApiVersionsRequest) encode(pe packetEncoder) error {
 	return nil

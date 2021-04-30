@@ -783,7 +783,7 @@ done:
 	close(bc.newSubscriptions)
 }
 
-//subscriptionConsumer ensures we will get nil right away if no new subscriptions is available
+// subscriptionConsumer ensures we will get nil right away if no new subscriptions is available
 func (bc *brokerConsumer) subscriptionConsumer() {
 	<-bc.wait // wait for our first piece of work
 
@@ -798,7 +798,6 @@ func (bc *brokerConsumer) subscriptionConsumer() {
 		}
 
 		response, err := bc.fetchNewMessages()
-
 		if err != nil {
 			Logger.Printf("consumer/broker/%d disconnecting due to error processing FetchRequest: %s\n", bc.broker.ID(), err)
 			bc.abort(err)
@@ -832,7 +831,7 @@ func (bc *brokerConsumer) updateSubscriptions(newSubscriptions []*partitionConsu
 	}
 }
 
-//handleResponses handles the response codes left for us by our subscriptions, and abandons ones that have been closed
+// handleResponses handles the response codes left for us by our subscriptions, and abandons ones that have been closed
 func (bc *brokerConsumer) handleResponses() {
 	for child := range bc.subscriptions {
 		result := child.responseResult

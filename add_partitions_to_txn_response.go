@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-//AddPartitionsToTxnResponse is a partition errors to transaction type
+// AddPartitionsToTxnResponse is a partition errors to transaction type
 type AddPartitionsToTxnResponse struct {
 	ThrottleTime time.Duration
 	Errors       map[string][]*PartitionError
@@ -87,7 +87,7 @@ func (a *AddPartitionsToTxnResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
-//PartitionError is a partition error type
+// PartitionError is a partition error type
 type PartitionError struct {
 	Partition int32
 	Err       KError

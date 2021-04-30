@@ -215,7 +215,6 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 	spn := fmt.Sprintf("%s/%s", broker.conf.Net.SASL.GSSAPI.ServiceName, host)
 
 	ticket, encKey, err := kerberosClient.GetServiceTicket(spn)
-
 	if err != nil {
 		Logger.Printf("Error getting Kerberos service ticket : %s", err)
 		return err

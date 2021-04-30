@@ -5,13 +5,15 @@ import (
 	"math"
 )
 
-var errInvalidArrayLength = PacketDecodingError{"invalid array length"}
-var errInvalidByteSliceLength = PacketDecodingError{"invalid byteslice length"}
-var errInvalidStringLength = PacketDecodingError{"invalid string length"}
-var errVarintOverflow = PacketDecodingError{"varint overflow"}
-var errUVarintOverflow = PacketDecodingError{"uvarint overflow"}
-var errInvalidBool = PacketDecodingError{"invalid bool"}
-var errUnsupportedTaggedFields = PacketDecodingError{"non-empty tagged fields are not supported yet"}
+var (
+	errInvalidArrayLength      = PacketDecodingError{"invalid array length"}
+	errInvalidByteSliceLength  = PacketDecodingError{"invalid byteslice length"}
+	errInvalidStringLength     = PacketDecodingError{"invalid string length"}
+	errVarintOverflow          = PacketDecodingError{"varint overflow"}
+	errUVarintOverflow         = PacketDecodingError{"uvarint overflow"}
+	errInvalidBool             = PacketDecodingError{"invalid bool"}
+	errUnsupportedTaggedFields = PacketDecodingError{"non-empty tagged fields are not supported yet"}
+)
 
 type realDecoder struct {
 	raw   []byte
@@ -176,7 +178,7 @@ func (rd *realDecoder) getCompactBytes() ([]byte, error) {
 		return nil, err
 	}
 
-	var length = int(n - 1)
+	length := int(n - 1)
 	return rd.getRawBytes(length)
 }
 
@@ -227,7 +229,7 @@ func (rd *realDecoder) getCompactString() (string, error) {
 		return "", err
 	}
 
-	var length = int(n - 1)
+	length := int(n - 1)
 
 	tmpStr := string(rd.raw[rd.off : rd.off+length])
 	rd.off += length
@@ -236,12 +238,11 @@ func (rd *realDecoder) getCompactString() (string, error) {
 
 func (rd *realDecoder) getCompactNullableString() (*string, error) {
 	n, err := rd.getUVarint()
-
 	if err != nil {
 		return nil, err
 	}
 
-	var length = int(n - 1)
+	length := int(n - 1)
 
 	if length < 0 {
 		return nil, err

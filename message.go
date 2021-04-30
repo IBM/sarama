@@ -6,15 +6,15 @@ import (
 )
 
 const (
-	//CompressionNone no compression
+	// CompressionNone no compression
 	CompressionNone CompressionCodec = iota
-	//CompressionGZIP compression using GZIP
+	// CompressionGZIP compression using GZIP
 	CompressionGZIP
-	//CompressionSnappy compression using snappy
+	// CompressionSnappy compression using snappy
 	CompressionSnappy
-	//CompressionLZ4 compression using LZ4
+	// CompressionLZ4 compression using LZ4
 	CompressionLZ4
-	//CompressionZSTD compression using ZSTD
+	// CompressionZSTD compression using ZSTD
 	CompressionZSTD
 
 	// The lowest 3 bits contain the compression codec used for the message
@@ -42,7 +42,7 @@ func (cc CompressionCodec) String() string {
 	}[int(cc)]
 }
 
-//Message is a kafka message type
+// Message is a kafka message type
 type Message struct {
 	Codec            CompressionCodec // codec used to compress the message contents
 	CompressionLevel int              // compression level

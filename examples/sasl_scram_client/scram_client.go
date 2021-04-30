@@ -7,8 +7,10 @@ import (
 	"github.com/xdg/scram"
 )
 
-var SHA256 scram.HashGeneratorFcn = sha256.New
-var SHA512 scram.HashGeneratorFcn = sha512.New
+var (
+	SHA256 scram.HashGeneratorFcn = sha256.New
+	SHA512 scram.HashGeneratorFcn = sha512.New
+)
 
 type XDGSCRAMClient struct {
 	*scram.Client

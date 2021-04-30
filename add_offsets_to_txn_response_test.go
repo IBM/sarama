@@ -5,12 +5,10 @@ import (
 	"time"
 )
 
-var (
-	addOffsetsToTxnResponse = []byte{
-		0, 0, 0, 100,
-		0, 47,
-	}
-)
+var addOffsetsToTxnResponse = []byte{
+	0, 0, 0, 100,
+	0, 47,
+}
 
 func TestAddOffsetsToTxnResponse(t *testing.T) {
 	resp := &AddOffsetsToTxnResponse{

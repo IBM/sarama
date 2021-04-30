@@ -46,7 +46,6 @@ func (a *AclFilter) decode(pd packetDecoder, version int16) (err error) {
 
 	if a.Version == 1 {
 		pattern, err := pd.getInt8()
-
 		if err != nil {
 			return err
 		}

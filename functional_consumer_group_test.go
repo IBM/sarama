@@ -335,11 +335,13 @@ func (m *testFuncConsumerGroupMember) Setup(s ConsumerGroupSession) error {
 	atomic.StoreInt32(&m.state, 2)
 	return nil
 }
+
 func (m *testFuncConsumerGroupMember) Cleanup(s ConsumerGroupSession) error {
 	// enter post-cleanup state
 	atomic.StoreInt32(&m.state, 3)
 	return nil
 }
+
 func (m *testFuncConsumerGroupMember) ConsumeClaim(s ConsumerGroupSession, c ConsumerGroupClaim) error {
 	atomic.AddInt32(&m.handlers, 1)
 	defer atomic.AddInt32(&m.handlers, -1)

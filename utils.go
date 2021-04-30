@@ -199,7 +199,7 @@ var (
 	DefaultVersion = V1_0_0_0
 )
 
-//ParseKafkaVersion parses and returns kafka version or error from a string
+// ParseKafkaVersion parses and returns kafka version or error from a string
 func ParseKafkaVersion(s string) (KafkaVersion, error) {
 	if len(s) < 5 {
 		return DefaultVersion, fmt.Errorf("invalid version `%s`", s)

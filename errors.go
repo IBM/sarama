@@ -93,7 +93,7 @@ type MultiError struct {
 }
 
 func (mErr MultiError) Error() string {
-	var errString = ""
+	errString := ""
 	for _, err := range *mErr.Errors {
 		errString += err.Error() + ","
 	}
@@ -101,7 +101,7 @@ func (mErr MultiError) Error() string {
 }
 
 func (mErr MultiError) PrettyError() string {
-	var errString = ""
+	errString := ""
 	for _, err := range *mErr.Errors {
 		errString += err.Error() + "\n"
 	}

@@ -5,12 +5,10 @@ import (
 	"time"
 )
 
-var (
-	endTxnResponse = []byte{
-		0, 0, 0, 100,
-		0, 49,
-	}
-)
+var endTxnResponse = []byte{
+	0, 0, 0, 100,
+	0, 49,
+}
 
 func TestEndTxnResponse(t *testing.T) {
 	resp := &EndTxnResponse{
