@@ -91,6 +91,7 @@ func TestTLS(t *testing.T) {
 		}},
 		ClientAuth: tls.RequireAndVerifyClientCert,
 		ClientCAs:  pool,
+		MinVersion: tls.VersionTLS12,
 	}
 
 	for _, tc := range []struct {
@@ -108,6 +109,7 @@ func TestTLS(t *testing.T) {
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
 				}},
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 		{
@@ -120,6 +122,7 @@ func TestTLS(t *testing.T) {
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  hostkey,
 				}},
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 		{
@@ -132,6 +135,7 @@ func TestTLS(t *testing.T) {
 					Certificate: [][]byte{hostDer},
 					PrivateKey:  clientkey,
 				}},
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 		{
@@ -143,6 +147,7 @@ func TestTLS(t *testing.T) {
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
 				}},
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 		{
@@ -150,7 +155,8 @@ func TestTLS(t *testing.T) {
 			Succeed: false,
 			Server:  serverTLSConfig,
 			Client: &tls.Config{
-				RootCAs: pool,
+				RootCAs:    pool,
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 		{
@@ -163,6 +169,7 @@ func TestTLS(t *testing.T) {
 					Certificate: [][]byte{clientDer},
 					PrivateKey:  clientkey,
 				}},
+				MinVersion: tls.VersionTLS12,
 			},
 		},
 	} {
@@ -213,11 +220,11 @@ func TestSetServerName(t *testing.T) {
 		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config is nil")
 	}
 
-	if validServerNameTLS("kafka-server.domain.com:9093", &tls.Config{}).ServerName != "kafka-server.domain.com" {
+	if validServerNameTLS("kafka-server.domain.com:9093", &tls.Config{MinVersion: tls.VersionTLS12}).ServerName != "kafka-server.domain.com" {
 		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config ServerName is not provided")
 	}
 
-	c := &tls.Config{ServerName: "kafka-server-other.domain.com"}
+	c := &tls.Config{ServerName: "kafka-server-other.domain.com", MinVersion: tls.VersionTLS12}
 	if validServerNameTLS("", c).ServerName != "kafka-server-other.domain.com" {
 		t.Fatal("Expected kafka-server-other.domain.com as tls.ServerName when tls config ServerName is provided")
 	}
