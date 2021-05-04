@@ -10,6 +10,7 @@ require (
 	github.com/eapache/queue v1.1.0
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/frankban/quicktest v1.11.3 // indirect
+	github.com/jcmturner/gofork v1.0.0
 	github.com/jcmturner/gokrb5/v8 v8.4.2
 	github.com/klauspost/compress v1.12.2
 	github.com/kr/text v0.2.0 // indirect
