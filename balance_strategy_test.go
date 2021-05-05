@@ -1765,7 +1765,7 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChang
 			}
 		}
 		plan2, err := s.Plan(membersPlan2, partitionsPerTopic)
-		verifyPlanIsBalancedAndSticky(t, s, members, plan2, err)
+		verifyPlanIsBalancedAndSticky(t, s, membersPlan2, plan2, err)
 	}
 }
 
@@ -2121,6 +2121,7 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopicsAndExistingAssig
 }
 
 func verifyPlanIsBalancedAndSticky(t *testing.T, s *stickyBalanceStrategy, members map[string]ConsumerGroupMemberMetadata, plan BalanceStrategyPlan, err error) {
+	t.Helper()
 	if err != nil {
 		t.Errorf("stickyBalanceStrategy.Plan() error = %v", err)
 		return
@@ -2133,6 +2134,7 @@ func verifyPlanIsBalancedAndSticky(t *testing.T, s *stickyBalanceStrategy, membe
 }
 
 func verifyValidityAndBalance(t *testing.T, consumers map[string]ConsumerGroupMemberMetadata, plan BalanceStrategyPlan) {
+	t.Helper()
 	size := len(consumers)
 	if size != len(plan) {
 		t.Errorf("Subscription size (%d) not equal to plan size (%d)", size, len(plan))
@@ -2151,13 +2153,13 @@ func verifyValidityAndBalance(t *testing.T, consumers map[string]ConsumerGroupMe
 		for assignedTopic := range plan[memberID] {
 			found := false
 			for _, assignableTopic := range consumers[memberID].Topics {
-				if assignableTopic == assignableTopic {
+				if assignableTopic == assignedTopic {
 					found = true
 					break
 				}
 			}
 			if !found {
-				t.Errorf("Consumer %s had assigned topic %s that wasn't in the list of assignable topics", memberID, assignedTopic)
+				t.Errorf("Consumer %s had assigned topic %q that wasn't in the list of assignable topics %v", memberID, assignedTopic, consumers[memberID].Topics)
 				t.FailNow()
 			}
 		}
