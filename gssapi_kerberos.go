@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"encoding/asn1"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jcmturner/gofork/encoding/asn1"
 	"github.com/jcmturner/gokrb5/v8/asn1tools"
 	"github.com/jcmturner/gokrb5/v8/gssapi"
 	"github.com/jcmturner/gokrb5/v8/iana/chksumtype"
