@@ -3,7 +3,9 @@ package tls
 import "crypto/tls"
 
 func NewConfig(clientCert, clientKey string) (*tls.Config, error) {
-	tlsConfig := tls.Config{}
+	tlsConfig := tls.Config{
+		MinVersion: tls.VersionTLS12,
+	}
 
 	if clientCert != "" && clientKey != "" {
 		cert, err := tls.LoadX509KeyPair(clientCert, clientKey)

@@ -1426,7 +1426,9 @@ func (b *Broker) registerCounter(name string) metrics.Counter {
 
 func validServerNameTLS(addr string, cfg *tls.Config) *tls.Config {
 	if cfg == nil {
-		cfg = &tls.Config{}
+		cfg = &tls.Config{
+			MinVersion: tls.VersionTLS12,
+		}
 	}
 	if cfg.ServerName != "" {
 		return cfg
