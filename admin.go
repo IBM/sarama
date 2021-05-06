@@ -104,6 +104,15 @@ type ClusterAdmin interface {
 	// Get information about all log directories on the given set of brokers
 	DescribeLogDirs(brokers []int32) (map[int32][]DescribeLogDirsResponseDirMetadata, error)
 
+	// Get information about SCRAM users
+	DescribeUserScramCredentials(users []string) ([]*DescribeUserScramCredentialsResult, error)
+
+	// Delete SCRAM users
+	DeleteUserScramCredentials(delete []AlterUserScramCredentialsDelete) ([]*AlterUserScramCredentialsResult, error)
+
+	// Upsert SCRAM users
+	UpsertUserScramCredentials(upsert []AlterUserScramCredentialsUpsert) ([]*AlterUserScramCredentialsResult, error)
+
 	// Close shuts down the admin and closes underlying client.
 	Close() error
 }
@@ -935,4 +944,62 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 	// Intentionally return only the first error for simplicity
 	err = <-errChan
 	return
+}
+
+func (ca *clusterAdmin) DescribeUserScramCredentials(users []string) ([]*DescribeUserScramCredentialsResult, error) {
+	req := &DescribeUserScramCredentialsRequest{}
+	for _, u := range users {
+		req.DescribeUsers = append(req.DescribeUsers, DescribeUserScramCredentialsRequestUser{
+			Name: u,
+		})
+	}
+
+	b, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := b.DescribeUserScramCredentials(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.Results, nil
+}
+
+func (ca *clusterAdmin) UpsertUserScramCredentials(upsert []AlterUserScramCredentialsUpsert) ([]*AlterUserScramCredentialsResult, error) {
+	res, err := ca.AlterUserScramCredentials(upsert, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (ca *clusterAdmin) DeleteUserScramCredentials(delete []AlterUserScramCredentialsDelete) ([]*AlterUserScramCredentialsResult, error) {
+	res, err := ca.AlterUserScramCredentials(nil, delete)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
+func (ca *clusterAdmin) AlterUserScramCredentials(u []AlterUserScramCredentialsUpsert, d []AlterUserScramCredentialsDelete) ([]*AlterUserScramCredentialsResult, error) {
+	req := &AlterUserScramCredentialsRequest{
+		Deletions:  d,
+		Upsertions: u,
+	}
+
+	b, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := b.AlterUserScramCredentials(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return rsp.Results, nil
 }

@@ -52,6 +52,9 @@ var ErrControllerNotAvailable = errors.New("kafka: controller is not available")
 // the metadata.
 var ErrNoTopicsToUpdateMetadata = errors.New("kafka: no specific topics to update metadata")
 
+// ErrUnknownScramMechanism is returned when user tries to AlterUserScramCredentials with unknown SCRAM mechanism
+var ErrUnknownScramMechanism = errors.New("kafka: unknown SCRAM mechanism provided")
+
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
 type PacketEncodingError struct {

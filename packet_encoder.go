@@ -20,6 +20,7 @@ type packetEncoder interface {
 	// Collections
 	putBytes(in []byte) error
 	putVarintBytes(in []byte) error
+	putCompactBytes(in []byte) error
 	putRawBytes(in []byte) error
 	putCompactString(in string) error
 	putNullableCompactString(in *string) error

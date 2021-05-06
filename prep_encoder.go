@@ -77,6 +77,11 @@ func (pe *prepEncoder) putVarintBytes(in []byte) error {
 	return pe.putRawBytes(in)
 }
 
+func (pe *prepEncoder) putCompactBytes(in []byte) error {
+	pe.putUVarint(uint64(len(in) + 1))
+	return pe.putRawBytes(in)
+}
+
 func (pe *prepEncoder) putCompactString(in string) error {
 	pe.putCompactArrayLength(len(in))
 	return pe.putRawBytes([]byte(in))
