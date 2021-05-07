@@ -432,15 +432,19 @@ func validateMetrics(t *testing.T, client Client) {
 func BenchmarkProducerSmall(b *testing.B) {
 	benchmarkProducer(b, nil, "test.64", ByteEncoder(make([]byte, 128)))
 }
+
 func BenchmarkProducerMedium(b *testing.B) {
 	benchmarkProducer(b, nil, "test.64", ByteEncoder(make([]byte, 1024)))
 }
+
 func BenchmarkProducerLarge(b *testing.B) {
 	benchmarkProducer(b, nil, "test.64", ByteEncoder(make([]byte, 8192)))
 }
+
 func BenchmarkProducerSmallSinglePartition(b *testing.B) {
 	benchmarkProducer(b, nil, "test.1", ByteEncoder(make([]byte, 128)))
 }
+
 func BenchmarkProducerMediumSnappy(b *testing.B) {
 	conf := NewTestConfig()
 	conf.Producer.Compression = CompressionSnappy

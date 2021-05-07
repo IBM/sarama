@@ -1,6 +1,6 @@
 package sarama
 
-//AddPartitionsToTxnRequest is a add paartition request
+// AddPartitionsToTxnRequest is a add paartition request
 type AddPartitionsToTxnRequest struct {
 	TransactionalID string
 	ProducerID      int64

@@ -1967,6 +1967,7 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testi
 	verifyPlanIsBalancedAndSticky(t, s, members, plan3, err)
 	verifyFullyBalanced(t, plan3)
 }
+
 func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGenerations(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 

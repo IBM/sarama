@@ -55,12 +55,12 @@ func (a *AclOperation) String() string {
 	return s
 }
 
-//MarshalText returns the text form of the AclOperation (name without prefix)
+// MarshalText returns the text form of the AclOperation (name without prefix)
 func (a *AclOperation) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
-//UnmarshalText takes a text reprentation of the operation and converts it to an AclOperation
+// UnmarshalText takes a text reprentation of the operation and converts it to an AclOperation
 func (a *AclOperation) UnmarshalText(text []byte) error {
 	normalized := strings.ToLower(string(text))
 	mapping := map[string]AclOperation{
@@ -109,12 +109,12 @@ func (a *AclPermissionType) String() string {
 	return s
 }
 
-//MarshalText returns the text form of the AclPermissionType (name without prefix)
+// MarshalText returns the text form of the AclPermissionType (name without prefix)
 func (a *AclPermissionType) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
-//UnmarshalText takes a text reprentation of the permission type and converts it to an AclPermissionType
+// UnmarshalText takes a text reprentation of the permission type and converts it to an AclPermissionType
 func (a *AclPermissionType) UnmarshalText(text []byte) error {
 	normalized := strings.ToLower(string(text))
 	mapping := map[string]AclPermissionType{
@@ -159,12 +159,12 @@ func (a *AclResourceType) String() string {
 	return s
 }
 
-//MarshalText returns the text form of the AclResourceType (name without prefix)
+// MarshalText returns the text form of the AclResourceType (name without prefix)
 func (a *AclResourceType) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
-//UnmarshalText takes a text reprentation of the resource type and converts it to an AclResourceType
+// UnmarshalText takes a text reprentation of the resource type and converts it to an AclResourceType
 func (a *AclResourceType) UnmarshalText(text []byte) error {
 	normalized := strings.ToLower(string(text))
 	mapping := map[string]AclResourceType{
@@ -209,12 +209,12 @@ func (a *AclResourcePatternType) String() string {
 	return s
 }
 
-//MarshalText returns the text form of the AclResourcePatternType (name without prefix)
+// MarshalText returns the text form of the AclResourcePatternType (name without prefix)
 func (a *AclResourcePatternType) MarshalText() ([]byte, error) {
 	return []byte(a.String()), nil
 }
 
-//UnmarshalText takes a text reprentation of the resource pattern type and converts it to an AclResourcePatternType
+// UnmarshalText takes a text reprentation of the resource pattern type and converts it to an AclResourcePatternType
 func (a *AclResourcePatternType) UnmarshalText(text []byte) error {
 	normalized := strings.ToLower(string(text))
 	mapping := map[string]AclResourcePatternType{

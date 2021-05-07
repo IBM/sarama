@@ -429,7 +429,7 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 
 	select {
 	case <-c.closed:
-		//consumer is closed
+		// consumer is closed
 		return
 	default:
 	}

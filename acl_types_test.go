@@ -37,6 +37,7 @@ func TestAclPermissionTypeTextMarshal(t *testing.T) {
 		}
 	}
 }
+
 func TestAclResourceTypeTextMarshal(t *testing.T) {
 	for i := AclResourceUnknown; i <= AclResourceTransactionalID; i++ {
 		text, err := i.MarshalText()
@@ -53,6 +54,7 @@ func TestAclResourceTypeTextMarshal(t *testing.T) {
 		}
 	}
 }
+
 func TestAclResourcePatternTypeTextMarshal(t *testing.T) {
 	for i := AclPatternUnknown; i <= AclPatternPrefixed; i++ {
 		text, err := i.MarshalText()

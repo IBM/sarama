@@ -357,7 +357,7 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var topicAssignment = make([][]int32, 0, 3)
+	topicAssignment := make([][]int32, 0, 3)
 
 	err = admin.AlterPartitionReassignments("my_topic", topicAssignment)
 	if err != nil {
@@ -395,7 +395,7 @@ func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var topicAssignment = make([][]int32, 0, 3)
+	topicAssignment := make([][]int32, 0, 3)
 
 	err = admin.AlterPartitionReassignments("my_topic", topicAssignment)
 
@@ -479,7 +479,7 @@ func TestClusterAdminListPartitionReassignmentsWithDiffVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var partitions = make([]int32, 0)
+	partitions := make([]int32, 0)
 
 	_, err = admin.ListPartitionReassignments("my_topic", partitions)
 
@@ -649,7 +649,7 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
 	})
 
-	var tests = []struct {
+	tests := []struct {
 		saramaVersion   KafkaVersion
 		requestVersion  int16
 		includeSynonyms bool

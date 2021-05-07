@@ -2,14 +2,12 @@ package sarama
 
 import "testing"
 
-var (
-	endTxnRequest = []byte{
-		0, 3, 't', 'x', 'n',
-		0, 0, 0, 0, 0, 0, 31, 64,
-		0, 1,
-		1,
-	}
-)
+var endTxnRequest = []byte{
+	0, 3, 't', 'x', 'n',
+	0, 0, 0, 0, 0, 0, 31, 64,
+	0, 1,
+	1,
+}
 
 func TestEndTxnRequest(t *testing.T) {
 	req := &EndTxnRequest{

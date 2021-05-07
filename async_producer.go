@@ -449,7 +449,6 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 		}
 		return
 	})
-
 	if err != nil {
 		return err
 	}

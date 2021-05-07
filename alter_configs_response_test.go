@@ -6,15 +6,15 @@ import (
 
 var (
 	alterResponseEmpty = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 0, // no configs
 	}
 
 	alterResponsePopulated = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 1, // response
-		0, 0, //errorcode
-		0, 0, //string
+		0, 0, // errorcode
+		0, 0, // string
 		2, // topic
 		0, 3, 'f', 'o', 'o',
 	}

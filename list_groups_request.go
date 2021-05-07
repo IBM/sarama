@@ -1,7 +1,6 @@
 package sarama
 
-type ListGroupsRequest struct {
-}
+type ListGroupsRequest struct{}
 
 func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 	return nil

@@ -72,6 +72,7 @@ func (c *crc32Field) check(curOffset int, buf []byte) error {
 
 	return nil
 }
+
 func (c *crc32Field) crc(curOffset int, buf []byte) (uint32, error) {
 	var tab *crc32.Table
 	switch c.polynomial {

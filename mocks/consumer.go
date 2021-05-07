@@ -231,7 +231,7 @@ func (pc *PartitionConsumer) Close() error {
 	go func() {
 		defer wg.Done()
 
-		var errs = make(sarama.ConsumerErrors, 0)
+		errs := make(sarama.ConsumerErrors, 0)
 		for err := range pc.errors {
 			errs = append(errs, err)
 		}

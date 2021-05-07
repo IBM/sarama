@@ -6,10 +6,12 @@ import (
 
 var (
 	consumerMetadataRequestEmpty = []byte{
-		0x00, 0x00}
+		0x00, 0x00,
+	}
 
 	consumerMetadataRequestString = []byte{
-		0x00, 0x06, 'f', 'o', 'o', 'b', 'a', 'r'}
+		0x00, 0x06, 'f', 'o', 'o', 'b', 'a', 'r',
+	}
 )
 
 func TestConsumerMetadataRequest(t *testing.T) {

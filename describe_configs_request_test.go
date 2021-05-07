@@ -11,7 +11,7 @@ var (
 		0, 0, 0, 1, // 1 config
 		2,                   // a topic
 		0, 3, 'f', 'o', 'o', // topic name: foo
-		0, 0, 0, 1, //1 config name
+		0, 0, 0, 1, // 1 config name
 		0, 10, // 10 chars
 		's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 	}
@@ -20,7 +20,7 @@ var (
 		0, 0, 0, 2, // 2 configs
 		2,                   // a topic
 		0, 3, 'f', 'o', 'o', // topic name: foo
-		0, 0, 0, 2, //2 config name
+		0, 0, 0, 2, // 2 config name
 		0, 10, // 10 chars
 		's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 		0, 12, // 12 chars
@@ -44,7 +44,7 @@ var (
 		2,                   // a topic
 		0, 3, 'f', 'o', 'o', // topic name: foo
 		255, 255, 255, 255, // no configs
-		1, //synoms
+		1, // synoms
 	}
 )
 

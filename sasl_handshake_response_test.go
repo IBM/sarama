@@ -2,13 +2,11 @@ package sarama
 
 import "testing"
 
-var (
-	saslHandshakeResponse = []byte{
-		0x00, 0x00,
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x03, 'f', 'o', 'o',
-	}
-)
+var saslHandshakeResponse = []byte{
+	0x00, 0x00,
+	0x00, 0x00, 0x00, 0x01,
+	0x00, 0x03, 'f', 'o', 'o',
+}
 
 func TestSaslHandshakeResponse(t *testing.T) {
 	response := new(SaslHandshakeResponse)

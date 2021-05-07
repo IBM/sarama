@@ -27,17 +27,19 @@ var (
 func TestCreateAclsRequestv0(t *testing.T) {
 	req := &CreateAclsRequest{
 		Version: 0,
-		AclCreations: []*AclCreation{{
-			Resource: Resource{
-				ResourceType: AclResourceGroup,
-				ResourceName: "group",
+		AclCreations: []*AclCreation{
+			{
+				Resource: Resource{
+					ResourceType: AclResourceGroup,
+					ResourceName: "group",
+				},
+				Acl: Acl{
+					Principal:      "principal",
+					Host:           "host",
+					Operation:      AclOperationAll,
+					PermissionType: AclPermissionDeny,
+				},
 			},
-			Acl: Acl{
-				Principal:      "principal",
-				Host:           "host",
-				Operation:      AclOperationAll,
-				PermissionType: AclPermissionDeny,
-			}},
 		},
 	}
 
@@ -47,18 +49,20 @@ func TestCreateAclsRequestv0(t *testing.T) {
 func TestCreateAclsRequestv1(t *testing.T) {
 	req := &CreateAclsRequest{
 		Version: 1,
-		AclCreations: []*AclCreation{{
-			Resource: Resource{
-				ResourceType:        AclResourceGroup,
-				ResourceName:        "group",
-				ResourcePatternType: AclPatternLiteral,
+		AclCreations: []*AclCreation{
+			{
+				Resource: Resource{
+					ResourceType:        AclResourceGroup,
+					ResourceName:        "group",
+					ResourcePatternType: AclPatternLiteral,
+				},
+				Acl: Acl{
+					Principal:      "principal",
+					Host:           "host",
+					Operation:      AclOperationAll,
+					PermissionType: AclPermissionDeny,
+				},
 			},
-			Acl: Acl{
-				Principal:      "principal",
-				Host:           "host",
-				Operation:      AclOperationAll,
-				PermissionType: AclPermissionDeny,
-			}},
 		},
 	}
 

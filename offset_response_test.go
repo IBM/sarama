@@ -1,12 +1,11 @@
 package sarama
 
-import (
-	"testing"
-)
+import "testing"
 
 var (
 	emptyOffsetResponse = []byte{
-		0x00, 0x00, 0x00, 0x00}
+		0x00, 0x00, 0x00, 0x00,
+	}
 
 	normalOffsetResponse = []byte{
 		0x00, 0x00, 0x00, 0x02,
@@ -20,7 +19,8 @@ var (
 		0x00, 0x00,
 		0x00, 0x00, 0x00, 0x02,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06}
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
+	}
 
 	normalOffsetResponseV1 = []byte{
 		0x00, 0x00, 0x00, 0x02,
@@ -33,21 +33,8 @@ var (
 		0x00, 0x00, 0x00, 0x02,
 		0x00, 0x00,
 		0x00, 0x00, 0x01, 0x58, 0x1A, 0xE6, 0x48, 0x86,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06}
-
-	normalOffsetResponseV2 = []byte{
-		0x00, 0x00, 0x00, 0x09,
-		0x00, 0x00, 0x00, 0x02,
-
-		0x00, 0x01, 'a',
-		0x00, 0x00, 0x00, 0x00,
-
-		0x00, 0x01, 'z',
-		0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x02,
-		0x00, 0x00,
-		0x00, 0x00, 0x01, 0x58, 0x1A, 0xE6, 0x48, 0x86,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06}
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06,
+	}
 )
 
 func TestEmptyOffsetResponse(t *testing.T) {
@@ -100,40 +87,6 @@ func TestNormalOffsetResponseV1(t *testing.T) {
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "normal", &response, normalOffsetResponseV1, 1)
-
-	if len(response.Blocks) != 2 {
-		t.Fatal("Decoding produced", len(response.Blocks), "topics where there were two.")
-	}
-
-	if len(response.Blocks["a"]) != 0 {
-		t.Fatal("Decoding produced", len(response.Blocks["a"]), "partitions for topic 'a' where there were none.")
-	}
-
-	if len(response.Blocks["z"]) != 1 {
-		t.Fatal("Decoding produced", len(response.Blocks["z"]), "partitions for topic 'z' where there was one.")
-	}
-
-	if response.Blocks["z"][2].Err != ErrNoError {
-		t.Fatal("Decoding produced invalid error for topic z partition 2.")
-	}
-
-	if response.Blocks["z"][2].Timestamp != 1477920049286 {
-		t.Fatal("Decoding produced invalid timestamp for topic z partition 2.", response.Blocks["z"][2].Timestamp)
-	}
-
-	if response.Blocks["z"][2].Offset != 6 {
-		t.Fatal("Decoding produced invalid offsets for topic z partition 2.")
-	}
-}
-
-func TestNormalOffsetResponseV2(t *testing.T) {
-	response := OffsetResponse{}
-
-	testVersionDecodable(t, "normal", &response, normalOffsetResponseV2, 2) // response should not change
-
-	if response.ThrottleTimeMs != 9 {
-		t.Fatal("Decoding produced", response.ThrottleTimeMs, "throttle milliseconds where there were nine milliseconds.")
-	}
 
 	if len(response.Blocks) != 2 {
 		t.Fatal("Decoding produced", len(response.Blocks), "topics where there were two.")

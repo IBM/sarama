@@ -8,7 +8,8 @@ import (
 
 var (
 	produceResponseNoBlocksV0 = []byte{
-		0x00, 0x00, 0x00, 0x00}
+		0x00, 0x00, 0x00, 0x00,
+	}
 
 	produceResponseManyBlocksVersions = map[int][]byte{
 		0: {

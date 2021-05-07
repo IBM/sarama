@@ -355,7 +355,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 			return fmt.Errorf("failed fetching the uncommitted msg jar: %w", err)
 		}
 		defer res.Body.Close()
-		jarFile, err := os.OpenFile(jarName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+		jarFile, err := os.OpenFile(jarName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o644)
 		if err != nil {
 			return fmt.Errorf("failed opening the uncomitted msg jar: %w", err)
 		}

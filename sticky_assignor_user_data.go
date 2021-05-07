@@ -11,7 +11,7 @@ type StickyAssignorUserData interface {
 	generation() int
 }
 
-//StickyAssignorUserDataV0 holds topic partition information for an assignment
+// StickyAssignorUserDataV0 holds topic partition information for an assignment
 type StickyAssignorUserDataV0 struct {
 	Topics map[string][]int32
 
@@ -58,7 +58,7 @@ func (m *StickyAssignorUserDataV0) partitions() []topicPartitionAssignment { ret
 func (m *StickyAssignorUserDataV0) hasGeneration() bool                    { return false }
 func (m *StickyAssignorUserDataV0) generation() int                        { return defaultGeneration }
 
-//StickyAssignorUserDataV1 holds topic partition information for an assignment
+// StickyAssignorUserDataV1 holds topic partition information for an assignment
 type StickyAssignorUserDataV1 struct {
 	Topics     map[string][]int32
 	Generation int32

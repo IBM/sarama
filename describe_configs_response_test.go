@@ -6,18 +6,18 @@ import (
 
 var (
 	describeConfigsResponseEmpty = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 0, // no configs
 	}
 
 	describeConfigsResponsePopulatedv0 = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 1, // response
-		0, 0, //errorcode
-		0, 0, //string
+		0, 0, // errorcode
+		0, 0, // string
 		2, // topic
 		0, 3, 'f', 'o', 'o',
-		0, 0, 0, 1, //configs
+		0, 0, 0, 1, // configs
 		0, 10, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 		0, 4, '1', '0', '0', '0',
 		0, // ReadOnly
@@ -26,13 +26,13 @@ var (
 	}
 
 	describeConfigsResponseWithDefaultv0 = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 1, // response
-		0, 0, //errorcode
-		0, 0, //string
+		0, 0, // errorcode
+		0, 0, // string
 		2, // topic
 		0, 3, 'f', 'o', 'o',
-		0, 0, 0, 1, //configs
+		0, 0, 0, 1, // configs
 		0, 10, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 		0, 4, '1', '0', '0', '0',
 		0, // ReadOnly
@@ -41,13 +41,13 @@ var (
 	}
 
 	describeConfigsResponsePopulatedv1 = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 1, // response
-		0, 0, //errorcode
-		0, 0, //string
+		0, 0, // errorcode
+		0, 0, // string
 		2, // topic
 		0, 3, 'f', 'o', 'o',
-		0, 0, 0, 1, //configs
+		0, 0, 0, 1, // configs
 		0, 10, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 		0, 4, '1', '0', '0', '0',
 		0,          // ReadOnly
@@ -57,13 +57,13 @@ var (
 	}
 
 	describeConfigsResponseWithSynonymv1 = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 1, // response
-		0, 0, //errorcode
-		0, 0, //string
+		0, 0, // errorcode
+		0, 0, // string
 		2, // topic
 		0, 3, 'f', 'o', 'o',
-		0, 0, 0, 1, //configs
+		0, 0, 0, 1, // configs
 		0, 10, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 		0, 4, '1', '0', '0', '0',
 		0,          // ReadOnly
@@ -76,13 +76,13 @@ var (
 	}
 
 	describeConfigsResponseWithDefaultv1 = []byte{
-		0, 0, 0, 0, //throttle
+		0, 0, 0, 0, // throttle
 		0, 0, 0, 1, // response
-		0, 0, //errorcode
-		0, 0, //string
+		0, 0, // errorcode
+		0, 0, // string
 		2, // topic
 		0, 3, 'f', 'o', 'o',
-		0, 0, 0, 1, //configs
+		0, 0, 0, 1, // configs
 		0, 10, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
 		0, 4, '1', '0', '0', '0',
 		0,          // ReadOnly

@@ -1,6 +1,6 @@
 package sarama
 
-//DescribeAclsRequest is a secribe acl request type
+// DescribeAclsRequest is a secribe acl request type
 type DescribeAclsRequest struct {
 	Version int
 	AclFilter

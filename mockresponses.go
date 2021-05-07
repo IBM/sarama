@@ -805,7 +805,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 				Configs: configEntries,
 			})
 		case TopicResource:
-			maxMessageBytes := &ConfigEntry{Name: "max.message.bytes",
+			maxMessageBytes := &ConfigEntry{
+				Name:      "max.message.bytes",
 				Value:     "1000000",
 				ReadOnly:  false,
 				Default:   !includeSource,
@@ -822,7 +823,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 					},
 				}
 			}
-			retentionMs := &ConfigEntry{Name: "retention.ms",
+			retentionMs := &ConfigEntry{
+				Name:      "retention.ms",
 				Value:     "5000",
 				ReadOnly:  false,
 				Default:   false,
@@ -836,7 +838,8 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 					},
 				}
 			}
-			password := &ConfigEntry{Name: "password",
+			password := &ConfigEntry{
+				Name:      "password",
 				Value:     "12345",
 				ReadOnly:  false,
 				Default:   false,
@@ -891,7 +894,8 @@ func (mr *MockAlterConfigsResponse) For(reqBody versionedDecoder) encoderWithHea
 	res := &AlterConfigsResponse{}
 
 	for _, r := range req.Resources {
-		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{Name: r.Name,
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:     r.Name,
 			Type:     r.Type,
 			ErrorMsg: "",
 		})

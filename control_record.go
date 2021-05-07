@@ -1,14 +1,14 @@
 package sarama
 
-//ControlRecordType ...
+// ControlRecordType ...
 type ControlRecordType int
 
 const (
-	//ControlRecordAbort is a control record for abort
+	// ControlRecordAbort is a control record for abort
 	ControlRecordAbort ControlRecordType = iota
-	//ControlRecordCommit is a control record for commit
+	// ControlRecordCommit is a control record for commit
 	ControlRecordCommit
-	//ControlRecordUnknown is a control record of unknown type
+	// ControlRecordUnknown is a control record of unknown type
 	ControlRecordUnknown
 )
 

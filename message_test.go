@@ -11,7 +11,8 @@ var (
 		0x00,                   // magic version byte
 		0x00,                   // attribute flags
 		0xFF, 0xFF, 0xFF, 0xFF, // key
-		0xFF, 0xFF, 0xFF, 0xFF} // value
+		0xFF, 0xFF, 0xFF, 0xFF,
+	} // value
 
 	emptyV1Message = []byte{
 		204, 47, 121, 217, // CRC
@@ -19,17 +20,19 @@ var (
 		0x00,                                           // attribute flags
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // timestamp
 		0xFF, 0xFF, 0xFF, 0xFF, // key
-		0xFF, 0xFF, 0xFF, 0xFF} // value
+		0xFF, 0xFF, 0xFF, 0xFF,
+	} // value
 
 	emptyV2Message = []byte{
 		167, 236, 104, 3, // CRC
 		0x02,                   // magic version byte
 		0x00,                   // attribute flags
 		0xFF, 0xFF, 0xFF, 0xFF, // key
-		0xFF, 0xFF, 0xFF, 0xFF} // value
+		0xFF, 0xFF, 0xFF, 0xFF,
+	} // value
 
 	emptyGzipMessage = []byte{
-		132, 99, 80, 148, //CRC
+		132, 99, 80, 148, // CRC
 		0x00,                   // magic version byte
 		0x01,                   // attribute flags
 		0xFF, 0xFF, 0xFF, 0xFF, // key
@@ -37,7 +40,8 @@ var (
 		0x00, 0x00, 0x00, 0x17,
 		0x1f, 0x8b,
 		0x08,
-		0, 0, 0, 0, 0, 0, 255, 1, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0}
+		0, 0, 0, 0, 0, 0, 255, 1, 0, 0, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
 
 	emptyLZ4Message = []byte{
 		132, 219, 238, 101, // CRC
@@ -64,7 +68,7 @@ var (
 	}
 
 	emptyBulkSnappyMessage = []byte{
-		180, 47, 53, 209, //CRC
+		180, 47, 53, 209, // CRC
 		0x00,                   // magic version byte
 		0x02,                   // attribute flags
 		0xFF, 0xFF, 0xFF, 0xFF, // key
@@ -72,17 +76,19 @@ var (
 		130, 83, 78, 65, 80, 80, 89, 0, // SNAPPY magic
 		0, 0, 0, 1, // min version
 		0, 0, 0, 1, // default version
-		0, 0, 0, 22, 52, 0, 0, 25, 1, 16, 14, 227, 138, 104, 118, 25, 15, 13, 1, 8, 1, 0, 0, 62, 26, 0}
+		0, 0, 0, 22, 52, 0, 0, 25, 1, 16, 14, 227, 138, 104, 118, 25, 15, 13, 1, 8, 1, 0, 0, 62, 26, 0,
+	}
 
 	emptyBulkGzipMessage = []byte{
-		139, 160, 63, 141, //CRC
+		139, 160, 63, 141, // CRC
 		0x00,                   // magic version byte
 		0x01,                   // attribute flags
 		0xFF, 0xFF, 0xFF, 0xFF, // key
 		0x00, 0x00, 0x00, 0x27, // len
 		0x1f, 0x8b, // Gzip Magic
 		0x08, // deflate compressed
-		0, 0, 0, 0, 0, 0, 0, 99, 96, 128, 3, 190, 202, 112, 143, 7, 12, 12, 255, 129, 0, 33, 200, 192, 136, 41, 3, 0, 199, 226, 155, 70, 52, 0, 0, 0}
+		0, 0, 0, 0, 0, 0, 0, 99, 96, 128, 3, 190, 202, 112, 143, 7, 12, 12, 255, 129, 0, 33, 200, 192, 136, 41, 3, 0, 199, 226, 155, 70, 52, 0, 0, 0,
+	}
 
 	emptyBulkLZ4Message = []byte{
 		246, 12, 188, 129, // CRC

@@ -1,6 +1,6 @@
 package sarama
 
-//DeleteAclsRequest is a delete acl request
+// DeleteAclsRequest is a delete acl request
 type DeleteAclsRequest struct {
 	Version int
 	Filters []*AclFilter

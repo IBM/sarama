@@ -1,6 +1,6 @@
 package sarama
 
-//Resource holds information about acl resource type
+// Resource holds information about acl resource type
 type Resource struct {
 	ResourceType        AclResourceType
 	ResourceName        string
@@ -46,7 +46,7 @@ func (r *Resource) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-//Acl holds information about acl type
+// Acl holds information about acl type
 type Acl struct {
 	Principal      string
 	Host           string
@@ -93,7 +93,7 @@ func (a *Acl) decode(pd packetDecoder, version int16) (err error) {
 	return nil
 }
 
-//ResourceAcls is an acl resource type
+// ResourceAcls is an acl resource type
 type ResourceAcls struct {
 	Resource
 	Acls []*Acl
