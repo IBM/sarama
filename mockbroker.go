@@ -218,6 +218,8 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 	defer func() {
 		_ = conn.Close()
 	}()
+	s := spew.NewDefaultConfig()
+	s.MaxDepth = 1
 	Logger.Printf("*** mockbroker/%d/%d: connection opened", b.BrokerID(), idx)
 	var err error
 
@@ -264,7 +266,12 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 				Logger.Printf("*** mockbroker/%d/%d: ignored %v", b.brokerID, idx, spew.Sdump(req))
 				continue
 			}
-			Logger.Printf("*** mockbroker/%d/%d: served %v -> %v", b.brokerID, idx, req, res)
+			Logger.Printf(
+				"*** mockbroker/%d/%d: replied to %T with %T\n-> %s\n-> %s",
+				b.brokerID, idx, req.body, res,
+				s.Sprintf("%#v", req.body),
+				s.Sprintf("%#v", res),
+			)
 
 			encodedRes, err := encode(res, nil)
 			if err != nil {
