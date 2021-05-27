@@ -255,36 +255,36 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	// Sync consumer group
-	groupRequest, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
+	groupResponse, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
 	if err != nil {
 		_ = coordinator.Close()
 		return nil, err
 	}
-	switch groupRequest.Err {
+	switch groupResponse.Err {
 	case ErrNoError:
 	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately
 		c.memberID = ""
 		return c.newSession(ctx, topics, handler, retries)
 	case ErrNotCoordinatorForConsumer: // retry after backoff with coordinator refresh
 		if retries <= 0 {
-			return nil, groupRequest.Err
+			return nil, groupResponse.Err
 		}
 
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	case ErrRebalanceInProgress: // retry after backoff
 		if retries <= 0 {
-			return nil, groupRequest.Err
+			return nil, groupResponse.Err
 		}
 
 		return c.retryNewSession(ctx, topics, handler, retries, false)
 	default:
-		return nil, groupRequest.Err
+		return nil, groupResponse.Err
 	}
 
 	// Retrieve and sort claims
 	var claims map[string][]int32
-	if len(groupRequest.MemberAssignment) > 0 {
-		members, err := groupRequest.GetMemberAssignment()
+	if len(groupResponse.MemberAssignment) > 0 {
+		members, err := groupResponse.GetMemberAssignment()
 		if err != nil {
 			return nil, err
 		}
