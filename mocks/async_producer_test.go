@@ -130,3 +130,45 @@ func TestProducerWithCheckerFunction(t *testing.T) {
 		t.Error("Expected to report a value check error, found: ", err1.Err)
 	}
 }
+
+func TestProducerWithBrokenPartitioner(t *testing.T) {
+	trm := newTestReporterMock()
+	config := sarama.NewConfig()
+	config.Producer.Partitioner = func(string) sarama.Partitioner {
+		return brokePartitioner{}
+	}
+	mp := NewAsyncProducer(trm, config)
+	mp.ExpectInputWithMessageCheckerFunctionAndSucceed(func(msg *sarama.ProducerMessage) error {
+		if msg.Partition != 15 {
+			t.Error("Expected partition 15, found: ", msg.Partition)
+		}
+		if msg.Topic != "test" {
+			t.Errorf(`Expected topic "test", found: %q`, msg.Topic)
+		}
+		return nil
+	})
+	mp.ExpectInputAndSucceed() // should actually fail in partitioning
+
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
+	mp.Input() <- &sarama.ProducerMessage{Topic: "not-test"}
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 1 || !strings.Contains(trm.errors[0], "partitioning unavailable") {
+		t.Error("Expected to report partitioning unavailable, found", trm.errors)
+	}
+}
+
+// brokeProducer refuses to partition anything not on the “test” topic, and sends everything on
+// that topic to partition 15.
+type brokePartitioner struct{}
+
+func (brokePartitioner) Partition(msg *sarama.ProducerMessage, n int32) (int32, error) {
+	if msg.Topic == "test" {
+		return 15, nil
+	}
+	return 0, errors.New("partitioning unavailable")
+}
+
+func (brokePartitioner) RequiresConsistency() bool { return false }
