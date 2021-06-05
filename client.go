@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -133,6 +134,8 @@ type client struct {
 	cachedPartitionsResults map[string][maxPartitionIndex][]int32
 
 	lock sync.RWMutex // protects access to the maps that hold cluster state.
+
+	updateMetaDataMs int64 //store update metadata time
 }
 
 // NewClient creates a new Client. It connects to one of the given broker addresses
@@ -877,10 +880,16 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				Logger.Println("client/metadata skipping last retries as we would go past the metadata timeout")
 				return err
 			}
-			Logger.Printf("client/metadata retrying after %dms... (%d attempts remaining)\n", backoff/time.Millisecond, attemptsRemaining)
 			if backoff > 0 {
 				time.Sleep(backoff)
 			}
+
+			t := atomic.LoadInt64(&client.updateMetaDataMs)
+			if time.Since(time.Unix(t/1e3, 0)) < backoff {
+				return err
+			}
+			Logger.Printf("client/metadata retrying after %dms... (%d attempts remaining)\n", backoff/time.Millisecond, attemptsRemaining)
+
 			return client.tryRefreshMetadata(topics, attemptsRemaining-1, deadline)
 		}
 		return err
@@ -903,6 +912,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		} else if client.conf.Version.IsAtLeast(V0_10_0_0) {
 			req.Version = 1
 		}
+
+		t := atomic.LoadInt64(&client.updateMetaDataMs)
+		if !atomic.CompareAndSwapInt64(&client.updateMetaDataMs, t, time.Now().UnixNano()/int64(time.Millisecond)) {
+			return nil
+		}
+
 		response, err := broker.GetMetadata(req)
 		var kerror KError
 		var packetEncodingError PacketEncodingError
