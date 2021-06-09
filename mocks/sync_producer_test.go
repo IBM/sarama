@@ -233,7 +233,7 @@ func TestSyncProducerSendMessagesFaultyEncoder(t *testing.T) {
 	msg1 := &sarama.ProducerMessage{Topic: "test", Value: faultyEncoder("123")}
 	msgs := []*sarama.ProducerMessage{msg1}
 
-	if err := sp.SendMessages(msgs); err == nil || !strings.HasPrefix(err.Error(), "encode error") {
+	if err := sp.SendMessages(msgs); err == nil || !strings.Contains(err.Error(), "encode error") {
 		t.Error("Encoding error expected, found: ", err)
 	}
 
