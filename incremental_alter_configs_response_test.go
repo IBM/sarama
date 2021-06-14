@@ -26,7 +26,7 @@ func TestIncrementalAlterConfigsResponse(t *testing.T) {
 	response = &IncrementalAlterConfigsResponse{
 		Resources: []*AlterConfigsResourceResponse{},
 	}
-	testVersionDecodable(t, "empty", response, alterResponseEmpty, 0)
+	testVersionDecodable(t, "empty", response, incrementalAlterResponseEmpty, 0)
 	if len(response.Resources) != 0 {
 		t.Error("Expected no groups")
 	}
@@ -41,5 +41,5 @@ func TestIncrementalAlterConfigsResponse(t *testing.T) {
 			},
 		},
 	}
-	testResponse(t, "response with error", response, alterResponsePopulated)
+	testResponse(t, "response with error", response, incrementalAlterResponsePopulated)
 }
