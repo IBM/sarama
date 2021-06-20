@@ -347,11 +347,11 @@ func runAsyncProducer(topic string, partition, messageLoad, messageSize int,
 
 	if throughput > 0 {
 		ticker := time.NewTicker(time.Second)
-		for _, message := range messages {
-			for i := 0; i < throughput; i++ {
-				producer.Input() <- message
+		for idx, message := range messages {
+			producer.Input() <- message
+			if (idx+1)%throughput == 0 {
+				<-ticker.C
 			}
-			<-ticker.C
 		}
 		ticker.Stop()
 	} else {
