@@ -1041,3 +1041,36 @@ func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics broke
 	// Run the validators
 	metricValidators.run(t, broker.conf.MetricRegistry)
 }
+
+func BenchmarkBroker_Open(b *testing.B) {
+	mb := NewMockBroker(nil, 0)
+	broker := NewBroker(mb.Addr())
+	// Set the broker id in order to validate local broker metrics
+	broker.id = 0
+	metrics.UseNilMetrics = false
+	conf := NewTestConfig()
+	conf.Version = V1_0_0_0
+	for i := 0; i < b.N; i++ {
+		err := broker.Open(conf)
+		if err != nil {
+			b.Fatal(err)
+		}
+		broker.Close()
+	}
+}
+
+func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
+	mb := NewMockBroker(nil, 0)
+	broker := NewBroker(mb.Addr())
+	broker.id = 0
+	metrics.UseNilMetrics = true
+	conf := NewTestConfig()
+	conf.Version = V1_0_0_0
+	for i := 0; i < b.N; i++ {
+		err := broker.Open(conf)
+		if err != nil {
+			b.Fatal(err)
+		}
+		broker.Close()
+	}
+}
