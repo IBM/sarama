@@ -148,6 +148,11 @@ type Config struct {
 		// `Net.[Dial|Read]Timeout * BrokerCount * (Metadata.Retry.Max + 1) + Metadata.Retry.Backoff * Metadata.Retry.Max`
 		// to fail.
 		Timeout time.Duration
+
+		// Whether to allow auto-create topics in metadata refresh. If set to true,
+		// the broker may auto-create topics that we requested which do not already exist,
+		// if it is configured to do so (`auto.create.topics.enable` is true). Defaults to true.
+		AllowAutoTopicCreation bool
 	}
 
 	// Producer is the namespace for configuration related to producing messages,
@@ -456,6 +461,7 @@ func NewConfig() *Config {
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
 	c.Metadata.RefreshFrequency = 10 * time.Minute
 	c.Metadata.Full = true
+	c.Metadata.AllowAutoTopicCreation = true
 
 	c.Producer.MaxMessageBytes = 1000000
 	c.Producer.RequiredAcks = WaitForLocal
