@@ -876,7 +876,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 	broker := client.any()
 	for ; broker != nil && !pastDeadline(0); broker = client.any() {
-		allowAutoTopicCreation := true
+		allowAutoTopicCreation := client.conf.Metadata.AllowAutoTopicCreation
 		if len(topics) > 0 {
 			Logger.Printf("client/metadata fetching metadata for %v from broker %s\n", topics, broker.addr)
 		} else {
