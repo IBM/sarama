@@ -443,6 +443,7 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 	request := &CreatePartitionsRequest{
 		TopicPartitions: topicPartitions,
 		Timeout:         ca.conf.Admin.Timeout,
+		ValidateOnly:    validateOnly,
 	}
 
 	return ca.retryOnError(isErrNoController, func() error {
