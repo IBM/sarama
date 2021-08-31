@@ -68,6 +68,10 @@ Consumer related metrics:
 	| Name                                      | Type       | Description                                                                          |
 	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
 	| consumer-batch-size                       | histogram  | Distribution of the number of messages in a batch                                    |
+	| consumer-group-join-total-<GroupID>       | counter    | Total count of consumer group join attempts                                          |
+	| consumer-group-join-failed-<GroupID>      | counter    | Total count of consumer group join failures                                          |
+	| consumer-group-sync-total-<GroupID>       | counter    | Total count of consumer group sync attempts                                          |
+	| consumer-group-sync-failed-<GroupID>      | counter    | Total count of consumer group sync failures                                          |
 	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
 
 */
