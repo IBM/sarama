@@ -113,6 +113,14 @@ type ClusterAdmin interface {
 	// Upsert SCRAM users
 	UpsertUserScramCredentials(upsert []AlterUserScramCredentialsUpsert) ([]*AlterUserScramCredentialsResult, error)
 
+	// Get client quota configurations corresponding to the specified filter.
+	// This operation is supported by brokers with version 2.6.0.0 or higher.
+	DescribeClientQuotas(components []QuotaFilterComponent, strict bool) ([]DescribeClientQuotasEntry, error)
+
+	// Alters client quota configurations with the specified alterations.
+	// This operation is supported by brokers with version 2.6.0.0 or higher.
+	AlterClientQuotas(entity []QuotaEntityComponent, op ClientQuotasOp, validateOnly bool) error
+
 	// Close shuts down the admin and closes underlying client.
 	Close() error
 }
@@ -1003,4 +1011,63 @@ func (ca *clusterAdmin) AlterUserScramCredentials(u []AlterUserScramCredentialsU
 	}
 
 	return rsp.Results, nil
+}
+
+// Describe All : use an empty/nil components slice + strict = false
+// Contains components: strict = false
+// Contains only components: strict = true
+func (ca *clusterAdmin) DescribeClientQuotas(components []QuotaFilterComponent, strict bool) ([]DescribeClientQuotasEntry, error) {
+	request := &DescribeClientQuotasRequest{
+		Components: components,
+		Strict:     strict,
+	}
+
+	b, err := ca.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	rsp, err := b.DescribeClientQuotas(request)
+	if err != nil {
+		return nil, err
+	}
+
+	if rsp.ErrorMsg != nil {
+		return nil, errors.New(*rsp.ErrorMsg)
+	}
+	if rsp.ErrorCode != ErrNoError {
+		return nil, rsp.ErrorCode
+	}
+
+	return rsp.Entries, nil
+}
+
+func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op ClientQuotasOp, validateOnly bool) error {
+	entry := AlterClientQuotasEntry{
+		Entity: entity,
+		Ops:    []ClientQuotasOp{op},
+	}
+
+	request := &AlterClientQuotasRequest{
+		Entries:      []AlterClientQuotasEntry{entry},
+		ValidateOnly: validateOnly,
+	}
+
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
+
+	rsp, err := b.AlterClientQuotas(request)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range rsp.Entries {
+		if entry.ErrorCode != ErrNoError {
+			return entry.ErrorCode
+		}
+	}
+
+	return nil
 }

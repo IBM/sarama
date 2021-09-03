@@ -724,6 +724,30 @@ func (b *Broker) AlterUserScramCredentials(req *AlterUserScramCredentialsRequest
 	return res, nil
 }
 
+// DescribeClientQuotas sends a request to get the broker's quotas
+func (b *Broker) DescribeClientQuotas(request *DescribeClientQuotasRequest) (*DescribeClientQuotasResponse, error) {
+	response := new(DescribeClientQuotasResponse)
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+// AlterClientQuotas sends a request to alter the broker's quotas
+func (b *Broker) AlterClientQuotas(request *AlterClientQuotasRequest) (*AlterClientQuotasResponse, error) {
+	response := new(AlterClientQuotasResponse)
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // readFull ensures the conn ReadDeadline has been setup before making a
 // call to io.ReadFull
 func (b *Broker) readFull(buf []byte) (n int, err error) {
