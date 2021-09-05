@@ -689,6 +689,17 @@ func (b *Broker) DeleteGroups(request *DeleteGroupsRequest) (*DeleteGroupsRespon
 	return response, nil
 }
 
+// DeleteOffsets sends a request to delete group offsets and returns a response or error
+func (b *Broker) DeleteOffsets(request *DeleteOffsetsRequest) (*DeleteOffsetsResponse, error) {
+	response := new(DeleteOffsetsResponse)
+
+	if err := b.sendAndReceive(request, response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // DescribeLogDirs sends a request to get the broker's log dir paths and sizes
 func (b *Broker) DescribeLogDirs(request *DescribeLogDirsRequest) (*DescribeLogDirsResponse, error) {
 	response := new(DescribeLogDirsResponse)
