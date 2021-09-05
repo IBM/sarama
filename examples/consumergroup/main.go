@@ -1,5 +1,6 @@
 package main
 
+// SIGUSR1 toggle the pause/resume consumption
 import (
 	"context"
 	"flag"
@@ -48,6 +49,7 @@ func init() {
 }
 
 func main() {
+	keepRunning := true
 	log.Println("Starting a new Sarama consumer")
 
 	if verbose {
@@ -94,6 +96,7 @@ func main() {
 		log.Panicf("Error creating consumer group client: %v", err)
 	}
 
+	consumptionIsPaused := false
 	wg := &sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
@@ -116,19 +119,41 @@ func main() {
 	<-consumer.ready // Await till the consumer has been set up
 	log.Println("Sarama consumer up and running!...")
 
+	sigusr1 := make(chan os.Signal, 1)
+	signal.Notify(sigusr1, syscall.SIGUSR1)
+
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
-	select {
-	case <-ctx.Done():
-		log.Println("terminating: context cancelled")
-	case <-sigterm:
-		log.Println("terminating: via signal")
+
+	for keepRunning {
+		select {
+		case <-ctx.Done():
+			log.Println("terminating: context cancelled")
+			keepRunning = false
+		case <-sigterm:
+			log.Println("terminating: via signal")
+			keepRunning = false
+		case <-sigusr1:
+			toggleConsumptionFlow(client, &consumptionIsPaused)
+		}
 	}
 	cancel()
 	wg.Wait()
 	if err = client.Close(); err != nil {
 		log.Panicf("Error closing client: %v", err)
 	}
+}
+
+func toggleConsumptionFlow(client sarama.ConsumerGroup, isPaused *bool) {
+	if *isPaused {
+		client.ResumeAll()
+		log.Println("Resuming consumption")
+	} else {
+		client.PauseAll()
+		log.Println("Pausing consumption")
+	}
+
+	*isPaused = !*isPaused
 }
 
 // Consumer represents a Sarama consumer group consumer

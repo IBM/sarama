@@ -78,6 +78,87 @@ func TestConsumerOffsetManual(t *testing.T) {
 	broker0.Close()
 }
 
+func TestPauseResumeConsumption(t *testing.T) {
+	// Given
+	broker0 := NewMockBroker(t, 0)
+
+	const newestOffsetBroker = 1233
+	const maxOffsetBroker = newestOffsetBroker + 10
+	offsetBroker := newestOffsetBroker
+	offsetClient := offsetBroker
+
+	mockFetchResponse := NewMockFetchResponse(t, 1)
+	mockFetchResponse.SetMessage("my_topic", 0, int64(newestOffsetBroker), testMsg)
+	offsetBroker++
+
+	brokerResponses := map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetOldest, 0).
+			SetOffset("my_topic", 0, OffsetNewest, int64(newestOffsetBroker)),
+		"FetchRequest": mockFetchResponse,
+	}
+
+	broker0.SetHandlerByMap(brokerResponses)
+
+	// When
+	master, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, OffsetNewest)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// pause the consumption
+	consumer.Pause()
+
+	// set more msgs on broker
+	for ; offsetBroker < maxOffsetBroker; offsetBroker++ {
+		mockFetchResponse = mockFetchResponse.SetMessage("my_topic", 0, int64(offsetBroker), testMsg)
+	}
+	brokerResponses["FetchRequest"] = mockFetchResponse
+	broker0.SetHandlerByMap(brokerResponses)
+
+	keepConsuming := true
+	for keepConsuming {
+		select {
+		case message := <-consumer.Messages():
+			// only the first msg is expected to be consumed
+			offsetClient++
+			assertMessageOffset(t, message, int64(newestOffsetBroker))
+		case err := <-consumer.Errors():
+			t.Fatal(err)
+		case <-time.After(time.Second):
+			// is expected to timedout once the consumption is pauses
+			keepConsuming = false
+		}
+	}
+
+	// lets resume the consumption in order to consume the new msgs
+	consumer.Resume()
+
+	for offsetClient < maxOffsetBroker {
+		select {
+		case message := <-consumer.Messages():
+			assertMessageOffset(t, message, int64(offsetClient))
+			offsetClient += 1
+		case err := <-consumer.Errors():
+			t.Fatal("Error: ", err)
+		case <-time.After(time.Second * 10):
+			t.Fatal("consumer timed out . Offset: ", offsetClient)
+		}
+	}
+
+	safeClose(t, consumer)
+	safeClose(t, master)
+	broker0.Close()
+}
+
 // If `OffsetNewest` is passed as the initial offset then the first consumed
 // message indeed corresponds to the offset that broker claims to be the
 // newest in its metadata response.
