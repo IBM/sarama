@@ -14,8 +14,8 @@ import (
 // to the correct broker for the provided topic-partition, refreshing metadata as appropriate,
 // and parses responses for errors. You must read from the Errors() channel or the
 // producer will deadlock. You must call Close() or AsyncClose() on a producer to avoid
-// leaks: it will not be garbage-collected automatically when it passes out of
-// scope.
+// leaks and message lost: it will not be garbage-collected automatically when it passes
+// out of scope and buffered messages may not be flushed.
 type AsyncProducer interface {
 
 	// AsyncClose triggers a shutdown of the producer. The shutdown has completed
@@ -26,7 +26,8 @@ type AsyncProducer interface {
 
 	// Close shuts down the producer and waits for any buffered messages to be
 	// flushed. You must call this function before a producer object passes out of
-	// scope, as it may otherwise leak memory. You must call this before calling
+	// scope, as it may otherwise leak memory. You must call this before process
+	// shutting down, or you may lose messages. You must call this before calling
 	// Close on the underlying client.
 	Close() error
 
