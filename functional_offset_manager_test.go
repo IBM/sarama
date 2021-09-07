@@ -1,4 +1,5 @@
-//+build functional
+//go:build functional
+// +build functional
 
 package sarama
 

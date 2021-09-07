@@ -180,7 +180,7 @@ func (b *Broker) Open(conf *Config) error {
 		b.requestsInFlight = metrics.GetOrRegisterCounter("requests-in-flight", conf.MetricRegistry)
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
-		if b.id >= 0 {
+		if b.id >= 0 && !metrics.UseNilMetrics {
 			b.registerMetrics()
 		}
 
