@@ -1074,4 +1074,3 @@ func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
 		broker.Close()
 	}
 }
-
