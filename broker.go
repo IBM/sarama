@@ -1188,9 +1188,9 @@ func (b *Broker) sendAndReceiveSASLSCRAM() error {
 }
 
 func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
-    if err := b.sendAndReceiveSASLHandshake(b.conf.Net.SASL.Mechanism, SASLHandshakeV0); err != nil {
-    	return err
-    }
+	if err := b.sendAndReceiveSASLHandshake(b.conf.Net.SASL.Mechanism, SASLHandshakeV0); err != nil {
+		return err
+	}
 
 	scramClient := b.conf.Net.SASL.SCRAMClientGeneratorFunc()
 	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
