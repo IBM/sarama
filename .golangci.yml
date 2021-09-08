@@ -57,6 +57,7 @@ linters:
     # - ineffassign
     # - misspell
     # - nakedret
+    - nilerr
     # - scopelint
     - staticcheck
     - structcheck
