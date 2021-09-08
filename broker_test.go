@@ -359,9 +359,11 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 
 			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
+			conf.Net.SASL.Version = SASLHandshakeV1
 			conf.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient { return test.scramClient }
 
 			broker.conf = conf
+			broker.conf.Version = V1_0_0_0
 			dialer := net.Dialer{
 				Timeout:   conf.Net.DialTimeout,
 				KeepAlive: conf.Net.KeepAlive,
