@@ -169,7 +169,7 @@ func NewHashPartitioner(topic string) Partitioner {
 
 // NewReferenceHashPartitioner is like NewHashPartitioner except that it handles absolute values
 // in the same way as the reference Java implementation. NewHashPartitioner was supposed to do
-// that but it had a mistake and now there are people depending on both behaviours. This will
+// that but it had a mistake and now there are people depending on both behaviors. This will
 // all go away on the next major version bump.
 func NewReferenceHashPartitioner(topic string) Partitioner {
 	p := new(hashPartitioner)
