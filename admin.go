@@ -885,9 +885,9 @@ func (ca *clusterAdmin) DeleteConsumerGroupOffset(group string, topic string, pa
 	}
 
 	request := &DeleteOffsetsRequest{
-		Group:      group,
+		Group: group,
 		partitions: map[string][]int32{
-			topic: []int32{partition},
+			topic: {partition},
 		},
 	}
 

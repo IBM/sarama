@@ -1083,9 +1083,9 @@ func (m *MockDeleteGroupsResponse) For(reqBody versionedDecoder) encoderWithHead
 }
 
 type MockDeleteOffsetResponse struct {
-	errorCode KError
-	topic string
-	partition int32
+	errorCode      KError
+	topic          string
+	partition      int32
 	errorPartition KError
 }
 
@@ -1105,7 +1105,7 @@ func (m *MockDeleteOffsetResponse) For(reqBody versionedDecoder) encoderWithHead
 	resp := &DeleteOffsetsResponse{
 		ErrorCode: m.errorCode,
 		Errors: map[string]map[int32]KError{
-			m.topic : {m.partition : m.errorPartition},
+			m.topic: {m.partition: m.errorPartition},
 		},
 	}
 	return resp
