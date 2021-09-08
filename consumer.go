@@ -373,7 +373,7 @@ func (child *partitionConsumer) preferredBroker() (*Broker, error) {
 		}
 	}
 
-	// if prefered replica cannot be found fallback to leader
+	// if preferred replica cannot be found fallback to leader
 	return child.consumer.client.Leader(child.topic, child.partition)
 }
 
@@ -845,7 +845,7 @@ func (bc *brokerConsumer) handleResponses() {
 		if result == nil {
 			if preferredBroker, err := child.preferredBroker(); err == nil {
 				if bc.broker.ID() != preferredBroker.ID() {
-					// not an error but needs redispatching to consume from prefered replica
+					// not an error but needs redispatching to consume from preferred replica
 					child.trigger <- none{}
 					delete(bc.subscriptions, child)
 				}

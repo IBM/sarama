@@ -30,7 +30,7 @@ type ConsumerGroup interface {
 	//    in a separate goroutine which requires it to be thread-safe. Any state must be carefully protected
 	//    from concurrent reads/writes.
 	// 4. The session will persist until one of the ConsumeClaim() functions exits. This can be either when the
-	//    parent context is cancelled or when a server-side rebalance cycle is initiated.
+	//    parent context is canceled or when a server-side rebalance cycle is initiated.
 	// 5. Once all the ConsumeClaim() loops have exited, the handler's Cleanup() hook is called
 	//    to allow the user to perform any final tasks before a rebalance.
 	// 6. Finally, marked offsets are committed one last time before claims are released.
