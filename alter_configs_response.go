@@ -61,12 +61,12 @@ func (a *AlterConfigsResourceResponse) encode(pe packetEncoder) error {
 	pe.putInt16(a.ErrorCode)
 	err := pe.putString(a.ErrorMsg)
 	if err != nil {
-		return nil
+		return err
 	}
 	pe.putInt8(int8(a.Type))
 	err = pe.putString(a.Name)
 	if err != nil {
-		return nil
+		return err
 	}
 	return nil
 }
