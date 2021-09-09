@@ -1326,6 +1326,52 @@ func TestDeleteConsumerGroup(t *testing.T) {
 	}
 }
 
+func TestDeleteOffset(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	group := "group-delete-offset"
+	topic := "topic-delete-offset"
+	partition := int32(0)
+
+	handlerMap := map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
+	}
+	seedBroker.SetHandlerByMap(handlerMap)
+
+	config := NewTestConfig()
+	config.Version = V2_4_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Test NoError
+	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNoError, topic, partition, ErrNoError)
+	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
+	if err != nil {
+		t.Fatalf("DeleteConsumerGroupOffset failed with error %v", err)
+	}
+
+	// Test Error
+	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNotCoordinatorForConsumer, topic, partition, ErrNoError)
+	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
+	if err != ErrNotCoordinatorForConsumer {
+		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrNotCoordinatorForConsumer)
+	}
+
+	// Test Error for partition
+	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNoError, topic, partition, ErrGroupSubscribedToTopic)
+	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
+	if err != ErrGroupSubscribedToTopic {
+		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrGroupSubscribedToTopic)
+	}
+}
+
 // TestRefreshMetaDataWithDifferentController ensures that the cached
 // controller can be forcibly updated from Metadata by the admin client
 func TestRefreshMetaDataWithDifferentController(t *testing.T) {

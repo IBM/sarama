@@ -1011,6 +1011,22 @@ var brokerTestTable = []struct {
 			}
 		},
 	},
+
+	{
+		V2_4_0_0,
+		"DeleteOffsetsRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := DeleteOffsetsRequest{}
+			response, err := broker.DeleteOffsets(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("DeleteGroups request got no response!")
+			}
+		},
+	},
 }
 
 func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics brokerMetrics) {
