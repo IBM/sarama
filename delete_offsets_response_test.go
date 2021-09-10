@@ -11,18 +11,6 @@ var (
 		0, 0, 0, 0, // 0 topics
 	}
 
-	noErrorDeleteOffsetsResponse = []byte{
-		0, 0, // no error
-		0, 0, 0, 0, // 0 throttle
-		0, 0, 0, 1, // 1 topic
-		0, 3, 'b', 'a', 'r', // topic name: bar
-		0, 0, 0, 2, // 2 partitions
-		0, 0, 0, 6, // partition 6
-		0, 0, // no error
-		0, 0, 0, 7, // partition 7
-		0, 0, // no error
-	}
-
 	errorDeleteOffsetsResponse = []byte{
 		0, 16, // error 16 : ErrNotCoordinatorForConsumer
 		0, 0, 0, 0, // 0 throttle
@@ -63,7 +51,9 @@ func TestDeleteOffsetsResponse(t *testing.T) {
 			},
 		},
 	}
-	testResponse(t, "no error", response, noErrorDeleteOffsetsResponse)
+	// The response encoded form cannot be checked for it varies due to
+	// unpredictable map traversal order.
+	testResponse(t, "no error", response, nil)
 
 	response = &DeleteOffsetsResponse{
 		ErrorCode:    16,
