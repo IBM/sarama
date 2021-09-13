@@ -190,7 +190,7 @@ func (b *Broker) Open(conf *Config) error {
 			if b.connErr != nil {
 				err = b.conn.Close()
 				if err == nil {
-					Logger.Printf("Closed connection to broker %s\n", b.addr)
+					DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
 				} else {
 					Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
 				}
@@ -204,9 +204,9 @@ func (b *Broker) Open(conf *Config) error {
 		b.responses = make(chan responsePromise, b.conf.Net.MaxOpenRequests-1)
 
 		if b.id >= 0 {
-			Logger.Printf("Connected to broker at %s (registered as #%d)\n", b.addr, b.id)
+			DebugLogger.Printf("Connected to broker at %s (registered as #%d)\n", b.addr, b.id)
 		} else {
-			Logger.Printf("Connected to broker at %s (unregistered)\n", b.addr)
+			DebugLogger.Printf("Connected to broker at %s (unregistered)\n", b.addr)
 		}
 		go withRecover(b.responseReceiver)
 	})
@@ -245,7 +245,7 @@ func (b *Broker) Close() error {
 	b.unregisterMetrics()
 
 	if err == nil {
-		Logger.Printf("Closed connection to broker %s\n", b.addr)
+		DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
 	} else {
 		Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
 	}
@@ -1044,7 +1044,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 		return res.Err
 	}
 
-	Logger.Print("Successful SASL handshake. Available mechanisms: ", res.EnabledMechanisms)
+	DebugLogger.Print("Successful SASL handshake. Available mechanisms: ", res.EnabledMechanisms)
 	return nil
 }
 
@@ -1117,7 +1117,7 @@ func (b *Broker) sendAndReceiveV0SASLPlainAuth() error {
 		return err
 	}
 
-	Logger.Printf("SASL authentication successful with broker %s:%v - %v\n", b.addr, n, header)
+	DebugLogger.Printf("SASL authentication successful with broker %s:%v - %v\n", b.addr, n, header)
 	return nil
 }
 
@@ -1275,7 +1275,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 		}
 	}
 
-	Logger.Println("SASL authentication succeeded")
+	DebugLogger.Println("SASL authentication succeeded")
 	return nil
 }
 
@@ -1323,7 +1323,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
 		}
 	}
 
-	Logger.Println("SASL authentication succeeded")
+	DebugLogger.Println("SASL authentication succeeded")
 	return nil
 }
 
