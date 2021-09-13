@@ -1,7 +1,6 @@
 # sarama
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/Shopify/sarama.svg)](https://pkg.go.dev/github.com/Shopify/sarama)
-[![Build Status](https://travis-ci.org/Shopify/sarama.svg?branch=main)](https://travis-ci.org/Shopify/sarama)
 [![Coverage](https://codecov.io/gh/Shopify/sarama/branch/main/graph/badge.svg)](https://codecov.io/gh/Shopify/sarama)
 
 Sarama is an MIT-licensed Go client library for [Apache Kafka](https://kafka.apache.org/) version 0.8 (and later).

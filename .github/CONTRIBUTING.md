@@ -28,4 +28,4 @@ We will gladly accept bug fixes, or additions to this library. Please fork this 
 - Explicitly handle all error return values. If you really want to ignore an error value, you can assign it to `_`.You can use [errcheck](https://github.com/kisielk/errcheck) to verify whether you have handled all errors.
 - You may also want to run [golint](https://github.com/golang/lint) as well to detect style problems.
 - Add tests that cover the changes you made. Make sure to run `go test` with the `-race` argument to test for race conditions.
-- Make sure your code is supported by all the Go versions we support. You can rely on [Travis CI](https://travis-ci.org/Shopify/sarama) for testing older Go versions
+- Make sure your code is supported by all the Go versions we support. You can rely on GitHub Actions for testing older Go versions.
