@@ -1563,7 +1563,7 @@ func TestConsumerTimestamps(t *testing.T) {
 			select {
 			case msg := <-consumer.Messages():
 				assertMessageOffset(t, msg, int64(i)+1)
-				if msg.Timestamp != ts {
+				if !msg.Timestamp.Equal(ts) {
 					t.Errorf("Wrong timestamp (kversion:%v, logAppendTime:%v): got: %v, want: %v",
 						d.kversion, d.logAppendTime, msg.Timestamp, ts)
 				}

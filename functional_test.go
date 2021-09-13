@@ -231,7 +231,7 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 		if err != nil {
 			return false, fmt.Errorf("proxy.Listen not a host:port combo: %w", err)
 		}
-		env.KafkaBrokerAddrs = append(env.KafkaBrokerAddrs, fmt.Sprintf("%s:%s", toxiproxyHost, proxyPort))
+		env.KafkaBrokerAddrs = append(env.KafkaBrokerAddrs, net.JoinHostPort(toxiproxyHost, proxyPort))
 	}
 
 	env.KafkaVersion, ok = os.LookupEnv("KAFKA_VERSION")

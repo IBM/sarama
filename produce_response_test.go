@@ -93,7 +93,7 @@ func TestProduceResponseDecode(t *testing.T) {
 				t.Error("Decoding failed for foo/1/Offset, got:", block.Offset)
 			}
 			if v >= 2 {
-				if block.Timestamp != time.Unix(1, 0) {
+				if !block.Timestamp.Equal(time.Unix(1, 0)) {
 					t.Error("Decoding failed for foo/1/Timestamp, got:", block.Timestamp)
 				}
 			}

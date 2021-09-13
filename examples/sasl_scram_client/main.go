@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -44,7 +43,7 @@ func createTLSConfiguration() (t *tls.Config) {
 			log.Fatal(err)
 		}
 
-		caCert, err := ioutil.ReadFile(*caFile)
+		caCert, err := os.ReadFile(*caFile)
 		if err != nil {
 			log.Fatal(err)
 		}
