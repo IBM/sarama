@@ -190,6 +190,10 @@ func allocateBody(key, version int16) protocolBody {
 		return &ListPartitionReassignmentsRequest{}
 	case 47:
 		return &DeleteOffsetsRequest{}
+	case 48:
+		return &DescribeClientQuotasRequest{}
+	case 49:
+		return &AlterClientQuotasRequest{}
 	case 50:
 		return &DescribeUserScramCredentialsRequest{}
 	case 51:
