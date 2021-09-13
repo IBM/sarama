@@ -22,7 +22,7 @@ func NewOTelInterceptor(brokers []string) *OTelInterceptor {
 	oi.tracer = global.TraceProvider().Tracer("shopify.com/sarama/examples/interceptors")
 
 	// These are based on the spec, which was reachable as of 2020-05-15
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/master/specification/trace/semantic_conventions/messaging.md
+	// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md
 	oi.fixedAttrs = []kv.KeyValue{
 		kv.String("messaging.destination_kind", "topic"),
 		kv.String("span.otel.kind", "PRODUCER"),

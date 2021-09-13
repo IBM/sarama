@@ -1,8 +1,8 @@
 # sarama
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/Shopify/sarama.svg)](https://pkg.go.dev/github.com/Shopify/sarama)
-[![Build Status](https://travis-ci.org/Shopify/sarama.svg?branch=master)](https://travis-ci.org/Shopify/sarama)
-[![Coverage](https://codecov.io/gh/Shopify/sarama/branch/master/graph/badge.svg)](https://codecov.io/gh/Shopify/sarama)
+[![Build Status](https://travis-ci.org/Shopify/sarama.svg?branch=main)](https://travis-ci.org/Shopify/sarama)
+[![Coverage](https://codecov.io/gh/Shopify/sarama/branch/main/graph/badge.svg)](https://codecov.io/gh/Shopify/sarama)
 
 Sarama is an MIT-licensed Go client library for [Apache Kafka](https://kafka.apache.org/) version 0.8 (and later).
 
@@ -29,7 +29,7 @@ A changelog is available [here](CHANGELOG.md).
 
 ## Contributing
 
-- Get started by checking our [contribution guidelines](https://github.com/Shopify/sarama/blob/master/.github/CONTRIBUTING.md).
+- Get started by checking our [contribution guidelines](https://github.com/Shopify/sarama/blob/main/.github/CONTRIBUTING.md).
 - Read the [Sarama wiki](https://github.com/Shopify/sarama/wiki) for more technical and design details.
 - The [Kafka Protocol Specification](https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol) contains a wealth of useful information.
 - For more general issues, there is [a google group](https://groups.google.com/forum/#!forum/kafka-clients) for Kafka client developers.

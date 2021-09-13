@@ -18,7 +18,7 @@ issues:
     not had any activity on it in the past 90 days and will be closed in
     30 days if no updates occur.
 
-    Please check if the master branch has already resolved the issue
+    Please check if the main branch has already resolved the issue
     since it was raised. If you believe the issue is still valid and you
     would like input from the maintainers then please comment to ask for
     it to be reviewed.
@@ -30,5 +30,5 @@ pulls:
     no updates occur.
 
     If you believe the changes are still valid then please verify your
-    branch has no conflicts with master and rebase if needed. If you
+    branch has no conflicts with main and rebase if needed. If you
     are awaiting a (re-)review then please let us know.
