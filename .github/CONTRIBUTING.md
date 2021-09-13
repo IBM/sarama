@@ -6,7 +6,7 @@ Contributions are always welcome, both reporting issues and submitting pull requ
 
 Please make sure to include any potentially useful information in the issue, so we can pinpoint the issue faster without going back and forth.
 
-- What SHA of Sarama are you running? If this is not the latest SHA on the master branch, please try if the problem persists with the latest version.
+- What SHA of Sarama are you running? If this is not the latest SHA on the main branch, please try if the problem persists with the latest version.
 - You can set `sarama.Logger` to a [log.Logger](http://golang.org/pkg/log/#Logger) instance to capture debug output. Please include it in your issue description.
 - Also look at the logs of the Kafka broker you are connected to. If you see anything out of the ordinary, please include it.
 
@@ -28,4 +28,4 @@ We will gladly accept bug fixes, or additions to this library. Please fork this 
 - Explicitly handle all error return values. If you really want to ignore an error value, you can assign it to `_`.You can use [errcheck](https://github.com/kisielk/errcheck) to verify whether you have handled all errors.
 - You may also want to run [golint](https://github.com/golang/lint) as well to detect style problems.
 - Add tests that cover the changes you made. Make sure to run `go test` with the `-race` argument to test for race conditions.
-- Make sure your code is supported by all the Go versions we support. You can rely on [Travis CI](https://travis-ci.org/Shopify/sarama) for testing older Go versions
+- Make sure your code is supported by all the Go versions we support. You can rely on GitHub Actions for testing older Go versions.
