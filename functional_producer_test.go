@@ -97,11 +97,7 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
-		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
-	}
-
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition {
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition && err != ErrInvalidTopic {
 		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
 	}
 
