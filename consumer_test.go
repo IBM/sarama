@@ -900,10 +900,6 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 //
 // See https://github.com/Shopify/sarama/issues/1927
 func TestConsumeMessagesTrackLeader(t *testing.T) {
-	prevLogger := Logger
-	defer func() { Logger = prevLogger }()
-	Logger = &testLogger{t}
-
 	cfg := NewConfig()
 	cfg.ClientID = t.Name()
 	cfg.Metadata.RefreshFrequency = time.Millisecond * 50

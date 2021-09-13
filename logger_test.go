@@ -6,11 +6,12 @@ import "testing"
 // logs of the given T passed from Test functions.
 // and records the text in the error log.
 //
-
+// nolint:unused
 type testLogger struct {
 	t *testing.T
 }
 
+// nolint:unused
 func (l *testLogger) Print(v ...interface{}) {
 	if l.t != nil {
 		l.t.Helper()
@@ -18,6 +19,7 @@ func (l *testLogger) Print(v ...interface{}) {
 	}
 }
 
+// nolint:unused
 func (l *testLogger) Printf(format string, v ...interface{}) {
 	if l.t != nil {
 		l.t.Helper()
@@ -25,6 +27,7 @@ func (l *testLogger) Printf(format string, v ...interface{}) {
 	}
 }
 
+// nolint:unused
 func (l *testLogger) Println(v ...interface{}) {
 	if l.t != nil {
 		l.t.Helper()
