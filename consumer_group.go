@@ -114,6 +114,7 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		groupID:  groupID,
 		errors:   make(chan error, config.ChannelBufferSize),
 		closed:   make(chan none),
+		userData: config.Consumer.Group.Member.UserData,
 	}, nil
 }
 
@@ -329,7 +330,15 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 			return nil, err
 		}
 		claims = members.Topics
-		c.userData = members.UserData
+
+		// in the case of stateful balance strategies, hold on to the returned
+		// assignment metadata, otherwise, reset the statically defined conusmer
+		// group metadata
+		if members.UserData != nil {
+			c.userData = members.UserData
+		} else {
+			c.userData = c.config.Consumer.Group.Member.UserData
+		}
 
 		for _, partitions := range claims {
 			sort.Sort(int32Slice(partitions))
@@ -351,14 +360,9 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond)
 	}
 
-	// use static user-data if configured, otherwise use consumer-group userdata from the last sync
-	userData := c.config.Consumer.Group.Member.UserData
-	if len(userData) == 0 {
-		userData = c.userData
-	}
 	meta := &ConsumerGroupMemberMetadata{
 		Topics:   topics,
-		UserData: userData,
+		UserData: c.userData,
 	}
 	strategy := c.config.Consumer.Group.Rebalance.Strategy
 	if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
