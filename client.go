@@ -213,11 +213,12 @@ func (client *client) Broker(brokerID int32) (*Broker, error) {
 }
 
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
-	var err error
+	err := ErrOutOfBrokers
 	for broker := client.any(); broker != nil; broker = client.any() {
+		var response *InitProducerIDResponse
 		req := &InitProducerIDRequest{}
 
-		response, err := broker.InitProducerID(req)
+		response, err = broker.InitProducerID(req)
 		switch err.(type) {
 		case nil:
 			return response, nil
@@ -228,6 +229,7 @@ func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 			client.deregisterBroker(broker)
 		}
 	}
+
 	return nil, err
 }
 
