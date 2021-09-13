@@ -255,7 +255,7 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 	}
 
 	batch := req.records["t1"][0].RecordBatch
-	if batch.FirstTimestamp != now.Truncate(time.Millisecond) {
+	if !batch.FirstTimestamp.Equal(now.Truncate(time.Millisecond)) {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
 	}
 	for i := 0; i < 10; i++ {
@@ -334,7 +334,7 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 	}
 
 	batch := req.records["t1"][0].RecordBatch
-	if batch.FirstTimestamp != now.Truncate(time.Millisecond) {
+	if !batch.FirstTimestamp.Equal(now.Truncate(time.Millisecond)) {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
 	}
 	if batch.ProducerID != pID {

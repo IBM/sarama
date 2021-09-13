@@ -94,8 +94,8 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 	msg.expectation = expectation
 	sp.producer.Input() <- msg
 
-	if err := <-expectation; err != nil {
-		return -1, -1, err.Err
+	if pErr := <-expectation; pErr != nil {
+		return -1, -1, pErr.Err
 	}
 
 	return msg.Partition, msg.Offset, nil
@@ -115,8 +115,8 @@ func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
 
 	var errors ProducerErrors
 	for expectation := range expectations {
-		if err := <-expectation; err != nil {
-			errors = append(errors, err)
+		if pErr := <-expectation; pErr != nil {
+			errors = append(errors, pErr)
 		}
 	}
 

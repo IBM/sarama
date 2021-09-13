@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -61,7 +60,7 @@ func createTlsConfiguration() (t *tls.Config) {
 			log.Fatal(err)
 		}
 
-		caCert, err := ioutil.ReadFile(*caFile)
+		caCert, err := os.ReadFile(*caFile)
 		if err != nil {
 			log.Fatal(err)
 		}

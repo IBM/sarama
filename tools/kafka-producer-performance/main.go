@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -267,7 +266,7 @@ func main() {
 		}
 
 		if *tlsRootCACerts != "" {
-			rootCAsBytes, err := ioutil.ReadFile(*tlsRootCACerts)
+			rootCAsBytes, err := os.ReadFile(*tlsRootCACerts)
 			if err != nil {
 				printErrorAndExit(69, "failed to read root CA certificates: %v", err)
 			}
