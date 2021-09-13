@@ -1,4 +1,5 @@
-//+build functional
+//go:build functional
+// +build functional
 
 package sarama
 
@@ -146,10 +147,79 @@ func TestFuncConsumerGroupFuzzy(t *testing.T) {
 	}
 }
 
+func TestFuncConsumerGroupOffsetDeletion(t *testing.T) {
+	checkKafkaVersion(t, "2.4.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+	// create a client with 2.4.0 version as it is the minimal version
+	// that supports DeleteOffsets request
+	config := NewTestConfig()
+	config.Version = V2_4_0_0
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	defer safeClose(t, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create a consumer group with offsets on
+	// - topic test.1 partition 0
+	// - topic test.4 partition 0
+	groupID := testFuncConsumerGroupID(t)
+	consumerGroup, err := NewConsumerGroupFromClient(groupID, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, consumerGroup)
+
+	offsetMgr, _ := NewOffsetManagerFromClient(groupID, client)
+	defer safeClose(t, offsetMgr)
+	markOffset(t, offsetMgr, "test.1", 0, 1)
+	markOffset(t, offsetMgr, "test.4", 0, 2)
+	offsetMgr.Commit()
+
+	admin, err := NewClusterAdminFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	offsetFetch, err := admin.ListConsumerGroupOffsets(groupID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(offsetFetch.Blocks) != 2 {
+		t.Fatal("Expected offsets on two topics. Found offsets on ", len(offsetFetch.Blocks), "topics.")
+	}
+
+	// Delete offset for partition topic test.4 partition 0
+	err = admin.DeleteConsumerGroupOffset(groupID, "test.4", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	offsetFetch, err = admin.ListConsumerGroupOffsets(groupID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(offsetFetch.Blocks) != 1 {
+		t.Fatal("Expected offsets on one topic. Found offsets on ", len(offsetFetch.Blocks), "topics.")
+	}
+	if offsetFetch.Blocks["test.4"] != nil {
+		t.Fatal("Offset still exists for topic 'topic.4'. It should have been deleted.")
+	}
+}
+
 // --------------------------------------------------------------------
 
 func testFuncConsumerGroupID(t *testing.T) string {
 	return fmt.Sprintf("sarama.%s%d", t.Name(), time.Now().UnixNano())
+}
+
+func markOffset(t *testing.T, offsetMgr OffsetManager, topic string, partition int32, offset int64) {
+	partitionOffsetManager, err := offsetMgr.ManagePartition(topic, partition)
+	defer safeClose(t, partitionOffsetManager)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partitionOffsetManager.MarkOffset(offset, "")
 }
 
 func testFuncConsumerGroupFuzzySeed(topic string) error {

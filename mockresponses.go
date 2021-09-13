@@ -1082,6 +1082,35 @@ func (m *MockDeleteGroupsResponse) For(reqBody versionedDecoder) encoderWithHead
 	return resp
 }
 
+type MockDeleteOffsetResponse struct {
+	errorCode      KError
+	topic          string
+	partition      int32
+	errorPartition KError
+}
+
+func NewMockDeleteOffsetRequest(t TestReporter) *MockDeleteOffsetResponse {
+	return &MockDeleteOffsetResponse{}
+}
+
+func (m *MockDeleteOffsetResponse) SetDeletedOffset(errorCode KError, topic string, partition int32, errorPartition KError) *MockDeleteOffsetResponse {
+	m.errorCode = errorCode
+	m.topic = topic
+	m.partition = partition
+	m.errorPartition = errorPartition
+	return m
+}
+
+func (m *MockDeleteOffsetResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	resp := &DeleteOffsetsResponse{
+		ErrorCode: m.errorCode,
+		Errors: map[string]map[int32]KError{
+			m.topic: {m.partition: m.errorPartition},
+		},
+	}
+	return resp
+}
+
 type MockJoinGroupResponse struct {
 	t TestReporter
 

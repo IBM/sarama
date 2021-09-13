@@ -1,4 +1,5 @@
-//+build functional
+//go:build functional
+// +build functional
 
 package sarama
 
@@ -59,7 +60,7 @@ func TestMain(m *testing.M) {
 	//
 	// In either case, the following topics will be deleted (if they exist) and
 	// then created/pre-seeded with data for the functional test run:
-	//     * uncomitted-topic-test-4
+	//     * uncommitted-topic-test-4
 	//     * test.1
 	//     * test.4
 	//     * test.64
@@ -133,7 +134,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	c.Env = append(os.Environ(), fmt.Sprintf("CONFLUENT_PLATFORM_VERSION=%s", confluentPlatformVersion))
 	err := c.Run()
 	if err != nil {
-		return fmt.Errorf("failed to run docker-compose to start test enviroment: %w", err)
+		return fmt.Errorf("failed to run docker-compose to start test environment: %w", err)
 	}
 
 	// Set up toxiproxy Proxies
@@ -251,10 +252,10 @@ func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) er
 	c.Stderr = os.Stderr
 	rmErr := c.Run()
 	if downErr != nil {
-		return fmt.Errorf("failed to run docker-compose to stop test enviroment: %w", downErr)
+		return fmt.Errorf("failed to run docker-compose to stop test environment: %w", downErr)
 	}
 	if rmErr != nil {
-		return fmt.Errorf("failed to run docker-compose to rm test enviroment: %w", rmErr)
+		return fmt.Errorf("failed to run docker-compose to rm test environment: %w", rmErr)
 	}
 	return nil
 }
@@ -341,14 +342,14 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	}
 
 	// This is kind of gross, but we don't actually have support for doing transactional publishing
-	// with sarama, so we need to use a java-based tool to publish uncomitted messages to
+	// with sarama, so we need to use a java-based tool to publish uncommitted messages to
 	// the uncommitted-topic-test-4 topic
 	jarName := filepath.Base(uncomittedMsgJar)
 	if _, err := os.Stat(jarName); err != nil {
 		Logger.Printf("Downloading %s\n", uncomittedMsgJar)
 		req, err := http.NewRequest("GET", uncomittedMsgJar, nil)
 		if err != nil {
-			return fmt.Errorf("failed creating requst for uncomitted msg jar: %w", err)
+			return fmt.Errorf("failed creating requst for uncommitted msg jar: %w", err)
 		}
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -357,13 +358,13 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 		defer res.Body.Close()
 		jarFile, err := os.OpenFile(jarName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o644)
 		if err != nil {
-			return fmt.Errorf("failed opening the uncomitted msg jar: %w", err)
+			return fmt.Errorf("failed opening the uncommitted msg jar: %w", err)
 		}
 		defer jarFile.Close()
 
 		_, err = io.Copy(jarFile, res.Body)
 		if err != nil {
-			return fmt.Errorf("failed writing the uncomitted msg jar: %w", err)
+			return fmt.Errorf("failed writing the uncommitted msg jar: %w", err)
 		}
 	}
 
@@ -372,7 +373,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	c.Stderr = os.Stderr
 	err = c.Run()
 	if err != nil {
-		return fmt.Errorf("failed running uncomitted msg jar: %w", err)
+		return fmt.Errorf("failed running uncommitted msg jar: %w", err)
 	}
 	return nil
 }

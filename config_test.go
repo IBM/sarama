@@ -115,7 +115,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA256
 				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
 				cfg.Net.SASL.User = "user"
-				cfg.Net.SASL.Password = "stong_password"
+				cfg.Net.SASL.Password = "strong_password"
 			},
 			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
 		},
@@ -126,7 +126,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
 				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
 				cfg.Net.SASL.User = "user"
-				cfg.Net.SASL.Password = "stong_password"
+				cfg.Net.SASL.Password = "strong_password"
 			},
 			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
 		},

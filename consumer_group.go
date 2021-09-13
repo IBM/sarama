@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 // ErrClosedConsumerGroup is the error returned when a method is called on a consumer group that has been closed.
@@ -28,7 +30,7 @@ type ConsumerGroup interface {
 	//    in a separate goroutine which requires it to be thread-safe. Any state must be carefully protected
 	//    from concurrent reads/writes.
 	// 4. The session will persist until one of the ConsumeClaim() functions exits. This can be either when the
-	//    parent context is cancelled or when a server-side rebalance cycle is initiated.
+	//    parent context is canceled or when a server-side rebalance cycle is initiated.
 	// 5. Once all the ConsumeClaim() loops have exited, the handler's Cleanup() hook is called
 	//    to allow the user to perform any final tasks before a rebalance.
 	// 6. Finally, marked offsets are committed one last time before claims are released.
@@ -212,11 +214,37 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	}
 
+	var (
+		metricRegistry          = c.config.MetricRegistry
+		consumerGroupJoinTotal  metrics.Counter
+		consumerGroupJoinFailed metrics.Counter
+		consumerGroupSyncTotal  metrics.Counter
+		consumerGroupSyncFailed metrics.Counter
+	)
+
+	if metricRegistry != nil {
+		consumerGroupJoinTotal = metrics.GetOrRegisterCounter(fmt.Sprintf("consumer-group-join-total-%s", c.groupID), metricRegistry)
+		consumerGroupJoinFailed = metrics.GetOrRegisterCounter(fmt.Sprintf("consumer-group-join-failed-%s", c.groupID), metricRegistry)
+		consumerGroupSyncTotal = metrics.GetOrRegisterCounter(fmt.Sprintf("consumer-group-sync-total-%s", c.groupID), metricRegistry)
+		consumerGroupSyncFailed = metrics.GetOrRegisterCounter(fmt.Sprintf("consumer-group-sync-failed-%s", c.groupID), metricRegistry)
+	}
+
 	// Join consumer group
 	join, err := c.joinGroupRequest(coordinator, topics)
+	if consumerGroupJoinTotal != nil {
+		consumerGroupJoinTotal.Inc(1)
+	}
 	if err != nil {
 		_ = coordinator.Close()
+		if consumerGroupJoinFailed != nil {
+			consumerGroupJoinFailed.Inc(1)
+		}
 		return nil, err
+	}
+	if join.Err != ErrNoError {
+		if consumerGroupJoinFailed != nil {
+			consumerGroupJoinFailed.Inc(1)
+		}
 	}
 	switch join.Err {
 	case ErrNoError:
@@ -256,10 +284,22 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 
 	// Sync consumer group
 	groupRequest, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
+	if consumerGroupSyncTotal != nil {
+		consumerGroupSyncTotal.Inc(1)
+	}
 	if err != nil {
 		_ = coordinator.Close()
+		if consumerGroupSyncFailed != nil {
+			consumerGroupSyncFailed.Inc(1)
+		}
 		return nil, err
 	}
+	if groupRequest.Err != ErrNoError {
+		if consumerGroupSyncFailed != nil {
+			consumerGroupSyncFailed.Inc(1)
+		}
+	}
+
 	switch groupRequest.Err {
 	case ErrNoError:
 	case ErrUnknownMemberId, ErrIllegalGeneration: // reset member ID and retry immediately

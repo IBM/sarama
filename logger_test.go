@@ -6,7 +6,7 @@ import "testing"
 // logs of the given T passed from Test functions.
 // and records the text in the error log.
 //
-// nolint
+
 type testLogger struct {
 	t *testing.T
 }

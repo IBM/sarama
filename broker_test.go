@@ -359,9 +359,11 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 
 			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
+			conf.Net.SASL.Version = SASLHandshakeV1
 			conf.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient { return test.scramClient }
 
 			broker.conf = conf
+			broker.conf.Version = V1_0_0_0
 			dialer := net.Dialer{
 				Timeout:   conf.Net.DialTimeout,
 				KeepAlive: conf.Net.KeepAlive,
@@ -1009,6 +1011,22 @@ var brokerTestTable = []struct {
 			}
 		},
 	},
+
+	{
+		V2_4_0_0,
+		"DeleteOffsetsRequest",
+		[]byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := DeleteOffsetsRequest{}
+			response, err := broker.DeleteOffsets(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("DeleteGroups request got no response!")
+			}
+		},
+	},
 }
 
 func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics brokerMetrics) {
@@ -1040,4 +1058,37 @@ func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics broke
 
 	// Run the validators
 	metricValidators.run(t, broker.conf.MetricRegistry)
+}
+
+func BenchmarkBroker_Open(b *testing.B) {
+	mb := NewMockBroker(nil, 0)
+	broker := NewBroker(mb.Addr())
+	// Set the broker id in order to validate local broker metrics
+	broker.id = 0
+	metrics.UseNilMetrics = false
+	conf := NewTestConfig()
+	conf.Version = V1_0_0_0
+	for i := 0; i < b.N; i++ {
+		err := broker.Open(conf)
+		if err != nil {
+			b.Fatal(err)
+		}
+		broker.Close()
+	}
+}
+
+func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
+	mb := NewMockBroker(nil, 0)
+	broker := NewBroker(mb.Addr())
+	broker.id = 0
+	metrics.UseNilMetrics = true
+	conf := NewTestConfig()
+	conf.Version = V1_0_0_0
+	for i := 0; i < b.N; i++ {
+		err := broker.Open(conf)
+		if err != nil {
+			b.Fatal(err)
+		}
+		broker.Close()
+	}
 }
