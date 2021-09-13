@@ -45,8 +45,8 @@ func TestFuncClientMetadata(t *testing.T) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
-	if _, err := client.Replicas("invalid/topic", 0); err != ErrUnknownTopicOrPartition {
-		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
+	if _, err := client.Replicas("invalid/topic", 0); err != ErrUnknownTopicOrPartition && err != ErrInvalidTopic {
+		t.Error("Expected ErrUnknownTopicOrPartition or ErrInvalidTopic, got", err)
 	}
 
 	partitions, err := client.Partitions("test.4")
