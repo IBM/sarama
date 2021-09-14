@@ -122,7 +122,7 @@ services:
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
   toxiproxy:
-    image: 'shopify/toxiproxy:2.1.4'
+    image: 'ghcr.io/shopify/toxiproxy:2.1.5'
     ports:
       # The tests themselves actually start the proxies on these ports
       - '29091:29091'
