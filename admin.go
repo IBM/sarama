@@ -124,6 +124,10 @@ type ClusterAdmin interface {
 	// This operation is supported by brokers with version 2.6.0.0 or higher.
 	AlterClientQuotas(entity []QuotaEntityComponent, op ClientQuotasOp, validateOnly bool) error
 
+	// Controller returns the cluster controller broker. It will return a
+	// locally cached value if it's available.
+	Controller() (*Broker, error)
+
 	// Close shuts down the admin and closes underlying client.
 	Close() error
 }
