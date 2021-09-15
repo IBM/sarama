@@ -45,6 +45,7 @@ type manualPartitioner struct{}
 // HashPartitionerOption lets you modify default values of the partitioner
 type HashPartitionerOption func(*hashPartitioner)
 
+// BytesForHash fetches the bytes required for hashing the message to a partition
 type BytesForHash func(*ProducerMessage) ([]byte, error)
 
 // WithAbsFirst means that the partitioner handles absolute values
@@ -69,6 +70,7 @@ func WithCustomFallbackPartitioner(randomHP Partitioner) HashPartitionerOption {
 	}
 }
 
+// WithCustomBytesForHash lets you specify what bytes you want to return for hashing
 func WithCustomBytesForHash(bytesForHash BytesForHash) HashPartitionerOption {
 	return func(hp *hashPartitioner) {
 		hp.bytesForHash = bytesForHash
