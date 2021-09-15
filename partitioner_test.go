@@ -3,7 +3,6 @@ package sarama
 import (
 	"crypto/rand"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"hash/fnv"
 	"log"
 	"math/big"
@@ -256,14 +255,20 @@ func TestWithCustomBytesForHash(t *testing.T) {
 		// override default keyBytesForHash
 		WithCustomBytesForHash(customBytesForHash),
 	)(topic)
-	key1 := fmt.Sprintf("PRE::%s", generateRandomString(20))
-	partitionSFO, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(key1)}, 50)
-	assert.NoError(t, err)
+	key1 := "PRE::" + generateRandomString(20)
+	partitionPRE, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(key1)}, 50)
+	if err != nil {
+		t.Error(err)
+	}
 	for i := 1; i < 250; i++ {
 		keySFO := fmt.Sprintf("PRE::%s", generateRandomString(20))
 		partition, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(keySFO)}, 50)
-		assert.NoError(t, err)
-		assert.Equal(t, partitionSFO, partition)
+		if err != nil {
+			t.Error(err)
+		}
+		if partitionPRE != partition {
+			t.Error("Returned partition", partition, "expecting", partitionPRE)
+		}
 	}
 }
 
