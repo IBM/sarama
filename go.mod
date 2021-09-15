@@ -3,7 +3,7 @@ module github.com/Shopify/sarama
 go 1.13
 
 require (
-	github.com/Shopify/toxiproxy v2.1.4+incompatible
+	github.com/Shopify/toxiproxy/v2 v2.1.6-0.20210914104332-15ea381dcdae
 	github.com/davecgh/go-spew v1.1.1
 	github.com/eapache/go-resiliency v1.2.0
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21

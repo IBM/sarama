@@ -19,7 +19,7 @@ import (
 	"testing"
 	"time"
 
-	toxiproxy "github.com/Shopify/toxiproxy/client"
+	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 )
 
 const (
