@@ -93,6 +93,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 			// Set the broker id in order to validate local broker metrics
 			broker.id = 0
 			conf := NewTestConfig()
+			conf.ApiVersionsRequest = false
 			conf.Version = tt.version
 			err := broker.Open(conf)
 			if err != nil {
