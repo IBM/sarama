@@ -45,6 +45,8 @@ type manualPartitioner struct{}
 // HashPartitionerOption lets you modify default values of the partitioner
 type HashPartitionerOption func(*hashPartitioner)
 
+type BytesForHash func(*ProducerMessage) ([]byte, error)
+
 // WithAbsFirst means that the partitioner handles absolute values
 // in the same way as the reference Java implementation
 func WithAbsFirst() HashPartitionerOption {
@@ -64,6 +66,12 @@ func WithCustomHashFunction(hasher func() hash.Hash32) HashPartitionerOption {
 func WithCustomFallbackPartitioner(randomHP Partitioner) HashPartitionerOption {
 	return func(hp *hashPartitioner) {
 		hp.random = randomHP
+	}
+}
+
+func WithCustomBytesForHash(bytesForHash BytesForHash) HashPartitionerOption {
+	return func(hp *hashPartitioner) {
+		hp.bytesForHash = bytesForHash
 	}
 }
 
@@ -126,6 +134,7 @@ type hashPartitioner struct {
 	random       Partitioner
 	hasher       hash.Hash32
 	referenceAbs bool
+	bytesForHash BytesForHash
 }
 
 // NewCustomHashPartitioner is a wrapper around NewHashPartitioner, allowing the use of custom hasher.
@@ -137,6 +146,7 @@ func NewCustomHashPartitioner(hasher func() hash.Hash32) PartitionerConstructor 
 		p.random = NewRandomPartitioner(topic)
 		p.hasher = hasher()
 		p.referenceAbs = false
+		p.bytesForHash = keyBytesForHash
 		return p
 	}
 }
@@ -148,6 +158,7 @@ func NewCustomPartitioner(options ...HashPartitionerOption) PartitionerConstruct
 		p.random = NewRandomPartitioner(topic)
 		p.hasher = fnv.New32a()
 		p.referenceAbs = false
+		p.bytesForHash = keyBytesForHash
 		for _, option := range options {
 			option(p)
 		}
@@ -164,6 +175,7 @@ func NewHashPartitioner(topic string) Partitioner {
 	p.random = NewRandomPartitioner(topic)
 	p.hasher = fnv.New32a()
 	p.referenceAbs = false
+	p.bytesForHash = keyBytesForHash
 	return p
 }
 
@@ -176,6 +188,7 @@ func NewReferenceHashPartitioner(topic string) Partitioner {
 	p.random = NewRandomPartitioner(topic)
 	p.hasher = fnv.New32a()
 	p.referenceAbs = true
+	p.bytesForHash = keyBytesForHash
 	return p
 }
 
@@ -183,7 +196,7 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	if message.Key == nil {
 		return p.random.Partition(message, numPartitions)
 	}
-	bytes, err := message.Key.Encode()
+	bytes, err := p.bytesForHash(message)
 	if err != nil {
 		return -1, err
 	}
@@ -206,6 +219,11 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 		}
 	}
 	return partition, nil
+}
+
+// keyBytesForHash returns bytes of the key in the message
+func keyBytesForHash(message *ProducerMessage) ([]byte, error) {
+	return message.Key.Encode()
 }
 
 func (p *hashPartitioner) RequiresConsistency() bool {

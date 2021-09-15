@@ -2,8 +2,12 @@ package sarama
 
 import (
 	"crypto/rand"
+	"fmt"
+	"github.com/stretchr/testify/assert"
 	"hash/fnv"
 	"log"
+	"math/big"
+	"strings"
 	"testing"
 )
 
@@ -235,6 +239,46 @@ func TestWithCustomFallbackPartitioner(t *testing.T) {
 		}
 		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: ByteEncoder(buf)}, 50)
 	}
+}
+
+func TestWithCustomBytesForHash(t *testing.T) {
+	topic := "mytopic"
+	// customBytesForHash splits a key of type <prefix>::<random string> and return bytes of the <prefix>
+	customBytesForHash := func(message *ProducerMessage) ([]byte, error) {
+		keyBytes, err := message.Key.Encode()
+		if err != nil {
+			return nil, err
+		}
+		s := strings.Split(string(keyBytes), "::")
+		return []byte(s[0]), nil
+	}
+	partitioner := NewCustomPartitioner(
+		// override default keyBytesForHash
+		WithCustomBytesForHash(customBytesForHash),
+	)(topic)
+	key1 := fmt.Sprintf("PRE::%s", generateRandomString(20))
+	partitionSFO, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(key1)}, 50)
+	assert.NoError(t, err)
+	for i := 1; i < 250; i++ {
+		keySFO := fmt.Sprintf("PRE::%s", generateRandomString(20))
+		partition, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(keySFO)}, 50)
+		assert.NoError(t, err)
+		assert.Equal(t, partitionSFO, partition)
+	}
+}
+
+func generateRandomString(n int) string {
+	const letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-"
+	ret := make([]byte, n)
+	for i := 0; i < n; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(int64(len(letters))))
+		if err != nil {
+			return ""
+		}
+		ret[i] = letters[num.Int64()]
+	}
+
+	return string(ret)
 }
 
 // By default, Sarama uses the message's key to consistently assign a partition to
