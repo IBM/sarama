@@ -1,6 +1,6 @@
 package sarama
 
-// const defaultClientSoftwareName = "sarama"
+const defaultClientSoftwareName = "sarama"
 
 type ApiVersionsRequest struct {
 	// Version defines the protocol version to use for encode and decode

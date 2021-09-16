@@ -340,6 +340,7 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 	defer secondBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"ApiVersionsRequest": NewMockApiVersionsResponse(t),
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(secondBroker.BrokerID()).
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
@@ -347,6 +348,7 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 	})
 
 	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"ApiVersionsRequest":                 NewMockApiVersionsResponse(t),
 		"AlterPartitionReassignmentsRequest": NewMockAlterPartitionReassignmentsResponse(t),
 	})
 
@@ -417,6 +419,7 @@ func TestClusterAdminListPartitionReassignments(t *testing.T) {
 	defer secondBroker.Close()
 
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"ApiVersionsRequest": NewMockApiVersionsResponse(t),
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(secondBroker.BrokerID()).
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
@@ -424,6 +427,7 @@ func TestClusterAdminListPartitionReassignments(t *testing.T) {
 	})
 
 	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"ApiVersionsRequest":                NewMockApiVersionsResponse(t),
 		"ListPartitionReassignmentsRequest": NewMockListPartitionReassignmentsResponse(t),
 	})
 
@@ -1335,6 +1339,7 @@ func TestDeleteOffset(t *testing.T) {
 	partition := int32(0)
 
 	handlerMap := map[string]MockResponse{
+		"ApiVersionsRequest": NewMockApiVersionsResponse(t),
 		"MetadataRequest": NewMockMetadataResponse(t).
 			SetController(seedBroker.BrokerID()).
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),

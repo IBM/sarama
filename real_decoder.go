@@ -240,7 +240,9 @@ func (rd *realDecoder) getCompactString() (string, error) {
 	}
 
 	length := int(n - 1)
-
+	if length < 0 {
+		return "", errInvalidByteSliceLength
+	}
 	tmpStr := string(rd.raw[rd.off : rd.off+length])
 	rd.off += length
 	return tmpStr, nil

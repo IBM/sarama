@@ -153,8 +153,23 @@ func (b *Broker) Open(conf *Config) error {
 	b.lock.Lock()
 
 	go withRecover(func() {
-		defer b.lock.Unlock()
+		defer func() {
+			b.lock.Unlock()
 
+			// Send an ApiVersionsRequest to identify the client (KIP-511).
+			// Ideally Sarama would use the response to control protocol versions,
+			// but for now just fire-and-forget just to send
+			if conf.Version.IsAtLeast(V2_4_0_0) && conf.ApiVersionsRequest {
+				_, err = b.ApiVersions(&ApiVersionsRequest{
+					Version:               3,
+					ClientSoftwareName:    defaultClientSoftwareName,
+					ClientSoftwareVersion: version(),
+				})
+				if err != nil {
+					Logger.Printf("Error while sending ApiVersionsRequest to broker %s: %s\n", b.addr, err)
+				}
+			}
+		}()
 		dialer := conf.getDialer()
 		b.conn, b.connErr = dialer.Dial("tcp", b.addr)
 		if b.connErr != nil {
