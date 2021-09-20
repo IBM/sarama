@@ -120,7 +120,9 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	// found here: https://docs.confluent.io/current/installation/versions-interoperability.html
 	var confluentPlatformVersion string
 	switch env.KafkaVersion {
-	case "2.8.0":
+	case "3.0.0":
+		confluentPlatformVersion = "6.2.0"
+	case "2.8.1":
 		confluentPlatformVersion = "6.2.0"
 	case "2.7.1":
 		confluentPlatformVersion = "6.1.2"
