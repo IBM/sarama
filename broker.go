@@ -150,6 +150,8 @@ func (b *Broker) Open(conf *Config) error {
 		return err
 	}
 
+	usingApiVersionsRequests := conf.Version.IsAtLeast(V2_4_0_0) && conf.ApiVersionsRequest
+
 	b.lock.Lock()
 
 	go withRecover(func() {
@@ -159,7 +161,7 @@ func (b *Broker) Open(conf *Config) error {
 			// Send an ApiVersionsRequest to identify the client (KIP-511).
 			// Ideally Sarama would use the response to control protocol versions,
 			// but for now just fire-and-forget just to send
-			if conf.Version.IsAtLeast(V2_4_0_0) && conf.ApiVersionsRequest {
+			if usingApiVersionsRequests {
 				_, err = b.ApiVersions(&ApiVersionsRequest{
 					Version:               3,
 					ClientSoftwareName:    defaultClientSoftwareName,
