@@ -256,23 +256,19 @@ func (om *offsetManager) Commit() {
 }
 
 func (om *offsetManager) flushToBroker() {
-
 	var (
 		attempt int
 	)
-
 	for {
 		req := om.constructRequest()
 		if req == nil {
 			return
 		}
-
 		broker, err := om.coordinator()
 		if err != nil {
 			om.handleError(err)
 			return
 		}
-
 		resp, err := broker.CommitOffset(req)
 		if err != nil {
 			om.handleError(err)
@@ -288,7 +284,6 @@ func (om *offsetManager) flushToBroker() {
 		om.handleResponse(broker, req, resp)
 		return
 	}
-
 }
 
 func (om *offsetManager) shouldRetry(resp *OffsetCommitResponse, attempt int) bool {
