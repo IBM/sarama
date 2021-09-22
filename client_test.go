@@ -687,30 +687,34 @@ func TestClientController(t *testing.T) {
 	cfg := NewTestConfig()
 
 	// test kafka version greater than 0.10.0.0
-	cfg.Version = V0_10_0_0
-	client1, err := NewClient([]string{seedBroker.Addr()}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer safeClose(t, client1)
-	broker, err := client1.Controller()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if broker.Addr() != controllerBroker.Addr() {
-		t.Errorf("Expected controller to have address %s, found %s", controllerBroker.Addr(), broker.Addr())
-	}
+	t.Run("V0_10_0_0", func(t *testing.T) {
+		cfg.Version = V0_10_0_0
+		client1, err := NewClient([]string{seedBroker.Addr()}, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, client1)
+		broker, err := client1.Controller()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if broker.Addr() != controllerBroker.Addr() {
+			t.Errorf("Expected controller to have address %s, found %s", controllerBroker.Addr(), broker.Addr())
+		}
+	})
 
 	// test kafka version earlier than 0.10.0.0
-	cfg.Version = V0_9_0_1
-	client2, err := NewClient([]string{seedBroker.Addr()}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer safeClose(t, client2)
-	if _, err = client2.Controller(); err != ErrUnsupportedVersion {
-		t.Errorf("Expected Controller() to return %s, found %s", ErrUnsupportedVersion, err)
-	}
+	t.Run("V0_9_0_1", func(t *testing.T) {
+		cfg.Version = V0_9_0_1
+		client2, err := NewClient([]string{seedBroker.Addr()}, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, client2)
+		if _, err = client2.Controller(); err != ErrUnsupportedVersion {
+			t.Errorf("Expected Controller() to return %s, found %s", ErrUnsupportedVersion, err)
+		}
+	})
 }
 
 func TestClientMetadataTimeout(t *testing.T) {

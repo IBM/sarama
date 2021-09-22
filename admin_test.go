@@ -1357,6 +1357,7 @@ func TestDeleteOffset(t *testing.T) {
 
 	// Test NoError
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNoError, topic, partition, ErrNoError)
+	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
 	if err != nil {
 		t.Fatalf("DeleteConsumerGroupOffset failed with error %v", err)
@@ -1364,6 +1365,7 @@ func TestDeleteOffset(t *testing.T) {
 
 	// Test Error
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNotCoordinatorForConsumer, topic, partition, ErrNoError)
+	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
 	if err != ErrNotCoordinatorForConsumer {
 		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrNotCoordinatorForConsumer)
@@ -1371,6 +1373,7 @@ func TestDeleteOffset(t *testing.T) {
 
 	// Test Error for partition
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNoError, topic, partition, ErrGroupSubscribedToTopic)
+	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
 	if err != ErrGroupSubscribedToTopic {
 		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrGroupSubscribedToTopic)
