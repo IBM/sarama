@@ -1,6 +1,8 @@
 package sarama
 
 import (
+	"math"
+	"math/rand"
 	"sync"
 	"time"
 )
@@ -254,26 +256,71 @@ func (om *offsetManager) Commit() {
 }
 
 func (om *offsetManager) flushToBroker() {
-	req := om.constructRequest()
-	if req == nil {
+
+	var (
+		attempt int
+	)
+
+	for {
+		req := om.constructRequest()
+		if req == nil {
+			return
+		}
+
+		broker, err := om.coordinator()
+		if err != nil {
+			om.handleError(err)
+			return
+		}
+
+		resp, err := broker.CommitOffset(req)
+		if err != nil {
+			om.handleError(err)
+			om.releaseCoordinator(broker)
+			_ = broker.Close()
+			return
+		}
+		if om.shouldRetry(resp, attempt) {
+			time.Sleep(om.backOff(attempt))
+			attempt++
+			continue
+		}
+		om.handleResponse(broker, req, resp)
 		return
 	}
 
-	broker, err := om.coordinator()
-	if err != nil {
-		om.handleError(err)
-		return
-	}
+}
 
-	resp, err := broker.CommitOffset(req)
-	if err != nil {
-		om.handleError(err)
-		om.releaseCoordinator(broker)
-		_ = broker.Close()
-		return
+func (om *offsetManager) shouldRetry(resp *OffsetCommitResponse, attempt int) bool {
+	if attempt > om.conf.Consumer.Offsets.Retry.Max {
+		return false
 	}
+	if len(resp.Errors) == 0 {
+		return false
+	}
+	for _, topicOffsetCommitErr := range resp.Errors {
+		for _, err := range topicOffsetCommitErr {
+			switch err {
+			// can add some else err code in future
+			case ErrRequestTimedOut:
+				return true
+			default:
+				return false
+			}
+		}
+	}
+	return true
+}
 
-	om.handleResponse(broker, req, resp)
+func (om *offsetManager) backOff(attempt int) time.Duration {
+	dur := float64(om.conf.Consumer.Offsets.Retry.MinDelay) * math.Pow(om.conf.Consumer.Offsets.Retry.Factor, float64(attempt))
+	if om.conf.Consumer.Offsets.Retry.Jitter == true {
+		dur = rand.Float64()*(dur-float64(om.conf.Consumer.Offsets.Retry.MinDelay)) + float64(om.conf.Consumer.Offsets.Retry.MinDelay)
+	}
+	if dur > float64(om.conf.Consumer.Offsets.Retry.MaxDelay) {
+		return om.conf.Consumer.Offsets.Retry.MaxDelay
+	}
+	return time.Duration(dur)
 }
 
 func (om *offsetManager) constructRequest() *OffsetCommitRequest {

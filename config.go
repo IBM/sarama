@@ -449,7 +449,11 @@ type Config struct {
 			Retry struct {
 				// The total number of times to retry failing commit
 				// requests during OffsetManager shutdown (default 3).
-				Max int
+				Max      int
+				Factor   float64
+				Jitter   bool
+				MinDelay time.Duration
+				MaxDelay time.Duration
 			}
 		}
 
@@ -544,6 +548,10 @@ func NewConfig() *Config {
 	c.Consumer.Offsets.AutoCommit.Interval = 1 * time.Second
 	c.Consumer.Offsets.Initial = OffsetNewest
 	c.Consumer.Offsets.Retry.Max = 3
+	c.Consumer.Offsets.Retry.Jitter = true
+	c.Consumer.Offsets.Retry.Factor = 2
+	c.Consumer.Offsets.Retry.MaxDelay = 2 * time.Second
+	c.Consumer.Offsets.Retry.MinDelay = 200 * time.Millisecond
 
 	c.Consumer.Group.Session.Timeout = 10 * time.Second
 	c.Consumer.Group.Heartbeat.Interval = 3 * time.Second
