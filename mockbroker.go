@@ -83,9 +83,13 @@ func (b *MockBroker) SetLatency(latency time.Duration) {
 // and uses the found MockResponse instance to generate an appropriate reply.
 // If the request type is not found in the map then nothing is sent.
 func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
+	fnMap := make(map[string]MockResponse)
+	for k, v := range handlerMap {
+		fnMap[k] = v
+	}
 	b.setHandler(func(req *request) (res encoderWithHeader) {
 		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
-		mockResponse := handlerMap[reqTypeName]
+		mockResponse := fnMap[reqTypeName]
 		if mockResponse == nil {
 			return nil
 		}
