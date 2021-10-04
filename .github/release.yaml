@@ -1,0 +1,40 @@
+changelog:
+  exclude:
+    labels:
+    - ignore-for-release
+    - invalid
+    - no-changelog
+    - skip-changelog
+  categories:
+  - title: ":rotating_light: Breaking Changes"
+    labels:
+    - breaking
+  - title: ":tada: New Features / Improvements"
+    labels:
+    - enhancement
+    - feature
+    - feat
+  - title: ":bug: Fixes"
+    labels:
+    - bug
+    - bugfix
+    - fix
+    - regression
+  - title: ":package: Dependency updates"
+    labels:
+    - dependencies
+    - deps
+  - title: ":wrench: Maintenance"
+    labels:
+    - build
+    - chore
+    - ci
+    - housekeeping
+    - internal
+  - title: ":memo: Documentation"
+    labels:
+    - documentation
+    - docs
+  - title: ":heavy_plus_sign: Other Changes"
+    labels:
+    - "*"
