@@ -1,6 +1,6 @@
 module github.com/Shopify/sarama
 
-go 1.13
+go 1.16
 
 require (
 	github.com/Shopify/toxiproxy/v2 v2.1.6-0.20210914104332-15ea381dcdae
