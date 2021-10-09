@@ -6,6 +6,10 @@
 
 - #1912 - @faillefer Support for --delete-offsets for consumer group topic
 
+# Fixes
+
+- #2048 - @troyanov - Set minimum supported go version to 1.16
+
 #### Version 1.28.0 (2021-02-15)
 
 **Note that with this release we change `RoundRobinBalancer` strategy to match Java client behavior. See #1788 for details.**
