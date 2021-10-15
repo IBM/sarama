@@ -6,32 +6,45 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-var zstdEncMap sync.Map
+type ZstdEncoderParams struct {
+	Level int
+}
+type ZstdDecoderParams struct {
+}
 
-var (
-	zstdDec, _ = zstd.NewReader(nil)
-)
+var zstdEncMap, zstdDecMap sync.Map
 
-func getEncoder(level int) *zstd.Encoder {
-	if ret, ok := zstdEncMap.Load(level); ok {
+func getEncoder(params ZstdEncoderParams) *zstd.Encoder {
+	if ret, ok := zstdEncMap.Load(params); ok {
 		return ret.(*zstd.Encoder)
 	}
 	// It's possible to race and create multiple new writers.
 	// Only one will survive GC after use.
 	encoderLevel := zstd.SpeedDefault
-	if level != CompressionLevelDefault {
-		encoderLevel = zstd.EncoderLevelFromZstd(level)
+	if params.Level != CompressionLevelDefault {
+		encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
 	}
 	zstdEnc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
 		zstd.WithEncoderLevel(encoderLevel))
-	zstdEncMap.Store(level, zstdEnc)
+	zstdEncMap.Store(params, zstdEnc)
 	return zstdEnc
 }
 
-func zstdDecompress(dst, src []byte) ([]byte, error) {
-	return zstdDec.DecodeAll(src, dst)
+func getDecoder(params ZstdDecoderParams) *zstd.Decoder {
+	if ret, ok := zstdDecMap.Load(params); ok {
+		return ret.(*zstd.Decoder)
+	}
+	// It's possible to race and create multiple new readers.
+	// Only one will survive GC after use.
+	zstdDec, _ := zstd.NewReader(nil)
+	zstdDecMap.Store(params, zstdDec)
+	return zstdDec
 }
 
-func zstdCompress(level int, dst, src []byte) ([]byte, error) {
-	return getEncoder(level).EncodeAll(src, dst), nil
+func zstdDecompress(params ZstdDecoderParams, dst, src []byte) ([]byte, error) {
+	return getDecoder(params).DecodeAll(src, dst)
+}
+
+func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {
+	return getEncoder(params).EncodeAll(src, dst), nil
 }
