@@ -121,6 +121,37 @@ var (
 		0x00,
 	}
 
+	emptyRecordsFetchResponsev11 = []byte{
+		0x00, 0x00, 0x00, 0x00, // ThrottleTime
+		0x00, 0x00, // Error
+		0x00, 0x00, 0x00, 0x00, // Fetch session
+		0x00, 0x00, 0x00, 0x01, // Num topic
+		0x00, 0x05, 't', 'o', 'p', 'i', 'c', // Topic
+		0x00, 0x00, 0x00, 0x01, // Num partition
+		0x00, 0x00, 0x00, 0x05, // Partition
+		0x00, 0x00, // Error
+		0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x10, // High Watermark Offset
+		0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x10, // Last Stable Offset
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Log start offset
+		0x00, 0x00, 0x00, 0x00, // Number of Aborted Transactions
+		0xff, 0xff, 0xff, 0xff, // Replica id
+		0x00, 0x00, 0x00, 0x3D, // Batch size
+		// recordBatch
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Offset
+		0x00, 0x00, 0x00, 0x31, // Message size
+		0x00, 0x00, 0x00, 0x00, // Leader epoch
+		0x02,                   // Magic byte
+		0x14, 0xE0, 0x7A, 0x62, // CRC
+		0x00, 0x00, // Flags
+		0x00, 0x00, 0x00, 0x00, // Last offset delta
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0A, // First timestamp
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0B, // Last timestamp
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, // Producer id
+		0x00, 0x00, // Producer epoch
+		0x00, 0x00, 0x00, 0x3d, // Base sequence
+		0x00, 0x00, 0x00, 0x00, // Records size
+	}
+
 	oneMessageFetchResponseV4 = []byte{
 		0x00, 0x00, 0x00, 0x00, // ThrottleTime
 		0x00, 0x00, 0x00, 0x01, // Number of Topics
@@ -383,6 +414,51 @@ func TestPartailFetchResponse(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatal("Decoding produced incorrect number of records.")
+	}
+}
+
+func TestEmptyRecordsFetchResponse(t *testing.T) {
+	response := FetchResponse{}
+	testVersionDecodable(t, "empty record", &response, emptyRecordsFetchResponsev11, 11)
+
+	if len(response.Blocks) != 1 {
+		t.Fatal("Decoding produced incorrect number of topic blocks.")
+	}
+
+	if len(response.Blocks["topic"]) != 1 {
+		t.Fatal("Decoding produced incorrect number of partition blocks for topic.")
+	}
+
+	block := response.GetBlock("topic", 5)
+	if block == nil {
+		t.Fatal("GetBlock didn't return block.")
+	}
+	if block.Err != ErrNoError {
+		t.Error("Decoding didn't produce correct error code.")
+	}
+	if block.HighWaterMarkOffset != 0x10101010 {
+		t.Error("Decoding didn't produce correct high water mark offset.")
+	}
+	if block.PreferredReadReplica != -1 {
+		t.Error("Decoding didn't produce correct preferred read replica.")
+	}
+	partial, err := block.isPartial()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if partial {
+		t.Error("Decoding a partial trailing record")
+	}
+
+	n, err := block.numRecords()
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	if n != 0 {
+		t.Fatal("Decoding produced incorrect number of records.")
+	}
+	if *block.LastRecordsBatchOffset != 0 {
+		t.Fatal("Last records batch offset is incorrect.")
 	}
 }
 

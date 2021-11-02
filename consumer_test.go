@@ -1734,6 +1734,39 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 	}
 }
 
+func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
+	lrbOffset := int64(5)
+	block := &FetchResponseBlock{
+		HighWaterMarkOffset:    10,
+		LastStableOffset:       10,
+		LastRecordsBatchOffset: &lrbOffset,
+		LogStartOffset:         0,
+	}
+	response := &FetchResponse{
+		Blocks:  map[string]map[int32]*FetchResponseBlock{"my_topic": {0: block}},
+		Version: 2,
+	}
+	child := &partitionConsumer{
+		broker: &brokerConsumer{
+			broker: &Broker{},
+		},
+		conf:      NewConfig(),
+		topic:     "my_topic",
+		partition: 0,
+	}
+	got, err := child.parseResponse(response)
+	if err != nil {
+		t.Errorf("partitionConsumer.parseResponse() error = %v", err)
+		return
+	}
+	if got != nil {
+		t.Errorf("partitionConsumer.parseResponse() should be nil, got %v", got)
+	}
+	if child.offset != 6 {
+		t.Errorf("child.offset should be LastRecordsBatchOffset + 1: %d, got %d", lrbOffset+1, child.offset)
+	}
+}
+
 func testConsumerInterceptor(
 	t *testing.T,
 	interceptors []ConsumerInterceptor,
