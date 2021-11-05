@@ -4,7 +4,7 @@ import (
 	"compress/gzip"
 	"crypto/tls"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net"
 	"regexp"
 	"time"
@@ -675,7 +675,7 @@ func (c *Config) Validate() error {
 
 	if c.Producer.Compression == CompressionGZIP {
 		if c.Producer.CompressionLevel != CompressionLevelDefault {
-			if _, err := gzip.NewWriterLevel(io.Discard, c.Producer.CompressionLevel); err != nil {
+			if _, err := gzip.NewWriterLevel(ioutil.Discard, c.Producer.CompressionLevel); err != nil {
 				return ConfigurationError(fmt.Sprintf("gzip compression does not work with level %d: %v", c.Producer.CompressionLevel, err))
 			}
 		}

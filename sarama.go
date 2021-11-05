@@ -78,7 +78,7 @@ Consumer related metrics:
 package sarama
 
 import (
-	"io"
+	"io/ioutil"
 	"log"
 )
 
@@ -86,7 +86,7 @@ var (
 	// Logger is the instance of a StdLogger interface that Sarama writes connection
 	// management events to. By default it is set to discard all log messages via ioutil.Discard,
 	// but you can set it to redirect wherever you want.
-	Logger StdLogger = log.New(io.Discard, "[Sarama] ", log.LstdFlags)
+	Logger StdLogger = log.New(ioutil.Discard, "[Sarama] ", log.LstdFlags)
 
 	// PanicHandler is called for recovering from panics spawned internally to the library (and thus
 	// not recoverable by the caller's goroutine). Defaults to nil, which means panics are not recovered.

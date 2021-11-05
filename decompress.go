@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"sync"
 
 	snappy "github.com/eapache/go-xerial-snappy"
@@ -40,7 +40,7 @@ func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
 
 		defer gzipReaderPool.Put(reader)
 
-		return io.ReadAll(reader)
+		return ioutil.ReadAll(reader)
 	case CompressionSnappy:
 		return snappy.Decode(data)
 	case CompressionLZ4:
@@ -52,7 +52,7 @@ func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
 		}
 		defer lz4ReaderPool.Put(reader)
 
-		return io.ReadAll(reader)
+		return ioutil.ReadAll(reader)
 	case CompressionZSTD:
 		return zstdDecompress(ZstdDecoderParams{}, nil, data)
 	default:
