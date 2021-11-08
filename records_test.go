@@ -72,12 +72,20 @@ func TestLegacyRecords(t *testing.T) {
 	if c {
 		t.Errorf("MessageSet can't be a control batch")
 	}
+	f, err := r.recordsOffset()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f != nil {
+		t.Errorf("RecordBatch record offset is invalid")
+	}
 }
 
 func TestDefaultRecords(t *testing.T) {
 	batch := &RecordBatch{
 		IsTransactional: true,
 		Version:         2,
+		FirstOffset:     1,
 		Records: []*Record{
 			{
 				Value: []byte{1},
@@ -140,5 +148,12 @@ func TestDefaultRecords(t *testing.T) {
 	}
 	if c {
 		t.Errorf("RecordBatch shouldn't be a control batch")
+	}
+	f, err := r.recordsOffset()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f == nil || *f != 1 {
+		t.Errorf("RecordBatch record offset is invalid")
 	}
 }
