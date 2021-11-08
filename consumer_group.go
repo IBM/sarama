@@ -259,7 +259,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		}
 
 		return c.retryNewSession(ctx, topics, handler, retries, true)
-	case ErrRebalanceInProgress: // retry after backoff
+	case ErrRebalanceInProgress, ErrOffsetsLoadInProgress: // retry after backoff
 		if retries <= 0 {
 			return nil, join.Err
 		}
@@ -312,7 +312,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		}
 
 		return c.retryNewSession(ctx, topics, handler, retries, true)
-	case ErrRebalanceInProgress: // retry after backoff
+	case ErrRebalanceInProgress, ErrOffsetsLoadInProgress: // retry after backoff
 		if retries <= 0 {
 			return nil, groupRequest.Err
 		}
