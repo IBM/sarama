@@ -119,6 +119,7 @@ func newConsumer(client Client) (Consumer, error) {
 }
 
 func (c *consumer) Close() error {
+	closeZstdDecoder()
 	return c.client.Close()
 }
 

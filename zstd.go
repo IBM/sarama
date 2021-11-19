@@ -42,11 +42,18 @@ func getDecoder(params ZstdDecoderParams) *zstd.Decoder {
 }
 
 func zstdDecompress(params ZstdDecoderParams, dst, src []byte) ([]byte, error) {
-	decoder := getDecoder(params)
-	defer decoder.Close()
-	return decoder.DecodeAll(src, dst)
+	return getDecoder(params).DecodeAll(src, dst)
 }
 
 func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {
 	return getEncoder(params).EncodeAll(src, dst), nil
+}
+
+func closeZstdDecoder() {
+	zstdDecMap.Range(func(key, value interface{}) bool {
+		if decoder, ok := value.(*zstd.Decoder); ok {
+			decoder.Close()
+		}
+		return true
+	})
 }
