@@ -48,7 +48,5 @@ func zstdDecompress(params ZstdDecoderParams, dst, src []byte) ([]byte, error) {
 }
 
 func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {
-	encoder := getEncoder(params)
-	defer encoder.Close()
-	return encoder.EncodeAll(src, dst), nil
+	return getEncoder(params).EncodeAll(src, dst), nil
 }
