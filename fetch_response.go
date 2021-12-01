@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const invalidPreferredReplicaID = -1
+
 type AbortedTransaction struct {
 	ProducerID  int64
 	FirstOffset int64
