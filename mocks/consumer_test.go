@@ -247,3 +247,68 @@ func TestConsumerUnexpectedTopicMetadata(t *testing.T) {
 		t.Errorf("Expected an expectation failure to be set on the error reporter.")
 	}
 }
+
+func TestConsumerOffsetsAreManagedCorrectlyWithOffsetOldest(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, NewTestConfig())
+	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.ExpectMessagesDrainedOnClose()
+
+	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	message1 := <-pc.Messages()
+	if message1.Offset != 0 {
+		t.Errorf("Expected offset of first message in the partition to be 0, got %d", message1.Offset)
+	}
+
+	message2 := <-pc.Messages()
+	if message2.Offset != 1 {
+		t.Errorf("Expected offset of second message in the partition to be 1, got %d", message2.Offset)
+	}
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected to not report any errors, found: %v", trm.errors)
+	}
+}
+
+func TestConsumerOffsetsAreManagedCorrectlyWithSpecifiedOffset(t *testing.T) {
+	startingOffset := int64(123)
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, NewTestConfig())
+	pcmock := consumer.ExpectConsumePartition("test", 0, startingOffset)
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.ExpectMessagesDrainedOnClose()
+
+	pc, err := consumer.ConsumePartition("test", 0, startingOffset)
+	if err != nil {
+		t.Error(err)
+	}
+
+	message1 := <-pc.Messages()
+	if message1.Offset != startingOffset {
+		t.Errorf("Expected offset of first message to be %d, got %d", startingOffset, message1.Offset)
+	}
+
+	message2 := <-pc.Messages()
+	if message2.Offset != startingOffset+1 {
+		t.Errorf("Expected offset of second message to be %d, got %d", startingOffset+1, message2.Offset)
+	}
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected to not report any errors, found: %v", trm.errors)
+	}
+}
