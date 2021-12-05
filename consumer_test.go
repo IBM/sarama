@@ -57,6 +57,9 @@ func TestConsumerOffsetManual(t *testing.T) {
 	}
 
 	// Then
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
+	}
 	for i := int64(0); i < 10; i++ {
 		select {
 		case message := <-consumer.Messages():
@@ -109,6 +112,9 @@ func TestConsumerOffsetNewest(t *testing.T) {
 	}
 
 	// Then
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
+	}
 	assertMessageOffset(t, <-consumer.Messages(), 10)
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewestAfterFetchRequest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewestAfterFetchRequest, hwmo)
@@ -154,6 +160,9 @@ func TestConsumerOffsetOldest(t *testing.T) {
 	}
 
 	// Then
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
+	}
 	assertMessageOffset(t, <-consumer.Messages(), int64(7))
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
