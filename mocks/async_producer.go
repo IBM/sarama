@@ -152,10 +152,12 @@ func (mp *AsyncProducer) Errors() <-chan *sarama.ProducerError {
 // check the message. If an error is returned it will be made available on the Errors channel
 // otherwise the mock will handle the message as if it produced successfully, i.e. it will make it
 // available on the Successes channel if the Producer.Return.Successes setting is set to true.
-func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndSucceed(cf MessageChecker) {
+func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndSucceed(cf MessageChecker) *AsyncProducer {
 	mp.l.Lock()
 	defer mp.l.Unlock()
 	mp.expectations = append(mp.expectations, &producerExpectation{Result: errProduceSuccess, CheckFunction: cf})
+
+	return mp
 }
 
 // ExpectInputWithMessageCheckerFunctionAndFail sets an expectation on the mock producer that a
@@ -163,10 +165,12 @@ func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndSucceed(cf Mess
 // function to check the message. If an error is returned it will be made available on the Errors
 // channel otherwise the mock will handle the message as if it failed to produce successfully. This
 // means it will make a ProducerError available on the Errors channel.
-func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndFail(cf MessageChecker, err error) {
+func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndFail(cf MessageChecker, err error) *AsyncProducer {
 	mp.l.Lock()
 	defer mp.l.Unlock()
 	mp.expectations = append(mp.expectations, &producerExpectation{Result: err, CheckFunction: cf})
+
+	return mp
 }
 
 // ExpectInputWithCheckerFunctionAndSucceed sets an expectation on the mock producer that a message
@@ -174,8 +178,10 @@ func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndFail(cf Message
 // the message value. If an error is returned it will be made available on the Errors channel
 // otherwise the mock will handle the message as if it produced successfully, i.e. it will make
 // it available on the Successes channel if the Producer.Return.Successes setting is set to true.
-func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndSucceed(cf ValueChecker) {
+func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndSucceed(cf ValueChecker) *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndSucceed(messageValueChecker(cf))
+
+	return mp
 }
 
 // ExpectInputWithCheckerFunctionAndFail sets an expectation on the mock producer that a message
@@ -183,21 +189,27 @@ func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndSucceed(cf ValueChecke
 // check the message value. If an error is returned it will be made available on the Errors channel
 // otherwise the mock will handle the message as if it failed to produce successfully. This means
 // it will make a ProducerError available on the Errors channel.
-func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndFail(cf ValueChecker, err error) {
+func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndFail(cf ValueChecker, err error) *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndFail(messageValueChecker(cf), err)
+
+	return mp
 }
 
 // ExpectInputAndSucceed sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it is produced successfully,
 // i.e. it will make it available on the Successes channel if the Producer.Return.Successes setting
 // is set to true.
-func (mp *AsyncProducer) ExpectInputAndSucceed() {
+func (mp *AsyncProducer) ExpectInputAndSucceed() *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndSucceed(nil)
+
+	return mp
 }
 
 // ExpectInputAndFail sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it failed to produce
 // successfully. This means it will make a ProducerError available on the Errors channel.
-func (mp *AsyncProducer) ExpectInputAndFail(err error) {
+func (mp *AsyncProducer) ExpectInputAndFail(err error) *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndFail(nil, err)
+
+	return mp
 }

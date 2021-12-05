@@ -45,11 +45,10 @@ func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
 func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Return.Successes = true
-	mp := NewAsyncProducer(t, config)
-
-	mp.ExpectInputAndSucceed()
-	mp.ExpectInputAndSucceed()
-	mp.ExpectInputAndFail(sarama.ErrOutOfBrokers)
+	mp := NewAsyncProducer(t, config).
+		ExpectInputAndSucceed().
+		ExpectInputAndSucceed().
+		ExpectInputAndFail(sarama.ErrOutOfBrokers)
 
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test 1"}
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test 2"}
@@ -95,9 +94,9 @@ func TestProducerWithTooFewExpectations(t *testing.T) {
 
 func TestProducerWithTooManyExpectations(t *testing.T) {
 	trm := newTestReporterMock()
-	mp := NewAsyncProducer(trm, nil)
-	mp.ExpectInputAndSucceed()
-	mp.ExpectInputAndFail(sarama.ErrOutOfBrokers)
+	mp := NewAsyncProducer(trm, nil).
+		ExpectInputAndSucceed().
+		ExpectInputAndFail(sarama.ErrOutOfBrokers)
 
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
 	if err := mp.Close(); err != nil {
@@ -111,9 +110,9 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 
 func TestProducerWithCheckerFunction(t *testing.T) {
 	trm := newTestReporterMock()
-	mp := NewAsyncProducer(trm, nil)
-	mp.ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
-	mp.ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
+	mp := NewAsyncProducer(trm, nil).
+		ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes")).
+		ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
 
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	mp.Input() <- &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}

@@ -149,48 +149,60 @@ func (sp *SyncProducer) Close() error {
 // that SendMessage will be called. The mock producer will first call the given function to check
 // the message. It will cascade the error of the function, if any, or handle the message as if it
 // produced successfully, i.e. by returning a valid partition, and offset, and a nil error.
-func (sp *SyncProducer) ExpectSendMessageWithMessageCheckerFunctionAndSucceed(cf MessageChecker) {
+func (sp *SyncProducer) ExpectSendMessageWithMessageCheckerFunctionAndSucceed(cf MessageChecker) *SyncProducer {
 	sp.l.Lock()
 	defer sp.l.Unlock()
 	sp.expectations = append(sp.expectations, &producerExpectation{Result: errProduceSuccess, CheckFunction: cf})
+
+	return sp
 }
 
 // ExpectSendMessageWithMessageCheckerFunctionAndFail sets an expectation on the mock producer that
 // SendMessage will be called. The mock producer will first call the given function to check the
 // message. It will cascade the error of the function, if any, or handle the message as if it
 // failed to produce successfully, i.e. by returning the provided error.
-func (sp *SyncProducer) ExpectSendMessageWithMessageCheckerFunctionAndFail(cf MessageChecker, err error) {
+func (sp *SyncProducer) ExpectSendMessageWithMessageCheckerFunctionAndFail(cf MessageChecker, err error) *SyncProducer {
 	sp.l.Lock()
 	defer sp.l.Unlock()
 	sp.expectations = append(sp.expectations, &producerExpectation{Result: err, CheckFunction: cf})
+
+	return sp
 }
 
 // ExpectSendMessageWithCheckerFunctionAndSucceed sets an expectation on the mock producer that SendMessage
 // will be called. The mock producer will first call the given function to check the message value.
 // It will cascade the error of the function, if any, or handle the message as if it produced
 // successfully, i.e. by returning a valid partition, and offset, and a nil error.
-func (sp *SyncProducer) ExpectSendMessageWithCheckerFunctionAndSucceed(cf ValueChecker) {
+func (sp *SyncProducer) ExpectSendMessageWithCheckerFunctionAndSucceed(cf ValueChecker) *SyncProducer {
 	sp.ExpectSendMessageWithMessageCheckerFunctionAndSucceed(messageValueChecker(cf))
+
+	return sp
 }
 
 // ExpectSendMessageWithCheckerFunctionAndFail sets an expectation on the mock producer that SendMessage will be
 // called. The mock producer will first call the given function to check the message value.
 // It will cascade the error of the function, if any, or handle the message as if it failed
 // to produce successfully, i.e. by returning the provided error.
-func (sp *SyncProducer) ExpectSendMessageWithCheckerFunctionAndFail(cf ValueChecker, err error) {
+func (sp *SyncProducer) ExpectSendMessageWithCheckerFunctionAndFail(cf ValueChecker, err error) *SyncProducer {
 	sp.ExpectSendMessageWithMessageCheckerFunctionAndFail(messageValueChecker(cf), err)
+
+	return sp
 }
 
 // ExpectSendMessageAndSucceed sets an expectation on the mock producer that SendMessage will be
 // called. The mock producer will handle the message as if it produced successfully, i.e. by
 // returning a valid partition, and offset, and a nil error.
-func (sp *SyncProducer) ExpectSendMessageAndSucceed() {
+func (sp *SyncProducer) ExpectSendMessageAndSucceed() *SyncProducer {
 	sp.ExpectSendMessageWithMessageCheckerFunctionAndSucceed(nil)
+
+	return sp
 }
 
 // ExpectSendMessageAndFail sets an expectation on the mock producer that SendMessage will be
 // called. The mock producer will handle the message as if it failed to produce
 // successfully, i.e. by returning the provided error.
-func (sp *SyncProducer) ExpectSendMessageAndFail(err error) {
+func (sp *SyncProducer) ExpectSendMessageAndFail(err error) *SyncProducer {
 	sp.ExpectSendMessageWithMessageCheckerFunctionAndFail(nil, err)
+
+	return sp
 }

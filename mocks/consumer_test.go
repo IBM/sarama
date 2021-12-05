@@ -143,10 +143,10 @@ func TestConsumerWithWrongOffsetExpectation(t *testing.T) {
 func TestConsumerViolatesMessagesDrainedExpectation(t *testing.T) {
 	trm := newTestReporterMock()
 	consumer := NewConsumer(trm, NewTestConfig())
-	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
-	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
-	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
-	pcmock.ExpectMessagesDrainedOnClose()
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).
+		YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")}).
+		YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")}).
+		ExpectMessagesDrainedOnClose()
 
 	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
 	if err != nil {
@@ -169,10 +169,10 @@ func TestConsumerMeetsErrorsDrainedExpectation(t *testing.T) {
 	trm := newTestReporterMock()
 	consumer := NewConsumer(trm, NewTestConfig())
 
-	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
-	pcmock.YieldError(sarama.ErrInvalidMessage)
-	pcmock.YieldError(sarama.ErrInvalidMessage)
-	pcmock.ExpectErrorsDrainedOnClose()
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).
+		YieldError(sarama.ErrInvalidMessage).
+		YieldError(sarama.ErrInvalidMessage).
+		ExpectErrorsDrainedOnClose()
 
 	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
 	if err != nil {

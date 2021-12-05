@@ -58,9 +58,9 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 func TestSyncProducerWithTooManyExpectations(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageAndSucceed()
-	sp.ExpectSendMessageAndFail(sarama.ErrOutOfBrokers)
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageAndSucceed().
+		ExpectSendMessageAndFail(sarama.ErrOutOfBrokers)
 
 	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	if _, _, err := sp.SendMessage(msg); err != nil {
@@ -79,8 +79,7 @@ func TestSyncProducerWithTooManyExpectations(t *testing.T) {
 func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageAndSucceed()
+	sp := NewSyncProducer(trm, nil).ExpectSendMessageAndSucceed()
 
 	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	if _, _, err := sp.SendMessage(msg); err != nil {
@@ -102,9 +101,9 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 func TestSyncProducerWithCheckerFunction(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes")).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
 
 	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	if _, _, err := sp.SendMessage(msg); err != nil {
@@ -127,9 +126,9 @@ func TestSyncProducerWithCheckerFunction(t *testing.T) {
 func TestSyncProducerWithCheckerFunctionForSendMessagesWithError(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes")).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes$"))
 
 	msg1 := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	msg2 := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
@@ -151,8 +150,8 @@ func TestSyncProducerWithCheckerFunctionForSendMessagesWithError(t *testing.T) {
 func TestSyncProducerWithCheckerFunctionForSendMessagesWithoutError(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
 
 	msg1 := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	msgs := []*sarama.ProducerMessage{msg1}
@@ -180,8 +179,8 @@ func TestSyncProducerWithCheckerFunctionForSendMessagesWithoutError(t *testing.T
 func TestSyncProducerSendMessagesExpectationsMismatchTooFew(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
 
 	msg1 := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	msg2 := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
@@ -204,9 +203,9 @@ func TestSyncProducerSendMessagesExpectationsMismatchTooFew(t *testing.T) {
 func TestSyncProducerSendMessagesExpectationsMismatchTooMany(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes")).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
 
 	msg1 := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
 	msgs := []*sarama.ProducerMessage{msg1}
@@ -227,8 +226,8 @@ func TestSyncProducerSendMessagesExpectationsMismatchTooMany(t *testing.T) {
 func TestSyncProducerSendMessagesFaultyEncoder(t *testing.T) {
 	trm := newTestReporterMock()
 
-	sp := NewSyncProducer(trm, nil)
-	sp.ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
+	sp := NewSyncProducer(trm, nil).
+		ExpectSendMessageWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes"))
 
 	msg1 := &sarama.ProducerMessage{Topic: "test", Value: faultyEncoder("123")}
 	msgs := []*sarama.ProducerMessage{msg1}
