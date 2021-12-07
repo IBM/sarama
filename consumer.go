@@ -400,6 +400,9 @@ func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
 	if err != nil {
 		return err
 	}
+
+	child.highWaterMarkOffset = newestOffset
+
 	oldestOffset, err := child.consumer.client.GetOffset(child.topic, child.partition, OffsetOldest)
 	if err != nil {
 		return err
