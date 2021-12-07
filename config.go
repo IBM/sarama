@@ -591,7 +591,16 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
 			}
 			if c.Net.SASL.SCRAMClientGeneratorFunc == nil {
-				return ConfigurationError("A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc")
+				if c.Net.SASL.Mechanism == SASLTypeSCRAMSHA256 {
+					c.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient {
+						return &XDGSCRAMClient{HashGeneratorFcn: SHA256}
+					}
+				}
+				if c.Net.SASL.Mechanism == SASLTypeSCRAMSHA512 {
+					c.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient {
+						return &XDGSCRAMClient{HashGeneratorFcn: SHA512}
+					}
+				}
 			}
 		case SASLTypeGSSAPI:
 			if c.Net.SASL.GSSAPI.ServiceName == "" {

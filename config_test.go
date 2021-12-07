@@ -109,28 +109,6 @@ func TestNetConfigValidates(t *testing.T) {
 			"An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider",
 		},
 		{
-			"SASL.Mechanism SCRAM-SHA-256 - Missing SCRAM client",
-			func(cfg *Config) {
-				cfg.Net.SASL.Enable = true
-				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA256
-				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
-				cfg.Net.SASL.User = "user"
-				cfg.Net.SASL.Password = "strong_password"
-			},
-			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
-		},
-		{
-			"SASL.Mechanism SCRAM-SHA-512 - Missing SCRAM client",
-			func(cfg *Config) {
-				cfg.Net.SASL.Enable = true
-				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
-				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
-				cfg.Net.SASL.User = "user"
-				cfg.Net.SASL.Password = "strong_password"
-			},
-			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
-		},
-		{
 			"SASL.Mechanism GSSAPI (Kerberos) - Using User/Password, Missing password field",
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
@@ -479,6 +457,48 @@ func TestZstdConfigValidation(t *testing.T) {
 	config.Version = V2_1_0_0
 	if err := config.Validate(); err != nil {
 		t.Error("Expected zstd to work, got ", err)
+	}
+}
+
+func TestSCRAMClientGeneratorFunc(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  func(*Config) // resorting to using a function as a param because of internal composite structs
+		err  string
+	}{
+		{
+			"SASL.Mechanism SCRAM-SHA-256 - Missing SCRAM client",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA256
+				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
+				cfg.Net.SASL.User = "user"
+				cfg.Net.SASL.Password = "strong_password"
+			},
+			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
+		},
+		{
+			"SASL.Mechanism SCRAM-SHA-512 - Missing SCRAM client",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
+				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
+				cfg.Net.SASL.User = "user"
+				cfg.Net.SASL.Password = "strong_password"
+			},
+			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
+		},
+	}
+
+	for i, test := range tests {
+		c := NewTestConfig()
+		test.cfg(c)
+		if err := c.Validate(); err != nil {
+			t.Errorf("[%d]:[%s] Expected nil, Got %s\n", i, test.name, err)
+		}
+		if c.Net.SASL.SCRAMClientGeneratorFunc == nil {
+			t.Error("Expected non nil Net.SASL.SCRAMClientGeneratorFunc, got nil")
+		}
 	}
 }
 
