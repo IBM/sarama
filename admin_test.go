@@ -911,6 +911,148 @@ func TestClusterAdminAlterBrokerConfig(t *testing.T) {
 	}
 }
 
+func TestClusterAdminIncrementalAlterConfig(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"IncrementalAlterConfigsRequest": NewMockIncrementalAlterConfigsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var value string
+	entries := make(map[string]IncrementalAlterConfigsEntry)
+	value = "60000"
+	entries["retention.ms"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationSet,
+		Value:     &value,
+	}
+	value = "1073741824"
+	entries["segment.bytes"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationDelete,
+		Value:     &value,
+	}
+	err = admin.IncrementalAlterConfig(TopicResource, "my_topic", entries, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminIncrementalAlterConfigWithErrorCode(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"IncrementalAlterConfigsRequest": NewMockIncrementalAlterConfigsResponseWithErrorCode(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = admin.Close()
+	}()
+
+	var value string
+	entries := make(map[string]IncrementalAlterConfigsEntry)
+	value = "60000"
+	entries["retention.ms"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationSet,
+		Value:     &value,
+	}
+	value = "1073741824"
+	entries["segment.bytes"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationDelete,
+		Value:     &value,
+	}
+	err = admin.IncrementalAlterConfig(TopicResource, "my_topic", entries, false)
+	if err == nil {
+		t.Fatal(errors.New("ErrorCode present but no Error returned"))
+	}
+}
+
+func TestClusterAdminIncrementalAlterBrokerConfig(t *testing.T) {
+	controllerBroker := NewMockBroker(t, 1)
+	defer controllerBroker.Close()
+	configBroker := NewMockBroker(t, 2)
+	defer configBroker.Close()
+
+	controllerBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+	})
+	configBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+		"IncrementalAlterConfigsRequest": NewMockIncrementalAlterConfigsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin(
+		[]string{
+			controllerBroker.Addr(),
+			configBroker.Addr(),
+		}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var value string
+	entries := make(map[string]IncrementalAlterConfigsEntry)
+	value = "3"
+	entries["min.insync.replicas"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationSet,
+		Value:     &value,
+	}
+	value = "2"
+	entries["log.cleaner.threads"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationDelete,
+		Value:     &value,
+	}
+
+	for _, resourceType := range []ConfigResourceType{BrokerResource, BrokerLoggerResource} {
+		resource := ConfigResource{Name: "2", Type: resourceType}
+		err = admin.IncrementalAlterConfig(
+			resource.Type,
+			resource.Name,
+			entries,
+			false)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminCreateAcl(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()

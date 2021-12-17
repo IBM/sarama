@@ -70,6 +70,12 @@ type ClusterAdmin interface {
 	// for some resources while fail for others. The configs for a particular resource are updated automatically.
 	AlterConfig(resourceType ConfigResourceType, name string, entries map[string]*string, validateOnly bool) error
 
+	// IncrementalAlterConfig Incrementally Update the configuration for the specified resources with the default options.
+	// This operation is supported by brokers with version 2.3.0.0 or higher.
+	// Updates are not transactional so they may succeed for some resources while fail for others.
+	// The configs for a particular resource are updated automatically.
+	IncrementalAlterConfig(resourceType ConfigResourceType, name string, entries map[string]IncrementalAlterConfigsEntry, validateOnly bool) error
+
 	// Creates access control lists (ACLs) which are bound to specific resources.
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
@@ -714,6 +720,58 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 
 	_ = b.Open(ca.client.Config())
 	rsp, err := b.AlterConfigs(request)
+	if err != nil {
+		return err
+	}
+
+	for _, rspResource := range rsp.Resources {
+		if rspResource.Name == name {
+			if rspResource.ErrorMsg != "" {
+				return errors.New(rspResource.ErrorMsg)
+			}
+			if rspResource.ErrorCode != 0 {
+				return KError(rspResource.ErrorCode)
+			}
+		}
+	}
+	return nil
+}
+
+func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, name string, entries map[string]IncrementalAlterConfigsEntry, validateOnly bool) error {
+	var resources []*IncrementalAlterConfigsResource
+	resources = append(resources, &IncrementalAlterConfigsResource{
+		Type:          resourceType,
+		Name:          name,
+		ConfigEntries: entries,
+	})
+
+	request := &IncrementalAlterConfigsRequest{
+		Resources:    resources,
+		ValidateOnly: validateOnly,
+	}
+
+	var (
+		b   *Broker
+		err error
+	)
+
+	// AlterConfig of broker/broker logger must be sent to the broker in question
+	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
+		var id int64
+		id, err = strconv.ParseInt(name, 10, 32)
+		if err != nil {
+			return err
+		}
+		b, err = ca.findBroker(int32(id))
+	} else {
+		b, err = ca.findAnyBroker()
+	}
+	if err != nil {
+		return err
+	}
+
+	_ = b.Open(ca.client.Config())
+	rsp, err := b.IncrementalAlterConfigs(request)
 	if err != nil {
 		return err
 	}

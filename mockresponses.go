@@ -926,6 +926,51 @@ func (mr *MockAlterConfigsResponseWithErrorCode) For(reqBody versionedDecoder) e
 	return res
 }
 
+type MockIncrementalAlterConfigsResponse struct {
+	t TestReporter
+}
+
+func NewMockIncrementalAlterConfigsResponse(t TestReporter) *MockIncrementalAlterConfigsResponse {
+	return &MockIncrementalAlterConfigsResponse{t: t}
+}
+
+func (mr *MockIncrementalAlterConfigsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*IncrementalAlterConfigsRequest)
+	res := &IncrementalAlterConfigsResponse{}
+
+	for _, r := range req.Resources {
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:     r.Name,
+			Type:     r.Type,
+			ErrorMsg: "",
+		})
+	}
+	return res
+}
+
+type MockIncrementalAlterConfigsResponseWithErrorCode struct {
+	t TestReporter
+}
+
+func NewMockIncrementalAlterConfigsResponseWithErrorCode(t TestReporter) *MockIncrementalAlterConfigsResponseWithErrorCode {
+	return &MockIncrementalAlterConfigsResponseWithErrorCode{t: t}
+}
+
+func (mr *MockIncrementalAlterConfigsResponseWithErrorCode) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*IncrementalAlterConfigsRequest)
+	res := &IncrementalAlterConfigsResponse{}
+
+	for _, r := range req.Resources {
+		res.Resources = append(res.Resources, &AlterConfigsResourceResponse{
+			Name:      r.Name,
+			Type:      r.Type,
+			ErrorCode: 83,
+			ErrorMsg:  "",
+		})
+	}
+	return res
+}
+
 type MockCreateAclsResponse struct {
 	t TestReporter
 }
