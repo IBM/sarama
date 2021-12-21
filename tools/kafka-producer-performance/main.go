@@ -85,6 +85,11 @@ var (
 		5,
 		"The maximum number of unacknowledged requests the client will send on a single connection before blocking (default: 5).",
 	)
+	pipeline = flag.Bool(
+		"enable-pipeline",
+		false,
+		"Enable pipelining according to -max-open-requests to improve throughput.",
+	)
 	maxMessageBytes = flag.Int(
 		"max-message-bytes",
 		1000000,
@@ -249,6 +254,7 @@ func main() {
 	config.Producer.Timeout = *timeout
 	config.Producer.Partitioner = parsePartitioner(*partitioner, *partition)
 	config.Producer.Compression = parseCompression(*compression)
+	config.Producer.Pipeline = *pipeline
 	config.Producer.Flush.Frequency = *flushFrequency
 	config.Producer.Flush.Bytes = *flushBytes
 	config.Producer.Flush.Messages = *flushMessages
