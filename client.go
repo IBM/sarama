@@ -861,7 +861,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		return false
 	}
 	retry := func(err error) error {
-		if attemptsRemaining > 0 {
+		if attemptsRemaining - 1 > 0 {
 			backoff := client.computeBackoff(attemptsRemaining)
 			if pastDeadline(backoff) {
 				Logger.Println("client/metadata skipping last retries as we would go past the metadata timeout")
