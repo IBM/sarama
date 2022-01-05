@@ -247,3 +247,75 @@ func TestConsumerUnexpectedTopicMetadata(t *testing.T) {
 		t.Errorf("Expected an expectation failure to be set on the error reporter.")
 	}
 }
+
+func TestPartitionConsumerUpdateHighWatermarksOnlyByMessageConsuming(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, NewTestConfig())
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).
+		YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")}).
+		YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+
+	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if pc.HighWaterMarkOffset() != 0 {
+		t.Error("Expected HighWatermarkOffset to be 0 before first read.")
+	}
+
+	// consume first message
+	<-pc.Messages()
+
+	if pc.HighWaterMarkOffset() != 2 {
+		t.Error("Expected HighWatermarkOffset to be 2 after first read.")
+	}
+
+	<-pc.Messages()
+
+	if pc.HighWaterMarkOffset() != 2 {
+		t.Error("Expected HighWatermarkOffset to still be 2 after second read.")
+	}
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected no expectation failures to be set on the error reporter.")
+	}
+}
+
+func TestPartitionConsumerYieldMessageStartsOffsetWithZero(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, NewTestConfig())
+	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).
+		YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")}).
+		YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+
+	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// consume first message
+	var firstMessage = <-pc.Messages()
+
+	if firstMessage.Offset != 0 {
+		t.Error("Expected first message offset to be 0, got ", firstMessage.Offset)
+	}
+
+	// consume second message
+	var secondMessage = <-pc.Messages()
+
+	if secondMessage.Offset != 1 {
+		t.Error("Expected second message offset to be 1, got ", secondMessage.Offset)
+	}
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected no expectation failures to be set on the error reporter.")
+	}
+}

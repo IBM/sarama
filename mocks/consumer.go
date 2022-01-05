@@ -156,12 +156,13 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 
 	if c.partitionConsumers[topic][partition] == nil {
 		c.partitionConsumers[topic][partition] = &PartitionConsumer{
-			t:         c.t,
-			topic:     topic,
-			partition: partition,
-			offset:    offset,
-			messages:  make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
-			errors:    make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
+			t:                c.t,
+			topic:            topic,
+			partition:        partition,
+			offset:           offset,
+			messages:         nil,
+			internalMessages: make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
+			errors:           make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
 		}
 	}
 
@@ -178,12 +179,14 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 // Errors and Messages channel, you should specify what values will be provided on these
 // channels using YieldMessage and YieldError.
 type PartitionConsumer struct {
-	highWaterMarkOffset     int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	messagesToDrain         int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	highWaterMarkOffset     int64
 	l                       sync.Mutex
 	t                       ErrorReporter
 	topic                   string
 	partition               int32
 	offset                  int64
+	internalMessages        chan *sarama.ConsumerMessage
 	messages                chan *sarama.ConsumerMessage
 	errors                  chan *sarama.ConsumerError
 	singleClose             sync.Once
@@ -199,7 +202,7 @@ type PartitionConsumer struct {
 // AsyncClose implements the AsyncClose method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) AsyncClose() {
 	pc.singleClose.Do(func() {
-		close(pc.messages)
+		close(pc.internalMessages)
 		close(pc.errors)
 	})
 }
@@ -216,10 +219,10 @@ func (pc *PartitionConsumer) Close() error {
 		pc.t.Errorf("Expected the errors channel for %s/%d to be drained on close, but found %d errors.", pc.topic, pc.partition, len(pc.errors))
 	}
 
-	if pc.messagesShouldBeDrained && len(pc.messages) > 0 {
-		pc.t.Errorf("Expected the messages channel for %s/%d to be drained on close, but found %d messages.", pc.topic, pc.partition, len(pc.messages))
+	messagesToDrain := atomic.LoadInt64(&pc.messagesToDrain)
+	if pc.messagesShouldBeDrained && messagesToDrain > 0 {
+		pc.t.Errorf("Expected the messages channel for %s/%d to be drained on close, but found %d messages.", pc.topic, pc.partition, messagesToDrain)
 	}
-
 	pc.AsyncClose()
 
 	var (
@@ -244,7 +247,7 @@ func (pc *PartitionConsumer) Close() error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for range pc.messages {
+		for range pc.internalMessages {
 			// drain
 		}
 	}()
@@ -260,11 +263,30 @@ func (pc *PartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 
 // Messages implements the Messages method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
+	if pc.messages == nil {
+		pc.messages = make(chan *sarama.ConsumerMessage, 0)
+		go func() {
+			defer func() {
+				close(pc.messages)
+			}()
+
+			alreadyReadOneMessage := false
+			for msg := range pc.internalMessages {
+				if !alreadyReadOneMessage {
+					alreadyReadOneMessage = true
+					atomic.StoreInt64(&pc.highWaterMarkOffset, pc.messagesToDrain)
+				}
+
+				pc.messages <- msg
+				atomic.AddInt64(&pc.messagesToDrain, -1)
+			}
+		}()
+	}
 	return pc.messages
 }
 
 func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
-	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
+	return atomic.LoadInt64(&pc.highWaterMarkOffset)
 }
 
 ///////////////////////////////////////////////////
@@ -282,9 +304,9 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *Partitio
 
 	msg.Topic = pc.topic
 	msg.Partition = pc.partition
-	msg.Offset = atomic.AddInt64(&pc.highWaterMarkOffset, 1)
+	msg.Offset = atomic.AddInt64(&pc.messagesToDrain, 1) - 1
 
-	pc.messages <- msg
+	pc.internalMessages <- msg
 
 	return pc
 }
