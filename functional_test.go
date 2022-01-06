@@ -121,11 +121,11 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	var confluentPlatformVersion string
 	switch env.KafkaVersion {
 	case "3.0.0":
-		confluentPlatformVersion = "7.0.0"
+		confluentPlatformVersion = "7.0.1"
 	case "2.8.1":
-		confluentPlatformVersion = "6.2.0"
+		confluentPlatformVersion = "6.2.2"
 	case "2.7.1":
-		confluentPlatformVersion = "6.1.2"
+		confluentPlatformVersion = "6.1.4"
 	default:
 		return fmt.Errorf("don't know what confluent platform version to use for kafka %s", env.KafkaVersion)
 	}
