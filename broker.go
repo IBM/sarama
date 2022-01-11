@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/rcrowley/go-metrics"
@@ -1764,4 +1765,20 @@ func validServerNameTLS(addr string, cfg *tls.Config) *tls.Config {
 	}
 	c.ServerName = sn
 	return c
+}
+
+// isBroken checks if the connection on the broker is still working. For this purpose it sends
+// an ApiVersions request. If the connection returns an EOF, ECONNRESET or EPIPE error, it is broken.
+func (b *Broker) isBroken() bool {
+	_, err := b.ApiVersions(&ApiVersionsRequest{
+		ClientSoftwareName:    defaultClientSoftwareName,
+		ClientSoftwareVersion: version(),
+	})
+
+	if err == io.EOF || errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.EPIPE) {
+		DebugLogger.Printf("Connection is broken on broker %s: %v", b.addr, err)
+		return true
+	}
+
+	return false
 }
