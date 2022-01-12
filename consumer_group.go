@@ -507,7 +507,9 @@ func (c *consumerGroup) loopCheckPartitionNumbers(topics []string, session *cons
 		select {
 		case <-pause.C:
 		case <-session.ctx.Done():
-			Logger.Printf("loop check partition number coroutine will exit, topics %s", topics)
+			Logger.Printf(
+				"consumergroup/%s loop check partition number coroutine will exit, topics %s\n",
+				c.groupID, topics)
 			// if session closed by other, should be exited
 			return
 		case <-c.closed:
@@ -520,7 +522,9 @@ func (c *consumerGroup) topicToPartitionNumbers(topics []string) (map[string]int
 	topicToPartitionNum := make(map[string]int, len(topics))
 	for _, topic := range topics {
 		if partitionNum, err := c.client.Partitions(topic); err != nil {
-			Logger.Printf("Consumer Group topic %s get partition number failed %v", topic, err)
+			Logger.Printf(
+				"consumergroup/%s topic %s get partition number failed %v\n",
+				c.groupID, err)
 			return nil, err
 		} else {
 			topicToPartitionNum[topic] = len(partitionNum)
@@ -766,12 +770,21 @@ func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 		<-s.hbDead
 	})
 
+	Logger.Printf(
+		"consumergroup/session/%s/%d released\n",
+		s.MemberID(), s.GenerationID())
+
 	return
 }
 
 func (s *consumerGroupSession) heartbeatLoop() {
 	defer close(s.hbDead)
 	defer s.cancel() // trigger the end of the session on exit
+	defer func() {
+		Logger.Printf(
+			"consumergroup/session/%s/%d heartbeat loop stopped\n",
+			s.MemberID(), s.GenerationID())
+	}()
 
 	pause := time.NewTicker(s.parent.config.Consumer.Group.Heartbeat.Interval)
 	defer pause.Stop()
@@ -813,7 +826,10 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		switch resp.Err {
 		case ErrNoError:
 			retries = s.parent.config.Metadata.Retry.Max
-		case ErrRebalanceInProgress, ErrUnknownMemberId, ErrIllegalGeneration:
+		case ErrRebalanceInProgress:
+			retries = s.parent.config.Metadata.Retry.Max
+			s.cancel()
+		case ErrUnknownMemberId, ErrIllegalGeneration:
 			return
 		default:
 			s.parent.handleError(resp.Err, "", -1)
