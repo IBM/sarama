@@ -221,6 +221,7 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 	toxiproxyHost := toxiproxyURL.Hostname()
 
 	env.ToxiproxyClient = toxiproxy.NewClient(toxiproxyAddr)
+	env.Proxies = map[string]*toxiproxy.Proxy{}
 	for i := 1; i <= 5; i++ {
 		proxyName := fmt.Sprintf("kafka%d", i)
 		proxy, err := env.ToxiproxyClient.Proxy(proxyName)
@@ -258,6 +259,26 @@ func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) er
 	}
 	if rmErr != nil {
 		return fmt.Errorf("failed to run docker-compose to rm test environment: %w", rmErr)
+	}
+	return nil
+}
+
+func startDockerTestBroker(ctx context.Context, brokerID int32) error {
+	c := exec.Command("docker-compose", "start", fmt.Sprintf("kafka-%d", brokerID))
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("failed to run docker-compose to start test broker kafka-%d: %w", brokerID, err)
+	}
+	return nil
+}
+
+func stopDockerTestBroker(ctx context.Context, brokerID int32) error {
+	c := exec.Command("docker-compose", "stop", fmt.Sprintf("kafka-%d", brokerID))
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("failed to run docker-compose to stop test broker kafka-%d: %w", brokerID, err)
 	}
 	return nil
 }
