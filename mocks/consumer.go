@@ -384,8 +384,6 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *Partitio
 	msg.Topic = pc.topic
 	msg.Partition = pc.partition
 
-	pc.messages <- msg
-
 	if pc.paused {
 		msg.Offset = atomic.AddInt64(&pc.suppressedHighWaterMarkOffset, 1)
 		pc.suppressedMessages <- msg
