@@ -351,7 +351,6 @@ func (child *partitionConsumer) dispatcher() {
 				child.broker = nil
 			}
 
-			Logger.Printf("consumer/%s/%d finding new broker\n", child.topic, child.partition)
 			if err := child.dispatch(); err != nil {
 				child.sendError(err)
 				child.trigger <- none{}
@@ -372,6 +371,14 @@ func (child *partitionConsumer) preferredBroker() (*Broker, error) {
 		if err == nil {
 			return broker, nil
 		}
+		Logger.Printf(
+			"consumer/%s/%d failed to find active broker for preferred read replica %d - will fallback to leader",
+			child.topic, child.partition, child.preferredReadReplica)
+
+		// if we couldn't find it, discard the replica preference and trigger a
+		// metadata refresh whilst falling back to consuming from the leader again
+		child.preferredReadReplica = invalidPreferredReplicaID
+		_ = child.consumer.client.RefreshMetadata(child.topic)
 	}
 
 	// if preferred replica cannot be found fallback to leader
@@ -856,6 +863,9 @@ func (bc *brokerConsumer) handleResponses() {
 			if preferredBroker, err := child.preferredBroker(); err == nil {
 				if bc.broker.ID() != preferredBroker.ID() {
 					// not an error but needs redispatching to consume from preferred replica
+					Logger.Printf(
+						"consumer/broker/%d abandoned in favor of preferred replica broker/%d\n",
+						bc.broker.ID(), preferredBroker.ID())
 					child.trigger <- none{}
 					delete(bc.subscriptions, child)
 				}
@@ -864,7 +874,7 @@ func (bc *brokerConsumer) handleResponses() {
 		}
 
 		// Discard any replica preference.
-		child.preferredReadReplica = -1
+		child.preferredReadReplica = invalidPreferredReplicaID
 
 		switch result {
 		case errTimedOut:
