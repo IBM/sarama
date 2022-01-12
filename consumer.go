@@ -864,7 +864,7 @@ func (bc *brokerConsumer) handleResponses() {
 				if bc.broker.ID() != preferredBroker.ID() {
 					// not an error but needs redispatching to consume from preferred replica
 					Logger.Printf(
-						"consumer/broker/%d abandoned in favour of preferred replica broker/%d\n",
+						"consumer/broker/%d abandoned in favor of preferred replica broker/%d\n",
 						bc.broker.ID(), preferredBroker.ID())
 					child.trigger <- none{}
 					delete(bc.subscriptions, child)

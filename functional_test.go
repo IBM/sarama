@@ -264,7 +264,8 @@ func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) er
 }
 
 func startDockerTestBroker(ctx context.Context, brokerID int32) error {
-	c := exec.Command("docker-compose", "start", fmt.Sprintf("kafka-%d", brokerID))
+	service := fmt.Sprintf("kafka-%d", brokerID)
+	c := exec.Command("docker-compose", "start", service)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
@@ -274,7 +275,8 @@ func startDockerTestBroker(ctx context.Context, brokerID int32) error {
 }
 
 func stopDockerTestBroker(ctx context.Context, brokerID int32) error {
-	c := exec.Command("docker-compose", "stop", fmt.Sprintf("kafka-%d", brokerID))
+	service := fmt.Sprintf("kafka-%d", brokerID)
+	c := exec.Command("docker-compose", "stop", service)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
