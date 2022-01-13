@@ -155,13 +155,19 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 	}
 
 	if c.partitionConsumers[topic][partition] == nil {
+		highWatermarkOffset := offset
+		if offset == sarama.OffsetOldest {
+			highWatermarkOffset = 0
+		}
+
 		c.partitionConsumers[topic][partition] = &PartitionConsumer{
-			t:         c.t,
-			topic:     topic,
-			partition: partition,
-			offset:    offset,
-			messages:  make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
-			errors:    make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
+			highWaterMarkOffset: highWatermarkOffset,
+			t:                   c.t,
+			topic:               topic,
+			partition:           partition,
+			offset:              offset,
+			messages:            make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
+			errors:              make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
 		}
 	}
 
@@ -282,7 +288,7 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *Partitio
 
 	msg.Topic = pc.topic
 	msg.Partition = pc.partition
-	msg.Offset = atomic.AddInt64(&pc.highWaterMarkOffset, 1)
+	msg.Offset = atomic.AddInt64(&pc.highWaterMarkOffset, 1) - 1
 
 	pc.messages <- msg
 
