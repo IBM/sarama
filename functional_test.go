@@ -121,11 +121,11 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	var confluentPlatformVersion string
 	switch env.KafkaVersion {
 	case "3.0.0":
-		confluentPlatformVersion = "7.0.0"
+		confluentPlatformVersion = "7.0.1"
 	case "2.8.1":
-		confluentPlatformVersion = "6.2.0"
+		confluentPlatformVersion = "6.2.2"
 	case "2.7.1":
-		confluentPlatformVersion = "6.1.2"
+		confluentPlatformVersion = "6.1.4"
 	default:
 		return fmt.Errorf("don't know what confluent platform version to use for kafka %s", env.KafkaVersion)
 	}
@@ -221,6 +221,7 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 	toxiproxyHost := toxiproxyURL.Hostname()
 
 	env.ToxiproxyClient = toxiproxy.NewClient(toxiproxyAddr)
+	env.Proxies = map[string]*toxiproxy.Proxy{}
 	for i := 1; i <= 5; i++ {
 		proxyName := fmt.Sprintf("kafka%d", i)
 		proxy, err := env.ToxiproxyClient.Proxy(proxyName)
@@ -258,6 +259,28 @@ func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) er
 	}
 	if rmErr != nil {
 		return fmt.Errorf("failed to run docker-compose to rm test environment: %w", rmErr)
+	}
+	return nil
+}
+
+func startDockerTestBroker(ctx context.Context, brokerID int32) error {
+	service := fmt.Sprintf("kafka-%d", brokerID)
+	c := exec.Command("docker-compose", "start", service)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("failed to run docker-compose to start test broker kafka-%d: %w", brokerID, err)
+	}
+	return nil
+}
+
+func stopDockerTestBroker(ctx context.Context, brokerID int32) error {
+	service := fmt.Sprintf("kafka-%d", brokerID)
+	c := exec.Command("docker-compose", "stop", service)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("failed to run docker-compose to stop test broker kafka-%d: %w", brokerID, err)
 	}
 	return nil
 }

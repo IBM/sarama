@@ -1125,7 +1125,7 @@ func (ca *clusterAdmin) DescribeClientQuotas(components []QuotaFilterComponent, 
 		return nil, err
 	}
 
-	if rsp.ErrorMsg != nil {
+	if rsp.ErrorMsg != nil && len(*rsp.ErrorMsg) > 0 {
 		return nil, errors.New(*rsp.ErrorMsg)
 	}
 	if rsp.ErrorCode != ErrNoError {
@@ -1157,6 +1157,9 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 	}
 
 	for _, entry := range rsp.Entries {
+		if entry.ErrorMsg != nil && len(*entry.ErrorMsg) > 0 {
+			return errors.New(*entry.ErrorMsg)
+		}
 		if entry.ErrorCode != ErrNoError {
 			return entry.ErrorCode
 		}
