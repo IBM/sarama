@@ -38,6 +38,9 @@ type Config struct {
 	Net struct {
 		// How many outstanding requests a connection is allowed to have before
 		// sending on it blocks (default 5).
+		// Throughput can improve but message ordering is not guaranteed if Producer.Idempotent is disabled, see:
+		// https://kafka.apache.org/protocol#protocol_network
+		// https://kafka.apache.org/28/documentation.html#producerconfigs_max.in.flight.requests.per.connection
 		MaxOpenRequests int
 
 		// All three of the below configurations are similar to the
@@ -185,12 +188,6 @@ type Config struct {
 		// If enabled, the producer will ensure that exactly one copy of each message is
 		// written.
 		Idempotent bool
-		// If enabled, broker.AsyncProduce will be used instead of broker.Produce in order
-		// to pipeline Produce requests, effectively honoring Net.MaxOpenRequests when RequiredAcks != NoResponse
-		// Throughput can improve but message ordering is not guaranteed if Idempotent is disabled, see:
-		// https://kafka.apache.org/protocol#protocol_network
-		// https://kafka.apache.org/28/documentation.html#producerconfigs_max.in.flight.requests.per.connection
-		Pipeline bool
 
 		// Return specifies what channels will be populated. If they are set to true,
 		// you must read from the respective channels to prevent deadlock. If,

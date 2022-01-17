@@ -23,12 +23,6 @@ func TestFuncProducing(t *testing.T) {
 	testProducingMessages(t, config)
 }
 
-func TestFuncProducingPipeline(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.Pipeline = true
-	testProducingMessages(t, config)
-}
-
 func TestFuncProducingGzip(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Compression = CompressionGZIP
@@ -51,13 +45,6 @@ func TestFuncProducingZstd(t *testing.T) {
 func TestFuncProducingNoResponse(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.RequiredAcks = NoResponse
-	testProducingMessages(t, config)
-}
-
-func TestFuncProducingNoResponsePipeline(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.RequiredAcks = NoResponse
-	config.Producer.Pipeline = true
 	testProducingMessages(t, config)
 }
 

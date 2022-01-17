@@ -147,53 +147,6 @@ done:
 	seedBroker.Close()
 }
 
-func TestAsyncProducerWithPipeline(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	leader := NewMockBroker(t, 2)
-
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
-	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
-	seedBroker.Returns(metadataResponse)
-
-	const totalRecords = 10
-	for i := 0; i < totalRecords; i++ {
-		prodSuccess := new(ProduceResponse)
-		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-		leader.Returns(prodSuccess)
-	}
-
-	config := NewTestConfig()
-	// To really use request pipelining, we will have 1 record per Produce request
-	config.Producer.Pipeline = true
-	config.Producer.Flush.MaxMessages = 1
-	config.Producer.Return.Successes = true
-	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for i := 0; i < totalRecords; i++ {
-		producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage), Metadata: i}
-	}
-	for i := 0; i < totalRecords; i++ {
-		select {
-		case msg := <-producer.Errors():
-			t.Error("Got produce error:", msg.Err)
-		case msg := <-producer.Successes():
-			if msg.Metadata.(int) != i {
-				t.Error("Message metadata did not match")
-			}
-		case <-time.After(time.Second):
-			t.Fatalf("Timeout waiting for msg #%d", i)
-		}
-	}
-
-	closeProducer(t, producer)
-	leader.Close()
-	seedBroker.Close()
-}
-
 func TestAsyncProducerMultipleFlushes(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
