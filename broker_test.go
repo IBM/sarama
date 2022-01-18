@@ -78,6 +78,38 @@ func TestBrokerAccessors(t *testing.T) {
 	}
 }
 
+type produceResponsePromise struct {
+	c chan produceResOrError
+}
+
+type produceResOrError struct {
+	res *ProduceResponse
+	err error
+}
+
+func newProduceResponsePromise() produceResponsePromise {
+	return produceResponsePromise{
+		c: make(chan produceResOrError, 0),
+	}
+}
+
+func (p produceResponsePromise) callback(res *ProduceResponse, err error) {
+	if err != nil {
+		p.c <- produceResOrError{
+			err: err,
+		}
+		return
+	}
+	p.c <- produceResOrError{
+		res: res,
+	}
+}
+
+func (p produceResponsePromise) Get() (*ProduceResponse, error) {
+	resOrError := <-p.c
+	return resOrError.res, resOrError.err
+}
+
 func TestSimpleBrokerCommunication(t *testing.T) {
 	for _, tt := range brokerTestTable {
 		t.Run(tt.name, func(t *testing.T) {
@@ -112,6 +144,47 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 			mb.Close()
 			err = broker.Close()
 			if err != nil {
+				t.Error(err)
+			}
+		})
+	}
+}
+
+func TestBrokerFailedRequest(t *testing.T) {
+	for _, tt := range brokerFailedReqTestTable {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Logf("Testing broker communication for %s", tt.name)
+			mb := NewMockBroker(t, 0)
+			if !tt.stopBroker {
+				mb.Returns(&mockEncoder{tt.response})
+			}
+			broker := NewBroker(mb.Addr())
+			// Stop the broker before calling the runner to purposefully
+			// make the request fail right away, the port will be closed
+			// and should not be reused right away
+			if tt.stopBroker {
+				t.Log("Closing broker:", mb.Addr())
+				mb.Close()
+			}
+			conf := NewTestConfig()
+			conf.ApiVersionsRequest = false
+			conf.Version = tt.version
+			// Tune read timeout to speed up some test cases
+			conf.Net.ReadTimeout = 1 * time.Second
+			err := broker.Open(conf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tt.runner(t, broker)
+			if !tt.stopBroker {
+				mb.Close()
+			}
+			err = broker.Close()
+			if err != nil {
+				if tt.stopBroker && err == ErrNotConnected {
+					// We expect the broker to not close properly
+					return
+				}
 				t.Error(err)
 			}
 		})
@@ -806,12 +879,48 @@ var brokerTestTable = []struct {
 
 	{
 		V0_10_0_0,
+		"ProduceRequest (NoResponse) using AsyncProduce",
+		[]byte{},
+		func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = NoResponse
+			err := broker.AsyncProduce(&request, nil)
+			if err != nil {
+				t.Error(err)
+			}
+		},
+	},
+
+	{
+		V0_10_0_0,
 		"ProduceRequest (WaitForLocal)",
 		[]byte{0x00, 0x00, 0x00, 0x00},
 		func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = WaitForLocal
 			response, err := broker.Produce(&request)
+			if err != nil {
+				t.Error(err)
+			}
+			if response == nil {
+				t.Error("Produce request without NoResponse got no response!")
+			}
+		},
+	},
+
+	{
+		V0_10_0_0,
+		"ProduceRequest (WaitForLocal) using AsyncProduce",
+		[]byte{0x00, 0x00, 0x00, 0x00},
+		func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = WaitForLocal
+			produceResPromise := newProduceResponsePromise()
+			err := broker.AsyncProduce(&request, produceResPromise.callback)
+			if err != nil {
+				t.Error(err)
+			}
+			response, err := produceResPromise.Get()
 			if err != nil {
 				t.Error(err)
 			}
@@ -1025,6 +1134,93 @@ var brokerTestTable = []struct {
 			}
 			if response == nil {
 				t.Error("DeleteGroups request got no response!")
+			}
+		},
+	},
+}
+
+// We are testing the handling of failed request or corrupt responses.
+var brokerFailedReqTestTable = []struct {
+	version    KafkaVersion
+	name       string
+	stopBroker bool
+	response   []byte
+	runner     func(*testing.T, *Broker)
+}{
+	{
+		version:    V0_10_0_0,
+		name:       "ProduceRequest (NoResponse) using AsyncProduce and stopped broker",
+		stopBroker: true,
+		runner: func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = NoResponse
+			err := broker.AsyncProduce(&request, nil)
+			if err == nil {
+				t.Fatal("Expected a non nil error because broker is not listening")
+			}
+			t.Log("Got error:", err)
+		},
+	},
+
+	{
+		version:    V0_10_0_0,
+		name:       "ProduceRequest (WaitForLocal) using AsyncProduce and stopped broker",
+		stopBroker: true,
+		runner: func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = WaitForLocal
+			err := broker.AsyncProduce(&request, nil)
+			if err == nil {
+				t.Fatal("Expected a non nil error because broker is not listening")
+			}
+			t.Log("Got error:", err)
+		},
+	},
+
+	{
+		version: V0_10_0_0,
+		name:    "ProduceRequest (WaitForLocal) using AsyncProduce and no response",
+		// A nil response means the mock broker will ignore the request leading to a read timeout
+		response: nil,
+		runner: func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = WaitForLocal
+			produceResPromise := newProduceResponsePromise()
+			err := broker.AsyncProduce(&request, produceResPromise.callback)
+			if err != nil {
+				t.Error(err)
+			}
+			response, err := produceResPromise.Get()
+			if err == nil {
+				t.Fatal("Expected a non nil error because broker is not listening")
+			}
+			t.Log("Got error:", err)
+			if response != nil {
+				t.Error("Produce request should have failed, got response:", response)
+			}
+		},
+	},
+
+	{
+		version: V0_10_0_0,
+		name:    "ProduceRequest (WaitForLocal) using AsyncProduce and corrupt response",
+		// Corrupt response (3 bytes vs 4)
+		response: []byte{0x00, 0x00, 0x00},
+		runner: func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = WaitForLocal
+			produceResPromise := newProduceResponsePromise()
+			err := broker.AsyncProduce(&request, produceResPromise.callback)
+			if err != nil {
+				t.Error(err)
+			}
+			response, err := produceResPromise.Get()
+			if err == nil {
+				t.Fatal(err)
+			}
+			t.Log("Got error:", err)
+			if response != nil {
+				t.Error("Produce request should have failed, got response:", response)
 			}
 		},
 	},

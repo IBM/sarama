@@ -670,20 +670,12 @@ func (pp *partitionProducer) updateLeader() error {
 	})
 }
 
-type pendingResponse struct {
-	set      *produceSet
-	version  int16
-	promise  *responsePromise
-	response *ProduceResponse
-}
-
 // one per broker; also constructs an associated flusher
 func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 	var (
 		input     = make(chan *ProducerMessage)
 		bridge    = make(chan *produceSet)
 		responses = make(chan *brokerProducerResponse)
-		pendings  = make(chan *pendingResponse, p.conf.Net.MaxOpenRequests-1)
 	)
 
 	bp := &brokerProducer{
@@ -700,54 +692,36 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 
 	// minimal bridge to make the network response `select`able
 	go withRecover(func() {
-		defer close(pendings)
 		for set := range bridge {
-			set := set
-			var err error
-			var response *ProduceResponse
-			var promise *responsePromise
-
 			request := set.buildRequest()
-			if request.RequiredAcks != NoResponse {
-				response = new(ProduceResponse)
-			}
 
-			responseHeaderVersion := int16(-1)
-			if response != nil {
-				responseHeaderVersion = response.headerVersion()
-			}
-
-			promise, err = broker.send(request, response != nil, responseHeaderVersion)
-
-			// return quickly if failed or ackMode: NoResponse
-			if err != nil || promise == nil {
-				responses <- &brokerProducerResponse{
-					set: set,
-					err: err,
-					res: response,
+			// Capture the current set to forward in the callback
+			sendResponse := func(set *produceSet) ProduceCallback {
+				return func(response *ProduceResponse, err error) {
+					responses <- &brokerProducerResponse{
+						set: set,
+						err: err,
+						res: response,
+					}
 				}
+			}(set)
+
+			// Use AsyncProduce vs Produce to not block waiting for the response
+			// so that we can pipeline multiple produce requests and achieve higher throughput, see:
+			// https://kafka.apache.org/protocol#protocol_network
+			err := broker.AsyncProduce(request, sendResponse)
+			if err != nil {
+				// Request failed to be sent
+				sendResponse(nil, err)
 				continue
 			}
-			pending := &pendingResponse{set: set, version: request.version(), response: response, promise: promise}
-			pendings <- pending
-		}
-	})
-
-	go withRecover(func() {
-		defer close(responses)
-		for pending := range pendings {
-			var err error
-			select {
-			case buf := <-pending.promise.packets:
-				err = versionedDecode(buf, pending.response, pending.version)
-			case err = <-pending.promise.errors:
-			}
-			responses <- &brokerProducerResponse{
-				set: pending.set,
-				err: err,
-				res: pending.response,
+			// Callback is not called when using NoResponse
+			if p.conf.Producer.RequiredAcks == NoResponse {
+				// Provide the expected nil response
+				sendResponse(nil, nil)
 			}
 		}
+		close(responses)
 	})
 
 	if p.conf.Producer.Retry.Max <= 0 {
