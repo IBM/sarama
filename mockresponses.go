@@ -1347,31 +1347,38 @@ func (m *MockDescribeLogDirsResponse) For(reqBody versionedDecoder) encoderWithH
 }
 
 type MockApiVersionsResponse struct {
-	t TestReporter
+	t       TestReporter
+	apiKeys []ApiVersionsResponseKey
 }
 
 func NewMockApiVersionsResponse(t TestReporter) *MockApiVersionsResponse {
-	return &MockApiVersionsResponse{t: t}
-}
-
-func (mr *MockApiVersionsResponse) For(reqBody versionedDecoder) encoderWithHeader {
-	req := reqBody.(*ApiVersionsRequest)
-	res := &ApiVersionsResponse{
-		Version: req.Version,
-		ApiKeys: []ApiVersionsResponseKey{
+	return &MockApiVersionsResponse{
+		t: t,
+		apiKeys: []ApiVersionsResponseKey{
 			{
-				Version:    req.Version,
 				ApiKey:     0,
 				MinVersion: 5,
 				MaxVersion: 8,
 			},
 			{
-				Version:    req.Version,
 				ApiKey:     1,
 				MinVersion: 7,
 				MaxVersion: 11,
 			},
 		},
+	}
+}
+
+func (m *MockApiVersionsResponse) SetApiKeys(apiKeys []ApiVersionsResponseKey) *MockApiVersionsResponse {
+	m.apiKeys = apiKeys
+	return m
+}
+
+func (m *MockApiVersionsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*ApiVersionsRequest)
+	res := &ApiVersionsResponse{
+		Version: req.Version,
+		ApiKeys: m.apiKeys,
 	}
 	return res
 }
