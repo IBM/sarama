@@ -256,6 +256,24 @@ func (b *Broker) Connected() (bool, error) {
 	return b.conn != nil, b.connErr
 }
 
+// TLSConnectionState returns the client's TLS connection state. The second return value is false if this is not a tls connection or the connection has not yet been established.
+func (b *Broker) TLSConnectionState() (state tls.ConnectionState, ok bool) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.conn == nil {
+		return state, false
+	}
+	conn := b.conn
+	if bconn, ok := b.conn.(*bufConn); ok {
+		conn = bconn.Conn
+	}
+	if tc, ok := conn.(*tls.Conn); ok {
+		return tc.ConnectionState(), true
+	}
+	return state, false
+}
+
 // Close closes the broker resources
 func (b *Broker) Close() error {
 	b.lock.Lock()
