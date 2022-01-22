@@ -74,6 +74,26 @@ type Consumer interface {
 	// Close shuts down the consumer. It must be called after all child
 	// PartitionConsumers have already been closed.
 	Close() error
+
+	// Pause suspends fetching from the requested partitions. Future calls to the broker will not return any
+	// records from these partitions until they have been resumed using Resume()/ResumeAll().
+	// Note that this method does not affect partition subscription.
+	// In particular, it does not cause a group rebalance when automatic assignment is used.
+	Pause(topicPartitions map[string][]int32)
+
+	// Resume resumes specified partitions which have been paused with Pause()/PauseAll().
+	// New calls to the broker will return records from these partitions if there are any to be fetched.
+	Resume(topicPartitions map[string][]int32)
+
+	// Pause suspends fetching from all partitions. Future calls to the broker will not return any
+	// records from these partitions until they have been resumed using Resume()/ResumeAll().
+	// Note that this method does not affect partition subscription.
+	// In particular, it does not cause a group rebalance when automatic assignment is used.
+	PauseAll()
+
+	// Resume resumes all partitions which have been paused with Pause()/PauseAll().
+	// New calls to the broker will return records from these partitions if there are any to be fetched.
+	ResumeAll()
 }
 
 type consumer struct {
@@ -245,6 +265,62 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 	delete(c.brokerConsumers, brokerWorker.broker)
 }
 
+// Pause implements Consumer.
+func (c *consumer) Pause(topicPartitions map[string][]int32) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for topic, partitions := range topicPartitions {
+		for _, partition := range partitions {
+			if topicConsumers, ok := c.children[topic]; ok {
+				if partitionConsumer, ok := topicConsumers[partition]; ok {
+					partitionConsumer.Pause()
+				}
+			}
+		}
+	}
+}
+
+// Resume implements Consumer.
+func (c *consumer) Resume(topicPartitions map[string][]int32) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for topic, partitions := range topicPartitions {
+		for _, partition := range partitions {
+			if topicConsumers, ok := c.children[topic]; ok {
+				if partitionConsumer, ok := topicConsumers[partition]; ok {
+					partitionConsumer.Resume()
+				}
+			}
+		}
+	}
+}
+
+// PauseAll implements Consumer.
+func (c *consumer) PauseAll() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for _, partitions := range c.children {
+		for _, partitionConsumer := range partitions {
+			partitionConsumer.Pause()
+		}
+	}
+}
+
+// ResumeAll implements Consumer.
+func (c *consumer) ResumeAll() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	for _, partitions := range c.children {
+		for _, partitionConsumer := range partitions {
+			partitionConsumer.Resume()
+		}
+	}
+}
+
 // PartitionConsumer
 
 // PartitionConsumer processes Kafka messages from a given topic and partition. You MUST call one of Close() or
@@ -292,6 +368,20 @@ type PartitionConsumer interface {
 	// i.e. the offset that will be used for the next message that will be produced.
 	// You can use this to determine how far behind the processing is.
 	HighWaterMarkOffset() int64
+
+	// Pause suspends fetching from this partition. Future calls to the broker will not return
+	// any records from these partition until it have been resumed using Resume().
+	// Note that this method does not affect partition subscription.
+	// In particular, it does not cause a group rebalance when automatic assignment is used.
+	Pause()
+
+	// Resume resumes this partition which have been paused with Pause().
+	// New calls to the broker will return records from these partitions if there are any to be fetched.
+	// If the partition was not previously paused, this method is a no-op.
+	Resume()
+
+	// IsPaused indicates if this partition consumer is paused or not
+	IsPaused() bool
 }
 
 type partitionConsumer struct {
@@ -314,6 +404,8 @@ type partitionConsumer struct {
 	fetchSize      int32
 	offset         int64
 	retries        int32
+
+	paused int32
 }
 
 var errTimedOut = errors.New("timed out feeding messages to the user") // not user-facing
@@ -737,6 +829,21 @@ func (child *partitionConsumer) interceptors(msg *ConsumerMessage) {
 	}
 }
 
+// Pause implements PartitionConsumer.
+func (child *partitionConsumer) Pause() {
+	atomic.StoreInt32(&child.paused, 1)
+}
+
+// Resume implements PartitionConsumer.
+func (child *partitionConsumer) Resume() {
+	atomic.StoreInt32(&child.paused, 0)
+}
+
+// IsPaused implements PartitionConsumer.
+func (child *partitionConsumer) IsPaused() bool {
+	return atomic.LoadInt32(&child.paused) == 1
+}
+
 type brokerConsumer struct {
 	consumer         *consumer
 	broker           *Broker
@@ -962,7 +1069,9 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	}
 
 	for child := range bc.subscriptions {
-		request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
+		if !child.IsPaused() {
+			request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
+		}
 	}
 
 	return bc.broker.Fetch(request)

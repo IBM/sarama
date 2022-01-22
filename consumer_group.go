@@ -54,6 +54,26 @@ type ConsumerGroup interface {
 	// Close stops the ConsumerGroup and detaches any running sessions. It is required to call
 	// this function before the object passes out of scope, as it will otherwise leak memory.
 	Close() error
+
+	// Pause suspends fetching from the requested partitions. Future calls to the broker will not return any
+	// records from these partitions until they have been resumed using Resume()/ResumeAll().
+	// Note that this method does not affect partition subscription.
+	// In particular, it does not cause a group rebalance when automatic assignment is used.
+	Pause(partitions map[string][]int32)
+
+	// Resume resumes specified partitions which have been paused with Pause()/PauseAll().
+	// New calls to the broker will return records from these partitions if there are any to be fetched.
+	Resume(partitions map[string][]int32)
+
+	// Pause suspends fetching from all partitions. Future calls to the broker will not return any
+	// records from these partitions until they have been resumed using Resume()/ResumeAll().
+	// Note that this method does not affect partition subscription.
+	// In particular, it does not cause a group rebalance when automatic assignment is used.
+	PauseAll()
+
+	// Resume resumes all partitions which have been paused with Pause()/PauseAll().
+	// New calls to the broker will return records from these partitions if there are any to be fetched.
+	ResumeAll()
 }
 
 type consumerGroup struct {
@@ -186,6 +206,26 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 
 	// Gracefully release session claims
 	return sess.release(true)
+}
+
+// Pause implements ConsumerGroup.
+func (c *consumerGroup) Pause(partitions map[string][]int32) {
+	c.consumer.Pause(partitions)
+}
+
+// Resume implements ConsumerGroup.
+func (c *consumerGroup) Resume(partitions map[string][]int32) {
+	c.consumer.Resume(partitions)
+}
+
+// PauseAll implements ConsumerGroup.
+func (c *consumerGroup) PauseAll() {
+	c.consumer.PauseAll()
+}
+
+// ResumeAll implements ConsumerGroup.
+func (c *consumerGroup) ResumeAll() {
+	c.consumer.ResumeAll()
 }
 
 func (c *consumerGroup) retryNewSession(ctx context.Context, topics []string, handler ConsumerGroupHandler, retries int, refreshCoordinator bool) (*consumerGroupSession, error) {

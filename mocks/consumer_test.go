@@ -64,6 +64,85 @@ func TestConsumerHandlesExpectations(t *testing.T) {
 	}
 }
 
+func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
+	consumer := NewConsumer(t, NewTestConfig())
+	defer func() {
+		if err := consumer.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	consumePartitionT0P0 := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+	consumePartitionT0P1 := consumer.ExpectConsumePartition("test", 1, sarama.OffsetOldest)
+	consumePartitionT1P0 := consumer.ExpectConsumePartition("other", 0, AnyOffset)
+
+	consumePartitionT0P0.Pause()
+	consumePartitionT0P0.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
+	consumePartitionT0P0.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world x")})
+	consumePartitionT0P0.YieldError(sarama.ErrOutOfBrokers)
+
+	consumePartitionT0P1.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world again")})
+
+	consumePartitionT1P0.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello other")})
+
+	pc_test0, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pc_test0.Messages()) > 0 {
+		t.Error("Problem to pause consumption")
+	}
+	test0_err := <-pc_test0.Errors()
+	if test0_err.Err != sarama.ErrOutOfBrokers {
+		t.Error("Expected sarama.ErrOutOfBrokers, found:", test0_err.Err)
+	}
+
+	if pc_test0.HighWaterMarkOffset() != 1 {
+		t.Error("High water mark offset with value different from the expected: ", pc_test0.HighWaterMarkOffset())
+	}
+
+	pc_test1, err := consumer.ConsumePartition("test", 1, sarama.OffsetOldest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	test1_msg := <-pc_test1.Messages()
+	if test1_msg.Topic != "test" || test1_msg.Partition != 1 || string(test1_msg.Value) != "hello world again" {
+		t.Error("Message was not as expected:", test1_msg)
+	}
+
+	if pc_test1.HighWaterMarkOffset() != 2 {
+		t.Error("High water mark offset with value different from the expected: ", pc_test1.HighWaterMarkOffset())
+	}
+
+	pc_other0, err := consumer.ConsumePartition("other", 0, sarama.OffsetNewest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	other0_msg := <-pc_other0.Messages()
+	if other0_msg.Topic != "other" || other0_msg.Partition != 0 || string(other0_msg.Value) != "hello other" {
+		t.Error("Message was not as expected:", other0_msg)
+	}
+
+	if pc_other0.HighWaterMarkOffset() != AnyOffset+2 {
+		t.Error("High water mark offset with value different from the expected: ", pc_other0.HighWaterMarkOffset())
+	}
+
+	pc_test0.Resume()
+	test0_msg1 := <-pc_test0.Messages()
+	if test0_msg1.Topic != "test" || test0_msg1.Partition != 0 || string(test0_msg1.Value) != "hello world" || test0_msg1.Offset != 0 {
+		t.Error("Message was not as expected:", test0_msg1)
+	}
+
+	test0_msg2 := <-pc_test0.Messages()
+	if test0_msg2.Topic != "test" || test0_msg2.Partition != 0 || string(test0_msg2.Value) != "hello world x" || test0_msg2.Offset != 1 {
+		t.Error("Message was not as expected:", test0_msg2)
+	}
+
+	if pc_test0.HighWaterMarkOffset() != 3 {
+		t.Error("High water mark offset with value different from the expected: ", pc_test0.HighWaterMarkOffset())
+	}
+}
+
 func TestConsumerReturnsNonconsumedErrorsOnClose(t *testing.T) {
 	consumer := NewConsumer(t, NewTestConfig())
 	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
