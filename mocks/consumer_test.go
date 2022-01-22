@@ -72,11 +72,18 @@ func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
 		}
 	}()
 
-	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).Pause()
-	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
-	consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest).YieldError(sarama.ErrOutOfBrokers)
-	consumer.ExpectConsumePartition("test", 1, sarama.OffsetOldest).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world again")})
-	consumer.ExpectConsumePartition("other", 0, AnyOffset).YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello other")})
+	consumePartitionT0P0 := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+	consumePartitionT0P1 := consumer.ExpectConsumePartition("test", 1, sarama.OffsetOldest)
+	consumePartitionT1P0 := consumer.ExpectConsumePartition("other", 0, AnyOffset)
+
+	consumePartitionT0P0.Pause()
+	consumePartitionT0P0.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world")})
+	consumePartitionT0P0.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world x")})
+	consumePartitionT0P0.YieldError(sarama.ErrOutOfBrokers)
+
+	consumePartitionT0P1.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello world again")})
+
+	consumePartitionT1P0.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello other")})
 
 	pc_test0, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
 	if err != nil {
@@ -116,17 +123,22 @@ func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
 		t.Error("Message was not as expected:", other0_msg)
 	}
 
-	if pc_other0.HighWaterMarkOffset() != 2 {
+	if pc_other0.HighWaterMarkOffset() != AnyOffset+2 {
 		t.Error("High water mark offset with value different from the expected: ", pc_other0.HighWaterMarkOffset())
 	}
 
 	pc_test0.Resume()
-	test0_msg := <-pc_test0.Messages()
-	if test0_msg.Topic != "test" || test0_msg.Partition != 0 || string(test0_msg.Value) != "hello world" {
-		t.Error("Message was not as expected:", test0_msg)
+	test0_msg1 := <-pc_test0.Messages()
+	if test0_msg1.Topic != "test" || test0_msg1.Partition != 0 || string(test0_msg1.Value) != "hello world" || test0_msg1.Offset != 0 {
+		t.Error("Message was not as expected:", test0_msg1)
 	}
 
-	if pc_test0.HighWaterMarkOffset() != 2 {
+	test0_msg2 := <-pc_test0.Messages()
+	if test0_msg2.Topic != "test" || test0_msg2.Partition != 0 || string(test0_msg2.Value) != "hello world x" || test0_msg2.Offset != 1 {
+		t.Error("Message was not as expected:", test0_msg2)
+	}
+
+	if pc_test0.HighWaterMarkOffset() != 3 {
 		t.Error("High water mark offset with value different from the expected: ", pc_test0.HighWaterMarkOffset())
 	}
 }
@@ -312,5 +324,70 @@ func TestConsumerUnexpectedTopicMetadata(t *testing.T) {
 
 	if len(trm.errors) != 1 {
 		t.Errorf("Expected an expectation failure to be set on the error reporter.")
+	}
+}
+
+func TestConsumerOffsetsAreManagedCorrectlyWithOffsetOldest(t *testing.T) {
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, NewTestConfig())
+	pcmock := consumer.ExpectConsumePartition("test", 0, sarama.OffsetOldest)
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.ExpectMessagesDrainedOnClose()
+
+	pc, err := consumer.ConsumePartition("test", 0, sarama.OffsetOldest)
+	if err != nil {
+		t.Error(err)
+	}
+
+	message1 := <-pc.Messages()
+	if message1.Offset != 0 {
+		t.Errorf("Expected offset of first message in the partition to be 0, got %d", message1.Offset)
+	}
+
+	message2 := <-pc.Messages()
+	if message2.Offset != 1 {
+		t.Errorf("Expected offset of second message in the partition to be 1, got %d", message2.Offset)
+	}
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected to not report any errors, found: %v", trm.errors)
+	}
+}
+
+func TestConsumerOffsetsAreManagedCorrectlyWithSpecifiedOffset(t *testing.T) {
+	startingOffset := int64(123)
+	trm := newTestReporterMock()
+	consumer := NewConsumer(trm, NewTestConfig())
+	pcmock := consumer.ExpectConsumePartition("test", 0, startingOffset)
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.YieldMessage(&sarama.ConsumerMessage{Value: []byte("hello")})
+	pcmock.ExpectMessagesDrainedOnClose()
+
+	pc, err := consumer.ConsumePartition("test", 0, startingOffset)
+	if err != nil {
+		t.Error(err)
+	}
+
+	message1 := <-pc.Messages()
+	if message1.Offset != startingOffset {
+		t.Errorf("Expected offset of first message to be %d, got %d", startingOffset, message1.Offset)
+	}
+
+	message2 := <-pc.Messages()
+	if message2.Offset != startingOffset+1 {
+		t.Errorf("Expected offset of second message to be %d, got %d", startingOffset+1, message2.Offset)
+	}
+
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 0 {
+		t.Errorf("Expected to not report any errors, found: %v", trm.errors)
 	}
 }

@@ -125,7 +125,7 @@ func (s *Server) collectQueryStringData() http.Handler {
 
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "Failed to store your data:, %s", err)
+			fmt.Fprintf(w, "Failed to store your data: %s", err)
 		} else {
 			// The tuple (topic, partition, offset) can be used as a unique identifier
 			// for a message in a Kafka cluster.
