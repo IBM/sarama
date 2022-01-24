@@ -18,9 +18,7 @@ You might also want to look at the [Frequently Asked Questions](https://github.c
 
 Sarama provides a "2 releases + 2 months" compatibility guarantee: we support
 the two latest stable releases of Kafka and Go, and we provide a two month
-grace period for older releases. This means we currently officially support
-Go 1.16.x/1.17.x, and Kafka 2.8.x through 3.0.x, although older releases of
-Kafka are still likely to work.
+grace period for older releases. However, older releases of Kafka are still likely to work.
 
 Sarama follows semantic versioning and provides API stability via the gopkg.in service.
 You can import a version with a guaranteed stable API via http://gopkg.in/Shopify/sarama.v1.
