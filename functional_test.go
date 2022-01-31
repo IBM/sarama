@@ -136,28 +136,13 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	if version, ok := os.LookupEnv("KAFKA_VERSION"); ok {
 		env.KafkaVersion = version
 	} else {
-		// We have cp-7.0.0 as the default in the docker-compose file, so that's kafka 3.0.0.
-		env.KafkaVersion = "3.0.0"
-	}
-
-	// the mapping of confluent platform docker image versions -> kafka versions can be
-	// found here: https://docs.confluent.io/current/installation/versions-interoperability.html
-	var confluentPlatformVersion string
-	switch env.KafkaVersion {
-	case "3.0.0":
-		confluentPlatformVersion = "7.0.1"
-	case "2.8.1":
-		confluentPlatformVersion = "6.2.2"
-	case "2.7.1":
-		confluentPlatformVersion = "6.1.4"
-	default:
-		return fmt.Errorf("don't know what confluent platform version to use for kafka %s", env.KafkaVersion)
+		env.KafkaVersion = "3.1.0"
 	}
 
 	c := exec.Command("docker-compose", "up", "-d")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	c.Env = append(os.Environ(), fmt.Sprintf("CONFLUENT_PLATFORM_VERSION=%s", confluentPlatformVersion))
+	c.Env = append(os.Environ(), fmt.Sprintf("KAFKA_VERSION=%s", env.KafkaVersion))
 	err := c.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run docker-compose to start test environment: %w", err)
@@ -169,7 +154,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 
 	// Wait for the kafka broker to come up
 	allBrokersUp := false
-	for i := 0; i < 45 && !allBrokersUp; i++ {
+	for i := 0; i < 90 && !allBrokersUp; i++ {
 		Logger.Println("waiting for kafka brokers to come up")
 		time.Sleep(1 * time.Second)
 		config := NewTestConfig()
