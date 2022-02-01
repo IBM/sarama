@@ -69,6 +69,7 @@ func TestVersionParsing(t *testing.T) {
 		"2.8.0",
 		"2.8.1",
 		"3.0.0",
+		"3.1.0",
 	}
 	for _, s := range validVersions {
 		v, err := ParseKafkaVersion(s)
