@@ -49,6 +49,8 @@ jobs:
     - name: Lint
       uses: golangci/golangci-lint-action@v2
       if: ${{ matrix.go-version == '1.17.x' }}
+      env:
+        GOFLAGS: -tags=functional
       with:
         version: v1.44.0
 
