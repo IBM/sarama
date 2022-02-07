@@ -212,23 +212,24 @@ func (client *client) Broker(brokerID int32) (*Broker, error) {
 }
 
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
-	err := ErrOutOfBrokers
+	brokerErrors := make([]error, 0)
 	for broker := client.any(); broker != nil; broker = client.any() {
 		var response *InitProducerIDResponse
 		req := &InitProducerIDRequest{}
 
-		response, err = broker.InitProducerID(req)
+		response, err := broker.InitProducerID(req)
 		if err == nil {
 			return response, nil
 		} else {
 			// some error, remove that broker and try again
 			Logger.Printf("Client got error from broker %d when issuing InitProducerID : %v\n", broker.ID(), err)
 			_ = broker.Close()
+			brokerErrors = append(brokerErrors, err)
 			client.deregisterBroker(broker)
 		}
 	}
 
-	return nil, err
+	return nil, Wrap(ErrOutOfBrokers, brokerErrors...)
 }
 
 func (client *client) Close() error {
@@ -875,6 +876,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 	}
 
 	broker := client.any()
+	brokerErrors := make([]error, 0)
 	for ; broker != nil && !pastDeadline(0); broker = client.any() {
 		allowAutoTopicCreation := client.conf.Metadata.AllowAutoTopicCreation
 		if len(topics) > 0 {
@@ -923,19 +925,21 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		} else {
 			// some other error, remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
+			brokerErrors = append(brokerErrors, err)
 			_ = broker.Close()
 			client.deregisterBroker(broker)
 		}
 	}
 
+	error := Wrap(ErrOutOfBrokers, brokerErrors...)
 	if broker != nil {
 		Logger.Printf("client/metadata not fetching metadata from broker %s as we would go past the metadata timeout\n", broker.addr)
-		return retry(ErrOutOfBrokers)
+		return retry(error)
 	}
 
 	Logger.Println("client/metadata no available broker to send metadata request to")
 	client.resurrectDeadBrokers()
-	return retry(ErrOutOfBrokers)
+	return retry(error)
 }
 
 // if no fatal error, returns a list of topics that need retrying due to ErrLeaderNotAvailable
@@ -1042,6 +1046,7 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 		return nil, err
 	}
 
+	brokerErrors := make([]error, 0)
 	for broker := client.any(); broker != nil; broker = client.any() {
 		DebugLogger.Printf("client/coordinator requesting coordinator for consumergroup %s from %s\n", consumerGroup, broker.Addr())
 
@@ -1058,6 +1063,7 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 				return nil, err
 			} else {
 				_ = broker.Close()
+				brokerErrors = append(brokerErrors, err)
 				client.deregisterBroker(broker)
 				continue
 			}
@@ -1088,7 +1094,7 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 
 	Logger.Println("client/coordinator no available broker to send consumer metadata request to")
 	client.resurrectDeadBrokers()
-	return retry(ErrOutOfBrokers)
+	return retry(Wrap(ErrOutOfBrokers, brokerErrors...))
 }
 
 // nopCloserClient embeds an existing Client, but disables

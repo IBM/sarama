@@ -639,20 +639,20 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	partitionOffset[3] = 1000
 
 	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err == nil {
+		t.Fatal("expected an ErrDeleteRecords")
+	}
+
 	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
 		t.Fatal(err)
 	}
-	var deleteRecordsError ErrDeleteRecords
-	ok := errors.As(err, &deleteRecordsError)
 
-	if !ok {
+	if !errors.Is(err, ErrDeleteRecords) {
 		t.Fatal(err)
 	}
 
-	for _, err := range *deleteRecordsError.Errors {
-		if !errors.Is(err, ErrUnsupportedVersion) {
-			t.Fatal(err)
-		}
+	if !errors.Is(err, ErrUnsupportedVersion) {
+		t.Fatal(err)
 	}
 
 	err = admin.Close()

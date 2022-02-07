@@ -5,6 +5,7 @@ import (
 	"io"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -996,4 +997,75 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 
 	// give the update time to happen so we get a panic if it's still running (which it shouldn't)
 	time.Sleep(10 * time.Millisecond)
+}
+
+func TestClientConnectionRefused(t *testing.T) {
+	t.Parallel()
+	seedBroker := NewMockBroker(t, 1)
+	seedBroker.Close()
+
+	_, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClientCoordinatorConnectionRefused(t *testing.T) {
+	t.Parallel()
+	seedBroker := NewMockBroker(t, 1)
+	seedBroker.Returns(new(MetadataResponse))
+
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seedBroker.Close()
+
+	_, err = client.Coordinator("my_group")
+
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	safeClose(t, client)
+}
+
+func TestInitProducerIDConnectionRefused(t *testing.T) {
+	t.Parallel()
+	seedBroker := NewMockBroker(t, 1)
+	seedBroker.Returns(&MetadataResponse{Version: 1})
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seedBroker.Close()
+
+	_, err = client.InitProducerID()
+
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !errors.Is(err, io.EOF) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	safeClose(t, client)
 }

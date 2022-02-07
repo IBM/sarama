@@ -528,7 +528,7 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 		}
 
 		if len(errs) > 0 {
-			return ErrReassignPartitions{MultiError{&errs}}
+			return Wrap(ErrReassignPartitions, errs...)
 		}
 
 		return nil
@@ -604,7 +604,7 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 		}
 	}
 	if len(errs) > 0 {
-		return ErrDeleteRecords{MultiError{&errs}}
+		return Wrap(ErrDeleteRecords, errs...)
 	}
 	// todo since we are dealing with couple of partitions it would be good if we return slice of errors
 	// for each partition instead of one error
