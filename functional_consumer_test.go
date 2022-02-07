@@ -4,6 +4,7 @@
 package sarama
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -25,11 +26,11 @@ func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := consumer.ConsumePartition("test.1", 0, -10); err != ErrOffsetOutOfRange {
+	if _, err := consumer.ConsumePartition("test.1", 0, -10); !errors.Is(err, ErrOffsetOutOfRange) {
 		t.Error("Expected ErrOffsetOutOfRange, got:", err)
 	}
 
-	if _, err := consumer.ConsumePartition("test.1", 0, math.MaxInt64); err != ErrOffsetOutOfRange {
+	if _, err := consumer.ConsumePartition("test.1", 0, math.MaxInt64); !errors.Is(err, ErrOffsetOutOfRange) {
 		t.Error("Expected ErrOffsetOutOfRange, got:", err)
 	}
 

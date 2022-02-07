@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -95,7 +96,7 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 
 	partitions, err := client.Partitions("unknown")
 
-	if err != ErrUnknownTopicOrPartition {
+	if !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
 	}
 	if partitions != nil {
@@ -114,7 +115,7 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 
 	// Should not use cache for unknown topic
 	partitions, err = client.Partitions("unknown")
-	if err != ErrUnknownTopicOrPartition {
+	if !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
 	}
 	if partitions != nil {
@@ -381,7 +382,7 @@ func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
 	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
-	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
+	if err := client.RefreshMetadata("new_topic"); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("ErrUnknownTopicOrPartition expected, got", err)
 	}
 
@@ -414,7 +415,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
-	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
+	if err := client.RefreshMetadata("new_topic"); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("ErrUnknownTopicOrPartition expected, got", err)
 	}
 
@@ -423,7 +424,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
-	if _, err = client.Leader("new_topic", 1); err != ErrUnknownTopicOrPartition {
+	if _, err = client.Leader("new_topic", 1); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
@@ -478,7 +479,7 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 
 	// Still no leader for the partition, so asking for it should return an error.
 	_, err = client.Leader("new_topic", 1)
-	if err != ErrLeaderNotAvailable {
+	if !errors.Is(err, ErrLeaderNotAvailable) {
 		t.Error("Expected ErrLeaderNotAvailable, got", err)
 	}
 
@@ -620,7 +621,7 @@ func TestClientGetBroker(t *testing.T) {
 		t.Error(err)
 	}
 	_, err = client.Broker(leader.BrokerID())
-	if err != ErrBrokerNotFound {
+	if !errors.Is(err, ErrBrokerNotFound) {
 		t.Errorf("Expected Broker(brokerID) to return %v found %v", ErrBrokerNotFound, err)
 	}
 }
@@ -726,7 +727,7 @@ func TestClientController(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer safeClose(t, client2)
-		if _, err = client2.Controller(); err != ErrUnsupportedVersion {
+		if _, err = client2.Controller(); !errors.Is(err, ErrUnsupportedVersion) {
 			t.Errorf("Expected Controller() to return %s, found %s", ErrUnsupportedVersion, err)
 		}
 	})
@@ -807,7 +808,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 				if err == nil {
 					t.Fatal("Expected failed RefreshMetadata, got nil")
 				}
-				if err != ErrOutOfBrokers {
+				if !errors.Is(err, ErrOutOfBrokers) {
 					t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
 				}
 			case <-time.After(maxRefreshDuration):

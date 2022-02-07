@@ -48,7 +48,7 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 	}
 
 	_, _, err = sp.SendMessage(msg)
-	if err != sarama.ErrOutOfBrokers {
+	if !errors.Is(err, sarama.ErrOutOfBrokers) {
 		t.Errorf("The third message should not have been produced successfully")
 	}
 
@@ -89,7 +89,7 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 	if _, _, err := sp.SendMessage(msg); err != nil {
 		t.Error("No error expected on first SendMessage call", err)
 	}
-	if _, _, err := sp.SendMessage(msg); err != errOutOfExpectations {
+	if _, _, err := sp.SendMessage(msg); !errors.Is(err, errOutOfExpectations) {
 		t.Error("errOutOfExpectations expected on second SendMessage call, found:", err)
 	}
 

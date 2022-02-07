@@ -188,7 +188,7 @@ func TestBrokerFailedRequest(t *testing.T) {
 			}
 			err = broker.Close()
 			if err != nil {
-				if tt.stopBroker && err == ErrNotConnected {
+				if tt.stopBroker && errors.Is(err, ErrNotConnected) {
 					// We expect the broker to not close properly
 					return
 				}
@@ -331,8 +331,8 @@ func TestSASLOAuthBearer(t *testing.T) {
 
 			err = broker.authenticateViaSASL()
 
-			if test.expectedBrokerError != ErrNoError {
-				if test.expectedBrokerError != err {
+			if !errors.Is(test.expectedBrokerError, ErrNoError) {
+				if !errors.Is(err, test.expectedBrokerError) {
 					t.Errorf("[%d]:[%s] Expected %s auth error, got %s\n", i, test.name, test.expectedBrokerError, err)
 				}
 			} else if test.expectClientErr && err == nil {
@@ -432,10 +432,10 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 			mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).SetAuthBytes([]byte(test.scramChallengeResp))
 			mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).SetEnabledMechanisms([]string{SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512})
 
-			if test.mockSASLAuthErr != ErrNoError {
+			if !errors.Is(test.mockSASLAuthErr, ErrNoError) {
 				mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockSASLAuthErr)
 			}
-			if test.mockHandshakeErr != ErrNoError {
+			if !errors.Is(test.mockHandshakeErr, ErrNoError) {
 				mockSASLHandshakeResponse = mockSASLHandshakeResponse.SetError(test.mockHandshakeErr)
 			}
 
@@ -466,12 +466,12 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 
 			err = broker.authenticateViaSASL()
 
-			if test.mockSASLAuthErr != ErrNoError {
-				if test.mockSASLAuthErr != err {
+			if !errors.Is(test.mockSASLAuthErr, ErrNoError) {
+				if !errors.Is(err, test.mockSASLAuthErr) {
 					t.Errorf("[%d]:[%s] Expected %s SASL authentication error, got %s\n", i, test.name, test.mockHandshakeErr, err)
 				}
-			} else if test.mockHandshakeErr != ErrNoError {
-				if test.mockHandshakeErr != err {
+			} else if !errors.Is(test.mockHandshakeErr, ErrNoError) {
+				if !errors.Is(err, test.mockHandshakeErr) {
 					t.Errorf("[%d]:[%s] Expected %s handshake error, got %s\n", i, test.name, test.mockHandshakeErr, err)
 				}
 			} else if test.expectClientErr && err == nil {
@@ -527,14 +527,14 @@ func TestSASLPlainAuth(t *testing.T) {
 			mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
 				SetAuthBytes([]byte(`response_payload`))
 
-			if test.mockAuthErr != ErrNoError {
+			if !errors.Is(test.mockAuthErr, ErrNoError) {
 				mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockAuthErr)
 			}
 
 			mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).
 				SetEnabledMechanisms([]string{SASLTypePlaintext})
 
-			if test.mockHandshakeErr != ErrNoError {
+			if !errors.Is(test.mockHandshakeErr, ErrNoError) {
 				mockSASLHandshakeResponse = mockSASLHandshakeResponse.SetError(test.mockHandshakeErr)
 			}
 
@@ -595,12 +595,12 @@ func TestSASLPlainAuth(t *testing.T) {
 				}
 			}
 
-			if test.mockAuthErr != ErrNoError {
-				if test.mockAuthErr != err {
+			if !errors.Is(test.mockAuthErr, ErrNoError) {
+				if !errors.Is(err, test.mockAuthErr) {
 					t.Errorf("[%d]:[%s] Expected %s auth error, got %s\n", i, test.name, test.mockAuthErr, err)
 				}
-			} else if test.mockHandshakeErr != ErrNoError {
-				if test.mockHandshakeErr != err {
+			} else if !errors.Is(test.mockHandshakeErr, ErrNoError) {
+				if !errors.Is(err, test.mockHandshakeErr) {
 					t.Errorf("[%d]:[%s] Expected %s handshake error, got %s\n", i, test.name, test.mockHandshakeErr, err)
 				}
 			} else if test.expectClientErr && err == nil {

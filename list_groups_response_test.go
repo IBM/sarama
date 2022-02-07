@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -29,7 +30,7 @@ func TestListGroupsResponse(t *testing.T) {
 
 	response = new(ListGroupsResponse)
 	testVersionDecodable(t, "no error", response, listGroupsResponseEmpty, 0)
-	if response.Err != ErrNoError {
+	if !errors.Is(response.Err, ErrNoError) {
 		t.Error("Expected no gerror, found:", response.Err)
 	}
 	if len(response.Groups) != 0 {
@@ -38,7 +39,7 @@ func TestListGroupsResponse(t *testing.T) {
 
 	response = new(ListGroupsResponse)
 	testVersionDecodable(t, "no error", response, listGroupsResponseError, 0)
-	if response.Err != ErrClusterAuthorizationFailed {
+	if !errors.Is(response.Err, ErrClusterAuthorizationFailed) {
 		t.Error("Expected no gerror, found:", response.Err)
 	}
 	if len(response.Groups) != 0 {
@@ -47,7 +48,7 @@ func TestListGroupsResponse(t *testing.T) {
 
 	response = new(ListGroupsResponse)
 	testVersionDecodable(t, "no error", response, listGroupsResponseWithConsumer, 0)
-	if response.Err != ErrNoError {
+	if !errors.Is(response.Err, ErrNoError) {
 		t.Error("Expected no gerror, found:", response.Err)
 	}
 	if len(response.Groups) != 1 {

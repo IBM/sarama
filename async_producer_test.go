@@ -740,7 +740,7 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		select {
 		case msg := <-producer.Errors():
-			if msg.Err != ErrNotLeaderForPartition {
+			if !errors.Is(msg.Err, ErrNotLeaderForPartition) {
 				t.Error(msg.Err)
 			}
 		case <-producer.Successes():
@@ -916,7 +916,7 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	time.Sleep(5 * time.Millisecond) // let the shutdown goroutine kick in
 
 	producer.Input() <- &ProducerMessage{Topic: "FOO"}
-	if err := <-producer.Errors(); err.Err != ErrShuttingDown {
+	if err := <-producer.Errors(); !errors.Is(err.Err, ErrShuttingDown) {
 		t.Error(err)
 	}
 
@@ -1454,6 +1454,14 @@ func TestAsyncProducerInterceptors(t *testing.T) {
 			t.Parallel()
 			testProducerInterceptor(t, tt.interceptors, tt.expectationFn)
 		})
+	}
+}
+
+func TestProducerError(t *testing.T) {
+	t.Parallel()
+	err := ProducerError{Err: ErrOutOfBrokers}
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Error("unexpected errors.Is")
 	}
 }
 

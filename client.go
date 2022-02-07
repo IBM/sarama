@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"math/rand"
 	"sort"
 	"sync"
@@ -168,13 +169,11 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 	if conf.Metadata.Full {
 		// do an initial fetch of all cluster metadata by specifying an empty list of topics
 		err := client.RefreshMetadata()
-		switch err {
-		case nil:
-			break
-		case ErrLeaderNotAvailable, ErrReplicaNotAvailable, ErrTopicAuthorizationFailed, ErrClusterAuthorizationFailed:
+		if err == nil {
+		} else if errors.Is(err, ErrLeaderNotAvailable) || errors.Is(err, ErrReplicaNotAvailable) || errors.Is(err, ErrTopicAuthorizationFailed) || errors.Is(err, ErrClusterAuthorizationFailed) {
 			// indicates that maybe part of the cluster is down, but is not fatal to creating the client
 			Logger.Println(err)
-		default:
+		} else {
 			close(client.closed) // we haven't started the background updater yet, so we have to do this manually
 			_ = client.Close()
 			return nil, err
@@ -219,10 +218,9 @@ func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 		req := &InitProducerIDRequest{}
 
 		response, err = broker.InitProducerID(req)
-		switch err.(type) {
-		case nil:
+		if err == nil {
 			return response, nil
-		default:
+		} else {
 			// some error, remove that broker and try again
 			Logger.Printf("Client got error from broker %d when issuing InitProducerID : %v\n", broker.ID(), err)
 			_ = broker.Close()
@@ -373,7 +371,7 @@ func (client *client) Replicas(topic string, partitionID int32) ([]int32, error)
 		return nil, ErrUnknownTopicOrPartition
 	}
 
-	if metadata.Err == ErrReplicaNotAvailable {
+	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
 		return dupInt32Slice(metadata.Replicas), metadata.Err
 	}
 	return dupInt32Slice(metadata.Replicas), nil
@@ -398,7 +396,7 @@ func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, 
 		return nil, ErrUnknownTopicOrPartition
 	}
 
-	if metadata.Err == ErrReplicaNotAvailable {
+	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
 		return dupInt32Slice(metadata.Isr), metadata.Err
 	}
 	return dupInt32Slice(metadata.Isr), nil
@@ -423,7 +421,7 @@ func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32,
 		return nil, ErrUnknownTopicOrPartition
 	}
 
-	if metadata.Err == ErrReplicaNotAvailable {
+	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
 		return dupInt32Slice(metadata.OfflineReplicas), metadata.Err
 	}
 	return dupInt32Slice(metadata.OfflineReplicas), nil
@@ -742,7 +740,7 @@ func (client *client) setPartitionCache(topic string, partitionSet partitionType
 
 	ret := make([]int32, 0, len(partitions))
 	for _, partition := range partitions {
-		if partitionSet == writablePartitions && partition.Err == ErrLeaderNotAvailable {
+		if partitionSet == writablePartitions && errors.Is(partition.Err, ErrLeaderNotAvailable) {
 			continue
 		}
 		ret = append(ret, partition.ID)
@@ -760,7 +758,7 @@ func (client *client) cachedLeader(topic string, partitionID int32) (*Broker, er
 	if partitions != nil {
 		metadata, ok := partitions[partitionID]
 		if ok {
-			if metadata.Err == ErrLeaderNotAvailable {
+			if errors.Is(metadata.Err, ErrLeaderNotAvailable) {
 				return nil, ErrLeaderNotAvailable
 			}
 			b := client.brokers[metadata.Leader]
@@ -798,7 +796,7 @@ func (client *client) getOffset(topic string, partitionID int32, time int64) (in
 		_ = broker.Close()
 		return -1, ErrIncompleteResponse
 	}
-	if block.Err != ErrNoError {
+	if !errors.Is(block.Err, ErrNoError) {
 		return -1, block.Err
 	}
 	if len(block.Offsets) != 1 {
@@ -893,8 +891,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			req.Version = 1
 		}
 		response, err := broker.GetMetadata(req)
-		switch err := err.(type) {
-		case nil:
+		var kerror KError
+		var packetEncodingError PacketEncodingError
+		if err == nil {
 			allKnownMetaData := len(topics) == 0
 			// valid response, use it
 			shouldRetry, err := client.updateMetadata(response, allKnownMetaData)
@@ -903,19 +902,17 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				return retry(err) // note: err can be nil
 			}
 			return err
-
-		case PacketEncodingError:
+		} else if errors.As(err, &packetEncodingError) {
 			// didn't even send, return the error
 			return err
-
-		case KError:
+		} else if errors.As(err, &kerror) {
 			// if SASL auth error return as this _should_ be a non retryable err for all brokers
-			if err == ErrSASLAuthenticationFailed {
+			if errors.Is(err, ErrSASLAuthenticationFailed) {
 				Logger.Println("client/metadata failed SASL authentication")
 				return err
 			}
 
-			if err == ErrTopicAuthorizationFailed {
+			if errors.Is(err, ErrTopicAuthorizationFailed) {
 				Logger.Println("client is not authorized to access this topic. The topics were: ", topics)
 				return err
 			}
@@ -923,8 +920,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
 			_ = broker.Close()
 			client.deregisterBroker(broker)
-
-		default:
+		} else {
 			// some other error, remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
 			_ = broker.Close()
@@ -996,7 +992,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
-			if partition.Err == ErrLeaderNotAvailable {
+			if errors.Is(partition.Err, ErrLeaderNotAvailable) {
 				retry = true
 			}
 		}
@@ -1057,22 +1053,20 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 		if err != nil {
 			Logger.Printf("client/coordinator request to broker %s failed: %s\n", broker.Addr(), err)
 
-			switch err.(type) {
-			case PacketEncodingError:
+			var packetEncodingError PacketEncodingError
+			if errors.As(err, &packetEncodingError) {
 				return nil, err
-			default:
+			} else {
 				_ = broker.Close()
 				client.deregisterBroker(broker)
 				continue
 			}
 		}
 
-		switch response.Err {
-		case ErrNoError:
+		if errors.Is(response.Err, ErrNoError) {
 			DebugLogger.Printf("client/coordinator coordinator for consumergroup %s is #%d (%s)\n", consumerGroup, response.Coordinator.ID(), response.Coordinator.Addr())
 			return response, nil
-
-		case ErrConsumerCoordinatorNotAvailable:
+		} else if errors.Is(response.Err, ErrConsumerCoordinatorNotAvailable) {
 			Logger.Printf("client/coordinator coordinator for consumer group %s is not available\n", consumerGroup)
 
 			// This is very ugly, but this scenario will only happen once per cluster.
@@ -1084,11 +1078,10 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 			}
 
 			return retry(ErrConsumerCoordinatorNotAvailable)
-		case ErrGroupAuthorizationFailed:
+		} else if errors.Is(response.Err, ErrGroupAuthorizationFailed) {
 			Logger.Printf("client was not authorized to access group %s while attempting to find coordinator", consumerGroup)
 			return retry(ErrGroupAuthorizationFailed)
-
-		default:
+		} else {
 			return nil, response.Err
 		}
 	}

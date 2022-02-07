@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestNewOffsetManager(t *testing.T) {
 	safeClose(t, testClient)
 
 	_, err = NewOffsetManagerFromClient("group", testClient)
-	if err != ErrClosedClient {
+	if !errors.Is(err, ErrClosedClient) {
 		t.Errorf("Error expected for closed client; actual value: %v", err)
 	}
 }

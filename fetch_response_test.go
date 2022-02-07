@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 )
 
@@ -228,7 +229,7 @@ func TestOneMessageFetchResponse(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrOffsetOutOfRange {
+	if !errors.Is(block.Err, ErrOffsetOutOfRange) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
@@ -285,7 +286,7 @@ func TestOverflowMessageFetchResponse(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrOffsetOutOfRange {
+	if !errors.Is(block.Err, ErrOffsetOutOfRange) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
@@ -346,7 +347,7 @@ func TestOneRecordFetchResponse(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrOffsetOutOfRange {
+	if !errors.Is(block.Err, ErrOffsetOutOfRange) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
@@ -396,7 +397,7 @@ func TestPartailFetchResponse(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrNoError {
+	if !errors.Is(block.Err, ErrNoError) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
@@ -439,7 +440,7 @@ func TestEmptyRecordsFetchResponse(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrNoError {
+	if !errors.Is(block.Err, ErrNoError) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
@@ -485,7 +486,7 @@ func TestOneMessageFetchResponseV4(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrOffsetOutOfRange {
+	if !errors.Is(block.Err, ErrOffsetOutOfRange) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {
@@ -552,7 +553,7 @@ func TestPreferredReplicaFetchResponseV11(t *testing.T) {
 	if block == nil {
 		t.Fatal("GetBlock didn't return block.")
 	}
-	if block.Err != ErrOffsetOutOfRange {
+	if !errors.Is(block.Err, ErrOffsetOutOfRange) {
 		t.Error("Decoding didn't produce correct error code.")
 	}
 	if block.HighWaterMarkOffset != 0x10101010 {

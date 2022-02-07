@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/Shopify/sarama"
@@ -78,7 +79,7 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 							mp.errors <- &sarama.ProducerError{Err: err, Msg: msg}
 						}
 					}
-					if expectation.Result == errProduceSuccess {
+					if errors.Is(expectation.Result, errProduceSuccess) {
 						mp.lastOffset++
 						if config.Producer.Return.Successes {
 							msg.Offset = mp.lastOffset

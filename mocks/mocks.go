@@ -44,7 +44,7 @@ func messageValueChecker(f ValueChecker) MessageChecker {
 	return func(msg *sarama.ProducerMessage) error {
 		val, err := msg.Value.Encode()
 		if err != nil {
-			return fmt.Errorf("Input message encoding failed: %s", err.Error())
+			return fmt.Errorf("Input message encoding failed: %w", err)
 		}
 		return f(val)
 	}

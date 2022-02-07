@@ -1,5 +1,7 @@
 package sarama
 
+import "errors"
+
 // ConsumerGroupMemberMetadata holds the metadata for consumer group
 // https://github.com/apache/kafka/blob/trunk/clients/src/main/resources/common/message/ConsumerProtocolSubscription.json
 type ConsumerGroupMemberMetadata struct {
@@ -41,7 +43,7 @@ func (m *ConsumerGroupMemberMetadata) decode(pd packetDecoder) (err error) {
 			// permit missing data here in case of misbehaving 3rd party
 			// clients who incorrectly marked the member metadata as V1 in
 			// their JoinGroup request
-			if err == ErrInsufficientData {
+			if errors.Is(err, ErrInsufficientData) {
 				return nil
 			}
 			return err

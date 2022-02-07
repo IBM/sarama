@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -167,7 +168,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	bufSize := int(batchLen) - recordBatchOverhead
 	recBuffer, err := pd.getRawBytes(bufSize)
 	if err != nil {
-		if err == ErrInsufficientData {
+		if errors.Is(err, ErrInsufficientData) {
 			b.PartialTrailingRecord = true
 			b.Records = nil
 			return nil
@@ -186,7 +187,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 
 	b.recordsLen = len(recBuffer)
 	err = decode(recBuffer, recordsArray(b.Records))
-	if err == ErrInsufficientData {
+	if errors.Is(err, ErrInsufficientData) {
 		b.PartialTrailingRecord = true
 		b.Records = nil
 		return nil

@@ -183,15 +183,7 @@ func (ca *clusterAdmin) refreshController() (*Broker, error) {
 // isErrNoController returns `true` if the given error type unwraps to an
 // `ErrNotController` response from Kafka
 func isErrNoController(err error) bool {
-	switch e := err.(type) {
-	case *TopicError:
-		return e.Err == ErrNotController
-	case *TopicPartitionError:
-		return e.Err == ErrNotController
-	case KError:
-		return e == ErrNotController
-	}
-	return false
+	return errors.Is(err, ErrNotController)
 }
 
 // retryOnError will repeatedly call the given (error-returning) func in the
@@ -255,8 +247,8 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 			return ErrIncompleteResponse
 		}
 
-		if topicErr.Err != ErrNoError {
-			if topicErr.Err == ErrNotController {
+		if !errors.Is(topicErr.Err, ErrNoError) {
+			if errors.Is(topicErr.Err, ErrNotController) {
 				_, _ = ca.refreshController()
 			}
 			return topicErr
@@ -442,8 +434,8 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 			return ErrIncompleteResponse
 		}
 
-		if topicErr != ErrNoError {
-			if topicErr == ErrNotController {
+		if !errors.Is(topicErr, ErrNoError) {
+			if errors.Is(topicErr, ErrNotController) {
 				_, _ = ca.refreshController()
 			}
 			return topicErr
@@ -483,8 +475,8 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 			return ErrIncompleteResponse
 		}
 
-		if topicErr.Err != ErrNoError {
-			if topicErr.Err == ErrNotController {
+		if !errors.Is(topicErr.Err, ErrNoError) {
+			if errors.Is(topicErr.Err, ErrNotController) {
 				_, _ = ca.refreshController()
 			}
 			return topicErr
@@ -527,7 +519,7 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 
 			for topic, topicErrors := range rsp.Errors {
 				for partition, partitionError := range topicErrors {
-					if partitionError.errorCode != ErrNoError {
+					if !errors.Is(partitionError.errorCode, ErrNoError) {
 						errStr := fmt.Sprintf("[%s-%d]: %s", topic, partition, partitionError.errorCode.Error())
 						errs = append(errs, errors.New(errStr))
 					}
@@ -604,7 +596,7 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 				errs = append(errs, ErrIncompleteResponse)
 			} else {
 				for _, deleteRecordsResponsePartition := range deleteRecordsResponseTopic.Partitions {
-					if deleteRecordsResponsePartition.Err != ErrNoError {
+					if !errors.Is(deleteRecordsResponsePartition.Err, ErrNoError) {
 						errs = append(errs, errors.New(deleteRecordsResponsePartition.Err.Error()))
 					}
 				}
@@ -966,11 +958,11 @@ func (ca *clusterAdmin) DeleteConsumerGroupOffset(group string, topic string, pa
 		return err
 	}
 
-	if resp.ErrorCode != ErrNoError {
+	if !errors.Is(resp.ErrorCode, ErrNoError) {
 		return resp.ErrorCode
 	}
 
-	if resp.Errors[topic][partition] != ErrNoError {
+	if !errors.Is(resp.Errors[topic][partition], ErrNoError) {
 		return resp.Errors[topic][partition]
 	}
 	return nil
@@ -996,7 +988,7 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 		return ErrIncompleteResponse
 	}
 
-	if groupErr != ErrNoError {
+	if !errors.Is(groupErr, ErrNoError) {
 		return groupErr
 	}
 
@@ -1128,7 +1120,7 @@ func (ca *clusterAdmin) DescribeClientQuotas(components []QuotaFilterComponent, 
 	if rsp.ErrorMsg != nil && len(*rsp.ErrorMsg) > 0 {
 		return nil, errors.New(*rsp.ErrorMsg)
 	}
-	if rsp.ErrorCode != ErrNoError {
+	if !errors.Is(rsp.ErrorCode, ErrNoError) {
 		return nil, rsp.ErrorCode
 	}
 
@@ -1160,7 +1152,7 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 		if entry.ErrorMsg != nil && len(*entry.ErrorMsg) > 0 {
 			return errors.New(*entry.ErrorMsg)
 		}
-		if entry.ErrorCode != ErrNoError {
+		if !errors.Is(entry.ErrorCode, ErrNoError) {
 			return entry.ErrorCode
 		}
 	}

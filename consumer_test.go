@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"log"
 	"os"
 	"os/signal"
@@ -330,7 +331,9 @@ func TestConsumerDuplicate(t *testing.T) {
 	pc2, err := c.ConsumePartition("my_topic", 0, 0)
 
 	// Then
-	if pc2 != nil || err != ConfigurationError("That topic/partition is already being consumed") {
+	var target ConfigurationError
+	ok := errors.As(err, &target)
+	if pc2 != nil || !ok || string(target) != "That topic/partition is already being consumed" {
 		t.Fatal("A partition cannot be consumed twice at the same time")
 	}
 
@@ -380,7 +383,7 @@ func runConsumerLeaderRefreshErrorTestWithConfig(t *testing.T, config *Config) {
 		"FetchRequest": NewMockWrapper(fetchResponse2),
 	})
 
-	if consErr := <-pc.Errors(); consErr.Err != ErrOutOfBrokers {
+	if consErr := <-pc.Errors(); !errors.Is(consErr.Err, ErrOutOfBrokers) {
 		t.Errorf("Unexpected error: %v", consErr.Err)
 	}
 
@@ -462,7 +465,7 @@ func TestConsumerInvalidTopic(t *testing.T) {
 	pc, err := c.ConsumePartition("my_topic", 0, OffsetOldest)
 
 	// Then
-	if pc != nil || err != ErrUnknownTopicOrPartition {
+	if pc != nil || !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Errorf("Should fail with, err=%v", err)
 	}
 
@@ -514,7 +517,7 @@ func TestConsumerClosePartitionWithoutLeader(t *testing.T) {
 	})
 
 	// When
-	if consErr := <-pc.Errors(); consErr.Err != ErrOutOfBrokers {
+	if consErr := <-pc.Errors(); !errors.Is(consErr.Err, ErrOutOfBrokers) {
 		t.Errorf("Unexpected error: %v", consErr.Err)
 	}
 
@@ -1606,13 +1609,13 @@ func TestConsumerOffsetOutOfRange(t *testing.T) {
 	}
 
 	// When/Then
-	if _, err := master.ConsumePartition("my_topic", 0, 0); err != ErrOffsetOutOfRange {
+	if _, err := master.ConsumePartition("my_topic", 0, 0); !errors.Is(err, ErrOffsetOutOfRange) {
 		t.Fatal("Should return ErrOffsetOutOfRange, got:", err)
 	}
-	if _, err := master.ConsumePartition("my_topic", 0, 3456); err != ErrOffsetOutOfRange {
+	if _, err := master.ConsumePartition("my_topic", 0, 3456); !errors.Is(err, ErrOffsetOutOfRange) {
 		t.Fatal("Should return ErrOffsetOutOfRange, got:", err)
 	}
-	if _, err := master.ConsumePartition("my_topic", 0, -3); err != ErrOffsetOutOfRange {
+	if _, err := master.ConsumePartition("my_topic", 0, -3); !errors.Is(err, ErrOffsetOutOfRange) {
 		t.Fatal("Should return ErrOffsetOutOfRange, got:", err)
 	}
 
@@ -2089,5 +2092,13 @@ func TestConsumerInterceptors(t *testing.T) {
 			t.Parallel()
 			testConsumerInterceptor(t, tt.interceptors, tt.expectationFn)
 		})
+	}
+}
+
+func TestConsumerError(t *testing.T) {
+	t.Parallel()
+	err := ConsumerError{Err: ErrOutOfBrokers}
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Error("unexpected errors.Is")
 	}
 }
