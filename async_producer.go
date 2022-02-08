@@ -684,6 +684,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		input:          input,
 		output:         bridge,
 		responses:      responses,
+		closeBroker:    make(chan struct{}),
 		stopchan:       make(chan struct{}),
 		buffer:         newProduceSet(p),
 		currentRetries: make(map[string]map[int32]error),
@@ -724,6 +725,22 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		close(responses)
 	})
 
+	// use a dedicated goroutine to close the broker instead of inside handleError
+	// this is because the AsyncProduce callback inside the bridge is invoked from the broker
+	// responseReceiver goroutine and closing the broker requires for such goroutine to be finished
+	// therefore leading to a deadlock
+	go withRecover(func() {
+		for range bp.closeBroker {
+			if err := bp.broker.Close(); err != nil {
+				Logger.Printf("producer/broker/%d unable to close broker: %v\n", bp.broker.ID(), err)
+			} else {
+				Logger.Printf("producer/broker/%d closing done\n", bp.broker.ID())
+			}
+		}
+		// Signal that we are done
+		close(bp.stopchan)
+	})
+
 	if p.conf.Producer.Retry.Max <= 0 {
 		bp.abandoned = make(chan struct{})
 	}
@@ -743,11 +760,12 @@ type brokerProducer struct {
 	parent *asyncProducer
 	broker *Broker
 
-	input     chan *ProducerMessage
-	output    chan<- *produceSet
-	responses <-chan *brokerProducerResponse
-	abandoned chan struct{}
-	stopchan  chan struct{}
+	input       chan *ProducerMessage
+	output      chan<- *produceSet
+	responses   <-chan *brokerProducerResponse
+	closeBroker chan struct{}
+	abandoned   chan struct{}
+	stopchan    chan struct{}
 
 	buffer     *produceSet
 	timer      <-chan time.Time
@@ -830,10 +848,6 @@ func (bp *brokerProducer) run() {
 			if ok {
 				bp.handleResponse(response)
 			}
-		case <-bp.stopchan:
-			Logger.Printf(
-				"producer/broker/%d run loop asked to stop\n", bp.broker.ID())
-			return
 		}
 
 		if bp.timerFired || bp.buffer.readyToFlush() {
@@ -854,10 +868,15 @@ func (bp *brokerProducer) shutdown() {
 		}
 	}
 	close(bp.output)
+	// Drain responses from bridge goroutine
 	for response := range bp.responses {
 		bp.handleResponse(response)
 	}
-	close(bp.stopchan)
+	// Ask for the closeBroker goroutine to stop
+	close(bp.closeBroker)
+	// And wait for it to be done
+	<-bp.stopchan
+	// No more brokerProducer related goroutine should be running
 	Logger.Printf("producer/broker/%d shut down\n", bp.broker.ID())
 }
 
@@ -1028,7 +1047,12 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 	default:
 		Logger.Printf("producer/broker/%d state change to [closing] because %s\n", bp.broker.ID(), err)
 		bp.parent.abandonBrokerConnection(bp.broker)
-		_ = bp.broker.Close()
+		// We only try to close the broker once
+		if bp.closing == nil {
+			// Request the closeBroker goroutine to close the broker for us
+			// because calling bp.broker.Close here can lead to a deadlock
+			bp.closeBroker <- struct{}{}
+		}
 		bp.closing = err
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 			bp.parent.retryMessages(pSet.msgs, err)

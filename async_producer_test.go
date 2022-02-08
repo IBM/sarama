@@ -643,6 +643,55 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	}
 }
 
+// https://github.com/Shopify/sarama/issues/2129
+func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
+	//Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	// The seed broker only handles Metadata request
+	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		metadataLeader := new(MetadataResponse)
+		metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
+		metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+		return metadataLeader
+	})
+
+	// Simulate a slow broker by taking ~200ms to handle requests
+	// therefore triggering the read timeout and the retry logic
+	leader.setHandler(func(req *request) (res encoderWithHeader) {
+		time.Sleep(200 * time.Millisecond)
+		// Will likely not be read by the producer (read timeout)
+		prodSuccess := new(ProduceResponse)
+		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+		return prodSuccess
+	})
+
+	config := NewTestConfig()
+	// Use very short read to simulate read error on unresponsive broker
+	config.Net.ReadTimeout = 50 * time.Millisecond
+	// Flush every record to generate N in-flight Produce requests
+	config.Producer.Flush.Messages = 1
+	config.Producer.Return.Successes = true
+	// Reduce retries to speed up the test while keeping the default backoff
+	config.Producer.Retry.Max = 1
+	config.Net.MaxOpenRequests = 1
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 10; i++ {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+	}
+
+	expectResults(t, producer, 0, 10)
+
+	seedBroker.Close()
+	leader.Close()
+	closeProducer(t, producer)
+}
+
 func TestAsyncProducerOutOfRetries(t *testing.T) {
 	t.Skip("Enable once bug #294 is fixed.")
 
@@ -1249,9 +1298,11 @@ func TestBrokerProducerShutdown(t *testing.T) {
 		addr: mockBroker.Addr(),
 		id:   mockBroker.BrokerID(),
 	}
-	bp := producer.(*asyncProducer).newBrokerProducer(broker)
+	// Starts various goroutines in newBrokerProducer
+	bp := producer.(*asyncProducer).getBrokerProducer(broker)
+	// Initiate the shutdown of all of them
+	producer.(*asyncProducer).unrefBrokerProducer(broker, bp)
 
-	bp.shutdown()
 	_ = producer.Close()
 	mockBroker.Close()
 }
