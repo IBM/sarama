@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"sort"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -143,20 +144,138 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 	defer teardownFunctionalTest(t)
 
 	config := NewTestConfig()
+	config.ClientID = t.Name()
+	config.Net.MaxOpenRequests = 1
 	config.Consumer.IsolationLevel = ReadCommitted
+	config.Producer.Idempotent = true
+	config.Producer.Return.Successes = true
+	config.Producer.RequiredAcks = WaitForAll
 	config.Version = V0_11_0_0
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	controller, err := client.Controller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer controller.Close()
+
+	transactionalID := strconv.FormatInt(time.Now().UnixNano()/(1<<22), 10)
+
+	var coordinator *Broker
+
+	// find the transaction coordinator
+	for {
+		coordRes, err := controller.FindCoordinator(&FindCoordinatorRequest{
+			Version:         2,
+			CoordinatorKey:  transactionalID,
+			CoordinatorType: CoordinatorTransaction,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if coordRes.Err != ErrNoError {
+			continue
+		}
+		if err := coordRes.Coordinator.Open(client.Config()); err != nil {
+			t.Fatal(err)
+		}
+		coordinator = coordRes.Coordinator
+		break
+	}
+
+	// produce some uncommitted messages to the topic
+	pidRes, err := coordinator.InitProducerID(&InitProducerIDRequest{
+		TransactionalID:    &transactionalID,
+		TransactionTimeout: 10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = coordinator.AddPartitionsToTxn(&AddPartitionsToTxnRequest{
+		TransactionalID: transactionalID,
+		ProducerID:      pidRes.ProducerID,
+		ProducerEpoch:   pidRes.ProducerEpoch,
+		TopicPartitions: map[string][]int32{
+			uncommittedTopic: {0},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ps := &produceSet{
+		msgs: make(map[string]map[int32]*partitionSet),
+		parent: &asyncProducer{
+			conf: config,
+		},
+		producerID:    pidRes.ProducerID,
+		producerEpoch: pidRes.ProducerEpoch,
+	}
+	_ = ps.add(&ProducerMessage{
+		Topic:     uncommittedTopic,
+		Partition: 0,
+		Value:     StringEncoder("uncommitted message 1"),
+	})
+	_ = ps.add(&ProducerMessage{
+		Topic:     uncommittedTopic,
+		Partition: 0,
+		Value:     StringEncoder("uncommitted message 2"),
+	})
+	produceReq := ps.buildRequest()
+	produceReq.TransactionalID = &transactionalID
+	if resp, err := coordinator.Produce(produceReq); err != nil {
+		t.Fatal(err)
+	} else {
+		b := resp.GetBlock(uncommittedTopic, 0)
+		if b != nil {
+			t.Logf("uncommitted message 1 to %s-%d at offset %d", uncommittedTopic, 0, b.Offset)
+			t.Logf("uncommitted message 2 to %s-%d at offset %d", uncommittedTopic, 0, b.Offset+1)
+		}
+	}
+
+	// now produce some committed messages to the topic
+	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer producer.Close()
+
+	for i := 1; i <= 6; i++ {
+		producer.Input() <- &ProducerMessage{
+			Topic:     uncommittedTopic,
+			Partition: 0,
+			Value:     StringEncoder(fmt.Sprintf("Committed %v", i)),
+		}
+		msg := <-producer.Successes()
+		t.Logf("Committed %v to %s-%d at offset %d", i, msg.Topic, msg.Partition, msg.Offset)
+	}
+
+	// now abort the uncommitted transaction
+	if _, err := coordinator.EndTxn(&EndTxnRequest{
+		TransactionalID:   transactionalID,
+		ProducerID:        pidRes.ProducerID,
+		ProducerEpoch:     pidRes.ProducerEpoch,
+		TransactionResult: false, // aborted
+	}); err != nil {
+		t.Fatal(err)
+	}
 
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer consumer.Close()
 
-	pc, err := consumer.ConsumePartition("uncommitted-topic-test-4", 0, OffsetOldest)
+	pc, err := consumer.ConsumePartition(uncommittedTopic, 0, OffsetOldest)
 	require.NoError(t, err)
 
 	msgChannel := pc.Messages()
 	for i := 1; i <= 6; i++ {
 		msg := <-msgChannel
+		t.Logf("Received %s from %s-%d at offset %d", msg.Value, msg.Topic, msg.Partition, msg.Offset)
 		require.Equal(t, fmt.Sprintf("Committed %v", i), string(msg.Value))
 	}
 }

@@ -6,13 +6,10 @@ package sarama
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,9 +18,7 @@ import (
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 )
 
-const (
-	uncomittedMsgJar = "https://github.com/FrancoisPoinsot/simplest-uncommitted-msg/releases/download/0.1/simplest-uncommitted-msg-0.1-jar-with-dependencies.jar"
-)
+const uncommittedTopic = "uncommitted-topic-test-4"
 
 var (
 	testTopicDetails = map[string]*TopicDetail{
@@ -39,7 +34,7 @@ var (
 			NumPartitions:     64,
 			ReplicationFactor: 3,
 		},
-		"uncommitted-topic-test-4": {
+		uncommittedTopic: {
 			NumPartitions:     1,
 			ReplicationFactor: 3,
 		},
@@ -277,7 +272,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	config := NewTestConfig()
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
-	config.ClientID = "sarama-tests"
+	config.ClientID = "sarama-prepareTestTopics"
 	var err error
 	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
 	if err != nil {
@@ -299,7 +294,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	// Start by deleting the test topics (if they already exist)
 	deleteRes, err := controller.DeleteTopics(&DeleteTopicsRequest{
 		Topics:  testTopicNames,
-		Timeout: 30 * time.Second,
+		Timeout: time.Minute,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete test topics: %w", err)
@@ -312,31 +307,35 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 
 	// wait for the topics to _actually_ be gone - the delete is not guaranteed to be processed
 	// synchronously
-	var topicsOk bool
-	for i := 0; i < 20 && !topicsOk; i++ {
-		time.Sleep(1 * time.Second)
-		md, err := controller.GetMetadata(&MetadataRequest{
-			Topics: testTopicNames,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to get metadata for test topics: %w", err)
-		}
+	{
+		var topicsOk bool
+		for i := 0; i < 60 && !topicsOk; i++ {
+			time.Sleep(1 * time.Second)
+			md, err := controller.GetMetadata(&MetadataRequest{
+				Topics: testTopicNames,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get metadata for test topics: %w", err)
+			}
 
-		topicsOk = true
-		for _, topicsMd := range md.Topics {
-			if !isTopicNotExistsErrorOrOk(topicsMd.Err) {
-				topicsOk = false
+			if len(md.Topics) == len(testTopicNames) {
+				topicsOk = true
+				for _, topicsMd := range md.Topics {
+					if !isTopicNotExistsErrorOrOk(topicsMd.Err) {
+						topicsOk = false
+					}
+				}
 			}
 		}
-	}
-	if !topicsOk {
-		return fmt.Errorf("timed out waiting for test topics to be gone")
+		if !topicsOk {
+			return fmt.Errorf("timed out waiting for test topics to be gone")
+		}
 	}
 
 	// now create the topics empty
 	createRes, err := controller.CreateTopics(&CreateTopicsRequest{
 		TopicDetails: testTopicDetails,
-		Timeout:      30 * time.Second,
+		Timeout:      time.Minute,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create test topics: %w", err)
@@ -347,40 +346,33 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 		}
 	}
 
-	// This is kind of gross, but we don't actually have support for doing transactional publishing
-	// with sarama, so we need to use a java-based tool to publish uncommitted messages to
-	// the uncommitted-topic-test-4 topic
-	jarName := filepath.Base(uncomittedMsgJar)
-	if _, err := os.Stat(jarName); err != nil {
-		Logger.Printf("Downloading %s\n", uncomittedMsgJar)
-		req, err := http.NewRequest("GET", uncomittedMsgJar, nil)
-		if err != nil {
-			return fmt.Errorf("failed creating requst for uncommitted msg jar: %w", err)
-		}
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("failed fetching the uncommitted msg jar: %w", err)
-		}
-		defer res.Body.Close()
-		jarFile, err := os.OpenFile(jarName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o644)
-		if err != nil {
-			return fmt.Errorf("failed opening the uncommitted msg jar: %w", err)
-		}
-		defer jarFile.Close()
+	// wait for the topics to _actually_ exist - the creates are not guaranteed to be processed
+	// synchronously
+	{
+		var topicsOk bool
+		for i := 0; i < 60 && !topicsOk; i++ {
+			time.Sleep(1 * time.Second)
+			md, err := controller.GetMetadata(&MetadataRequest{
+				Topics: testTopicNames,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get metadata for test topics: %w", err)
+			}
 
-		_, err = io.Copy(jarFile, res.Body)
-		if err != nil {
-			return fmt.Errorf("failed writing the uncommitted msg jar: %w", err)
+			if len(md.Topics) == len(testTopicNames) {
+				topicsOk = true
+				for _, topicsMd := range md.Topics {
+					if topicsMd.Err != ErrNoError {
+						topicsOk = false
+					}
+				}
+			}
+		}
+		if !topicsOk {
+			return fmt.Errorf("timed out waiting for test topics to be created")
 		}
 	}
 
-	c := exec.Command("java", "-jar", jarName, "-b", env.KafkaBrokerAddrs[0], "-c", "4")
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	err = c.Run()
-	if err != nil {
-		return fmt.Errorf("failed running uncommitted msg jar: %w", err)
-	}
 	return nil
 }
 
