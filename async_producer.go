@@ -693,9 +693,12 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 
 	// minimal bridge to make the network response `select`able
 	go withRecover(func() {
+		var wg sync.WaitGroup
 		for set := range bridge {
 			request := set.buildRequest()
 
+			// Count the callbacks to know when to close the responses channel safely
+			wg.Add(1)
 			// Capture the current set to forward in the callback
 			sendResponse := func(set *produceSet) ProduceCallback {
 				return func(response *ProduceResponse, err error) {
@@ -704,6 +707,8 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 						err: err,
 						res: response,
 					}
+					// We forwarded the response
+					wg.Done()
 				}
 			}(set)
 
@@ -722,6 +727,8 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 				sendResponse(nil, nil)
 			}
 		}
+		// Wait for all callbacks invocations to close the channel safely
+		wg.Wait()
 		close(responses)
 	})
 
