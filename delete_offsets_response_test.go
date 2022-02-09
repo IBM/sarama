@@ -33,6 +33,7 @@ var (
 )
 
 func TestDeleteOffsetsResponse(t *testing.T) {
+	t.Parallel()
 	var response *DeleteOffsetsResponse
 
 	response = &DeleteOffsetsResponse{

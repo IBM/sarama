@@ -21,6 +21,7 @@ var (
 )
 
 func TestDeleteTopicsResponse(t *testing.T) {
+	t.Parallel()
 	resp := &DeleteTopicsResponse{
 		TopicErrorCodes: map[string]KError{
 			"topic": ErrNoError,

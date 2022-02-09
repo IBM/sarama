@@ -8,6 +8,7 @@ var basicLeaveGroupRequest = []byte{
 }
 
 func TestLeaveGroupRequest(t *testing.T) {
+	t.Parallel()
 	request := new(LeaveGroupRequest)
 	request.GroupId = "foo"
 	request.MemberId = "bar"

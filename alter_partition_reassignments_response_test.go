@@ -26,6 +26,7 @@ var (
 )
 
 func TestAlterPartitionReassignmentResponse(t *testing.T) {
+	t.Parallel()
 	var response *AlterPartitionReassignmentsResponse = &AlterPartitionReassignmentsResponse{
 		ThrottleTimeMs: int32(10000),
 		Version:        int16(0),

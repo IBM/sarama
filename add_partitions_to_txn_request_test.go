@@ -12,6 +12,7 @@ var addPartitionsToTxnRequest = []byte{
 }
 
 func TestAddPartitionsToTxnRequest(t *testing.T) {
+	t.Parallel()
 	req := &AddPartitionsToTxnRequest{
 		TransactionalID: "txn",
 		ProducerID:      8000,

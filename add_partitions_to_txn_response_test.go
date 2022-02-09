@@ -15,6 +15,7 @@ var addPartitionsToTxnResponse = []byte{
 }
 
 func TestAddPartitionsToTxnResponse(t *testing.T) {
+	t.Parallel()
 	resp := &AddPartitionsToTxnResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Errors: map[string][]*PartitionError{

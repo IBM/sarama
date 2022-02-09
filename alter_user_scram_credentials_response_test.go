@@ -23,6 +23,7 @@ var (
 )
 
 func TestAlterUserScramCredentialsResponse(t *testing.T) {
+	t.Parallel()
 	response := &AlterUserScramCredentialsResponse{
 		Version:      0,
 		ThrottleTime: time.Second * 3,

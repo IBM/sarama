@@ -10,11 +10,13 @@ var emptyOffsetCommitResponse = []byte{
 }
 
 func TestEmptyOffsetCommitResponse(t *testing.T) {
+	t.Parallel()
 	response := OffsetCommitResponse{}
 	testResponse(t, "empty", &response, emptyOffsetCommitResponse)
 }
 
 func TestNormalOffsetCommitResponse(t *testing.T) {
+	t.Parallel()
 	response := OffsetCommitResponse{}
 	response.AddError("t", 0, ErrNotLeaderForPartition)
 	response.Errors["m"] = make(map[int32]KError)
@@ -24,6 +26,7 @@ func TestNormalOffsetCommitResponse(t *testing.T) {
 }
 
 func TestOffsetCommitResponseWithThrottleTime(t *testing.T) {
+	t.Parallel()
 	for version := 3; version <= 4; version++ {
 		response := OffsetCommitResponse{
 			Version:        int16(version),

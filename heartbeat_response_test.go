@@ -7,6 +7,7 @@ var heartbeatResponseNoError = []byte{
 }
 
 func TestHeartbeatResponse(t *testing.T) {
+	t.Parallel()
 	response := new(HeartbeatResponse)
 	testVersionDecodable(t, "no error", response, heartbeatResponseNoError, 0)
 	if response.Err != ErrNoError {

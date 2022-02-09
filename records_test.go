@@ -7,6 +7,7 @@ import (
 )
 
 func TestLegacyRecords(t *testing.T) {
+	t.Parallel()
 	set := &MessageSet{
 		Messages: []*MessageBlock{
 			{
@@ -82,6 +83,7 @@ func TestLegacyRecords(t *testing.T) {
 }
 
 func TestDefaultRecords(t *testing.T) {
+	t.Parallel()
 	batch := &RecordBatch{
 		IsTransactional: true,
 		Version:         2,

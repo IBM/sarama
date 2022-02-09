@@ -24,6 +24,7 @@ var (
 )
 
 func TestCreateAclsResponse(t *testing.T) {
+	t.Parallel()
 	errmsg := "error"
 	resp := &CreateAclsResponse{
 		ThrottleTime: 100 * time.Millisecond,

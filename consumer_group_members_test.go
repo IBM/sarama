@@ -45,6 +45,7 @@ var (
 )
 
 func TestConsumerGroupMemberMetadata(t *testing.T) {
+	t.Parallel()
 	meta := &ConsumerGroupMemberMetadata{
 		Version:  0,
 		Topics:   []string{"one", "two"},
@@ -68,6 +69,7 @@ func TestConsumerGroupMemberMetadata(t *testing.T) {
 }
 
 func TestConsumerGroupMemberMetadataV1Decode(t *testing.T) {
+	t.Parallel()
 	meta := new(ConsumerGroupMemberMetadata)
 	if err := decode(groupMemberMetadataV1, meta); err != nil {
 		t.Error("Failed to decode V1 data", err)
@@ -78,6 +80,7 @@ func TestConsumerGroupMemberMetadataV1Decode(t *testing.T) {
 }
 
 func TestConsumerGroupMemberAssignment(t *testing.T) {
+	t.Parallel()
 	amt := &ConsumerGroupMemberAssignment{
 		Version: 0,
 		Topics: map[string][]int32{

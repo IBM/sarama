@@ -12,6 +12,7 @@ var listPartitionReassignmentsRequestOneBlock = []byte{
 }
 
 func TestListPartitionReassignmentRequest(t *testing.T) {
+	t.Parallel()
 	var request *ListPartitionReassignmentsRequest = &ListPartitionReassignmentsRequest{
 		TimeoutMs: int32(10000),
 		Version:   int16(0),

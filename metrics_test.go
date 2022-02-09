@@ -7,6 +7,7 @@ import (
 )
 
 func TestGetOrRegisterHistogram(t *testing.T) {
+	t.Parallel()
 	metricRegistry := metrics.NewRegistry()
 	histogram := getOrRegisterHistogram("name", metricRegistry)
 
@@ -30,6 +31,7 @@ func TestGetOrRegisterHistogram(t *testing.T) {
 }
 
 func TestGetMetricNameForBroker(t *testing.T) {
+	t.Parallel()
 	metricName := getMetricNameForBroker("name", &Broker{id: 1})
 
 	if metricName != "name-for-broker-1" {

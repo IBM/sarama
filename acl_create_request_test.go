@@ -25,6 +25,7 @@ var (
 )
 
 func TestCreateAclsRequestv0(t *testing.T) {
+	t.Parallel()
 	req := &CreateAclsRequest{
 		Version: 0,
 		AclCreations: []*AclCreation{
@@ -47,6 +48,7 @@ func TestCreateAclsRequestv0(t *testing.T) {
 }
 
 func TestCreateAclsRequestv1(t *testing.T) {
+	t.Parallel()
 	req := &CreateAclsRequest{
 		Version: 1,
 		AclCreations: []*AclCreation{

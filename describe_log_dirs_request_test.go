@@ -15,6 +15,7 @@ var (
 )
 
 func TestDescribeLogDirsRequest(t *testing.T) {
+	t.Parallel()
 	request := &DescribeLogDirsRequest{
 		Version:        0,
 		DescribeTopics: []DescribeLogDirsRequestTopic{},

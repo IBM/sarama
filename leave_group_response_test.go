@@ -8,6 +8,7 @@ var (
 )
 
 func TestLeaveGroupResponse(t *testing.T) {
+	t.Parallel()
 	var response *LeaveGroupResponse
 
 	response = new(LeaveGroupResponse)

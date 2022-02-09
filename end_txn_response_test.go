@@ -11,6 +11,7 @@ var endTxnResponse = []byte{
 }
 
 func TestEndTxnResponse(t *testing.T) {
+	t.Parallel()
 	resp := &EndTxnResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Err:          ErrInvalidProducerIDMapping,

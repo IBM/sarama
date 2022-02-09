@@ -41,6 +41,7 @@ var (
 )
 
 func TestAlterConfigsRequest(t *testing.T) {
+	t.Parallel()
 	var request *AlterConfigsRequest
 
 	request = &AlterConfigsRequest{

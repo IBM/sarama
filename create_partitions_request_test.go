@@ -30,6 +30,7 @@ var (
 )
 
 func TestCreatePartitionsRequest(t *testing.T) {
+	t.Parallel()
 	req := &CreatePartitionsRequest{
 		TopicPartitions: map[string]*TopicPartition{
 			"topic": {

@@ -6,6 +6,7 @@ import (
 )
 
 func TestFindCoordinatorResponse(t *testing.T) {
+	t.Parallel()
 	errMsg := "kaboom"
 
 	for _, tc := range []struct {

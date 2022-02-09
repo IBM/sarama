@@ -66,6 +66,7 @@ var (
 )
 
 func TestProduceResponseDecode(t *testing.T) {
+	t.Parallel()
 	response := ProduceResponse{}
 
 	testVersionDecodable(t, "no blocks", &response, produceResponseNoBlocksV0, 0)
@@ -112,6 +113,7 @@ func TestProduceResponseDecode(t *testing.T) {
 }
 
 func TestProduceResponseEncode(t *testing.T) {
+	t.Parallel()
 	response := ProduceResponse{}
 	response.Blocks = make(map[string]map[int32]*ProduceResponseBlock)
 	testEncodable(t, "empty", &response, produceResponseNoBlocksV0)
@@ -131,6 +133,7 @@ func TestProduceResponseEncode(t *testing.T) {
 }
 
 func TestProduceResponseEncodeInvalidTimestamp(t *testing.T) {
+	t.Parallel()
 	response := ProduceResponse{}
 	response.Version = 2
 	response.Blocks = make(map[string]map[int32]*ProduceResponseBlock)

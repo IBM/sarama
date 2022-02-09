@@ -21,6 +21,7 @@ var (
 )
 
 func TestAlterConfigsResponse(t *testing.T) {
+	t.Parallel()
 	var response *AlterConfigsResponse
 
 	response = &AlterConfigsResponse{

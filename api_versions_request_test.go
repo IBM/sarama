@@ -13,11 +13,13 @@ var (
 )
 
 func TestApiVersionsRequest(t *testing.T) {
+	t.Parallel()
 	request := new(ApiVersionsRequest)
 	testRequest(t, "basic", request, apiVersionRequest)
 }
 
 func TestApiVersionsRequestV3(t *testing.T) {
+	t.Parallel()
 	request := new(ApiVersionsRequest)
 	request.Version = 3
 	request.ClientSoftwareName = "sarama"

@@ -7,6 +7,7 @@ var saslAuthenticateRequest = []byte{
 }
 
 func TestSaslAuthenticateRequest(t *testing.T) {
+	t.Parallel()
 	request := new(SaslAuthenticateRequest)
 	request.SaslAuthBytes = []byte(`foo`)
 	testRequest(t, "basic", request, saslAuthenticateRequest)

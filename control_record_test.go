@@ -46,6 +46,7 @@ func assertRecordType(t *testing.T, r *ControlRecord, expected ControlRecordType
 }
 
 func TestDecodingControlRecords(t *testing.T) {
+	t.Parallel()
 	abortTx := testDecode(t, "abort transaction", abortTxCtrlRecKey, abortTxCtrlRecValue)
 
 	assertRecordType(t, &abortTx, ControlRecordAbort)
