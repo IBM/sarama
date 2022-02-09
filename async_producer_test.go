@@ -670,12 +670,12 @@ func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 	config := NewTestConfig()
 	// Use very short read to simulate read error on unresponsive broker
 	config.Net.ReadTimeout = 50 * time.Millisecond
-	// Flush every record to generate N in-flight Produce requests
-	config.Producer.Flush.Messages = 1
+	// Flush every record to generate up to 5 in-flight Produce requests
+	// because config.Net.MaxOpenRequests defaults to 5
+	config.Producer.Flush.MaxMessages = 1
 	config.Producer.Return.Successes = true
 	// Reduce retries to speed up the test while keeping the default backoff
 	config.Producer.Retry.Max = 1
-	config.Net.MaxOpenRequests = 1
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
