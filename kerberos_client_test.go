@@ -58,6 +58,7 @@ const (
 )
 
 func TestFaildToCreateKerberosConfig(t *testing.T) {
+	t.Parallel()
 	expectedErr := errors.New("configuration file could not be opened: krb5.conf open krb5.conf: no such file or directory")
 	clientConfig := NewTestConfig()
 	clientConfig.Net.SASL.Mechanism = SASLTypeGSSAPI
@@ -76,6 +77,7 @@ func TestFaildToCreateKerberosConfig(t *testing.T) {
 }
 
 func TestCreateWithPassword(t *testing.T) {
+	t.Parallel()
 	kerberosConfig, err := krbcfg.NewFromString(krb5cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -106,6 +108,7 @@ func TestCreateWithPassword(t *testing.T) {
 }
 
 func TestCreateWithKeyTab(t *testing.T) {
+	t.Parallel()
 	kerberosConfig, err := krbcfg.NewFromString(krb5cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -128,6 +131,7 @@ func TestCreateWithKeyTab(t *testing.T) {
 }
 
 func TestCreateWithDisablePAFXFAST(t *testing.T) {
+	t.Parallel()
 	kerberosConfig, err := krbcfg.NewFromString(krb5cfg)
 	if err != nil {
 		t.Fatal(err)

@@ -23,6 +23,7 @@ var (
 )
 
 func TestEmptyOffsetFetchResponse(t *testing.T) {
+	t.Parallel()
 	for version := 0; version <= 1; version++ {
 		response := OffsetFetchResponse{Version: int16(version)}
 		testResponse(t, fmt.Sprintf("empty v%d", version), &response, emptyOffsetFetchResponse)
@@ -41,6 +42,7 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 	// The response encoded form cannot be checked for it varies due to
 	// unpredictable map traversal order.
 	// Hence the 'nil' as byte[] parameter in the 'testResponse(..)' calls
+	t.Parallel()
 
 	for version := 0; version <= 1; version++ {
 		response := OffsetFetchResponse{Version: int16(version)}

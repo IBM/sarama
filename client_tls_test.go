@@ -13,6 +13,7 @@ import (
 )
 
 func TestTLS(t *testing.T) {
+	t.Parallel()
 	cakey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -173,7 +174,11 @@ func TestTLS(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) { doListenerTLSTest(t, tc.Succeed, tc.Server, tc.Client) })
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			doListenerTLSTest(t, tc.Succeed, tc.Server, tc.Client)
+		})
 	}
 }
 
@@ -216,6 +221,7 @@ func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientCon
 }
 
 func TestSetServerName(t *testing.T) {
+	t.Parallel()
 	if validServerNameTLS("kafka-server.domain.com:9093", nil).ServerName != "kafka-server.domain.com" {
 		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config is nil")
 	}

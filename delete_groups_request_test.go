@@ -18,6 +18,7 @@ var (
 )
 
 func TestDeleteGroupsRequest(t *testing.T) {
+	t.Parallel()
 	var request *DeleteGroupsRequest
 
 	request = new(DeleteGroupsRequest)

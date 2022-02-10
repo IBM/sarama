@@ -10,6 +10,7 @@ var (
 )
 
 func TestDeleteOffsetsRequest(t *testing.T) {
+	t.Parallel()
 	var request *DeleteOffsetsRequest
 
 	request = new(DeleteOffsetsRequest)

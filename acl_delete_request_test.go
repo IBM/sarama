@@ -63,6 +63,7 @@ var (
 )
 
 func TestDeleteAclsRequest(t *testing.T) {
+	t.Parallel()
 	req := &DeleteAclsRequest{
 		Filters: []*AclFilter{{
 			ResourceType:   AclResourceAny,
@@ -91,6 +92,7 @@ func TestDeleteAclsRequest(t *testing.T) {
 }
 
 func TestDeleteAclsRequestV1(t *testing.T) {
+	t.Parallel()
 	req := &DeleteAclsRequest{
 		Version: 1,
 		Filters: []*AclFilter{{

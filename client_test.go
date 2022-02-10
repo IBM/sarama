@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -17,6 +16,7 @@ func safeClose(t testing.TB, c io.Closer) {
 }
 
 func TestSimpleClient(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	seedBroker.Returns(new(MetadataResponse))
@@ -31,6 +31,7 @@ func TestSimpleClient(t *testing.T) {
 }
 
 func TestCachedPartitions(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	replicas := []int32{3, 1, 5}
@@ -70,6 +71,7 @@ func TestCachedPartitions(t *testing.T) {
 }
 
 func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	replicas := []int32{seedBroker.BrokerID()}
@@ -124,6 +126,7 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 }
 
 func TestClientSeedBrokers(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	metadataResponse := new(MetadataResponse)
@@ -140,6 +143,7 @@ func TestClientSeedBrokers(t *testing.T) {
 }
 
 func TestClientMetadata(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 5)
 
@@ -215,6 +219,7 @@ func TestClientMetadata(t *testing.T) {
 }
 
 func TestClientMetadataWithOfflineReplicas(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 5)
 
@@ -303,6 +308,7 @@ func TestClientMetadataWithOfflineReplicas(t *testing.T) {
 }
 
 func TestClientGetOffset(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 	leaderAddr := leader.Addr()
@@ -351,6 +357,7 @@ func TestClientGetOffset(t *testing.T) {
 }
 
 func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	metadataResponse1 := new(MetadataResponse)
@@ -388,6 +395,7 @@ func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
 }
 
 func TestClientReceivingUnknownTopic(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	metadataResponse1 := new(MetadataResponse)
@@ -424,6 +432,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 }
 
 func TestClientReceivingPartialMetadata(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 5)
 
@@ -479,6 +488,7 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 }
 
 func TestClientRefreshBehaviour(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 5)
 
@@ -516,6 +526,7 @@ func TestClientRefreshBehaviour(t *testing.T) {
 }
 
 func TestClientRefreshBrokers(t *testing.T) {
+	t.Parallel()
 	initialSeed := NewMockBroker(t, 0)
 	leader := NewMockBroker(t, 5)
 
@@ -547,6 +558,7 @@ func TestClientRefreshBrokers(t *testing.T) {
 }
 
 func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 5)
 
@@ -577,6 +589,7 @@ func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 }
 
 func TestClientGetBroker(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 5)
 
@@ -613,6 +626,7 @@ func TestClientGetBroker(t *testing.T) {
 }
 
 func TestClientResurrectDeadSeeds(t *testing.T) {
+	t.Parallel()
 	initialSeed := NewMockBroker(t, 0)
 	emptyMetadata := new(MetadataResponse)
 	initialSeed.Returns(emptyMetadata)
@@ -671,6 +685,7 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 	safeClose(t, c)
 }
 
+//nolint:paralleltest
 func TestClientController(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -718,13 +733,33 @@ func TestClientController(t *testing.T) {
 }
 
 func TestClientMetadataTimeout(t *testing.T) {
-	for _, timeout := range []time.Duration{
-		250 * time.Millisecond, // Will cut the first retry pass
-		500 * time.Millisecond, // Will cut the second retry pass
-		750 * time.Millisecond, // Will cut the third retry pass
-		900 * time.Millisecond, // Will stop after the three retries
-	} {
-		t.Run(fmt.Sprintf("timeout=%v", timeout), func(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		timeout time.Duration
+	}{
+		{
+			"timeout=250ms",
+			250 * time.Millisecond, // Will cut the first retry pass
+		},
+		{
+			"timeout=500ms",
+			500 * time.Millisecond, // Will cut the second retry pass
+		},
+		{
+			"timeout=750ms",
+			750 * time.Millisecond, // Will cut the third retry pass
+		},
+		{
+			"timeout=900ms",
+			900 * time.Millisecond, // Will stop after the three retries
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			// Use a responsive broker to create a working client
 			initialSeed := NewMockBroker(t, 0)
 			emptyMetadata := new(MetadataResponse)
@@ -737,7 +772,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 			conf.Metadata.Retry.Backoff = 0
 			conf.Metadata.RefreshFrequency = 0
 			// But configure a "global" timeout
-			conf.Metadata.Timeout = timeout
+			conf.Metadata.Timeout = tc.timeout
 			c, err := NewClient([]string{initialSeed.Addr()}, conf)
 			if err != nil {
 				t.Fatal(err)
@@ -766,7 +801,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 
 			// Check that the refresh fails fast enough (less than twice the configured timeout)
 			// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
-			maxRefreshDuration := 2 * timeout
+			maxRefreshDuration := 2 * tc.timeout
 			select {
 			case err := <-errChan:
 				if err == nil {
@@ -785,6 +820,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 }
 
 func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	staleCoordinator := NewMockBroker(t, 2)
 	freshCoordinator := NewMockBroker(t, 3)
@@ -864,6 +900,7 @@ func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 }
 
 func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	coordinator := NewMockBroker(t, 2)
 
@@ -917,6 +954,7 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 }
 
 func TestClientAutorefreshShutdownRace(t *testing.T) {
+	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 
 	metadataResponse := new(MetadataResponse)

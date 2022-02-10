@@ -52,6 +52,7 @@ type brokerMetrics struct {
 }
 
 func TestBrokerAccessors(t *testing.T) {
+	t.Parallel()
 	broker := NewBroker("abc:123")
 
 	if broker.ID() != -1 {
@@ -111,8 +112,11 @@ func (p produceResponsePromise) Get() (*ProduceResponse, error) {
 }
 
 func TestSimpleBrokerCommunication(t *testing.T) {
+	t.Parallel()
 	for _, tt := range brokerTestTable {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			Logger.Printf("Testing broker communication for %s", tt.name)
 			mb := NewMockBroker(t, 0)
 			mb.Returns(&mockEncoder{tt.response})
@@ -151,8 +155,11 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 }
 
 func TestBrokerFailedRequest(t *testing.T) {
+	t.Parallel()
 	for _, tt := range brokerFailedReqTestTable {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			t.Logf("Testing broker communication for %s", tt.name)
 			mb := NewMockBroker(t, 0)
 			if !tt.stopBroker {
@@ -210,6 +217,7 @@ func newTokenProvider(token *AccessToken, err error) *TokenProvider {
 }
 
 func TestSASLOAuthBearer(t *testing.T) {
+	t.Parallel()
 	testTable := []struct {
 		name                      string
 		authidentity              string
@@ -280,7 +288,9 @@ func TestSASLOAuthBearer(t *testing.T) {
 	}
 
 	for i, test := range testTable {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
 
@@ -363,6 +373,7 @@ func (m *MockSCRAMClient) Done() bool {
 var _ SCRAMClient = &MockSCRAMClient{}
 
 func TestSASLSCRAMSHAXXX(t *testing.T) {
+	t.Parallel()
 	testTable := []struct {
 		name               string
 		mockHandshakeErr   KError
@@ -402,7 +413,9 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 	}
 
 	for i, test := range testTable {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
 			broker := NewBroker(mockBroker.Addr())
@@ -473,6 +486,7 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 }
 
 func TestSASLPlainAuth(t *testing.T) {
+	t.Parallel()
 	testTable := []struct {
 		name             string
 		authidentity     string
@@ -504,7 +518,9 @@ func TestSASLPlainAuth(t *testing.T) {
 	}
 
 	for i, test := range testTable {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
 
@@ -601,6 +617,7 @@ func TestSASLPlainAuth(t *testing.T) {
 // TestSASLReadTimeout ensures that the broker connection won't block forever
 // if the remote end never responds after the handshake
 func TestSASLReadTimeout(t *testing.T) {
+	t.Parallel()
 	mockBroker := NewMockBroker(t, 0)
 	defer mockBroker.Close()
 
@@ -649,6 +666,7 @@ func TestSASLReadTimeout(t *testing.T) {
 }
 
 func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
+	t.Parallel()
 	testTable := []struct {
 		name               string
 		error              error
@@ -697,7 +715,9 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 		},
 	}
 	for i, test := range testTable {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			mockBroker := NewMockBroker(t, 0)
 			// broker executes SASL requests against mockBroker
 
@@ -769,6 +789,7 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 }
 
 func TestBuildClientFirstMessage(t *testing.T) {
+	t.Parallel()
 	testTable := []struct {
 		name        string
 		token       *AccessToken
@@ -805,7 +826,9 @@ func TestBuildClientFirstMessage(t *testing.T) {
 	}
 
 	for i, test := range testTable {
+		test := test
 		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			actual, err := buildClientFirstMessage(test.token)
 
 			if !reflect.DeepEqual(test.expected, actual) {

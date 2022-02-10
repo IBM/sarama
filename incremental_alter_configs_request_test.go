@@ -44,6 +44,7 @@ var (
 )
 
 func TestIncrementalAlterConfigsRequest(t *testing.T) {
+	t.Parallel()
 	var request *IncrementalAlterConfigsRequest
 
 	request = &IncrementalAlterConfigsRequest{

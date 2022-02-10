@@ -16,6 +16,7 @@ var testMsg = StringEncoder("Foo")
 // If a particular offset is provided then messages are consumed starting from
 // that offset.
 func TestConsumerOffsetManual(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 
@@ -78,6 +79,7 @@ func TestConsumerOffsetManual(t *testing.T) {
 }
 
 func TestPauseResumeConsumption(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 
@@ -162,6 +164,7 @@ func TestPauseResumeConsumption(t *testing.T) {
 // message indeed corresponds to the offset that broker claims to be the
 // newest in its metadata response.
 func TestConsumerOffsetNewest(t *testing.T) {
+	t.Parallel()
 	// Given
 	offsetNewest := int64(10)
 	offsetNewestAfterFetchRequest := int64(50)
@@ -208,6 +211,7 @@ func TestConsumerOffsetNewest(t *testing.T) {
 // If `OffsetOldest` is passed as the initial offset then the first consumed
 // message is indeed the first available in the partition.
 func TestConsumerOffsetOldest(t *testing.T) {
+	t.Parallel()
 	// Given
 	offsetNewest := int64(10)
 	broker0 := NewMockBroker(t, 0)
@@ -255,6 +259,7 @@ func TestConsumerOffsetOldest(t *testing.T) {
 
 // It is possible to close a partition consumer and create the same anew.
 func TestConsumerRecreate(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -296,6 +301,7 @@ func TestConsumerRecreate(t *testing.T) {
 
 // An attempt to consume the same partition twice should fail.
 func TestConsumerDuplicate(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -407,6 +413,7 @@ func runConsumerLeaderRefreshErrorTestWithConfig(t *testing.T, config *Config) {
 // If consumer fails to refresh metadata it keeps retrying with frequency
 // specified by `Config.Consumer.Retry.Backoff`.
 func TestConsumerLeaderRefreshError(t *testing.T) {
+	t.Parallel()
 	config := NewTestConfig()
 	config.Net.ReadTimeout = 100 * time.Millisecond
 	config.Consumer.Retry.Backoff = 200 * time.Millisecond
@@ -417,6 +424,7 @@ func TestConsumerLeaderRefreshError(t *testing.T) {
 }
 
 func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
+	t.Parallel()
 	var calls int32 = 0
 
 	config := NewTestConfig()
@@ -437,6 +445,7 @@ func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
 }
 
 func TestConsumerInvalidTopic(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 100)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -464,6 +473,7 @@ func TestConsumerInvalidTopic(t *testing.T) {
 // Nothing bad happens if a partition consumer that has no leader assigned at
 // the moment is closed.
 func TestConsumerClosePartitionWithoutLeader(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 100)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -518,6 +528,7 @@ func TestConsumerClosePartitionWithoutLeader(t *testing.T) {
 // actual offset range for the partition, then the partition consumer stops
 // immediately closing its output channels.
 func TestConsumerShutsDownOutOfRange(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 	fetchResponse := new(FetchResponse)
@@ -556,6 +567,7 @@ func TestConsumerShutsDownOutOfRange(t *testing.T) {
 // If a fetch response contains messages with offsets that are smaller then
 // requested, then such messages are ignored.
 func TestConsumerExtraOffsets(t *testing.T) {
+	t.Parallel()
 	// Given
 	legacyFetchResponse := &FetchResponse{}
 	legacyFetchResponse.AddMessage("my_topic", 0, nil, testMsg, 1)
@@ -630,6 +642,7 @@ func TestConsumerExtraOffsets(t *testing.T) {
 // messages older then requested, even though there would be
 // more messages if higher offset was requested.
 func TestConsumerReceivingFetchResponseWithTooOldRecords(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 4}
 	fetchResponse1.AddRecord("my_topic", 0, nil, testMsg, 1)
@@ -678,6 +691,7 @@ func TestConsumerReceivingFetchResponseWithTooOldRecords(t *testing.T) {
 }
 
 func TestConsumeMessageWithNewerFetchAPIVersion(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 4}
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
@@ -721,6 +735,7 @@ func TestConsumeMessageWithNewerFetchAPIVersion(t *testing.T) {
 }
 
 func TestConsumeMessageWithSessionIDs(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 7}
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
@@ -770,6 +785,7 @@ func TestConsumeMessageWithSessionIDs(t *testing.T) {
 }
 
 func TestConsumeMessagesFromReadReplica(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 11}
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
@@ -848,6 +864,7 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 }
 
 func TestConsumeMessagesFromReadReplicaLeaderFallback(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 11}
 	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
@@ -900,6 +917,7 @@ func TestConsumeMessagesFromReadReplicaLeaderFallback(t *testing.T) {
 }
 
 func TestConsumeMessagesFromReadReplicaErrorReplicaNotAvailable(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 11}
 	block1 := fetchResponse1.getOrCreateBlock("my_topic", 0)
@@ -972,6 +990,7 @@ func TestConsumeMessagesFromReadReplicaErrorReplicaNotAvailable(t *testing.T) {
 }
 
 func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
+	t.Parallel()
 	// Given
 	fetchResponse1 := &FetchResponse{Version: 11}
 	block1 := fetchResponse1.getOrCreateBlock("my_topic", 0)
@@ -1050,6 +1069,7 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 //
 // See https://github.com/Shopify/sarama/issues/1927
 func TestConsumeMessagesTrackLeader(t *testing.T) {
+	t.Parallel()
 	cfg := NewConfig()
 	cfg.ClientID = t.Name()
 	cfg.Metadata.RefreshFrequency = time.Millisecond * 50
@@ -1161,6 +1181,7 @@ func TestConsumeMessagesTrackLeader(t *testing.T) {
 // It is fine if offsets of fetched messages are not sequential (although
 // strictly increasing!).
 func TestConsumerNonSequentialOffsets(t *testing.T) {
+	t.Parallel()
 	// Given
 	legacyFetchResponse := &FetchResponse{}
 	legacyFetchResponse.AddMessage("my_topic", 0, nil, testMsg, 5)
@@ -1220,6 +1241,7 @@ func TestConsumerNonSequentialOffsets(t *testing.T) {
 // If leadership for a partition is changing then consumer resolves the new
 // leader and switches to it.
 func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
+	t.Parallel()
 	// initial setup
 	seedBroker := NewMockBroker(t, 10)
 	leader0 := NewMockBroker(t, 0)
@@ -1418,6 +1440,7 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 // consumer channel buffer is full then that does not affect the ability to
 // read messages by the other consumer.
 func TestConsumerInterleavedClose(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -1466,6 +1489,7 @@ func TestConsumerInterleavedClose(t *testing.T) {
 }
 
 func TestConsumerBounceWithReferenceOpen(t *testing.T) {
+	t.Parallel()
 	broker0 := NewMockBroker(t, 0)
 	broker0Addr := broker0.Addr()
 	broker1 := NewMockBroker(t, 1)
@@ -1564,6 +1588,7 @@ func TestConsumerBounceWithReferenceOpen(t *testing.T) {
 }
 
 func TestConsumerOffsetOutOfRange(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 2)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -1596,6 +1621,7 @@ func TestConsumerOffsetOutOfRange(t *testing.T) {
 }
 
 func TestConsumerExpiryTicker(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 	fetchResponse1 := &FetchResponse{}
@@ -1638,6 +1664,7 @@ func TestConsumerExpiryTicker(t *testing.T) {
 }
 
 func TestConsumerTimestamps(t *testing.T) {
+	t.Parallel()
 	now := time.Now().Truncate(time.Millisecond)
 	type testMessage struct {
 		key       Encoder
@@ -1755,6 +1782,7 @@ func TestConsumerTimestamps(t *testing.T) {
 
 // When set to ReadCommitted, no uncommitted message should be available in messages channel
 func TestExcludeUncommitted(t *testing.T) {
+	t.Parallel()
 	// Given
 	broker0 := NewMockBroker(t, 0)
 
@@ -1868,6 +1896,7 @@ ConsumerLoop:
 }
 
 func Test_partitionConsumer_parseResponse(t *testing.T) {
+	t.Parallel()
 	type args struct {
 		response *FetchResponse
 	}
@@ -1894,7 +1923,9 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			child := &partitionConsumer{
 				broker: &brokerConsumer{
 					broker: &Broker{},
@@ -1914,6 +1945,7 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 }
 
 func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
+	t.Parallel()
 	lrbOffset := int64(5)
 	block := &FetchResponseBlock{
 		HighWaterMarkOffset:    10,
@@ -1996,6 +2028,7 @@ func testConsumerInterceptor(
 }
 
 func TestConsumerInterceptors(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name          string
 		interceptors  []ConsumerInterceptor
@@ -2051,6 +2084,10 @@ func TestConsumerInterceptors(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) { testConsumerInterceptor(t, tt.interceptors, tt.expectationFn) })
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			testConsumerInterceptor(t, tt.interceptors, tt.expectationFn)
+		})
 	}
 }

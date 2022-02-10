@@ -10,6 +10,7 @@ var endTxnRequest = []byte{
 }
 
 func TestEndTxnRequest(t *testing.T) {
+	t.Parallel()
 	req := &EndTxnRequest{
 		TransactionalID:   "txn",
 		ProducerID:        8000,

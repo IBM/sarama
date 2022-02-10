@@ -27,6 +27,7 @@ func assertPartitioningConsistent(t *testing.T, partitioner Partitioner, message
 }
 
 func TestRandomPartitioner(t *testing.T) {
+	t.Parallel()
 	partitioner := NewRandomPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(nil, 1)
@@ -49,6 +50,7 @@ func TestRandomPartitioner(t *testing.T) {
 }
 
 func TestRoundRobinPartitioner(t *testing.T) {
+	t.Parallel()
 	partitioner := NewRoundRobinPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(nil, 1)
@@ -72,6 +74,7 @@ func TestRoundRobinPartitioner(t *testing.T) {
 }
 
 func TestNewHashPartitionerWithHasher(t *testing.T) {
+	t.Parallel()
 	// use the current default hasher fnv.New32a()
 	partitioner := NewCustomHashPartitioner(fnv.New32a)("mytopic")
 
@@ -103,6 +106,7 @@ func TestNewHashPartitionerWithHasher(t *testing.T) {
 }
 
 func TestHashPartitionerWithHasherMinInt32(t *testing.T) {
+	t.Parallel()
 	// use the current default hasher fnv.New32a()
 	partitioner := NewCustomHashPartitioner(fnv.New32a)("mytopic")
 
@@ -121,6 +125,7 @@ func TestHashPartitionerWithHasherMinInt32(t *testing.T) {
 }
 
 func TestHashPartitioner(t *testing.T) {
+	t.Parallel()
 	partitioner := NewHashPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
@@ -151,6 +156,7 @@ func TestHashPartitioner(t *testing.T) {
 }
 
 func TestHashPartitionerConsistency(t *testing.T) {
+	t.Parallel()
 	partitioner := NewHashPartitioner("mytopic")
 	ep, ok := partitioner.(DynamicConsistencyPartitioner)
 
@@ -169,6 +175,7 @@ func TestHashPartitionerConsistency(t *testing.T) {
 }
 
 func TestHashPartitionerMinInt32(t *testing.T) {
+	t.Parallel()
 	partitioner := NewHashPartitioner("mytopic")
 
 	msg := ProducerMessage{}
@@ -186,6 +193,7 @@ func TestHashPartitionerMinInt32(t *testing.T) {
 }
 
 func TestManualPartitioner(t *testing.T) {
+	t.Parallel()
 	partitioner := NewManualPartitioner("mytopic")
 
 	choice, err := partitioner.Partition(&ProducerMessage{}, 1)
@@ -208,6 +216,7 @@ func TestManualPartitioner(t *testing.T) {
 }
 
 func TestWithCustomFallbackPartitioner(t *testing.T) {
+	t.Parallel()
 	topic := "mytopic"
 
 	partitioner := NewCustomPartitioner(

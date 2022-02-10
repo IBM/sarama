@@ -15,6 +15,7 @@ var (
 )
 
 func TestResponseHeaderV0(t *testing.T) {
+	t.Parallel()
 	header := responseHeader{}
 
 	testVersionDecodable(t, "response header", &header, responseHeaderBytesV0, 0)
@@ -27,6 +28,7 @@ func TestResponseHeaderV0(t *testing.T) {
 }
 
 func TestResponseHeaderV1(t *testing.T) {
+	t.Parallel()
 	header := responseHeader{}
 
 	testVersionDecodable(t, "response header", &header, responseHeaderBytesV1, 1)

@@ -11,6 +11,7 @@ var addOffsetsToTxnResponse = []byte{
 }
 
 func TestAddOffsetsToTxnResponse(t *testing.T) {
+	t.Parallel()
 	resp := &AddOffsetsToTxnResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Err:          ErrInvalidProducerEpoch,
