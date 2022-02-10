@@ -2,6 +2,8 @@ module github.com/Shopify/sarama
 
 go 1.16
 
+retract [v1.31.0, v1.31.2] // https://github.com/Shopify/sarama/issues/2129
+
 require (
 	github.com/Shopify/toxiproxy/v2 v2.3.0
 	github.com/davecgh/go-spew v1.1.1
