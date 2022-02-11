@@ -38,6 +38,7 @@ func closeProducer(t *testing.T, p AsyncProducer) {
 }
 
 func expectResults(t *testing.T, p AsyncProducer, successes, errors int) {
+	t.Helper()
 	expect := successes + errors
 	for expect > 0 {
 		select {
