@@ -646,6 +646,7 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 
 // https://github.com/Shopify/sarama/issues/2129
 func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
+	t.Parallel()
 	//Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
