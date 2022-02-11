@@ -936,6 +936,12 @@ func (bc *brokerConsumer) subscriptionConsumer() {
 			return
 		}
 
+		// if there isn't response, it means that not fetch was made
+		// so we don't need to handle any response
+		if response == nil {
+			continue
+		}
+
 		bc.acks.Add(len(bc.subscriptions))
 		for child := range bc.subscriptions {
 			child.feeder <- response
@@ -1036,6 +1042,8 @@ func (bc *brokerConsumer) abort(err error) {
 	}
 }
 
+// fetchResponse can be nil if no fetch is made, it can occur when
+// all partitions are paused
 func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
 		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
@@ -1075,6 +1083,11 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		if !child.IsPaused() {
 			request.AddBlock(child.topic, child.partition, child.offset, child.fetchSize)
 		}
+	}
+
+	// avoid to fetch when there is no block
+	if len(request.blocks) == 0 {
+		return nil, nil
 	}
 
 	return bc.broker.Fetch(request)
