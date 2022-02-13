@@ -389,6 +389,8 @@ type ProduceCallback func(*ProduceResponse, error)
 // When configured with RequiredAcks == NoResponse, the callback will not be invoked.
 // If an error is returned because the request could not be sent then the callback
 // will not be invoked either.
+//
+// Make sure not to Close the broker in the callback as it will lead to a deadlock.
 func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error {
 	needAcks := request.RequiredAcks != NoResponse
 	// Use a nil promise when no acks is required
