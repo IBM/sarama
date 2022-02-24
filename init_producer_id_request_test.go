@@ -18,7 +18,6 @@ var (
 )
 
 func TestInitProducerIDRequest(t *testing.T) {
-	t.Parallel()
 	req := &InitProducerIDRequest{
 		TransactionTimeout: 100 * time.Millisecond,
 	}

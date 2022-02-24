@@ -100,7 +100,6 @@ func (f flakyEncoder) Encode() ([]byte, error) {
 }
 
 func TestAsyncProducer(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -150,7 +149,6 @@ done:
 }
 
 func TestAsyncProducerMultipleFlushes(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -186,7 +184,6 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 }
 
 func TestAsyncProducerMultipleBrokers(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader0 := NewMockBroker(t, 2)
 	leader1 := NewMockBroker(t, 3)
@@ -227,7 +224,6 @@ func TestAsyncProducerMultipleBrokers(t *testing.T) {
 }
 
 func TestAsyncProducerCustomPartitioner(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -270,7 +266,6 @@ func TestAsyncProducerCustomPartitioner(t *testing.T) {
 }
 
 func TestAsyncProducerFailureRetry(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -319,7 +314,6 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 }
 
 func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
-	t.Parallel()
 	tt := func(t *testing.T, kErr KError) {
 		seedBroker := NewMockBroker(t, 0)
 		broker1 := NewMockBroker(t, 1)
@@ -397,18 +391,15 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 	}
 
 	t.Run("retriable error", func(t *testing.T) {
-		t.Parallel()
 		tt(t, ErrNotLeaderForPartition)
 	})
 
 	t.Run("non-retriable error", func(t *testing.T) {
-		t.Parallel()
 		tt(t, ErrNotController)
 	})
 }
 
 func TestAsyncProducerEncoderFailures(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -447,7 +438,6 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 // If a Kafka broker becomes unavailable and then returns back in service, then
 // producer reconnects to it and continues sending messages.
 func TestAsyncProducerBrokerBounce(t *testing.T) {
-	t.Parallel()
 	// Given
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
@@ -489,7 +479,6 @@ func TestAsyncProducerBrokerBounce(t *testing.T) {
 }
 
 func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -533,7 +522,6 @@ func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 }
 
 func TestAsyncProducerMultipleRetries(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -590,7 +578,6 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 }
 
 func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -659,7 +646,6 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 
 // https://github.com/Shopify/sarama/issues/2129
 func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
-	t.Parallel()
 	//Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
@@ -708,7 +694,6 @@ func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 }
 
 func TestAsyncProducerOutOfRetries(t *testing.T) {
-	t.Parallel()
 	t.Skip("Enable once bug #294 is fixed.")
 
 	seedBroker := NewMockBroker(t, 1)
@@ -766,7 +751,6 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 }
 
 func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 	leaderAddr := leader.Addr()
@@ -824,7 +808,6 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 }
 
 func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -891,7 +874,6 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 }
 
 func TestAsyncProducerRetryShutdown(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -941,7 +923,6 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 }
 
 func TestAsyncProducerNoReturns(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -982,7 +963,6 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
-	t.Parallel()
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
@@ -1031,7 +1011,6 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
-	t.Parallel()
 	// Logger = log.New(os.Stderr, "", log.LstdFlags)
 	tests := []struct {
 		name           string
@@ -1179,7 +1158,6 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
-	t.Parallel()
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
@@ -1229,7 +1207,6 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
-	t.Parallel()
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -1397,7 +1374,6 @@ func testProducerInterceptor(
 }
 
 func TestAsyncProducerInterceptors(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name          string
 		interceptors  []ProducerInterceptor
@@ -1451,7 +1427,6 @@ func TestAsyncProducerInterceptors(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			testProducerInterceptor(t, tt.interceptors, tt.expectationFn)
 		})
 	}

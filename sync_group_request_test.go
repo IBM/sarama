@@ -21,7 +21,6 @@ var (
 )
 
 func TestSyncGroupRequest(t *testing.T) {
-	t.Parallel()
 	var request *SyncGroupRequest
 
 	request = new(SyncGroupRequest)

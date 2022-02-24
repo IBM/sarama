@@ -9,7 +9,6 @@ import (
 )
 
 func TestDefaultConfigValidates(t *testing.T) {
-	t.Parallel()
 	config := NewTestConfig()
 	if err := config.Validate(); err != nil {
 		t.Error(err)
@@ -20,7 +19,6 @@ func TestDefaultConfigValidates(t *testing.T) {
 }
 
 func TestInvalidClientIDConfigValidates(t *testing.T) {
-	t.Parallel()
 	config := NewTestConfig()
 	config.ClientID = "foo:bar"
 	err := config.Validate()
@@ -31,7 +29,6 @@ func TestInvalidClientIDConfigValidates(t *testing.T) {
 }
 
 func TestEmptyClientIDConfigValidates(t *testing.T) {
-	t.Parallel()
 	config := NewTestConfig()
 	config.ClientID = ""
 	err := config.Validate()
@@ -48,7 +45,6 @@ func (t *DummyTokenProvider) Token() (*AccessToken, error) {
 }
 
 func TestNetConfigValidates(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		cfg  func(*Config) // resorting to using a function as a param because of internal composite structs
@@ -246,7 +242,6 @@ func TestNetConfigValidates(t *testing.T) {
 }
 
 func TestMetadataConfigValidates(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		cfg  func(*Config) // resorting to using a function as a param because of internal composite structs
@@ -287,7 +282,6 @@ func TestMetadataConfigValidates(t *testing.T) {
 }
 
 func TestAdminConfigValidates(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		cfg  func(*Config) // resorting to using a function as a param because of internal composite structs
@@ -314,7 +308,6 @@ func TestAdminConfigValidates(t *testing.T) {
 }
 
 func TestProducerConfigValidates(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		cfg  func(*Config) // resorting to using a function as a param because of internal composite structs
@@ -446,7 +439,6 @@ func TestProducerConfigValidates(t *testing.T) {
 }
 
 func TestConsumerConfigValidates(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		name string
 		cfg  func(*Config)
@@ -482,7 +474,6 @@ func TestConsumerConfigValidates(t *testing.T) {
 }
 
 func TestLZ4ConfigValidation(t *testing.T) {
-	t.Parallel()
 	config := NewTestConfig()
 	config.Producer.Compression = CompressionLZ4
 	err := config.Validate()
@@ -497,7 +488,6 @@ func TestLZ4ConfigValidation(t *testing.T) {
 }
 
 func TestZstdConfigValidation(t *testing.T) {
-	t.Parallel()
 	config := NewTestConfig()
 	config.Producer.Compression = CompressionZSTD
 	err := config.Validate()

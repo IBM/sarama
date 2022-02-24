@@ -18,7 +18,6 @@ var (
 )
 
 func TestDescribeGroupsRequest(t *testing.T) {
-	t.Parallel()
 	var request *DescribeGroupsRequest
 
 	request = new(DescribeGroupsRequest)

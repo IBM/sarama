@@ -19,7 +19,6 @@ var (
 )
 
 func TestSyncGroupResponse(t *testing.T) {
-	t.Parallel()
 	var response *SyncGroupResponse
 
 	response = new(SyncGroupResponse)

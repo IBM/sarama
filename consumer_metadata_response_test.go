@@ -22,7 +22,6 @@ var (
 )
 
 func TestConsumerMetadataResponseError(t *testing.T) {
-	t.Parallel()
 	response := &ConsumerMetadataResponse{Err: ErrOffsetsLoadInProgress}
 	testEncodable(t, "", response, consumerMetadataResponseError)
 
@@ -37,7 +36,6 @@ func TestConsumerMetadataResponseError(t *testing.T) {
 }
 
 func TestConsumerMetadataResponseSuccess(t *testing.T) {
-	t.Parallel()
 	broker := NewBroker("foo:52445")
 	broker.id = 0xAB
 	response := ConsumerMetadataResponse{

@@ -51,15 +51,12 @@ var (
 )
 
 func TestFetchRequest(t *testing.T) {
-	t.Parallel()
 	t.Run("no blocks", func(t *testing.T) {
-		t.Parallel()
 		request := new(FetchRequest)
 		testRequest(t, "no blocks", request, fetchRequestNoBlocks)
 	})
 
 	t.Run("with properties", func(t *testing.T) {
-		t.Parallel()
 		request := new(FetchRequest)
 		request.MaxWaitTime = 0x20
 		request.MinBytes = 0xEF
@@ -67,7 +64,6 @@ func TestFetchRequest(t *testing.T) {
 	})
 
 	t.Run("one block", func(t *testing.T) {
-		t.Parallel()
 		request := new(FetchRequest)
 		request.MaxWaitTime = 0
 		request.MinBytes = 0
@@ -76,7 +72,6 @@ func TestFetchRequest(t *testing.T) {
 	})
 
 	t.Run("one block v4", func(t *testing.T) {
-		t.Parallel()
 		request := new(FetchRequest)
 		request.Version = 4
 		request.MaxBytes = 0xFF
@@ -86,7 +81,6 @@ func TestFetchRequest(t *testing.T) {
 	})
 
 	t.Run("one block v11 rackid", func(t *testing.T) {
-		t.Parallel()
 		request := new(FetchRequest)
 		request.Version = 11
 		request.MaxBytes = 0xFF

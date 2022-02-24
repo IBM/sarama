@@ -21,7 +21,6 @@ var (
 )
 
 func TestIncrementalAlterConfigsResponse(t *testing.T) {
-	t.Parallel()
 	var response *IncrementalAlterConfigsResponse
 
 	response = &IncrementalAlterConfigsResponse{

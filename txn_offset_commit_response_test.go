@@ -15,7 +15,6 @@ var txnOffsetCommitResponse = []byte{
 }
 
 func TestTxnOffsetCommitResponse(t *testing.T) {
-	t.Parallel()
 	resp := &TxnOffsetCommitResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Topics: map[string][]*PartitionError{

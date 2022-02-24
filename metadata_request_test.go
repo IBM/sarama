@@ -63,7 +63,6 @@ var (
 )
 
 func TestMetadataRequestV0(t *testing.T) {
-	t.Parallel()
 	request := new(MetadataRequest)
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV0)
 
@@ -75,7 +74,6 @@ func TestMetadataRequestV0(t *testing.T) {
 }
 
 func TestMetadataRequestV1(t *testing.T) {
-	t.Parallel()
 	request := new(MetadataRequest)
 	request.Version = 1
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV1)
@@ -88,7 +86,6 @@ func TestMetadataRequestV1(t *testing.T) {
 }
 
 func TestMetadataRequestV2(t *testing.T) {
-	t.Parallel()
 	request := new(MetadataRequest)
 	request.Version = 2
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV2)
@@ -101,7 +98,6 @@ func TestMetadataRequestV2(t *testing.T) {
 }
 
 func TestMetadataRequestV3(t *testing.T) {
-	t.Parallel()
 	request := new(MetadataRequest)
 	request.Version = 3
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV3)
@@ -114,7 +110,6 @@ func TestMetadataRequestV3(t *testing.T) {
 }
 
 func TestMetadataRequestV4(t *testing.T) {
-	t.Parallel()
 	request := new(MetadataRequest)
 	request.Version = 4
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV4)
@@ -129,7 +124,6 @@ func TestMetadataRequestV4(t *testing.T) {
 }
 
 func TestMetadataRequestV5(t *testing.T) {
-	t.Parallel()
 	request := new(MetadataRequest)
 	request.Version = 5
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV5)

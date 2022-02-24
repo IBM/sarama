@@ -15,7 +15,6 @@ var (
 )
 
 func TestFindCoordinatorRequest(t *testing.T) {
-	t.Parallel()
 	req := &FindCoordinatorRequest{
 		Version:         1,
 		CoordinatorKey:  "group",

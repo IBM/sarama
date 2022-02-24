@@ -10,7 +10,6 @@ var addOffsetsToTxnRequest = []byte{
 }
 
 func TestAddOffsetsToTxnRequest(t *testing.T) {
-	t.Parallel()
 	req := &AddOffsetsToTxnRequest{
 		TransactionalID: "txn",
 		ProducerID:      8000,

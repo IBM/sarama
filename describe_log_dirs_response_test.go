@@ -32,7 +32,6 @@ var (
 )
 
 func TestDescribeLogDirsResponse(t *testing.T) {
-	t.Parallel()
 	// Test empty response
 	response := &DescribeLogDirsResponse{
 		LogDirs: []DescribeLogDirsResponseDirMetadata{},

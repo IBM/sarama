@@ -31,7 +31,6 @@ var (
 )
 
 func TestAlterUserScramCredentialsRequest(t *testing.T) {
-	t.Parallel()
 	request := &AlterUserScramCredentialsRequest{
 		Version:    0,
 		Deletions:  []AlterUserScramCredentialsDelete{},

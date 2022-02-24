@@ -9,7 +9,6 @@ var basicHeartbeatRequest = []byte{
 }
 
 func TestHeartbeatRequest(t *testing.T) {
-	t.Parallel()
 	request := new(HeartbeatRequest)
 	request.GroupId = "foo"
 	request.GenerationId = 66051

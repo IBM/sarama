@@ -17,7 +17,6 @@ var listPartitionReassignmentsResponse = []byte{
 }
 
 func TestListPartitionReassignmentResponse(t *testing.T) {
-	t.Parallel()
 	var response *ListPartitionReassignmentsResponse = &ListPartitionReassignmentsResponse{
 		ThrottleTimeMs: int32(10000),
 		Version:        int16(0),

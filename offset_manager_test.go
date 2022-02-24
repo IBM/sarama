@@ -73,7 +73,6 @@ func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 }
 
 func TestNewOffsetManager(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Returns(new(MetadataResponse))
 	defer seedBroker.Close()
@@ -119,12 +118,10 @@ var offsetsautocommitTestTable = []struct {
 }
 
 func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
-	t.Parallel()
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			config := NewTestConfig()
 			if tt.set {
 				config.Consumer.Offsets.AutoCommit.Enable = tt.enable
@@ -175,7 +172,6 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 }
 
 func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
-	t.Parallel()
 	// Tests to validate configuration when `Consumer.Offsets.AutoCommit.Enable` is false
 	config := NewTestConfig()
 	config.Consumer.Offsets.AutoCommit.Enable = false
@@ -236,7 +232,6 @@ func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
 // Test recovery from ErrNotCoordinatorForConsumer
 // on first fetchInitialOffset call
 func TestOffsetManagerFetchInitialFail(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 
 	// Error on first fetchInitialOffset call
@@ -280,7 +275,6 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 
 // Test fetchInitialOffset retry on ErrOffsetsLoadInProgress
 func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
-	t.Parallel()
 	retryCount := int32(0)
 	backoff := func(retries, maxRetries int) time.Duration {
 		atomic.AddInt32(&retryCount, 1)
@@ -323,7 +317,6 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerInitialOffset(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	testClient.Config().Consumer.Offsets.Initial = OffsetOldest
 
@@ -346,7 +339,6 @@ func TestPartitionOffsetManagerInitialOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerNextOffset(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "test_meta")
 
@@ -366,7 +358,6 @@ func TestPartitionOffsetManagerNextOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerResetOffset(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
@@ -393,7 +384,6 @@ func TestPartitionOffsetManagerResetOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, time.Hour)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
@@ -430,7 +420,6 @@ func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
@@ -456,7 +445,6 @@ func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, time.Hour)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
@@ -492,7 +480,6 @@ func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerCommitErr(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
 
@@ -557,7 +544,6 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 
 // Test of recovery from abort
 func TestAbortPartitionOffsetManager(t *testing.T) {
-	t.Parallel()
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
 

@@ -20,7 +20,6 @@ var aclDescribeResponseError = []byte{
 }
 
 func TestAclDescribeResponse(t *testing.T) {
-	t.Parallel()
 	errmsg := "error"
 	resp := &DescribeAclsResponse{
 		ThrottleTime: 100 * time.Millisecond,

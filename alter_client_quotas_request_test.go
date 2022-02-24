@@ -63,7 +63,6 @@ var (
 )
 
 func TestAlterClientQuotasRequest(t *testing.T) {
-	t.Parallel()
 	// default user
 	defaultUserComponent := QuotaEntityComponent{
 		EntityType: QuotaEntityUser,

@@ -36,7 +36,6 @@ var (
 )
 
 func TestDescribeGroupsResponse(t *testing.T) {
-	t.Parallel()
 	var response *DescribeGroupsResponse
 
 	response = new(DescribeGroupsResponse)

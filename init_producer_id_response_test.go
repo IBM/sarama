@@ -22,7 +22,6 @@ var (
 )
 
 func TestInitProducerIDResponse(t *testing.T) {
-	t.Parallel()
 	resp := &InitProducerIDResponse{
 		ThrottleTime:  100 * time.Millisecond,
 		ProducerID:    8000,

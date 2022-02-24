@@ -13,7 +13,6 @@ var deleteTopicsRequest = []byte{
 }
 
 func TestDeleteTopicsRequestV0(t *testing.T) {
-	t.Parallel()
 	req := &DeleteTopicsRequest{
 		Version: 0,
 		Topics:  []string{"topic", "other"},
@@ -24,7 +23,6 @@ func TestDeleteTopicsRequestV0(t *testing.T) {
 }
 
 func TestDeleteTopicsRequestV1(t *testing.T) {
-	t.Parallel()
 	req := &DeleteTopicsRequest{
 		Version: 1,
 		Topics:  []string{"topic", "other"},
