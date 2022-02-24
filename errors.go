@@ -3,6 +3,8 @@ package sarama
 import (
 	"errors"
 	"fmt"
+
+	"github.com/hashicorp/go-multierror"
 )
 
 // ErrOutOfBrokers is the error returned when the client has run out of brokers to talk to because all of them errored
@@ -55,6 +57,48 @@ var ErrNoTopicsToUpdateMetadata = errors.New("kafka: no specific topics to updat
 // ErrUnknownScramMechanism is returned when user tries to AlterUserScramCredentials with unknown SCRAM mechanism
 var ErrUnknownScramMechanism = errors.New("kafka: unknown SCRAM mechanism provided")
 
+// ErrReassignPartitions is returned when altering partition assignments for a topic fails
+var ErrReassignPartitions = errors.New("failed to reassign partitions for topic")
+
+// ErrDeleteRecords is the type of error returned when fail to delete the required records
+var ErrDeleteRecords = errors.New("kafka server: failed to delete records")
+
+// The formatter used to format multierrors
+var MultiErrorFormat multierror.ErrorFormatFunc
+
+type sentinelError struct {
+	sentinel error
+	wrapped  error
+}
+
+func (err sentinelError) Error() string {
+	if err.wrapped != nil {
+		return fmt.Sprintf("%s: %v", err.sentinel, err.wrapped)
+	} else {
+		return fmt.Sprintf("%s", err.sentinel)
+	}
+}
+
+func (err sentinelError) Is(target error) bool {
+	return errors.Is(err.sentinel, target) || errors.Is(err.wrapped, target)
+}
+
+func (err sentinelError) Unwrap() error {
+	return err.wrapped
+}
+
+func Wrap(sentinel error, wrapped ...error) sentinelError {
+	return sentinelError{sentinel: sentinel, wrapped: multiError(wrapped...)}
+}
+
+func multiError(wrapped ...error) error {
+	merr := multierror.Append(nil, wrapped...)
+	if MultiErrorFormat != nil {
+		merr.ErrorFormat = MultiErrorFormat
+	}
+	return merr.ErrorOrNil()
+}
+
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
 type PacketEncodingError struct {
@@ -86,44 +130,6 @@ func (err ConfigurationError) Error() string {
 // KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
-
-// MultiError is used to contain multi error.
-type MultiError struct {
-	Errors *[]error
-}
-
-func (mErr MultiError) Error() string {
-	errString := ""
-	for _, err := range *mErr.Errors {
-		errString += err.Error() + ","
-	}
-	return errString
-}
-
-func (mErr MultiError) PrettyError() string {
-	errString := ""
-	for _, err := range *mErr.Errors {
-		errString += err.Error() + "\n"
-	}
-	return errString
-}
-
-// ErrDeleteRecords is the type of error returned when fail to delete the required records
-type ErrDeleteRecords struct {
-	MultiError
-}
-
-func (err ErrDeleteRecords) Error() string {
-	return "kafka server: failed to delete records " + err.MultiError.Error()
-}
-
-type ErrReassignPartitions struct {
-	MultiError
-}
-
-func (err ErrReassignPartitions) Error() string {
-	return fmt.Sprintf("failed to reassign partitions for topic: \n%s", err.MultiError.PrettyError())
-}
 
 // Numeric error codes returned by the Kafka server.
 const (

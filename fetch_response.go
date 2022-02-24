@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"sort"
 	"time"
 )
@@ -112,7 +113,7 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		records := &Records{}
 		if err := records.decode(recordsDecoder); err != nil {
 			// If we have at least one decoded records, this is not an error
-			if err == ErrInsufficientData {
+			if errors.Is(err, ErrInsufficientData) {
 				if len(b.RecordsSet) == 0 {
 					b.Partial = true
 				}

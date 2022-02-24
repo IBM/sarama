@@ -47,7 +47,7 @@ func TestClusterAdminInvalidController(t *testing.T) {
 		t.Fatal(errors.New("controller not set still cluster admin was created"))
 	}
 
-	if err != ErrControllerNotAvailable {
+	if !errors.Is(err, ErrControllerNotAvailable) {
 		t.Fatal(err)
 	}
 }
@@ -243,7 +243,7 @@ func TestClusterAdminDeleteEmptyTopic(t *testing.T) {
 	}
 
 	err = admin.DeleteTopic("")
-	if err != ErrInvalidTopic {
+	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatal(err)
 	}
 
@@ -303,7 +303,7 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 	}
 
 	err = admin.CreatePartitions("my_topic", 3, nil, false)
-	if err != ErrUnsupportedVersion {
+	if !errors.Is(err, ErrUnsupportedVersion) {
 		t.Fatal(err)
 	}
 
@@ -639,19 +639,20 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	partitionOffset[3] = 1000
 
 	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err == nil {
+		t.Fatal("expected an ErrDeleteRecords")
+	}
+
 	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
 		t.Fatal(err)
 	}
-	deleteRecordsError, ok := err.(ErrDeleteRecords)
 
-	if !ok {
+	if !errors.Is(err, ErrDeleteRecords) {
 		t.Fatal(err)
 	}
 
-	for _, err := range *deleteRecordsError.Errors {
-		if err != ErrUnsupportedVersion {
-			t.Fatal(err)
-		}
+	if !errors.Is(err, ErrUnsupportedVersion) {
+		t.Fatal(err)
 	}
 
 	err = admin.Close()
@@ -1547,7 +1548,7 @@ func TestDeleteOffset(t *testing.T) {
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNotCoordinatorForConsumer, topic, partition, ErrNoError)
 	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
-	if err != ErrNotCoordinatorForConsumer {
+	if !errors.Is(err, ErrNotCoordinatorForConsumer) {
 		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrNotCoordinatorForConsumer)
 	}
 
@@ -1555,7 +1556,7 @@ func TestDeleteOffset(t *testing.T) {
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNoError, topic, partition, ErrGroupSubscribedToTopic)
 	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
-	if err != ErrGroupSubscribedToTopic {
+	if !errors.Is(err, ErrGroupSubscribedToTopic) {
 		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrGroupSubscribedToTopic)
 	}
 }
@@ -1643,7 +1644,7 @@ func TestDescribeLogDirs(t *testing.T) {
 		t.Fatalf("Expected log dirs for broker %v to be returned, but it did not, got %v", seedBroker.BrokerID(), len(logDirs))
 	}
 	logDirsBroker := logDirs[0]
-	if logDirsBroker.ErrorCode != ErrNoError {
+	if !errors.Is(logDirsBroker.ErrorCode, ErrNoError) {
 		t.Fatalf("Expected no error for broker %v, but it was %v", seedBroker.BrokerID(), logDirsBroker.ErrorCode)
 	}
 	if logDirsBroker.Path != "/tmp/logs" {

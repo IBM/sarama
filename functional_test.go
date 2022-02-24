@@ -5,6 +5,7 @@ package sarama
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/url"
@@ -377,11 +378,11 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 }
 
 func isTopicNotExistsErrorOrOk(err KError) bool {
-	return err == ErrUnknownTopicOrPartition || err == ErrInvalidTopic || err == ErrNoError
+	return errors.Is(err, ErrUnknownTopicOrPartition) || errors.Is(err, ErrInvalidTopic) || errors.Is(err, ErrNoError)
 }
 
 func isTopicExistsErrorOrOk(err KError) bool {
-	return err == ErrTopicAlreadyExists || err == ErrNoError
+	return errors.Is(err, ErrTopicAlreadyExists) || errors.Is(err, ErrNoError)
 }
 
 func checkKafkaVersion(t testing.TB, requiredVersion string) {

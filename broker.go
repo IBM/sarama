@@ -3,6 +3,7 @@ package sarama
 import (
 	"crypto/tls"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -1161,7 +1162,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 		return err
 	}
 
-	if res.Err != ErrNoError {
+	if !errors.Is(res.Err, ErrNoError) {
 		Logger.Printf("Invalid SASL Mechanism : %s\n", res.Err.Error())
 		return res.Err
 	}
@@ -1351,12 +1352,12 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 
 	scramClient := b.conf.Net.SASL.SCRAMClientGeneratorFunc()
 	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
-		return fmt.Errorf("failed to start SCRAM exchange with the server: %s", err.Error())
+		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
 	}
 
 	msg, err := scramClient.Step("")
 	if err != nil {
-		return fmt.Errorf("failed to advance the SCRAM exchange: %s", err.Error())
+		return fmt.Errorf("failed to advance the SCRAM exchange: %w", err)
 	}
 
 	for !scramClient.Done() {
@@ -1408,12 +1409,12 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
 
 	scramClient := b.conf.Net.SASL.SCRAMClientGeneratorFunc()
 	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
-		return fmt.Errorf("failed to start SCRAM exchange with the server: %s", err.Error())
+		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
 	}
 
 	msg, err := scramClient.Step("")
 	if err != nil {
-		return fmt.Errorf("failed to advance the SCRAM exchange: %s", err.Error())
+		return fmt.Errorf("failed to advance the SCRAM exchange: %w", err)
 	}
 
 	for !scramClient.Done() {
@@ -1487,7 +1488,7 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 	if err := versionedDecode(buf, res, 0); err != nil {
 		return nil, err
 	}
-	if res.Err != ErrNoError {
+	if !errors.Is(res.Err, ErrNoError) {
 		return nil, res.Err
 	}
 	return res.SaslAuthBytes, nil
@@ -1577,7 +1578,7 @@ func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correl
 		return bytesRead, err
 	}
 
-	if res.Err != ErrNoError {
+	if !errors.Is(res.Err, ErrNoError) {
 		return bytesRead, res.Err
 	}
 

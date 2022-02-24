@@ -697,7 +697,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 		return nil, ErrIncompleteResponse
 	}
 
-	if block.Err != ErrNoError {
+	if !errors.Is(block.Err, ErrNoError) {
 		return nil, block.Err
 	}
 
@@ -983,25 +983,24 @@ func (bc *brokerConsumer) handleResponses() {
 		// Discard any replica preference.
 		child.preferredReadReplica = invalidPreferredReplicaID
 
-		switch result {
-		case errTimedOut:
+		if errors.Is(result, errTimedOut) {
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because consuming was taking too long\n",
 				bc.broker.ID(), child.topic, child.partition)
 			delete(bc.subscriptions, child)
-		case ErrOffsetOutOfRange:
+		} else if errors.Is(result, ErrOffsetOutOfRange) {
 			// there's no point in retrying this it will just fail the same way again
 			// shut it down and force the user to choose what to do
 			child.sendError(result)
 			Logger.Printf("consumer/%s/%d shutting down because %s\n", child.topic, child.partition, result)
 			close(child.trigger)
 			delete(bc.subscriptions, child)
-		case ErrUnknownTopicOrPartition, ErrNotLeaderForPartition, ErrLeaderNotAvailable, ErrReplicaNotAvailable:
+		} else if errors.Is(result, ErrUnknownTopicOrPartition) || errors.Is(result, ErrNotLeaderForPartition) || errors.Is(result, ErrLeaderNotAvailable) || errors.Is(result, ErrReplicaNotAvailable) {
 			// not an error, but does need redispatching
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because %s\n",
 				bc.broker.ID(), child.topic, child.partition, result)
 			child.trigger <- none{}
 			delete(bc.subscriptions, child)
-		default:
+		} else {
 			// dunno, tell the user and try redispatching
 			child.sendError(result)
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because %s\n",

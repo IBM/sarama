@@ -5,6 +5,7 @@ package sarama
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"reflect"
@@ -529,7 +530,7 @@ func (m *testFuncConsumerGroupMember) loop(topics []string) {
 		// set state to pre-consume
 		atomic.StoreInt32(&m.state, 1)
 
-		if err := m.Consume(ctx, topics, m); err == ErrClosedConsumerGroup {
+		if err := m.Consume(ctx, topics, m); errors.Is(err, ErrClosedConsumerGroup) {
 			return
 		} else if err != nil {
 			m.mu.Lock()

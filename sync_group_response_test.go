@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -23,7 +24,7 @@ func TestSyncGroupResponse(t *testing.T) {
 
 	response = new(SyncGroupResponse)
 	testVersionDecodable(t, "no error", response, syncGroupResponseNoError, 0)
-	if response.Err != ErrNoError {
+	if !errors.Is(response.Err, ErrNoError) {
 		t.Error("Decoding Err failed: no error expected but found", response.Err)
 	}
 	if !reflect.DeepEqual(response.MemberAssignment, []byte{0x01, 0x02, 0x03}) {
@@ -32,7 +33,7 @@ func TestSyncGroupResponse(t *testing.T) {
 
 	response = new(SyncGroupResponse)
 	testVersionDecodable(t, "no error", response, syncGroupResponseWithError, 0)
-	if response.Err != ErrRebalanceInProgress {
+	if !errors.Is(response.Err, ErrRebalanceInProgress) {
 		t.Error("Decoding Err failed: ErrRebalanceInProgress expected but found", response.Err)
 	}
 	if !reflect.DeepEqual(response.MemberAssignment, []byte{}) {

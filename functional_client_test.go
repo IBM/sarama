@@ -4,6 +4,7 @@
 package sarama
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -20,7 +21,7 @@ func TestFuncConnectionFailure(t *testing.T) {
 	config.Metadata.Retry.Max = 1
 
 	_, err := NewClient([]string{FunctionalTestEnv.KafkaBrokerAddrs[0]}, config)
-	if err != ErrOutOfBrokers {
+	if !errors.Is(err, ErrOutOfBrokers) {
 		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
 	}
 }
@@ -37,15 +38,15 @@ func TestFuncClientMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := client.RefreshMetadata("unknown_topic"); err != ErrUnknownTopicOrPartition {
+	if err := client.RefreshMetadata("unknown_topic"); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
-	if _, err := client.Leader("unknown_topic", 0); err != ErrUnknownTopicOrPartition {
+	if _, err := client.Leader("unknown_topic", 0); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
-	if _, err := client.Replicas("invalid/topic", 0); err != ErrUnknownTopicOrPartition && err != ErrInvalidTopic {
+	if _, err := client.Replicas("invalid/topic", 0); !errors.Is(err, ErrUnknownTopicOrPartition) && !errors.Is(err, ErrInvalidTopic) {
 		t.Error("Expected ErrUnknownTopicOrPartition or ErrInvalidTopic, got", err)
 	}
 

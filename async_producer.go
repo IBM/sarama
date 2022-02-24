@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -1058,12 +1059,12 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 }
 
 func (bp *brokerProducer) handleError(sent *produceSet, err error) {
-	switch err.(type) {
-	case PacketEncodingError:
+	var target PacketEncodingError
+	if errors.As(err, &target) {
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 			bp.parent.returnErrors(pSet.msgs, err)
 		})
-	default:
+	} else {
 		Logger.Printf("producer/broker/%d state change to [closing] because %s\n", bp.broker.ID(), err)
 		bp.parent.abandonBrokerConnection(bp.broker)
 		_ = bp.broker.Close()

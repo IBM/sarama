@@ -4,6 +4,7 @@
 package sarama
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -97,7 +98,7 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); err != ErrUnknownTopicOrPartition && err != ErrInvalidTopic {
+	if _, _, err := producer.SendMessage(&ProducerMessage{Topic: "in/valid"}); !errors.Is(err, ErrUnknownTopicOrPartition) && !errors.Is(err, ErrInvalidTopic) {
 		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
 	}
 

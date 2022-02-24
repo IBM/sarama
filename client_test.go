@@ -1,9 +1,11 @@
 package sarama
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -95,7 +97,7 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 
 	partitions, err := client.Partitions("unknown")
 
-	if err != ErrUnknownTopicOrPartition {
+	if !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
 	}
 	if partitions != nil {
@@ -114,7 +116,7 @@ func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
 
 	// Should not use cache for unknown topic
 	partitions, err = client.Partitions("unknown")
-	if err != ErrUnknownTopicOrPartition {
+	if !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, found", err)
 	}
 	if partitions != nil {
@@ -381,7 +383,7 @@ func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
 	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
-	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
+	if err := client.RefreshMetadata("new_topic"); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("ErrUnknownTopicOrPartition expected, got", err)
 	}
 
@@ -414,7 +416,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
-	if err := client.RefreshMetadata("new_topic"); err != ErrUnknownTopicOrPartition {
+	if err := client.RefreshMetadata("new_topic"); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("ErrUnknownTopicOrPartition expected, got", err)
 	}
 
@@ -423,7 +425,7 @@ func TestClientReceivingUnknownTopic(t *testing.T) {
 	seedBroker.Returns(metadataUnknownTopic)
 	seedBroker.Returns(metadataUnknownTopic)
 
-	if _, err = client.Leader("new_topic", 1); err != ErrUnknownTopicOrPartition {
+	if _, err = client.Leader("new_topic", 1); !errors.Is(err, ErrUnknownTopicOrPartition) {
 		t.Error("Expected ErrUnknownTopicOrPartition, got", err)
 	}
 
@@ -478,7 +480,7 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 
 	// Still no leader for the partition, so asking for it should return an error.
 	_, err = client.Leader("new_topic", 1)
-	if err != ErrLeaderNotAvailable {
+	if !errors.Is(err, ErrLeaderNotAvailable) {
 		t.Error("Expected ErrLeaderNotAvailable, got", err)
 	}
 
@@ -620,7 +622,7 @@ func TestClientGetBroker(t *testing.T) {
 		t.Error(err)
 	}
 	_, err = client.Broker(leader.BrokerID())
-	if err != ErrBrokerNotFound {
+	if !errors.Is(err, ErrBrokerNotFound) {
 		t.Errorf("Expected Broker(brokerID) to return %v found %v", ErrBrokerNotFound, err)
 	}
 }
@@ -726,7 +728,7 @@ func TestClientController(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer safeClose(t, client2)
-		if _, err = client2.Controller(); err != ErrUnsupportedVersion {
+		if _, err = client2.Controller(); !errors.Is(err, ErrUnsupportedVersion) {
 			t.Errorf("Expected Controller() to return %s, found %s", ErrUnsupportedVersion, err)
 		}
 	})
@@ -807,7 +809,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 				if err == nil {
 					t.Fatal("Expected failed RefreshMetadata, got nil")
 				}
-				if err != ErrOutOfBrokers {
+				if !errors.Is(err, ErrOutOfBrokers) {
 					t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
 				}
 			case <-time.After(maxRefreshDuration):
@@ -995,4 +997,75 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 
 	// give the update time to happen so we get a panic if it's still running (which it shouldn't)
 	time.Sleep(10 * time.Millisecond)
+}
+
+func TestClientConnectionRefused(t *testing.T) {
+	t.Parallel()
+	seedBroker := NewMockBroker(t, 1)
+	seedBroker.Close()
+
+	_, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestClientCoordinatorConnectionRefused(t *testing.T) {
+	t.Parallel()
+	seedBroker := NewMockBroker(t, 1)
+	seedBroker.Returns(new(MetadataResponse))
+
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seedBroker.Close()
+
+	_, err = client.Coordinator("my_group")
+
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !errors.Is(err, syscall.ECONNREFUSED) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	safeClose(t, client)
+}
+
+func TestInitProducerIDConnectionRefused(t *testing.T) {
+	t.Parallel()
+	seedBroker := NewMockBroker(t, 1)
+	seedBroker.Returns(&MetadataResponse{Version: 1})
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seedBroker.Close()
+
+	_, err = client.InitProducerID()
+
+	if !errors.Is(err, ErrOutOfBrokers) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !errors.Is(err, io.EOF) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	safeClose(t, client)
 }

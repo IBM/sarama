@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/Shopify/sarama"
@@ -68,7 +69,7 @@ func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 				return -1, -1, errCheck
 			}
 		}
-		if expectation.Result == errProduceSuccess {
+		if errors.Is(expectation.Result, errProduceSuccess) {
 			sp.lastOffset++
 			msg.Offset = sp.lastOffset
 			return 0, msg.Offset, nil
@@ -106,7 +107,7 @@ func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 					return errCheck
 				}
 			}
-			if expectation.Result != errProduceSuccess {
+			if !errors.Is(expectation.Result, errProduceSuccess) {
 				return expectation.Result
 			}
 			sp.lastOffset++

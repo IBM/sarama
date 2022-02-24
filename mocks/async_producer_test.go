@@ -68,7 +68,7 @@ func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 		t.Error("Expected message 2 to be returned second")
 	}
 
-	if err1.Msg.Topic != "test 3" || err1.Err != sarama.ErrOutOfBrokers {
+	if err1.Msg.Topic != "test 3" || !errors.Is(err1, sarama.ErrOutOfBrokers) {
 		t.Error("Expected message 3 to be returned as error")
 	}
 
