@@ -36,7 +36,6 @@ public class App {
 */
 
 func TestScramSaltedPasswordSha512(t *testing.T) {
-	t.Parallel()
 	password := []byte("hello")
 	salt := []byte("world")
 
@@ -61,7 +60,6 @@ func TestScramSaltedPasswordSha512(t *testing.T) {
 }
 
 func TestScramSaltedPasswordSha256(t *testing.T) {
-	t.Parallel()
 	password := []byte("hello")
 	salt := []byte("world")
 

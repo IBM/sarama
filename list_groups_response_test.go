@@ -24,7 +24,6 @@ var (
 )
 
 func TestListGroupsResponse(t *testing.T) {
-	t.Parallel()
 	var response *ListGroupsResponse
 
 	response = new(ListGroupsResponse)

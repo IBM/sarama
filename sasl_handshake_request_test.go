@@ -7,7 +7,6 @@ var baseSaslRequest = []byte{
 }
 
 func TestSaslHandshakeRequest(t *testing.T) {
-	t.Parallel()
 	request := new(SaslHandshakeRequest)
 	request.Mechanism = "foo"
 	testRequest(t, "basic", request, baseSaslRequest)

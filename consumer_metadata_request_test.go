@@ -15,7 +15,6 @@ var (
 )
 
 func TestConsumerMetadataRequest(t *testing.T) {
-	t.Parallel()
 	request := new(ConsumerMetadataRequest)
 	testEncodable(t, "empty string", request, consumerMetadataRequestEmpty)
 	testVersionDecodable(t, "empty string", request, consumerMetadataRequestEmpty, 0)

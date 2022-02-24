@@ -49,7 +49,6 @@ var (
 )
 
 func TestDescribeConfigsRequestv0(t *testing.T) {
-	t.Parallel()
 	var request *DescribeConfigsRequest
 
 	request = &DescribeConfigsRequest{
@@ -103,7 +102,6 @@ func TestDescribeConfigsRequestv0(t *testing.T) {
 }
 
 func TestDescribeConfigsRequestv1(t *testing.T) {
-	t.Parallel()
 	request := &DescribeConfigsRequest{
 		Version: 1,
 		Resources: []*ConfigResource{

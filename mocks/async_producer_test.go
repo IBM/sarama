@@ -36,7 +36,6 @@ func (trm *testReporterMock) Errorf(format string, args ...interface{}) {
 }
 
 func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
-	t.Parallel()
 	var mp interface{} = &AsyncProducer{}
 	if _, ok := mp.(sarama.AsyncProducer); !ok {
 		t.Error("The mock producer should implement the sarama.Producer interface.")
@@ -44,7 +43,6 @@ func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
 }
 
 func TestProducerReturnsExpectationsToChannels(t *testing.T) {
-	t.Parallel()
 	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	mp := NewAsyncProducer(t, config).
@@ -78,7 +76,6 @@ func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 }
 
 func TestProducerWithTooFewExpectations(t *testing.T) {
-	t.Parallel()
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil)
 	mp.ExpectInputAndSucceed()
@@ -96,7 +93,6 @@ func TestProducerWithTooFewExpectations(t *testing.T) {
 }
 
 func TestProducerWithTooManyExpectations(t *testing.T) {
-	t.Parallel()
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil).
 		ExpectInputAndSucceed().
@@ -113,7 +109,6 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 }
 
 func TestProducerWithCheckerFunction(t *testing.T) {
-	t.Parallel()
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil).
 		ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes")).
@@ -136,7 +131,6 @@ func TestProducerWithCheckerFunction(t *testing.T) {
 }
 
 func TestProducerWithBrokenPartitioner(t *testing.T) {
-	t.Parallel()
 	trm := newTestReporterMock()
 	config := sarama.NewConfig()
 	config.Producer.Partitioner = func(string) sarama.Partitioner {

@@ -26,7 +26,6 @@ var (
 )
 
 func TestDeleteGroupsResponse(t *testing.T) {
-	t.Parallel()
 	var response *DeleteGroupsResponse
 
 	response = new(DeleteGroupsResponse)

@@ -64,7 +64,6 @@ var (
 )
 
 func TestOffsetCommitRequestV0(t *testing.T) {
-	t.Parallel()
 	request := new(OffsetCommitRequest)
 	request.Version = 0
 	request.ConsumerGroup = "foobar"
@@ -75,7 +74,6 @@ func TestOffsetCommitRequestV0(t *testing.T) {
 }
 
 func TestOffsetCommitRequestV1(t *testing.T) {
-	t.Parallel()
 	request := new(OffsetCommitRequest)
 	request.ConsumerGroup = "foobar"
 	request.ConsumerID = "cons"
@@ -88,7 +86,6 @@ func TestOffsetCommitRequestV1(t *testing.T) {
 }
 
 func TestOffsetCommitRequestV2ToV4(t *testing.T) {
-	t.Parallel()
 	for version := 2; version <= 4; version++ {
 		request := new(OffsetCommitRequest)
 		request.ConsumerGroup = "foobar"

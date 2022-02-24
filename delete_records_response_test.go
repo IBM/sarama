@@ -21,7 +21,6 @@ var deleteRecordsResponse = []byte{
 }
 
 func TestDeleteRecordsResponse(t *testing.T) {
-	t.Parallel()
 	resp := &DeleteRecordsResponse{
 		Version:      0,
 		ThrottleTime: 100 * time.Millisecond,

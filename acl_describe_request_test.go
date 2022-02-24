@@ -25,7 +25,6 @@ var (
 )
 
 func TestAclDescribeRequestV0(t *testing.T) {
-	t.Parallel()
 	resourcename := "topic"
 	principal := "principal"
 	host := "host"
@@ -45,7 +44,6 @@ func TestAclDescribeRequestV0(t *testing.T) {
 }
 
 func TestAclDescribeRequestV1(t *testing.T) {
-	t.Parallel()
 	resourcename := "topic"
 	principal := "principal"
 	host := "host"

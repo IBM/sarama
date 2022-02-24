@@ -270,7 +270,6 @@ func isOldGo(t *testing.T) bool {
 }
 
 func TestRecordBatchEncoding(t *testing.T) {
-	t.Parallel()
 	for _, tc := range recordBatchTestCases() {
 		if tc.oldGoEncoded != nil && isOldGo(t) {
 			testEncodable(t, tc.name, &tc.batch, tc.oldGoEncoded)
@@ -281,7 +280,6 @@ func TestRecordBatchEncoding(t *testing.T) {
 }
 
 func TestRecordBatchDecoding(t *testing.T) {
-	t.Parallel()
 	for _, tc := range recordBatchTestCases() {
 		batch := RecordBatch{}
 		testDecodable(t, tc.name, &batch, tc.encoded)

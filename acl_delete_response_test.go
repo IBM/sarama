@@ -22,7 +22,6 @@ var deleteAclsResponse = []byte{
 }
 
 func TestDeleteAclsResponse(t *testing.T) {
-	t.Parallel()
 	resp := &DeleteAclsResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		FilterResponses: []*FilterResponse{{

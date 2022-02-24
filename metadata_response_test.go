@@ -109,7 +109,6 @@ var (
 )
 
 func TestEmptyMetadataResponseV0(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "empty, V0", &response, emptyMetadataResponseV0, 0)
@@ -122,7 +121,6 @@ func TestEmptyMetadataResponseV0(t *testing.T) {
 }
 
 func TestMetadataResponseWithBrokersV0(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "brokers, no topics, V0", &response, brokersNoTopicsMetadataResponseV0, 0)
@@ -149,7 +147,6 @@ func TestMetadataResponseWithBrokersV0(t *testing.T) {
 }
 
 func TestMetadataResponseWithTopicsV0(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "topics, no brokers, V0", &response, topicsNoBrokersMetadataResponseV0, 0)
@@ -212,7 +209,6 @@ func TestMetadataResponseWithTopicsV0(t *testing.T) {
 }
 
 func TestMetadataResponseWithBrokersV1(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "topics, V1", &response, brokersNoTopicsMetadataResponseV1, 1)
@@ -234,7 +230,6 @@ func TestMetadataResponseWithBrokersV1(t *testing.T) {
 }
 
 func TestMetadataResponseWithTopicsV1(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "topics, V1", &response, topicsNoBrokersMetadataResponseV1, 1)
@@ -256,7 +251,6 @@ func TestMetadataResponseWithTopicsV1(t *testing.T) {
 }
 
 func TestMetadataResponseWithThrottleTime(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "no topics, no brokers, throttle time and cluster Id V3", &response, noBrokersNoTopicsWithThrottleTimeAndClusterIDV3, 3)
@@ -278,7 +272,6 @@ func TestMetadataResponseWithThrottleTime(t *testing.T) {
 }
 
 func TestMetadataResponseWithOfflineReplicasV5(t *testing.T) {
-	t.Parallel()
 	response := MetadataResponse{}
 
 	testVersionDecodable(t, "no brokers, 1 topic with offline replica V5", &response, noBrokersOneTopicWithOfflineReplicasV5, 5)

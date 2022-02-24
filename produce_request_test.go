@@ -74,7 +74,6 @@ var (
 )
 
 func TestProduceRequest(t *testing.T) {
-	t.Parallel()
 	request := new(ProduceRequest)
 	testRequest(t, "empty", request, produceRequestEmpty)
 

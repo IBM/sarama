@@ -19,7 +19,6 @@ var deleteRecordsRequest = []byte{
 }
 
 func TestDeleteRecordsRequest(t *testing.T) {
-	t.Parallel()
 	req := &DeleteRecordsRequest{
 		Topics: map[string]*DeleteRecordsRequestTopic{
 			"topic": {

@@ -56,7 +56,6 @@ var (
 )
 
 func TestJoinGroupResponseV0(t *testing.T) {
-	t.Parallel()
 	var response *JoinGroupResponse
 
 	response = new(JoinGroupResponse)
@@ -118,7 +117,6 @@ func TestJoinGroupResponseV0(t *testing.T) {
 }
 
 func TestJoinGroupResponseV1(t *testing.T) {
-	t.Parallel()
 	response := new(JoinGroupResponse)
 	testVersionDecodable(t, "no error", response, joinGroupResponseV1, 1)
 	if response.Err != ErrNoError {
@@ -145,7 +143,6 @@ func TestJoinGroupResponseV1(t *testing.T) {
 }
 
 func TestJoinGroupResponseV2(t *testing.T) {
-	t.Parallel()
 	response := new(JoinGroupResponse)
 	testVersionDecodable(t, "no error", response, joinGroupResponseV2, 2)
 	if response.ThrottleTime != 100 {

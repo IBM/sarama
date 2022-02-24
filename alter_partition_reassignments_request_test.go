@@ -33,7 +33,6 @@ var (
 )
 
 func TestAlterPartitionReassignmentRequest(t *testing.T) {
-	t.Parallel()
 	var request *AlterPartitionReassignmentsRequest
 
 	request = &AlterPartitionReassignmentsRequest{

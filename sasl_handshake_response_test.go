@@ -9,7 +9,6 @@ var saslHandshakeResponse = []byte{
 }
 
 func TestSaslHandshakeResponse(t *testing.T) {
-	t.Parallel()
 	response := new(SaslHandshakeResponse)
 	testVersionDecodable(t, "no error", response, saslHandshakeResponse, 0)
 	if response.Err != ErrNoError {

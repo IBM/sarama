@@ -202,7 +202,6 @@ var (
 )
 
 func TestEmptyFetchResponse(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "empty", &response, emptyFetchResponse, 0)
 
@@ -212,7 +211,6 @@ func TestEmptyFetchResponse(t *testing.T) {
 }
 
 func TestOneMessageFetchResponse(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "one message", &response, oneMessageFetchResponse, 0)
 
@@ -269,7 +267,6 @@ func TestOneMessageFetchResponse(t *testing.T) {
 }
 
 func TestOverflowMessageFetchResponse(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "overflow message", &response, overflowMessageFetchResponse, 0)
 
@@ -330,7 +327,6 @@ func TestOverflowMessageFetchResponse(t *testing.T) {
 }
 
 func TestOneRecordFetchResponse(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "one record", &response, oneRecordFetchResponse, 4)
 
@@ -380,7 +376,6 @@ func TestOneRecordFetchResponse(t *testing.T) {
 }
 
 func TestPartailFetchResponse(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "partial record", &response, partialFetchResponse, 4)
 
@@ -423,7 +418,6 @@ func TestPartailFetchResponse(t *testing.T) {
 }
 
 func TestEmptyRecordsFetchResponse(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "empty record", &response, emptyRecordsFetchResponsev11, 11)
 
@@ -469,7 +463,6 @@ func TestEmptyRecordsFetchResponse(t *testing.T) {
 }
 
 func TestOneMessageFetchResponseV4(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(t, "one message v4", &response, oneMessageFetchResponseV4, 4)
 
@@ -526,7 +519,6 @@ func TestOneMessageFetchResponseV4(t *testing.T) {
 }
 
 func TestPreferredReplicaFetchResponseV11(t *testing.T) {
-	t.Parallel()
 	response := FetchResponse{}
 	testVersionDecodable(
 		t, "preferred replica fetch response v11", &response,

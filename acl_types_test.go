@@ -5,7 +5,6 @@ import (
 )
 
 func TestAclOperationTextMarshal(t *testing.T) {
-	t.Parallel()
 	for i := AclOperationUnknown; i <= AclOperationIdempotentWrite; i++ {
 		text, err := i.MarshalText()
 		if err != nil {
@@ -23,7 +22,6 @@ func TestAclOperationTextMarshal(t *testing.T) {
 }
 
 func TestAclPermissionTypeTextMarshal(t *testing.T) {
-	t.Parallel()
 	for i := AclPermissionUnknown; i <= AclPermissionAllow; i++ {
 		text, err := i.MarshalText()
 		if err != nil {
@@ -41,7 +39,6 @@ func TestAclPermissionTypeTextMarshal(t *testing.T) {
 }
 
 func TestAclResourceTypeTextMarshal(t *testing.T) {
-	t.Parallel()
 	for i := AclResourceUnknown; i <= AclResourceTransactionalID; i++ {
 		text, err := i.MarshalText()
 		if err != nil {
@@ -59,7 +56,6 @@ func TestAclResourceTypeTextMarshal(t *testing.T) {
 }
 
 func TestAclResourcePatternTypeTextMarshal(t *testing.T) {
-	t.Parallel()
 	for i := AclPatternUnknown; i <= AclPatternPrefixed; i++ {
 		text, err := i.MarshalText()
 		if err != nil {

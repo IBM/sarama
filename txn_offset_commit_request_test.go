@@ -16,7 +16,6 @@ var txnOffsetCommitRequest = []byte{
 }
 
 func TestTxnOffsetCommitRequest(t *testing.T) {
-	t.Parallel()
 	req := &TxnOffsetCommitRequest{
 		TransactionalID: "txn",
 		GroupID:         "groupid",

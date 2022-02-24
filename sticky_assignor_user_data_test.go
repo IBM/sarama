@@ -6,7 +6,6 @@ import (
 )
 
 func TestStickyAssignorUserDataV0(t *testing.T) {
-	t.Parallel()
 	// Single topic with deterministic ordering across encode-decode
 	req := &StickyAssignorUserDataV0{}
 	data := decodeUserDataBytes(t, "AAAAAQADdDAzAAAAAQAAAAU=")
@@ -25,7 +24,6 @@ func TestStickyAssignorUserDataV0(t *testing.T) {
 }
 
 func TestStickyAssignorUserDataV1(t *testing.T) {
-	t.Parallel()
 	// Single topic with deterministic ordering across encode-decode
 	req := &StickyAssignorUserDataV1{}
 	data := decodeUserDataBytes(t, "AAAAAQADdDA2AAAAAgAAAAAAAAAE/////w==")

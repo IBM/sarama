@@ -9,7 +9,6 @@ var saslAuthenticatResponseErr = []byte{
 }
 
 func TestSaslAuthenticateResponse(t *testing.T) {
-	t.Parallel()
 	response := new(SaslAuthenticateResponse)
 	response.Err = ErrSASLAuthenticationFailed
 	msg := "err"

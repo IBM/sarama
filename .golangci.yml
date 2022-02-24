@@ -59,7 +59,7 @@ linters:
     - misspell
     # - nakedret
     - nilerr
-    - paralleltest
+    # - paralleltest
     # - scopelint
     - staticcheck
     - structcheck

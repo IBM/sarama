@@ -37,7 +37,6 @@ var (
 )
 
 func TestDescribeClientQuotasRequest(t *testing.T) {
-	t.Parallel()
 	// Match All
 	req := &DescribeClientQuotasRequest{
 		Components: []QuotaFilterComponent{},

@@ -7,7 +7,6 @@ import (
 )
 
 func TestSyncProducer(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -58,7 +57,6 @@ func TestSyncProducer(t *testing.T) {
 }
 
 func TestSyncProducerBatch(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -107,7 +105,6 @@ func TestSyncProducerBatch(t *testing.T) {
 }
 
 func TestConcurrentSyncProducer(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -152,7 +149,6 @@ func TestConcurrentSyncProducer(t *testing.T) {
 }
 
 func TestSyncProducerToNonExistingTopic(t *testing.T) {
-	t.Parallel()
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := new(MetadataResponse)
@@ -184,7 +180,6 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 }
 
 func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)

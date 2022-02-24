@@ -44,7 +44,6 @@ var (
 )
 
 func TestDescribeClientQuotasResponse(t *testing.T) {
-	t.Parallel()
 	// Response With Error
 	errMsg := "Custom entity type 'faulty' not supported"
 	res := &DescribeClientQuotasResponse{

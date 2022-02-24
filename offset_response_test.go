@@ -38,7 +38,6 @@ var (
 )
 
 func TestEmptyOffsetResponse(t *testing.T) {
-	t.Parallel()
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "empty", &response, emptyOffsetResponse, 0)
@@ -55,7 +54,6 @@ func TestEmptyOffsetResponse(t *testing.T) {
 }
 
 func TestNormalOffsetResponse(t *testing.T) {
-	t.Parallel()
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "normal", &response, normalOffsetResponse, 0)
@@ -86,7 +84,6 @@ func TestNormalOffsetResponse(t *testing.T) {
 }
 
 func TestNormalOffsetResponseV1(t *testing.T) {
-	t.Parallel()
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "normal", &response, normalOffsetResponseV1, 1)

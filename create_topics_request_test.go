@@ -23,7 +23,6 @@ var (
 )
 
 func TestCreateTopicsRequest(t *testing.T) {
-	t.Parallel()
 	retention := "-1"
 
 	req := &CreateTopicsRequest{

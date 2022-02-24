@@ -15,7 +15,6 @@ var (
 )
 
 func TestDescribeUserScramCredentialsRequest(t *testing.T) {
-	t.Parallel()
 	request := &DescribeUserScramCredentialsRequest{
 		Version:       0,
 		DescribeUsers: []DescribeUserScramCredentialsRequestUser{},

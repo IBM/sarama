@@ -12,7 +12,6 @@ import (
 )
 
 func TestBalanceStrategyRange(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		members  map[string][]string
 		topics   map[string][]int32
@@ -65,7 +64,6 @@ func TestBalanceStrategyRange(t *testing.T) {
 }
 
 func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
-	t.Parallel()
 	strategy := BalanceStrategyRange
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -86,7 +84,6 @@ func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
 }
 
 func TestBalanceStrategyRoundRobin(t *testing.T) {
-	t.Parallel()
 	tests := []struct {
 		members  map[string][]string
 		topics   map[string][]int32
@@ -169,7 +166,6 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 }
 
 func Test_deserializeTopicPartitionAssignment(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		userDataBytes []byte
 	}
@@ -243,7 +239,6 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got, err := deserializeTopicPartitionAssignment(tt.args.userDataBytes)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("deserializeTopicPartitionAssignment() error = %v, wantErr %v", err, tt.wantErr)
@@ -257,7 +252,6 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 }
 
 func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
-	t.Parallel()
 	strategy := BalanceStrategyRoundRobin
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -278,7 +272,6 @@ func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
 }
 
 func Test_prepopulateCurrentAssignments(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		members map[string]ConsumerGroupMemberMetadata
 	}
@@ -418,7 +411,6 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			_, gotPrevAssignments, err := prepopulateCurrentAssignments(tt.args.members)
 
 			if (err != nil) != tt.wantErr {
@@ -433,7 +425,6 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 }
 
 func Test_areSubscriptionsIdentical(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
 		consumer2AllPotentialPartitions map[string][]topicPartitionAssignment
@@ -551,7 +542,6 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := areSubscriptionsIdentical(tt.args.partition2AllPotentialConsumers, tt.args.consumer2AllPotentialPartitions); got != tt.want {
 				t.Errorf("areSubscriptionsIdentical() = %v, want %v", got, tt.want)
 			}
@@ -560,7 +550,6 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 }
 
 func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		assignments map[string][]topicPartitionAssignment
 	}
@@ -610,7 +599,6 @@ func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := sortMemberIDsByPartitionAssignments(tt.args.assignments); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sortMemberIDsByPartitionAssignments() = %v, want %v", got, tt.want)
 			}
@@ -619,7 +607,6 @@ func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
 }
 
 func Test_sortPartitions(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		currentAssignment                          map[string][]topicPartitionAssignment
 		partitionsWithADifferentPreviousAssignment map[topicPartitionAssignment]consumerGenerationPair
@@ -723,7 +710,6 @@ func Test_sortPartitions(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			got := sortPartitions(tt.args.currentAssignment, tt.args.partitionsWithADifferentPreviousAssignment, tt.args.isFreshAssignment, tt.args.partition2AllPotentialConsumers, tt.args.consumer2AllPotentialPartitions)
 			if tt.want != nil && !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sortPartitions() = %v, want %v", got, tt.want)
@@ -733,7 +719,6 @@ func Test_sortPartitions(t *testing.T) {
 }
 
 func Test_filterAssignedPartitions(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		currentAssignment               map[string][]topicPartitionAssignment
 		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
@@ -799,7 +784,6 @@ func Test_filterAssignedPartitions(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := filterAssignedPartitions(tt.args.currentAssignment, tt.args.partition2AllPotentialConsumers); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterAssignedPartitions() = %v, want %v", got, tt.want)
 			}
@@ -808,7 +792,6 @@ func Test_filterAssignedPartitions(t *testing.T) {
 }
 
 func Test_canConsumerParticipateInReassignment(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		memberID                        string
 		currentAssignment               map[string][]topicPartitionAssignment
@@ -903,7 +886,6 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := canConsumerParticipateInReassignment(tt.args.memberID, tt.args.currentAssignment, tt.args.consumer2AllPotentialPartitions, tt.args.partition2AllPotentialConsumers); got != tt.want {
 				t.Errorf("canConsumerParticipateInReassignment() = %v, want %v", got, tt.want)
 			}
@@ -912,7 +894,6 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 }
 
 func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		assignments []topicPartitionAssignment
 		topic       topicPartitionAssignment
@@ -979,7 +960,6 @@ func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := removeTopicPartitionFromMemberAssignments(tt.args.assignments, tt.args.topic); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("removeTopicPartitionFromMemberAssignments() = %v, want %v", got, tt.want)
 			}
@@ -988,7 +968,6 @@ func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
 }
 
 func Test_assignPartition(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		partition                       topicPartitionAssignment
 		sortedCurrentSubscriptions      []string
@@ -1100,7 +1079,6 @@ func Test_assignPartition(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := assignPartition(tt.args.partition, tt.args.sortedCurrentSubscriptions, tt.args.currentAssignment, tt.args.consumer2AllPotentialPartitions, tt.args.currentPartitionConsumer); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("assignPartition() = %v, want %v", got, tt.want)
 			}
@@ -1115,7 +1093,6 @@ func Test_assignPartition(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		members map[string]ConsumerGroupMemberMetadata
 		topics  map[string][]int32
@@ -1337,7 +1314,6 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			s := &stickyBalanceStrategy{}
 			plan, err := s.Plan(tt.args.members, tt.args.topics)
 			verifyPlanIsBalancedAndSticky(t, s, tt.args.members, plan, err)
@@ -1347,7 +1323,6 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_KIP54_ExampleOne(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1388,7 +1363,6 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleOne(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_KIP54_ExampleTwo(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1433,7 +1407,6 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleTwo(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_KIP54_ExampleThree(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 	topicNames := []string{"topic1", "topic2"}
 
@@ -1471,7 +1444,6 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleThree(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_AddRemoveConsumerOneTopic(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1508,7 +1480,6 @@ func Test_stickyBalanceStrategy_Plan_AddRemoveConsumerOneTopic(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_PoorRoundRobinAssignmentScenario(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1540,7 +1511,6 @@ func Test_stickyBalanceStrategy_Plan_PoorRoundRobinAssignmentScenario(t *testing
 }
 
 func Test_stickyBalanceStrategy_Plan_AddRemoveTopicTwoConsumers(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1591,7 +1561,6 @@ func Test_stickyBalanceStrategy_Plan_AddRemoveTopicTwoConsumers(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerLeaves(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1632,7 +1601,6 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerLeaves(t *testi
 }
 
 func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerAdded(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1657,7 +1625,6 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerAdded(t *testin
 }
 
 func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1695,7 +1662,6 @@ func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_LargeAssignmentWithMultipleConsumersLeaving(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -1736,7 +1702,6 @@ func Test_stickyBalanceStrategy_Plan_LargeAssignmentWithMultipleConsumersLeaving
 }
 
 func Test_stickyBalanceStrategy_Plan_NewSubscription(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
@@ -1766,7 +1731,6 @@ func Test_stickyBalanceStrategy_Plan_NewSubscription(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChanges(t *testing.T) {
-	t.Parallel()
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	minNumConsumers := 20
@@ -1816,7 +1780,6 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChang
 }
 
 func Test_stickyBalanceStrategy_Plan_MoveExistingAssignments(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := make(map[string][]int32, 6)
@@ -1842,7 +1805,6 @@ func Test_stickyBalanceStrategy_Plan_MoveExistingAssignments(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_Stickiness(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2}}
@@ -1871,7 +1833,6 @@ func Test_stickyBalanceStrategy_Plan_Stickiness(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := make(map[string][]int32, 2)
@@ -1894,7 +1855,6 @@ func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing
 }
 
 func Test_stickyBalanceStrategy_Plan_NoExceptionRaisedWhenOnlySubscribedTopicDeleted(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2}}
@@ -1923,7 +1883,6 @@ func Test_stickyBalanceStrategy_Plan_NoExceptionRaisedWhenOnlySubscribedTopicDel
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations1(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
@@ -1974,7 +1933,6 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations1(t *testi
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
@@ -2021,7 +1979,6 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testi
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGenerations(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
@@ -2045,7 +2002,6 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGeneration
 }
 
 func Test_stickyBalanceStrategy_Plan_SchemaBackwardCompatibility(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2}}
@@ -2066,7 +2022,6 @@ func Test_stickyBalanceStrategy_Plan_SchemaBackwardCompatibility(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1}}
@@ -2086,7 +2041,6 @@ func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
-	t.Parallel()
 	s := &stickyBalanceStrategy{}
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -2376,7 +2330,6 @@ func getRandomSublist(r *rand.Rand, s []string) []string {
 }
 
 func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
-	t.Parallel()
 	type args struct {
 		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
 	}
@@ -2456,7 +2409,6 @@ func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
 			if got := sortPartitionsByPotentialConsumerAssignments(tt.args.partition2AllPotentialConsumers); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sortPartitionsByPotentialConsumerAssignments() = %v, want %v", got, tt.want)
 			}
