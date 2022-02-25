@@ -6,7 +6,6 @@ package sarama
 import (
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -351,8 +350,8 @@ func TestAsyncProducerRemoteBrokerClosed(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 	config.Producer.Flush.MaxMessages = 1
 	config.Producer.Return.Successes = true
-	config.Producer.Retry.Max = math.MaxInt32
-	config.Producer.Retry.Backoff = time.Millisecond
+	config.Producer.Retry.Max = 1024
+	config.Producer.Retry.Backoff = time.Millisecond * 50
 	config.Version, _ = ParseKafkaVersion(FunctionalTestEnv.KafkaVersion)
 
 	producer, err := NewAsyncProducer(
