@@ -7,12 +7,12 @@ import (
 	"testing"
 )
 
-func TestSentinelWithWrappedError(t *testing.T) {
+func TestSentinelWithSingleWrappedError(t *testing.T) {
 	t.Parallel()
 	myNetError := &net.OpError{Op: "mock", Err: errors.New("op error")}
 	error := Wrap(ErrOutOfBrokers, myNetError)
 
-	expected := fmt.Sprintf("%s: 1 error occurred:\n\t* %s\n\n", ErrOutOfBrokers, myNetError)
+	expected := fmt.Sprintf("%s: %s", ErrOutOfBrokers, myNetError)
 	actual := error.Error()
 	if actual != expected {
 		t.Errorf("unexpected value '%s' vs '%v'", expected, actual)

@@ -3,6 +3,7 @@ package sarama
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
 )
@@ -63,8 +64,23 @@ var ErrReassignPartitions = errors.New("failed to reassign partitions for topic"
 // ErrDeleteRecords is the type of error returned when fail to delete the required records
 var ErrDeleteRecords = errors.New("kafka server: failed to delete records")
 
-// The formatter used to format multierrors
-var MultiErrorFormat multierror.ErrorFormatFunc
+// MultiErrorFormat specifies the formatter applied to format multierrors. The
+// default implementation is a consensed version of the hashicorp/go-multierror
+// default one
+var MultiErrorFormat multierror.ErrorFormatFunc = func(es []error) string {
+	if len(es) == 1 {
+		return es[0].Error()
+	}
+
+	points := make([]string, len(es))
+	for i, err := range es {
+		points[i] = fmt.Sprintf("* %s", err)
+	}
+
+	return fmt.Sprintf(
+		"%d errors occurred:\n\t%s\n",
+		len(es), strings.Join(points, "\n\t"))
+}
 
 type sentinelError struct {
 	sentinel error
