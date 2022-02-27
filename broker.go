@@ -1167,7 +1167,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 		return res.Err
 	}
 
-	DebugLogger.Print("Successful SASL handshake. Available mechanisms: ", res.EnabledMechanisms)
+	DebugLogger.Print("Completed pre-auth SASL handshake. Available mechanisms: ", res.EnabledMechanisms)
 	return nil
 }
 
@@ -1268,7 +1268,9 @@ func (b *Broker) sendAndReceiveV1SASLPlainAuth() error {
 
 	// With v1 sasl we get an error message set in the response we can return
 	if err != nil {
-		Logger.Printf("Error returned from broker during SASL flow %s: %s\n", b.addr, err.Error())
+		Logger.Printf(
+			"Error returned from broker %s during SASL authentication: %v\n",
+			b.addr, err.Error())
 		return err
 	}
 
@@ -1579,7 +1581,11 @@ func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correl
 	}
 
 	if !errors.Is(res.Err, ErrNoError) {
-		return bytesRead, res.Err
+		var err error = res.Err
+		if res.ErrorMessage != nil {
+			err = Wrap(res.Err, errors.New(*res.ErrorMessage))
+		}
+		return bytesRead, err
 	}
 
 	return bytesRead, nil
