@@ -232,159 +232,159 @@ func (err KError) Error() string {
 	case ErrNoError:
 		return "kafka server: Not an error, why are you printing me?"
 	case ErrUnknown:
-		return "kafka server: Unexpected (unknown?) server error."
+		return "kafka server: Unexpected (unknown?) server error"
 	case ErrOffsetOutOfRange:
-		return "kafka server: The requested offset is outside the range of offsets maintained by the server for the given topic/partition."
+		return "kafka server: The requested offset is outside the range of offsets maintained by the server for the given topic/partition"
 	case ErrInvalidMessage:
-		return "kafka server: Message contents does not match its CRC."
+		return "kafka server: Message contents does not match its CRC"
 	case ErrUnknownTopicOrPartition:
-		return "kafka server: Request was for a topic or partition that does not exist on this broker."
+		return "kafka server: Request was for a topic or partition that does not exist on this broker"
 	case ErrInvalidMessageSize:
-		return "kafka server: The message has a negative size."
+		return "kafka server: The message has a negative size"
 	case ErrLeaderNotAvailable:
-		return "kafka server: In the middle of a leadership election, there is currently no leader for this partition and hence it is unavailable for writes."
+		return "kafka server: In the middle of a leadership election, there is currently no leader for this partition and hence it is unavailable for writes"
 	case ErrNotLeaderForPartition:
-		return "kafka server: Tried to send a message to a replica that is not the leader for some partition. Your metadata is out of date."
+		return "kafka server: Tried to send a message to a replica that is not the leader for some partition. Your metadata is out of date"
 	case ErrRequestTimedOut:
-		return "kafka server: Request exceeded the user-specified time limit in the request."
+		return "kafka server: Request exceeded the user-specified time limit in the request"
 	case ErrBrokerNotAvailable:
 		return "kafka server: Broker not available. Not a client facing error, we should never receive this!!!"
 	case ErrReplicaNotAvailable:
-		return "kafka server: Replica information not available, one or more brokers are down."
+		return "kafka server: Replica information not available, one or more brokers are down"
 	case ErrMessageSizeTooLarge:
-		return "kafka server: Message was too large, server rejected it to avoid allocation error."
+		return "kafka server: Message was too large, server rejected it to avoid allocation error"
 	case ErrStaleControllerEpochCode:
-		return "kafka server: StaleControllerEpochCode (internal error code for broker-to-broker communication)."
+		return "kafka server: StaleControllerEpochCode (internal error code for broker-to-broker communication)"
 	case ErrOffsetMetadataTooLarge:
-		return "kafka server: Specified a string larger than the configured maximum for offset metadata."
+		return "kafka server: Specified a string larger than the configured maximum for offset metadata"
 	case ErrNetworkException:
-		return "kafka server: The server disconnected before a response was received."
+		return "kafka server: The server disconnected before a response was received"
 	case ErrOffsetsLoadInProgress:
-		return "kafka server: The broker is still loading offsets after a leader change for that offset's topic partition."
+		return "kafka server: The broker is still loading offsets after a leader change for that offset's topic partition"
 	case ErrConsumerCoordinatorNotAvailable:
-		return "kafka server: Offset's topic has not yet been created."
+		return "kafka server: Offset's topic has not yet been created"
 	case ErrNotCoordinatorForConsumer:
-		return "kafka server: Request was for a consumer group that is not coordinated by this broker."
+		return "kafka server: Request was for a consumer group that is not coordinated by this broker"
 	case ErrInvalidTopic:
-		return "kafka server: The request attempted to perform an operation on an invalid topic."
+		return "kafka server: The request attempted to perform an operation on an invalid topic"
 	case ErrMessageSetSizeTooLarge:
-		return "kafka server: The request included message batch larger than the configured segment size on the server."
+		return "kafka server: The request included message batch larger than the configured segment size on the server"
 	case ErrNotEnoughReplicas:
-		return "kafka server: Messages are rejected since there are fewer in-sync replicas than required."
+		return "kafka server: Messages are rejected since there are fewer in-sync replicas than required"
 	case ErrNotEnoughReplicasAfterAppend:
-		return "kafka server: Messages are written to the log, but to fewer in-sync replicas than required."
+		return "kafka server: Messages are written to the log, but to fewer in-sync replicas than required"
 	case ErrInvalidRequiredAcks:
-		return "kafka server: The number of required acks is invalid (should be either -1, 0, or 1)."
+		return "kafka server: The number of required acks is invalid (should be either -1, 0, or 1)"
 	case ErrIllegalGeneration:
-		return "kafka server: The provided generation id is not the current generation."
+		return "kafka server: The provided generation id is not the current generation"
 	case ErrInconsistentGroupProtocol:
-		return "kafka server: The provider group protocol type is incompatible with the other members."
+		return "kafka server: The provider group protocol type is incompatible with the other members"
 	case ErrInvalidGroupId:
-		return "kafka server: The provided group id was empty."
+		return "kafka server: The provided group id was empty"
 	case ErrUnknownMemberId:
-		return "kafka server: The provided member is not known in the current generation."
+		return "kafka server: The provided member is not known in the current generation"
 	case ErrInvalidSessionTimeout:
-		return "kafka server: The provided session timeout is outside the allowed range."
+		return "kafka server: The provided session timeout is outside the allowed range"
 	case ErrRebalanceInProgress:
-		return "kafka server: A rebalance for the group is in progress. Please re-join the group."
+		return "kafka server: A rebalance for the group is in progress. Please re-join the group"
 	case ErrInvalidCommitOffsetSize:
-		return "kafka server: The provided commit metadata was too large."
+		return "kafka server: The provided commit metadata was too large"
 	case ErrTopicAuthorizationFailed:
-		return "kafka server: The client is not authorized to access this topic."
+		return "kafka server: The client is not authorized to access this topic"
 	case ErrGroupAuthorizationFailed:
-		return "kafka server: The client is not authorized to access this group."
+		return "kafka server: The client is not authorized to access this group"
 	case ErrClusterAuthorizationFailed:
-		return "kafka server: The client is not authorized to send this request type."
+		return "kafka server: The client is not authorized to send this request type"
 	case ErrInvalidTimestamp:
-		return "kafka server: The timestamp of the message is out of acceptable range."
+		return "kafka server: The timestamp of the message is out of acceptable range"
 	case ErrUnsupportedSASLMechanism:
-		return "kafka server: The broker does not support the requested SASL mechanism."
+		return "kafka server: The broker does not support the requested SASL mechanism"
 	case ErrIllegalSASLState:
-		return "kafka server: Request is not valid given the current SASL state."
+		return "kafka server: Request is not valid given the current SASL state"
 	case ErrUnsupportedVersion:
-		return "kafka server: The version of API is not supported."
+		return "kafka server: The version of API is not supported"
 	case ErrTopicAlreadyExists:
-		return "kafka server: Topic with this name already exists."
+		return "kafka server: Topic with this name already exists"
 	case ErrInvalidPartitions:
-		return "kafka server: Number of partitions is invalid."
+		return "kafka server: Number of partitions is invalid"
 	case ErrInvalidReplicationFactor:
-		return "kafka server: Replication-factor is invalid."
+		return "kafka server: Replication-factor is invalid"
 	case ErrInvalidReplicaAssignment:
-		return "kafka server: Replica assignment is invalid."
+		return "kafka server: Replica assignment is invalid"
 	case ErrInvalidConfig:
-		return "kafka server: Configuration is invalid."
+		return "kafka server: Configuration is invalid"
 	case ErrNotController:
-		return "kafka server: This is not the correct controller for this cluster."
+		return "kafka server: This is not the correct controller for this cluster"
 	case ErrInvalidRequest:
-		return "kafka server: This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details."
+		return "kafka server: This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details"
 	case ErrUnsupportedForMessageFormat:
-		return "kafka server: The requested operation is not supported by the message format version."
+		return "kafka server: The requested operation is not supported by the message format version"
 	case ErrPolicyViolation:
-		return "kafka server: Request parameters do not satisfy the configured policy."
+		return "kafka server: Request parameters do not satisfy the configured policy"
 	case ErrOutOfOrderSequenceNumber:
-		return "kafka server: The broker received an out of order sequence number."
+		return "kafka server: The broker received an out of order sequence number"
 	case ErrDuplicateSequenceNumber:
-		return "kafka server: The broker received a duplicate sequence number."
+		return "kafka server: The broker received a duplicate sequence number"
 	case ErrInvalidProducerEpoch:
-		return "kafka server: Producer attempted an operation with an old epoch."
+		return "kafka server: Producer attempted an operation with an old epoch"
 	case ErrInvalidTxnState:
-		return "kafka server: The producer attempted a transactional operation in an invalid state."
+		return "kafka server: The producer attempted a transactional operation in an invalid state"
 	case ErrInvalidProducerIDMapping:
-		return "kafka server: The producer attempted to use a producer id which is not currently assigned to its transactional id."
+		return "kafka server: The producer attempted to use a producer id which is not currently assigned to its transactional id"
 	case ErrInvalidTransactionTimeout:
-		return "kafka server: The transaction timeout is larger than the maximum value allowed by the broker (as configured by max.transaction.timeout.ms)."
+		return "kafka server: The transaction timeout is larger than the maximum value allowed by the broker (as configured by max.transaction.timeout.ms)"
 	case ErrConcurrentTransactions:
-		return "kafka server: The producer attempted to update a transaction while another concurrent operation on the same transaction was ongoing."
+		return "kafka server: The producer attempted to update a transaction while another concurrent operation on the same transaction was ongoing"
 	case ErrTransactionCoordinatorFenced:
-		return "kafka server: The transaction coordinator sending a WriteTxnMarker is no longer the current coordinator for a given producer."
+		return "kafka server: The transaction coordinator sending a WriteTxnMarker is no longer the current coordinator for a given producer"
 	case ErrTransactionalIDAuthorizationFailed:
-		return "kafka server: Transactional ID authorization failed."
+		return "kafka server: Transactional ID authorization failed"
 	case ErrSecurityDisabled:
-		return "kafka server: Security features are disabled."
+		return "kafka server: Security features are disabled"
 	case ErrOperationNotAttempted:
-		return "kafka server: The broker did not attempt to execute this operation."
+		return "kafka server: The broker did not attempt to execute this operation"
 	case ErrKafkaStorageError:
-		return "kafka server: Disk error when trying to access log file on the disk."
+		return "kafka server: Disk error when trying to access log file on the disk"
 	case ErrLogDirNotFound:
-		return "kafka server: The specified log directory is not found in the broker config."
+		return "kafka server: The specified log directory is not found in the broker config"
 	case ErrSASLAuthenticationFailed:
-		return "kafka server: SASL Authentication failed."
+		return "kafka server: SASL Authentication failed"
 	case ErrUnknownProducerID:
-		return "kafka server: The broker could not locate the producer metadata associated with the Producer ID."
+		return "kafka server: The broker could not locate the producer metadata associated with the Producer ID"
 	case ErrReassignmentInProgress:
-		return "kafka server: A partition reassignment is in progress."
+		return "kafka server: A partition reassignment is in progress"
 	case ErrDelegationTokenAuthDisabled:
-		return "kafka server: Delegation Token feature is not enabled."
+		return "kafka server: Delegation Token feature is not enabled"
 	case ErrDelegationTokenNotFound:
-		return "kafka server: Delegation Token is not found on server."
+		return "kafka server: Delegation Token is not found on server"
 	case ErrDelegationTokenOwnerMismatch:
-		return "kafka server: Specified Principal is not valid Owner/Renewer."
+		return "kafka server: Specified Principal is not valid Owner/Renewer"
 	case ErrDelegationTokenRequestNotAllowed:
-		return "kafka server: Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels."
+		return "kafka server: Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels"
 	case ErrDelegationTokenAuthorizationFailed:
-		return "kafka server: Delegation Token authorization failed."
+		return "kafka server: Delegation Token authorization failed"
 	case ErrDelegationTokenExpired:
-		return "kafka server: Delegation Token is expired."
+		return "kafka server: Delegation Token is expired"
 	case ErrInvalidPrincipalType:
-		return "kafka server: Supplied principalType is not supported."
+		return "kafka server: Supplied principalType is not supported"
 	case ErrNonEmptyGroup:
-		return "kafka server: The group is not empty."
+		return "kafka server: The group is not empty"
 	case ErrGroupIDNotFound:
-		return "kafka server: The group id does not exist."
+		return "kafka server: The group id does not exist"
 	case ErrFetchSessionIDNotFound:
-		return "kafka server: The fetch session ID was not found."
+		return "kafka server: The fetch session ID was not found"
 	case ErrInvalidFetchSessionEpoch:
-		return "kafka server: The fetch session epoch is invalid."
+		return "kafka server: The fetch session epoch is invalid"
 	case ErrListenerNotFound:
-		return "kafka server: There is no listener on the leader broker that matches the listener on which metadata request was processed."
+		return "kafka server: There is no listener on the leader broker that matches the listener on which metadata request was processed"
 	case ErrTopicDeletionDisabled:
-		return "kafka server: Topic deletion is disabled."
+		return "kafka server: Topic deletion is disabled"
 	case ErrFencedLeaderEpoch:
-		return "kafka server: The leader epoch in the request is older than the epoch on the broker."
+		return "kafka server: The leader epoch in the request is older than the epoch on the broker"
 	case ErrUnknownLeaderEpoch:
-		return "kafka server: The leader epoch in the request is newer than the epoch on the broker."
+		return "kafka server: The leader epoch in the request is newer than the epoch on the broker"
 	case ErrUnsupportedCompressionType:
-		return "kafka server: The requesting client does not support the compression type of given partition."
+		return "kafka server: The requesting client does not support the compression type of given partition"
 	case ErrStaleBrokerEpoch:
 		return "kafka server: Broker epoch has changed"
 	case ErrOffsetNotAvailable:
@@ -394,21 +394,21 @@ func (err KError) Error() string {
 	case ErrPreferredLeaderNotAvailable:
 		return "kafka server: The preferred leader was not available"
 	case ErrGroupMaxSizeReached:
-		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members."
+		return "kafka server: Consumer group The consumer group has reached its max size. already has the configured maximum number of members"
 	case ErrFencedInstancedId:
-		return "kafka server: The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id."
+		return "kafka server: The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id"
 	case ErrEligibleLeadersNotAvailable:
-		return "kafka server: Eligible topic partition leaders are not available."
+		return "kafka server: Eligible topic partition leaders are not available"
 	case ErrElectionNotNeeded:
-		return "kafka server: Leader election not needed for topic partition."
+		return "kafka server: Leader election not needed for topic partition"
 	case ErrNoReassignmentInProgress:
-		return "kafka server: No partition reassignment is in progress."
+		return "kafka server: No partition reassignment is in progress"
 	case ErrGroupSubscribedToTopic:
-		return "kafka server: Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it."
+		return "kafka server: Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it"
 	case ErrInvalidRecord:
-		return "kafka server: This record has failed the validation on broker and hence will be rejected."
+		return "kafka server: This record has failed the validation on broker and hence will be rejected"
 	case ErrUnstableOffsetCommit:
-		return "kafka server: There are unstable offsets that need to be cleared."
+		return "kafka server: There are unstable offsets that need to be cleared"
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
