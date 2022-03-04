@@ -1,11 +1,17 @@
 package sarama
 
-import "runtime/debug"
+import (
+	"runtime/debug"
+	"sync"
+)
 
-var v string
+var (
+	v     string
+	vOnce sync.Once
+)
 
 func version() string {
-	if v == "" {
+	vOnce.Do(func() {
 		bi, ok := debug.ReadBuildInfo()
 		if ok {
 			v = bi.Main.Version
@@ -15,6 +21,6 @@ func version() string {
 			// the version
 			v = "dev"
 		}
-	}
+	})
 	return v
 }
