@@ -3,6 +3,7 @@ package sarama
 import (
 	"errors"
 	"log"
+	"math"
 	"os"
 	"os/signal"
 	"strconv"
@@ -1415,6 +1416,83 @@ func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
 	}
 	if lastProduceBatch.ProducerEpoch <= 1 {
 		t.Error("second epoch was not > 1")
+	}
+}
+
+// TestAsyncProducerIdempotentEpochExhaustion ensures that producer requests
+// a new producerID when producerEpoch is exhausted
+func TestAsyncProducerIdempotentEpochExhaustion(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	var (
+		initialProducerID = int64(1000)
+		newProducerID     = initialProducerID + 1
+	)
+
+	metadataResponse := &MetadataResponse{
+		Version:      1,
+		ControllerID: 1,
+	}
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataResponse)
+
+	initProducerID := &InitProducerIDResponse{
+		ThrottleTime:  0,
+		ProducerID:    initialProducerID,
+		ProducerEpoch: math.MaxInt16, // Mock ProducerEpoch at the exhaustion point
+	}
+	broker.Returns(initProducerID)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.Flush.Frequency = 10 * time.Millisecond
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 1 // This test needs to exercise what happens when retries exhaust
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = V0_11_0_0
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer closeProducer(t, producer)
+
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder("hello")}
+	prodError := &ProduceResponse{
+		Version:      3,
+		ThrottleTime: 0,
+	}
+	prodError.AddTopicPartition("my_topic", 0, ErrBrokerNotAvailable)
+	broker.Returns(prodError)
+	broker.Returns(&InitProducerIDResponse{
+		ProducerID: newProducerID,
+	})
+
+	<-producer.Errors()
+
+	lastProduceReqRes := broker.history[len(broker.history)-2] // last is InitProducerIDRequest
+	lastProduceBatch := lastProduceReqRes.Request.(*ProduceRequest).records["my_topic"][0].RecordBatch
+	if lastProduceBatch.FirstSequence != 0 {
+		t.Error("first sequence not zero")
+	}
+	if lastProduceBatch.ProducerEpoch <= 1 {
+		t.Error("first epoch was not at exhaustion point")
+	}
+
+	// Now we should produce with a new ProducerID
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder("hello")}
+	broker.Returns(prodError)
+	<-producer.Errors()
+
+	lastProduceReqRes = broker.history[len(broker.history)-1]
+	lastProduceBatch = lastProduceReqRes.Request.(*ProduceRequest).records["my_topic"][0].RecordBatch
+	if lastProduceBatch.ProducerID != newProducerID || lastProduceBatch.ProducerEpoch != 0 {
+		t.Error("producer did not requested a new producerID")
 	}
 }
 
