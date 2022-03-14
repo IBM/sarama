@@ -216,7 +216,7 @@
 
 #1466 - @rubenvp8510  - Expose kerberos fast negotiation configuration
 #1695 - @KJTsanaktsidis - Use docker-compose to run the functional tests
-#1699 - @wclaeys  - Consumer group support for manually comitting offsets
+#1699 - @wclaeys  - Consumer group support for manually committing offsets
 #1714 - @bai - Bump Go to version 1.14.3, golangci-lint to 1.27.0
 #1726 - @d1egoaz - Include zstd on the functional tests
 #1730 - @d1egoaz - KIP-42 Add producer and consumer interceptors
@@ -1172,7 +1172,7 @@ Bug Fixes:
  - Fix a condition where the producer's internal control messages could have
    gotten stuck ([#368](https://github.com/Shopify/sarama/pull/368)).
  - Fix an issue where invalid partition lists would be cached when asking for
-   metadata for a non-existant topic ([#372](https://github.com/Shopify/sarama/pull/372)).
+   metadata for a non-existent topic ([#372](https://github.com/Shopify/sarama/pull/372)).
 
 
 ## Version 1.0.0 (2015-03-17)
@@ -1181,7 +1181,7 @@ Version 1.0.0 is the first tagged version, and is almost a complete rewrite. The
 
 - The producer has been rewritten; there is now a `SyncProducer` with a blocking API, and an `AsyncProducer` that is non-blocking.
 - The consumer has been rewritten to only open one connection per broker instead of one connection per partition.
-- The main types of Sarama are now interfaces to make depedency injection easy; mock implementations for `Consumer`, `SyncProducer` and `AsyncProducer` are provided in the `github.com/Shopify/sarama/mocks` package.
+- The main types of Sarama are now interfaces to make dependency injection easy; mock implementations for `Consumer`, `SyncProducer` and `AsyncProducer` are provided in the `github.com/Shopify/sarama/mocks` package.
 - For most uses cases, it is no longer necessary to open a `Client`; this will be done for you.
 - All the configuration values have been unified in the `Config` struct.
 - Much improved test suite.
