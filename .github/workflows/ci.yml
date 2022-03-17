@@ -52,7 +52,7 @@ jobs:
       env:
         GOFLAGS: -tags=functional
       with:
-        version: v1.44.0
+        version: v1.45.0
 
     - name: Test (Unit)
       run: make test
