@@ -17,31 +17,67 @@ import (
 
 const TestMessage = "ABC THE MESSAGE"
 
-func closeProducer(t *testing.T, p AsyncProducer) {
+func closeProducerWithTimeout(t *testing.T, p AsyncProducer, timeout time.Duration) {
 	var wg sync.WaitGroup
 	p.AsyncClose()
 
+	closer := make(chan struct{})
+	timer := time.AfterFunc(timeout, func() {
+		t.Error("timeout")
+		close(closer)
+	})
+	defer timer.Stop()
+
 	wg.Add(2)
 	go func() {
-		for range p.Successes() {
-			t.Error("Unexpected message on Successes()")
+		defer wg.Done()
+		for {
+			select {
+			case <-closer:
+				return
+			case _, ok := <-p.Successes():
+				if !ok {
+					return
+				}
+				t.Error("Unexpected message on Successes()")
+			}
 		}
-		wg.Done()
 	}()
 	go func() {
-		for msg := range p.Errors() {
-			t.Error(msg.Err)
+		defer wg.Done()
+		for {
+			select {
+			case <-closer:
+				return
+			case msg, ok := <-p.Errors():
+				if !ok {
+					return
+				}
+				t.Error(msg.Err)
+			}
 		}
-		wg.Done()
 	}()
 	wg.Wait()
 }
 
-func expectResults(t *testing.T, p AsyncProducer, successes, errors int) {
+func closeProducer(t *testing.T, p AsyncProducer) {
+	closeProducerWithTimeout(t, p, time.Hour)
+}
+
+func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successes, errors int, timeout time.Duration) {
 	t.Helper()
 	expect := successes + errors
+	defer func() {
+		if successes != 0 || errors != 0 {
+			t.Error("Unexpected successes", successes, "or errors", errors)
+		}
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 	for expect > 0 {
 		select {
+		case <-timer.C:
+			return
 		case msg := <-p.Errors():
 			if msg.Msg.flags != 0 {
 				t.Error("Message had flags set")
@@ -62,9 +98,10 @@ func expectResults(t *testing.T, p AsyncProducer, successes, errors int) {
 			}
 		}
 	}
-	if successes != 0 || errors != 0 {
-		t.Error("Unexpected successes", successes, "or errors", errors)
-	}
+}
+
+func expectResults(t *testing.T, p AsyncProducer, successes, errors int) {
+	expectResultsWithTimeout(t, p, successes, errors, time.Hour)
 }
 
 type testPartitioner chan *int32
@@ -691,6 +728,105 @@ func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 	seedBroker.Close()
 	leader.Close()
 	closeProducer(t, producer)
+}
+
+func TestAsyncProducerBrokerRestart(t *testing.T) {
+	Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	// The seed broker only handles Metadata request
+	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		metadataLeader := new(MetadataResponse)
+		metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
+		metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+		return metadataLeader
+	})
+
+	emptyValues := 0
+
+	produceRequestTest := func(req *request) {
+		preq := req.body.(*ProduceRequest)
+		if batch := preq.records["my_topic"][0].RecordBatch; batch != nil {
+			for _, record := range batch.Records {
+				if len(record.Value) == 0 {
+					emptyValues++
+				}
+			}
+		}
+		if batch := preq.records["my_topic"][0].MsgSet; batch != nil {
+			for _, record := range batch.Messages {
+				if len(record.Msg.Value) == 0 {
+					emptyValues++
+				}
+			}
+		}
+	}
+
+	leader.setHandler(func(req *request) (res encoderWithHeader) {
+		produceRequestTest(req)
+
+		time.Sleep(50 * time.Millisecond)
+
+		prodSuccess := new(ProduceResponse)
+		prodSuccess.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
+		return prodSuccess
+	})
+
+	config := NewTestConfig()
+	config.Producer.Retry.Backoff = time.Second
+	config.Producer.Flush.MaxMessages = 1
+	config.Producer.Return.Errors = true
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 10
+
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var wg sync.WaitGroup
+
+	pushMsg := func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+			time.Sleep(50 * time.Millisecond)
+		}
+	}
+
+	wg.Add(1)
+	go pushMsg()
+
+	for i := 0; i < 3; i++ {
+		time.Sleep(100 * time.Millisecond)
+
+		wg.Add(1)
+		go pushMsg()
+	}
+
+	leader.Close()
+	leader = NewMockBroker(t, 2)
+	leader.setHandler(func(req *request) (res encoderWithHeader) {
+		produceRequestTest(req)
+
+		prodSuccess := new(ProduceResponse)
+		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+		return prodSuccess
+	})
+
+	wg.Wait()
+
+	expectResultsWithTimeout(t, producer, 40, 00, 10*time.Second)
+
+	seedBroker.Close()
+	leader.Close()
+
+	closeProducerWithTimeout(t, producer, 5*time.Second)
+
+	if emptyValues > 0 {
+		t.Fatalf("%d empty values", emptyValues)
+	}
 }
 
 func TestAsyncProducerOutOfRetries(t *testing.T) {
