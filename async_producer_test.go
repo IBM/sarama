@@ -731,7 +731,8 @@ func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 }
 
 func TestAsyncProducerBrokerRestart(t *testing.T) {
-	Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	// Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
