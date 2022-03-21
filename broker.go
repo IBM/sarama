@@ -665,6 +665,12 @@ func (b *Broker) CreateAcls(request *CreateAclsRequest) (*CreateAclsResponse, er
 	if err != nil {
 		return nil, err
 	}
+	for _, res := range response.AclCreationResponses {
+		if !errors.Is(res.Err, ErrNoError) {
+			Logger.Printf("Failed creating ACL: %s\n", res.Err.Error())
+			return response, res.Err
+		}
+	}
 
 	return response, nil
 }
