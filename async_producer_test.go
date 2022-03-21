@@ -736,8 +736,12 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
+	var leaderLock sync.Mutex
+
 	// The seed broker only handles Metadata request
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		leaderLock.Lock()
+		defer leaderLock.Unlock()
 		metadataLeader := new(MetadataResponse)
 		metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
 		metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
@@ -807,7 +811,9 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	}
 
 	leader.Close()
+	leaderLock.Lock()
 	leader = NewMockBroker(t, 2)
+	leaderLock.Unlock()
 	leader.setHandler(func(req *request) (res encoderWithHeader) {
 		produceRequestTest(req)
 
