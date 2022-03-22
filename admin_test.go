@@ -1118,6 +1118,50 @@ func TestClusterAdminCreateAclErrorHandling(t *testing.T) {
 	}
 }
 
+func TestClusterAdminCreateAcls(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"CreateAclsRequest": NewMockCreateAclsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rACLs := []*ResourceAcls{
+		{
+			Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"},
+			Acls: []*Acl{
+				{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
+			},
+		},
+		{
+			Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "your_topic"},
+			Acls: []*Acl{
+				{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
+			},
+		},
+	}
+
+	err = admin.CreateACLs(rACLs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminListAcls(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
