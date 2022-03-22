@@ -64,6 +64,9 @@ var ErrReassignPartitions = errors.New("failed to reassign partitions for topic"
 // ErrDeleteRecords is the type of error returned when fail to delete the required records
 var ErrDeleteRecords = errors.New("kafka server: failed to delete records")
 
+// ErrCreateACLs is the type of error returned when ACL creation failed
+var ErrCreateACLs = errors.New("kafka server: failed to create one or more ACL rules")
+
 // MultiErrorFormat specifies the formatter applied to format multierrors. The
 // default implementation is a consensed version of the hashicorp/go-multierror
 // default one
