@@ -61,7 +61,7 @@ func closeProducerWithTimeout(t *testing.T, p AsyncProducer, timeout time.Durati
 }
 
 func closeProducer(t *testing.T, p AsyncProducer) {
-	closeProducerWithTimeout(t, p, time.Hour)
+	closeProducerWithTimeout(t, p, 5*time.Minute)
 }
 
 func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successes, errors int, timeout time.Duration) {
@@ -101,7 +101,7 @@ func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successes, errors i
 }
 
 func expectResults(t *testing.T, p AsyncProducer, successes, errors int) {
-	expectResultsWithTimeout(t, p, successes, errors, time.Hour)
+	expectResultsWithTimeout(t, p, successes, errors, 5*time.Minute)
 }
 
 type testPartitioner chan *int32
