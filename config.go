@@ -17,6 +17,16 @@ const defaultClientID = "sarama"
 
 var validID = regexp.MustCompile(`\A[A-Za-z0-9._-]+\z`)
 
+type AWSMSKIAMConfig struct {
+	Region               string
+	AccessKeyID          string
+	SecretAccessKey      string
+	SessionToken         string
+	RoleArn              string
+	WebIdentityTokenFile string
+	Expiry               time.Duration
+}
+
 // Config is used to pass multiple configuration options to Sarama's constructors.
 type Config struct {
 	// Admin is the namespace for ClusterAdmin properties used by the administrative Kafka client.
@@ -97,6 +107,8 @@ type Config struct {
 			TokenProvider AccessTokenProvider
 
 			GSSAPI GSSAPIConfig
+
+			AWSMSKIAM AWSMSKIAMConfig
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection (defaults to 0).
@@ -586,6 +598,10 @@ func (c *Config) Validate() error {
 			if c.Net.SASL.TokenProvider == nil {
 				return ConfigurationError("An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider")
 			}
+		case SASLTypeAWSMSKIAM:
+			if c.Net.SASL.AWSMSKIAM.Region == "" {
+				return ConfigurationError("AWSMSKIAM.Region must be set when AWS_MSK_IAM is enabled")
+			}
 		case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
 			if c.Net.SASL.User == "" {
 				return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
@@ -624,8 +640,8 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used")
 			}
 		default:
-			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s` and `%s`",
-				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI)
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s`, `%s` and `%s`",
+				SASLTypeAWSMSKIAM, SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI)
 			return ConfigurationError(msg)
 		}
 	}

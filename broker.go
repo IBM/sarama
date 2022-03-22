@@ -1,12 +1,16 @@
 package sarama
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
+	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
+	"github.com/aws/aws-sdk-go/aws/session"
+	sign "github.com/aws/aws-sdk-go/aws/signer/v4"
+	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -68,6 +78,8 @@ const (
 	// SASLTypeSCRAMSHA512 represents the SCRAM-SHA-512 mechanism.
 	SASLTypeSCRAMSHA512 = "SCRAM-SHA-512"
 	SASLTypeGSSAPI      = "GSSAPI"
+	// SASLTypeAWSMSKIAM represents the SASL IAM mechanism
+	SASLTypeAWSMSKIAM = "AWS_MSK_IAM"
 	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL auth using opaque packets.
 	SASLHandshakeV0 = int16(0)
@@ -77,6 +89,8 @@ const (
 	// SASLExtKeyAuth is the reserved extension key name sent as part of the
 	// SASL/OAUTHBEARER initial client response
 	SASLExtKeyAuth = "auth"
+
+	IAMAuthVersion = "2020_10_22"
 )
 
 // AccessToken contains an access token used to authenticate a
@@ -1100,6 +1114,8 @@ func (b *Broker) authenticateViaSASL() error {
 		return b.sendAndReceiveSASLOAuth(b.conf.Net.SASL.TokenProvider)
 	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
 		return b.sendAndReceiveSASLSCRAM()
+	case SASLTypeAWSMSKIAM:
+		return b.sendAndReceiveSASLIAM()
 	case SASLTypeGSSAPI:
 		return b.sendAndReceiveKerberos()
 	default:
@@ -1490,6 +1506,7 @@ func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, e
 	if err := versionedDecode(buf, res, 0); err != nil {
 		return nil, err
 	}
+
 	if !errors.Is(res.Err, ErrNoError) {
 		return nil, res.Err
 	}
@@ -1713,4 +1730,131 @@ func validServerNameTLS(addr string, cfg *tls.Config) *tls.Config {
 	}
 	c.ServerName = sn
 	return c
+}
+
+func (b *Broker) sendAndReceiveSASLIAM() error {
+	if err := b.sendAndReceiveSASLHandshake(SASLTypeAWSMSKIAM, SASLHandshakeV1); err != nil {
+		return err
+	}
+
+	msg, err := getIAMPayload(
+		b.addr,
+		b.conf.ClientID,
+		b.conf.Net.SASL.AWSMSKIAM,
+	)
+	if err != nil {
+		return err
+	}
+
+	requestTime := time.Now()
+	// Will be decremented in updateIncomingCommunicationMetrics (except error)
+	b.addRequestInFlightMetrics(1)
+	correlationID := b.correlationID
+
+	bytesWritten, err := b.sendSaslAuthenticateRequest(correlationID, msg)
+	b.updateOutgoingCommunicationMetrics(bytesWritten)
+	if err != nil {
+		b.addRequestInFlightMetrics(-1)
+		Logger.Printf("Failed to write SASL auth header to broker %s: %s\n", b.addr, err.Error())
+		return err
+	}
+	b.correlationID++
+	bytesRead, err := b.receiveSaslAuthenticateResponse(correlationID)
+	if err != nil {
+		b.addRequestInFlightMetrics(-1)
+		Logger.Printf("Failed to read response while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
+		return err
+	}
+
+	resp := struct {
+		Version   string `json:"version"`
+		RequestID string `json:"request-id"`
+	}{}
+	err = json.NewDecoder(bytes.NewReader(bytesRead)).Decode(&resp)
+	if err != nil {
+		return fmt.Errorf("unable to process msk response: %w", err)
+	}
+	if resp.Version != IAMAuthVersion {
+		return fmt.Errorf("unknown version found in response")
+	}
+
+	requestLatency := time.Since(requestTime)
+	b.updateIncomingCommunicationMetrics(len(bytesRead), requestLatency)
+
+	DebugLogger.Println("SASL authentication succeeded")
+	return nil
+}
+
+func getIAMPayload(addr, useragent string, cfg AWSMSKIAMConfig) ([]byte, error) {
+	sess, err := session.NewSession(&aws.Config{Region: &cfg.Region})
+	if err != nil {
+		return nil, err
+	}
+
+	signer := sign.NewSigner(
+		credentials.NewChainCredentials([]credentials.Provider{
+			&credentials.EnvProvider{},
+			&credentials.StaticProvider{
+				Value: credentials.Value{
+					AccessKeyID:     cfg.AccessKeyID,
+					SecretAccessKey: cfg.SecretAccessKey,
+					SessionToken:    cfg.SessionToken,
+				},
+			},
+			stscreds.NewWebIdentityRoleProviderWithOptions(
+				sts.New(sess),
+				cfg.RoleArn,
+				useragent,
+				stscreds.FetchTokenPath(cfg.WebIdentityTokenFile),
+			),
+		}),
+	)
+
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, err
+	}
+
+	var action = "kafka-cluster:Connect"
+
+	q := url.Values{
+		"Action": {action},
+	}
+
+	u := url.URL{
+		Host:     host,
+		Path:     "/",
+		RawQuery: q.Encode(),
+	}
+
+	req, err := http.NewRequest("GET", u.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.Expiry == time.Duration(0) {
+		cfg.Expiry = 5 * time.Minute
+	}
+
+	header, err := signer.Presign(req, nil, "kafka-cluster", cfg.Region, cfg.Expiry, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+
+	payload := map[string]string{
+		"version":    IAMAuthVersion,
+		"host":       host,
+		"user-agent": useragent,
+		"action":     action,
+	}
+
+	for key, vals := range header {
+		payload[strings.ToLower(key)] = vals[0]
+	}
+
+	for key, vals := range req.URL.Query() {
+		payload[strings.ToLower(key)] = vals[0]
+	}
+
+	return json.Marshal(payload)
 }
