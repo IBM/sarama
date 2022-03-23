@@ -850,7 +850,6 @@ type brokerConsumer struct {
 	input            chan *partitionConsumer
 	newSubscriptions chan []*partitionConsumer
 	subscriptions    map[*partitionConsumer]none
-	wait             chan none
 	acks             sync.WaitGroup
 	refs             int
 }
@@ -861,7 +860,6 @@ func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
 		broker:           broker,
 		input:            make(chan *partitionConsumer),
 		newSubscriptions: make(chan []*partitionConsumer),
-		wait:             make(chan none, 1),
 		subscriptions:    make(map[*partitionConsumer]none),
 		refs:             0,
 	}
@@ -875,72 +873,59 @@ func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
 // The subscriptionManager constantly accepts new subscriptions on `input` (even when the main subscriptionConsumer
 // goroutine is in the middle of a network request) and batches it up. The main worker goroutine picks
 // up a batch of new subscriptions between every network request by reading from `newSubscriptions`, so we give
-// it nil if no new subscriptions are available. We also write to `wait` only when new subscriptions is available,
-// so the main goroutine can block waiting for work if it has none.
+// it nil if no new subscriptions are available.
 func (bc *brokerConsumer) subscriptionManager() {
-	var partitionConsumers []*partitionConsumer
+	defer close(bc.newSubscriptions)
 
 	for {
-		// check for any partition consumer asking to subscribe if there aren't
-		// any, trigger the network request by sending "nil" to the
+		var partitionConsumers []*partitionConsumer
+
+		// Check for any partition consumer asking to subscribe if there aren't
+		// any, trigger the network request (to fetch Kafka messages) by sending "nil" to the
 		// newSubscriptions channel
 		select {
 		case pc, ok := <-bc.input:
 			if !ok {
-				goto done
+				return
 			}
-
-			// add to list of subscribing consumers
 			partitionConsumers = append(partitionConsumers, pc)
-
-			// wait up to 250ms to drain input of any further incoming
-			// subscriptions
-			for batchComplete := false; !batchComplete; {
-				select {
-				case pc, ok := <-bc.input:
-					if !ok {
-						goto done
-					}
-
-					partitionConsumers = append(partitionConsumers, pc)
-				case <-time.After(250 * time.Millisecond):
-					batchComplete = true
-				}
-			}
-
-			Logger.Printf(
-				"consumer/broker/%d accumulated %d new subscriptions\n",
-				bc.broker.ID(), len(partitionConsumers))
-
-			bc.wait <- none{}
-			bc.newSubscriptions <- partitionConsumers
-
-			// clear out the batch
-			partitionConsumers = nil
-
 		case bc.newSubscriptions <- nil:
+			continue
 		}
-	}
 
-done:
-	close(bc.wait)
-	if len(partitionConsumers) > 0 {
+		// wait up to 250ms to drain input of any further incoming
+		// subscriptions
+		for batchComplete := false; !batchComplete; {
+			select {
+			case pc, ok := <-bc.input:
+				if !ok {
+					return
+				}
+
+				partitionConsumers = append(partitionConsumers, pc)
+			case <-time.After(250 * time.Millisecond):
+				batchComplete = true
+			}
+		}
+
+		Logger.Printf(
+			"consumer/broker/%d accumulated %d new subscriptions\n",
+			bc.broker.ID(), len(partitionConsumers))
+
 		bc.newSubscriptions <- partitionConsumers
 	}
-	close(bc.newSubscriptions)
 }
 
 // subscriptionConsumer ensures we will get nil right away if no new subscriptions is available
+// this is a the main loop that fetches Kafka messages
 func (bc *brokerConsumer) subscriptionConsumer() {
-	<-bc.wait // wait for our first piece of work
-
 	for newSubscriptions := range bc.newSubscriptions {
 		bc.updateSubscriptions(newSubscriptions)
 
 		if len(bc.subscriptions) == 0 {
 			// We're about to be shut down or we're about to receive more subscriptions.
-			// Either way, the signal just hasn't propagated to our goroutine yet.
-			<-bc.wait
+			// Take a small nap to avoid burning the CPU.
+			time.Sleep(250 * time.Millisecond)
 			continue
 		}
 
@@ -1040,7 +1025,6 @@ func (bc *brokerConsumer) abort(err error) {
 
 	for newSubscriptions := range bc.newSubscriptions {
 		if len(newSubscriptions) == 0 {
-			<-bc.wait
 			continue
 		}
 		for _, child := range newSubscriptions {
