@@ -843,7 +843,6 @@ func (bp *brokerProducer) run() {
 			if msg.flags&fin == fin {
 				// New broker producer that was caught up by the retry loop
 				bp.parent.retryMessage(msg, ErrShuttingDown)
-				delete(bp.currentRetries[msg.Topic], msg.Partition)
 				Logger.Printf("producer/broker/%d state change to [dying-%d] on %s/%d\n",
 					bp.broker.ID(), msg.retries, msg.Topic, msg.Partition)
 				continue
