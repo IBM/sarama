@@ -912,7 +912,11 @@ func (bc *brokerConsumer) subscriptionManager() {
 				"consumer/broker/%d accumulated %d new subscriptions\n",
 				bc.broker.ID(), len(partitionConsumers))
 
-			bc.wait <- none{}
+			select {
+				case bc.wait <- none{}:
+				default:
+			}
+
 			bc.newSubscriptions <- partitionConsumers
 
 			// clear out the batch
