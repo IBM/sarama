@@ -750,7 +750,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 
 	var emptyValues int32 = 0
 
-	produceRequestTest := func(req *request) {
+	countRecordsWithEmptyValue := func(req *request) {
 		preq := req.body.(*ProduceRequest)
 		if batch := preq.records["my_topic"][0].RecordBatch; batch != nil {
 			for _, record := range batch.Records {
@@ -769,7 +769,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	}
 
 	leader.setHandler(func(req *request) (res encoderWithHeader) {
-		produceRequestTest(req)
+		countRecordsWithEmptyValue(req)
 
 		time.Sleep(50 * time.Millisecond)
 
@@ -815,7 +815,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	leader = NewMockBroker(t, 2)
 	leaderLock.Unlock()
 	leader.setHandler(func(req *request) (res encoderWithHeader) {
-		produceRequestTest(req)
+		countRecordsWithEmptyValue(req)
 
 		prodSuccess := new(ProduceResponse)
 		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
