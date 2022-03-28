@@ -824,7 +824,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 
 	wg.Wait()
 
-	expectResultsWithTimeout(t, producer, 40, 00, 10*time.Second)
+	expectResultsWithTimeout(t, producer, 40, 0, 10*time.Second)
 
 	seedBroker.Close()
 	leader.Close()
