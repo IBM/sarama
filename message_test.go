@@ -244,3 +244,32 @@ func TestMessageDecodingUnknownVersions(t *testing.T) {
 		t.Error("Decoding an unknown magic byte produced an unknown error ", err)
 	}
 }
+
+func TestCompressionCodecUnmarshal(t *testing.T) {
+	cases := []struct {
+		Input         string
+		Expected      CompressionCodec
+		ExpectedError bool
+	}{
+		{"none", CompressionNone, false},
+		{"zstd", CompressionZSTD, false},
+		{"gzip", CompressionGZIP, false},
+		{"unknown", CompressionNone, true},
+	}
+	for _, c := range cases {
+		var cc CompressionCodec
+		err := cc.UnmarshalText([]byte(c.Input))
+		if err != nil && !c.ExpectedError {
+			t.Errorf("UnmarshalText(%q) error:\n%+v", c.Input, err)
+			continue
+		}
+		if err == nil && c.ExpectedError {
+			t.Errorf("UnmarshalText(%q) got %v but expected error", c.Input, cc)
+			continue
+		}
+		if cc != c.Expected {
+			t.Errorf("UnmarshalText(%q) got %v but expected %v", c.Input, cc, c.Expected)
+			continue
+		}
+	}
+}
