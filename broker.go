@@ -666,6 +666,17 @@ func (b *Broker) CreateAcls(request *CreateAclsRequest) (*CreateAclsResponse, er
 		return nil, err
 	}
 
+	errs := make([]error, 0)
+	for _, res := range response.AclCreationResponses {
+		if !errors.Is(res.Err, ErrNoError) {
+			errs = append(errs, res.Err)
+		}
+	}
+
+	if len(errs) > 0 {
+		return response, Wrap(ErrCreateACLs, errs...)
+	}
+
 	return response, nil
 }
 

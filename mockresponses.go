@@ -998,6 +998,24 @@ func (mr *MockCreateAclsResponse) For(reqBody versionedDecoder) encoderWithHeade
 	return res
 }
 
+type MockCreateAclsResponseError struct {
+	t TestReporter
+}
+
+func NewMockCreateAclsResponseWithError(t TestReporter) *MockCreateAclsResponseError {
+	return &MockCreateAclsResponseError{t: t}
+}
+
+func (mr *MockCreateAclsResponseError) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*CreateAclsRequest)
+	res := &CreateAclsResponse{}
+
+	for range req.AclCreations {
+		res.AclCreationResponses = append(res.AclCreationResponses, &AclCreationResponse{Err: ErrInvalidRequest})
+	}
+	return res
+}
+
 type MockListAclsResponse struct {
 	t TestReporter
 }
