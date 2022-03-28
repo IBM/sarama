@@ -748,21 +748,21 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 		return metadataLeader
 	})
 
-	emptyValues := 0
+	var emptyValues int32 = 0
 
 	produceRequestTest := func(req *request) {
 		preq := req.body.(*ProduceRequest)
 		if batch := preq.records["my_topic"][0].RecordBatch; batch != nil {
 			for _, record := range batch.Records {
 				if len(record.Value) == 0 {
-					emptyValues++
+					atomic.AddInt32(&emptyValues, 1)
 				}
 			}
 		}
 		if batch := preq.records["my_topic"][0].MsgSet; batch != nil {
 			for _, record := range batch.Messages {
 				if len(record.Msg.Value) == 0 {
-					emptyValues++
+					atomic.AddInt32(&emptyValues, 1)
 				}
 			}
 		}
@@ -831,7 +831,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 
 	closeProducerWithTimeout(t, producer, 5*time.Second)
 
-	if emptyValues > 0 {
+	if emptyValues := atomic.LoadInt32(&emptyValues); emptyValues > 0 {
 		t.Fatalf("%d empty values", emptyValues)
 	}
 }
