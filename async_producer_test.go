@@ -779,7 +779,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	})
 
 	config := NewTestConfig()
-	config.Producer.Retry.Backoff = time.Second
+	config.Producer.Retry.Backoff = 250 * time.Millisecond
 	config.Producer.Flush.MaxMessages = 1
 	config.Producer.Return.Errors = true
 	config.Producer.Return.Successes = true
