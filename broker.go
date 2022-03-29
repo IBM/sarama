@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"sort"
 	"strconv"
@@ -52,7 +53,8 @@ type Broker struct {
 	brokerRequestsInFlight metrics.Counter
 	brokerThrottleTime     metrics.Histogram
 
-	kerberosAuthenticator GSSAPIKerberosAuth
+	kerberosAuthenticator               GSSAPIKerberosAuth
+	clientSessionReauthenticationTimeMs int64
 }
 
 // SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
@@ -923,6 +925,13 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 		return ErrNotConnected
 	}
 
+	if b.clientSessionReauthenticationTimeMs > 0 && currentUnixMilli() > b.clientSessionReauthenticationTimeMs {
+		err := b.authenticateViaSASL()
+		if err != nil {
+			return err
+		}
+	}
+
 	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
 		return ErrUnsupportedVersion
 	}
@@ -1263,7 +1272,7 @@ func (b *Broker) sendAndReceiveV1SASLPlainAuth() error {
 
 	// Will be decremented in updateIncomingCommunicationMetrics (except error)
 	b.addRequestInFlightMetrics(1)
-	bytesWritten, err := b.sendSASLPlainAuthClientResponse(correlationID)
+	bytesWritten, resVersion, err := b.sendSASLPlainAuthClientResponse(correlationID)
 	b.updateOutgoingCommunicationMetrics(bytesWritten)
 
 	if err != nil {
@@ -1274,7 +1283,8 @@ func (b *Broker) sendAndReceiveV1SASLPlainAuth() error {
 
 	b.correlationID++
 
-	bytesRead, err := b.receiveSASLServerResponse(&SaslAuthenticateResponse{}, correlationID)
+	res := &SaslAuthenticateResponse{}
+	bytesRead, err := b.receiveSASLServerResponse(res, correlationID, resVersion)
 	b.updateIncomingCommunicationMetrics(bytesRead, time.Since(requestTime))
 
 	// With v1 sasl we get an error message set in the response we can return
@@ -1286,6 +1296,10 @@ func (b *Broker) sendAndReceiveV1SASLPlainAuth() error {
 	}
 
 	return nil
+}
+
+func currentUnixMilli() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
 // sendAndReceiveSASLOAuth performs the authentication flow as described by KIP-255
@@ -1327,7 +1341,7 @@ func (b *Broker) sendClientMessage(message []byte) (bool, error) {
 	b.addRequestInFlightMetrics(1)
 	correlationID := b.correlationID
 
-	bytesWritten, err := b.sendSASLOAuthBearerClientMessage(message, correlationID)
+	bytesWritten, resVersion, err := b.sendSASLOAuthBearerClientMessage(message, correlationID)
 	b.updateOutgoingCommunicationMetrics(bytesWritten)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
@@ -1337,7 +1351,7 @@ func (b *Broker) sendClientMessage(message []byte) (bool, error) {
 	b.correlationID++
 
 	res := &SaslAuthenticateResponse{}
-	bytesRead, err := b.receiveSASLServerResponse(res, correlationID)
+	bytesRead, err := b.receiveSASLServerResponse(res, correlationID, resVersion)
 
 	requestLatency := time.Since(requestTime)
 	b.updateIncomingCommunicationMetrics(bytesRead, requestLatency)
@@ -1464,7 +1478,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
 }
 
 func (b *Broker) sendSaslAuthenticateRequest(correlationID int32, msg []byte) (int, error) {
-	rb := &SaslAuthenticateRequest{msg}
+	rb := b.createSaslAuthenticateRequest(msg)
 	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
 	buf, err := encode(req, b.conf.MetricRegistry)
 	if err != nil {
@@ -1472,6 +1486,15 @@ func (b *Broker) sendSaslAuthenticateRequest(correlationID int32, msg []byte) (i
 	}
 
 	return b.write(buf)
+}
+
+func (b *Broker) createSaslAuthenticateRequest(msg []byte) *SaslAuthenticateRequest {
+	authenticateRequest := SaslAuthenticateRequest{SaslAuthBytes: msg}
+	if b.conf.Version.IsAtLeast(V2_2_0_0) {
+		authenticateRequest.Version = 1
+	}
+
+	return &authenticateRequest
 }
 
 func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, error) {
@@ -1538,32 +1561,34 @@ func mapToString(extensions map[string]string, keyValSep string, elemSep string)
 	return strings.Join(buf, elemSep)
 }
 
-func (b *Broker) sendSASLPlainAuthClientResponse(correlationID int32) (int, error) {
+func (b *Broker) sendSASLPlainAuthClientResponse(correlationID int32) (int, int16, error) {
 	authBytes := []byte(b.conf.Net.SASL.AuthIdentity + "\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password)
-	rb := &SaslAuthenticateRequest{authBytes}
+	rb := b.createSaslAuthenticateRequest(authBytes)
 	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
 	buf, err := encode(req, b.conf.MetricRegistry)
 	if err != nil {
-		return 0, err
+		return 0, rb.Version, err
 	}
 
-	return b.write(buf)
+	write, err := b.write(buf)
+	return write, rb.Version, err
 }
 
-func (b *Broker) sendSASLOAuthBearerClientMessage(initialResp []byte, correlationID int32) (int, error) {
-	rb := &SaslAuthenticateRequest{initialResp}
+func (b *Broker) sendSASLOAuthBearerClientMessage(initialResp []byte, correlationID int32) (int, int16, error) {
+	rb := b.createSaslAuthenticateRequest(initialResp)
 
 	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
 
 	buf, err := encode(req, b.conf.MetricRegistry)
 	if err != nil {
-		return 0, err
+		return 0, rb.version(), err
 	}
 
-	return b.write(buf)
+	write, err := b.write(buf)
+	return write, rb.version(), err
 }
 
-func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correlationID int32) (int, error) {
+func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correlationID int32, resVersion int16) (int, error) {
 	buf := make([]byte, responseLengthSize+correlationIDSize)
 	bytesRead, err := b.readFull(buf)
 	if err != nil {
@@ -1587,7 +1612,7 @@ func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correl
 		return bytesRead, err
 	}
 
-	if err := versionedDecode(buf, res, 0); err != nil {
+	if err := versionedDecode(buf, res, resVersion); err != nil {
 		return bytesRead, err
 	}
 
@@ -1597,6 +1622,21 @@ func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correl
 			err = Wrap(res.Err, errors.New(*res.ErrorMessage))
 		}
 		return bytesRead, err
+	}
+
+	if res.SessionLifetimeMs > 0 {
+		// Follows the Java Kafka implementation from SaslClientAuthenticator.ReauthInfo#setAuthenticationEndAndSessionReauthenticationTimes
+		// pick a random percentage between 85% and 95% for session re-authentication
+		positiveSessionLifetimeMs := res.SessionLifetimeMs
+		authenticationEndMs := currentUnixMilli()
+		pctWindowFactorToTakeNetworkLatencyAndClockDriftIntoAccount := 0.85
+		pctWindowJitterToAvoidReauthenticationStormAcrossManyChannelsSimultaneously := 0.10
+		pctToUse := pctWindowFactorToTakeNetworkLatencyAndClockDriftIntoAccount + rand.Float64()*pctWindowJitterToAvoidReauthenticationStormAcrossManyChannelsSimultaneously
+		sessionLifetimeMsToUse := int64(float64(positiveSessionLifetimeMs) * pctToUse)
+		DebugLogger.Printf("Session expiration in %d ms and session re-authentication on or after %d ms", positiveSessionLifetimeMs, sessionLifetimeMsToUse)
+		b.clientSessionReauthenticationTimeMs = authenticationEndMs + sessionLifetimeMsToUse
+	} else {
+		b.clientSessionReauthenticationTimeMs = 0
 	}
 
 	return bytesRead, nil
