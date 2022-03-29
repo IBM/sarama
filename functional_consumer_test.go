@@ -4,12 +4,14 @@
 package sarama
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -280,6 +282,128 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 		t.Logf("Received %s from %s-%d at offset %d", msg.Value, msg.Topic, msg.Partition, msg.Offset)
 		require.Equal(t, fmt.Sprintf("Committed %v", i), string(msg.Value))
 	}
+}
+
+func TestConsumerGroupDeadlock(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	require := require.New(t)
+
+	const topic = "test_consumer_group_rebalance_test_topic"
+	const msgQty = 50
+	partitionsQty := len(FunctionalTestEnv.KafkaBrokerAddrs) * 3
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+
+	config := NewConfig()
+	config.ClientID = t.Name()
+	config.Producer.Return.Successes = true
+	config.ChannelBufferSize = 2 * msgQty
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(err)
+
+	admin, err := NewClusterAdminFromClient(client)
+	require.NoError(err)
+
+	cgName := "test_consumer_group_rebalance_consumer_group"
+
+	err = admin.DeleteConsumerGroup(cgName)
+	if err != nil {
+		t.Logf("failed to delete topic: %s", err)
+	}
+
+	err = admin.DeleteTopic(topic)
+	if err != nil {
+		t.Logf("failed to delete topic: %s", err)
+	}
+
+	// it takes time to delete topic, the API is not sync
+	for i := 0; i < 5; i++ {
+		err = admin.CreateTopic(topic, &TopicDetail{NumPartitions: int32(partitionsQty), ReplicationFactor: 1}, false)
+		if err == nil {
+			break
+		}
+		if err == ErrTopicAlreadyExists || strings.Contains(err.Error(), "is marked for deletion") {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		break
+	}
+	require.NoError(err)
+	defer admin.DeleteTopic(topic)
+
+	var wg sync.WaitGroup
+
+	consumer, err := NewConsumerFromClient(client)
+	require.NoError(err)
+
+	ch := make(chan string, msgQty)
+	for i := 0; i < partitionsQty; i++ {
+		time.Sleep(250 * time.Millisecond) // ensure delays between the "claims"
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			pConsumer, err := consumer.ConsumePartition(topic, int32(i), OffsetOldest)
+			require.NoError(err)
+			defer pConsumer.Close()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case msg, ok := <-pConsumer.Messages():
+					if !ok {
+						return
+					}
+					// t.Logf("consumer-group %d consumed: %v from %s/%d/%d", i, msg.Value, msg.Topic, msg.Partition, msg.Offset)
+					ch <- string(msg.Value)
+				}
+			}
+		}(i)
+	}
+
+	producer, err := NewSyncProducerFromClient(client)
+	require.NoError(err)
+
+	for i := 0; i < msgQty; i++ {
+		msg := &ProducerMessage{
+			Topic: topic,
+			Value: StringEncoder(strconv.FormatInt(int64(i), 10)),
+		}
+		_, _, err := producer.SendMessage(msg)
+		require.NoError(err)
+	}
+
+	var received []string
+	func() {
+		for len(received) < msgQty {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-ch:
+				received = append(received, msg)
+				// t.Logf("received: %s, count: %d", msg, len(received))
+			}
+		}
+	}()
+
+	cancel()
+
+	require.Equal(msgQty, len(received))
+
+	err = producer.Close()
+	require.NoError(err)
+
+	err = consumer.Close()
+	require.NoError(err)
+
+	err = client.Close()
+	require.NoError(err)
+
+	wg.Wait()
 }
 
 func prodMsg2Str(prodMsg *ProducerMessage) string {
