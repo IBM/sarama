@@ -840,6 +840,14 @@ func (bp *brokerProducer) run() {
 				continue
 			}
 
+			if msg.flags&fin == fin {
+				// New broker producer that was caught up by the retry loop
+				bp.parent.retryMessage(msg, ErrShuttingDown)
+				DebugLogger.Printf("producer/broker/%d state change to [dying-%d] on %s/%d\n",
+					bp.broker.ID(), msg.retries, msg.Topic, msg.Partition)
+				continue
+			}
+
 			if bp.buffer.wouldOverflow(msg) {
 				Logger.Printf("producer/broker/%d maximum request accumulated, waiting for space\n", bp.broker.ID())
 				if err := bp.waitForSpace(msg, false); err != nil {
