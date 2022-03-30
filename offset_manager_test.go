@@ -553,6 +553,7 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 
 	// Response to refresh coordinator request
 	newCoordinator := NewMockBroker(t, 3)
+	defer newCoordinator.Close()
 	broker.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   newCoordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",

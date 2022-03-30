@@ -149,7 +149,11 @@ func NewClusterAdmin(addrs []string, conf *Config) (ClusterAdmin, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewClusterAdminFromClient(client)
+	admin, err := NewClusterAdminFromClient(client)
+	if err != nil {
+		client.Close()
+	}
+	return admin, err
 }
 
 // NewClusterAdminFromClient creates a new ClusterAdmin using the given client.

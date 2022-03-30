@@ -1498,6 +1498,7 @@ func TestDeleteConsumerGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	err = admin.DeleteConsumerGroup(group)
 	if err != nil {
@@ -1537,6 +1538,7 @@ func TestDeleteOffset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeleteConsumerGroupOffset failed with error %v", err)
 	}
+	defer admin.Close()
 
 	// Test Error
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNotCoordinatorForConsumer, topic, partition, ErrNoError)
@@ -1577,6 +1579,7 @@ func TestRefreshMetaDataWithDifferentController(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	ca := clusterAdmin{client: client, conf: config}
 

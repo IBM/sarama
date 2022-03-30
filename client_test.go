@@ -518,7 +518,9 @@ func TestClientRefreshBehaviour(t *testing.T) {
 
 func TestClientRefreshBrokers(t *testing.T) {
 	initialSeed := NewMockBroker(t, 0)
+	defer initialSeed.Close()
 	leader := NewMockBroker(t, 5)
+	defer leader.Close()
 
 	metadataResponse1 := new(MetadataResponse)
 	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
@@ -549,7 +551,9 @@ func TestClientRefreshBrokers(t *testing.T) {
 
 func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
 	leader := NewMockBroker(t, 5)
+	defer leader.Close()
 
 	metadataResponse1 := new(MetadataResponse)
 	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
@@ -560,6 +564,7 @@ func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	if len(client.Brokers()) != 2 {
 		t.Error("Meta broker is not 2")
@@ -579,7 +584,9 @@ func TestClientRefreshMetadataBrokerOffline(t *testing.T) {
 
 func TestClientGetBroker(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
 	leader := NewMockBroker(t, 5)
+	defer leader.Close()
 
 	metadataResponse1 := new(MetadataResponse)
 	metadataResponse1.AddBroker(leader.Addr(), leader.BrokerID())
@@ -590,6 +597,7 @@ func TestClientGetBroker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	broker, err := client.Broker(leader.BrokerID())
 	if err != nil {
@@ -669,6 +677,7 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 		t.Error("incorrect number of dead seeds")
 	}
 
+	seed2.Close()
 	safeClose(t, c)
 }
 
@@ -938,6 +947,7 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 
 func TestClientAutorefreshShutdownRace(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
 
 	metadataResponse := new(MetadataResponse)
 	seedBroker.Returns(metadataResponse)
@@ -964,6 +974,7 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 
 	// Then return some metadata to the still-running background thread
 	leader := NewMockBroker(t, 2)
+	defer leader.Close()
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataResponse.AddTopicPartition("foo", 0, leader.BrokerID(), []int32{2}, []int32{2}, []int32{}, ErrNoError)
 	seedBroker.Returns(metadataResponse)
@@ -972,8 +983,6 @@ func TestClientAutorefreshShutdownRace(t *testing.T) {
 	if err != nil {
 		t.Fatalf("goroutine client.Close():%s", err)
 	}
-
-	seedBroker.Close()
 
 	// give the update time to happen so we get a panic if it's still running (which it shouldn't)
 	time.Sleep(10 * time.Millisecond)

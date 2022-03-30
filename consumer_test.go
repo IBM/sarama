@@ -1157,6 +1157,7 @@ func TestConsumeMessagesTrackLeader(t *testing.T) {
 
 	safeClose(t, pConsumer)
 	safeClose(t, consumer)
+	safeClose(t, client)
 	leader1.Close()
 	leader2.Close()
 }
