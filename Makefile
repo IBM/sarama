@@ -2,7 +2,7 @@ default: fmt get update test lint
 
 GO       := go
 GOBUILD  := CGO_ENABLED=0 $(GO) build $(BUILD_FLAG)
-GOTEST   := $(GO) test -v -race -timeout 10m -coverprofile=profile.out -covermode=atomic
+GOTEST   := $(GO) test -v -race -coverprofile=profile.out -covermode=atomic
 
 FILES    := $(shell find . -name '*.go' -type f -not -name '*.pb.go' -not -name '*_generated.go' -not -name '*_test.go')
 TESTS    := $(shell find . -name '*.go' -type f -not -name '*.pb.go' -not -name '*_generated.go' -name '*_test.go')
@@ -24,8 +24,8 @@ lint:
 	GOFLAGS="-tags=functional" golangci-lint run
 
 test:
-	$(GOTEST) ./...
+	$(GOTEST) -timeout 2m ./...
 
 .PHONY: test_functional
 test_functional:
-	$(GOTEST) -tags=functional ./...
+	$(GOTEST) -timeout 12m -tags=functional ./...
