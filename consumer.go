@@ -96,6 +96,9 @@ type Consumer interface {
 	ResumeAll()
 }
 
+// max time to wait for more partition subscriptions
+const partitionConsumersBatchTimeout = 100 * time.Millisecond
+
 type consumer struct {
 	conf            *Config
 	children        map[string]map[int32]*partitionConsumer
@@ -893,20 +896,17 @@ func (bc *brokerConsumer) subscriptionManager() {
 			continue
 		}
 
-		// wait up to 250ms to drain input of any further incoming
-		// subscriptions
+		// drain input of any further incoming subscriptions
+		timer := time.NewTimer(partitionConsumersBatchTimeout)
 		for batchComplete := false; !batchComplete; {
 			select {
-			case pc, ok := <-bc.input:
-				if !ok {
-					return
-				}
-
+			case pc := <-bc.input:
 				partitionConsumers = append(partitionConsumers, pc)
-			case <-time.After(250 * time.Millisecond):
+			case <-timer.C:
 				batchComplete = true
 			}
 		}
+		timer.Stop()
 
 		Logger.Printf(
 			"consumer/broker/%d accumulated %d new subscriptions\n",
@@ -925,7 +925,7 @@ func (bc *brokerConsumer) subscriptionConsumer() {
 		if len(bc.subscriptions) == 0 {
 			// We're about to be shut down or we're about to receive more subscriptions.
 			// Take a small nap to avoid burning the CPU.
-			time.Sleep(250 * time.Millisecond)
+			time.Sleep(partitionConsumersBatchTimeout)
 			continue
 		}
 
@@ -1025,6 +1025,8 @@ func (bc *brokerConsumer) abort(err error) {
 
 	for newSubscriptions := range bc.newSubscriptions {
 		if len(newSubscriptions) == 0 {
+			// Take a small nap to avoid burning the CPU.
+			time.Sleep(partitionConsumersBatchTimeout)
 			continue
 		}
 		for _, child := range newSubscriptions {
