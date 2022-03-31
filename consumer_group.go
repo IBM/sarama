@@ -869,6 +869,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 			retries = s.parent.config.Metadata.Retry.Max
 		case ErrRebalanceInProgress:
 			retries = s.parent.config.Metadata.Retry.Max
+			s.cancel()
 		case ErrUnknownMemberId, ErrIllegalGeneration:
 			return
 		default:
