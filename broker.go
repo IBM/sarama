@@ -32,7 +32,7 @@ type Broker struct {
 	responses     chan *responsePromise
 	done          chan bool
 
-	registeredMetrics []string
+	registeredMetrics map[string]struct{}
 
 	incomingByteRate       metrics.Meter
 	requestRate            metrics.Meter
@@ -1683,7 +1683,7 @@ func (b *Broker) registerMetrics() {
 }
 
 func (b *Broker) unregisterMetrics() {
-	for _, name := range b.registeredMetrics {
+	for name := range b.registeredMetrics {
 		b.conf.MetricRegistry.Unregister(name)
 	}
 	b.registeredMetrics = nil
@@ -1691,19 +1691,28 @@ func (b *Broker) unregisterMetrics() {
 
 func (b *Broker) registerMeter(name string) metrics.Meter {
 	nameForBroker := getMetricNameForBroker(name, b)
-	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	if b.registeredMetrics == nil {
+		b.registeredMetrics = map[string]struct{}{}
+	}
+	b.registeredMetrics[nameForBroker] = struct{}{}
 	return metrics.GetOrRegisterMeter(nameForBroker, b.conf.MetricRegistry)
 }
 
 func (b *Broker) registerHistogram(name string) metrics.Histogram {
 	nameForBroker := getMetricNameForBroker(name, b)
-	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	if b.registeredMetrics == nil {
+		b.registeredMetrics = map[string]struct{}{}
+	}
+	b.registeredMetrics[nameForBroker] = struct{}{}
 	return getOrRegisterHistogram(nameForBroker, b.conf.MetricRegistry)
 }
 
 func (b *Broker) registerCounter(name string) metrics.Counter {
 	nameForBroker := getMetricNameForBroker(name, b)
-	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	if b.registeredMetrics == nil {
+		b.registeredMetrics = map[string]struct{}{}
+	}
+	b.registeredMetrics[nameForBroker] = struct{}{}
 	return metrics.GetOrRegisterCounter(nameForBroker, b.conf.MetricRegistry)
 }
 
