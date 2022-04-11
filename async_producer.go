@@ -1064,6 +1064,7 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 	}
 	bp := p.getBrokerProducer(leader)
 	bp.output <- produceSet
+	p.unrefBrokerProducer(leader, bp)
 }
 
 func (bp *brokerProducer) handleError(sent *produceSet, err error) {
