@@ -1,45 +1,46 @@
 version: '3.7'
 services:
   zookeeper-1:
-    image: 'confluentinc/cp-zookeeper:7.0.1'
+    image: 'docker.io/library/zookeeper:3.6.3'
     restart: always
     environment:
-      ZOOKEEPER_SERVER_ID: '1'
-      ZOOKEEPER_SERVERS: 'zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888'
-      ZOOKEEPER_CLIENT_PORT: '2181'
-      ZOOKEEPER_PEER_PORT: '2888'
-      ZOOKEEPER_LEADER_PORT: '3888'
-      ZOOKEEPER_INIT_LIMIT: '10'
-      ZOOKEEPER_SYNC_LIMIT: '5'
-      ZOOKEEPER_MAX_CLIENT_CONNS: '0'
+      ZOO_MY_ID: '1'
+      ZOO_SERVERS: 'server.1=zookeeper-1:2888:3888 server.2=zookeeper-2:2888:3888 server.3=zookeeper-3:2888:3888'
+      ZOO_CFG_EXTRA: 'clientPort=2181 peerPort=2888 leaderPort=3888'
+      ZOO_INIT_LIMIT: '10'
+      ZOO_SYNC_LIMIT: '5'
+      ZOO_MAX_CLIENT_CNXNS: '0'
+      ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   zookeeper-2:
-    image: 'confluentinc/cp-zookeeper:7.0.1'
+    image: 'docker.io/library/zookeeper:3.6.3'
     restart: always
     environment:
-      ZOOKEEPER_SERVER_ID: '2'
-      ZOOKEEPER_SERVERS: 'zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888'
-      ZOOKEEPER_CLIENT_PORT: '2181'
-      ZOOKEEPER_PEER_PORT: '2888'
-      ZOOKEEPER_LEADER_PORT: '3888'
-      ZOOKEEPER_INIT_LIMIT: '10'
-      ZOOKEEPER_SYNC_LIMIT: '5'
-      ZOOKEEPER_MAX_CLIENT_CONNS: '0'
+      ZOO_MY_ID: '2'
+      ZOO_SERVERS: 'server.1=zookeeper-1:2888:3888 server.2=zookeeper-2:2888:3888 server.3=zookeeper-3:2888:3888'
+      ZOO_CFG_EXTRA: 'clientPort=2181 peerPort=2888 leaderPort=3888'
+      ZOO_INIT_LIMIT: '10'
+      ZOO_SYNC_LIMIT: '5'
+      ZOO_MAX_CLIENT_CNXNS: '0'
+      ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   zookeeper-3:
-    image: 'confluentinc/cp-zookeeper:7.0.1'
+    image: 'docker.io/library/zookeeper:3.6.3'
     restart: always
     environment:
-      ZOOKEEPER_SERVER_ID: '3'
-      ZOOKEEPER_SERVERS: 'zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888'
-      ZOOKEEPER_CLIENT_PORT: '2181'
-      ZOOKEEPER_PEER_PORT: '2888'
-      ZOOKEEPER_LEADER_PORT: '3888'
-      ZOOKEEPER_INIT_LIMIT: '10'
-      ZOOKEEPER_SYNC_LIMIT: '5'
-      ZOOKEEPER_MAX_CLIENT_CONNS: '0'
+      ZOO_MY_ID: '3'
+      ZOO_SERVERS: 'server.1=zookeeper-1:2888:3888 server.2=zookeeper-2:2888:3888 server.3=zookeeper-3:2888:3888'
+      ZOO_CFG_EXTRA: 'clientPort=2181 peerPort=2888 leaderPort=3888'
+      ZOO_INIT_LIMIT: '10'
+      ZOO_SYNC_LIMIT: '5'
+      ZOO_MAX_CLIENT_CNXNS: '0'
+      ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   kafka-1:
-    image: 'bitnami/kafka:${KAFKA_VERSION:-3.1.0}'
+    image: 'sarama/fv-kafka'
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka
     restart: always
     environment:
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.1.0}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29091'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-1:9091,LISTENER_LOCAL://localhost:29091'
@@ -48,16 +49,19 @@ services:
       KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: '2'
       KAFKA_CFG_BROKER_ID: '1'
       KAFKA_CFG_BROKER_RACK: '1'
-      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '3000'
-      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '3000'
+      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '6000'
+      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '6000'
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
-      ALLOW_PLAINTEXT_LISTENER: 'true'
   kafka-2:
-    image: 'bitnami/kafka:${KAFKA_VERSION:-3.1.0}'
+    image: 'sarama/fv-kafka'
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka
     restart: always
     environment:
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.1.0}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29092'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-2:9091,LISTENER_LOCAL://localhost:29092'
@@ -66,16 +70,19 @@ services:
       KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: '2'
       KAFKA_CFG_BROKER_ID: '2'
       KAFKA_CFG_BROKER_RACK: '2'
-      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '3000'
-      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '3000'
+      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '6000'
+      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '6000'
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
-      ALLOW_PLAINTEXT_LISTENER: 'true'
   kafka-3:
-    image: 'bitnami/kafka:${KAFKA_VERSION:-3.1.0}'
+    image: 'sarama/fv-kafka'
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka
     restart: always
     environment:
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.1.0}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29093'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-3:9091,LISTENER_LOCAL://localhost:29093'
@@ -84,16 +91,19 @@ services:
       KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: '2'
       KAFKA_CFG_BROKER_ID: '3'
       KAFKA_CFG_BROKER_RACK: '3'
-      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '3000'
-      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '3000'
+      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '6000'
+      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '6000'
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
-      ALLOW_PLAINTEXT_LISTENER: 'true'
   kafka-4:
-    image: 'bitnami/kafka:${KAFKA_VERSION:-3.1.0}'
+    image: 'sarama/fv-kafka'
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka
     restart: always
     environment:
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.1.0}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29094'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-4:9091,LISTENER_LOCAL://localhost:29094'
@@ -102,16 +112,19 @@ services:
       KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: '2'
       KAFKA_CFG_BROKER_ID: '4'
       KAFKA_CFG_BROKER_RACK: '4'
-      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '3000'
-      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '3000'
+      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '6000'
+      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '6000'
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
-      ALLOW_PLAINTEXT_LISTENER: 'true'
   kafka-5:
-    image: 'bitnami/kafka:${KAFKA_VERSION:-3.1.0}'
+    image: 'sarama/fv-kafka'
+    build:
+      context: .
+      dockerfile: Dockerfile.kafka
     restart: always
     environment:
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.1.0}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29095'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-5:9091,LISTENER_LOCAL://localhost:29095'
@@ -120,12 +133,11 @@ services:
       KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: '2'
       KAFKA_CFG_BROKER_ID: '5'
       KAFKA_CFG_BROKER_RACK: '5'
-      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '3000'
-      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '3000'
+      KAFKA_CFG_ZOOKEEPER_SESSION_TIMEOUT_MS: '6000'
+      KAFKA_CFG_ZOOKEEPER_CONNECTION_TIMEOUT_MS: '6000'
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
-      ALLOW_PLAINTEXT_LISTENER: 'true'
   toxiproxy:
     image: 'ghcr.io/shopify/toxiproxy:2.3.0'
     ports:
