@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -1135,13 +1136,30 @@ func (p *asyncProducer) shutdown() {
 	close(p.successes)
 }
 
+func (p *asyncProducer) bumpIdempotentProducerEpoch() {
+	_, epoch := p.txnmgr.getProducerID()
+	if epoch == math.MaxInt16 {
+		Logger.Println("producer/txnmanager epoch exhausted, requesting new producer ID")
+		txnmgr, err := newTransactionManager(p.conf, p.client)
+		if err != nil {
+			Logger.Println(err)
+			return
+		}
+
+		p.txnmgr = txnmgr
+	} else {
+		p.txnmgr.bumpEpoch()
+	}
+}
+
 func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
 	// We need to reset the producer ID epoch if we set a sequence number on it, because the broker
 	// will never see a message with this number, so we can never continue the sequence.
 	if msg.hasSequence {
 		Logger.Printf("producer/txnmanager rolling over epoch due to publish failure on %s/%d", msg.Topic, msg.Partition)
-		p.txnmgr.bumpEpoch()
+		p.bumpIdempotentProducerEpoch()
 	}
+
 	msg.clear()
 	pErr := &ProducerError{Msg: msg, Err: err}
 	if p.conf.Producer.Return.Errors {
