@@ -325,14 +325,16 @@ func TestConsumerGroupDeadlock(t *testing.T) {
 		if err == nil {
 			break
 		}
-		if err == ErrTopicAlreadyExists || strings.Contains(err.Error(), "is marked for deletion") {
+		if errors.Is(err, ErrTopicAlreadyExists) || strings.Contains(err.Error(), "is marked for deletion") {
 			time.Sleep(500 * time.Millisecond)
 			continue
 		}
 		break
 	}
 	require.NoError(err)
-	defer admin.DeleteTopic(topic)
+	defer func() {
+		_ = admin.DeleteTopic(topic)
+	}()
 
 	var wg sync.WaitGroup
 
