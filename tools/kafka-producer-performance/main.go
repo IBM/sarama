@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/base64"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"io"
@@ -33,7 +36,17 @@ var (
 	messageSize = flag.Int(
 		"message-size",
 		0,
-		"REQUIRED: The approximate size (in bytes) of each message to produce to -topic.",
+		"(OR -message-file) The approximate size (in bytes) of each message to produce to -topic.",
+	)
+	messageFile = flag.String(
+		"message-file",
+		"",
+		"(OR -message-size) The file holding the payload of messages, one message per line.",
+	)
+	messageDecoder = flag.String(
+		"message-decoder",
+		"raw",
+		"The decoder for the message lines in the -message-file (raw, hex, base64).",
 	)
 	brokers = flag.String(
 		"brokers",
@@ -157,6 +170,36 @@ var (
 	)
 )
 
+type DecoderFunc func(text []byte) (message []byte, err error)
+
+func parseMessageDecoder(scheme string) DecoderFunc {
+	switch scheme {
+	case "raw":
+		return func(text []byte) (message []byte, err error) {
+			return text, nil
+		}
+	case "hex":
+		return func(text []byte) (message []byte, err error) {
+			message = make([]byte, len(text)/2)
+			if _, err = hex.Decode(message, text); err != nil {
+				return nil, err
+			}
+			return
+		}
+	case "base64":
+		return func(text []byte) (message []byte, err error) {
+			message = make([]byte, len(text)*3/4+1)
+			if _, err = base64.StdEncoding.Decode(message, text); err != nil {
+				return nil, err
+			}
+			return
+		}
+	default:
+		printUsageErrorAndExit(fmt.Sprintf("Unknown -message-decoder: %s", scheme))
+	}
+	panic("should not happen")
+}
+
 func parseCompression(scheme string) sarama.CompressionCodec {
 	switch scheme {
 	case "none":
@@ -200,10 +243,18 @@ func parseVersion(version string) sarama.KafkaVersion {
 	return result
 }
 
-func generateMessages(topic string, partition, messageLoad, messageSize int) []*sarama.ProducerMessage {
+type MessageGenerator interface {
+	Generate(topic string, partition, messageLoad int) []*sarama.ProducerMessage
+}
+
+type RandomMessageGenerator struct {
+	MessageSize int
+}
+
+func (g *RandomMessageGenerator) Generate(topic string, partition, messageLoad int) []*sarama.ProducerMessage {
 	messages := make([]*sarama.ProducerMessage, messageLoad)
 	for i := 0; i < messageLoad; i++ {
-		payload := make([]byte, messageSize)
+		payload := make([]byte, g.MessageSize)
 		if _, err := rand.Read(payload); err != nil {
 			printErrorAndExit(69, "Failed to generate message payload: %s", err)
 		}
@@ -213,6 +264,46 @@ func generateMessages(topic string, partition, messageLoad, messageSize int) []*
 			Value:     sarama.ByteEncoder(payload),
 		}
 	}
+	log.Printf("RandomMessageGenerator has generated %d messages\n", len(messages))
+	return messages
+}
+
+type FileMessageGenerator struct {
+	MessageFile string
+	DecoderFunc DecoderFunc
+}
+
+func (g *FileMessageGenerator) Generate(topic string, partition, messageLoad int) []*sarama.ProducerMessage {
+	messages := make([]*sarama.ProducerMessage, messageLoad)
+	in, err := os.Open(g.MessageFile)
+	if err != nil {
+		printErrorAndExit(69, "Failed to open message file: %v", err)
+	}
+	defer in.Close()
+	r := bufio.NewScanner(in)
+
+	records := make([][]byte, 0, 64)
+	for r.Scan() {
+		if b := r.Bytes(); len(b) != 0 {
+			records = append(records, r.Bytes())
+		}
+	}
+	if err = r.Err(); err != nil {
+		printErrorAndExit(69, "Failed to scan message file: %v", err)
+	}
+	for i := 0; i < messageLoad; i++ {
+		text := records[i%len(records)]
+		payload, err := g.DecoderFunc(text)
+		if err != nil {
+			printErrorAndExit(69, "Failed to decode message data: %s", string(text))
+		}
+		messages[i] = &sarama.ProducerMessage{
+			Topic:     topic,
+			Partition: int32(partition),
+			Value:     sarama.ByteEncoder(payload),
+		}
+	}
+	log.Printf("FileMessageGenerator has generated %d messages from %d records\n", len(messages), len(records))
 	return messages
 }
 
@@ -228,8 +319,8 @@ func main() {
 	if *messageLoad <= 0 {
 		printUsageErrorAndExit("-message-load must be greater than 0")
 	}
-	if *messageSize <= 0 {
-		printUsageErrorAndExit("-message-size must be greater than 0")
+	if *messageSize <= 0 && *messageFile == "" {
+		printUsageErrorAndExit("one of -message-size or -message-file must be set")
 	}
 	if *routines < 1 || *routines > *messageLoad {
 		printUsageErrorAndExit("-routines must be greater than 0 and less than or equal to -message-load")
@@ -303,19 +394,26 @@ func main() {
 	}(ctx)
 
 	brokers := strings.Split(*brokers, ",")
+
+	var messageGenerator MessageGenerator
+	if *messageFile != "" {
+		messageGenerator = &FileMessageGenerator{*messageFile, parseMessageDecoder(*messageDecoder)}
+	} else {
+		messageGenerator = &RandomMessageGenerator{*messageSize}
+	}
+
 	if *sync {
-		runSyncProducer(*topic, *partition, *messageLoad, *messageSize, *routines,
+		runSyncProducer(*topic, *partition, *messageLoad, *routines, messageGenerator,
 			config, brokers, *throughput)
 	} else {
-		runAsyncProducer(*topic, *partition, *messageLoad, *messageSize,
+		runAsyncProducer(*topic, *partition, *messageLoad, messageGenerator,
 			config, brokers, *throughput)
 	}
 
 	cancel()
 	<-done
 }
-
-func runAsyncProducer(topic string, partition, messageLoad, messageSize int,
+func runAsyncProducer(topic string, partition, messageLoad int, messageGenerator MessageGenerator,
 	config *sarama.Config, brokers []string, throughput int) {
 	producer, err := sarama.NewAsyncProducer(brokers, config)
 	if err != nil {
@@ -329,7 +427,7 @@ func runAsyncProducer(topic string, partition, messageLoad, messageSize int,
 		}
 	}()
 
-	messages := generateMessages(topic, partition, messageLoad, messageSize)
+	messages := messageGenerator.Generate(topic, partition, messageLoad)
 
 	messagesDone := make(chan struct{})
 	go func() {
@@ -362,7 +460,7 @@ func runAsyncProducer(topic string, partition, messageLoad, messageSize int,
 	close(messagesDone)
 }
 
-func runSyncProducer(topic string, partition, messageLoad, messageSize, routines int,
+func runSyncProducer(topic string, partition, messageLoad, routines int, messageGenerator MessageGenerator,
 	config *sarama.Config, brokers []string, throughput int) {
 	producer, err := sarama.NewSyncProducer(brokers, config)
 	if err != nil {
@@ -379,9 +477,9 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 	messages := make([][]*sarama.ProducerMessage, routines)
 	for i := 0; i < routines; i++ {
 		if i == routines-1 {
-			messages[i] = generateMessages(topic, partition, messageLoad/routines+messageLoad%routines, messageSize)
+			messages[i] = messageGenerator.Generate(topic, partition, messageLoad/routines+messageLoad%routines)
 		} else {
-			messages[i] = generateMessages(topic, partition, messageLoad/routines, messageSize)
+			messages[i] = messageGenerator.Generate(topic, partition, messageLoad/routines)
 		}
 	}
 
