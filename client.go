@@ -541,7 +541,10 @@ func (client *client) Controller() (*Broker, error) {
 func (client *client) deregisterController() {
 	client.lock.Lock()
 	defer client.lock.Unlock()
-	delete(client.brokers, client.controllerID)
+	if controller, ok := client.brokers[client.controllerID]; ok {
+		_ = controller.Close()
+		delete(client.brokers, client.controllerID)
+	}
 }
 
 // RefreshController retrieves the cluster controller from fresh metadata
