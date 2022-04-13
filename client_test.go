@@ -528,11 +528,11 @@ func TestClientRefreshBrokers(t *testing.T) {
 	initialSeed.Returns(metadataResponse1)
 
 	c, err := NewClient([]string{initialSeed.Addr()}, NewTestConfig())
-	client := c.(*client)
-
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer c.Close()
+	client := c.(*client)
 
 	if len(client.Brokers()) != 2 {
 		t.Error("Meta broker is not 2")
