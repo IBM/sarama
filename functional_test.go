@@ -195,6 +195,10 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 		}
 	}
 	if !allBrokersUp {
+		c := exec.Command("docker-compose", "logs", "-t")
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		_ = c.Run()
 		return fmt.Errorf("timed out waiting for broker to come up")
 	}
 
