@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/url"
 	"os"
 	"os/exec"
@@ -122,6 +123,8 @@ func setupToxiProxies(env *testEnvironment, endpoint string) error {
 }
 
 func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) error {
+	const expectedBrokers = 5
+
 	Logger.Println("bringing up docker-based test environment")
 
 	// Always (try to) tear down first.
@@ -148,21 +151,42 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 		return fmt.Errorf("failed to setup toxiproxies: %w", err)
 	}
 
-	// Wait for the kafka broker to come up
-	allBrokersUp := false
-	for i := 0; i < 90 && !allBrokersUp; i++ {
-		Logger.Println("waiting for kafka brokers to come up")
-		time.Sleep(1 * time.Second)
-		config := NewTestConfig()
-		config.Version, err = ParseKafkaVersion(env.KafkaVersion)
+	dialCheck := func(addr string, timeout time.Duration) error {
+		conn, err := net.DialTimeout("tcp", addr, timeout)
 		if err != nil {
 			return err
 		}
-		config.Net.DialTimeout = 1 * time.Second
-		config.Net.ReadTimeout = 1 * time.Second
-		config.Net.WriteTimeout = 1 * time.Second
-		config.ClientID = "sarama-tests"
+		return conn.Close()
+	}
+
+	config := NewTestConfig()
+	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
+	if err != nil {
+		return err
+	}
+	config.Net.DialTimeout = 1 * time.Second
+	config.Net.ReadTimeout = 1 * time.Second
+	config.Net.WriteTimeout = 1 * time.Second
+	config.ClientID = "sarama-tests"
+
+	// wait for the kafka brokers to come up
+	allBrokersUp := false
+
+mainLoop:
+	for i := 0; i < 30 && !allBrokersUp; i++ {
+		Logger.Println("waiting for kafka brokers to come up")
+		time.Sleep(3 * time.Second)
 		brokersOk := make([]bool, len(env.KafkaBrokerAddrs))
+
+		// first check that all bootstrap brokers are TCP accessible
+		for _, addr := range env.KafkaBrokerAddrs {
+			if err := dialCheck(addr, time.Second); err != nil {
+				continue mainLoop
+			}
+		}
+
+		// now check we can bootstrap metadata from the cluster and all brokers
+		// are known and accessible at their advertised address
 	retryLoop:
 		for j, addr := range env.KafkaBrokerAddrs {
 			client, err := NewClient([]string{addr}, config)
@@ -174,7 +198,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 				continue
 			}
 			brokers := client.Brokers()
-			if len(brokers) < 5 {
+			if len(brokers) < expectedBrokers {
 				continue
 			}
 			for _, broker := range brokers {
@@ -189,17 +213,19 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 			}
 			brokersOk[j] = true
 		}
+
 		allBrokersUp = true
 		for _, u := range brokersOk {
 			allBrokersUp = allBrokersUp && u
 		}
 	}
+
 	if !allBrokersUp {
-		c := exec.Command("docker-compose", "logs", "-t")
+		c := exec.Command("docker-compose", "logs", "-t", "kafka-1", "kafka-2", "kafka-3", "kafka-4", "kafka-5")
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 		_ = c.Run()
-		return fmt.Errorf("timed out waiting for broker to come up")
+		return fmt.Errorf("timed out waiting for one or more broker to come up")
 	}
 
 	return nil
