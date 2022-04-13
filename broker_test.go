@@ -828,6 +828,165 @@ func TestBuildClientFirstMessage(t *testing.T) {
 	}
 }
 
+func TestKip368ReAuthenticationSuccess(t *testing.T) {
+	sessionLifetimeMs := int64(100)
+
+	mockBroker := NewMockBroker(t, 0)
+
+	countSaslAuthRequests := func() (count int) {
+		for _, rr := range mockBroker.History() {
+			switch rr.Request.(type) {
+			case *SaslAuthenticateRequest:
+				count++
+			}
+		}
+		return
+	}
+
+	mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
+		SetAuthBytes([]byte(`response_payload`)).
+		SetSessionLifetimeMs(sessionLifetimeMs)
+
+	mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).
+		SetEnabledMechanisms([]string{SASLTypePlaintext})
+
+	mockApiVersions := NewMockApiVersionsResponse(t)
+
+	mockBroker.SetHandlerByMap(map[string]MockResponse{
+		"SaslAuthenticateRequest": mockSASLAuthResponse,
+		"SaslHandshakeRequest":    mockSASLHandshakeResponse,
+		"ApiVersionsRequest":      mockApiVersions,
+	})
+
+	broker := NewBroker(mockBroker.Addr())
+
+	conf := NewTestConfig()
+	conf.Net.SASL.Enable = true
+	conf.Net.SASL.Mechanism = SASLTypePlaintext
+	conf.Net.SASL.Version = SASLHandshakeV1
+	conf.Net.SASL.AuthIdentity = "authid"
+	conf.Net.SASL.User = "token"
+	conf.Net.SASL.Password = "password"
+
+	broker.conf = conf
+	broker.conf.Version = V2_2_0_0
+
+	err := broker.Open(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = broker.Close() })
+
+	connected, err := broker.Connected()
+	if err != nil || !connected {
+		t.Fatal(err)
+	}
+
+	actualSaslAuthRequests := countSaslAuthRequests()
+	if actualSaslAuthRequests != 1 {
+		t.Fatalf("unexpected number of SaslAuthRequests during initial authentication: %d", actualSaslAuthRequests)
+	}
+
+	timeout := time.After(time.Duration(sessionLifetimeMs) * time.Millisecond)
+
+loop:
+	for actualSaslAuthRequests < 2 {
+		select {
+		case <-timeout:
+			break loop
+		default:
+			time.Sleep(10 * time.Millisecond)
+			// put some traffic on the wire
+			_, err = broker.ApiVersions(&ApiVersionsRequest{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			actualSaslAuthRequests = countSaslAuthRequests()
+		}
+	}
+
+	if actualSaslAuthRequests < 2 {
+		t.Fatalf("sasl reauth has not occurred within expected timeframe")
+	}
+
+	mockBroker.Close()
+}
+
+func TestKip368ReAuthenticationFailure(t *testing.T) {
+	sessionLifetimeMs := int64(100)
+
+	mockBroker := NewMockBroker(t, 0)
+
+	mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).
+		SetAuthBytes([]byte(`response_payload`)).
+		SetSessionLifetimeMs(sessionLifetimeMs)
+
+	mockSASLAuthErrorResponse := NewMockSaslAuthenticateResponse(t).
+		SetError(ErrSASLAuthenticationFailed)
+
+	mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).
+		SetEnabledMechanisms([]string{SASLTypePlaintext})
+
+	mockApiVersions := NewMockApiVersionsResponse(t)
+
+	mockBroker.SetHandlerByMap(map[string]MockResponse{
+		"SaslAuthenticateRequest": mockSASLAuthResponse,
+		"SaslHandshakeRequest":    mockSASLHandshakeResponse,
+		"ApiVersionsRequest":      mockApiVersions,
+	})
+
+	broker := NewBroker(mockBroker.Addr())
+
+	conf := NewTestConfig()
+	conf.Net.SASL.Enable = true
+	conf.Net.SASL.Mechanism = SASLTypePlaintext
+	conf.Net.SASL.Version = SASLHandshakeV1
+	conf.Net.SASL.AuthIdentity = "authid"
+	conf.Net.SASL.User = "token"
+	conf.Net.SASL.Password = "password"
+
+	broker.conf = conf
+	broker.conf.Version = V2_2_0_0
+
+	err := broker.Open(conf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = broker.Close() })
+
+	connected, err := broker.Connected()
+	if err != nil || !connected {
+		t.Fatal(err)
+	}
+
+	mockBroker.SetHandlerByMap(map[string]MockResponse{
+		"SaslAuthenticateRequest": mockSASLAuthErrorResponse,
+		"SaslHandshakeRequest":    mockSASLHandshakeResponse,
+		"ApiVersionsRequest":      mockApiVersions,
+	})
+
+	timeout := time.After(time.Duration(sessionLifetimeMs) * time.Millisecond)
+
+	var apiVersionError error
+loop:
+	for apiVersionError == nil {
+		select {
+		case <-timeout:
+			break loop
+		default:
+			time.Sleep(10 * time.Millisecond)
+			// put some traffic on the wire
+			_, apiVersionError = broker.ApiVersions(&ApiVersionsRequest{})
+		}
+	}
+
+	if !errors.Is(apiVersionError, ErrSASLAuthenticationFailed) {
+		t.Fatalf("sasl reauth has not failed in the expected way %v", apiVersionError)
+	}
+
+	mockBroker.Close()
+}
+
 // We're not testing encoding/decoding here, so most of the requests/responses will be empty for simplicity's sake
 var brokerTestTable = []struct {
 	version  KafkaVersion

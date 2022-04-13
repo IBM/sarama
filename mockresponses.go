@@ -1057,9 +1057,10 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoderWithHeader 
 }
 
 type MockSaslAuthenticateResponse struct {
-	t             TestReporter
-	kerror        KError
-	saslAuthBytes []byte
+	t                 TestReporter
+	kerror            KError
+	saslAuthBytes     []byte
+	sessionLifetimeMs int64
 }
 
 func NewMockSaslAuthenticateResponse(t TestReporter) *MockSaslAuthenticateResponse {
@@ -1067,9 +1068,12 @@ func NewMockSaslAuthenticateResponse(t TestReporter) *MockSaslAuthenticateRespon
 }
 
 func (msar *MockSaslAuthenticateResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*SaslAuthenticateRequest)
 	res := &SaslAuthenticateResponse{}
+	res.Version = req.Version
 	res.Err = msar.kerror
 	res.SaslAuthBytes = msar.saslAuthBytes
+	res.SessionLifetimeMs = msar.sessionLifetimeMs
 	return res
 }
 
@@ -1080,6 +1084,11 @@ func (msar *MockSaslAuthenticateResponse) SetError(kerror KError) *MockSaslAuthe
 
 func (msar *MockSaslAuthenticateResponse) SetAuthBytes(saslAuthBytes []byte) *MockSaslAuthenticateResponse {
 	msar.saslAuthBytes = saslAuthBytes
+	return msar
+}
+
+func (msar *MockSaslAuthenticateResponse) SetSessionLifetimeMs(sessionLifetimeMs int64) *MockSaslAuthenticateResponse {
+	msar.sessionLifetimeMs = sessionLifetimeMs
 	return msar
 }
 
