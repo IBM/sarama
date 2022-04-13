@@ -929,11 +929,28 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				Logger.Println("client is not authorized to access this topic. The topics were: ", topics)
 				return err
 			}
+
+			if errors.Is(err, ErrUnsupportedSASLMechanism) {
+				Logger.Println("requested SASL mechanism is not supported by the broker")
+				return err
+			}
+
 			// else remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
 			_ = broker.Close()
 			client.deregisterBroker(broker)
 		} else {
+			if errors.Is(err, ErrSASLHandshakeReadEOF) ||
+				errors.Is(err, ErrSASLHandshakeSendEOF) ||
+				errors.Is(err, ErrFetchMetadataEOF) ||
+				errors.Is(err, ErrBadTLSHandshake) {
+				// These errors are typically unrecoverable connection /
+				// authentication failures, so we return them
+				// directly here to avoid falling back on the less useful
+				// "client has run out of brokers" error after retrying.
+				return err
+			}
+
 			// some other error, remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
 			brokerErrors = append(brokerErrors, err)

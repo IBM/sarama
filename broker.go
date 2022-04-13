@@ -336,6 +336,19 @@ func (b *Broker) GetMetadata(request *MetadataRequest) (*MetadataResponse, error
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			// An EOF while fetching metadata is a special case, since it
+			// usually indicates an unrecoverable protocol mismatch.
+			return nil, ErrFetchMetadataEOF
+		} else if strings.HasPrefix(err.Error(), "tls:") {
+			// Currently there's no good way to extract TLS error types,
+			// as they are represented internally by opaque strings that
+			// are not stable between go versions. However, a TLS error
+			// has very different mitigations than other metadata failures,
+			// so we want to surface it as the real failure.
+			// (see also Broker.sendAndReceiveSASLHandshake)
+			return nil, ErrBadTLSHandshake
+		}
 		return nil, err
 	}
 
@@ -1152,6 +1165,20 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		Logger.Printf("Failed to send SASL handshake %s: %s\n", b.addr, err.Error())
+		if errors.Is(err, io.EOF) {
+			return ErrSASLHandshakeSendEOF
+		} else if strings.HasPrefix(err.Error(), "tls:") {
+			// This is a workaround for the fact that the TLS subsystem
+			// generally returns opaque string literals (which are not stable
+			// between go versions) rather than documented / typed errors.
+			// A TLS-related error while sending a SASL handshake almost
+			// always indicates a failure in the underlying TLS handshake,
+			// and we need a way to surface that case to the user, otherwise
+			// it will fall back on "client has run out of available brokers
+			// to talk to", which is hard to troubleshoot.
+			return ErrBadTLSHandshake
+		}
+
 		return err
 	}
 	b.correlationID++
@@ -1161,6 +1188,9 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		Logger.Printf("Failed to read SASL handshake header : %s\n", err.Error())
+		if errors.Is(err, io.ErrUnexpectedEOF) {
+			return ErrSASLHandshakeReadEOF
+		}
 		return err
 	}
 

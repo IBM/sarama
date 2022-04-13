@@ -67,6 +67,25 @@ var ErrDeleteRecords = errors.New("kafka server: failed to delete records")
 // ErrCreateACLs is the type of error returned when ACL creation failed
 var ErrCreateACLs = errors.New("kafka server: failed to create one or more ACL rules")
 
+// ErrSASLHandshakeReadEOF is returned when an unexpected EOF arises reading the SASL handshake header,
+// which usually indicates an invalid server certificate.
+var ErrSASLHandshakeReadEOF = errors.New("kafka: couldn't read SASL handshake (bad broker certificate?)")
+
+// ErrSASLHandshakeSendEOF is returned when an EOF arises initiating a SASL handshake with the broker,
+// which usually indicates that the broker is not expecting a SASL handshake.
+var ErrSASLHandshakeSendEOF = errors.New("kafka: couldn't write SASL handshake (make sure SASL is enabled on the target broker port)")
+
+// ErrFetchMetadataEOF is returned when an unexpected EOF arises while fetching broker metadata.
+// When this is not caused by one of the preceding handshake errors, this often means a plaintext
+// client is attempting to connect to a TLS-enabled broker, or a TLS-only client
+// is attempting to connect to a broker that requires SASL authentication.
+var ErrFetchMetadataEOF = errors.New("kafka: couldn't fetch broker metadata (check that your client and broker are using the same encryption and authentication settings)")
+
+// ErrBadTLSHandshake is returned when there is a TLS error while attempting a SASL handshake or
+// metadata refresh. This usually means that the requested TLS version or cipher is unsupported
+// by the broker.
+var ErrBadTLSHandshake = errors.New("kafka: bad TLS handshake connecting to broker (check that your TLS version and cipher are enabled by the broker)")
+
 // MultiErrorFormat specifies the formatter applied to format multierrors. The
 // default implementation is a consensed version of the hashicorp/go-multierror
 // default one
