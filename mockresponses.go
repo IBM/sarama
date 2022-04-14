@@ -204,7 +204,6 @@ func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoderWithHeader
 type MockOffsetResponse struct {
 	offsets map[string]map[int32]map[int64]int64
 	t       TestReporter
-	version int16
 }
 
 func NewMockOffsetResponse(t TestReporter) *MockOffsetResponse {
@@ -212,11 +211,6 @@ func NewMockOffsetResponse(t TestReporter) *MockOffsetResponse {
 		offsets: make(map[string]map[int32]map[int64]int64),
 		t:       t,
 	}
-}
-
-func (mor *MockOffsetResponse) SetVersion(version int16) *MockOffsetResponse {
-	mor.version = version
-	return mor
 }
 
 func (mor *MockOffsetResponse) SetOffset(topic string, partition int32, time, offset int64) *MockOffsetResponse {
@@ -236,7 +230,7 @@ func (mor *MockOffsetResponse) SetOffset(topic string, partition int32, time, of
 
 func (mor *MockOffsetResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	offsetRequest := reqBody.(*OffsetRequest)
-	offsetResponse := &OffsetResponse{Version: mor.version}
+	offsetResponse := &OffsetResponse{Version: offsetRequest.Version}
 	for topic, partitions := range offsetRequest.blocks {
 		for partition, block := range partitions {
 			offset := mor.getOffset(topic, partition, block.time)
@@ -269,7 +263,6 @@ type MockFetchResponse struct {
 	highWaterMarks map[string]map[int32]int64
 	t              TestReporter
 	batchSize      int
-	version        int16
 }
 
 func NewMockFetchResponse(t TestReporter, batchSize int) *MockFetchResponse {
@@ -280,11 +273,6 @@ func NewMockFetchResponse(t TestReporter, batchSize int) *MockFetchResponse {
 		t:              t,
 		batchSize:      batchSize,
 	}
-}
-
-func (mfr *MockFetchResponse) SetVersion(version int16) *MockFetchResponse {
-	mfr.version = version
-	return mfr
 }
 
 func (mfr *MockFetchResponse) SetMessage(topic string, partition int32, offset int64, msg Encoder) *MockFetchResponse {
@@ -317,7 +305,7 @@ func (mfr *MockFetchResponse) SetHighWaterMark(topic string, partition int32, of
 func (mfr *MockFetchResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	fetchRequest := reqBody.(*FetchRequest)
 	res := &FetchResponse{
-		Version: mfr.version,
+		Version: fetchRequest.Version,
 	}
 	for topic, partitions := range fetchRequest.blocks {
 		for partition, block := range partitions {

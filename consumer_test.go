@@ -573,12 +573,10 @@ func TestConsumerExtraOffsets(t *testing.T) {
 	newFetchResponse.SetLastOffsetDelta("my_topic", 0, 4)
 	newFetchResponse.SetLastStableOffset("my_topic", 0, 4)
 	for _, fetchResponse1 := range []*FetchResponse{legacyFetchResponse, newFetchResponse} {
-		var offsetResponseVersion int16
 		cfg := NewTestConfig()
 		cfg.Consumer.Return.Errors = true
 		if fetchResponse1.Version >= 4 {
 			cfg.Version = V0_11_0_0
-			offsetResponseVersion = 1
 		}
 
 		broker0 := NewMockBroker(t, 0)
@@ -590,7 +588,6 @@ func TestConsumerExtraOffsets(t *testing.T) {
 				SetBroker(broker0.Addr(), broker0.BrokerID()).
 				SetLeader("my_topic", 0, broker0.BrokerID()),
 			"OffsetRequest": NewMockOffsetResponse(t).
-				SetVersion(offsetResponseVersion).
 				SetOffset("my_topic", 0, OffsetNewest, 1234).
 				SetOffset("my_topic", 0, OffsetOldest, 0),
 			"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -651,7 +648,6 @@ func TestConsumerReceivingFetchResponseWithTooOldRecords(t *testing.T) {
 			SetBroker(broker0.Addr(), broker0.BrokerID()).
 			SetLeader("my_topic", 0, broker0.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -698,7 +694,6 @@ func TestConsumeMessageWithNewerFetchAPIVersion(t *testing.T) {
 			SetBroker(broker0.Addr(), broker0.BrokerID()).
 			SetLeader("my_topic", 0, broker0.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -742,7 +737,6 @@ func TestConsumeMessageWithSessionIDs(t *testing.T) {
 			SetBroker(broker0.Addr(), broker0.BrokerID()).
 			SetLeader("my_topic", 0, broker0.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -810,7 +804,6 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -822,7 +815,6 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse3, fetchResponse4),
@@ -875,7 +867,6 @@ func TestConsumeMessagesFromReadReplicaLeaderFallback(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -934,7 +925,6 @@ func TestConsumeMessagesFromReadReplicaErrorReplicaNotAvailable(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse4),
@@ -946,7 +936,6 @@ func TestConsumeMessagesFromReadReplicaErrorReplicaNotAvailable(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse2, fetchResponse3),
@@ -1006,7 +995,6 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse4),
@@ -1018,7 +1006,6 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 			SetBroker(leader.Addr(), leader.BrokerID()).
 			SetLeader("my_topic", 0, leader.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockSequence(fetchResponse2, fetchResponse3),
@@ -1078,11 +1065,9 @@ func TestConsumeMessagesTrackLeader(t *testing.T) {
 	leader1.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": mockMetadataResponse1,
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetNewest, 1234).
 			SetOffset("my_topic", 0, OffsetOldest, 0),
 		"FetchRequest": NewMockFetchResponse(t, 1).
-			SetVersion(10).
 			SetMessage("my_topic", 0, 1, testMsg).
 			SetMessage("my_topic", 0, 2, testMsg),
 	})
@@ -1114,7 +1099,6 @@ func TestConsumeMessagesTrackLeader(t *testing.T) {
 	leader2.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": mockMetadataResponse2,
 		"FetchRequest": NewMockFetchResponse(t, 1).
-			SetVersion(10).
 			SetMessage("my_topic", 0, 3, testMsg).
 			SetMessage("my_topic", 0, 4, testMsg),
 	})
@@ -1134,7 +1118,6 @@ func TestConsumeMessagesTrackLeader(t *testing.T) {
 	leader1.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": mockMetadataResponse3,
 		"FetchRequest": NewMockFetchResponse(t, 1).
-			SetVersion(10).
 			SetMessage("my_topic", 0, 5, testMsg).
 			SetMessage("my_topic", 0, 6, testMsg),
 	})
@@ -1177,11 +1160,9 @@ func TestConsumerNonSequentialOffsets(t *testing.T) {
 	newFetchResponse.SetLastOffsetDelta("my_topic", 0, 11)
 	newFetchResponse.SetLastStableOffset("my_topic", 0, 11)
 	for _, fetchResponse1 := range []*FetchResponse{legacyFetchResponse, newFetchResponse} {
-		var offsetResponseVersion int16
 		cfg := NewTestConfig()
 		if fetchResponse1.Version >= 4 {
 			cfg.Version = V0_11_0_0
-			offsetResponseVersion = 1
 		}
 
 		broker0 := NewMockBroker(t, 0)
@@ -1192,7 +1173,6 @@ func TestConsumerNonSequentialOffsets(t *testing.T) {
 				SetBroker(broker0.Addr(), broker0.BrokerID()).
 				SetLeader("my_topic", 0, broker0.BrokerID()),
 			"OffsetRequest": NewMockOffsetResponse(t).
-				SetVersion(offsetResponseVersion).
 				SetOffset("my_topic", 0, OffsetNewest, 1234).
 				SetOffset("my_topic", 0, OffsetOldest, 0),
 			"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
@@ -1684,12 +1664,10 @@ func TestConsumerTimestamps(t *testing.T) {
 		}, []time.Time{now, now}},
 	} {
 		var fr *FetchResponse
-		var offsetResponseVersion int16
 		cfg := NewTestConfig()
 		cfg.Version = d.kversion
 		switch {
 		case d.kversion.IsAtLeast(V0_11_0_0):
-			offsetResponseVersion = 1
 			fr = &FetchResponse{Version: 4, LogAppendTime: d.logAppendTime, Timestamp: now}
 			for _, m := range d.messages {
 				fr.AddRecordWithTimestamp("my_topic", 0, m.key, testMsg, m.offset, m.timestamp)
@@ -1697,7 +1675,6 @@ func TestConsumerTimestamps(t *testing.T) {
 			fr.SetLastOffsetDelta("my_topic", 0, 2)
 			fr.SetLastStableOffset("my_topic", 0, 2)
 		case d.kversion.IsAtLeast(V0_10_1_0):
-			offsetResponseVersion = 1
 			fr = &FetchResponse{Version: 3, LogAppendTime: d.logAppendTime, Timestamp: now}
 			for _, m := range d.messages {
 				fr.AddMessageWithTimestamp("my_topic", 0, m.key, testMsg, m.offset, m.timestamp, 1)
@@ -1722,7 +1699,6 @@ func TestConsumerTimestamps(t *testing.T) {
 				SetBroker(broker0.Addr(), broker0.BrokerID()).
 				SetLeader("my_topic", 0, broker0.BrokerID()),
 			"OffsetRequest": NewMockOffsetResponse(t).
-				SetVersion(offsetResponseVersion).
 				SetOffset("my_topic", 0, OffsetNewest, 1234).
 				SetOffset("my_topic", 0, OffsetOldest, 0),
 			"FetchRequest": NewMockSequence(fr),
@@ -1779,7 +1755,6 @@ func TestExcludeUncommitted(t *testing.T) {
 			SetBroker(broker0.Addr(), broker0.BrokerID()).
 			SetLeader("my_topic", 0, broker0.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
-			SetVersion(1).
 			SetOffset("my_topic", 0, OffsetOldest, 0).
 			SetOffset("my_topic", 0, OffsetNewest, 1237),
 		"FetchRequest": NewMockWrapper(fetchResponse),
