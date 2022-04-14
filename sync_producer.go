@@ -91,7 +91,15 @@ func verifyProducerConfig(config *Config) error {
 func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error) {
 	expectation := make(chan *ProducerError, 1)
 	msg.expectation = expectation
-	sp.producer.Input() <- msg
+	if msg.Context != nil {
+		select {
+		case <-msg.Context.Done():
+			return -1, -1, msg.Context.Err()
+		case sp.producer.Input() <- msg:
+		}
+	} else {
+		sp.producer.Input() <- msg
+	}
 
 	if pErr := <-expectation; pErr != nil {
 		return -1, -1, pErr.Err
@@ -106,7 +114,15 @@ func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
 		for _, msg := range msgs {
 			expectation := make(chan *ProducerError, 1)
 			msg.expectation = expectation
-			sp.producer.Input() <- msg
+			if msg.Context != nil {
+				select {
+				case <-msg.Context.Done():
+					expectation <- &ProducerError{Msg: msg, Err: msg.Context.Err()}
+				case sp.producer.Input() <- msg:
+				}
+			} else {
+				sp.producer.Input() <- msg
+			}
 			expectations <- expectation
 		}
 		close(expectations)

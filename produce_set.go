@@ -91,6 +91,15 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 	}
 
 	// Past this point we can't return an error, because we've already added the message to the set.
+	if msg.Context != nil {
+		// last chance to check if sender has given up
+		select {
+		case <-msg.Context.Done():
+			return msg.Context.Err()
+		default:
+			// continue sending
+		}
+	}
 	set.msgs = append(set.msgs, msg)
 
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {

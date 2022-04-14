@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -182,6 +183,9 @@ const (
 
 // ProducerMessage is the collection of elements passed to the Producer in order to send a message.
 type ProducerMessage struct {
+	// The context used for the message's lifetime.
+	Context context.Context
+
 	Topic string // The Kafka topic for this message.
 	// The partitioning key for this message. Pre-existing Encoders include
 	// StringEncoder and ByteEncoder.
@@ -377,7 +381,21 @@ func (p *asyncProducer) dispatcher() {
 			handlers[msg.Topic] = handler
 		}
 
-		handler <- msg
+		if msg.Context != nil {
+			select {
+			case handler <- msg:
+			case <-msg.Context.Done():
+				pErr := &ProducerError{Msg: msg, Err: msg.Context.Err()}
+				if p.conf.Producer.Return.Errors {
+					p.errors <- pErr
+				} else {
+					Logger.Println(pErr)
+				}
+				continue
+			}
+		} else {
+			handler <- msg
+		}
 	}
 
 	for _, handler := range handlers {
@@ -426,7 +444,15 @@ func (tp *topicProducer) dispatch() {
 			tp.handlers[msg.Partition] = handler
 		}
 
-		handler <- msg
+		if msg.Context != nil {
+			select {
+			case handler <- msg:
+			case <-msg.Context.Done():
+				tp.parent.returnError(msg, msg.Context.Err())
+			}
+		} else {
+			handler <- msg
+		}
 	}
 
 	for _, handler := range tp.handlers {
@@ -605,7 +631,15 @@ func (pp *partitionProducer) dispatch() {
 			msg.hasSequence = true
 		}
 
-		pp.brokerProducer.input <- msg
+		if msg.Context != nil {
+			select {
+			case pp.brokerProducer.input <- msg:
+			case <-msg.Context.Done():
+				pp.parent.returnError(msg, msg.Context.Err())
+			}
+		} else {
+			pp.brokerProducer.input <- msg
+		}
 	}
 }
 
