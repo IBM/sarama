@@ -296,7 +296,11 @@ func (g *FileMessageGenerator) Generate(topic string, partition, messageLoad int
 	records := make([][]byte, 0, 64)
 	for r.Scan() {
 		if b := r.Bytes(); len(b) != 0 {
-			records = append(records, r.Bytes())
+			text, err := g.DecoderFunc(b)
+			if err != nil {
+				printErrorAndExit(69, "Failed to decode message data: %s", string(text))
+			}
+			records = append(records, text)
 		}
 	}
 	if err = r.Err(); err != nil {
@@ -306,15 +310,10 @@ func (g *FileMessageGenerator) Generate(topic string, partition, messageLoad int
 	log.Printf("FileMessageGenerator is generating %d messages from %d records\n", messageLoad, len(records))
 	go func() {
 		for i := 0; i < messageLoad; i++ {
-			text := records[i%len(records)]
-			payload, err := g.DecoderFunc(text)
-			if err != nil {
-				printErrorAndExit(69, "Failed to decode message data: %s", string(text))
-			}
 			messages <- &sarama.ProducerMessage{
 				Topic:     topic,
 				Partition: int32(partition),
-				Value:     sarama.ByteEncoder(payload),
+				Value:     sarama.ByteEncoder(records[i%len(records)]),
 			}
 		}
 		close(messages)
