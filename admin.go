@@ -76,11 +76,18 @@ type ClusterAdmin interface {
 	// The configs for a particular resource are updated automatically.
 	IncrementalAlterConfig(resourceType ConfigResourceType, name string, entries map[string]IncrementalAlterConfigsEntry, validateOnly bool) error
 
+	// Creates an access control list (ACL) which is bound to a specific resource.
+	// This operation is not transactional so it may succeed or fail.
+	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
+	// no changes will be made. This operation is supported by brokers with version 0.11.0.0 or higher.
+	// Deprecated: Use CreateACLs instead.
+	CreateACL(resource Resource, acl Acl) error
+
 	// Creates access control lists (ACLs) which are bound to specific resources.
 	// This operation is not transactional so it may succeed for some ACLs while fail for others.
 	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
 	// no changes will be made. This operation is supported by brokers with version 0.11.0.0 or higher.
-	CreateACL(resource Resource, acl Acl) error
+	CreateACLs([]*ResourceAcls) error
 
 	// Lists access control lists (ACLs) according to the supplied filter.
 	// it may take some time for changes made by createAcls or deleteAcls to be reflected in the output of ListAcls
@@ -788,6 +795,28 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
 	var acls []*AclCreation
 	acls = append(acls, &AclCreation{resource, acl})
+	request := &CreateAclsRequest{AclCreations: acls}
+
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 1
+	}
+
+	b, err := ca.Controller()
+	if err != nil {
+		return err
+	}
+
+	_, err = b.CreateAcls(request)
+	return err
+}
+
+func (ca *clusterAdmin) CreateACLs(resourceACLs []*ResourceAcls) error {
+	var acls []*AclCreation
+	for _, resourceACL := range resourceACLs {
+		for _, acl := range resourceACL.Acls {
+			acls = append(acls, &AclCreation{resourceACL.Resource, *acl})
+		}
+	}
 	request := &CreateAclsRequest{AclCreations: acls}
 
 	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
