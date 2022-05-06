@@ -562,7 +562,7 @@ func (child *partitionConsumer) HighWaterMarkOffset() int64 {
 
 func (child *partitionConsumer) responseFeeder() {
 	var msgs []*ConsumerMessage
-	expiryTicker := time.NewTicker(child.conf.Consumer.MaxProcessingTime)
+	expiryTimer := time.NewTimer(child.conf.Consumer.MaxProcessingTime)
 	firstAttempt := true
 
 feederLoop:
@@ -576,13 +576,18 @@ feederLoop:
 		for i, msg := range msgs {
 			child.interceptors(msg)
 		messageSelect:
+
+			if !expiryTimer.Stop() {
+				<-expiryTimer.C
+			}
+
 			select {
 			case <-child.dying:
 				child.broker.acks.Done()
 				continue feederLoop
 			case child.messages <- msg:
 				firstAttempt = true
-			case <-expiryTicker.C:
+			case <-expiryTimer.C:
 				if !firstAttempt {
 					child.responseResult = errTimedOut
 					child.broker.acks.Done()
@@ -609,7 +614,10 @@ feederLoop:
 		child.broker.acks.Done()
 	}
 
-	expiryTicker.Stop()
+	if !expiryTimer.Stop() {
+		<-expiryTimer.C
+	}
+
 	close(child.messages)
 	close(child.errors)
 }
