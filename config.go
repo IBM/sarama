@@ -483,7 +483,7 @@ func NewConfig() *Config {
 	c.Consumer.Fetch.Min = 1
 	c.Consumer.Fetch.Default = 1024 * 1024
 	c.Consumer.Retry.Backoff = 2 * time.Second
-	c.Consumer.MaxWaitTime = 250 * time.Millisecond
+	c.Consumer.MaxWaitTime = 500 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
 	c.Consumer.Return.Errors = false
 	c.Consumer.Offsets.AutoCommit.Enable = true
