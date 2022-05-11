@@ -593,7 +593,7 @@ func TestClusterAdminDeleteRecordsWithInCorrectBroker(t *testing.T) {
 	}
 }
 
-func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
+func TestClusterAdminDeleteRecordsWithUnsupportedVersion(t *testing.T) {
 	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -634,6 +634,51 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	}
 
 	if !errors.Is(err, ErrUnsupportedVersion) {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminDeleteRecordsWithLeaderNotAvailable(t *testing.T) {
+	topicName := "my_topic"
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetLeader("my_topic", 1, -1).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	partitionOffset := make(map[int32]int64)
+	partitionOffset[1] = 1000
+
+	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err == nil {
+		t.Fatal("expected an ErrDeleteRecords")
+	}
+
+	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
+		t.Fatal(err)
+	}
+
+	if !errors.Is(err, ErrDeleteRecords) {
+		t.Fatal(err)
+	}
+
+	if !errors.Is(err, ErrLeaderNotAvailable) {
 		t.Fatal(err)
 	}
 
