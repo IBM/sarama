@@ -525,14 +525,13 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 			errs = append(errs, err)
 		} else {
 			if rsp.ErrorCode > 0 {
-				errs = append(errs, errors.New(rsp.ErrorCode.Error()))
+				errs = append(errs, rsp.ErrorCode)
 			}
 
 			for topic, topicErrors := range rsp.Errors {
 				for partition, partitionError := range topicErrors {
 					if !errors.Is(partitionError.errorCode, ErrNoError) {
-						errStr := fmt.Sprintf("[%s-%d]: %s", topic, partition, partitionError.errorCode.Error())
-						errs = append(errs, errors.New(errStr))
+						errs = append(errs, fmt.Errorf("[%s-%d]: %w", topic, partition, partitionError.errorCode))
 					}
 				}
 			}
@@ -577,40 +576,45 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	if topic == "" {
 		return ErrInvalidTopic
 	}
+	errs := make([]error, 0)
 	partitionPerBroker := make(map[*Broker][]int32)
 	for partition := range partitionOffsets {
 		broker, err := ca.client.Leader(topic, partition)
 		if err != nil {
-			return err
+			errs = append(errs, err)
+			continue
 		}
 		partitionPerBroker[broker] = append(partitionPerBroker[broker], partition)
 	}
-	errs := make([]error, 0)
 	for broker, partitions := range partitionPerBroker {
 		topics := make(map[string]*DeleteRecordsRequestTopic)
 		recordsToDelete := make(map[int32]int64)
 		for _, p := range partitions {
 			recordsToDelete[p] = partitionOffsets[p]
 		}
-		topics[topic] = &DeleteRecordsRequestTopic{PartitionOffsets: recordsToDelete}
+		topics[topic] = &DeleteRecordsRequestTopic{
+			PartitionOffsets: recordsToDelete,
+		}
 		request := &DeleteRecordsRequest{
 			Topics:  topics,
 			Timeout: ca.conf.Admin.Timeout,
 		}
-
 		rsp, err := broker.DeleteRecords(request)
 		if err != nil {
 			errs = append(errs, err)
-		} else {
-			deleteRecordsResponseTopic, ok := rsp.Topics[topic]
-			if !ok {
-				errs = append(errs, ErrIncompleteResponse)
-			} else {
-				for _, deleteRecordsResponsePartition := range deleteRecordsResponseTopic.Partitions {
-					if !errors.Is(deleteRecordsResponsePartition.Err, ErrNoError) {
-						errs = append(errs, errors.New(deleteRecordsResponsePartition.Err.Error()))
-					}
-				}
+			continue
+		}
+
+		deleteRecordsResponseTopic, ok := rsp.Topics[topic]
+		if !ok {
+			errs = append(errs, ErrIncompleteResponse)
+			continue
+		}
+
+		for _, deleteRecordsResponsePartition := range deleteRecordsResponseTopic.Partitions {
+			if !errors.Is(deleteRecordsResponsePartition.Err, ErrNoError) {
+				errs = append(errs, deleteRecordsResponsePartition.Err)
+				continue
 			}
 		}
 	}
