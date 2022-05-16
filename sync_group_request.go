@@ -1,9 +1,11 @@
 package sarama
 
 type SyncGroupRequest struct {
+	Version          int16
 	GroupId          string
 	GenerationId     int32
 	MemberId         string
+	GroupInstanceId  *string
 	GroupAssignments map[string][]byte
 }
 
@@ -16,6 +18,12 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 
 	if err := pe.putString(r.MemberId); err != nil {
 		return err
+	}
+
+	if r.Version >= 3 {
+		if err := pe.putNullableString(r.GroupInstanceId); err != nil {
+			return err
+		}
 	}
 
 	if err := pe.putArrayLength(len(r.GroupAssignments)); err != nil {
@@ -34,6 +42,8 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 }
 
 func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
+	r.Version = version
+
 	if r.GroupId, err = pd.getString(); err != nil {
 		return
 	}
@@ -42,6 +52,11 @@ func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 	}
 	if r.MemberId, err = pd.getString(); err != nil {
 		return
+	}
+	if r.Version >= 3 {
+		if r.GroupInstanceId, err = pd.getNullableString(); err != nil {
+			return
+		}
 	}
 
 	n, err := pd.getArrayLength()
@@ -74,7 +89,7 @@ func (r *SyncGroupRequest) key() int16 {
 }
 
 func (r *SyncGroupRequest) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *SyncGroupRequest) headerVersion() int16 {
@@ -82,6 +97,10 @@ func (r *SyncGroupRequest) headerVersion() int16 {
 }
 
 func (r *SyncGroupRequest) requiredVersion() KafkaVersion {
+	switch {
+	case r.Version >= 3:
+		return V2_3_0_0
+	}
 	return V0_9_0_0
 }
 

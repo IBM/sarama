@@ -1,24 +1,40 @@
 package sarama
 
 type DescribeGroupsResponse struct {
-	Groups []*GroupDescription
+	Version              int16
+	ThrottleTimeMs       int32
+	Groups               []*GroupDescription
+	AuthorizedOperations int32
 }
 
 func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
+	if r.Version >= 1 {
+		pe.putInt32(r.ThrottleTimeMs)
+	}
 	if err := pe.putArrayLength(len(r.Groups)); err != nil {
 		return err
 	}
 
 	for _, groupDescription := range r.Groups {
+		groupDescription.Version = r.Version
 		if err := groupDescription.encode(pe); err != nil {
 			return err
 		}
+	}
+	if r.Version >= 3 {
+		pe.putInt32(r.AuthorizedOperations)
 	}
 
 	return nil
 }
 
 func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err error) {
+	r.Version = version
+	if r.Version >= 1 {
+		if r.ThrottleTimeMs, err = pd.getInt32(); err != nil {
+			return err
+		}
+	}
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -27,7 +43,13 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 	r.Groups = make([]*GroupDescription, n)
 	for i := 0; i < n; i++ {
 		r.Groups[i] = new(GroupDescription)
+		r.Groups[i].Version = r.Version
 		if err := r.Groups[i].decode(pd); err != nil {
+			return err
+		}
+	}
+	if r.Version >= 3 {
+		if r.AuthorizedOperations, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
@@ -40,7 +62,7 @@ func (r *DescribeGroupsResponse) key() int16 {
 }
 
 func (r *DescribeGroupsResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *DescribeGroupsResponse) headerVersion() int16 {
@@ -48,10 +70,16 @@ func (r *DescribeGroupsResponse) headerVersion() int16 {
 }
 
 func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
+	switch r.Version {
+	case 1, 2, 3, 4:
+		return V2_3_0_0
+	}
 	return V0_9_0_0
 }
 
 type GroupDescription struct {
+	Version int16
+
 	Err          KError
 	GroupId      string
 	State        string
@@ -84,6 +112,8 @@ func (gd *GroupDescription) encode(pe packetEncoder) error {
 		if err := pe.putString(memberId); err != nil {
 			return err
 		}
+		// encode with version
+		groupMemberDescription.Version = gd.Version
 		if err := groupMemberDescription.encode(pe); err != nil {
 			return err
 		}
@@ -129,6 +159,7 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 		}
 
 		gd.Members[memberId] = new(GroupMemberDescription)
+		gd.Members[memberId].Version = gd.Version
 		if err := gd.Members[memberId].decode(pd); err != nil {
 			return err
 		}
@@ -138,6 +169,9 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 }
 
 type GroupMemberDescription struct {
+	Version int16
+
+	GroupInstanceId  *string
 	ClientId         string
 	ClientHost       string
 	MemberMetadata   []byte
@@ -145,6 +179,11 @@ type GroupMemberDescription struct {
 }
 
 func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
+	if gmd.Version >= 4 {
+		if err := pe.putNullableString(gmd.GroupInstanceId); err != nil {
+			return err
+		}
+	}
 	if err := pe.putString(gmd.ClientId); err != nil {
 		return err
 	}
@@ -162,6 +201,11 @@ func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
 }
 
 func (gmd *GroupMemberDescription) decode(pd packetDecoder) (err error) {
+	if gmd.Version >= 4 {
+		if gmd.GroupInstanceId, err = pd.getNullableString(); err != nil {
+			return
+		}
+	}
 	if gmd.ClientId, err = pd.getString(); err != nil {
 		return
 	}
