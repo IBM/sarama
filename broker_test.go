@@ -306,24 +306,16 @@ func TestSASLOAuthBearer(t *testing.T) {
 			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeOAuth
 			conf.Net.SASL.TokenProvider = test.tokProvider
+			conf.Net.SASL.Enable = true
+			conf.Version = V1_0_0_0
 
-			broker.conf = conf
-
-			dialer := net.Dialer{
-				Timeout:   conf.Net.DialTimeout,
-				KeepAlive: conf.Net.KeepAlive,
-				LocalAddr: conf.Net.LocalAddr,
-			}
-
-			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+			err := broker.Open(conf)
 			if err != nil {
 				t.Fatal(err)
 			}
+			t.Cleanup(func() { _ = broker.Close() })
 
-			broker.conn = conn
-
-			err = broker.authenticateViaSASL()
-
+			_, err = broker.Connected()
 			if !errors.Is(test.expectedBrokerError, ErrNoError) {
 				if !errors.Is(err, test.expectedBrokerError) {
 					t.Errorf("[%d]:[%s] Expected %s auth error, got %s\n", i, test.name, test.expectedBrokerError, err)
@@ -438,24 +430,19 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
 			conf.Net.SASL.Version = SASLHandshakeV1
+			conf.Net.SASL.User = "user"
+			conf.Net.SASL.Password = "pass"
+			conf.Net.SASL.Enable = true
 			conf.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient { return test.scramClient }
+			conf.Version = V1_0_0_0
 
-			broker.conf = conf
-			broker.conf.Version = V1_0_0_0
-			dialer := net.Dialer{
-				Timeout:   conf.Net.DialTimeout,
-				KeepAlive: conf.Net.KeepAlive,
-				LocalAddr: conf.Net.LocalAddr,
-			}
-
-			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+			err := broker.Open(conf)
 			if err != nil {
 				t.Fatal(err)
 			}
+			t.Cleanup(func() { _ = broker.Close() })
 
-			broker.conn = conn
-
-			err = broker.authenticateViaSASL()
+			_, err = broker.Connected()
 
 			if !errors.Is(test.mockSASLAuthErr, ErrNoError) {
 				if !errors.Is(err, test.mockSASLAuthErr) {
@@ -546,26 +533,20 @@ func TestSASLPlainAuth(t *testing.T) {
 			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypePlaintext
 			conf.Net.SASL.AuthIdentity = test.authidentity
+			conf.Net.SASL.Enable = true
 			conf.Net.SASL.User = "token"
 			conf.Net.SASL.Password = "password"
 			conf.Net.SASL.Version = SASLHandshakeV1
+			conf.Version = V1_0_0_0
 
-			broker.conf = conf
-			broker.conf.Version = V1_0_0_0
-			dialer := net.Dialer{
-				Timeout:   conf.Net.DialTimeout,
-				KeepAlive: conf.Net.KeepAlive,
-				LocalAddr: conf.Net.LocalAddr,
-			}
-
-			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+			err := broker.Open(conf)
 			if err != nil {
 				t.Fatal(err)
 			}
+			t.Cleanup(func() { _ = broker.Close() })
 
-			broker.conn = conn
+			_, err = broker.Connected()
 
-			err = broker.authenticateViaSASL()
 			if err == nil {
 				for _, rr := range mockBroker.History() {
 					switch r := rr.Request.(type) {
@@ -635,21 +616,20 @@ func TestSASLReadTimeout(t *testing.T) {
 		conf.Net.SASL.User = "token"
 		conf.Net.SASL.Password = "password"
 		conf.Net.SASL.Version = SASLHandshakeV1
+		conf.Net.SASL.Enable = true
+		conf.Version = V1_0_0_0
 	}
 
-	broker.conf = conf
-	broker.conf.Version = V1_0_0_0
-	dialer := net.Dialer{}
-
-	conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
+	err := broker.Open(conf)
 	if err != nil {
 		t.Fatal(err)
 	}
+	t.Cleanup(func() { _ = broker.Close() })
 
-	broker.conn = conn
-	err = broker.authenticateViaSASL()
-	if err == nil {
-		t.Errorf("should never happen - expected read timeout")
+	_, err = broker.Connected()
+
+	if err, ok := err.(net.Error); !ok || !err.Timeout() {
+		t.Errorf("should never happen - expected read timeout got: %v", err)
 	}
 }
 
@@ -719,8 +699,10 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			broker.responseRate = metrics.NilMeter{}
 			broker.requestLatency = metrics.NilHistogram{}
 			broker.requestsInFlight = metrics.NilCounter{}
+
 			conf := NewTestConfig()
 			conf.Net.SASL.Mechanism = SASLTypeGSSAPI
+			conf.Net.SASL.Enable = true
 			conf.Net.SASL.GSSAPI.ServiceName = "kafka"
 			conf.Net.SASL.GSSAPI.KerberosConfigPath = "krb5.conf"
 			conf.Net.SASL.GSSAPI.Realm = "EXAMPLE.COM"
@@ -728,18 +710,7 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			conf.Net.SASL.GSSAPI.Password = "kafka"
 			conf.Net.SASL.GSSAPI.KeyTabPath = "kafka.keytab"
 			conf.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
-			broker.conf = conf
-			broker.conf.Version = V1_0_0_0
-			dialer := net.Dialer{
-				Timeout:   conf.Net.DialTimeout,
-				KeepAlive: conf.Net.KeepAlive,
-				LocalAddr: conf.Net.LocalAddr,
-			}
-
-			conn, err := dialer.Dial("tcp", mockBroker.listener.Addr().String())
-			if err != nil {
-				t.Fatal(err)
-			}
+			conf.Version = V1_0_0_0
 
 			gssapiHandler := KafkaGSSAPIHandler{
 				client:         &MockKerberosClient{},
@@ -747,7 +718,6 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 				badKeyChecksum: test.badKeyChecksum,
 			}
 			mockBroker.SetGSSAPIHandler(gssapiHandler.MockKafkaGSSAPI)
-			broker.conn = conn
 			if test.mockKerberosClient {
 				broker.kerberosAuthenticator.NewKerberosClientFunc = func(config *GSSAPIConfig) (KerberosClient, error) {
 					return &MockKerberosClient{
@@ -759,7 +729,14 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 				broker.kerberosAuthenticator.NewKerberosClientFunc = nil
 			}
 
-			err = broker.authenticateViaSASL()
+			err := broker.Open(conf)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = broker.Close() })
+
+			_, err = broker.Connected()
+
 
 			if err != nil && test.error != nil {
 				if test.error.Error() != err.Error() {
