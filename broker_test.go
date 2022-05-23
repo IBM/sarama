@@ -628,7 +628,8 @@ func TestSASLReadTimeout(t *testing.T) {
 
 	_, err = broker.Connected()
 
-	if err, ok := err.(net.Error); !ok || !err.Timeout() {
+	var nerr net.Error
+	if !(errors.As(err, &nerr) && nerr.Timeout()) {
 		t.Errorf("should never happen - expected read timeout got: %v", err)
 	}
 }
