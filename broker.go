@@ -960,7 +960,6 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 	return b.sendInternal(rb, promise)
 }
 
-
 // b.lock must be held by caller
 func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {

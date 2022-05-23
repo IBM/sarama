@@ -737,7 +737,6 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 
 			_, err = broker.Connected()
 
-
 			if err != nil && test.error != nil {
 				if test.error.Error() != err.Error() {
 					t.Errorf("[%d] Expected error:%s, got:%s.", i, test.error, err)
