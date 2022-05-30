@@ -3,6 +3,7 @@ package sarama
 import (
 	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rcrowley/go-metrics"
@@ -498,6 +499,50 @@ func TestZstdConfigValidation(t *testing.T) {
 	config.Version = V2_1_0_0
 	if err := config.Validate(); err != nil {
 		t.Error("Expected zstd to work, got ", err)
+	}
+}
+
+func TestValidGroupInstanceId(t *testing.T) {
+	tests := []struct {
+		grouptInstanceId string
+		shouldHaveErr    bool
+	}{
+		{"groupInstanceId1", false},
+		{"", true},
+		{".", true},
+		{"..", true},
+		{strings.Repeat("a", 250), true},
+		{"group_InstanceId.1", false},
+		{"group-InstanceId1", false},
+		{"group#InstanceId1", true},
+	}
+	for _, testcase := range tests {
+		err := validateGroupInstanceId(testcase.grouptInstanceId)
+		if !testcase.shouldHaveErr {
+			if err != nil {
+				t.Errorf("Expected validGroupInstanceId %s to pass, got error %v", testcase.grouptInstanceId, err)
+			}
+		} else {
+			if err == nil {
+				t.Errorf("Expected validGroupInstanceId %s to be error, got nil", testcase.grouptInstanceId)
+			}
+			var target ConfigurationError
+			if !errors.As(err, &target) {
+				t.Errorf("Excepted err to be ConfigurationError, got %v", err)
+			}
+		}
+	}
+}
+
+func TestGroupInstanceIdAndVersionValidation(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Group.InstanceId = "groupInstanceId1"
+	if err := config.Validate(); !strings.Contains(err.Error(), "Consumer.Group.InstanceId need Version >= 2.3") {
+		t.Error("Expected invalid group instance error, got ", err)
+	}
+	config.Version = V2_3_0_0
+	if err := config.Validate(); err != nil {
+		t.Error("Expected group instance to work, got ", err)
 	}
 }
 

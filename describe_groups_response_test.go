@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	describeGroupsResponseEmpty = []byte{
+	describeGroupsResponseEmptyV0 = []byte{
 		0, 0, 0, 0, // no groups
 	}
 
-	describeGroupsResponsePopulated = []byte{
+	describeGroupsResponsePopulatedV0 = []byte{
 		0, 0, 0, 2, // 2 groups
 
 		0, 0, // no error
@@ -35,17 +35,17 @@ var (
 	}
 )
 
-func TestDescribeGroupsResponse(t *testing.T) {
+func TestDescribeGroupsResponseV0(t *testing.T) {
 	var response *DescribeGroupsResponse
 
 	response = new(DescribeGroupsResponse)
-	testVersionDecodable(t, "empty", response, describeGroupsResponseEmpty, 0)
+	testVersionDecodable(t, "empty", response, describeGroupsResponseEmptyV0, 0)
 	if len(response.Groups) != 0 {
 		t.Error("Expected no groups")
 	}
 
 	response = new(DescribeGroupsResponse)
-	testVersionDecodable(t, "populated", response, describeGroupsResponsePopulated, 0)
+	testVersionDecodable(t, "populated", response, describeGroupsResponsePopulatedV0, 0)
 	if len(response.Groups) != 2 {
 		t.Error("Expected two groups")
 	}
@@ -88,5 +88,191 @@ func TestDescribeGroupsResponse(t *testing.T) {
 	}
 	if len(group1.Members) != 0 {
 		t.Error("Unxpected groups[1].Members, found", group0.Members)
+	}
+}
+
+var (
+	describeGroupsResponseEmptyV3 = []byte{
+		0, 0, 0, 0, // throttle time 0
+		0, 0, 0, 0, // no groups
+		0, 0, 0, 0, // authorizedOperations 0
+	}
+
+	describeGroupsResponsePopulatedV3 = []byte{
+		0, 0, 0, 0, // throttle time 0
+		0, 0, 0, 2, // 2 groups
+
+		0, 0, // no error
+		0, 3, 'f', 'o', 'o', // Group ID
+		0, 3, 'b', 'a', 'r', // State
+		0, 8, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', // ConsumerProtocol type
+		0, 3, 'b', 'a', 'z', // Protocol name
+		0, 0, 0, 1, // 1 member
+		0, 2, 'i', 'd', // Member ID
+		0, 6, 's', 'a', 'r', 'a', 'm', 'a', // Client ID
+		0, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', // Client Host
+		0, 0, 0, 3, 0x01, 0x02, 0x03, // MemberMetadata
+		0, 0, 0, 3, 0x04, 0x05, 0x06, // MemberAssignment
+
+		0, 30, // ErrGroupAuthorizationFailed
+		0, 0,
+		0, 0,
+		0, 0,
+		0, 0,
+		0, 0, 0, 0,
+
+		0, 0, 0, 0, // authorizedOperations 0
+	}
+
+	describeGroupsResponseEmptyV4 = []byte{
+		0, 0, 0, 0, // throttle time 0
+		0, 0, 0, 0, // no groups
+		0, 0, 0, 0, // authorizedOperations 0
+	}
+
+	describeGroupsResponsePopulatedV4 = []byte{
+		0, 0, 0, 0, // throttle time 0
+		0, 0, 0, 2, // 2 groups
+
+		0, 0, // no error
+		0, 3, 'f', 'o', 'o', // Group ID
+		0, 3, 'b', 'a', 'r', // State
+		0, 8, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', // ConsumerProtocol type
+		0, 3, 'b', 'a', 'z', // Protocol name
+		0, 0, 0, 1, // 1 member
+		0, 2, 'i', 'd', // Member ID
+		0, 3, 'g', 'i', 'd', // Group Instance ID
+		0, 6, 's', 'a', 'r', 'a', 'm', 'a', // Client ID
+		0, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', // Client Host
+		0, 0, 0, 3, 0x01, 0x02, 0x03, // MemberMetadata
+		0, 0, 0, 3, 0x04, 0x05, 0x06, // MemberAssignment
+
+		0, 30, // ErrGroupAuthorizationFailed
+		0, 0,
+		0, 0,
+		0, 0,
+		0, 0,
+		0, 0, 0, 0,
+
+		0, 0, 0, 0, // authorizedOperations 0
+	}
+)
+
+func TestDescribeGroupsResponseV1plus(t *testing.T) {
+	groupInstanceId := "gid"
+	tests := []struct {
+		CaseName     string
+		Version      int16
+		MessageBytes []byte
+		Message      *DescribeGroupsResponse
+	}{
+		{
+			"empty",
+			3,
+			describeGroupsResponseEmptyV3,
+			&DescribeGroupsResponse{
+				Version:              3,
+				ThrottleTimeMs:       int32(0),
+				Groups:               []*GroupDescription{},
+				AuthorizedOperations: int32(0),
+			},
+		},
+		{
+			"populated",
+			3,
+			describeGroupsResponsePopulatedV3,
+			&DescribeGroupsResponse{
+				Version:        3,
+				ThrottleTimeMs: int32(0),
+				Groups: []*GroupDescription{
+					{
+						Version:      3,
+						Err:          KError(0),
+						GroupId:      "foo",
+						State:        "bar",
+						ProtocolType: "consumer",
+						Protocol:     "baz",
+						Members: map[string]*GroupMemberDescription{
+							"id": {
+								Version:          3,
+								ClientId:         "sarama",
+								ClientHost:       "localhost",
+								MemberMetadata:   []byte{1, 2, 3},
+								MemberAssignment: []byte{4, 5, 6},
+							},
+						},
+					},
+					{
+						Version:      3,
+						Err:          KError(30),
+						GroupId:      "",
+						State:        "",
+						ProtocolType: "",
+						Protocol:     "",
+						Members:      nil,
+					},
+				},
+				AuthorizedOperations: int32(0),
+			},
+		},
+		{
+			"empty",
+			4,
+			describeGroupsResponseEmptyV4,
+			&DescribeGroupsResponse{
+				Version:              4,
+				ThrottleTimeMs:       int32(0),
+				Groups:               []*GroupDescription{},
+				AuthorizedOperations: int32(0),
+			},
+		},
+		{
+			"populated",
+			4,
+			describeGroupsResponsePopulatedV4,
+			&DescribeGroupsResponse{
+				Version:        4,
+				ThrottleTimeMs: int32(0),
+				Groups: []*GroupDescription{
+					{
+						Version:      4,
+						Err:          KError(0),
+						GroupId:      "foo",
+						State:        "bar",
+						ProtocolType: "consumer",
+						Protocol:     "baz",
+						Members: map[string]*GroupMemberDescription{
+							"id": {
+								Version:          4,
+								GroupInstanceId:  &groupInstanceId,
+								ClientId:         "sarama",
+								ClientHost:       "localhost",
+								MemberMetadata:   []byte{1, 2, 3},
+								MemberAssignment: []byte{4, 5, 6},
+							},
+						},
+					},
+					{
+						Version:      4,
+						Err:          KError(30),
+						GroupId:      "",
+						State:        "",
+						ProtocolType: "",
+						Protocol:     "",
+						Members:      nil,
+					},
+				},
+				AuthorizedOperations: int32(0),
+			},
+		},
+	}
+
+	for _, c := range tests {
+		response := new(DescribeGroupsResponse)
+		testVersionDecodable(t, c.CaseName, response, c.MessageBytes, c.Version)
+		if !reflect.DeepEqual(c.Message, response) {
+			t.Errorf("case %s decode failed, expected:%+v got %+v", c.CaseName, c.Message, response)
+		}
+		testEncodable(t, c.CaseName, c.Message, c.MessageBytes)
 	}
 }

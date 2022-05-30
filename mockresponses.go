@@ -1189,13 +1189,13 @@ type MockJoinGroupResponse struct {
 	GroupProtocol string
 	LeaderId      string
 	MemberId      string
-	Members       map[string][]byte
+	Members       []GroupMember
 }
 
 func NewMockJoinGroupResponse(t TestReporter) *MockJoinGroupResponse {
 	return &MockJoinGroupResponse{
 		t:       t,
-		Members: make(map[string][]byte),
+		Members: make([]GroupMember, 0),
 	}
 }
 
@@ -1249,7 +1249,7 @@ func (m *MockJoinGroupResponse) SetMember(id string, meta *ConsumerGroupMemberMe
 	if err != nil {
 		panic(fmt.Sprintf("error encoding member metadata: %v", err))
 	}
-	m.Members[id] = bin
+	m.Members = append(m.Members, GroupMember{MemberId: id, Metadata: bin})
 	return m
 }
 

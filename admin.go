@@ -141,6 +141,11 @@ type ClusterAdmin interface {
 	// locally cached value if it's available.
 	Controller() (*Broker, error)
 
+	// Remove members from the consumer group by given member identities.
+	// This operation is supported by brokers with version 2.3 or higher
+	// This is for static membership feature. KIP-345
+	RemoveMemberFromConsumerGroup(groupId string, groupInstanceIds []string) (*LeaveGroupResponse, error)
+
 	// Close shuts down the admin and closes underlying client.
 	Close() error
 }
@@ -900,9 +905,13 @@ func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*Group
 	}
 
 	for broker, brokerGroups := range groupsPerBroker {
-		response, err := broker.DescribeGroups(&DescribeGroupsRequest{
+		describeReq := &DescribeGroupsRequest{
 			Groups: brokerGroups,
-		})
+		}
+		if ca.conf.Version.IsAtLeast(V2_3_0_0) {
+			describeReq.Version = 4
+		}
+		response, err := broker.DescribeGroups(describeReq)
 		if err != nil {
 			return nil, err
 		}
@@ -1195,4 +1204,22 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 	}
 
 	return nil
+}
+
+func (ca *clusterAdmin) RemoveMemberFromConsumerGroup(groupId string, groupInstanceIds []string) (*LeaveGroupResponse, error) {
+	controller, err := ca.client.Coordinator(groupId)
+	if err != nil {
+		return nil, err
+	}
+	request := &LeaveGroupRequest{
+		Version: 3,
+		GroupId: groupId,
+	}
+	for _, instanceId := range groupInstanceIds {
+		groupInstanceId := instanceId
+		request.Members = append(request.Members, MemberIdentity{
+			GroupInstanceId: &groupInstanceId,
+		})
+	}
+	return controller.LeaveGroup(request)
 }
