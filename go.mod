@@ -17,7 +17,7 @@ require (
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.14
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/xdg-go/scram v1.1.1
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2
