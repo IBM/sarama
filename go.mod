@@ -3,7 +3,7 @@ module github.com/Shopify/sarama
 go 1.16
 
 require (
-	github.com/Shopify/toxiproxy/v2 v2.3.0
+	github.com/Shopify/toxiproxy/v2 v2.4.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/eapache/go-resiliency v1.2.0
 	github.com/eapache/go-xerial-snappy v0.0.0-20180814174437-776d5712da21
@@ -13,11 +13,11 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jcmturner/gofork v1.0.0
 	github.com/jcmturner/gokrb5/v8 v8.4.2
-	github.com/klauspost/compress v1.15.0
+	github.com/klauspost/compress v1.15.6
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.14
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
-	github.com/stretchr/testify v1.7.0
+	github.com/stretchr/testify v1.7.1
 	github.com/xdg-go/scram v1.1.1
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
 	golang.org/x/net v0.0.0-20220520000938-2e3eb7b945c2
