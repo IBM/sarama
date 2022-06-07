@@ -95,7 +95,6 @@ var (
 	describeGroupsResponseEmptyV3 = []byte{
 		0, 0, 0, 0, // throttle time 0
 		0, 0, 0, 0, // no groups
-		0, 0, 0, 0, // authorizedOperations 0
 	}
 
 	describeGroupsResponsePopulatedV3 = []byte{
@@ -113,6 +112,7 @@ var (
 		0, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', // Client Host
 		0, 0, 0, 3, 0x01, 0x02, 0x03, // MemberMetadata
 		0, 0, 0, 3, 0x04, 0x05, 0x06, // MemberAssignment
+		0, 0, 0, 0, // authorizedOperations 0
 
 		0, 30, // ErrGroupAuthorizationFailed
 		0, 0,
@@ -120,14 +120,13 @@ var (
 		0, 0,
 		0, 0,
 		0, 0, 0, 0,
-
 		0, 0, 0, 0, // authorizedOperations 0
+
 	}
 
 	describeGroupsResponseEmptyV4 = []byte{
 		0, 0, 0, 0, // throttle time 0
 		0, 0, 0, 0, // no groups
-		0, 0, 0, 0, // authorizedOperations 0
 	}
 
 	describeGroupsResponsePopulatedV4 = []byte{
@@ -146,6 +145,7 @@ var (
 		0, 9, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', // Client Host
 		0, 0, 0, 3, 0x01, 0x02, 0x03, // MemberMetadata
 		0, 0, 0, 3, 0x04, 0x05, 0x06, // MemberAssignment
+		0, 0, 0, 0, // authorizedOperations 0
 
 		0, 30, // ErrGroupAuthorizationFailed
 		0, 0,
@@ -153,8 +153,8 @@ var (
 		0, 0,
 		0, 0,
 		0, 0, 0, 0,
-
 		0, 0, 0, 0, // authorizedOperations 0
+
 	}
 )
 
@@ -171,10 +171,9 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 			3,
 			describeGroupsResponseEmptyV3,
 			&DescribeGroupsResponse{
-				Version:              3,
-				ThrottleTimeMs:       int32(0),
-				Groups:               []*GroupDescription{},
-				AuthorizedOperations: int32(0),
+				Version:        3,
+				ThrottleTimeMs: int32(0),
+				Groups:         []*GroupDescription{},
 			},
 		},
 		{
@@ -212,7 +211,6 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 						Members:      nil,
 					},
 				},
-				AuthorizedOperations: int32(0),
 			},
 		},
 		{
@@ -220,10 +218,9 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 			4,
 			describeGroupsResponseEmptyV4,
 			&DescribeGroupsResponse{
-				Version:              4,
-				ThrottleTimeMs:       int32(0),
-				Groups:               []*GroupDescription{},
-				AuthorizedOperations: int32(0),
+				Version:        4,
+				ThrottleTimeMs: int32(0),
+				Groups:         []*GroupDescription{},
 			},
 		},
 		{
@@ -262,7 +259,6 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 						Members:      nil,
 					},
 				},
-				AuthorizedOperations: int32(0),
 			},
 		},
 	}
