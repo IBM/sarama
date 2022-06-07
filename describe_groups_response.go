@@ -1,12 +1,17 @@
 package sarama
 
 type DescribeGroupsResponse struct {
-	Version        int16
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// ThrottleTimeMs contains the duration in milliseconds for which the
+	// request was throttled due to a quota violation, or zero if the request
+	// did not violate any quota.
 	ThrottleTimeMs int32
-	Groups         []*GroupDescription
+	// Groups contains each described group.
+	Groups []*GroupDescription
 }
 
-func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
+func (r *DescribeGroupsResponse) encode(pe packetEncoder) (err error) {
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTimeMs)
 	}
@@ -14,9 +19,8 @@ func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for _, groupDescription := range r.Groups {
-		groupDescription.Version = r.Version
-		if err := groupDescription.encode(pe); err != nil {
+	for _, block := range r.Groups {
+		if err := block.encode(pe, r.Version); err != nil {
 			return err
 		}
 	}
@@ -31,17 +35,16 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 			return err
 		}
 	}
-	n, err := pd.getArrayLength()
-	if err != nil {
+	if numGroups, err := pd.getArrayLength(); err != nil {
 		return err
-	}
-
-	r.Groups = make([]*GroupDescription, n)
-	for i := 0; i < n; i++ {
-		r.Groups[i] = new(GroupDescription)
-		r.Groups[i].Version = r.Version
-		if err := r.Groups[i].decode(pd); err != nil {
-			return err
+	} else if numGroups > 0 {
+		r.Groups = make([]*GroupDescription, numGroups)
+		for i := 0; i < numGroups; i++ {
+			block := &GroupDescription{}
+			if err := block.decode(pd, r.Version); err != nil {
+				return err
+			}
+			r.Groups[i] = block
 		}
 	}
 
@@ -68,20 +71,32 @@ func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 	return V0_9_0_0
 }
 
+// GroupDescription contains each described group.
 type GroupDescription struct {
+	// Version defines the protocol version to use for encode and decode
 	Version int16
-
-	Err                  KError
-	GroupId              string
-	State                string
-	ProtocolType         string
-	Protocol             string
-	Members              map[string]*GroupMemberDescription
+	// Err contains the describe error as the KError type.
+	Err KError
+	// ErrorCode contains the describe error, or 0 if there was no error.
+	ErrorCode int16
+	// GroupId contains the group ID string.
+	GroupId string
+	// State contains the group state string, or the empty string.
+	State string
+	// ProtocolType contains the group protocol type, or the empty string.
+	ProtocolType string
+	// Protocol contains the group protocol data, or the empty string.
+	Protocol string
+	// Members contains the group members.
+	Members map[string]*GroupMemberDescription
+	// AuthorizedOperations contains a 32-bit bitfield to represent authorized
+	// operations for this group.
 	AuthorizedOperations int32
 }
 
-func (gd *GroupDescription) encode(pe packetEncoder) error {
-	pe.putInt16(int16(gd.Err))
+func (gd *GroupDescription) encode(pe packetEncoder, version int16) (err error) {
+	gd.Version = version
+	pe.putInt16(gd.ErrorCode)
 
 	if err := pe.putString(gd.GroupId); err != nil {
 		return err
@@ -100,13 +115,8 @@ func (gd *GroupDescription) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for memberId, groupMemberDescription := range gd.Members {
-		if err := pe.putString(memberId); err != nil {
-			return err
-		}
-		// encode with version
-		groupMemberDescription.Version = gd.Version
-		if err := groupMemberDescription.encode(pe); err != nil {
+	for _, block := range gd.Members {
+		if err := block.encode(pe, gd.Version); err != nil {
 			return err
 		}
 	}
@@ -118,44 +128,38 @@ func (gd *GroupDescription) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
-	kerr, err := pd.getInt16()
-	if err != nil {
+func (gd *GroupDescription) decode(pd packetDecoder, version int16) (err error) {
+	gd.Version = version
+	if gd.ErrorCode, err = pd.getInt16(); err != nil {
 		return err
 	}
 
-	gd.Err = KError(kerr)
+	gd.Err = KError(gd.ErrorCode)
 
 	if gd.GroupId, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 	if gd.State, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 	if gd.ProtocolType, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 	if gd.Protocol, err = pd.getString(); err != nil {
-		return
-	}
-
-	n, err := pd.getArrayLength()
-	if err != nil {
 		return err
 	}
 
-	if n > 0 {
-		gd.Members = make(map[string]*GroupMemberDescription)
-		for i := 0; i < n; i++ {
-			memberId, err := pd.getString()
-			if err != nil {
+	if numMembers, err := pd.getArrayLength(); err != nil {
+		return err
+	} else if numMembers > 0 {
+		gd.Members = make(map[string]*GroupMemberDescription, numMembers)
+		for i := 0; i < numMembers; i++ {
+			block := &GroupMemberDescription{}
+			if err := block.decode(pd, gd.Version); err != nil {
 				return err
 			}
-
-			gd.Members[memberId] = new(GroupMemberDescription)
-			gd.Members[memberId].Version = gd.Version
-			if err := gd.Members[memberId].decode(pd); err != nil {
-				return err
+			if block != nil {
+				gd.Members[block.MemberId] = block
 			}
 		}
 	}
@@ -169,17 +173,33 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 	return nil
 }
 
+// GroupMemberDescription contains the group members.
 type GroupMemberDescription struct {
+	// Version defines the protocol version to use for encode and decode
 	Version int16
-
-	GroupInstanceId  *string
-	ClientId         string
-	ClientHost       string
-	MemberMetadata   []byte
+	// MemberId contains the member ID assigned by the group coordinator.
+	MemberId string
+	// GroupInstanceId contains the unique identifier of the consumer instance
+	// provided by end user.
+	GroupInstanceId *string
+	// ClientId contains the client ID used in the member's latest join group
+	// request.
+	ClientId string
+	// ClientHost contains the client host.
+	ClientHost string
+	// MemberMetadata contains the metadata corresponding to the current group
+	// protocol in use.
+	MemberMetadata []byte
+	// MemberAssignment contains the current assignment provided by the group
+	// leader.
 	MemberAssignment []byte
 }
 
-func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
+func (gmd *GroupMemberDescription) encode(pe packetEncoder, version int16) (err error) {
+	gmd.Version = version
+	if err := pe.putString(gmd.MemberId); err != nil {
+		return err
+	}
 	if gmd.Version >= 4 {
 		if err := pe.putNullableString(gmd.GroupInstanceId); err != nil {
 			return err
@@ -201,23 +221,27 @@ func (gmd *GroupMemberDescription) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (gmd *GroupMemberDescription) decode(pd packetDecoder) (err error) {
+func (gmd *GroupMemberDescription) decode(pd packetDecoder, version int16) (err error) {
+	gmd.Version = version
+	if gmd.MemberId, err = pd.getString(); err != nil {
+		return err
+	}
 	if gmd.Version >= 4 {
 		if gmd.GroupInstanceId, err = pd.getNullableString(); err != nil {
-			return
+			return err
 		}
 	}
 	if gmd.ClientId, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 	if gmd.ClientHost, err = pd.getString(); err != nil {
-		return
+		return err
 	}
 	if gmd.MemberMetadata, err = pd.getBytes(); err != nil {
-		return
+		return err
 	}
 	if gmd.MemberAssignment, err = pd.getBytes(); err != nil {
-		return
+		return err
 	}
 
 	return nil
