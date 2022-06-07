@@ -1,10 +1,9 @@
 package sarama
 
 type DescribeGroupsResponse struct {
-	Version              int16
-	ThrottleTimeMs       int32
-	Groups               []*GroupDescription
-	AuthorizedOperations int32
+	Version        int16
+	ThrottleTimeMs int32
+	Groups         []*GroupDescription
 }
 
 func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
@@ -20,9 +19,6 @@ func (r *DescribeGroupsResponse) encode(pe packetEncoder) error {
 		if err := groupDescription.encode(pe); err != nil {
 			return err
 		}
-	}
-	if r.Version >= 3 {
-		pe.putInt32(r.AuthorizedOperations)
 	}
 
 	return nil
@@ -45,11 +41,6 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 		r.Groups[i] = new(GroupDescription)
 		r.Groups[i].Version = r.Version
 		if err := r.Groups[i].decode(pd); err != nil {
-			return err
-		}
-	}
-	if r.Version >= 3 {
-		if r.AuthorizedOperations, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
@@ -80,12 +71,13 @@ func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 type GroupDescription struct {
 	Version int16
 
-	Err          KError
-	GroupId      string
-	State        string
-	ProtocolType string
-	Protocol     string
-	Members      map[string]*GroupMemberDescription
+	Err                  KError
+	GroupId              string
+	State                string
+	ProtocolType         string
+	Protocol             string
+	Members              map[string]*GroupMemberDescription
+	AuthorizedOperations int32
 }
 
 func (gd *GroupDescription) encode(pe packetEncoder) error {
@@ -119,6 +111,10 @@ func (gd *GroupDescription) encode(pe packetEncoder) error {
 		}
 	}
 
+	if gd.Version >= 3 {
+		pe.putInt32(gd.AuthorizedOperations)
+	}
+
 	return nil
 }
 
@@ -147,20 +143,25 @@ func (gd *GroupDescription) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	if n == 0 {
-		return nil
+
+	if n > 0 {
+		gd.Members = make(map[string]*GroupMemberDescription)
+		for i := 0; i < n; i++ {
+			memberId, err := pd.getString()
+			if err != nil {
+				return err
+			}
+
+			gd.Members[memberId] = new(GroupMemberDescription)
+			gd.Members[memberId].Version = gd.Version
+			if err := gd.Members[memberId].decode(pd); err != nil {
+				return err
+			}
+		}
 	}
 
-	gd.Members = make(map[string]*GroupMemberDescription)
-	for i := 0; i < n; i++ {
-		memberId, err := pd.getString()
-		if err != nil {
-			return err
-		}
-
-		gd.Members[memberId] = new(GroupMemberDescription)
-		gd.Members[memberId].Version = gd.Version
-		if err := gd.Members[memberId].decode(pd); err != nil {
+	if gd.Version >= 3 {
+		if gd.AuthorizedOperations, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
