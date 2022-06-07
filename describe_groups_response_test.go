@@ -4,6 +4,8 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -161,7 +163,7 @@ var (
 func TestDescribeGroupsResponseV1plus(t *testing.T) {
 	groupInstanceId := "gid"
 	tests := []struct {
-		CaseName     string
+		Name         string
 		Version      int16
 		MessageBytes []byte
 		Message      *DescribeGroupsResponse
@@ -171,9 +173,7 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 			3,
 			describeGroupsResponseEmptyV3,
 			&DescribeGroupsResponse{
-				Version:        3,
-				ThrottleTimeMs: int32(0),
-				Groups:         []*GroupDescription{},
+				Version: 3,
 			},
 		},
 		{
@@ -194,6 +194,7 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 						Members: map[string]*GroupMemberDescription{
 							"id": {
 								Version:          3,
+								MemberId:         "id",
 								ClientId:         "sarama",
 								ClientHost:       "localhost",
 								MemberMetadata:   []byte{1, 2, 3},
@@ -202,13 +203,9 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 						},
 					},
 					{
-						Version:      3,
-						Err:          KError(30),
-						GroupId:      "",
-						State:        "",
-						ProtocolType: "",
-						Protocol:     "",
-						Members:      nil,
+						Version:   3,
+						Err:       KError(30),
+						ErrorCode: 30,
 					},
 				},
 			},
@@ -218,9 +215,7 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 			4,
 			describeGroupsResponseEmptyV4,
 			&DescribeGroupsResponse{
-				Version:        4,
-				ThrottleTimeMs: int32(0),
-				Groups:         []*GroupDescription{},
+				Version: 4,
 			},
 		},
 		{
@@ -241,6 +236,7 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 						Members: map[string]*GroupMemberDescription{
 							"id": {
 								Version:          4,
+								MemberId:         "id",
 								GroupInstanceId:  &groupInstanceId,
 								ClientId:         "sarama",
 								ClientHost:       "localhost",
@@ -250,13 +246,9 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 						},
 					},
 					{
-						Version:      4,
-						Err:          KError(30),
-						GroupId:      "",
-						State:        "",
-						ProtocolType: "",
-						Protocol:     "",
-						Members:      nil,
+						Version:   4,
+						Err:       KError(30),
+						ErrorCode: 30,
 					},
 				},
 			},
@@ -264,11 +256,13 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 	}
 
 	for _, c := range tests {
-		response := new(DescribeGroupsResponse)
-		testVersionDecodable(t, c.CaseName, response, c.MessageBytes, c.Version)
-		if !reflect.DeepEqual(c.Message, response) {
-			t.Errorf("case %s decode failed, expected:%+v got %+v", c.CaseName, c.Message, response)
-		}
-		testEncodable(t, c.CaseName, c.Message, c.MessageBytes)
+		t.Run(c.Name, func(t *testing.T) {
+			response := new(DescribeGroupsResponse)
+			testVersionDecodable(t, c.Name, response, c.MessageBytes, c.Version)
+			if !assert.Equal(t, c.Message, response) {
+				t.Errorf("case %s decode failed, expected:%+v got %+v", c.Name, c.Message, response)
+			}
+			testEncodable(t, c.Name, c.Message, c.MessageBytes)
+		})
 	}
 }
