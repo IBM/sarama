@@ -13,27 +13,48 @@ import (
 
 func TestBalanceStrategyRange(t *testing.T) {
 	tests := []struct {
+		name     string
 		members  map[string][]string
 		topics   map[string][]int32
 		expected BalanceStrategyPlan
 	}{
 		{
+			name:    "2 members, 2 topics, 4 partitions each",
 			members: map[string][]string{"M1": {"T1", "T2"}, "M2": {"T1", "T2"}},
 			topics:  map[string][]int32{"T1": {0, 1, 2, 3}, "T2": {0, 1, 2, 3}},
 			expected: BalanceStrategyPlan{
-				"M1": map[string][]int32{"T1": {0, 1}, "T2": {2, 3}},
-				"M2": map[string][]int32{"T1": {2, 3}, "T2": {0, 1}},
+				"M1": map[string][]int32{"T1": {0, 1}, "T2": {0, 1}},
+				"M2": map[string][]int32{"T1": {2, 3}, "T2": {2, 3}},
 			},
 		},
 		{
+			name:    "2 members, 2 topics, 4 partitions each (different member ids)",
+			members: map[string][]string{"M3": {"T1", "T2"}, "M4": {"T1", "T2"}},
+			topics:  map[string][]int32{"T1": {0, 1, 2, 3}, "T2": {0, 1, 2, 3}},
+			expected: BalanceStrategyPlan{
+				"M3": map[string][]int32{"T1": {0, 1}, "T2": {0, 1}},
+				"M4": map[string][]int32{"T1": {2, 3}, "T2": {2, 3}},
+			},
+		},
+		{
+			name:    "3 members, 1 topic, 1 partition each",
+			members: map[string][]string{"M1": {"T1"}, "M2": {"T1"}, "M3": {"T1"}},
+			topics:  map[string][]int32{"T1": {0}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0}},
+			},
+		},
+		{
+			name:    "2 members, 2 topics, 3 partitions each",
 			members: map[string][]string{"M1": {"T1", "T2"}, "M2": {"T1", "T2"}},
 			topics:  map[string][]int32{"T1": {0, 1, 2}, "T2": {0, 1, 2}},
 			expected: BalanceStrategyPlan{
-				"M1": map[string][]int32{"T1": {0, 1}, "T2": {2}},
-				"M2": map[string][]int32{"T1": {2}, "T2": {0, 1}},
+				"M1": map[string][]int32{"T1": {0, 1}, "T2": {0, 1}},
+				"M2": map[string][]int32{"T1": {2}, "T2": {2}},
 			},
 		},
 		{
+			name:    "2 members, 2 topics, different subscriptions",
 			members: map[string][]string{"M1": {"T1"}, "M2": {"T1", "T2"}},
 			topics:  map[string][]int32{"T1": {0, 1}, "T2": {0, 1}},
 			expected: BalanceStrategyPlan{
@@ -49,17 +70,19 @@ func TestBalanceStrategyRange(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		members := make(map[string]ConsumerGroupMemberMetadata)
-		for memberID, topics := range test.members {
-			members[memberID] = ConsumerGroupMemberMetadata{Topics: topics}
-		}
+		t.Run(test.name, func(t *testing.T) {
+			members := make(map[string]ConsumerGroupMemberMetadata)
+			for memberID, topics := range test.members {
+				members[memberID] = ConsumerGroupMemberMetadata{Topics: topics}
+			}
 
-		actual, err := strategy.Plan(members, test.topics)
-		if err != nil {
-			t.Errorf("Unexpected error %v", err)
-		} else if !reflect.DeepEqual(actual, test.expected) {
-			t.Errorf("Plan does not match expectation\nexpected: %#v\nactual: %#v", test.expected, actual)
-		}
+			actual, err := strategy.Plan(members, test.topics)
+			if err != nil {
+				t.Errorf("Unexpected error %v", err)
+			} else if !reflect.DeepEqual(actual, test.expected) {
+				t.Errorf("Plan does not match expectation\nexpected: %#v\nactual: %#v", test.expected, actual)
+			}
+		})
 	}
 }
 

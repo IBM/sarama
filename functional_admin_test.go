@@ -123,3 +123,59 @@ func TestFuncAdminQuotas(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestFuncAdminDescribeGroups(t *testing.T) {
+	checkKafkaVersion(t, "2.3.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	group1 := testFuncConsumerGroupID(t)
+	group2 := testFuncConsumerGroupID(t)
+
+	kafkaVersion, err := ParseKafkaVersion(FunctionalTestEnv.KafkaVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewTestConfig()
+	config.Version = kafkaVersion
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config1 := NewTestConfig()
+	config1.ClientID = "M1"
+	config1.Version = V2_3_0_0
+	config1.Consumer.Offsets.Initial = OffsetNewest
+	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, group1, 100, nil, "test.4")
+	defer m1.Close()
+
+	config2 := NewTestConfig()
+	config2.ClientID = "M2"
+	config2.Version = V2_3_0_0
+	config2.Consumer.Offsets.Initial = OffsetNewest
+	config2.Consumer.Group.InstanceId = "Instance2"
+	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, group2, 100, nil, "test.4")
+	defer m2.Close()
+
+	m1.WaitForState(2)
+	m2.WaitForState(2)
+
+	res, err := adminClient.DescribeConsumerGroups([]string{group1, group2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != 2 {
+		t.Errorf("group description should be 2, got %v\n", len(res))
+	}
+	if len(res[0].Members) != 1 {
+		t.Errorf("should have 1 members in group , got %v\n", len(res[0].Members))
+	}
+	if len(res[1].Members) != 1 {
+		t.Errorf("should have 1 members in group , got %v\n", len(res[1].Members))
+	}
+
+	m1.AssertCleanShutdown()
+	m2.AssertCleanShutdown()
+}

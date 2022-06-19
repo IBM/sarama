@@ -58,18 +58,27 @@ type BalanceStrategy interface {
 // --------------------------------------------------------------------
 
 // BalanceStrategyRange is the default and assigns partitions as ranges to consumer group members.
-// Example with one topic T with six partitions (0..5) and two members (M1, M2):
-//   M1: {T: [0, 1, 2]}
-//   M2: {T: [3, 4, 5]}
+// This follows the same logic as
+// https://kafka.apache.org/31/javadoc/org/apache/kafka/clients/consumer/RangeAssignor.html
+//
+// Example with two topics T1 and T2 with six partitions each (0..5) and two members (M1, M2):
+//   M1: {T1: [0, 1, 2], T2: [0, 1, 2]}
+//   M2: {T2: [3, 4, 5], T2: [3, 4, 5]}
 var BalanceStrategyRange = &balanceStrategy{
 	name: RangeBalanceStrategyName,
 	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
-		step := float64(len(partitions)) / float64(len(memberIDs))
+		partitionsPerConsumer := len(partitions) / len(memberIDs)
+		consumersWithExtraPartition := len(partitions) % len(memberIDs)
+
+		sort.Strings(memberIDs)
 
 		for i, memberID := range memberIDs {
-			pos := float64(i)
-			min := int(math.Floor(pos*step + 0.5))
-			max := int(math.Floor((pos+1)*step + 0.5))
+			min := i*partitionsPerConsumer + int(math.Min(float64(consumersWithExtraPartition), float64(i)))
+			extra := 0
+			if i < consumersWithExtraPartition {
+				extra = 1
+			}
+			max := min + partitionsPerConsumer + extra
 			plan.Add(memberID, topic, partitions[min:max]...)
 		}
 	},

@@ -1,36 +1,23 @@
 ---
-name: CI
+name: FVT
 on: [push, pull_request]
 jobs:
-  lint:
-    name: Linting with Go ${{ matrix.go-version }}
+  fvt:
+    name: Test with Kafka ${{ matrix.kafka-version }}
     runs-on: ubuntu-latest
+
+    # We want to run on external PRs, but not on our own internal PRs as they'll be run
+    # by the push to the branch.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.17.x, 1.18.x]
-    steps:
-    - uses: actions/checkout@v2
-    - name: Setup Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: ${{ matrix.go-version }}
-    - name: golangci-lint
-      env:
-        GOFLAGS: -tags=functional
-      uses: golangci/golangci-lint-action@v2
-      with:
-        version: v1.45.2
-  test:
-    name: Unit Testing with Go ${{ matrix.go-version }}
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        go-version: [1.17.x, 1.18.x]
+        go-version: [1.18.x]
+        kafka-version: [2.8.1, 3.0.1, 3.1.0]
     env:
       DEBUG: true
       GOFLAGS: -trimpath
+      KAFKA_VERSION: ${{ matrix.kafka-version }}
     steps:
     - uses: actions/checkout@v2
     - name: Setup Go
@@ -51,5 +38,5 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-    - name: Test (Unit)
-      run: make test
+    - name: Test (Functional)
+      run: make test_functional

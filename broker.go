@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"sort"
 	"strconv"
@@ -32,7 +33,7 @@ type Broker struct {
 	responses     chan *responsePromise
 	done          chan bool
 
-	registeredMetrics []string
+	registeredMetrics map[string]struct{}
 
 	incomingByteRate       metrics.Meter
 	requestRate            metrics.Meter
@@ -52,7 +53,8 @@ type Broker struct {
 	brokerRequestsInFlight metrics.Counter
 	brokerThrottleTime     metrics.Histogram
 
-	kerberosAuthenticator GSSAPIKerberosAuth
+	kerberosAuthenticator               GSSAPIKerberosAuth
+	clientSessionReauthenticationTimeMs int64
 }
 
 // SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
@@ -218,8 +220,13 @@ func (b *Broker) Open(conf *Config) error {
 			b.registerMetrics()
 		}
 
-		if conf.Net.SASL.Enable {
-			b.connErr = b.authenticateViaSASL()
+		if conf.Net.SASL.Mechanism == SASLTypeOAuth && conf.Net.SASL.Version == SASLHandshakeV0 {
+			conf.Net.SASL.Version = SASLHandshakeV1
+		}
+
+		useSaslV0 := conf.Net.SASL.Version == SASLHandshakeV0 || conf.Net.SASL.Mechanism == SASLTypeGSSAPI
+		if conf.Net.SASL.Enable && useSaslV0 {
+			b.connErr = b.authenticateViaSASLv0()
 
 			if b.connErr != nil {
 				err = b.conn.Close()
@@ -237,12 +244,27 @@ func (b *Broker) Open(conf *Config) error {
 		b.done = make(chan bool)
 		b.responses = make(chan *responsePromise, b.conf.Net.MaxOpenRequests-1)
 
+		go withRecover(b.responseReceiver)
+		if conf.Net.SASL.Enable && !useSaslV0 {
+			b.connErr = b.authenticateViaSASLv1()
+			if b.connErr != nil {
+				close(b.responses)
+				err = b.conn.Close()
+				if err == nil {
+					DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
+				} else {
+					Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
+				}
+				b.conn = nil
+				atomic.StoreInt32(&b.opened, 0)
+				return
+			}
+		}
 		if b.id >= 0 {
 			DebugLogger.Printf("Connected to broker at %s (registered as #%d)\n", b.addr, b.id)
 		} else {
 			DebugLogger.Printf("Connected to broker at %s (unregistered)\n", b.addr)
 		}
-		go withRecover(b.responseReceiver)
 	})
 
 	return nil
@@ -898,11 +920,7 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersi
 	if promiseResponse {
 		// Packets or error will be sent to the following channels
 		// once the response is received
-		promise = &responsePromise{
-			headerVersion: responseHeaderVersion,
-			packets:       make(chan []byte),
-			errors:        make(chan error),
-		}
+		promise = makeResponsePromise(responseHeaderVersion)
 	}
 
 	if err := b.sendWithPromise(rb, promise); err != nil {
@@ -910,6 +928,15 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersi
 	}
 
 	return promise, nil
+}
+
+func makeResponsePromise(responseHeaderVersion int16) *responsePromise {
+	promise := &responsePromise{
+		headerVersion: responseHeaderVersion,
+		packets:       make(chan []byte),
+		errors:        make(chan error),
+	}
+	return promise
 }
 
 func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) error {
@@ -923,6 +950,18 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 		return ErrNotConnected
 	}
 
+	if b.clientSessionReauthenticationTimeMs > 0 && currentUnixMilli() > b.clientSessionReauthenticationTimeMs {
+		err := b.authenticateViaSASLv1()
+		if err != nil {
+			return err
+		}
+	}
+
+	return b.sendInternal(rb, promise)
+}
+
+// b.lock must be held by caller
+func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
 		return ErrUnsupportedVersion
 	}
@@ -972,10 +1011,14 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 		return nil
 	}
 
+	return handleResponsePromise(req, res, promise)
+}
+
+func handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise) error {
 	select {
 	case buf := <-promise.packets:
 		return versionedDecode(buf, res, req.version())
-	case err = <-promise.errors:
+	case err := <-promise.errors:
 		return err
 	}
 }
@@ -1105,16 +1148,74 @@ func getHeaderLength(headerVersion int16) int8 {
 	}
 }
 
-func (b *Broker) authenticateViaSASL() error {
+func (b *Broker) authenticateViaSASLv0() error {
 	switch b.conf.Net.SASL.Mechanism {
-	case SASLTypeOAuth:
-		return b.sendAndReceiveSASLOAuth(b.conf.Net.SASL.TokenProvider)
 	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
-		return b.sendAndReceiveSASLSCRAM()
+		return b.sendAndReceiveSASLSCRAMv0()
 	case SASLTypeGSSAPI:
 		return b.sendAndReceiveKerberos()
 	default:
-		return b.sendAndReceiveSASLPlainAuth()
+		return b.sendAndReceiveSASLPlainAuthV0()
+	}
+}
+
+func (b *Broker) authenticateViaSASLv1() error {
+	if b.conf.Net.SASL.Handshake {
+		handshakeRequest := &SaslHandshakeRequest{Mechanism: string(b.conf.Net.SASL.Mechanism), Version: b.conf.Net.SASL.Version}
+		handshakeResponse := new(SaslHandshakeResponse)
+		prom := makeResponsePromise(handshakeResponse.version())
+
+		handshakeErr := b.sendInternal(handshakeRequest, prom)
+		if handshakeErr != nil {
+			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+			return handshakeErr
+		}
+		handshakeErr = handleResponsePromise(handshakeRequest, handshakeResponse, prom)
+		if handshakeErr != nil {
+			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+			return handshakeErr
+		}
+
+		if !errors.Is(handshakeResponse.Err, ErrNoError) {
+			return handshakeResponse.Err
+		}
+	}
+
+	authSendReceiver := func(authBytes []byte) (*SaslAuthenticateResponse, error) {
+		authenticateRequest := b.createSaslAuthenticateRequest(authBytes)
+		authenticateResponse := new(SaslAuthenticateResponse)
+		prom := makeResponsePromise(authenticateResponse.version())
+		authErr := b.sendInternal(authenticateRequest, prom)
+		if authErr != nil {
+			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
+			return nil, authErr
+		}
+		authErr = handleResponsePromise(authenticateRequest, authenticateResponse, prom)
+		if authErr != nil {
+			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
+			return nil, authErr
+		}
+
+		if !errors.Is(authenticateResponse.Err, ErrNoError) {
+			var err error = authenticateResponse.Err
+			if authenticateResponse.ErrorMessage != nil {
+				err = Wrap(authenticateResponse.Err, errors.New(*authenticateResponse.ErrorMessage))
+			}
+			return nil, err
+		}
+
+		b.computeSaslSessionLifetime(authenticateResponse)
+		return authenticateResponse, nil
+	}
+
+	switch b.conf.Net.SASL.Mechanism {
+	case SASLTypeOAuth:
+		provider := b.conf.Net.SASL.TokenProvider
+		return b.sendAndReceiveSASLOAuth(authSendReceiver, provider)
+	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
+		return b.sendAndReceiveSASLSCRAMv1(authSendReceiver, b.conf.Net.SASL.SCRAMClientGeneratorFunc())
+	default:
+		return b.sendAndReceiveSASLPlainAuthV1(authSendReceiver)
 	}
 }
 
@@ -1182,10 +1283,6 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	return nil
 }
 
-// Kafka 0.10.x supported SASL PLAIN/Kerberos via KAFKA-3149 (KIP-43).
-// Kafka 1.x.x onward added a SaslAuthenticate request/response message which
-// wraps the SASL flow in the Kafka protocol, which allows for returning
-// meaningful errors on authentication failure.
 //
 // In SASL Plain, Kafka expects the auth header to be in the following format
 // Message format (from https://tools.ietf.org/html/rfc4616):
@@ -1199,14 +1296,15 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 //   SAFE      = UTF1 / UTF2 / UTF3 / UTF4
 //                  ;; any UTF-8 encoded Unicode character except NUL
 //
+//
+
+// Kafka 0.10.x supported SASL PLAIN/Kerberos via KAFKA-3149 (KIP-43).
+// sendAndReceiveSASLPlainAuthV0 flows the v0 sasl auth NOT wrapped in the kafka protocol
+//
 // With SASL v0 handshake and auth then:
 // When credentials are valid, Kafka returns a 4 byte array of null characters.
 // When credentials are invalid, Kafka closes the connection.
-//
-// With SASL v1 handshake and auth then:
-// When credentials are invalid, Kafka replies with a SaslAuthenticate response
-// containing an error code and message detailing the authentication failure.
-func (b *Broker) sendAndReceiveSASLPlainAuth() error {
+func (b *Broker) sendAndReceiveSASLPlainAuthV0() error {
 	// default to V0 to allow for backward compatibility when SASL is enabled
 	// but not the handshake
 	if b.conf.Net.SASL.Handshake {
@@ -1217,14 +1315,6 @@ func (b *Broker) sendAndReceiveSASLPlainAuth() error {
 		}
 	}
 
-	if b.conf.Net.SASL.Version == SASLHandshakeV1 {
-		return b.sendAndReceiveV1SASLPlainAuth()
-	}
-	return b.sendAndReceiveV0SASLPlainAuth()
-}
-
-// sendAndReceiveV0SASLPlainAuth flows the v0 sasl auth NOT wrapped in the kafka protocol
-func (b *Broker) sendAndReceiveV0SASLPlainAuth() error {
 	length := len(b.conf.Net.SASL.AuthIdentity) + 1 + len(b.conf.Net.SASL.User) + 1 + len(b.conf.Net.SASL.Password)
 	authBytes := make([]byte, length+4) // 4 byte length header + auth data
 	binary.BigEndian.PutUint32(authBytes, uint32(length))
@@ -1255,46 +1345,25 @@ func (b *Broker) sendAndReceiveV0SASLPlainAuth() error {
 	return nil
 }
 
-// sendAndReceiveV1SASLPlainAuth flows the v1 sasl authentication using the kafka protocol
-func (b *Broker) sendAndReceiveV1SASLPlainAuth() error {
-	correlationID := b.correlationID
-
-	requestTime := time.Now()
-
-	// Will be decremented in updateIncomingCommunicationMetrics (except error)
-	b.addRequestInFlightMetrics(1)
-	bytesWritten, err := b.sendSASLPlainAuthClientResponse(correlationID)
-	b.updateOutgoingCommunicationMetrics(bytesWritten)
-
+// Kafka 1.x.x onward added a SaslAuthenticate request/response message which
+// wraps the SASL flow in the Kafka protocol, which allows for returning
+// meaningful errors on authentication failure.
+func (b *Broker) sendAndReceiveSASLPlainAuthV1(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error)) error {
+	authBytes := []byte(b.conf.Net.SASL.AuthIdentity + "\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password)
+	_, err := authSendReceiver(authBytes)
 	if err != nil {
-		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to write SASL auth header to broker %s: %s\n", b.addr, err.Error())
 		return err
 	}
+	return err
+}
 
-	b.correlationID++
-
-	bytesRead, err := b.receiveSASLServerResponse(&SaslAuthenticateResponse{}, correlationID)
-	b.updateIncomingCommunicationMetrics(bytesRead, time.Since(requestTime))
-
-	// With v1 sasl we get an error message set in the response we can return
-	if err != nil {
-		Logger.Printf(
-			"Error returned from broker %s during SASL authentication: %v\n",
-			b.addr, err.Error())
-		return err
-	}
-
-	return nil
+func currentUnixMilli() int64 {
+	return time.Now().UnixNano() / int64(time.Millisecond)
 }
 
 // sendAndReceiveSASLOAuth performs the authentication flow as described by KIP-255
 // https://cwiki.apache.org/confluence/pages/viewpage.action?pageId=75968876
-func (b *Broker) sendAndReceiveSASLOAuth(provider AccessTokenProvider) error {
-	if err := b.sendAndReceiveSASLHandshake(SASLTypeOAuth, SASLHandshakeV1); err != nil {
-		return err
-	}
-
+func (b *Broker) sendAndReceiveSASLOAuth(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error), provider AccessTokenProvider) error {
 	token, err := provider.Token()
 	if err != nil {
 		return err
@@ -1305,57 +1374,17 @@ func (b *Broker) sendAndReceiveSASLOAuth(provider AccessTokenProvider) error {
 		return err
 	}
 
-	challenged, err := b.sendClientMessage(message)
+	res, err := authSendReceiver(message)
 	if err != nil {
 		return err
 	}
-
-	if challenged {
-		// Abort the token exchange. The broker returns the failure code.
-		_, err = b.sendClientMessage([]byte(`\x01`))
-	}
-
-	return err
-}
-
-// sendClientMessage sends a SASL/OAUTHBEARER client message and returns true
-// if the broker responds with a challenge, in which case the token is
-// rejected.
-func (b *Broker) sendClientMessage(message []byte) (bool, error) {
-	requestTime := time.Now()
-	// Will be decremented in updateIncomingCommunicationMetrics (except error)
-	b.addRequestInFlightMetrics(1)
-	correlationID := b.correlationID
-
-	bytesWritten, err := b.sendSASLOAuthBearerClientMessage(message, correlationID)
-	b.updateOutgoingCommunicationMetrics(bytesWritten)
-	if err != nil {
-		b.addRequestInFlightMetrics(-1)
-		return false, err
-	}
-
-	b.correlationID++
-
-	res := &SaslAuthenticateResponse{}
-	bytesRead, err := b.receiveSASLServerResponse(res, correlationID)
-
-	requestLatency := time.Since(requestTime)
-	b.updateIncomingCommunicationMetrics(bytesRead, requestLatency)
-
 	isChallenge := len(res.SaslAuthBytes) > 0
 
-	if isChallenge && err != nil {
-		Logger.Printf("Broker rejected authentication token: %s", res.SaslAuthBytes)
+	if isChallenge {
+		// Abort the token exchange. The broker returns the failure code.
+		_, err = authSendReceiver([]byte(`\x01`))
 	}
-
-	return isChallenge, err
-}
-
-func (b *Broker) sendAndReceiveSASLSCRAM() error {
-	if b.conf.Net.SASL.Version == SASLHandshakeV0 {
-		return b.sendAndReceiveSASLSCRAMv0()
-	}
-	return b.sendAndReceiveSASLSCRAMv1()
+	return err
 }
 
 func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
@@ -1415,12 +1444,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 	return nil
 }
 
-func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
-	if err := b.sendAndReceiveSASLHandshake(b.conf.Net.SASL.Mechanism, SASLHandshakeV1); err != nil {
-		return err
-	}
-
-	scramClient := b.conf.Net.SASL.SCRAMClientGeneratorFunc()
+func (b *Broker) sendAndReceiveSASLSCRAMv1(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error), scramClient SCRAMClient) error {
 	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
 		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
 	}
@@ -1431,28 +1455,12 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
 	}
 
 	for !scramClient.Done() {
-		requestTime := time.Now()
-		// Will be decremented in updateIncomingCommunicationMetrics (except error)
-		b.addRequestInFlightMetrics(1)
-		correlationID := b.correlationID
-		bytesWritten, err := b.sendSaslAuthenticateRequest(correlationID, []byte(msg))
-		b.updateOutgoingCommunicationMetrics(bytesWritten)
+		res, err := authSendReceiver([]byte(msg))
 		if err != nil {
-			b.addRequestInFlightMetrics(-1)
-			Logger.Printf("Failed to write SASL auth header to broker %s: %s\n", b.addr, err.Error())
 			return err
 		}
 
-		b.correlationID++
-		challenge, err := b.receiveSaslAuthenticateResponse(correlationID)
-		if err != nil {
-			b.addRequestInFlightMetrics(-1)
-			Logger.Printf("Failed to read response while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
-			return err
-		}
-
-		b.updateIncomingCommunicationMetrics(len(challenge), time.Since(requestTime))
-		msg, err = scramClient.Step(string(challenge))
+		msg, err = scramClient.Step(string(res.SaslAuthBytes))
 		if err != nil {
 			Logger.Println("SASL authentication failed", err)
 			return err
@@ -1460,51 +1468,17 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1() error {
 	}
 
 	DebugLogger.Println("SASL authentication succeeded")
+
 	return nil
 }
 
-func (b *Broker) sendSaslAuthenticateRequest(correlationID int32, msg []byte) (int, error) {
-	rb := &SaslAuthenticateRequest{msg}
-	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
-	buf, err := encode(req, b.conf.MetricRegistry)
-	if err != nil {
-		return 0, err
+func (b *Broker) createSaslAuthenticateRequest(msg []byte) *SaslAuthenticateRequest {
+	authenticateRequest := SaslAuthenticateRequest{SaslAuthBytes: msg}
+	if b.conf.Version.IsAtLeast(V2_2_0_0) {
+		authenticateRequest.Version = 1
 	}
 
-	return b.write(buf)
-}
-
-func (b *Broker) receiveSaslAuthenticateResponse(correlationID int32) ([]byte, error) {
-	buf := make([]byte, responseLengthSize+correlationIDSize)
-	_, err := b.readFull(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	header := responseHeader{}
-	err = versionedDecode(buf, &header, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	if header.correlationID != correlationID {
-		return nil, fmt.Errorf("correlation ID didn't match, wanted %d, got %d", b.correlationID, header.correlationID)
-	}
-
-	buf = make([]byte, header.length-correlationIDSize)
-	_, err = b.readFull(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	res := &SaslAuthenticateResponse{}
-	if err := versionedDecode(buf, res, 0); err != nil {
-		return nil, err
-	}
-	if !errors.Is(res.Err, ErrNoError) {
-		return nil, res.Err
-	}
-	return res.SaslAuthBytes, nil
+	return &authenticateRequest
 }
 
 // Build SASL/OAUTHBEARER initial client response as described by RFC-7628
@@ -1538,68 +1512,21 @@ func mapToString(extensions map[string]string, keyValSep string, elemSep string)
 	return strings.Join(buf, elemSep)
 }
 
-func (b *Broker) sendSASLPlainAuthClientResponse(correlationID int32) (int, error) {
-	authBytes := []byte(b.conf.Net.SASL.AuthIdentity + "\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password)
-	rb := &SaslAuthenticateRequest{authBytes}
-	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
-	buf, err := encode(req, b.conf.MetricRegistry)
-	if err != nil {
-		return 0, err
+func (b *Broker) computeSaslSessionLifetime(res *SaslAuthenticateResponse) {
+	if res.SessionLifetimeMs > 0 {
+		// Follows the Java Kafka implementation from SaslClientAuthenticator.ReauthInfo#setAuthenticationEndAndSessionReauthenticationTimes
+		// pick a random percentage between 85% and 95% for session re-authentication
+		positiveSessionLifetimeMs := res.SessionLifetimeMs
+		authenticationEndMs := currentUnixMilli()
+		pctWindowFactorToTakeNetworkLatencyAndClockDriftIntoAccount := 0.85
+		pctWindowJitterToAvoidReauthenticationStormAcrossManyChannelsSimultaneously := 0.10
+		pctToUse := pctWindowFactorToTakeNetworkLatencyAndClockDriftIntoAccount + rand.Float64()*pctWindowJitterToAvoidReauthenticationStormAcrossManyChannelsSimultaneously
+		sessionLifetimeMsToUse := int64(float64(positiveSessionLifetimeMs) * pctToUse)
+		DebugLogger.Printf("Session expiration in %d ms and session re-authentication on or after %d ms", positiveSessionLifetimeMs, sessionLifetimeMsToUse)
+		b.clientSessionReauthenticationTimeMs = authenticationEndMs + sessionLifetimeMsToUse
+	} else {
+		b.clientSessionReauthenticationTimeMs = 0
 	}
-
-	return b.write(buf)
-}
-
-func (b *Broker) sendSASLOAuthBearerClientMessage(initialResp []byte, correlationID int32) (int, error) {
-	rb := &SaslAuthenticateRequest{initialResp}
-
-	req := &request{correlationID: correlationID, clientID: b.conf.ClientID, body: rb}
-
-	buf, err := encode(req, b.conf.MetricRegistry)
-	if err != nil {
-		return 0, err
-	}
-
-	return b.write(buf)
-}
-
-func (b *Broker) receiveSASLServerResponse(res *SaslAuthenticateResponse, correlationID int32) (int, error) {
-	buf := make([]byte, responseLengthSize+correlationIDSize)
-	bytesRead, err := b.readFull(buf)
-	if err != nil {
-		return bytesRead, err
-	}
-
-	header := responseHeader{}
-	err = versionedDecode(buf, &header, 0)
-	if err != nil {
-		return bytesRead, err
-	}
-
-	if header.correlationID != correlationID {
-		return bytesRead, fmt.Errorf("correlation ID didn't match, wanted %d, got %d", b.correlationID, header.correlationID)
-	}
-
-	buf = make([]byte, header.length-correlationIDSize)
-	c, err := b.readFull(buf)
-	bytesRead += c
-	if err != nil {
-		return bytesRead, err
-	}
-
-	if err := versionedDecode(buf, res, 0); err != nil {
-		return bytesRead, err
-	}
-
-	if !errors.Is(res.Err, ErrNoError) {
-		var err error = res.Err
-		if res.ErrorMessage != nil {
-			err = Wrap(res.Err, errors.New(*res.ErrorMessage))
-		}
-		return bytesRead, err
-	}
-
-	return bytesRead, nil
 }
 
 func (b *Broker) updateIncomingCommunicationMetrics(bytes int, requestLatency time.Duration) {
@@ -1683,7 +1610,7 @@ func (b *Broker) registerMetrics() {
 }
 
 func (b *Broker) unregisterMetrics() {
-	for _, name := range b.registeredMetrics {
+	for name := range b.registeredMetrics {
 		b.conf.MetricRegistry.Unregister(name)
 	}
 	b.registeredMetrics = nil
@@ -1691,19 +1618,28 @@ func (b *Broker) unregisterMetrics() {
 
 func (b *Broker) registerMeter(name string) metrics.Meter {
 	nameForBroker := getMetricNameForBroker(name, b)
-	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	if b.registeredMetrics == nil {
+		b.registeredMetrics = map[string]struct{}{}
+	}
+	b.registeredMetrics[nameForBroker] = struct{}{}
 	return metrics.GetOrRegisterMeter(nameForBroker, b.conf.MetricRegistry)
 }
 
 func (b *Broker) registerHistogram(name string) metrics.Histogram {
 	nameForBroker := getMetricNameForBroker(name, b)
-	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	if b.registeredMetrics == nil {
+		b.registeredMetrics = map[string]struct{}{}
+	}
+	b.registeredMetrics[nameForBroker] = struct{}{}
 	return getOrRegisterHistogram(nameForBroker, b.conf.MetricRegistry)
 }
 
 func (b *Broker) registerCounter(name string) metrics.Counter {
 	nameForBroker := getMetricNameForBroker(name, b)
-	b.registeredMetrics = append(b.registeredMetrics, nameForBroker)
+	if b.registeredMetrics == nil {
+		b.registeredMetrics = map[string]struct{}{}
+	}
+	b.registeredMetrics[nameForBroker] = struct{}{}
 	return metrics.GetOrRegisterCounter(nameForBroker, b.conf.MetricRegistry)
 }
 

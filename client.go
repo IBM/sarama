@@ -462,6 +462,14 @@ func (client *client) RefreshBrokers(addrs []string) error {
 		delete(client.brokers, broker.ID())
 	}
 
+	for _, broker := range client.seedBrokers {
+		_ = broker.Close()
+	}
+
+	for _, broker := range client.deadSeeds {
+		_ = broker.Close()
+	}
+
 	client.seedBrokers = nil
 	client.deadSeeds = nil
 
@@ -536,7 +544,10 @@ func (client *client) Controller() (*Broker, error) {
 func (client *client) deregisterController() {
 	client.lock.Lock()
 	defer client.lock.Unlock()
-	delete(client.brokers, client.controllerID)
+	if controller, ok := client.brokers[client.controllerID]; ok {
+		_ = controller.Close()
+		delete(client.brokers, client.controllerID)
+	}
 }
 
 // RefreshController retrieves the cluster controller from fresh metadata

@@ -339,14 +339,15 @@ func (s *testFuncConsumerGroupSink) Close() map[string][]string {
 
 type testFuncConsumerGroupMember struct {
 	ConsumerGroup
-	clientID    string
-	claims      map[string]int
-	state       int32
-	handlers    int32
-	errs        []error
-	maxMessages int32
-	isCapped    bool
-	sink        *testFuncConsumerGroupSink
+	clientID     string
+	claims       map[string]int
+	generationId int32
+	state        int32
+	handlers     int32
+	errs         []error
+	maxMessages  int32
+	isCapped     bool
+	sink         *testFuncConsumerGroupSink
 
 	t  *testing.T
 	mu sync.RWMutex
@@ -457,6 +458,9 @@ func (m *testFuncConsumerGroupMember) Setup(s ConsumerGroupSession) error {
 	m.mu.Lock()
 	m.claims = claims
 	m.mu.Unlock()
+
+	// store generationID
+	atomic.StoreInt32(&m.generationId, s.GenerationID())
 
 	// enter post-setup state
 	atomic.StoreInt32(&m.state, 2)

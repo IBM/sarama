@@ -8,7 +8,7 @@ import (
 	"sync"
 
 	snappy "github.com/eapache/go-xerial-snappy"
-	"github.com/pierrec/lz4"
+	"github.com/pierrec/lz4/v4"
 )
 
 var (
