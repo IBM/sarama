@@ -188,6 +188,9 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 		return fmt.Errorf("no topics provided")
 	}
 
+	// Remove duplicates in topics slice
+	topics = getUniqueKeys(topics)
+
 	// Refresh metadata for requested topics
 	if err := c.client.RefreshMetadata(topics...); err != nil {
 		return err

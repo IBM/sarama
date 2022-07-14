@@ -266,3 +266,15 @@ func (v KafkaVersion) String() string {
 
 	return fmt.Sprintf("%d.%d.%d", v.version[0], v.version[1], v.version[2])
 }
+
+func getUniqueKeys(strSlice []string) []string {
+	allKeys := make(map[string]bool)
+	list := []string{}
+	for _, item := range strSlice {
+		if _, value := allKeys[item]; !value {
+			allKeys[item] = true
+			list = append(list, item)
+		}
+	}
+	return list
+}
