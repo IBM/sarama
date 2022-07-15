@@ -1050,12 +1050,12 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 	wg := sync.WaitGroup{}
 
 	for _, b := range brokerIds {
-		wg.Add(1)
 		broker, err := ca.findBroker(b)
 		if err != nil {
 			Logger.Printf("Unable to find broker with ID = %v\n", b)
 			continue
 		}
+		wg.Add(1)
 		go func(b *Broker, conf *Config) {
 			defer wg.Done()
 			_ = b.Open(conf) // Ensure that broker is opened
