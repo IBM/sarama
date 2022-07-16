@@ -74,6 +74,10 @@ type ConsumerGroup interface {
 	// Resume resumes all partitions which have been paused with Pause()/PauseAll().
 	// New calls to the broker will return records from these partitions if there are any to be fetched.
 	ResumeAll()
+
+	// Partitions returns the sorted list of all partition IDs for the given topic.
+	// This method is the same as Client.Partitions(), and is provided for convenience.
+	Partitions(topic string) ([]int32, error)
 }
 
 type consumerGroup struct {
@@ -240,6 +244,11 @@ func (c *consumerGroup) PauseAll() {
 // ResumeAll implements ConsumerGroup.
 func (c *consumerGroup) ResumeAll() {
 	c.consumer.ResumeAll()
+}
+
+// Partitions implements ConsumerGroup.
+func (c *consumerGroup) Partitions(topic string) ([]int32, error) {
+	return c.client.Partitions(topic)
 }
 
 func (c *consumerGroup) retryNewSession(ctx context.Context, topics []string, handler ConsumerGroupHandler, retries int, refreshCoordinator bool) (*consumerGroupSession, error) {
