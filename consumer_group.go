@@ -74,6 +74,13 @@ type ConsumerGroup interface {
 	// Resume resumes all partitions which have been paused with Pause()/PauseAll().
 	// New calls to the broker will return records from these partitions if there are any to be fetched.
 	ResumeAll()
+
+	// GetOffset queries the cluster to get the most recent available offset at the
+	// given time (in milliseconds) on the topic/partition combination.
+	// Time should be OffsetOldest for the earliest available offset,
+	// OffsetNewest for the offset of the message that will be produced next, or a time.
+	// This method is the same as Client.Partitions(), and is provided for convenience.
+	GetOffset(topic string, partitionID int32, time int64) (int64, error)
 }
 
 type consumerGroup struct {
@@ -240,6 +247,11 @@ func (c *consumerGroup) PauseAll() {
 // ResumeAll implements ConsumerGroup.
 func (c *consumerGroup) ResumeAll() {
 	c.consumer.ResumeAll()
+}
+
+// GetOffset implements ConsumerGroup.
+func (c *consumerGroup) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
+	return c.consumer.GetOffset(topic, partitionID, time)
 }
 
 func (c *consumerGroup) retryNewSession(ctx context.Context, topics []string, handler ConsumerGroupHandler, retries int, refreshCoordinator bool) (*consumerGroupSession, error) {
