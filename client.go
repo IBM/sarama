@@ -216,7 +216,7 @@ func (client *client) Broker(brokerID int32) (*Broker, error) {
 
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 	brokerErrors := make([]error, 0)
-	for broker := client.any(); broker != nil; broker = client.any() {
+	for broker := client.anyBroker(); broker != nil; broker = client.anyBroker() {
 		var response *InitProducerIDResponse
 		req := &InitProducerIDRequest{}
 
@@ -691,7 +691,7 @@ func (client *client) resurrectDeadBrokers() {
 	client.deadSeeds = nil
 }
 
-func (client *client) any() *Broker {
+func (client *client) anyBroker() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
@@ -895,9 +895,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		return err
 	}
 
-	broker := client.any()
+	broker := client.anyBroker()
 	brokerErrors := make([]error, 0)
-	for ; broker != nil && !pastDeadline(0); broker = client.any() {
+	for ; broker != nil && !pastDeadline(0); broker = client.anyBroker() {
 		allowAutoTopicCreation := client.conf.Metadata.AllowAutoTopicCreation
 		if len(topics) > 0 {
 			DebugLogger.Printf("client/metadata fetching metadata for %v from broker %s\n", topics, broker.addr)
@@ -1073,7 +1073,7 @@ func (client *client) getConsumerMetadata(consumerGroup string, attemptsRemainin
 	}
 
 	brokerErrors := make([]error, 0)
-	for broker := client.any(); broker != nil; broker = client.any() {
+	for broker := client.anyBroker(); broker != nil; broker = client.anyBroker() {
 		DebugLogger.Printf("client/coordinator requesting coordinator for consumergroup %s from %s\n", consumerGroup, broker.Addr())
 
 		request := new(FindCoordinatorRequest)
