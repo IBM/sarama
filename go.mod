@@ -13,7 +13,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jcmturner/gofork v1.0.0
 	github.com/jcmturner/gokrb5/v8 v8.4.2
-	github.com/klauspost/compress v1.15.6
+	github.com/klauspost/compress v1.15.8
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.15
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
