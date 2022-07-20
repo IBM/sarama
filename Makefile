@@ -9,7 +9,7 @@ FILES    := $(shell find . -name '*.go' -type f -not -name '*.pb.go' -not -name 
 TESTS    := $(shell find . -name '*.go' -type f -not -name '*.pb.go' -not -name '*_generated.go' -name '*_test.go')
 
 $(GOBIN)/tparse:
-	GOBIN=$(GOBIN) go install github.com/mfridman/tparse@v0.10.3
+	GOBIN=$(GOBIN) go install github.com/mfridman/tparse@v0.11.1
 get:
 	$(GO) get ./...
 	$(GO) mod verify
@@ -29,12 +29,11 @@ lint:
 test: $(GOBIN)/tparse
 	$(GOTEST) -timeout 2m -json ./... \
 		| tee output.json | $(GOBIN)/tparse -follow -all
-	[ -z "${GITHUB_STEP_SUMMARY}" ] \
-		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >${GITHUB_STEP_SUMMARY}
-
+	[ -z "$${GITHUB_STEP_SUMMARY}" ] \
+		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >"$${GITHUB_STEP_SUMMARY:-/dev/null}"
 .PHONY: test_functional
 test_functional: $(GOBIN)/tparse
 	$(GOTEST) -timeout 12m -tags=functional -json ./... \
 		| tee output.json | $(GOBIN)/tparse -follow -all
-	[ -z "${GITHUB_STEP_SUMMARY}" ] \
-		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >${GITHUB_STEP_SUMMARY}
+	[ -z "$${GITHUB_STEP_SUMMARY:-}" ] \
+		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >"$${GITHUB_STEP_SUMMARY:-/dev/null}"
