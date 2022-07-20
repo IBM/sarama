@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -439,33 +441,44 @@ func versionRange(lower KafkaVersion) []KafkaVersion {
 
 func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []CompressionCodec, flush int, countPerVerCodec int, idempotent bool) []*ProducerMessage {
 	var (
-		wg                 sync.WaitGroup
 		producers          []SyncProducer
 		producedMessagesMu sync.Mutex
 		producedMessages   []*ProducerMessage
 	)
+	g := errgroup.Group{}
 	for _, prodVer := range clientVersions {
 		for _, codec := range codecs {
-			t.Run("producer-"+prodVer.String()+"-"+codec.String(), func(t *testing.T) {
-				t.Logf("*** Producing with client version %s codec %s\n", prodVer, codec)
-				prodCfg := NewTestConfig()
-				prodCfg.Version = prodVer
-				prodCfg.Producer.Return.Successes = true
-				prodCfg.Producer.Return.Errors = true
-				prodCfg.Producer.Flush.MaxMessages = flush
-				prodCfg.Producer.Compression = codec
-				prodCfg.Producer.Idempotent = idempotent
-				if idempotent {
-					prodCfg.Producer.RequiredAcks = WaitForAll
-					prodCfg.Net.MaxOpenRequests = 1
-				}
+			prodCfg := NewTestConfig()
+			prodCfg.ClientID = t.Name() + "-Producer-" + prodVer.String()
+			if idempotent {
+				prodCfg.ClientID += "-idempotent"
+			}
+			if codec > 0 {
+				prodCfg.ClientID += "-" + codec.String()
+			}
+			prodCfg.Metadata.Full = false
+			prodCfg.Version = prodVer
+			prodCfg.Producer.Return.Successes = true
+			prodCfg.Producer.Return.Errors = true
+			prodCfg.Producer.Flush.MaxMessages = flush
+			prodCfg.Producer.Compression = codec
+			prodCfg.Producer.Idempotent = idempotent
+			if idempotent {
+				prodCfg.Producer.RequiredAcks = WaitForAll
+				prodCfg.Net.MaxOpenRequests = 1
+			}
 
-				p, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, prodCfg)
-				if err != nil {
-					t.Errorf("Failed to create producer: version=%s, compression=%s, err=%v", prodVer, codec, err)
-					return
-				}
-				producers = append(producers, p)
+			p, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, prodCfg)
+			if err != nil {
+				t.Fatalf("Failed to create producer: version=%s, compression=%s, err=%v", prodVer, codec, err)
+			}
+			producers = append(producers, p)
+
+			prodVer := prodVer
+			codec := codec
+			g.Go(func() error {
+				t.Logf("*** Producing with client version %s codec %s\n", prodVer, codec)
+				var wg sync.WaitGroup
 				for i := 0; i < countPerVerCodec; i++ {
 					msg := &ProducerMessage{
 						Topic: "test.1",
@@ -483,10 +496,14 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 						producedMessagesMu.Unlock()
 					}()
 				}
+				wg.Wait()
+				return nil
 			})
 		}
 	}
-	wg.Wait()
+	if err := g.Wait(); err != nil {
+		t.Fatal(err)
+	}
 
 	for _, p := range producers {
 		safeClose(t, p)
@@ -496,6 +513,7 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 	sort.Slice(producedMessages, func(i, j int) bool {
 		return producedMessages[i].Offset < producedMessages[j].Offset
 	})
+	require.NotEmpty(t, producedMessages, "should have produced >0 messages")
 	t.Logf("*** Total produced %d, firstOffset=%d, lastOffset=%d\n",
 		len(producedMessages), producedMessages[0].Offset, producedMessages[len(producedMessages)-1].Offset)
 	return producedMessages
@@ -504,26 +522,33 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 func consumeMsgs(t *testing.T, clientVersions []KafkaVersion, producedMessages []*ProducerMessage) {
 	// Consume all produced messages with all client versions supported by the
 	// cluster.
+	g := errgroup.Group{}
 	for _, consVer := range clientVersions {
-		t.Run("consumer-"+consVer.String(), func(t *testing.T) {
-			t.Logf("*** Consuming with client version %s\n", consVer)
-			// Create a partition consumer that should start from the first produced
-			// message.
-			consCfg := NewTestConfig()
-			consCfg.Version = consVer
-			c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consCfg)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer safeClose(t, c)
-			pc, err := c.ConsumePartition("test.1", 0, producedMessages[0].Offset)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer safeClose(t, pc)
+		// Create a partition consumer that should start from the first produced
+		// message.
+		consCfg := NewTestConfig()
+		consCfg.ClientID = t.Name() + "-Consumer-" + consVer.String()
+		consCfg.Consumer.MaxProcessingTime = time.Second
+		consCfg.Metadata.Full = false
+		consCfg.Version = consVer
+		c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consCfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, c)
+		pc, err := c.ConsumePartition("test.1", 0, producedMessages[0].Offset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, pc)
 
+		var wg sync.WaitGroup
+		wg.Add(1)
+		consVer := consVer
+		g.Go(func() error {
 			// Consume as many messages as there have been produced and make sure that
 			// order is preserved.
+			t.Logf("*** Consuming with client version %s\n", consVer)
 			for i, prodMsg := range producedMessages {
 				select {
 				case consMsg := <-pc.Messages():
@@ -535,10 +560,25 @@ func consumeMsgs(t *testing.T, clientVersions []KafkaVersion, producedMessages [
 						t.Fatalf("Consumed unexpected msg: version=%s, index=%d, want=%s, got=%s",
 							consVer, i, prodMsg2Str(prodMsg), consMsg2Str(consMsg))
 					}
-				case <-time.After(3 * time.Second):
-					t.Fatalf("Timeout waiting for: index=%d, offset=%d, msg=%s", i, prodMsg.Offset, prodMsg.Value)
+					if i == 0 {
+						t.Logf("Consumed first msg: version=%s, index=%d, got=%s",
+							consVer, i, consMsg2Str(consMsg))
+						wg.Done()
+					}
+					if i%1000 == 0 {
+						t.Logf("Consumed messages: version=%s, index=%d, got=%s",
+							consVer, i, consMsg2Str(consMsg))
+					}
+				case <-time.After(15 * time.Second):
+					t.Fatalf("Timeout %s waiting for: index=%d, offset=%d, msg=%s",
+						consCfg.ClientID, i, prodMsg.Offset, prodMsg.Value)
 				}
 			}
+			return nil
 		})
+		wg.Wait() // wait for first message to be consumed before starting next consumer
+	}
+	if err := g.Wait(); err != nil {
+		t.Fatal(err)
 	}
 }
