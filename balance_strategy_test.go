@@ -62,6 +62,15 @@ func TestBalanceStrategyRange(t *testing.T) {
 				"M2": map[string][]int32{"T1": {1}, "T2": {0, 1}},
 			},
 		},
+		{
+			name:    "2 members, 1 topic with duplicate assignments, 8 partitions each",
+			members: map[string][]string{"M1": {"T1", "T1", "T1", "T1", "T1", "T1", "T1", "T1"}, "M2": {"T1", "T1", "T1", "T1", "T1", "T1", "T1", "T1"}},
+			topics:  map[string][]int32{"T1": {0, 1, 2, 3, 4, 5, 6, 7}},
+			expected: BalanceStrategyPlan{
+				"M1": map[string][]int32{"T1": {0, 1, 2, 3}},
+				"M2": map[string][]int32{"T1": {4, 5, 6, 7}},
+			},
+		},
 	}
 
 	strategy := BalanceStrategyRange
