@@ -182,6 +182,7 @@ var (
 	V3_0_0_0  = newKafkaVersion(3, 0, 0, 0)
 	V3_0_1_0  = newKafkaVersion(3, 0, 1, 0)
 	V3_1_0_0  = newKafkaVersion(3, 1, 0, 0)
+	V3_2_0_0  = newKafkaVersion(3, 2, 0, 0)
 
 	SupportedVersions = []KafkaVersion{
 		V0_8_2_0,
@@ -227,9 +228,10 @@ var (
 		V3_0_0_0,
 		V3_0_1_0,
 		V3_1_0_0,
+		V3_2_0_0,
 	}
 	MinVersion     = V0_8_2_0
-	MaxVersion     = V3_1_0_0
+	MaxVersion     = V3_2_0_0
 	DefaultVersion = V1_0_0_0
 )
 
