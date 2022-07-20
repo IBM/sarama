@@ -117,18 +117,27 @@ func (s *balanceStrategy) Plan(members map[string]ConsumerGroupMemberMetadata, t
 		}
 	}
 
-	// Sort members for each topic
-	for topic, memberIDs := range mbt {
-		sort.Sort(&balanceStrategySortable{
-			topic:     topic,
-			memberIDs: memberIDs,
-		})
+	// func to sort and de-duplicate a StringSlice
+	uniq := func(ss sort.StringSlice) []string {
+		if ss.Len() < 2 {
+			return ss
+		}
+		sort.Sort(ss)
+		var i, j int
+		for i = 1; i < ss.Len(); i++ {
+			if ss[i] == ss[j] {
+				continue
+			}
+			j++
+			ss.Swap(i, j)
+		}
+		return ss[:j+1]
 	}
 
 	// Assemble plan
 	plan := make(BalanceStrategyPlan, len(members))
 	for topic, memberIDs := range mbt {
-		s.coreFn(plan, memberIDs, topic, topics[topic])
+		s.coreFn(plan, uniq(memberIDs), topic, topics[topic])
 	}
 	return plan, nil
 }
@@ -136,31 +145,6 @@ func (s *balanceStrategy) Plan(members map[string]ConsumerGroupMemberMetadata, t
 // AssignmentData simple strategies do not require any shared assignment data
 func (s *balanceStrategy) AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error) {
 	return nil, nil
-}
-
-type balanceStrategySortable struct {
-	topic     string
-	memberIDs []string
-}
-
-func (p balanceStrategySortable) Len() int { return len(p.memberIDs) }
-func (p balanceStrategySortable) Swap(i, j int) {
-	p.memberIDs[i], p.memberIDs[j] = p.memberIDs[j], p.memberIDs[i]
-}
-
-func (p balanceStrategySortable) Less(i, j int) bool {
-	return balanceStrategyHashValue(p.topic, p.memberIDs[i]) < balanceStrategyHashValue(p.topic, p.memberIDs[j])
-}
-
-func balanceStrategyHashValue(vv ...string) uint32 {
-	h := uint32(2166136261)
-	for _, s := range vv {
-		for _, c := range s {
-			h ^= uint32(c)
-			h *= 16777619
-		}
-	}
-	return h
 }
 
 type stickyBalanceStrategy struct {
