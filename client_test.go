@@ -1090,7 +1090,7 @@ func TestInitProducerIDConnectionRefused(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !errors.Is(err, io.EOF) {
+	if !errors.Is(err, io.EOF) && !errors.Is(err, syscall.ECONNRESET) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
