@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
+	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/require"
 )
 
@@ -85,6 +86,11 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 // from this test case. It has a similar version matrix test case below that
 // only checks versions from v0.10.0.0 until KAFKA_VERSION.
 func TestVersionMatrix(t *testing.T) {
+	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
+	t.Cleanup(func() {
+		metrics.UseNilMetrics = false
+	})
+
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -101,6 +107,10 @@ func TestVersionMatrix(t *testing.T) {
 // Support for LZ4 codec was introduced in v0.10.0.0 so a version matrix to
 // test LZ4 should start with v0.10.0.0.
 func TestVersionMatrixLZ4(t *testing.T) {
+	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
+	t.Cleanup(func() {
+		metrics.UseNilMetrics = false
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -117,6 +127,10 @@ func TestVersionMatrixLZ4(t *testing.T) {
 
 // Support for zstd codec was introduced in v2.1.0.0
 func TestVersionMatrixZstd(t *testing.T) {
+	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
+	t.Cleanup(func() {
+		metrics.UseNilMetrics = false
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -131,6 +145,10 @@ func TestVersionMatrixZstd(t *testing.T) {
 }
 
 func TestVersionMatrixIdempotent(t *testing.T) {
+	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
+	t.Cleanup(func() {
+		metrics.UseNilMetrics = false
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
