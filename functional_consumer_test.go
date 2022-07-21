@@ -444,8 +444,8 @@ func versionRange(lower KafkaVersion) []KafkaVersion {
 		upper = MaxVersion
 	}
 
-	versions := make([]KafkaVersion, 0, len(SupportedVersions))
-	for _, v := range SupportedVersions {
+	versions := make([]KafkaVersion, 0, len(fvtRangeVersions))
+	for _, v := range fvtRangeVersions {
 		if !v.IsAtLeast(lower) {
 			continue
 		}

@@ -233,6 +233,26 @@ var (
 	MinVersion     = V0_8_2_0
 	MaxVersion     = V3_2_0_0
 	DefaultVersion = V1_0_0_0
+
+	// reduced set of versions to matrix test
+	fvtRangeVersions = []KafkaVersion{
+		V0_8_2_2,
+		V0_10_2_2,
+		V1_0_2_0,
+		V1_1_1_0,
+		V2_0_1_0,
+		V2_1_1_0,
+		V2_2_2_0,
+		V2_3_1_0,
+		V2_4_1_0,
+		V2_5_1_0,
+		V2_6_2_0,
+		V2_7_1_0,
+		V2_8_1_0,
+		V3_0_1_0,
+		V3_1_0_0,
+		V3_2_0_0,
+	}
 )
 
 // ParseKafkaVersion parses and returns kafka version or error from a string
