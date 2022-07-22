@@ -33,7 +33,7 @@ test: $(GOBIN)/tparse
 		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >"$${GITHUB_STEP_SUMMARY:-/dev/null}"
 .PHONY: test_functional
 test_functional: $(GOBIN)/tparse
-	$(GOTEST) -timeout 12m -tags=functional -json ./... \
+	$(GOTEST) -timeout 15m -tags=functional -json ./... \
 		| tee output.json | $(GOBIN)/tparse -follow -all
 	[ -z "$${GITHUB_STEP_SUMMARY:-}" ] \
 		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >"$${GITHUB_STEP_SUMMARY:-/dev/null}"
