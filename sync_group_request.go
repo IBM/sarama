@@ -1,39 +1,73 @@
 package sarama
 
-type SyncGroupRequest struct {
-	Version          int16
-	GroupId          string
-	GenerationId     int32
-	MemberId         string
-	GroupInstanceId  *string
-	GroupAssignments map[string][]byte
+type SyncGroupRequestAssignment struct {
+	// MemberId contains the ID of the member to assign.
+	MemberId string
+	// Assignment contains the member assignment.
+	Assignment []byte
 }
 
-func (r *SyncGroupRequest) encode(pe packetEncoder) error {
-	if err := pe.putString(r.GroupId); err != nil {
+func (a *SyncGroupRequestAssignment) encode(pe packetEncoder, version int16) (err error) {
+	if err := pe.putString(a.MemberId); err != nil {
 		return err
 	}
 
-	pe.putInt32(r.GenerationId)
-
-	if err := pe.putString(r.MemberId); err != nil {
+	if err := pe.putBytes(a.Assignment); err != nil {
 		return err
 	}
 
-	if r.Version >= 3 {
-		if err := pe.putNullableString(r.GroupInstanceId); err != nil {
+	return nil
+}
+
+func (a *SyncGroupRequestAssignment) decode(pd packetDecoder, version int16) (err error) {
+	if a.MemberId, err = pd.getString(); err != nil {
+		return err
+	}
+
+	if a.Assignment, err = pd.getBytes(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+type SyncGroupRequest struct {
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// GroupId contains the unique group identifier.
+	GroupId string
+	// GenerationId contains the generation of the group.
+	GenerationId int32
+	// MemberId contains the member ID assigned by the group.
+	MemberId string
+	// GroupInstanceId contains the unique identifier of the consumer instance provided by end user.
+	GroupInstanceId *string
+	// GroupAssignments contains each assignment.
+	GroupAssignments []SyncGroupRequestAssignment
+}
+
+func (s *SyncGroupRequest) encode(pe packetEncoder) (err error) {
+	if err := pe.putString(s.GroupId); err != nil {
+		return err
+	}
+
+	pe.putInt32(s.GenerationId)
+
+	if err := pe.putString(s.MemberId); err != nil {
+		return err
+	}
+
+	if s.Version >= 3 {
+		if err := pe.putNullableString(s.GroupInstanceId); err != nil {
 			return err
 		}
 	}
 
-	if err := pe.putArrayLength(len(r.GroupAssignments)); err != nil {
+	if err := pe.putArrayLength(len(s.GroupAssignments)); err != nil {
 		return err
 	}
-	for memberId, memberAssignment := range r.GroupAssignments {
-		if err := pe.putString(memberId); err != nil {
-			return err
-		}
-		if err := pe.putBytes(memberAssignment); err != nil {
+	for _, block := range s.GroupAssignments {
+		if err := block.encode(pe, s.Version); err != nil {
 			return err
 		}
 	}
@@ -41,44 +75,37 @@ func (r *SyncGroupRequest) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
-	r.Version = version
-
-	if r.GroupId, err = pd.getString(); err != nil {
-		return
-	}
-	if r.GenerationId, err = pd.getInt32(); err != nil {
-		return
-	}
-	if r.MemberId, err = pd.getString(); err != nil {
-		return
-	}
-	if r.Version >= 3 {
-		if r.GroupInstanceId, err = pd.getNullableString(); err != nil {
-			return
-		}
-	}
-
-	n, err := pd.getArrayLength()
-	if err != nil {
+func (s *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
+	s.Version = version
+	if s.GroupId, err = pd.getString(); err != nil {
 		return err
 	}
-	if n == 0 {
-		return nil
+
+	if s.GenerationId, err = pd.getInt32(); err != nil {
+		return err
 	}
 
-	r.GroupAssignments = make(map[string][]byte)
-	for i := 0; i < n; i++ {
-		memberId, err := pd.getString()
-		if err != nil {
-			return err
-		}
-		memberAssignment, err := pd.getBytes()
-		if err != nil {
-			return err
-		}
+	if s.MemberId, err = pd.getString(); err != nil {
+		return err
+	}
 
-		r.GroupAssignments[memberId] = memberAssignment
+	if s.Version >= 3 {
+		if s.GroupInstanceId, err = pd.getNullableString(); err != nil {
+			return err
+		}
+	}
+
+	if numAssignments, err := pd.getArrayLength(); err != nil {
+		return err
+	} else if numAssignments > 0 {
+		s.GroupAssignments = make([]SyncGroupRequestAssignment, numAssignments)
+		for i := 0; i < numAssignments; i++ {
+			var block SyncGroupRequestAssignment
+			if err := block.decode(pd, s.Version); err != nil {
+				return err
+			}
+			s.GroupAssignments[i] = block
+		}
 	}
 
 	return nil
@@ -105,14 +132,16 @@ func (r *SyncGroupRequest) requiredVersion() KafkaVersion {
 }
 
 func (r *SyncGroupRequest) AddGroupAssignment(memberId string, memberAssignment []byte) {
-	if r.GroupAssignments == nil {
-		r.GroupAssignments = make(map[string][]byte)
-	}
-
-	r.GroupAssignments[memberId] = memberAssignment
+	r.GroupAssignments = append(r.GroupAssignments, SyncGroupRequestAssignment{
+		MemberId:   memberId,
+		Assignment: memberAssignment,
+	})
 }
 
-func (r *SyncGroupRequest) AddGroupAssignmentMember(memberId string, memberAssignment *ConsumerGroupMemberAssignment) error {
+func (r *SyncGroupRequest) AddGroupAssignmentMember(
+	memberId string,
+	memberAssignment *ConsumerGroupMemberAssignment,
+) error {
 	bin, err := encode(memberAssignment, nil)
 	if err != nil {
 		return err

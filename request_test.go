@@ -35,6 +35,7 @@ func testVersionDecodable(t *testing.T, name string, out versionedDecoder, in []
 }
 
 func testRequest(t *testing.T, name string, rb protocolBody, expected []byte) {
+	t.Helper()
 	if !rb.requiredVersion().IsAtLeast(MinVersion) {
 		t.Errorf("Request %s has invalid required version", name)
 	}
@@ -74,6 +75,7 @@ func testRequestEncode(t *testing.T, name string, rb protocolBody, expected []by
 }
 
 func testRequestDecode(t *testing.T, name string, rb protocolBody, packet []byte) {
+	t.Helper()
 	decoded, n, err := decodeRequest(bytes.NewReader(packet))
 	if err != nil {
 		t.Error("Failed to decode request", err)

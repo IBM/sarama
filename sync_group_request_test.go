@@ -70,8 +70,11 @@ func TestSyncGroupRequestV3AndPlus(t *testing.T) {
 				GenerationId:    0x00010203,
 				MemberId:        "baz",
 				GroupInstanceId: &groupInstanceId,
-				GroupAssignments: map[string][]byte{
-					"baz": []byte("foo"),
+				GroupAssignments: []SyncGroupRequestAssignment{
+					{
+						MemberId:   "baz",
+						Assignment: []byte("foo"),
+					},
 				},
 			},
 		},

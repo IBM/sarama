@@ -1,9 +1,15 @@
 package sarama
 
 type SyncGroupResponse struct {
-	Version          int16
-	ThrottleTime     int32
-	Err              KError
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// ThrottleTimeMs contains the duration in milliseconds for which the
+	// request was throttled due to a quota violation, or zero if the request
+	// did not violate any quota.
+	ThrottleTime int32
+	// Err contains the error code, or 0 if there was no error.
+	Err KError
+	// MemberAssignment contains the member assignment.
 	MemberAssignment []byte
 }
 
