@@ -321,8 +321,9 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 
 	// Prepare distribution plan if we joined as the leader
 	var plan BalanceStrategyPlan
+	var members map[string]ConsumerGroupMemberMetadata
 	if join.LeaderId == join.MemberId {
-		members, err := join.GetMembers()
+		members, err = join.GetMembers()
 		if err != nil {
 			return nil, err
 		}
@@ -334,7 +335,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	// Sync consumer group
-	groupRequest, err := c.syncGroupRequest(coordinator, plan, join.GenerationId)
+	groupRequest, err := c.syncGroupRequest(coordinator, members, plan, join.GenerationId)
 	if consumerGroupSyncTotal != nil {
 		consumerGroupSyncTotal.Inc(1)
 	}
@@ -426,15 +427,22 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 	return coordinator.JoinGroup(req)
 }
 
-func (c *consumerGroup) syncGroupRequest(coordinator *Broker, plan BalanceStrategyPlan, generationID int32) (*SyncGroupResponse, error) {
+func (c *consumerGroup) syncGroupRequest(
+	coordinator *Broker,
+	members map[string]ConsumerGroupMemberMetadata,
+	plan BalanceStrategyPlan,
+	generationID int32,
+) (*SyncGroupResponse, error) {
 	req := &SyncGroupRequest{
 		GroupId:      c.groupID,
 		MemberId:     c.memberID,
 		GenerationId: generationID,
 	}
 	strategy := c.config.Consumer.Group.Rebalance.Strategy
-	if c.groupInstanceId != nil {
+	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 3
+	}
+	if c.groupInstanceId != nil {
 		req.GroupInstanceId = c.groupInstanceId
 	}
 	for memberID, topics := range plan {
@@ -447,7 +455,15 @@ func (c *consumerGroup) syncGroupRequest(coordinator *Broker, plan BalanceStrate
 		if err := req.AddGroupAssignmentMember(memberID, assignment); err != nil {
 			return nil, err
 		}
+		delete(members, memberID)
 	}
+	// add empty assignments for any remaining members
+	for memberID := range members {
+		if err := req.AddGroupAssignmentMember(memberID, &ConsumerGroupMemberAssignment{}); err != nil {
+			return nil, err
+		}
+	}
+
 	return coordinator.SyncGroup(req)
 }
 
