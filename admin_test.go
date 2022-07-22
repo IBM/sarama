@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestClusterAdmin(t *testing.T) {
@@ -1740,5 +1741,50 @@ func TestDescribeLogDirs(t *testing.T) {
 	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDescribeLogDirsUnknownBroker(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DescribeLogDirsRequest": NewMockDescribeLogDirsResponse(t).
+			SetLogDirs("/tmp/logs", map[string]int{"topic1": 2, "topic2": 2}),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type result struct {
+		metadata map[int32][]DescribeLogDirsResponseDirMetadata
+		err      error
+	}
+
+	res := make(chan result)
+
+	go func() {
+		metadata, err := admin.DescribeLogDirs([]int32{seedBroker.BrokerID() + 1})
+		res <- result{metadata, err}
+	}()
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatalf("DescribeLogDirs timed out")
+	case returned := <-res:
+		if len(returned.metadata) != 0 {
+			t.Fatalf("Expected no results, got %v", len(returned.metadata))
+		}
+		if returned.err != nil {
+			t.Fatalf("Expected no error, got %v", returned.err)
+		}
 	}
 }
