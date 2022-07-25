@@ -20,6 +20,10 @@ type SyncProducer struct {
 	*TopicConfig
 	newPartitioner sarama.PartitionerConstructor
 	partitioners   map[string]sarama.Partitioner
+
+	isTransactional bool
+	txnLock         sync.Mutex
+	txnStatus       sarama.ProducerTxnStatusFlag
 }
 
 // NewSyncProducer instantiates a new SyncProducer mock. The t argument should
@@ -30,11 +34,13 @@ func NewSyncProducer(t ErrorReporter, config *sarama.Config) *SyncProducer {
 		config = sarama.NewConfig()
 	}
 	return &SyncProducer{
-		t:              t,
-		expectations:   make([]*producerExpectation, 0),
-		TopicConfig:    NewTopicConfig(),
-		newPartitioner: config.Producer.Partitioner,
-		partitioners:   make(map[string]sarama.Partitioner, 1),
+		t:               t,
+		expectations:    make([]*producerExpectation, 0),
+		TopicConfig:     NewTopicConfig(),
+		newPartitioner:  config.Producer.Partitioner,
+		partitioners:    make(map[string]sarama.Partitioner, 1),
+		isTransactional: config.Producer.Transaction.ID != "",
+		txnStatus:       sarama.ProducerTxnFlagReady,
 	}
 }
 
@@ -51,6 +57,11 @@ func NewSyncProducer(t ErrorReporter, config *sarama.Config) *SyncProducer {
 func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition int32, offset int64, err error) {
 	sp.l.Lock()
 	defer sp.l.Unlock()
+
+	if sp.IsTransactional() && sp.txnStatus&sarama.ProducerTxnFlagInTransaction == 0 {
+		sp.t.Errorf("attempt to send message when transaction is not started or is in ending state.")
+		return -1, -1, errors.New("attempt to send message when transaction is not started or is in ending state")
+	}
 
 	if len(sp.expectations) > 0 {
 		expectation := sp.expectations[0]
@@ -206,4 +217,44 @@ func (sp *SyncProducer) ExpectSendMessageAndFail(err error) *SyncProducer {
 	sp.ExpectSendMessageWithMessageCheckerFunctionAndFail(nil, err)
 
 	return sp
+}
+
+func (sp *SyncProducer) IsTransactional() bool {
+	return sp.isTransactional
+}
+
+func (sp *SyncProducer) BeginTxn() error {
+	sp.txnLock.Lock()
+	defer sp.txnLock.Unlock()
+
+	sp.txnStatus = sarama.ProducerTxnFlagInTransaction
+	return nil
+}
+
+func (sp *SyncProducer) CommitTxn() error {
+	sp.txnLock.Lock()
+	defer sp.txnLock.Unlock()
+
+	sp.txnStatus = sarama.ProducerTxnFlagReady
+	return nil
+}
+
+func (sp *SyncProducer) AbortTxn() error {
+	sp.txnLock.Lock()
+	defer sp.txnLock.Unlock()
+
+	sp.txnStatus = sarama.ProducerTxnFlagReady
+	return nil
+}
+
+func (sp *SyncProducer) TxnStatus() sarama.ProducerTxnStatusFlag {
+	return sp.txnStatus
+}
+
+func (sp *SyncProducer) AddOffsetsToTxn(offsets map[string][]*sarama.PartitionOffsetMetadata, groupId string) error {
+	return nil
+}
+
+func (sp *SyncProducer) AddMessageToTxn(msg *sarama.ConsumerMessage, groupId string, metadata *string) error {
+	return nil
 }

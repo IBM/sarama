@@ -155,7 +155,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 21:
 		return &DeleteRecordsRequest{}
 	case 22:
-		return &InitProducerIDRequest{}
+		return &InitProducerIDRequest{Version: version}
 	case 24:
 		return &AddPartitionsToTxnRequest{}
 	case 25:

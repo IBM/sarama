@@ -57,6 +57,108 @@ func TestSyncProducer(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestSyncProducerTransactional(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+	leader := NewMockBroker(t, 2)
+	defer leader.Close()
+
+	config := NewTestConfig()
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Return.Successes = true
+	config.Producer.Transaction.ID = "test"
+	config.Producer.Idempotent = true
+	config.Producer.Retry.Max = 5
+	config.Net.MaxOpenRequests = 1
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.Version = 1
+	metadataResponse.ControllerID = leader.BrokerID()
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopic("my_topic", ErrNoError)
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	findCoordinatorResponse := new(FindCoordinatorResponse)
+	findCoordinatorResponse.Coordinator = client.Brokers()[0]
+	findCoordinatorResponse.Version = 1
+	seedBroker.Returns(findCoordinatorResponse)
+
+	initProducerIdResponse := new(InitProducerIDResponse)
+	leader.Returns(initProducerIdResponse)
+
+	addPartitionToTxn := new(AddPartitionsToTxnResponse)
+	addPartitionToTxn.Errors = map[string][]*PartitionError{
+		"my_topic": {
+			{
+				Partition: 0,
+			},
+		},
+	}
+	leader.Returns(addPartitionToTxn)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.Version = 3
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	for i := 0; i < 10; i++ {
+		leader.Returns(prodSuccess)
+	}
+
+	endTxnResponse := &EndTxnResponse{}
+	leader.Returns(endTxnResponse)
+
+	producer, err := NewSyncProducerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !producer.IsTransactional() {
+		t.Error("producer is not transactional")
+	}
+
+	err = producer.BeginTxn()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if producer.TxnStatus()&ProducerTxnFlagInTransaction == 0 {
+		t.Error("transaction must started")
+	}
+
+	for i := 0; i < 10; i++ {
+		msg := &ProducerMessage{
+			Topic:    "my_topic",
+			Value:    StringEncoder(TestMessage),
+			Metadata: "test",
+		}
+
+		partition, offset, err := producer.SendMessage(msg)
+
+		if partition != 0 || msg.Partition != partition {
+			t.Error("Unexpected partition")
+		}
+		if offset != 0 || msg.Offset != offset {
+			t.Error("Unexpected offset")
+		}
+		if str, ok := msg.Metadata.(string); !ok || str != "test" {
+			t.Error("Unexpected metadata")
+		}
+		if err != nil {
+			t.Error(err)
+		}
+	}
+	err = producer.CommitTxn()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	safeClose(t, producer)
+}
+
 func TestSyncProducerBatch(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
