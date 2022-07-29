@@ -68,6 +68,7 @@ func (m *metricValidators) registerForAllBrokers(broker *Broker, validator *metr
 }
 
 func (m metricValidators) run(t *testing.T, r metrics.Registry) {
+	t.Helper()
 	for _, metricValidator := range m {
 		metric := r.Get(metricValidator.name)
 		if metric == nil {
@@ -82,6 +83,7 @@ func meterValidator(name string, extraValidator func(*testing.T, metrics.Meter))
 	return &metricValidator{
 		name: name,
 		validator: func(t *testing.T, metric interface{}) {
+			t.Helper()
 			if meter, ok := metric.(metrics.Meter); !ok {
 				t.Errorf("Expected meter metric for '%s', got %T", name, metric)
 			} else {
@@ -93,6 +95,7 @@ func meterValidator(name string, extraValidator func(*testing.T, metrics.Meter))
 
 func countMeterValidator(name string, expectedCount int) *metricValidator {
 	return meterValidator(name, func(t *testing.T, meter metrics.Meter) {
+		t.Helper()
 		count := meter.Count()
 		if count != int64(expectedCount) {
 			t.Errorf("Expected meter metric '%s' count = %d, got %d", name, expectedCount, count)

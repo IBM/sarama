@@ -307,7 +307,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 	safeClose(t, producer)
 
 	// Validate producer metrics before using the consumer minus the offset request
-	validateMetrics(t, client)
+	validateProducerMetrics(t, client)
 
 	master, err := NewConsumerFromClient(client)
 	if err != nil {
@@ -332,6 +332,9 @@ func testProducingMessages(t *testing.T, config *Config) {
 			}
 		}
 	}
+
+	validateConsumerMetrics(t, client)
+
 	safeClose(t, consumer)
 	safeClose(t, client)
 }
@@ -397,7 +400,7 @@ func TestAsyncProducerRemoteBrokerClosed(t *testing.T) {
 	closeProducer(t, producer)
 }
 
-func validateMetrics(t *testing.T, client Client) {
+func validateProducerMetrics(t *testing.T, client Client) {
 	// Get the broker used by test1 topic
 	var broker *Broker
 	if partitions, err := client.Partitions("test.1"); err != nil {
@@ -481,6 +484,36 @@ func validateMetrics(t *testing.T, client Client) {
 
 	// There should be no requests in flight anymore
 	metricValidators.registerForAllBrokers(broker, counterValidator("requests-in-flight", 0))
+
+	// Run the validators
+	metricValidators.run(t, client.Config().MetricRegistry)
+}
+
+func validateConsumerMetrics(t *testing.T, client Client) {
+	// Get the broker used by test1 topic
+	var broker *Broker
+	if partitions, err := client.Partitions("test.1"); err != nil {
+		t.Error(err)
+	} else {
+		for _, partition := range partitions {
+			if b, err := client.Leader("test.1", partition); err != nil {
+				t.Error(err)
+			} else {
+				if broker != nil && b != broker {
+					t.Fatal("Expected only one broker, got at least 2")
+				}
+				broker = b
+			}
+		}
+	}
+
+	metricValidators := newMetricValidators()
+
+	// at least 1 global fetch request for the given topic
+	metricValidators.registerForGlobalAndTopic("test_1", minCountMeterValidator("consumer-fetch-rate", 1))
+
+	// and at least 1 fetch request to the lead broker
+	metricValidators.registerForBroker(broker, minCountMeterValidator("consumer-fetch-rate", 1))
 
 	// Run the validators
 	metricValidators.run(t, client.Config().MetricRegistry)

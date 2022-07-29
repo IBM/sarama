@@ -37,6 +37,7 @@ type Broker struct {
 
 	incomingByteRate       metrics.Meter
 	requestRate            metrics.Meter
+	fetchRate              metrics.Meter
 	requestSize            metrics.Histogram
 	requestLatency         metrics.Histogram
 	outgoingByteRate       metrics.Meter
@@ -45,6 +46,7 @@ type Broker struct {
 	requestsInFlight       metrics.Counter
 	brokerIncomingByteRate metrics.Meter
 	brokerRequestRate      metrics.Meter
+	brokerFetchRate        metrics.Meter
 	brokerRequestSize      metrics.Histogram
 	brokerRequestLatency   metrics.Histogram
 	brokerOutgoingByteRate metrics.Meter
@@ -208,6 +210,7 @@ func (b *Broker) Open(conf *Config) error {
 		// Create or reuse the global metrics shared between brokers
 		b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", conf.MetricRegistry)
 		b.requestRate = metrics.GetOrRegisterMeter("request-rate", conf.MetricRegistry)
+		b.fetchRate = metrics.GetOrRegisterMeter("consumer-fetch-rate", conf.MetricRegistry)
 		b.requestSize = getOrRegisterHistogram("request-size", conf.MetricRegistry)
 		b.requestLatency = getOrRegisterHistogram("request-latency-in-ms", conf.MetricRegistry)
 		b.outgoingByteRate = metrics.GetOrRegisterMeter("outgoing-byte-rate", conf.MetricRegistry)
@@ -472,6 +475,15 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 
 // Fetch returns a FetchResponse or error
 func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
+	defer func() {
+		if b.fetchRate != nil {
+			b.fetchRate.Mark(1)
+		}
+		if b.brokerFetchRate != nil {
+			b.brokerFetchRate.Mark(1)
+		}
+	}()
+
 	response := new(FetchResponse)
 
 	err := b.sendAndReceive(request, response)
@@ -1600,6 +1612,7 @@ func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
 func (b *Broker) registerMetrics() {
 	b.brokerIncomingByteRate = b.registerMeter("incoming-byte-rate")
 	b.brokerRequestRate = b.registerMeter("request-rate")
+	b.brokerFetchRate = b.registerMeter("consumer-fetch-rate")
 	b.brokerRequestSize = b.registerHistogram("request-size")
 	b.brokerRequestLatency = b.registerHistogram("request-latency-in-ms")
 	b.brokerOutgoingByteRate = b.registerMeter("outgoing-byte-rate")
