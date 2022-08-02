@@ -11,7 +11,7 @@ require (
 	github.com/fortytw2/leaktest v1.3.0
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/jcmturner/gofork v1.0.0
+	github.com/jcmturner/gofork v1.7.6
 	github.com/jcmturner/gokrb5/v8 v8.4.2
 	github.com/klauspost/compress v1.15.8
 	github.com/kr/pretty v0.3.0 // indirect
