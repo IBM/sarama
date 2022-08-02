@@ -135,7 +135,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	if version, ok := os.LookupEnv("KAFKA_VERSION"); ok {
 		env.KafkaVersion = version
 	} else {
-		env.KafkaVersion = "3.1.0"
+		env.KafkaVersion = "3.1.1"
 	}
 
 	c := exec.Command("docker-compose", "up", "-d")
