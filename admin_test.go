@@ -161,7 +161,7 @@ func TestClusterAdminListTopics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(entries) <= 0 {
+	if len(entries) == 0 {
 		t.Fatal(errors.New("no resource present"))
 	}
 
@@ -447,10 +447,10 @@ func TestClusterAdminListPartitionReassignments(t *testing.T) {
 	partitionStatus, ok := response["my_topic"]
 	if !ok {
 		t.Fatalf("topic missing in response")
-	} else {
-		if len(partitionStatus) != 2 {
-			t.Fatalf("partition missing in response")
-		}
+	}
+
+	if len(partitionStatus) != 2 {
+		t.Fatalf("partition missing in response")
 	}
 
 	err = admin.Close()
@@ -711,47 +711,49 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		{V2_0_0_0, 2, true},
 	}
 	for _, tt := range tests {
-		config := NewTestConfig()
-		config.Version = tt.saramaVersion
-		admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = admin.Close()
-		}()
-
-		resource := ConfigResource{
-			Name:        "r1",
-			Type:        TopicResource,
-			ConfigNames: []string{"my_topic"},
-		}
-
-		entries, err := admin.DescribeConfig(resource)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		history := seedBroker.History()
-		describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
-		if !ok {
-			t.Fatal("failed to find DescribeConfigsRequest in mockBroker history")
-		}
-
-		if describeReq.Version != tt.requestVersion {
-			t.Fatalf(
-				"requestVersion %v did not match expected %v",
-				describeReq.Version, tt.requestVersion)
-		}
-
-		if len(entries) <= 0 {
-			t.Fatal(errors.New("no resource present"))
-		}
-		if tt.includeSynonyms {
-			if len(entries[0].Synonyms) == 0 {
-				t.Fatal("expected synonyms to have been included")
+		t.Run(tt.saramaVersion.String(), func(t *testing.T) {
+			config := NewTestConfig()
+			config.Version = tt.saramaVersion
+			admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
+			defer func() {
+				_ = admin.Close()
+			}()
+
+			resource := ConfigResource{
+				Name:        "r1",
+				Type:        TopicResource,
+				ConfigNames: []string{"my_topic"},
+			}
+
+			entries, err := admin.DescribeConfig(resource)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			history := seedBroker.History()
+			describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
+			if !ok {
+				t.Fatal("failed to find DescribeConfigsRequest in mockBroker history")
+			}
+
+			if describeReq.Version != tt.requestVersion {
+				t.Fatalf(
+					"requestVersion %v did not match expected %v",
+					describeReq.Version, tt.requestVersion)
+			}
+
+			if len(entries) == 0 {
+				t.Fatal(errors.New("no resource present"))
+			}
+			if tt.includeSynonyms {
+				if len(entries[0].Synonyms) == 0 {
+					t.Fatal("expected synonyms to have been included")
+				}
+			}
+		})
 	}
 }
 
@@ -829,7 +831,7 @@ func TestClusterAdminDescribeBrokerConfig(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(entries) <= 0 {
+		if len(entries) == 0 {
 			t.Fatal(errors.New("no resource present"))
 		}
 	}
@@ -1245,7 +1247,7 @@ func TestClusterAdminListAcls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rAcls) <= 0 {
+	if len(rAcls) == 0 {
 		t.Fatal("no acls present")
 	}
 

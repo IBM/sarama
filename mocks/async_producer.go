@@ -85,10 +85,8 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 							msg.Offset = mp.lastOffset
 							mp.successes <- msg
 						}
-					} else {
-						if config.Producer.Return.Errors {
-							mp.errors <- &sarama.ProducerError{Err: expectation.Result, Msg: msg}
-						}
+					} else if config.Producer.Return.Errors {
+						mp.errors <- &sarama.ProducerError{Err: expectation.Result, Msg: msg}
 					}
 				}
 			}
