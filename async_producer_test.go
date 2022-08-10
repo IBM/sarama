@@ -1498,6 +1498,7 @@ func TestAsyncProducerIdempotentEpochExhaustion(t *testing.T) {
 
 // TestBrokerProducerShutdown ensures that a call to shutdown stops the
 // brokerProducer run() loop and doesn't leak any goroutines
+//
 //nolint:paralleltest
 func TestBrokerProducerShutdown(t *testing.T) {
 	defer leaktest.Check(t)()
