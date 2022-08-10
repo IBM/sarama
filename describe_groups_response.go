@@ -250,7 +250,7 @@ func (gmd *GroupMemberDescription) GetMemberAssignment() (*ConsumerGroupMemberAs
 		return nil, nil
 	}
 	assignment := new(ConsumerGroupMemberAssignment)
-	err := decode(gmd.MemberAssignment, assignment)
+	err := decode(gmd.MemberAssignment, assignment, nil)
 	return assignment, err
 }
 
@@ -259,6 +259,6 @@ func (gmd *GroupMemberDescription) GetMemberMetadata() (*ConsumerGroupMemberMeta
 		return nil, nil
 	}
 	metadata := new(ConsumerGroupMemberMetadata)
-	err := decode(gmd.MemberMetadata, metadata)
+	err := decode(gmd.MemberMetadata, metadata, nil)
 	return metadata, err
 }

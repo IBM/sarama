@@ -609,9 +609,9 @@ func assignPartition(partition topicPartitionAssignment, sortedCurrentSubscripti
 // Deserialize topic partition assignment data to aid with creation of a sticky assignment.
 func deserializeTopicPartitionAssignment(userDataBytes []byte) (StickyAssignorUserData, error) {
 	userDataV1 := &StickyAssignorUserDataV1{}
-	if err := decode(userDataBytes, userDataV1); err != nil {
+	if err := decode(userDataBytes, userDataV1, nil); err != nil {
 		userDataV0 := &StickyAssignorUserDataV0{}
-		if err := decode(userDataBytes, userDataV0); err != nil {
+		if err := decode(userDataBytes, userDataV0, nil); err != nil {
 			return nil, err
 		}
 		return userDataV0, nil

@@ -21,7 +21,7 @@ func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata
 	members := make(map[string]ConsumerGroupMemberMetadata, len(r.Members))
 	for _, member := range r.Members {
 		meta := new(ConsumerGroupMemberMetadata)
-		if err := decode(member.Metadata, meta); err != nil {
+		if err := decode(member.Metadata, meta, nil); err != nil {
 			return nil, err
 		}
 		members[member.MemberId] = *meta

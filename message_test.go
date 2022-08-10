@@ -236,7 +236,7 @@ func TestMessageDecodingVersion1(t *testing.T) {
 
 func TestMessageDecodingUnknownVersions(t *testing.T) {
 	message := Message{Version: 2}
-	err := decode(emptyV2Message, &message)
+	err := decode(emptyV2Message, &message, nil)
 	if err == nil {
 		t.Error("Decoding did not produce an error for an unknown magic byte")
 	}

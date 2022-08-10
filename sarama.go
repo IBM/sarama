@@ -71,6 +71,7 @@ Consumer related metrics:
 	| consumer-fetch-rate                       | meter      | Fetch requests/second sent to all brokers                                            |
 	| consumer-fetch-rate-for-broker-<broker>   | meter      | Fetch requests/second sent to a given broker                                         |
 	| consumer-fetch-rate-for-topic-<topic>     | meter      | Fetch requests/second sent for a given topic                                         |
+	| consumer-fetch-response-size              | histogram  | Distribution of the fetch response size in bytes                                     |
 	| consumer-group-join-total-<GroupID>       | counter    | Total count of consumer group join attempts                                          |
 	| consumer-group-join-failed-<GroupID>      | counter    | Total count of consumer group join failures                                          |
 	| consumer-group-sync-total-<GroupID>       | counter    | Total count of consumer group sync attempts                                          |

@@ -186,7 +186,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	}
 
 	b.recordsLen = len(recBuffer)
-	err = decode(recBuffer, recordsArray(b.Records))
+	err = decode(recBuffer, recordsArray(b.Records), nil)
 	if errors.Is(err, ErrInsufficientData) {
 		b.PartialTrailingRecord = true
 		b.Records = nil
