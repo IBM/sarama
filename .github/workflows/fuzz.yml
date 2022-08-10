@@ -15,7 +15,7 @@ jobs:
       GOFLAGS: -trimpath
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
     - name: Setup Go
       uses: actions/setup-go@v3
