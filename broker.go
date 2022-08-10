@@ -1407,7 +1407,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 		// Will be decremented in updateIncomingCommunicationMetrics (except error)
 		b.addRequestInFlightMetrics(1)
 		length := len(msg)
-		authBytes := make([]byte, length+4) //4 byte length header + auth data
+		authBytes := make([]byte, length+4) // 4 byte length header + auth data
 		binary.BigEndian.PutUint32(authBytes, uint32(length))
 		copy(authBytes[4:], []byte(msg))
 		_, err := b.write(authBytes)

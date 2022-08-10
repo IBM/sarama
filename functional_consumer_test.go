@@ -553,12 +553,12 @@ func consumeMsgs(t *testing.T, clientVersions []KafkaVersion, producedMessages [
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer safeClose(t, c)
+		defer safeClose(t, c) //nolint: gocritic // the close intentionally happens outside the loop
 		pc, err := c.ConsumePartition("test.1", 0, producedMessages[0].Offset)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer safeClose(t, pc)
+		defer safeClose(t, pc) //nolint: gocritic // the close intentionally happens outside the loop
 
 		var wg sync.WaitGroup
 		wg.Add(1)

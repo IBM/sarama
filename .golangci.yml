@@ -23,13 +23,18 @@ linters-settings:
   gocritic:
     enabled-tags:
       - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
+      # - experimental
+      # - opinionated
+      # - performance
+      # - style
     disabled-checks:
-      - wrapperFunc
+      - assignOp
+      - appendAssign
+      - commentedOutCode
       - ifElseChain
+      - singleCaseSwitch
+      - sloppyReassign
+      - wrapperFunc
   funlen:
     lines: 300
     statements: 300
@@ -48,7 +53,7 @@ linters:
     - funlen
     - gochecknoinits
     # - goconst
-    # - gocritic
+    - gocritic
     - gocyclo
     - gofmt
     - goimports
