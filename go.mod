@@ -20,7 +20,7 @@ require (
 	github.com/stretchr/testify v1.8.0
 	github.com/xdg-go/scram v1.1.1
 	golang.org/x/crypto v0.0.0-20220214200702-86341886e292 // indirect
-	golang.org/x/net v0.0.0-20220728211354-c7608f3a8462
+	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
 	golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )
