@@ -158,9 +158,7 @@ func (gd *GroupDescription) decode(pd packetDecoder, version int16) (err error) 
 			if err := block.decode(pd, gd.Version); err != nil {
 				return err
 			}
-			if block != nil {
-				gd.Members[block.MemberId] = block
-			}
+			gd.Members[block.MemberId] = block
 		}
 	}
 

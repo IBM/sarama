@@ -73,7 +73,6 @@ Consumer related metrics:
 	| consumer-group-sync-total-<GroupID>       | counter    | Total count of consumer group sync attempts                                          |
 	| consumer-group-sync-failed-<GroupID>      | counter    | Total count of consumer group sync failures                                          |
 	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
-
 */
 package sarama
 

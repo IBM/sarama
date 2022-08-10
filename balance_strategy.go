@@ -62,8 +62,9 @@ type BalanceStrategy interface {
 // https://kafka.apache.org/31/javadoc/org/apache/kafka/clients/consumer/RangeAssignor.html
 //
 // Example with two topics T1 and T2 with six partitions each (0..5) and two members (M1, M2):
-//   M1: {T1: [0, 1, 2], T2: [0, 1, 2]}
-//   M2: {T2: [3, 4, 5], T2: [3, 4, 5]}
+//
+//	M1: {T1: [0, 1, 2], T2: [0, 1, 2]}
+//	M2: {T2: [3, 4, 5], T2: [3, 4, 5]}
 var BalanceStrategyRange = &balanceStrategy{
 	name: RangeBalanceStrategyName,
 	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
@@ -87,14 +88,15 @@ var BalanceStrategyRange = &balanceStrategy{
 // BalanceStrategySticky assigns partitions to members with an attempt to preserve earlier assignments
 // while maintain a balanced partition distribution.
 // Example with topic T with six partitions (0..5) and two members (M1, M2):
-//   M1: {T: [0, 2, 4]}
-//   M2: {T: [1, 3, 5]}
+//
+//	M1: {T: [0, 2, 4]}
+//	M2: {T: [1, 3, 5]}
 //
 // On reassignment with an additional consumer, you might get an assignment plan like:
-//   M1: {T: [0, 2]}
-//   M2: {T: [1, 3]}
-//   M3: {T: [4, 5]}
 //
+//	M1: {T: [0, 2]}
+//	M2: {T: [1, 3]}
+//	M3: {T: [4, 5]}
 var BalanceStrategySticky = &stickyBalanceStrategy{}
 
 // --------------------------------------------------------------------
