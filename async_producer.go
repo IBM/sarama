@@ -232,7 +232,7 @@ type ProducerMessage struct {
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
 
-func (m *ProducerMessage) byteSize(version int) int {
+func (m *ProducerMessage) ByteSize(version int) int {
 	var size int
 	if version >= 2 {
 		size = maximumRecordOverhead
@@ -366,7 +366,7 @@ func (p *asyncProducer) dispatcher() {
 			p.returnError(msg, ConfigurationError("Producing headers requires Kafka at least v0.11"))
 			continue
 		}
-		if msg.byteSize(version) > p.conf.Producer.MaxMessageBytes {
+		if msg.ByteSize(version) > p.conf.Producer.MaxMessageBytes {
 			p.returnError(msg, ErrMessageSizeTooLarge)
 			continue
 		}
