@@ -33,11 +33,11 @@ func TestLegacyRecords(t *testing.T) {
 	set = &MessageSet{}
 	r = Records{}
 
-	err = decode(exp, set)
+	err = decode(exp, set, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = decode(buf, &r)
+	err = decode(buf, &r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,11 +110,11 @@ func TestDefaultRecords(t *testing.T) {
 	batch = &RecordBatch{}
 	r = Records{}
 
-	err = decode(exp, batch)
+	err = decode(exp, batch, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = decode(buf, &r)
+	err = decode(buf, &r, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

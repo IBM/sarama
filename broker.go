@@ -37,6 +37,7 @@ type Broker struct {
 
 	incomingByteRate       metrics.Meter
 	requestRate            metrics.Meter
+	fetchRate              metrics.Meter
 	requestSize            metrics.Histogram
 	requestLatency         metrics.Histogram
 	outgoingByteRate       metrics.Meter
@@ -45,6 +46,7 @@ type Broker struct {
 	requestsInFlight       metrics.Counter
 	brokerIncomingByteRate metrics.Meter
 	brokerRequestRate      metrics.Meter
+	brokerFetchRate        metrics.Meter
 	brokerRequestSize      metrics.Histogram
 	brokerRequestLatency   metrics.Histogram
 	brokerOutgoingByteRate metrics.Meter
@@ -208,6 +210,7 @@ func (b *Broker) Open(conf *Config) error {
 		// Create or reuse the global metrics shared between brokers
 		b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", conf.MetricRegistry)
 		b.requestRate = metrics.GetOrRegisterMeter("request-rate", conf.MetricRegistry)
+		b.fetchRate = metrics.GetOrRegisterMeter("consumer-fetch-rate", conf.MetricRegistry)
 		b.requestSize = getOrRegisterHistogram("request-size", conf.MetricRegistry)
 		b.requestLatency = getOrRegisterHistogram("request-latency-in-ms", conf.MetricRegistry)
 		b.outgoingByteRate = metrics.GetOrRegisterMeter("outgoing-byte-rate", conf.MetricRegistry)
@@ -432,7 +435,7 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 					return
 				}
 
-				if err := versionedDecode(packets, res, request.version()); err != nil {
+				if err := versionedDecode(packets, res, request.version(), b.conf.MetricRegistry); err != nil {
 					// Malformed response
 					cb(nil, err)
 					return
@@ -472,6 +475,15 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 
 // Fetch returns a FetchResponse or error
 func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
+	defer func() {
+		if b.fetchRate != nil {
+			b.fetchRate.Mark(1)
+		}
+		if b.brokerFetchRate != nil {
+			b.brokerFetchRate.Mark(1)
+		}
+	}()
+
 	response := new(FetchResponse)
 
 	err := b.sendAndReceive(request, response)
@@ -1011,13 +1023,13 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 		return nil
 	}
 
-	return handleResponsePromise(req, res, promise)
+	return b.handleResponsePromise(req, res, promise)
 }
 
-func handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise) error {
+func (b *Broker) handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise) error {
 	select {
 	case buf := <-promise.packets:
-		return versionedDecode(buf, res, req.version())
+		return versionedDecode(buf, res, req.version(), b.conf.MetricRegistry)
 	case err := <-promise.errors:
 		return err
 	}
@@ -1109,7 +1121,7 @@ func (b *Broker) responseReceiver() {
 		}
 
 		decodedHeader := responseHeader{}
-		err = versionedDecode(header, &decodedHeader, response.headerVersion)
+		err = versionedDecode(header, &decodedHeader, response.headerVersion, b.conf.MetricRegistry)
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
@@ -1170,7 +1182,7 @@ func (b *Broker) authenticateViaSASLv1() error {
 			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
 			return handshakeErr
 		}
-		handshakeErr = handleResponsePromise(handshakeRequest, handshakeResponse, prom)
+		handshakeErr = b.handleResponsePromise(handshakeRequest, handshakeResponse, prom)
 		if handshakeErr != nil {
 			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
 			return handshakeErr
@@ -1190,7 +1202,7 @@ func (b *Broker) authenticateViaSASLv1() error {
 			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
 			return nil, authErr
 		}
-		authErr = handleResponsePromise(authenticateRequest, authenticateResponse, prom)
+		authErr = b.handleResponsePromise(authenticateRequest, authenticateResponse, prom)
 		if authErr != nil {
 			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
 			return nil, authErr
@@ -1268,7 +1280,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	b.updateIncomingCommunicationMetrics(n+8, time.Since(requestTime))
 	res := &SaslHandshakeResponse{}
 
-	err = versionedDecode(payload, res, 0)
+	err = versionedDecode(payload, res, 0, b.conf.MetricRegistry)
 	if err != nil {
 		Logger.Printf("Failed to parse SASL handshake : %s\n", err.Error())
 		return err
@@ -1600,6 +1612,7 @@ func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
 func (b *Broker) registerMetrics() {
 	b.brokerIncomingByteRate = b.registerMeter("incoming-byte-rate")
 	b.brokerRequestRate = b.registerMeter("request-rate")
+	b.brokerFetchRate = b.registerMeter("consumer-fetch-rate")
 	b.brokerRequestSize = b.registerHistogram("request-size")
 	b.brokerRequestLatency = b.registerHistogram("request-latency-in-ms")
 	b.brokerOutgoingByteRate = b.registerMeter("outgoing-byte-rate")

@@ -26,7 +26,7 @@ func TestConsumerMetadataResponseError(t *testing.T) {
 	testEncodable(t, "", response, consumerMetadataResponseError)
 
 	decodedResp := &ConsumerMetadataResponse{}
-	if err := versionedDecode(consumerMetadataResponseError, decodedResp, 0); err != nil {
+	if err := versionedDecode(consumerMetadataResponseError, decodedResp, 0, nil); err != nil {
 		t.Error("could not decode: ", err)
 	}
 

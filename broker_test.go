@@ -123,7 +123,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 				pendingNotify <- brokerMetrics{bytesRead, bytesWritten}
 			})
 			broker := NewBroker(mb.Addr())
-			// Set the broker id in order to validate local broker metrics
+			// Set the broker id in order to validate local broujhjker metrics
 			broker.id = 0
 			conf := NewTestConfig()
 			conf.ApiVersionsRequest = false
@@ -131,6 +131,9 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 			err := broker.Open(conf)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if _, err := broker.Connected(); err != nil {
+				t.Error(err)
 			}
 			tt.runner(t, broker)
 			// Wait up to 500 ms for the remote broker to process the request and

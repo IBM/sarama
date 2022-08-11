@@ -21,14 +21,14 @@ func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
 }
 
 func testDecodable(t *testing.T, name string, out decoder, in []byte) {
-	err := decode(in, out)
+	err := decode(in, out, nil)
 	if err != nil {
 		t.Error("Decoding", name, "failed:", err)
 	}
 }
 
 func testVersionDecodable(t *testing.T, name string, out versionedDecoder, in []byte, version int16) {
-	err := versionedDecode(in, out, version)
+	err := versionedDecode(in, out, version, nil)
 	if err != nil {
 		t.Error("Decoding", name, "version", version, "failed:", err)
 	}
@@ -99,7 +99,7 @@ func testResponse(t *testing.T, name string, res protocolBody, expected []byte) 
 	}
 
 	decoded := reflect.New(reflect.TypeOf(res).Elem()).Interface().(versionedDecoder)
-	if err := versionedDecode(encoded, decoded, res.version()); err != nil {
+	if err := versionedDecode(encoded, decoded, res.version(), nil); err != nil {
 		t.Error("Decoding", name, "failed:", err)
 	}
 

@@ -109,7 +109,7 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 	bytesRead += len(encodedReq)
 
 	req := &request{}
-	if err := decode(encodedReq, req); err != nil {
+	if err := decode(encodedReq, req, nil); err != nil {
 		return nil, bytesRead, err
 	}
 
