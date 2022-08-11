@@ -73,7 +73,7 @@ func TestProduceSetAddingMessagesOverflowBytesLimit(t *testing.T) {
 
 	msg := &ProducerMessage{Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
 
-	for ps.bufferBytes+msg.byteSize(2) < parent.conf.Producer.MaxMessageBytes {
+	for ps.bufferBytes+msg.ByteSize(2) < parent.conf.Producer.MaxMessageBytes {
 		if ps.wouldOverflow(msg) {
 			t.Error("set shouldn't fill up before 1000 bytes")
 		}
