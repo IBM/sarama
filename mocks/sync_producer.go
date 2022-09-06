@@ -28,10 +28,14 @@ type SyncProducer struct {
 
 // NewSyncProducer instantiates a new SyncProducer mock. The t argument should
 // be the *testing.T instance of your test method. An error will be written to it if
-// an expectation is violated. The config argument is used to handle partitioning.
+// an expectation is violated. The config argument is validated and used to handle
+// partitioning.
 func NewSyncProducer(t ErrorReporter, config *sarama.Config) *SyncProducer {
 	if config == nil {
 		config = sarama.NewConfig()
+	}
+	if err := config.Validate(); err != nil {
+		t.Errorf("Invalid mock configuration provided: %s", err.Error())
 	}
 	return &SyncProducer{
 		t:               t,

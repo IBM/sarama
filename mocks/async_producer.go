@@ -30,11 +30,14 @@ type AsyncProducer struct {
 
 // NewAsyncProducer instantiates a new Producer mock. The t argument should
 // be the *testing.T instance of your test method. An error will be written to it if
-// an expectation is violated. The config argument is used to determine whether it
-// should ack successes on the Successes channel and to handle partitioning.
+// an expectation is violated. The config argument is validated and used to determine
+// whether it should ack successes on the Successes channel and handle partitioning.
 func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 	if config == nil {
 		config = sarama.NewConfig()
+	}
+	if err := config.Validate(); err != nil {
+		t.Errorf("Invalid mock configuration provided: %s", err.Error())
 	}
 	mp := &AsyncProducer{
 		t:               t,

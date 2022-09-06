@@ -3,6 +3,7 @@ package mocks
 import (
 	"errors"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/Shopify/sarama"
@@ -393,5 +394,21 @@ func TestConsumerOffsetsAreManagedCorrectlyWithSpecifiedOffset(t *testing.T) {
 
 	if len(trm.errors) != 0 {
 		t.Errorf("Expected to not report any errors, found: %v", trm.errors)
+	}
+}
+
+func TestConsumerInvalidConfiguration(t *testing.T) {
+	trm := newTestReporterMock()
+	config := NewTestConfig()
+	config.ClientID = "not a valid client ID"
+	consumer := NewConsumer(trm, config)
+	if err := consumer.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Error("Expected to report a single error")
+	} else if !strings.Contains(trm.errors[0], "ClientID is invalid") {
+		t.Errorf("Unexpected error: %s", trm.errors[0])
 	}
 }
