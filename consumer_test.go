@@ -29,10 +29,10 @@ func TestConsumerOffsetManual(t *testing.T) {
 	mockFetchResponse := NewMockFetchResponse(t, 1)
 
 	// skipped because parseRecords(): offset < child.offset
-	mockFetchResponse.SetMessageWithKey("my_topic", 0, manualOffset-1, testKey, testMsg)
+	mockFetchResponse.SetMessage("my_topic", 0, manualOffset-1, testMsg)
 
 	for i := int64(0); i < 10; i++ {
-		mockFetchResponse.SetMessageWithKey("my_topic", 0, i+manualOffset, testKey, testMsg)
+		mockFetchResponse.SetMessage("my_topic", 0, i+manualOffset, testMsg)
 	}
 
 	mockFetchResponse.SetHighWaterMark("my_topic", 0, offsetNewestAfterFetchRequest)
