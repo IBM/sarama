@@ -15,7 +15,7 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.3
 	github.com/klauspost/compress v1.15.9
 	github.com/kr/pretty v0.3.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.15
+	github.com/pierrec/lz4/v4 v4.1.16
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/stretchr/testify v1.8.0
 	github.com/xdg-go/scram v1.1.1
