@@ -59,7 +59,7 @@ func TestFuncConsumerGroupPartitioningStateful(t *testing.T) {
 
 	m1s := newTestStatefulStrategy(t)
 	config := defaultConfig("M1")
-	config.Consumer.Group.Rebalance.Strategy = m1s
+	config.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{m1s}
 	config.Consumer.Group.Member.UserData = []byte(config.ClientID)
 
 	// start M1
@@ -72,7 +72,7 @@ func TestFuncConsumerGroupPartitioningStateful(t *testing.T) {
 
 	m2s := newTestStatefulStrategy(t)
 	config = defaultConfig("M2")
-	config.Consumer.Group.Rebalance.Strategy = m2s
+	config.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{m2s}
 	config.Consumer.Group.Member.UserData = []byte(config.ClientID)
 
 	// start M2
