@@ -572,6 +572,9 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 }
 
 func (c *consumerGroup) loopCheckPartitionNumbers(topics []string, session *consumerGroupSession) {
+	if c.config.Metadata.RefreshFrequency == time.Duration(0) {
+		return
+	}
 	pause := time.NewTicker(c.config.Metadata.RefreshFrequency)
 	defer session.cancel()
 	defer pause.Stop()
