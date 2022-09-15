@@ -1104,8 +1104,6 @@ func TestMetricsCleanup(t *testing.T) {
 	seedBroker.Returns(new(MetadataResponse))
 
 	config := NewTestConfig()
-	config.MetricRegistry = metrics.NewRegistry()
-
 	metrics.GetOrRegisterMeter("a", config.MetricRegistry)
 
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
