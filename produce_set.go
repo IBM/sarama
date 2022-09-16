@@ -181,7 +181,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 						msg.Offset = int64(i)
 					}
 				}
-				payload, err := encode(set.recordsToSend.MsgSet, ps.parent.conf.MetricRegistry)
+				payload, err := encode(set.recordsToSend.MsgSet, ps.parent.metricsRegistry)
 				if err != nil {
 					Logger.Println(err) // if this happens, it's basically our fault.
 					panic(err)
