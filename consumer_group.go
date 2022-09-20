@@ -91,6 +91,8 @@ type consumerGroup struct {
 	closeOnce sync.Once
 
 	userData []byte
+
+	metricRegistry metrics.Registry
 }
 
 // NewConsumerGroup creates a new consumer group the given broker addresses and configuration.
@@ -129,13 +131,14 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 	}
 
 	cg := &consumerGroup{
-		client:   client,
-		consumer: consumer,
-		config:   config,
-		groupID:  groupID,
-		errors:   make(chan error, config.ChannelBufferSize),
-		closed:   make(chan none),
-		userData: config.Consumer.Group.Member.UserData,
+		client:         client,
+		consumer:       consumer,
+		config:         config,
+		groupID:        groupID,
+		errors:         make(chan error, config.ChannelBufferSize),
+		closed:         make(chan none),
+		userData:       config.Consumer.Group.Member.UserData,
+		metricRegistry: newCleanupRegistry(config.MetricRegistry),
 	}
 	if client.Config().Consumer.Group.InstanceId != "" && config.Version.IsAtLeast(V2_3_0_0) {
 		cg.groupInstanceId = &client.Config().Consumer.Group.InstanceId
@@ -167,6 +170,8 @@ func (c *consumerGroup) Close() (err error) {
 		if e := c.client.Close(); e != nil {
 			err = e
 		}
+
+		c.metricRegistry.UnregisterAll()
 	})
 	return
 }
@@ -261,7 +266,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	var (
-		metricRegistry          = c.config.MetricRegistry
+		metricRegistry          = c.metricRegistry
 		consumerGroupJoinTotal  metrics.Counter
 		consumerGroupJoinFailed metrics.Counter
 		consumerGroupSyncTotal  metrics.Counter
