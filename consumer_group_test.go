@@ -49,7 +49,7 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 		"HeartbeatRequest": NewMockHeartbeatResponse(t),
 		"JoinGroupRequest": NewMockSequence(
 			NewMockJoinGroupResponse(t).SetError(ErrOffsetsLoadInProgress),
-			NewMockJoinGroupResponse(t),
+			NewMockJoinGroupResponse(t).SetGroupProtocol(RangeBalanceStrategyName),
 		),
 		"SyncGroupRequest": NewMockSequence(
 			NewMockSyncGroupResponse(t).SetError(ErrOffsetsLoadInProgress),

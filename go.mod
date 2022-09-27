@@ -15,11 +15,11 @@ require (
 	github.com/jcmturner/gokrb5/v8 v8.4.3
 	github.com/klauspost/compress v1.15.9
 	github.com/kr/pretty v0.3.0 // indirect
-	github.com/pierrec/lz4/v4 v4.1.15
+	github.com/pierrec/lz4/v4 v4.1.16
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/stretchr/testify v1.8.0
 	github.com/xdg-go/scram v1.1.1
-	golang.org/x/net v0.0.0-20220809184613-07c6da5e1ced
+	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
 	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 )

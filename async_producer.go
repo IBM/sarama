@@ -10,6 +10,7 @@ import (
 
 	"github.com/eapache/go-resiliency/breaker"
 	"github.com/eapache/queue"
+	"github.com/rcrowley/go-metrics"
 )
 
 // AsyncProducer publishes Kafka messages using a non-blocking API. It routes messages
@@ -85,6 +86,8 @@ type asyncProducer struct {
 
 	txnmgr *transactionManager
 	txLock sync.Mutex
+
+	metricsRegistry metrics.Registry
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
@@ -117,15 +120,16 @@ func newAsyncProducer(client Client) (AsyncProducer, error) {
 	}
 
 	p := &asyncProducer{
-		client:     client,
-		conf:       client.Config(),
-		errors:     make(chan *ProducerError),
-		input:      make(chan *ProducerMessage),
-		successes:  make(chan *ProducerMessage),
-		retries:    make(chan *ProducerMessage),
-		brokers:    make(map[*Broker]*brokerProducer),
-		brokerRefs: make(map[*brokerProducer]int),
-		txnmgr:     txnmgr,
+		client:          client,
+		conf:            client.Config(),
+		errors:          make(chan *ProducerError),
+		input:           make(chan *ProducerMessage),
+		successes:       make(chan *ProducerMessage),
+		retries:         make(chan *ProducerMessage),
+		brokers:         make(map[*Broker]*brokerProducer),
+		brokerRefs:      make(map[*brokerProducer]int),
+		txnmgr:          txnmgr,
+		metricsRegistry: newCleanupRegistry(client.Config().MetricRegistry),
 	}
 
 	// launch our singleton dispatchers
@@ -1228,6 +1232,8 @@ func (p *asyncProducer) shutdown() {
 	close(p.retries)
 	close(p.errors)
 	close(p.successes)
+
+	p.metricsRegistry.UnregisterAll()
 }
 
 func (p *asyncProducer) bumpIdempotentProducerEpoch() {

@@ -91,6 +91,8 @@ type consumerGroup struct {
 	closeOnce sync.Once
 
 	userData []byte
+
+	metricRegistry metrics.Registry
 }
 
 // NewConsumerGroup creates a new consumer group the given broker addresses and configuration.
@@ -129,13 +131,14 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 	}
 
 	cg := &consumerGroup{
-		client:   client,
-		consumer: consumer,
-		config:   config,
-		groupID:  groupID,
-		errors:   make(chan error, config.ChannelBufferSize),
-		closed:   make(chan none),
-		userData: config.Consumer.Group.Member.UserData,
+		client:         client,
+		consumer:       consumer,
+		config:         config,
+		groupID:        groupID,
+		errors:         make(chan error, config.ChannelBufferSize),
+		closed:         make(chan none),
+		userData:       config.Consumer.Group.Member.UserData,
+		metricRegistry: newCleanupRegistry(config.MetricRegistry),
 	}
 	if client.Config().Consumer.Group.InstanceId != "" && config.Version.IsAtLeast(V2_3_0_0) {
 		cg.groupInstanceId = &client.Config().Consumer.Group.InstanceId
@@ -167,6 +170,8 @@ func (c *consumerGroup) Close() (err error) {
 		if e := c.client.Close(); e != nil {
 			err = e
 		}
+
+		c.metricRegistry.UnregisterAll()
 	})
 	return
 }
@@ -261,7 +266,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	var (
-		metricRegistry          = c.config.MetricRegistry
+		metricRegistry          = c.metricRegistry
 		consumerGroupJoinTotal  metrics.Counter
 		consumerGroupJoinFailed metrics.Counter
 		consumerGroupSyncTotal  metrics.Counter
@@ -319,6 +324,17 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		return nil, join.Err
 	}
 
+	var strategy BalanceStrategy
+	var ok bool
+	if strategy = c.config.Consumer.Group.Rebalance.Strategy; strategy == nil {
+		strategy, ok = c.findStrategy(join.GroupProtocol, c.config.Consumer.Group.Rebalance.GroupStrategies)
+		if !ok {
+			// this case shouldn't happen in practice, since the leader will choose the protocol
+			// that all the members support
+			return nil, fmt.Errorf("unable to find selected strategy: %s", join.GroupProtocol)
+		}
+	}
+
 	// Prepare distribution plan if we joined as the leader
 	var plan BalanceStrategyPlan
 	var members map[string]ConsumerGroupMemberMetadata
@@ -328,14 +344,14 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 			return nil, err
 		}
 
-		plan, err = c.balance(members)
+		plan, err = c.balance(strategy, members)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	// Sync consumer group
-	groupRequest, err := c.syncGroupRequest(coordinator, members, plan, join.GenerationId)
+	syncGroupResponse, err := c.syncGroupRequest(coordinator, members, plan, join.GenerationId, strategy)
 	if consumerGroupSyncTotal != nil {
 		consumerGroupSyncTotal.Inc(1)
 	}
@@ -346,13 +362,13 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		}
 		return nil, err
 	}
-	if !errors.Is(groupRequest.Err, ErrNoError) {
+	if !errors.Is(syncGroupResponse.Err, ErrNoError) {
 		if consumerGroupSyncFailed != nil {
 			consumerGroupSyncFailed.Inc(1)
 		}
 	}
 
-	switch groupRequest.Err {
+	switch syncGroupResponse.Err {
 	case ErrNoError:
 	case ErrUnknownMemberId, ErrIllegalGeneration:
 		// reset member ID and retry immediately
@@ -361,22 +377,22 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	case ErrNotCoordinatorForConsumer, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
 		// retry after backoff
 		if retries <= 0 {
-			return nil, groupRequest.Err
+			return nil, syncGroupResponse.Err
 		}
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	case ErrFencedInstancedId:
 		if c.groupInstanceId != nil {
 			Logger.Printf("JoinGroup failed: group instance id %s has been fenced\n", *c.groupInstanceId)
 		}
-		return nil, groupRequest.Err
+		return nil, syncGroupResponse.Err
 	default:
-		return nil, groupRequest.Err
+		return nil, syncGroupResponse.Err
 	}
 
 	// Retrieve and sort claims
 	var claims map[string][]int32
-	if len(groupRequest.MemberAssignment) > 0 {
-		members, err := groupRequest.GetMemberAssignment()
+	if len(syncGroupResponse.MemberAssignment) > 0 {
+		members, err := syncGroupResponse.GetMemberAssignment()
 		if err != nil {
 			return nil, err
 		}
@@ -419,12 +435,31 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		Topics:   topics,
 		UserData: c.userData,
 	}
-	strategy := c.config.Consumer.Group.Rebalance.Strategy
-	if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
-		return nil, err
+	var strategy BalanceStrategy
+	if strategy = c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
+		if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
+			return nil, err
+		}
+	} else {
+		for _, strategy = range c.config.Consumer.Group.Rebalance.GroupStrategies {
+			if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	return coordinator.JoinGroup(req)
+}
+
+// findStrategy returns the BalanceStrategy with the specified protocolName
+// from the slice provided.
+func (c *consumerGroup) findStrategy(name string, groupStrategies []BalanceStrategy) (BalanceStrategy, bool) {
+	for _, strategy := range groupStrategies {
+		if strategy.Name() == name {
+			return strategy, true
+		}
+	}
+	return nil, false
 }
 
 func (c *consumerGroup) syncGroupRequest(
@@ -432,13 +467,14 @@ func (c *consumerGroup) syncGroupRequest(
 	members map[string]ConsumerGroupMemberMetadata,
 	plan BalanceStrategyPlan,
 	generationID int32,
+	strategy BalanceStrategy,
 ) (*SyncGroupResponse, error) {
 	req := &SyncGroupRequest{
 		GroupId:      c.groupID,
 		MemberId:     c.memberID,
 		GenerationId: generationID,
 	}
-	strategy := c.config.Consumer.Group.Rebalance.Strategy
+
 	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 3
 	}
@@ -481,7 +517,7 @@ func (c *consumerGroup) heartbeatRequest(coordinator *Broker, memberID string, g
 	return coordinator.Heartbeat(req)
 }
 
-func (c *consumerGroup) balance(members map[string]ConsumerGroupMemberMetadata) (BalanceStrategyPlan, error) {
+func (c *consumerGroup) balance(strategy BalanceStrategy, members map[string]ConsumerGroupMemberMetadata) (BalanceStrategyPlan, error) {
 	topics := make(map[string][]int32)
 	for _, meta := range members {
 		for _, topic := range meta.Topics {
@@ -497,7 +533,6 @@ func (c *consumerGroup) balance(members map[string]ConsumerGroupMemberMetadata) 
 		topics[topic] = partitions
 	}
 
-	strategy := c.config.Consumer.Group.Rebalance.Strategy
 	return strategy.Plan(members, topics)
 }
 
@@ -572,6 +607,9 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 }
 
 func (c *consumerGroup) loopCheckPartitionNumbers(topics []string, session *consumerGroupSession) {
+	if c.config.Metadata.RefreshFrequency == time.Duration(0) {
+		return
+	}
 	pause := time.NewTicker(c.config.Metadata.RefreshFrequency)
 	defer session.cancel()
 	defer pause.Stop()

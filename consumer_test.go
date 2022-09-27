@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"os"
@@ -13,6 +14,7 @@ import (
 )
 
 var testMsg = StringEncoder("Foo")
+var testKey = StringEncoder("Bar")
 
 // If a particular offset is provided then messages are consumed starting from
 // that offset.
@@ -64,6 +66,71 @@ func TestConsumerOffsetManual(t *testing.T) {
 		select {
 		case message := <-consumer.Messages():
 			assertMessageOffset(t, message, i+manualOffset)
+		case err := <-consumer.Errors():
+			t.Error(err)
+		}
+	}
+
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewestAfterFetchRequest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewestAfterFetchRequest, hwmo)
+	}
+
+	safeClose(t, consumer)
+	safeClose(t, master)
+	broker0.Close()
+}
+
+// If a message is given a key, it can be correctly collected while consuming.
+func TestConsumerMessageWithKey(t *testing.T) {
+	// Given
+	broker0 := NewMockBroker(t, 0)
+
+	manualOffset := int64(1234)
+	offsetNewest := int64(2345)
+	offsetNewestAfterFetchRequest := int64(3456)
+
+	mockFetchResponse := NewMockFetchResponse(t, 1)
+
+	// skipped because parseRecords(): offset < child.offset
+	mockFetchResponse.SetMessageWithKey("my_topic", 0, manualOffset-1, testKey, testMsg)
+
+	for i := int64(0); i < 10; i++ {
+		mockFetchResponse.SetMessageWithKey("my_topic", 0, i+manualOffset, testKey, testMsg)
+	}
+
+	mockFetchResponse.SetHighWaterMark("my_topic", 0, offsetNewestAfterFetchRequest)
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetOldest, 0).
+			SetOffset("my_topic", 0, OffsetNewest, offsetNewest),
+		"FetchRequest": mockFetchResponse,
+	})
+
+	// When
+	master, err := NewConsumer([]string{broker0.Addr()}, NewTestConfig())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, manualOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Then
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
+	}
+	for i := int64(0); i < 10; i++ {
+		select {
+		case message := <-consumer.Messages():
+			assertMessageOffset(t, message, i+manualOffset)
+			assertMessageKey(t, message, testKey)
+			assertMessageValue(t, message, testMsg)
 		case err := <-consumer.Errors():
 			t.Error(err)
 		}
@@ -1793,6 +1860,24 @@ func TestExcludeUncommitted(t *testing.T) {
 	safeClose(t, consumer)
 	safeClose(t, master)
 	broker0.Close()
+}
+
+func assertMessageKey(t *testing.T, msg *ConsumerMessage, expectedKey Encoder) {
+	t.Helper()
+
+	wantKey, _ := expectedKey.Encode()
+	if bytes.Compare(msg.Key, wantKey) != 0 {
+		t.Fatalf("Incorrect key for message. expected=%s, actual=%s", expectedKey, msg.Key)
+	}
+}
+
+func assertMessageValue(t *testing.T, msg *ConsumerMessage, expectedValue Encoder) {
+	t.Helper()
+
+	wantValue, _ := expectedValue.Encode()
+	if bytes.Compare(msg.Value, wantValue) != 0 {
+		t.Fatalf("Incorrect value for message. expected=%s, actual=%s", expectedValue, msg.Key)
+	}
 }
 
 func assertMessageOffset(t *testing.T, msg *ConsumerMessage, expectedOffset int64) {
