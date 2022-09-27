@@ -188,6 +188,28 @@ type Config struct {
 		// If enabled, the producer will ensure that exactly one copy of each message is
 		// written.
 		Idempotent bool
+		// Transaction specify
+		Transaction struct {
+			// Used in transactions to identify an instance of a producer through restarts
+			ID string
+			// Amount of time a transaction can remain unresolved (neither committed nor aborted)
+			// default is 1 min
+			Timeout time.Duration
+
+			Retry struct {
+				// The total number of times to retry sending a message (default 50).
+				// Similar to the `message.send.max.retries` setting of the JVM producer.
+				Max int
+				// How long to wait for the cluster to settle between retries
+				// (default 10ms). Similar to the `retry.backoff.ms` setting of the
+				// JVM producer.
+				Backoff time.Duration
+				// Called to compute backoff time dynamically. Useful for implementing
+				// more sophisticated backoff strategies. This takes precedence over
+				// `Backoff` if set.
+				BackoffFunc func(retries, maxRetries int) time.Duration
+			}
+		}
 
 		// Return specifies what channels will be populated. If they are set to true,
 		// you must read from the respective channels to prevent deadlock. If,
@@ -500,6 +522,10 @@ func NewConfig() *Config {
 	c.Producer.Return.Errors = true
 	c.Producer.CompressionLevel = CompressionLevelDefault
 
+	c.Producer.Transaction.Timeout = 1 * time.Minute
+	c.Producer.Transaction.Retry.Max = 50
+	c.Producer.Transaction.Retry.Backoff = 100 * time.Millisecond
+
 	c.Consumer.Fetch.Min = 1
 	c.Consumer.Fetch.Default = 1024 * 1024
 	c.Consumer.Retry.Backoff = 2 * time.Second
@@ -724,6 +750,10 @@ func (c *Config) Validate() error {
 		if c.Net.MaxOpenRequests > 1 {
 			return ConfigurationError("Idempotent producer requires Net.MaxOpenRequests to be 1")
 		}
+	}
+
+	if c.Producer.Transaction.ID != "" && !c.Producer.Idempotent {
+		return ConfigurationError("Transactional producer requires Idempotent to be true")
 	}
 
 	// validate the Consumer values

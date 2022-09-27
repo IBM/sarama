@@ -14,6 +14,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/require"
 )
 
 const TestMessage = "ABC THE MESSAGE"
@@ -1660,6 +1661,507 @@ func TestProducerError(t *testing.T) {
 	if !errors.Is(err, ErrOutOfBrokers) {
 		t.Error("unexpected errors.Is")
 	}
+}
+
+func TestTxmngInitProducerId(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 1
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	broker.Returns(metadataLeader)
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	producerIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1,
+		ProducerEpoch: 0,
+	}
+	broker.Returns(producerIdResponse)
+
+	txmng, err := newTransactionManager(config, client)
+	require.NoError(t, err)
+
+	require.Equal(t, int64(1), txmng.producerID)
+	require.Equal(t, int16(0), txmng.producerEpoch)
+}
+
+func TestTxnProduceBumpEpoch(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V2_6_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Return.Errors = false
+
+	config.ApiVersionsRequest = false
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 5
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataLeader.AddTopic("test-topic", ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataLeader)
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	findCoordinatorResponse := FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	}
+	broker.Returns(&findCoordinatorResponse)
+
+	producerIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1000,
+		ProducerEpoch: 0,
+		Version:       3,
+	}
+	broker.Returns(producerIdResponse)
+
+	ap, err := NewAsyncProducerFromClient(client)
+	producer := ap.(*asyncProducer)
+	require.NoError(t, err)
+	defer ap.Close()
+	require.Equal(t, int64(1000), producer.txnmgr.producerID)
+	require.Equal(t, int16(0), producer.txnmgr.producerEpoch)
+
+	addPartitionsToTxnResponse := &AddPartitionsToTxnResponse{
+		Errors: map[string][]*PartitionError{
+			"test-topic": {
+				{
+					Partition: 0,
+				},
+			},
+		},
+	}
+	broker.Returns(addPartitionsToTxnResponse)
+
+	produceResponse := new(ProduceResponse)
+	produceResponse.Version = 3
+	produceResponse.AddTopicPartition("test-topic", 0, ErrOutOfOrderSequenceNumber)
+	broker.Returns(produceResponse)
+
+	err = producer.BeginTxn()
+	require.NoError(t, err)
+
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Key: nil, Value: StringEncoder(TestMessage)}
+
+	// Force send
+	producer.inFlight.Add(1)
+	producer.Input() <- &ProducerMessage{flags: shutdown}
+	producer.inFlight.Wait()
+
+	err = producer.CommitTxn()
+	require.Error(t, err)
+	require.Equal(t, ProducerTxnFlagInError|ProducerTxnFlagAbortableError, producer.txnmgr.status)
+
+	err = producer.CommitTxn()
+	require.Error(t, err)
+	require.Equal(t, ProducerTxnFlagInError|ProducerTxnFlagAbortableError, producer.txnmgr.status)
+
+	endTxnResponse := &EndTxnResponse{
+		Err: ErrNoError,
+	}
+	broker.Returns(endTxnResponse)
+
+	producerBumpIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1000,
+		ProducerEpoch: 1,
+		Version:       3,
+	}
+	broker.Returns(producerBumpIdResponse)
+
+	err = producer.AbortTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+	require.Equal(t, int64(1000), producer.txnmgr.producerID)
+	require.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+}
+
+func TestTxnProduceRecordWithCommit(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 1
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataLeader.AddTopic("test-topic", ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataLeader)
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	findCoordinatorResponse := FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	}
+	broker.Returns(&findCoordinatorResponse)
+
+	producerIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1,
+		ProducerEpoch: 0,
+	}
+	broker.Returns(producerIdResponse)
+
+	ap, err := NewAsyncProducerFromClient(client)
+	producer := ap.(*asyncProducer)
+	require.NoError(t, err)
+	defer ap.Close()
+
+	addPartitionsToTxnResponse := &AddPartitionsToTxnResponse{
+		Errors: map[string][]*PartitionError{
+			"test-topic": {
+				{
+					Partition: 0,
+				},
+			},
+		},
+	}
+	broker.Returns(addPartitionsToTxnResponse)
+
+	produceResponse := new(ProduceResponse)
+	produceResponse.Version = 3
+	produceResponse.AddTopicPartition("test-topic", 0, ErrNoError)
+	broker.Returns(produceResponse)
+
+	endTxnResponse := &EndTxnResponse{
+		Err: ErrNoError,
+	}
+	broker.Returns(endTxnResponse)
+
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+
+	err = producer.BeginTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagInTransaction, producer.txnmgr.status)
+
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Key: nil, Value: StringEncoder(TestMessage)}
+	err = producer.CommitTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+}
+
+func TestTxnProduceBatchAddPartition(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	config.Producer.Retry.Max = 1
+	config.Producer.Flush.Messages = 3
+	config.Producer.Flush.Frequency = 30 * time.Second
+	config.Producer.Flush.Bytes = 1 << 12
+	config.Producer.Partitioner = NewManualPartitioner
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 1
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataLeader.AddTopic("test-topic", ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 1, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 2, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataLeader)
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	findCoordinatorResponse := FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	}
+	broker.Returns(&findCoordinatorResponse)
+
+	producerIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1,
+		ProducerEpoch: 0,
+	}
+	broker.Returns(producerIdResponse)
+
+	ap, err := NewAsyncProducerFromClient(client)
+	producer := ap.(*asyncProducer)
+	require.NoError(t, err)
+	defer ap.Close()
+
+	go func() {
+		for err := range producer.Errors() {
+			require.NoError(t, err)
+		}
+	}()
+
+	broker.Returns(&AddPartitionsToTxnResponse{
+		Errors: map[string][]*PartitionError{
+			"test-topic": {
+				{
+					Partition: 0,
+					Err:       ErrNoError,
+				},
+				{
+					Partition: 1,
+					Err:       ErrNoError,
+				},
+				{
+					Partition: 2,
+					Err:       ErrNoError,
+				},
+			},
+		},
+	})
+
+	produceResponse := new(ProduceResponse)
+	produceResponse.Version = 3
+	produceResponse.AddTopicPartition("test-topic", 0, ErrNoError)
+	produceResponse.AddTopicPartition("test-topic", 1, ErrNoError)
+	produceResponse.AddTopicPartition("test-topic", 2, ErrNoError)
+	broker.Returns(produceResponse)
+
+	endTxnResponse := &EndTxnResponse{
+		Err: ErrNoError,
+	}
+	broker.Returns(endTxnResponse)
+
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+
+	err = producer.BeginTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagInTransaction, producer.txnmgr.status)
+
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Key: nil, Value: StringEncoder("partition-0")}
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 1, Key: nil, Value: StringEncoder("partition-1")}
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 2, Key: nil, Value: StringEncoder("partition-2")}
+
+	err = producer.CommitTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+
+	produceExchange := broker.History()[len(broker.History())-2]
+	produceRequest := produceExchange.Request.(*ProduceRequest)
+	require.Equal(t, 3, len(produceRequest.records["test-topic"]))
+
+	addPartitionExchange := broker.History()[len(broker.History())-3]
+	addpartitionRequest := addPartitionExchange.Request.(*AddPartitionsToTxnRequest)
+	require.Equal(t, 3, len(addpartitionRequest.TopicPartitions["test-topic"]))
+	require.Contains(t, addpartitionRequest.TopicPartitions["test-topic"], int32(0))
+	require.Contains(t, addpartitionRequest.TopicPartitions["test-topic"], int32(1))
+	require.Contains(t, addpartitionRequest.TopicPartitions["test-topic"], int32(2))
+}
+
+func TestTxnProduceRecordWithAbort(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 1
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataLeader.AddTopic("test-topic", ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataLeader)
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	findCoordinatorResponse := FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	}
+	broker.Returns(&findCoordinatorResponse)
+
+	producerIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1,
+		ProducerEpoch: 0,
+	}
+	broker.Returns(producerIdResponse)
+
+	ap, err := NewAsyncProducerFromClient(client)
+	producer := ap.(*asyncProducer)
+	require.NoError(t, err)
+	defer ap.Close()
+
+	broker.Returns(&AddPartitionsToTxnResponse{
+		Errors: map[string][]*PartitionError{
+			"test-topic": {
+				{
+					Partition: 0,
+					Err:       ErrNoError,
+				},
+			},
+		},
+	})
+
+	produceResponse := new(ProduceResponse)
+	produceResponse.Version = 3
+	produceResponse.AddTopicPartition("test-topic", 0, ErrNoError)
+	broker.Returns(produceResponse)
+
+	endTxnResponse := &EndTxnResponse{
+		Err: ErrNoError,
+	}
+	broker.Returns(endTxnResponse)
+
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+
+	err = producer.BeginTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagInTransaction, producer.txnmgr.status)
+
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Key: nil, Value: StringEncoder(TestMessage)}
+	err = producer.AbortTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+}
+
+func TestTxnCanAbort(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Return.Errors = false
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Flush.Messages = 1
+	config.Producer.Retry.Max = 1
+	config.Net.MaxOpenRequests = 1
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 1
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataLeader.AddTopic("test-topic", ErrNoError)
+	metadataLeader.AddTopic("test-topic-2", ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic-2", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataLeader)
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	findCoordinatorResponse := FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	}
+	broker.Returns(&findCoordinatorResponse)
+
+	producerIdResponse := &InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    1,
+		ProducerEpoch: 0,
+	}
+	broker.Returns(producerIdResponse)
+
+	ap, err := NewAsyncProducerFromClient(client)
+	producer := ap.(*asyncProducer)
+	require.NoError(t, err)
+	defer ap.Close()
+
+	broker.Returns(&AddPartitionsToTxnResponse{
+		Errors: map[string][]*PartitionError{
+			"test-topic-2": {
+				{
+					Partition: 0,
+					Err:       ErrNoError,
+				},
+			},
+		},
+	})
+
+	produceResponse := new(ProduceResponse)
+	produceResponse.Version = 3
+	produceResponse.AddTopicPartition("test-topic-2", 0, ErrNoError)
+	broker.Returns(produceResponse)
+
+	broker.Returns(&AddPartitionsToTxnResponse{
+		Errors: map[string][]*PartitionError{
+			"test-topic": {
+				{
+					Partition: 0,
+					Err:       ErrTopicAuthorizationFailed,
+				},
+			},
+		},
+	})
+
+	// now broker is closed due to error. will now reopen it
+	broker.Returns(metadataLeader)
+
+	endTxnResponse := &EndTxnResponse{
+		Err: ErrNoError,
+	}
+	broker.Returns(endTxnResponse)
+
+	require.Equal(t, ProducerTxnFlagReady, producer.txnmgr.status)
+
+	err = producer.BeginTxn()
+	require.NoError(t, err)
+	require.Equal(t, ProducerTxnFlagInTransaction, producer.txnmgr.status)
+
+	producer.Input() <- &ProducerMessage{Topic: "test-topic-2", Partition: 0, Key: nil, Value: StringEncoder(TestMessage)}
+	<-producer.Successes()
+
+	producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Key: nil, Value: StringEncoder(TestMessage)}
+
+	err = producer.CommitTxn()
+	require.Error(t, err)
+	require.NotEqual(t, producer.txnmgr.status&ProducerTxnFlagAbortableError, 0)
+
+	err = producer.AbortTxn()
+	require.NoError(t, err)
 }
 
 // This example shows how to use the producer while simultaneously

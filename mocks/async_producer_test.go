@@ -108,6 +108,82 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 	}
 }
 
+func TestProducerFailTxn(t *testing.T) {
+	config := sarama.NewConfig()
+	config.Producer.Transaction.ID = "test"
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = sarama.V0_11_0_0
+
+	trm := newTestReporterMock()
+	mp := NewAsyncProducer(trm, config)
+
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
+
+	_ = mp.Close()
+
+	if len(trm.errors) != 1 {
+		t.Error("must have fail with txn begin error")
+	}
+}
+
+func TestProducerWithTxn(t *testing.T) {
+	config := sarama.NewConfig()
+	config.Producer.Transaction.ID = "test"
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = sarama.V0_11_0_0
+
+	trm := newTestReporterMock()
+	mp := NewAsyncProducer(trm, config).
+		ExpectInputAndSucceed()
+
+	if !mp.IsTransactional() {
+		t.Error("producer must be transactional")
+	}
+
+	if err := mp.BeginTxn(); err != nil {
+		t.Error(err)
+	}
+
+	if mp.TxnStatus()&sarama.ProducerTxnFlagInTransaction == 0 {
+		t.Error("transaction must be started")
+	}
+
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
+
+	if err := mp.AddMessageToTxn(&sarama.ConsumerMessage{
+		Topic:     "original-topic",
+		Partition: 0,
+		Offset:    123,
+	}, "test-group", nil); err != nil {
+		t.Error(err)
+	}
+
+	if err := mp.AddOffsetsToTxn(map[string][]*sarama.PartitionOffsetMetadata{
+		"original-topic": {
+			{
+				Partition: 1,
+				Offset:    321,
+			},
+		},
+	}, "test-group"); err != nil {
+		t.Error(err)
+	}
+
+	if err := mp.CommitTxn(); err != nil {
+		t.Error(err)
+	}
+
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestProducerWithCheckerFunction(t *testing.T) {
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil).

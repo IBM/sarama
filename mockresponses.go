@@ -459,6 +459,7 @@ func (mr *MockFindCoordinatorResponse) SetError(coordinatorType CoordinatorType,
 func (mr *MockFindCoordinatorResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	req := reqBody.(*FindCoordinatorRequest)
 	res := &FindCoordinatorResponse{}
+	res.Version = req.Version
 	var v interface{}
 	switch req.CoordinatorType {
 	case CoordinatorGroup:

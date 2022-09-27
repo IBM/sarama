@@ -67,6 +67,27 @@ var ErrDeleteRecords = errors.New("kafka server: failed to delete records")
 // ErrCreateACLs is the type of error returned when ACL creation failed
 var ErrCreateACLs = errors.New("kafka server: failed to create one or more ACL rules")
 
+// ErrAddPartitionsToTxn is returned when AddPartitionsToTxn failed multiple times
+var ErrAddPartitionsToTxn = errors.New("transaction manager: failed to send partitions to transaction")
+
+// ErrTxnOffsetCommit is returned when TxnOffsetCommit failed multiple times
+var ErrTxnOffsetCommit = errors.New("transaction manager: failed to send offsets to transaction")
+
+// ErrTransactionNotReady when transaction status is invalid for the current action.
+var ErrTransactionNotReady = errors.New("transaction manager: transaction is not ready")
+
+// ErrNonTransactedProducer when calling BeginTxn, CommitTxn or AbortTxn on a non transactional producer.
+var ErrNonTransactedProducer = errors.New("transaction manager: you need to add TransactionalID to producer")
+
+// ErrTransitionNotAllowed when txnmgr state transiion is not valid.
+var ErrTransitionNotAllowed = errors.New("transaction manager: invalid transition attempted")
+
+// ErrCannotTransitionNilError when transition is attempted with an nil error.
+var ErrCannotTransitionNilError = errors.New("transaction manager: cannot transition with a nil error")
+
+// ErrTxnUnableToParseResponse when response is nil
+var ErrTxnUnableToParseResponse = errors.New("transaction manager: unable to parse response")
+
 // MultiErrorFormat specifies the formatter applied to format multierrors. The
 // default implementation is a consensed version of the hashicorp/go-multierror
 // default one
@@ -242,6 +263,8 @@ const (
 	ErrGroupSubscribedToTopic             KError = 86
 	ErrInvalidRecord                      KError = 87
 	ErrUnstableOffsetCommit               KError = 88
+	ErrThrottlingQuotaExceeded            KError = 89
+	ErrProducerFenced                     KError = 90
 )
 
 func (err KError) Error() string {

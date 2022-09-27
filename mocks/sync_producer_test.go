@@ -55,6 +55,104 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 	}
 }
 
+func TestSyncProducerFailTxn(t *testing.T) {
+	config := sarama.NewConfig()
+	config.Producer.Transaction.ID = "test"
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = sarama.V0_11_0_0
+
+	tfm := newTestReporterMock()
+
+	sp := NewSyncProducer(tfm, config)
+	defer func() {
+		if err := sp.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+
+	_, _, err := sp.SendMessage(msg)
+	if err == nil {
+		t.Errorf("must have failed with txn begin error")
+	}
+
+	if len(tfm.errors) != 1 {
+		t.Errorf("must have failed with txn begin error")
+	}
+}
+
+func TestSyncProducerUseTxn(t *testing.T) {
+	config := sarama.NewConfig()
+	config.Producer.Transaction.ID = "test"
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = sarama.V0_11_0_0
+
+	sp := NewSyncProducer(t, config)
+	defer func() {
+		if err := sp.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	if !sp.IsTransactional() {
+		t.Error("producer must be transactional")
+	}
+
+	sp.ExpectSendMessageAndSucceed()
+
+	msg := &sarama.ProducerMessage{Topic: "test", Value: sarama.StringEncoder("test")}
+
+	err := sp.BeginTxn()
+	if err != nil {
+		t.Errorf("txn can't be started, got %s", err)
+	}
+	if sp.TxnStatus()&sarama.ProducerTxnFlagInTransaction == 0 {
+		t.Error("transaction must be started")
+	}
+	_, offset, err := sp.SendMessage(msg)
+	if err != nil {
+		t.Errorf("The first message should have been produced successfully, but got %s", err)
+	}
+	if offset != 1 || offset != msg.Offset {
+		t.Errorf("The first message should have been assigned offset 1, but got %d", msg.Offset)
+	}
+
+	if err := sp.AddMessageToTxn(&sarama.ConsumerMessage{
+		Topic:     "original-topic",
+		Partition: 0,
+		Offset:    123,
+	}, "test-group", nil); err != nil {
+		t.Error(err)
+	}
+
+	if err := sp.AddOffsetsToTxn(map[string][]*sarama.PartitionOffsetMetadata{
+		"original-topic": {
+			{
+				Partition: 1,
+				Offset:    321,
+			},
+		},
+	}, "test-group"); err != nil {
+		t.Error(err)
+	}
+
+	err = sp.CommitTxn()
+	if err != nil {
+		t.Errorf("txn can't be committed, got %s", err)
+	}
+
+	if err := sp.Close(); err != nil {
+		t.Error(err)
+	}
+}
+
 func TestSyncProducerWithTooManyExpectations(t *testing.T) {
 	trm := newTestReporterMock()
 

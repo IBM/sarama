@@ -14,14 +14,17 @@ import (
 // function in each expectation so that the message is checked by this function and
 // an error is returned if the match fails.
 type AsyncProducer struct {
-	l            sync.Mutex
-	t            ErrorReporter
-	expectations []*producerExpectation
-	closed       chan struct{}
-	input        chan *sarama.ProducerMessage
-	successes    chan *sarama.ProducerMessage
-	errors       chan *sarama.ProducerError
-	lastOffset   int64
+	l               sync.Mutex
+	t               ErrorReporter
+	expectations    []*producerExpectation
+	closed          chan struct{}
+	input           chan *sarama.ProducerMessage
+	successes       chan *sarama.ProducerMessage
+	errors          chan *sarama.ProducerError
+	isTransactional bool
+	txnLock         sync.Mutex
+	txnStatus       sarama.ProducerTxnStatusFlag
+	lastOffset      int64
 	*TopicConfig
 }
 
@@ -34,13 +37,15 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 		config = sarama.NewConfig()
 	}
 	mp := &AsyncProducer{
-		t:            t,
-		closed:       make(chan struct{}),
-		expectations: make([]*producerExpectation, 0),
-		input:        make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
-		successes:    make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
-		errors:       make(chan *sarama.ProducerError, config.ChannelBufferSize),
-		TopicConfig:  NewTopicConfig(),
+		t:               t,
+		closed:          make(chan struct{}),
+		expectations:    make([]*producerExpectation, 0),
+		input:           make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
+		successes:       make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
+		errors:          make(chan *sarama.ProducerError, config.ChannelBufferSize),
+		isTransactional: config.Producer.Transaction.ID != "",
+		txnStatus:       sarama.ProducerTxnFlagReady,
+		TopicConfig:     NewTopicConfig(),
 	}
 
 	go func() {
@@ -53,6 +58,13 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 		partitioners := make(map[string]sarama.Partitioner, 1)
 
 		for msg := range mp.input {
+			mp.txnLock.Lock()
+			if mp.IsTransactional() && mp.txnStatus&sarama.ProducerTxnFlagInTransaction == 0 {
+				mp.t.Errorf("attempt to send message when transaction is not started or is in ending state.")
+				mp.errors <- &sarama.ProducerError{Err: errors.New("attempt to send message when transaction is not started or is in ending state"), Msg: msg}
+				continue
+			}
+			mp.txnLock.Unlock()
 			partitioner := partitioners[msg.Topic]
 			if partitioner == nil {
 				partitioner = config.Producer.Partitioner(msg.Topic)
@@ -140,6 +152,49 @@ func (mp *AsyncProducer) Successes() <-chan *sarama.ProducerMessage {
 // Errors corresponds with the Errors method of sarama's Producer implementation.
 func (mp *AsyncProducer) Errors() <-chan *sarama.ProducerError {
 	return mp.errors
+}
+
+func (mp *AsyncProducer) IsTransactional() bool {
+	return mp.isTransactional
+}
+
+func (mp *AsyncProducer) BeginTxn() error {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	mp.txnStatus = sarama.ProducerTxnFlagInTransaction
+	return nil
+}
+
+func (mp *AsyncProducer) CommitTxn() error {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	mp.txnStatus = sarama.ProducerTxnFlagReady
+	return nil
+}
+
+func (mp *AsyncProducer) AbortTxn() error {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	mp.txnStatus = sarama.ProducerTxnFlagReady
+	return nil
+}
+
+func (mp *AsyncProducer) TxnStatus() sarama.ProducerTxnStatusFlag {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	return mp.txnStatus
+}
+
+func (mp *AsyncProducer) AddOffsetsToTxn(offsets map[string][]*sarama.PartitionOffsetMetadata, groupId string) error {
+	return nil
+}
+
+func (mp *AsyncProducer) AddMessageToTxn(msg *sarama.ConsumerMessage, groupId string, metadata *string) error {
+	return nil
 }
 
 ////////////////////////////////////////////////

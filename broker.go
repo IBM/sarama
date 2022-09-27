@@ -274,6 +274,13 @@ func (b *Broker) Open(conf *Config) error {
 	return nil
 }
 
+func (b *Broker) ResponseSize() int {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	return len(b.responses)
+}
+
 // Connected returns true if the broker is connected and false otherwise. If the broker is not
 // connected but it had tried to connect, the error from that connection attempt is also returned.
 func (b *Broker) Connected() (bool, error) {
@@ -730,6 +737,7 @@ func (b *Broker) DeleteAcls(request *DeleteAclsRequest) (*DeleteAclsResponse, er
 // InitProducerID sends an init producer request and returns a response or error
 func (b *Broker) InitProducerID(request *InitProducerIDRequest) (*InitProducerIDResponse, error) {
 	response := new(InitProducerIDResponse)
+	response.Version = request.version()
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {
