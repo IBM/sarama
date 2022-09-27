@@ -180,11 +180,17 @@ var (
 	V2_7_2_0  = newKafkaVersion(2, 7, 2, 0)
 	V2_8_0_0  = newKafkaVersion(2, 8, 0, 0)
 	V2_8_1_0  = newKafkaVersion(2, 8, 1, 0)
+	V2_8_2_0  = newKafkaVersion(2, 8, 2, 0)
 	V3_0_0_0  = newKafkaVersion(3, 0, 0, 0)
 	V3_0_1_0  = newKafkaVersion(3, 0, 1, 0)
+	V3_0_2_0  = newKafkaVersion(3, 0, 2, 0)
 	V3_1_0_0  = newKafkaVersion(3, 1, 0, 0)
-	V3_1_0_1  = newKafkaVersion(3, 1, 0, 1)
+	V3_1_1_0  = newKafkaVersion(3, 1, 1, 0)
+	V3_1_2_0  = newKafkaVersion(3, 1, 2, 0)
 	V3_2_0_0  = newKafkaVersion(3, 2, 0, 0)
+	V3_2_1_0  = newKafkaVersion(3, 2, 1, 0)
+	V3_2_2_0  = newKafkaVersion(3, 2, 2, 0)
+	V3_2_3_0  = newKafkaVersion(3, 2, 3, 0)
 
 	SupportedVersions = []KafkaVersion{
 		V0_8_2_0,
@@ -227,14 +233,20 @@ var (
 		V2_7_1_0,
 		V2_8_0_0,
 		V2_8_1_0,
+		V2_8_2_0,
 		V3_0_0_0,
 		V3_0_1_0,
+		V3_0_2_0,
 		V3_1_0_0,
-		V3_1_0_1,
+		V3_1_1_0,
+		V3_1_2_0,
 		V3_2_0_0,
+		V3_2_1_0,
+		V3_2_2_0,
+		V3_2_3_0,
 	}
 	MinVersion     = V0_8_2_0
-	MaxVersion     = V3_2_0_0
+	MaxVersion     = V3_2_3_0
 	DefaultVersion = V1_0_0_0
 
 	// reduced set of versions to matrix test
@@ -251,10 +263,10 @@ var (
 		V2_5_1_0,
 		V2_6_2_0,
 		V2_7_1_0,
-		V2_8_1_0,
-		V3_0_1_0,
-		V3_1_0_1,
-		V3_2_0_0,
+		V2_8_2_0,
+		V3_0_2_0,
+		V3_1_2_0,
+		V3_2_3_0,
 	}
 )
 
