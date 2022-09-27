@@ -273,7 +273,16 @@ type Config struct {
 			}
 			Rebalance struct {
 				// Strategy for allocating topic partitions to members (default BalanceStrategyRange)
+				// Deprecated: Strategy exists for historical compatibility
+				// and should not be used. Please use GroupStrategies.
 				Strategy BalanceStrategy
+
+				// GroupStrategies is the priority-ordered list of client-side consumer group
+				// balancing strategies that will be offered to the coordinator. The first
+				// strategy that all group members support will be chosen by the leader.
+				// default: [BalanceStrategyRange]
+				GroupStrategies []BalanceStrategy
+
 				// The maximum allowed time for each worker to join the group once a rebalance has begun.
 				// This is basically a limit on the amount of time needed for all tasks to flush any pending
 				// data and commit offsets. If the timeout is exceeded, then the worker will be removed from
@@ -504,7 +513,7 @@ func NewConfig() *Config {
 
 	c.Consumer.Group.Session.Timeout = 10 * time.Second
 	c.Consumer.Group.Heartbeat.Interval = 3 * time.Second
-	c.Consumer.Group.Rebalance.Strategy = BalanceStrategyRange
+	c.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{BalanceStrategyRange}
 	c.Consumer.Group.Rebalance.Timeout = 60 * time.Second
 	c.Consumer.Group.Rebalance.Retry.Max = 4
 	c.Consumer.Group.Rebalance.Retry.Backoff = 2 * time.Second
@@ -745,6 +754,10 @@ func (c *Config) Validate() error {
 		Logger.Println("Deprecation warning: Consumer.Offsets.CommitInterval exists for historical compatibility" +
 			" and should not be used. Please use Consumer.Offsets.AutoCommit, the current value will be ignored")
 	}
+	if c.Consumer.Group.Rebalance.Strategy != nil {
+		Logger.Println("Deprecation warning: Consumer.Group.Rebalance.Strategy exists for historical compatibility" +
+			" and should not be used. Please use Consumer.Group.Rebalance.GroupStrategies")
+	}
 
 	// validate IsolationLevel
 	if c.Consumer.IsolationLevel == ReadCommitted && !c.Version.IsAtLeast(V0_11_0_0) {
@@ -759,8 +772,10 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.Group.Heartbeat.Interval must be >= 1ms")
 	case c.Consumer.Group.Heartbeat.Interval >= c.Consumer.Group.Session.Timeout:
 		return ConfigurationError("Consumer.Group.Heartbeat.Interval must be < Consumer.Group.Session.Timeout")
-	case c.Consumer.Group.Rebalance.Strategy == nil:
-		return ConfigurationError("Consumer.Group.Rebalance.Strategy must not be empty")
+	case c.Consumer.Group.Rebalance.Strategy == nil && len(c.Consumer.Group.Rebalance.GroupStrategies) == 0:
+		return ConfigurationError("Consumer.Group.Rebalance.GroupStrategies or Consumer.Group.Rebalance.Strategy must not be empty")
+	case c.Consumer.Group.Rebalance.Strategy != nil && len(c.Consumer.Group.Rebalance.GroupStrategies) != 0:
+		return ConfigurationError("Consumer.Group.Rebalance.GroupStrategies and Consumer.Group.Rebalance.Strategy cannot be set at the same time")
 	case c.Consumer.Group.Rebalance.Timeout <= time.Millisecond:
 		return ConfigurationError("Consumer.Group.Rebalance.Timeout must be >= 1ms")
 	case c.Consumer.Group.Rebalance.Retry.Max < 0:
@@ -768,6 +783,13 @@ func (c *Config) Validate() error {
 	case c.Consumer.Group.Rebalance.Retry.Backoff < 0:
 		return ConfigurationError("Consumer.Group.Rebalance.Retry.Backoff must be >= 0")
 	}
+
+	for _, strategy := range c.Consumer.Group.Rebalance.GroupStrategies {
+		if strategy == nil {
+			return ConfigurationError("elements in Consumer.Group.Rebalance.Strategies must not be empty")
+		}
+	}
+
 	if c.Consumer.Group.InstanceId != "" {
 		if !c.Version.IsAtLeast(V2_3_0_0) {
 			return ConfigurationError("Consumer.Group.InstanceId need Version >= 2.3")
