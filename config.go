@@ -508,7 +508,7 @@ func NewConfig() *Config {
 	c.Consumer.Group.Rebalance.Timeout = 60 * time.Second
 	c.Consumer.Group.Rebalance.Retry.Max = 4
 	c.Consumer.Group.Rebalance.Retry.Backoff = 2 * time.Second
-	c.Consumer.Group.ResetInvalidOffsets = false
+	c.Consumer.Group.ResetInvalidOffsets = true
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
