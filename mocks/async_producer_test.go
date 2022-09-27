@@ -247,3 +247,18 @@ func (brokePartitioner) Partition(msg *sarama.ProducerMessage, n int32) (int32, 
 }
 
 func (brokePartitioner) RequiresConsistency() bool { return false }
+
+func TestProducerWithInvalidConfiguration(t *testing.T) {
+	trm := newTestReporterMock()
+	config := NewTestConfig()
+	config.ClientID = "not a valid client ID"
+	mp := NewAsyncProducer(trm, config)
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
+	if len(trm.errors) != 1 {
+		t.Error("Expected to report a single error")
+	} else if !strings.Contains(trm.errors[0], "ClientID is invalid") {
+		t.Errorf("Unexpected error: %s", trm.errors[0])
+	}
+}

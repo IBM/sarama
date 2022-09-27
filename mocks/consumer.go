@@ -20,10 +20,14 @@ type Consumer struct {
 
 // NewConsumer returns a new mock Consumer instance. The t argument should
 // be the *testing.T instance of your test method. An error will be written to it if
-// an expectation is violated. The config argument can be set to nil.
+// an expectation is violated. The config argument can be set to nil; if it is
+// non-nil it is validated.
 func NewConsumer(t ErrorReporter, config *sarama.Config) *Consumer {
 	if config == nil {
 		config = sarama.NewConfig()
+	}
+	if err := config.Validate(); err != nil {
+		t.Errorf("Invalid mock configuration provided: %s", err.Error())
 	}
 
 	c := &Consumer{

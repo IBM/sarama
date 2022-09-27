@@ -352,3 +352,19 @@ func (f faultyEncoder) Encode() ([]byte, error) {
 func (f faultyEncoder) Length() int {
 	return len(f)
 }
+
+func TestSyncProducerInvalidConfiguration(t *testing.T) {
+	trm := newTestReporterMock()
+	config := NewTestConfig()
+	config.ClientID = "not a valid client ID"
+	mp := NewSyncProducer(trm, config)
+	if err := mp.Close(); err != nil {
+		t.Error(err)
+	}
+
+	if len(trm.errors) != 1 {
+		t.Error("Expected to report a single error")
+	} else if !strings.Contains(trm.errors[0], "ClientID is invalid") {
+		t.Errorf("Unexpected error: %s", trm.errors[0])
+	}
+}
