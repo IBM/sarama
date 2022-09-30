@@ -794,12 +794,6 @@ func (c *Config) Validate() error {
 		return ConfigurationError("ReadCommitted requires Version >= V0_11_0_0")
 	}
 
-	// backward compatibility on Rebalance Strategy
-	if c.Consumer.Group.Rebalance.Strategy != nil {
-		// avoid Consumer.Group.Rebalance.GroupStrategies and Consumer.Group.Rebalance.Strategy being set at the same time
-		c.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{}
-	}
-
 	// validate the Consumer Group values
 	switch {
 	case c.Consumer.Group.Session.Timeout <= 2*time.Millisecond:
