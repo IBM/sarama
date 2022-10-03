@@ -804,8 +804,6 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.Group.Heartbeat.Interval must be < Consumer.Group.Session.Timeout")
 	case c.Consumer.Group.Rebalance.Strategy == nil && len(c.Consumer.Group.Rebalance.GroupStrategies) == 0:
 		return ConfigurationError("Consumer.Group.Rebalance.GroupStrategies or Consumer.Group.Rebalance.Strategy must not be empty")
-	case c.Consumer.Group.Rebalance.Strategy != nil && len(c.Consumer.Group.Rebalance.GroupStrategies) != 0:
-		return ConfigurationError("Consumer.Group.Rebalance.GroupStrategies and Consumer.Group.Rebalance.Strategy cannot be set at the same time")
 	case c.Consumer.Group.Rebalance.Timeout <= time.Millisecond:
 		return ConfigurationError("Consumer.Group.Rebalance.Timeout must be >= 1ms")
 	case c.Consumer.Group.Rebalance.Retry.Max < 0:
