@@ -546,6 +546,14 @@ func TestGroupInstanceIdAndVersionValidation(t *testing.T) {
 	}
 }
 
+func TestConsumerGroupStrategyCompatibility(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Group.Rebalance.Strategy = BalanceStrategySticky
+	if err := config.Validate(); err != nil {
+		t.Error("Expected passing config validation, got ", err)
+	}
+}
+
 // This example shows how to integrate with an existing registry as well as publishing metrics
 // on the standard output
 func ExampleConfig_metrics() {
