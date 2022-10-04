@@ -128,6 +128,11 @@ const (
 )
 
 type client struct {
+	// updateMetaDataMs stores the time at which metadata was lasted updated.
+	// Note: this accessed atomically so must be the first word in the struct
+	// as per golang/go#41970
+	updateMetaDataMs int64
+
 	conf           *Config
 	closer, closed chan none // for shutting down background metadata updater
 
@@ -150,7 +155,6 @@ type client struct {
 
 	lock sync.RWMutex // protects access to the maps that hold cluster state.
 
-	updateMetaDataMs int64 // store update metadata time
 }
 
 // NewClient creates a new Client. It connects to one of the given broker addresses
