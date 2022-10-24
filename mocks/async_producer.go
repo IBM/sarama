@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"errors"
 	"sync"
 
 	"github.com/Shopify/sarama"
@@ -13,33 +14,41 @@ import (
 // function in each expectation so that the message is checked by this function and
 // an error is returned if the match fails.
 type AsyncProducer struct {
-	l            sync.Mutex
-	t            ErrorReporter
-	expectations []*producerExpectation
-	closed       chan struct{}
-	input        chan *sarama.ProducerMessage
-	successes    chan *sarama.ProducerMessage
-	errors       chan *sarama.ProducerError
-	lastOffset   int64
+	l               sync.Mutex
+	t               ErrorReporter
+	expectations    []*producerExpectation
+	closed          chan struct{}
+	input           chan *sarama.ProducerMessage
+	successes       chan *sarama.ProducerMessage
+	errors          chan *sarama.ProducerError
+	isTransactional bool
+	txnLock         sync.Mutex
+	txnStatus       sarama.ProducerTxnStatusFlag
+	lastOffset      int64
 	*TopicConfig
 }
 
 // NewAsyncProducer instantiates a new Producer mock. The t argument should
 // be the *testing.T instance of your test method. An error will be written to it if
-// an expectation is violated. The config argument is used to determine whether it
-// should ack successes on the Successes channel and to handle partitioning.
+// an expectation is violated. The config argument is validated and used to determine
+// whether it should ack successes on the Successes channel and handle partitioning.
 func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 	if config == nil {
 		config = sarama.NewConfig()
 	}
+	if err := config.Validate(); err != nil {
+		t.Errorf("Invalid mock configuration provided: %s", err.Error())
+	}
 	mp := &AsyncProducer{
-		t:            t,
-		closed:       make(chan struct{}),
-		expectations: make([]*producerExpectation, 0),
-		input:        make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
-		successes:    make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
-		errors:       make(chan *sarama.ProducerError, config.ChannelBufferSize),
-		TopicConfig:  NewTopicConfig(),
+		t:               t,
+		closed:          make(chan struct{}),
+		expectations:    make([]*producerExpectation, 0),
+		input:           make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
+		successes:       make(chan *sarama.ProducerMessage, config.ChannelBufferSize),
+		errors:          make(chan *sarama.ProducerError, config.ChannelBufferSize),
+		isTransactional: config.Producer.Transaction.ID != "",
+		txnStatus:       sarama.ProducerTxnFlagReady,
+		TopicConfig:     NewTopicConfig(),
 	}
 
 	go func() {
@@ -52,6 +61,13 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 		partitioners := make(map[string]sarama.Partitioner, 1)
 
 		for msg := range mp.input {
+			mp.txnLock.Lock()
+			if mp.IsTransactional() && mp.txnStatus&sarama.ProducerTxnFlagInTransaction == 0 {
+				mp.t.Errorf("attempt to send message when transaction is not started or is in ending state.")
+				mp.errors <- &sarama.ProducerError{Err: errors.New("attempt to send message when transaction is not started or is in ending state"), Msg: msg}
+				continue
+			}
+			mp.txnLock.Unlock()
 			partitioner := partitioners[msg.Topic]
 			if partitioner == nil {
 				partitioner = config.Producer.Partitioner(msg.Topic)
@@ -78,16 +94,14 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 							mp.errors <- &sarama.ProducerError{Err: err, Msg: msg}
 						}
 					}
-					if expectation.Result == errProduceSuccess {
+					if errors.Is(expectation.Result, errProduceSuccess) {
 						mp.lastOffset++
 						if config.Producer.Return.Successes {
 							msg.Offset = mp.lastOffset
 							mp.successes <- msg
 						}
-					} else {
-						if config.Producer.Return.Errors {
-							mp.errors <- &sarama.ProducerError{Err: expectation.Result, Msg: msg}
-						}
+					} else if config.Producer.Return.Errors {
+						mp.errors <- &sarama.ProducerError{Err: expectation.Result, Msg: msg}
 					}
 				}
 			}
@@ -143,6 +157,49 @@ func (mp *AsyncProducer) Errors() <-chan *sarama.ProducerError {
 	return mp.errors
 }
 
+func (mp *AsyncProducer) IsTransactional() bool {
+	return mp.isTransactional
+}
+
+func (mp *AsyncProducer) BeginTxn() error {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	mp.txnStatus = sarama.ProducerTxnFlagInTransaction
+	return nil
+}
+
+func (mp *AsyncProducer) CommitTxn() error {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	mp.txnStatus = sarama.ProducerTxnFlagReady
+	return nil
+}
+
+func (mp *AsyncProducer) AbortTxn() error {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	mp.txnStatus = sarama.ProducerTxnFlagReady
+	return nil
+}
+
+func (mp *AsyncProducer) TxnStatus() sarama.ProducerTxnStatusFlag {
+	mp.txnLock.Lock()
+	defer mp.txnLock.Unlock()
+
+	return mp.txnStatus
+}
+
+func (mp *AsyncProducer) AddOffsetsToTxn(offsets map[string][]*sarama.PartitionOffsetMetadata, groupId string) error {
+	return nil
+}
+
+func (mp *AsyncProducer) AddMessageToTxn(msg *sarama.ConsumerMessage, groupId string, metadata *string) error {
+	return nil
+}
+
 ////////////////////////////////////////////////
 // Setting expectations
 ////////////////////////////////////////////////
@@ -152,10 +209,12 @@ func (mp *AsyncProducer) Errors() <-chan *sarama.ProducerError {
 // check the message. If an error is returned it will be made available on the Errors channel
 // otherwise the mock will handle the message as if it produced successfully, i.e. it will make it
 // available on the Successes channel if the Producer.Return.Successes setting is set to true.
-func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndSucceed(cf MessageChecker) {
+func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndSucceed(cf MessageChecker) *AsyncProducer {
 	mp.l.Lock()
 	defer mp.l.Unlock()
 	mp.expectations = append(mp.expectations, &producerExpectation{Result: errProduceSuccess, CheckFunction: cf})
+
+	return mp
 }
 
 // ExpectInputWithMessageCheckerFunctionAndFail sets an expectation on the mock producer that a
@@ -163,10 +222,12 @@ func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndSucceed(cf Mess
 // function to check the message. If an error is returned it will be made available on the Errors
 // channel otherwise the mock will handle the message as if it failed to produce successfully. This
 // means it will make a ProducerError available on the Errors channel.
-func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndFail(cf MessageChecker, err error) {
+func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndFail(cf MessageChecker, err error) *AsyncProducer {
 	mp.l.Lock()
 	defer mp.l.Unlock()
 	mp.expectations = append(mp.expectations, &producerExpectation{Result: err, CheckFunction: cf})
+
+	return mp
 }
 
 // ExpectInputWithCheckerFunctionAndSucceed sets an expectation on the mock producer that a message
@@ -174,8 +235,10 @@ func (mp *AsyncProducer) ExpectInputWithMessageCheckerFunctionAndFail(cf Message
 // the message value. If an error is returned it will be made available on the Errors channel
 // otherwise the mock will handle the message as if it produced successfully, i.e. it will make
 // it available on the Successes channel if the Producer.Return.Successes setting is set to true.
-func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndSucceed(cf ValueChecker) {
+func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndSucceed(cf ValueChecker) *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndSucceed(messageValueChecker(cf))
+
+	return mp
 }
 
 // ExpectInputWithCheckerFunctionAndFail sets an expectation on the mock producer that a message
@@ -183,21 +246,27 @@ func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndSucceed(cf ValueChecke
 // check the message value. If an error is returned it will be made available on the Errors channel
 // otherwise the mock will handle the message as if it failed to produce successfully. This means
 // it will make a ProducerError available on the Errors channel.
-func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndFail(cf ValueChecker, err error) {
+func (mp *AsyncProducer) ExpectInputWithCheckerFunctionAndFail(cf ValueChecker, err error) *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndFail(messageValueChecker(cf), err)
+
+	return mp
 }
 
 // ExpectInputAndSucceed sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it is produced successfully,
 // i.e. it will make it available on the Successes channel if the Producer.Return.Successes setting
 // is set to true.
-func (mp *AsyncProducer) ExpectInputAndSucceed() {
+func (mp *AsyncProducer) ExpectInputAndSucceed() *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndSucceed(nil)
+
+	return mp
 }
 
 // ExpectInputAndFail sets an expectation on the mock producer that a message will be provided
 // on the input channel. The mock producer will handle the message as if it failed to produce
 // successfully. This means it will make a ProducerError available on the Errors channel.
-func (mp *AsyncProducer) ExpectInputAndFail(err error) {
+func (mp *AsyncProducer) ExpectInputAndFail(err error) *AsyncProducer {
 	mp.ExpectInputWithMessageCheckerFunctionAndFail(nil, err)
+
+	return mp
 }

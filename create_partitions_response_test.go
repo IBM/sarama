@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -55,6 +56,10 @@ func TestTopicPartitionError(t *testing.T) {
 	// Assert that TopicPartitionError satisfies error interface
 	var err error = &TopicPartitionError{
 		Err: ErrTopicAuthorizationFailed,
+	}
+
+	if !errors.Is(err, ErrTopicAuthorizationFailed) {
+		t.Errorf("unexpected errors.Is")
 	}
 
 	got := err.Error()

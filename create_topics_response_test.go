@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"testing"
 	"time"
 )
@@ -55,6 +56,10 @@ func TestTopicError(t *testing.T) {
 	// Assert that TopicError satisfies error interface
 	var err error = &TopicError{
 		Err: ErrTopicAuthorizationFailed,
+	}
+
+	if !errors.Is(err, ErrTopicAuthorizationFailed) {
+		t.Errorf("unexpected errors.Is")
 	}
 
 	got := err.Error()

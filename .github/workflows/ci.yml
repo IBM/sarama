@@ -1,43 +1,49 @@
 ---
 name: CI
-
 on: [push, pull_request]
-
 jobs:
-  test:
-    name: Go ${{ matrix.go-version }} with Kafka ${{ matrix.kafka-version }} on Ubuntu
+  lint:
+    name: Linting with Go ${{ matrix.go-version }}
     runs-on: ubuntu-latest
-    # We want to run on external PRs, but not on our own internal PRs as they'll be run
-    # by the push to the branch.
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.16.x, 1.17.x]
-        kafka-version: [2.7.1, 2.8.1, 3.0.0]
-        platform: [ubuntu-latest]
-
+        go-version: [1.18.x, 1.19.x]
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: golangci-lint
+      env:
+        GOFLAGS: -tags=functional
+      uses: golangci/golangci-lint-action@v3
+      with:
+        version: v1.48.0
+  test:
+    name: Unit Testing with Go ${{ matrix.go-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.17.x, 1.18.x, 1.19.x]
     env:
       DEBUG: true
       GOFLAGS: -trimpath
-      KAFKA_VERSION: ${{ matrix.kafka-version }}
-
     steps:
-    - uses: actions/checkout@v2
-
+    - uses: actions/checkout@v3
     - name: Setup Go
-      uses: actions/setup-go@v2
+      uses: actions/setup-go@v3
       with:
         go-version: ${{ matrix.go-version }}
-
     - name: Get Go environment
       id: go-env
       run: |
         echo "::set-output name=cache::$(go env GOCACHE)"
         echo "::set-output name=modcache::$(go env GOMODCACHE)"
-
     - name: Set up cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ${{ steps.go-env.outputs.cache }}
@@ -45,14 +51,5 @@ jobs:
         key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-
-
-    - name: Install dependencies
-      run: |
-        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.42.1
-        export REPOSITORY_ROOT=${GITHUB_WORKSPACE}
-
-    - name: Run test suite
-      run: make test_functional
-
-    - name: Run linter
-      run: make lint
+    - name: Test (Unit)
+      run: make test

@@ -5,3 +5,5 @@ This example shows you how to use the Sarama consumer group consumer. The exampl
 ```bash
 $ go run main.go -brokers="127.0.0.1:9092" -topics="sarama" -group="example"
 ```
+
+You can also toggle (pause/resume) the consumption by sending SIGUSR1

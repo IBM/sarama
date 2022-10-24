@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -89,7 +90,7 @@ func TestNewOffsetManager(t *testing.T) {
 	safeClose(t, testClient)
 
 	_, err = NewOffsetManagerFromClient("group", testClient)
-	if err != ErrClosedClient {
+	if !errors.Is(err, ErrClosedClient) {
 		t.Errorf("Error expected for closed client; actual value: %v", err)
 	}
 }
@@ -119,6 +120,7 @@ var offsetsautocommitTestTable = []struct {
 func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			config := NewTestConfig()
 			if tt.set {
@@ -551,6 +553,7 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 
 	// Response to refresh coordinator request
 	newCoordinator := NewMockBroker(t, 3)
+	defer newCoordinator.Close()
 	broker.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   newCoordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",

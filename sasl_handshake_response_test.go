@@ -1,6 +1,9 @@
 package sarama
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 var saslHandshakeResponse = []byte{
 	0x00, 0x00,
@@ -11,7 +14,7 @@ var saslHandshakeResponse = []byte{
 func TestSaslHandshakeResponse(t *testing.T) {
 	response := new(SaslHandshakeResponse)
 	testVersionDecodable(t, "no error", response, saslHandshakeResponse, 0)
-	if response.Err != ErrNoError {
+	if !errors.Is(response.Err, ErrNoError) {
 		t.Error("Decoding error failed: no error expected but found", response.Err)
 	}
 	if response.EnabledMechanisms[0] != "foo" {

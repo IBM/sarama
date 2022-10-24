@@ -4,6 +4,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestClusterAdmin(t *testing.T) {
@@ -45,7 +46,7 @@ func TestClusterAdminInvalidController(t *testing.T) {
 		t.Fatal(errors.New("controller not set still cluster admin was created"))
 	}
 
-	if err != ErrControllerNotAvailable {
+	if !errors.Is(err, ErrControllerNotAvailable) {
 		t.Fatal(err)
 	}
 }
@@ -160,7 +161,7 @@ func TestClusterAdminListTopics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(entries) <= 0 {
+	if len(entries) == 0 {
 		t.Fatal(errors.New("no resource present"))
 	}
 
@@ -235,7 +236,7 @@ func TestClusterAdminDeleteEmptyTopic(t *testing.T) {
 	}
 
 	err = admin.DeleteTopic("")
-	if err != ErrInvalidTopic {
+	if !errors.Is(err, ErrInvalidTopic) {
 		t.Fatal(err)
 	}
 
@@ -293,7 +294,7 @@ func TestClusterAdminCreatePartitionsWithDiffVersion(t *testing.T) {
 	}
 
 	err = admin.CreatePartitions("my_topic", 3, nil, false)
-	if err != ErrUnsupportedVersion {
+	if !errors.Is(err, ErrUnsupportedVersion) {
 		t.Fatal(err)
 	}
 
@@ -446,10 +447,10 @@ func TestClusterAdminListPartitionReassignments(t *testing.T) {
 	partitionStatus, ok := response["my_topic"]
 	if !ok {
 		t.Fatalf("topic missing in response")
-	} else {
-		if len(partitionStatus) != 2 {
-			t.Fatalf("partition missing in response")
-		}
+	}
+
+	if len(partitionStatus) != 2 {
+		t.Fatalf("partition missing in response")
 	}
 
 	err = admin.Close()
@@ -593,7 +594,7 @@ func TestClusterAdminDeleteRecordsWithInCorrectBroker(t *testing.T) {
 	}
 }
 
-func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
+func TestClusterAdminDeleteRecordsWithUnsupportedVersion(t *testing.T) {
 	topicName := "my_topic"
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -621,19 +622,65 @@ func TestClusterAdminDeleteRecordsWithDiffVersion(t *testing.T) {
 	partitionOffset[3] = 1000
 
 	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err == nil {
+		t.Fatal("expected an ErrDeleteRecords")
+	}
+
 	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
 		t.Fatal(err)
 	}
-	deleteRecordsError, ok := err.(ErrDeleteRecords)
 
-	if !ok {
+	if !errors.Is(err, ErrDeleteRecords) {
 		t.Fatal(err)
 	}
 
-	for _, err := range *deleteRecordsError.Errors {
-		if err != ErrUnsupportedVersion {
-			t.Fatal(err)
-		}
+	if !errors.Is(err, ErrUnsupportedVersion) {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminDeleteRecordsWithLeaderNotAvailable(t *testing.T) {
+	topicName := "my_topic"
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetLeader("my_topic", 1, -1).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	partitionOffset := make(map[int32]int64)
+	partitionOffset[1] = 1000
+
+	err = admin.DeleteRecords(topicName, partitionOffset)
+	if err == nil {
+		t.Fatal("expected an ErrDeleteRecords")
+	}
+
+	if !strings.HasPrefix(err.Error(), "kafka server: failed to delete records") {
+		t.Fatal(err)
+	}
+
+	if !errors.Is(err, ErrDeleteRecords) {
+		t.Fatal(err)
+	}
+
+	if !errors.Is(err, ErrLeaderNotAvailable) {
+		t.Fatal(err)
 	}
 
 	err = admin.Close()
@@ -664,47 +711,49 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		{V2_0_0_0, 2, true},
 	}
 	for _, tt := range tests {
-		config := NewTestConfig()
-		config.Version = tt.saramaVersion
-		admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer func() {
-			_ = admin.Close()
-		}()
-
-		resource := ConfigResource{
-			Name:        "r1",
-			Type:        TopicResource,
-			ConfigNames: []string{"my_topic"},
-		}
-
-		entries, err := admin.DescribeConfig(resource)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		history := seedBroker.History()
-		describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
-		if !ok {
-			t.Fatal("failed to find DescribeConfigsRequest in mockBroker history")
-		}
-
-		if describeReq.Version != tt.requestVersion {
-			t.Fatalf(
-				"requestVersion %v did not match expected %v",
-				describeReq.Version, tt.requestVersion)
-		}
-
-		if len(entries) <= 0 {
-			t.Fatal(errors.New("no resource present"))
-		}
-		if tt.includeSynonyms {
-			if len(entries[0].Synonyms) == 0 {
-				t.Fatal("expected synonyms to have been included")
+		t.Run(tt.saramaVersion.String(), func(t *testing.T) {
+			config := NewTestConfig()
+			config.Version = tt.saramaVersion
+			admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+			if err != nil {
+				t.Fatal(err)
 			}
-		}
+			defer func() {
+				_ = admin.Close()
+			}()
+
+			resource := ConfigResource{
+				Name:        "r1",
+				Type:        TopicResource,
+				ConfigNames: []string{"my_topic"},
+			}
+
+			entries, err := admin.DescribeConfig(resource)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			history := seedBroker.History()
+			describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
+			if !ok {
+				t.Fatal("failed to find DescribeConfigsRequest in mockBroker history")
+			}
+
+			if describeReq.Version != tt.requestVersion {
+				t.Fatalf(
+					"requestVersion %v did not match expected %v",
+					describeReq.Version, tt.requestVersion)
+			}
+
+			if len(entries) == 0 {
+				t.Fatal(errors.New("no resource present"))
+			}
+			if tt.includeSynonyms {
+				if len(entries[0].Synonyms) == 0 {
+					t.Fatal("expected synonyms to have been included")
+				}
+			}
+		})
 	}
 }
 
@@ -782,7 +831,7 @@ func TestClusterAdminDescribeBrokerConfig(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if len(entries) <= 0 {
+		if len(entries) == 0 {
 			t.Fatal(errors.New("no resource present"))
 		}
 	}
@@ -911,6 +960,148 @@ func TestClusterAdminAlterBrokerConfig(t *testing.T) {
 	}
 }
 
+func TestClusterAdminIncrementalAlterConfig(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"IncrementalAlterConfigsRequest": NewMockIncrementalAlterConfigsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var value string
+	entries := make(map[string]IncrementalAlterConfigsEntry)
+	value = "60000"
+	entries["retention.ms"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationSet,
+		Value:     &value,
+	}
+	value = "1073741824"
+	entries["segment.bytes"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationDelete,
+		Value:     &value,
+	}
+	err = admin.IncrementalAlterConfig(TopicResource, "my_topic", entries, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminIncrementalAlterConfigWithErrorCode(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"IncrementalAlterConfigsRequest": NewMockIncrementalAlterConfigsResponseWithErrorCode(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = admin.Close()
+	}()
+
+	var value string
+	entries := make(map[string]IncrementalAlterConfigsEntry)
+	value = "60000"
+	entries["retention.ms"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationSet,
+		Value:     &value,
+	}
+	value = "1073741824"
+	entries["segment.bytes"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationDelete,
+		Value:     &value,
+	}
+	err = admin.IncrementalAlterConfig(TopicResource, "my_topic", entries, false)
+	if err == nil {
+		t.Fatal(errors.New("ErrorCode present but no Error returned"))
+	}
+}
+
+func TestClusterAdminIncrementalAlterBrokerConfig(t *testing.T) {
+	controllerBroker := NewMockBroker(t, 1)
+	defer controllerBroker.Close()
+	configBroker := NewMockBroker(t, 2)
+	defer configBroker.Close()
+
+	controllerBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+	})
+	configBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(controllerBroker.BrokerID()).
+			SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()).
+			SetBroker(configBroker.Addr(), configBroker.BrokerID()),
+		"IncrementalAlterConfigsRequest": NewMockIncrementalAlterConfigsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin(
+		[]string{
+			controllerBroker.Addr(),
+			configBroker.Addr(),
+		}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var value string
+	entries := make(map[string]IncrementalAlterConfigsEntry)
+	value = "3"
+	entries["min.insync.replicas"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationSet,
+		Value:     &value,
+	}
+	value = "2"
+	entries["log.cleaner.threads"] = IncrementalAlterConfigsEntry{
+		Operation: IncrementalAlterConfigsOperationDelete,
+		Value:     &value,
+	}
+
+	for _, resourceType := range []ConfigResourceType{BrokerResource, BrokerLoggerResource} {
+		resource := ConfigResource{Name: "2", Type: resourceType}
+		err = admin.IncrementalAlterConfig(
+			resource.Type,
+			resource.Name,
+			entries,
+			false)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminCreateAcl(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -933,6 +1124,82 @@ func TestClusterAdminCreateAcl(t *testing.T) {
 	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
 
 	err = admin.CreateACL(r, a)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminCreateAclErrorHandling(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"CreateAclsRequest": NewMockCreateAclsResponseWithError(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
+	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
+
+	err = admin.CreateACL(r, a)
+	if err == nil {
+		t.Fatal(errors.New("error should have been thrown"))
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestClusterAdminCreateAcls(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"CreateAclsRequest": NewMockCreateAclsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rACLs := []*ResourceAcls{
+		{
+			Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"},
+			Acls: []*Acl{
+				{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
+			},
+		},
+		{
+			Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "your_topic"},
+			Acls: []*Acl{
+				{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
+			},
+		},
+	}
+
+	err = admin.CreateACLs(rACLs)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -980,7 +1247,7 @@ func TestClusterAdminListAcls(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(rAcls) <= 0 {
+	if len(rAcls) == 0 {
 		t.Fatal("no acls present")
 	}
 
@@ -1323,6 +1590,7 @@ func TestDeleteConsumerGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer admin.Close()
 
 	err = admin.DeleteConsumerGroup(group)
 	if err != nil {
@@ -1362,12 +1630,13 @@ func TestDeleteOffset(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DeleteConsumerGroupOffset failed with error %v", err)
 	}
+	defer admin.Close()
 
 	// Test Error
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNotCoordinatorForConsumer, topic, partition, ErrNoError)
 	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
-	if err != ErrNotCoordinatorForConsumer {
+	if !errors.Is(err, ErrNotCoordinatorForConsumer) {
 		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrNotCoordinatorForConsumer)
 	}
 
@@ -1375,7 +1644,7 @@ func TestDeleteOffset(t *testing.T) {
 	handlerMap["DeleteOffsetsRequest"] = NewMockDeleteOffsetRequest(t).SetDeletedOffset(ErrNoError, topic, partition, ErrGroupSubscribedToTopic)
 	seedBroker.SetHandlerByMap(handlerMap)
 	err = admin.DeleteConsumerGroupOffset(group, topic, partition)
-	if err != ErrGroupSubscribedToTopic {
+	if !errors.Is(err, ErrGroupSubscribedToTopic) {
 		t.Fatalf("DeleteConsumerGroupOffset should have failed with error %v", ErrGroupSubscribedToTopic)
 	}
 }
@@ -1402,6 +1671,7 @@ func TestRefreshMetaDataWithDifferentController(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer client.Close()
 
 	ca := clusterAdmin{client: client, conf: config}
 
@@ -1461,7 +1731,7 @@ func TestDescribeLogDirs(t *testing.T) {
 		t.Fatalf("Expected log dirs for broker %v to be returned, but it did not, got %v", seedBroker.BrokerID(), len(logDirs))
 	}
 	logDirsBroker := logDirs[0]
-	if logDirsBroker.ErrorCode != ErrNoError {
+	if !errors.Is(logDirsBroker.ErrorCode, ErrNoError) {
 		t.Fatalf("Expected no error for broker %v, but it was %v", seedBroker.BrokerID(), logDirsBroker.ErrorCode)
 	}
 	if logDirsBroker.Path != "/tmp/logs" {
@@ -1473,5 +1743,50 @@ func TestDescribeLogDirs(t *testing.T) {
 	err = admin.Close()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDescribeLogDirsUnknownBroker(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DescribeLogDirsRequest": NewMockDescribeLogDirsResponse(t).
+			SetLogDirs("/tmp/logs", map[string]int{"topic1": 2, "topic2": 2}),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type result struct {
+		metadata map[int32][]DescribeLogDirsResponseDirMetadata
+		err      error
+	}
+
+	res := make(chan result)
+
+	go func() {
+		metadata, err := admin.DescribeLogDirs([]int32{seedBroker.BrokerID() + 1})
+		res <- result{metadata, err}
+	}()
+
+	select {
+	case <-time.After(time.Second):
+		t.Fatalf("DescribeLogDirs timed out")
+	case returned := <-res:
+		if len(returned.metadata) != 0 {
+			t.Fatalf("Expected no results, got %v", len(returned.metadata))
+		}
+		if returned.err != nil {
+			t.Fatalf("Expected no error, got %v", returned.err)
+		}
 	}
 }

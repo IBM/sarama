@@ -173,7 +173,10 @@ func TestTLS(t *testing.T) {
 			},
 		},
 	} {
-		t.Run(tc.name, func(t *testing.T) { doListenerTLSTest(t, tc.Succeed, tc.Server, tc.Client) })
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			doListenerTLSTest(t, tc.Succeed, tc.Server, tc.Client)
+		})
 	}
 }
 

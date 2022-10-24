@@ -1,6 +1,9 @@
 package sarama
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 var (
 	emptyMetadataResponseV0 = []byte{
@@ -158,7 +161,7 @@ func TestMetadataResponseWithTopicsV0(t *testing.T) {
 		t.Fatal("Decoding produced", len(response.Topics), "topics where there were two!")
 	}
 
-	if response.Topics[0].Err != ErrNoError {
+	if !errors.Is(response.Topics[0].Err, ErrNoError) {
 		t.Error("Decoding produced invalid topic 0 error.")
 	}
 
@@ -170,7 +173,7 @@ func TestMetadataResponseWithTopicsV0(t *testing.T) {
 		t.Fatal("Decoding produced invalid partition count for topic 0.")
 	}
 
-	if response.Topics[0].Partitions[0].Err != ErrInvalidMessageSize {
+	if !errors.Is(response.Topics[0].Partitions[0].Err, ErrInvalidMessageSize) {
 		t.Error("Decoding produced invalid topic 0 partition 0 error.")
 	}
 
@@ -195,7 +198,7 @@ func TestMetadataResponseWithTopicsV0(t *testing.T) {
 		t.Error("Decoding produced invalid topic 0 partition 0 isr length.")
 	}
 
-	if response.Topics[1].Err != ErrNoError {
+	if !errors.Is(response.Topics[1].Err, ErrNoError) {
 		t.Error("Decoding produced invalid topic 1 error.")
 	}
 

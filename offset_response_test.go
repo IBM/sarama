@@ -1,6 +1,9 @@
 package sarama
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 var (
 	emptyOffsetResponse = []byte{
@@ -70,7 +73,7 @@ func TestNormalOffsetResponse(t *testing.T) {
 		t.Fatal("Decoding produced", len(response.Blocks["z"]), "partitions for topic 'z' where there was one.")
 	}
 
-	if response.Blocks["z"][2].Err != ErrNoError {
+	if !errors.Is(response.Blocks["z"][2].Err, ErrNoError) {
 		t.Fatal("Decoding produced invalid error for topic z partition 2.")
 	}
 
@@ -100,7 +103,7 @@ func TestNormalOffsetResponseV1(t *testing.T) {
 		t.Fatal("Decoding produced", len(response.Blocks["z"]), "partitions for topic 'z' where there was one.")
 	}
 
-	if response.Blocks["z"][2].Err != ErrNoError {
+	if !errors.Is(response.Blocks["z"][2].Err, ErrNoError) {
 		t.Fatal("Decoding produced invalid error for topic z partition 2.")
 	}
 

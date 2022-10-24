@@ -1,6 +1,9 @@
 package sarama
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 var (
 	consumerMetadataResponseError = []byte{
@@ -23,11 +26,11 @@ func TestConsumerMetadataResponseError(t *testing.T) {
 	testEncodable(t, "", response, consumerMetadataResponseError)
 
 	decodedResp := &ConsumerMetadataResponse{}
-	if err := versionedDecode(consumerMetadataResponseError, decodedResp, 0); err != nil {
+	if err := versionedDecode(consumerMetadataResponseError, decodedResp, 0, nil); err != nil {
 		t.Error("could not decode: ", err)
 	}
 
-	if decodedResp.Err != ErrOffsetsLoadInProgress {
+	if !errors.Is(decodedResp.Err, ErrOffsetsLoadInProgress) {
 		t.Errorf("got %s, want %s", decodedResp.Err, ErrOffsetsLoadInProgress)
 	}
 }

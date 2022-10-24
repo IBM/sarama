@@ -1,7 +1,9 @@
 package sarama
 
 import (
+	"errors"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rcrowley/go-metrics"
@@ -20,7 +22,9 @@ func TestDefaultConfigValidates(t *testing.T) {
 func TestInvalidClientIDConfigValidates(t *testing.T) {
 	config := NewTestConfig()
 	config.ClientID = "foo:bar"
-	if err := config.Validate(); string(err.(ConfigurationError)) != "ClientID is invalid" {
+	err := config.Validate()
+	var target ConfigurationError
+	if !errors.As(err, &target) || string(target) != "ClientID is invalid" {
 		t.Error("Expected invalid ClientID, got ", err)
 	}
 }
@@ -28,7 +32,9 @@ func TestInvalidClientIDConfigValidates(t *testing.T) {
 func TestEmptyClientIDConfigValidates(t *testing.T) {
 	config := NewTestConfig()
 	config.ClientID = ""
-	if err := config.Validate(); string(err.(ConfigurationError)) != "ClientID is invalid" {
+	err := config.Validate()
+	var target ConfigurationError
+	if !errors.As(err, &target) || string(target) != "ClientID is invalid" {
 		t.Error("Expected invalid ClientID, got ", err)
 	}
 }
@@ -206,7 +212,9 @@ func TestNetConfigValidates(t *testing.T) {
 	for i, test := range tests {
 		c := NewTestConfig()
 		test.cfg(c)
-		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+		err := c.Validate()
+		var target ConfigurationError
+		if !errors.As(err, &target) || string(target) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
 		}
 	}
@@ -244,7 +252,9 @@ func TestMetadataConfigValidates(t *testing.T) {
 	for i, test := range tests {
 		c := NewTestConfig()
 		test.cfg(c)
-		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+		err := c.Validate()
+		var target ConfigurationError
+		if !errors.As(err, &target) || string(target) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
 		}
 	}
@@ -268,7 +278,9 @@ func TestAdminConfigValidates(t *testing.T) {
 	for i, test := range tests {
 		c := NewTestConfig()
 		test.cfg(c)
-		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+		err := c.Validate()
+		var target ConfigurationError
+		if !errors.As(err, &target) || string(target) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
 		}
 	}
@@ -397,7 +409,9 @@ func TestProducerConfigValidates(t *testing.T) {
 	for i, test := range tests {
 		c := NewTestConfig()
 		test.cfg(c)
-		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+		err := c.Validate()
+		var target ConfigurationError
+		if !errors.As(err, &target) || string(target) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
 		}
 	}
@@ -430,7 +444,9 @@ func TestConsumerConfigValidates(t *testing.T) {
 	for i, test := range tests {
 		c := NewTestConfig()
 		test.cfg(c)
-		if err := c.Validate(); string(err.(ConfigurationError)) != test.err {
+		err := c.Validate()
+		var target ConfigurationError
+		if !errors.As(err, &target) || string(target) != test.err {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
 		}
 	}
@@ -439,7 +455,9 @@ func TestConsumerConfigValidates(t *testing.T) {
 func TestLZ4ConfigValidation(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Compression = CompressionLZ4
-	if err := config.Validate(); string(err.(ConfigurationError)) != "lz4 compression requires Version >= V0_10_0_0" {
+	err := config.Validate()
+	var target ConfigurationError
+	if !errors.As(err, &target) || string(target) != "lz4 compression requires Version >= V0_10_0_0" {
 		t.Error("Expected invalid lz4/kafka version error, got ", err)
 	}
 	config.Version = V0_10_0_0
@@ -451,12 +469,66 @@ func TestLZ4ConfigValidation(t *testing.T) {
 func TestZstdConfigValidation(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Compression = CompressionZSTD
-	if err := config.Validate(); string(err.(ConfigurationError)) != "zstd compression requires Version >= V2_1_0_0" {
+	err := config.Validate()
+	var target ConfigurationError
+	if !errors.As(err, &target) || string(target) != "zstd compression requires Version >= V2_1_0_0" {
 		t.Error("Expected invalid zstd/kafka version error, got ", err)
 	}
 	config.Version = V2_1_0_0
 	if err := config.Validate(); err != nil {
 		t.Error("Expected zstd to work, got ", err)
+	}
+}
+
+func TestValidGroupInstanceId(t *testing.T) {
+	tests := []struct {
+		grouptInstanceId string
+		shouldHaveErr    bool
+	}{
+		{"groupInstanceId1", false},
+		{"", true},
+		{".", true},
+		{"..", true},
+		{strings.Repeat("a", 250), true},
+		{"group_InstanceId.1", false},
+		{"group-InstanceId1", false},
+		{"group#InstanceId1", true},
+	}
+	for _, testcase := range tests {
+		err := validateGroupInstanceId(testcase.grouptInstanceId)
+		if !testcase.shouldHaveErr {
+			if err != nil {
+				t.Errorf("Expected validGroupInstanceId %s to pass, got error %v", testcase.grouptInstanceId, err)
+			}
+		} else {
+			if err == nil {
+				t.Errorf("Expected validGroupInstanceId %s to be error, got nil", testcase.grouptInstanceId)
+			}
+			var target ConfigurationError
+			if !errors.As(err, &target) {
+				t.Errorf("Excepted err to be ConfigurationError, got %v", err)
+			}
+		}
+	}
+}
+
+func TestGroupInstanceIdAndVersionValidation(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Group.InstanceId = "groupInstanceId1"
+	if err := config.Validate(); !strings.Contains(err.Error(), "Consumer.Group.InstanceId need Version >= 2.3") {
+		t.Error("Expected invalid group instance error, got ", err)
+	}
+	config.Version = V2_3_0_0
+	if err := config.Validate(); err != nil {
+		t.Error("Expected group instance to work, got ", err)
+	}
+}
+
+func TestConsumerGroupStrategyCompatibility(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Group.Rebalance.Strategy = BalanceStrategySticky
+	if err := config.Validate(); err != nil {
+		t.Error("Expected passing config validation, got ", err)
 	}
 }
 

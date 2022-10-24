@@ -20,10 +20,14 @@ type Consumer struct {
 
 // NewConsumer returns a new mock Consumer instance. The t argument should
 // be the *testing.T instance of your test method. An error will be written to it if
-// an expectation is violated. The config argument can be set to nil.
+// an expectation is violated. The config argument can be set to nil; if it is
+// non-nil it is validated.
 func NewConsumer(t ErrorReporter, config *sarama.Config) *Consumer {
 	if config == nil {
 		config = sarama.NewConfig()
+	}
+	if err := config.Validate(); err != nil {
+		t.Errorf("Invalid mock configuration provided: %s", err.Error())
 	}
 
 	c := &Consumer{
@@ -127,6 +131,62 @@ func (c *Consumer) Close() error {
 	return nil
 }
 
+// Pause implements Consumer.
+func (c *Consumer) Pause(topicPartitions map[string][]int32) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	for topic, partitions := range topicPartitions {
+		for _, partition := range partitions {
+			if topicConsumers, ok := c.partitionConsumers[topic]; ok {
+				if partitionConsumer, ok := topicConsumers[partition]; ok {
+					partitionConsumer.Pause()
+				}
+			}
+		}
+	}
+}
+
+// Resume implements Consumer.
+func (c *Consumer) Resume(topicPartitions map[string][]int32) {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	for topic, partitions := range topicPartitions {
+		for _, partition := range partitions {
+			if topicConsumers, ok := c.partitionConsumers[topic]; ok {
+				if partitionConsumer, ok := topicConsumers[partition]; ok {
+					partitionConsumer.Resume()
+				}
+			}
+		}
+	}
+}
+
+// PauseAll implements Consumer.
+func (c *Consumer) PauseAll() {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	for _, partitions := range c.partitionConsumers {
+		for _, partitionConsumer := range partitions {
+			partitionConsumer.Pause()
+		}
+	}
+}
+
+// ResumeAll implements Consumer.
+func (c *Consumer) ResumeAll() {
+	c.l.Lock()
+	defer c.l.Unlock()
+
+	for _, partitions := range c.partitionConsumers {
+		for _, partitionConsumer := range partitions {
+			partitionConsumer.Resume()
+		}
+	}
+}
+
 ///////////////////////////////////////////////////
 // Expectation API
 ///////////////////////////////////////////////////
@@ -155,13 +215,20 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 	}
 
 	if c.partitionConsumers[topic][partition] == nil {
+		highWatermarkOffset := offset
+		if offset == sarama.OffsetOldest {
+			highWatermarkOffset = 0
+		}
+
 		c.partitionConsumers[topic][partition] = &PartitionConsumer{
-			t:         c.t,
-			topic:     topic,
-			partition: partition,
-			offset:    offset,
-			messages:  make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
-			errors:    make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
+			highWaterMarkOffset: highWatermarkOffset,
+			t:                   c.t,
+			topic:               topic,
+			partition:           partition,
+			offset:              offset,
+			messages:            make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
+			suppressedMessages:  make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
+			errors:              make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
 		}
 	}
 
@@ -178,18 +245,21 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 // Errors and Messages channel, you should specify what values will be provided on these
 // channels using YieldMessage and YieldError.
 type PartitionConsumer struct {
-	highWaterMarkOffset     int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	l                       sync.Mutex
-	t                       ErrorReporter
-	topic                   string
-	partition               int32
-	offset                  int64
-	messages                chan *sarama.ConsumerMessage
-	errors                  chan *sarama.ConsumerError
-	singleClose             sync.Once
-	consumed                bool
-	errorsShouldBeDrained   bool
-	messagesShouldBeDrained bool
+	highWaterMarkOffset           int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	l                             sync.Mutex
+	t                             ErrorReporter
+	topic                         string
+	partition                     int32
+	offset                        int64
+	messages                      chan *sarama.ConsumerMessage
+	suppressedMessages            chan *sarama.ConsumerMessage
+	suppressedHighWaterMarkOffset int64
+	errors                        chan *sarama.ConsumerError
+	singleClose                   sync.Once
+	consumed                      bool
+	errorsShouldBeDrained         bool
+	messagesShouldBeDrained       bool
+	paused                        bool
 }
 
 ///////////////////////////////////////////////////
@@ -199,6 +269,7 @@ type PartitionConsumer struct {
 // AsyncClose implements the AsyncClose method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) AsyncClose() {
 	pc.singleClose.Do(func() {
+		close(pc.suppressedMessages)
 		close(pc.messages)
 		close(pc.errors)
 	})
@@ -249,6 +320,14 @@ func (pc *PartitionConsumer) Close() error {
 		}
 	}()
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range pc.suppressedMessages {
+			// drain
+		}
+	}()
+
 	wg.Wait()
 	return closeErr
 }
@@ -267,6 +346,38 @@ func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
 	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
 }
 
+// Pause implements the Pause method from the sarama.PartitionConsumer interface.
+func (pc *PartitionConsumer) Pause() {
+	pc.l.Lock()
+	defer pc.l.Unlock()
+
+	pc.suppressedHighWaterMarkOffset = atomic.LoadInt64(&pc.highWaterMarkOffset)
+
+	pc.paused = true
+}
+
+// Resume implements the Resume method from the sarama.PartitionConsumer interface.
+func (pc *PartitionConsumer) Resume() {
+	pc.l.Lock()
+	defer pc.l.Unlock()
+
+	pc.highWaterMarkOffset = atomic.LoadInt64(&pc.suppressedHighWaterMarkOffset)
+	for len(pc.suppressedMessages) > 0 {
+		msg := <-pc.suppressedMessages
+		pc.messages <- msg
+	}
+
+	pc.paused = false
+}
+
+// IsPaused implements the IsPaused method from the sarama.PartitionConsumer interface.
+func (pc *PartitionConsumer) IsPaused() bool {
+	pc.l.Lock()
+	defer pc.l.Unlock()
+
+	return pc.paused
+}
+
 ///////////////////////////////////////////////////
 // Expectation API
 ///////////////////////////////////////////////////
@@ -276,15 +387,22 @@ func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
 // message was consumed from the Messages channel, because there are legitimate
 // reasons forthis not to happen. ou can call ExpectMessagesDrainedOnClose so it will
 // verify that the channel is empty on close.
-func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) {
+func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *PartitionConsumer {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
 	msg.Topic = pc.topic
 	msg.Partition = pc.partition
-	msg.Offset = atomic.AddInt64(&pc.highWaterMarkOffset, 1)
 
-	pc.messages <- msg
+	if pc.paused {
+		msg.Offset = atomic.AddInt64(&pc.suppressedHighWaterMarkOffset, 1) - 1
+		pc.suppressedMessages <- msg
+	} else {
+		msg.Offset = atomic.AddInt64(&pc.highWaterMarkOffset, 1) - 1
+		pc.messages <- msg
+	}
+
+	return pc
 }
 
 // YieldError will yield an error on the Errors channel of this partition consumer
@@ -292,24 +410,30 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) {
 // consumed from the Errors channel, because there are legitimate reasons for this
 // not to happen. You can call ExpectErrorsDrainedOnClose so it will verify that
 // the channel is empty on close.
-func (pc *PartitionConsumer) YieldError(err error) {
+func (pc *PartitionConsumer) YieldError(err error) *PartitionConsumer {
 	pc.errors <- &sarama.ConsumerError{
 		Topic:     pc.topic,
 		Partition: pc.partition,
 		Err:       err,
 	}
+
+	return pc
 }
 
 // ExpectMessagesDrainedOnClose sets an expectation on the partition consumer
 // that the messages channel will be fully drained when Close is called. If this
 // expectation is not met, an error is reported to the error reporter.
-func (pc *PartitionConsumer) ExpectMessagesDrainedOnClose() {
+func (pc *PartitionConsumer) ExpectMessagesDrainedOnClose() *PartitionConsumer {
 	pc.messagesShouldBeDrained = true
+
+	return pc
 }
 
 // ExpectErrorsDrainedOnClose sets an expectation on the partition consumer
 // that the errors channel will be fully drained when Close is called. If this
 // expectation is not met, an error is reported to the error reporter.
-func (pc *PartitionConsumer) ExpectErrorsDrainedOnClose() {
+func (pc *PartitionConsumer) ExpectErrorsDrainedOnClose() *PartitionConsumer {
 	pc.errorsShouldBeDrained = true
+
+	return pc
 }

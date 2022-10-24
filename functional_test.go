@@ -5,15 +5,13 @@ package sarama
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -22,9 +20,7 @@ import (
 	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 )
 
-const (
-	uncomittedMsgJar = "https://github.com/FrancoisPoinsot/simplest-uncommitted-msg/releases/download/0.1/simplest-uncommitted-msg-0.1-jar-with-dependencies.jar"
-)
+const uncommittedTopic = "uncommitted-topic-test-4"
 
 var (
 	testTopicDetails = map[string]*TopicDetail{
@@ -40,7 +36,7 @@ var (
 			NumPartitions:     64,
 			ReplicationFactor: 3,
 		},
-		"uncommitted-topic-test-4": {
+		uncommittedTopic: {
 			NumPartitions:     1,
 			ReplicationFactor: 3,
 		},
@@ -101,7 +97,34 @@ type testEnvironment struct {
 	KafkaVersion     string
 }
 
+// setupToxiProxies will configure the toxiproxy proxies with routes for the
+// kafka brokers if they don't already exist
+func setupToxiProxies(env *testEnvironment, endpoint string) error {
+	env.ToxiproxyClient = toxiproxy.NewClient(endpoint)
+	env.Proxies = map[string]*toxiproxy.Proxy{}
+	env.KafkaBrokerAddrs = nil
+	for i := 1; i <= 5; i++ {
+		proxyName := fmt.Sprintf("kafka%d", i)
+		proxy, err := env.ToxiproxyClient.Proxy(proxyName)
+		if err != nil {
+			proxy, err = env.ToxiproxyClient.CreateProxy(
+				proxyName,
+				fmt.Sprintf("0.0.0.0:%d", 29090+i),
+				fmt.Sprintf("kafka-%d:%d", i, 29090+i),
+			)
+			if err != nil {
+				return fmt.Errorf("failed to create toxiproxy: %w", err)
+			}
+		}
+		env.Proxies[proxyName] = proxy
+		env.KafkaBrokerAddrs = append(env.KafkaBrokerAddrs, fmt.Sprintf("127.0.0.1:%d", 29090+i))
+	}
+	return nil
+}
+
 func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) error {
+	const expectedBrokers = 5
+
 	Logger.Println("bringing up docker-based test environment")
 
 	// Always (try to) tear down first.
@@ -112,65 +135,58 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	if version, ok := os.LookupEnv("KAFKA_VERSION"); ok {
 		env.KafkaVersion = version
 	} else {
-		// We have cp-7.0.0 as the default in the docker-compose file, so that's kafka 3.0.0.
-		env.KafkaVersion = "3.0.0"
-	}
-
-	// the mapping of confluent platform docker image versions -> kafka versions can be
-	// found here: https://docs.confluent.io/current/installation/versions-interoperability.html
-	var confluentPlatformVersion string
-	switch env.KafkaVersion {
-	case "3.0.0":
-		confluentPlatformVersion = "7.0.0"
-	case "2.8.1":
-		confluentPlatformVersion = "6.2.0"
-	case "2.7.1":
-		confluentPlatformVersion = "6.1.2"
-	default:
-		return fmt.Errorf("don't know what confluent platform version to use for kafka %s", env.KafkaVersion)
+		env.KafkaVersion = "3.1.2"
 	}
 
 	c := exec.Command("docker-compose", "up", "-d")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
-	c.Env = append(os.Environ(), fmt.Sprintf("CONFLUENT_PLATFORM_VERSION=%s", confluentPlatformVersion))
+	c.Env = append(os.Environ(), fmt.Sprintf("KAFKA_VERSION=%s", env.KafkaVersion))
 	err := c.Run()
 	if err != nil {
 		return fmt.Errorf("failed to run docker-compose to start test environment: %w", err)
 	}
 
-	// Set up toxiproxy Proxies
-	env.ToxiproxyClient = toxiproxy.NewClient("localhost:8474")
-	env.Proxies = map[string]*toxiproxy.Proxy{}
-	for i := 1; i <= 5; i++ {
-		proxyName := fmt.Sprintf("kafka%d", i)
-		proxy, err := env.ToxiproxyClient.CreateProxy(
-			proxyName,
-			fmt.Sprintf("0.0.0.0:%d", 29090+i),
-			fmt.Sprintf("kafka-%d:%d", i, 29090+i),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to create toxiproxy: %w", err)
-		}
-		env.Proxies[proxyName] = proxy
-		env.KafkaBrokerAddrs = append(env.KafkaBrokerAddrs, fmt.Sprintf("127.0.0.1:%d", 29090+i))
+	if err := setupToxiProxies(env, "http://localhost:8474"); err != nil {
+		return fmt.Errorf("failed to setup toxiproxies: %w", err)
 	}
 
-	// Wait for the kafka broker to come up
-	allBrokersUp := false
-	for i := 0; i < 45 && !allBrokersUp; i++ {
-		Logger.Println("waiting for kafka brokers to come up")
-		time.Sleep(1 * time.Second)
-		config := NewTestConfig()
-		config.Version, err = ParseKafkaVersion(env.KafkaVersion)
+	dialCheck := func(addr string, timeout time.Duration) error {
+		conn, err := net.DialTimeout("tcp", addr, timeout)
 		if err != nil {
 			return err
 		}
-		config.Net.DialTimeout = 1 * time.Second
-		config.Net.ReadTimeout = 1 * time.Second
-		config.Net.WriteTimeout = 1 * time.Second
-		config.ClientID = "sarama-tests"
+		return conn.Close()
+	}
+
+	config := NewTestConfig()
+	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
+	if err != nil {
+		return err
+	}
+	config.Net.DialTimeout = 1 * time.Second
+	config.Net.ReadTimeout = 1 * time.Second
+	config.Net.WriteTimeout = 1 * time.Second
+	config.ClientID = "sarama-tests"
+
+	// wait for the kafka brokers to come up
+	allBrokersUp := false
+
+mainLoop:
+	for i := 0; i < 30 && !allBrokersUp; i++ {
+		Logger.Println("waiting for kafka brokers to come up")
+		time.Sleep(3 * time.Second)
 		brokersOk := make([]bool, len(env.KafkaBrokerAddrs))
+
+		// first check that all bootstrap brokers are TCP accessible
+		for _, addr := range env.KafkaBrokerAddrs {
+			if err := dialCheck(addr, time.Second); err != nil {
+				continue mainLoop
+			}
+		}
+
+		// now check we can bootstrap metadata from the cluster and all brokers
+		// are known and accessible at their advertised address
 	retryLoop:
 		for j, addr := range env.KafkaBrokerAddrs {
 			client, err := NewClient([]string{addr}, config)
@@ -182,7 +198,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 				continue
 			}
 			brokers := client.Brokers()
-			if len(brokers) < 5 {
+			if len(brokers) < expectedBrokers {
 				continue
 			}
 			for _, broker := range brokers {
@@ -197,13 +213,19 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 			}
 			brokersOk[j] = true
 		}
+
 		allBrokersUp = true
 		for _, u := range brokersOk {
 			allBrokersUp = allBrokersUp && u
 		}
 	}
+
 	if !allBrokersUp {
-		return fmt.Errorf("timed out waiting for broker to come up")
+		c := exec.Command("docker-compose", "logs", "-t", "kafka-1", "kafka-2", "kafka-3", "kafka-4", "kafka-5")
+		c.Stdout = os.Stdout
+		c.Stderr = os.Stderr
+		_ = c.Run()
+		return fmt.Errorf("timed out waiting for one or more broker to come up")
 	}
 
 	return nil
@@ -218,22 +240,8 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 	if err != nil {
 		return false, fmt.Errorf("$TOXIPROXY_ADDR not parseable as url")
 	}
-	toxiproxyHost := toxiproxyURL.Hostname()
-
-	env.ToxiproxyClient = toxiproxy.NewClient(toxiproxyAddr)
-	for i := 1; i <= 5; i++ {
-		proxyName := fmt.Sprintf("kafka%d", i)
-		proxy, err := env.ToxiproxyClient.Proxy(proxyName)
-		if err != nil {
-			return false, fmt.Errorf("no proxy kafka%d on toxiproxy: %w", i, err)
-		}
-		env.Proxies[proxyName] = proxy
-		// get the host:port from the proxy & toxiproxy addr, so we can do "$toxiproxy_addr:$proxy_port"
-		_, proxyPort, err := net.SplitHostPort(proxy.Listen)
-		if err != nil {
-			return false, fmt.Errorf("proxy.Listen not a host:port combo: %w", err)
-		}
-		env.KafkaBrokerAddrs = append(env.KafkaBrokerAddrs, net.JoinHostPort(toxiproxyHost, proxyPort))
+	if err := setupToxiProxies(env, toxiproxyURL.String()); err != nil {
+		return false, fmt.Errorf("failed to setup toxiproxies: %w", err)
 	}
 
 	env.KafkaVersion, ok = os.LookupEnv("KAFKA_VERSION")
@@ -262,6 +270,28 @@ func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) er
 	return nil
 }
 
+func startDockerTestBroker(ctx context.Context, brokerID int32) error {
+	service := fmt.Sprintf("kafka-%d", brokerID)
+	c := exec.Command("docker-compose", "start", service)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("failed to run docker-compose to start test broker kafka-%d: %w", brokerID, err)
+	}
+	return nil
+}
+
+func stopDockerTestBroker(ctx context.Context, brokerID int32) error {
+	service := fmt.Sprintf("kafka-%d", brokerID)
+	c := exec.Command("docker-compose", "stop", service)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	if err := c.Run(); err != nil {
+		return fmt.Errorf("failed to run docker-compose to stop test broker kafka-%d: %w", brokerID, err)
+	}
+	return nil
+}
+
 func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	Logger.Println("creating test topics")
 	var testTopicNames []string
@@ -273,7 +303,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	config := NewTestConfig()
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
-	config.ClientID = "sarama-tests"
+	config.ClientID = "sarama-prepareTestTopics"
 	var err error
 	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
 	if err != nil {
@@ -295,7 +325,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	// Start by deleting the test topics (if they already exist)
 	deleteRes, err := controller.DeleteTopics(&DeleteTopicsRequest{
 		Topics:  testTopicNames,
-		Timeout: 30 * time.Second,
+		Timeout: time.Minute,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to delete test topics: %w", err)
@@ -308,31 +338,35 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 
 	// wait for the topics to _actually_ be gone - the delete is not guaranteed to be processed
 	// synchronously
-	var topicsOk bool
-	for i := 0; i < 20 && !topicsOk; i++ {
-		time.Sleep(1 * time.Second)
-		md, err := controller.GetMetadata(&MetadataRequest{
-			Topics: testTopicNames,
-		})
-		if err != nil {
-			return fmt.Errorf("failed to get metadata for test topics: %w", err)
-		}
+	{
+		var topicsOk bool
+		for i := 0; i < 60 && !topicsOk; i++ {
+			time.Sleep(1 * time.Second)
+			md, err := controller.GetMetadata(&MetadataRequest{
+				Topics: testTopicNames,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get metadata for test topics: %w", err)
+			}
 
-		topicsOk = true
-		for _, topicsMd := range md.Topics {
-			if !isTopicNotExistsErrorOrOk(topicsMd.Err) {
-				topicsOk = false
+			if len(md.Topics) == len(testTopicNames) {
+				topicsOk = true
+				for _, topicsMd := range md.Topics {
+					if !isTopicNotExistsErrorOrOk(topicsMd.Err) {
+						topicsOk = false
+					}
+				}
 			}
 		}
-	}
-	if !topicsOk {
-		return fmt.Errorf("timed out waiting for test topics to be gone")
+		if !topicsOk {
+			return fmt.Errorf("timed out waiting for test topics to be gone")
+		}
 	}
 
 	// now create the topics empty
 	createRes, err := controller.CreateTopics(&CreateTopicsRequest{
 		TopicDetails: testTopicDetails,
-		Timeout:      30 * time.Second,
+		Timeout:      time.Minute,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create test topics: %w", err)
@@ -343,49 +377,42 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 		}
 	}
 
-	// This is kind of gross, but we don't actually have support for doing transactional publishing
-	// with sarama, so we need to use a java-based tool to publish uncommitted messages to
-	// the uncommitted-topic-test-4 topic
-	jarName := filepath.Base(uncomittedMsgJar)
-	if _, err := os.Stat(jarName); err != nil {
-		Logger.Printf("Downloading %s\n", uncomittedMsgJar)
-		req, err := http.NewRequest("GET", uncomittedMsgJar, nil)
-		if err != nil {
-			return fmt.Errorf("failed creating requst for uncommitted msg jar: %w", err)
-		}
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("failed fetching the uncommitted msg jar: %w", err)
-		}
-		defer res.Body.Close()
-		jarFile, err := os.OpenFile(jarName, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0o644)
-		if err != nil {
-			return fmt.Errorf("failed opening the uncommitted msg jar: %w", err)
-		}
-		defer jarFile.Close()
+	// wait for the topics to _actually_ exist - the creates are not guaranteed to be processed
+	// synchronously
+	{
+		var topicsOk bool
+		for i := 0; i < 60 && !topicsOk; i++ {
+			time.Sleep(1 * time.Second)
+			md, err := controller.GetMetadata(&MetadataRequest{
+				Topics: testTopicNames,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to get metadata for test topics: %w", err)
+			}
 
-		_, err = io.Copy(jarFile, res.Body)
-		if err != nil {
-			return fmt.Errorf("failed writing the uncommitted msg jar: %w", err)
+			if len(md.Topics) == len(testTopicNames) {
+				topicsOk = true
+				for _, topicsMd := range md.Topics {
+					if topicsMd.Err != ErrNoError {
+						topicsOk = false
+					}
+				}
+			}
+		}
+		if !topicsOk {
+			return fmt.Errorf("timed out waiting for test topics to be created")
 		}
 	}
 
-	c := exec.Command("java", "-jar", jarName, "-b", env.KafkaBrokerAddrs[0], "-c", "4")
-	c.Stdout = os.Stdout
-	c.Stderr = os.Stderr
-	err = c.Run()
-	if err != nil {
-		return fmt.Errorf("failed running uncommitted msg jar: %w", err)
-	}
 	return nil
 }
 
 func isTopicNotExistsErrorOrOk(err KError) bool {
-	return err == ErrUnknownTopicOrPartition || err == ErrInvalidTopic || err == ErrNoError
+	return errors.Is(err, ErrUnknownTopicOrPartition) || errors.Is(err, ErrInvalidTopic) || errors.Is(err, ErrNoError)
 }
 
 func isTopicExistsErrorOrOk(err KError) bool {
-	return err == ErrTopicAlreadyExists || err == ErrNoError
+	return errors.Is(err, ErrTopicAlreadyExists) || errors.Is(err, ErrNoError)
 }
 
 func checkKafkaVersion(t testing.TB, requiredVersion string) {
