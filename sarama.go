@@ -77,6 +77,14 @@ Consumer related metrics:
 	| consumer-group-sync-total-<GroupID>       | counter    | Total count of consumer group sync attempts                                          |
 	| consumer-group-sync-failed-<GroupID>      | counter    | Total count of consumer group sync failures                                          |
 	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
+
+Topic related metrics:
+
+	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
+	| Name                                      | Type       | Description                                                                          |
+	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
+	| metadata-age-for-topic-<topic>            | gauge      | Age of metadata from broker for this topic                                           |
+	+-------------------------------------------+------------+--------------------------------------------------------------------------------------+
 */
 package sarama
 

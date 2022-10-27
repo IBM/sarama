@@ -39,6 +39,10 @@ func getOrRegisterTopicMeter(name string, topic string, r metrics.Registry) metr
 	return metrics.GetOrRegisterMeter(getMetricNameForTopic(name, topic), r)
 }
 
+func getOrRegisterTopicGauge(name string, topic string, r metrics.Registry) metrics.Gauge {
+	return metrics.GetOrRegisterGauge(getMetricNameForTopic(name, topic), r)
+}
+
 func getOrRegisterTopicHistogram(name string, topic string, r metrics.Registry) metrics.Histogram {
 	return getOrRegisterHistogram(getMetricNameForTopic(name, topic), r)
 }

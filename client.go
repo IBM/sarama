@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -146,6 +148,7 @@ type client struct {
 	brokers                 map[int32]*Broker                       // maps broker ids to brokers
 	metadata                map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
 	metadataTopics          map[string]none                         // topics that need to collect metadata
+	metadataUpdates         map[string]time.Time                    // topic metadata successful updates
 	coordinators            map[string]int32                        // Maps consumer group names to coordinating broker IDs
 	transactionCoordinators map[string]int32                        // Maps transaction ids to coordinating broker IDs
 
@@ -153,8 +156,9 @@ type client struct {
 	// so the result is cached.  It is important to update this value whenever metadata is changed
 	cachedPartitionsResults map[string][maxPartitionIndex][]int32
 
-	lock sync.RWMutex // protects access to the maps that hold cluster state.
+	metricRegistry metrics.Registry
 
+	lock sync.RWMutex // protects access to the maps that hold cluster state.
 }
 
 // NewClient creates a new Client. It connects to one of the given broker addresses
@@ -182,9 +186,11 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		brokers:                 make(map[int32]*Broker),
 		metadata:                make(map[string]map[int32]*PartitionMetadata),
 		metadataTopics:          make(map[string]none),
+		metadataUpdates:         map[string]time.Time{},
 		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 		coordinators:            make(map[string]int32),
 		transactionCoordinators: make(map[string]int32),
+		metricRegistry:          newCleanupRegistry(conf.MetricRegistry),
 	}
 
 	client.randomizeSeedBrokers(addrs)
@@ -916,12 +922,26 @@ func (client *client) backgroundMetadataUpdater() {
 	ticker := time.NewTicker(client.conf.Metadata.RefreshFrequency)
 	defer ticker.Stop()
 
+	metadataAgeTicker := time.NewTicker(time.Second)
+	defer metadataAgeTicker.Stop()
+
 	for {
 		select {
 		case <-ticker.C:
 			if err := client.refreshMetadata(); err != nil {
 				Logger.Println("Client background metadata update:", err)
 			}
+		case <-metadataAgeTicker.C:
+			client.lock.RLock()
+			now := time.Now()
+			for topic, t := range client.metadataUpdates {
+				if t.IsZero() {
+					continue
+				}
+				getOrRegisterTopicGauge("metadata-age", topic, client.metricRegistry).
+					Update(int64(now.Sub(t).Seconds()))
+			}
+			client.lock.RUnlock()
 		case <-client.closer:
 			return
 		}
@@ -1057,6 +1077,8 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		return
 	}
 
+	now := time.Now()
+
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
@@ -1109,6 +1131,8 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 				retry = true
 			}
 		}
+
+		client.metadataUpdates[topic.Name] = now
 
 		var partitionCache [maxPartitionIndex][]int32
 		partitionCache[allPartitions] = client.setPartitionCache(topic.Name, allPartitions)
