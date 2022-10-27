@@ -43,6 +43,7 @@ type Broker struct {
 	responseRate           metrics.Meter
 	responseSize           metrics.Histogram
 	requestsInFlight       metrics.Counter
+	protocolRequests       map[int16]metrics.Counter
 	brokerIncomingByteRate metrics.Meter
 	brokerRequestRate      metrics.Meter
 	brokerFetchRate        metrics.Meter
@@ -53,6 +54,7 @@ type Broker struct {
 	brokerResponseSize     metrics.Histogram
 	brokerRequestsInFlight metrics.Counter
 	brokerThrottleTime     metrics.Histogram
+	brokerProtocolRequests map[int16]metrics.Counter
 
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
@@ -218,6 +220,7 @@ func (b *Broker) Open(conf *Config) error {
 		b.responseRate = metrics.GetOrRegisterMeter("response-rate", b.metricRegistry)
 		b.responseSize = getOrRegisterHistogram("response-size", b.metricRegistry)
 		b.requestsInFlight = metrics.GetOrRegisterCounter("requests-in-flight", b.metricRegistry)
+		b.protocolRequests = map[int16]metrics.Counter{}
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
 		if b.id >= 0 && !metrics.UseNilMetrics {
@@ -998,6 +1001,7 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	b.addRequestInFlightMetrics(1)
 	bytes, err := b.write(buf)
 	b.updateOutgoingCommunicationMetrics(bytes)
+	b.updateProtocolMetrics(rb)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		return err
@@ -1606,6 +1610,24 @@ func (b *Broker) updateOutgoingCommunicationMetrics(bytes int) {
 	}
 }
 
+func (b *Broker) updateProtocolMetrics(rb protocolBody) {
+	protocolRequests := b.protocolRequests[rb.key()]
+	if protocolRequests == nil {
+		protocolRequests = metrics.GetOrRegisterCounter(fmt.Sprintf("protocol-requests-%d", rb.key()), b.metricRegistry)
+		b.protocolRequests[rb.key()] = protocolRequests
+	}
+	protocolRequests.Inc(1)
+
+	if b.brokerProtocolRequests != nil {
+		brokerProtocolRequests := b.brokerProtocolRequests[rb.key()]
+		if brokerProtocolRequests == nil {
+			brokerProtocolRequests = b.registerCounter(fmt.Sprintf("protocol-requests-%d", rb.key()))
+			b.brokerProtocolRequests[rb.key()] = brokerProtocolRequests
+		}
+		brokerProtocolRequests.Inc(1)
+	}
+}
+
 func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
 	if throttleTime != time.Duration(0) {
 		DebugLogger.Printf(
@@ -1629,6 +1651,7 @@ func (b *Broker) registerMetrics() {
 	b.brokerResponseSize = b.registerHistogram("response-size")
 	b.brokerRequestsInFlight = b.registerCounter("requests-in-flight")
 	b.brokerThrottleTime = b.registerHistogram("throttle-time-in-ms")
+	b.brokerProtocolRequests = map[int16]metrics.Counter{}
 }
 
 func (b *Broker) registerMeter(name string) metrics.Meter {
