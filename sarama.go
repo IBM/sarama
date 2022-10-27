@@ -43,6 +43,8 @@ Broker related metrics:
 	|                                              |            | for all brokers                                               |
 	| requests-in-flight-for-broker-<broker-id>    | counter    | The current number of in-flight requests awaiting a response  |
 	|                                              |            | for a given broker                                            |
+	| commit-duration-in-ms                        | histogram  | Distribution of the commit duration in ms for all brokers     |
+	| commit-duration-in-ms-for-broker-<broker-id> | histogram  | Distribution of the commit duration in ms for a given broker  |
 	+----------------------------------------------+------------+---------------------------------------------------------------+
 
 Note that we do not gather specific metrics for seed brokers but they are part of the "all brokers" metrics.

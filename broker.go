@@ -43,6 +43,7 @@ type Broker struct {
 	responseRate           metrics.Meter
 	responseSize           metrics.Histogram
 	requestsInFlight       metrics.Counter
+	commitDuration         metrics.Histogram
 	brokerIncomingByteRate metrics.Meter
 	brokerRequestRate      metrics.Meter
 	brokerFetchRate        metrics.Meter
@@ -53,6 +54,7 @@ type Broker struct {
 	brokerResponseSize     metrics.Histogram
 	brokerRequestsInFlight metrics.Counter
 	brokerThrottleTime     metrics.Histogram
+	brokerCommitDuration   metrics.Histogram
 
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
@@ -218,6 +220,7 @@ func (b *Broker) Open(conf *Config) error {
 		b.responseRate = metrics.GetOrRegisterMeter("response-rate", b.metricRegistry)
 		b.responseSize = getOrRegisterHistogram("response-size", b.metricRegistry)
 		b.requestsInFlight = metrics.GetOrRegisterCounter("requests-in-flight", b.metricRegistry)
+		b.commitDuration = getOrRegisterHistogram("commit-duration-in-ms", b.metricRegistry)
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
 		if b.id >= 0 && !metrics.UseNilMetrics {
@@ -506,9 +509,15 @@ func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
 func (b *Broker) CommitOffset(request *OffsetCommitRequest) (*OffsetCommitResponse, error) {
 	response := new(OffsetCommitResponse)
 
+	t := time.Now()
 	err := b.sendAndReceive(request, response)
 	if err != nil {
 		return nil, err
+	}
+	dur := time.Since(t).Milliseconds()
+	b.commitDuration.Update(dur)
+	if b.brokerCommitDuration != nil {
+		b.brokerCommitDuration.Update(dur)
 	}
 
 	return response, nil
@@ -1629,6 +1638,7 @@ func (b *Broker) registerMetrics() {
 	b.brokerResponseSize = b.registerHistogram("response-size")
 	b.brokerRequestsInFlight = b.registerCounter("requests-in-flight")
 	b.brokerThrottleTime = b.registerHistogram("throttle-time-in-ms")
+	b.brokerCommitDuration = b.registerHistogram("commit-duration-in-ms")
 }
 
 func (b *Broker) registerMeter(name string) metrics.Meter {
