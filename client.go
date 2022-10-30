@@ -285,6 +285,8 @@ func (client *client) Close() error {
 		safeAsyncClose(broker)
 	}
 
+	client.metricRegistry.UnregisterAll()
+
 	client.brokers = nil
 	client.metadata = nil
 	client.metadataTopics = nil
@@ -938,8 +940,8 @@ func (client *client) backgroundMetadataUpdater() {
 				if t.IsZero() {
 					continue
 				}
-				getOrRegisterTopicGauge("metadata-age", topic, client.metricRegistry).
-					Update(int64(now.Sub(t).Seconds()))
+				getOrRegisterTopicGauge("metadata-age-in-ms", topic, client.metricRegistry).
+					Update(now.Sub(t).Milliseconds())
 			}
 			client.lock.RUnlock()
 		case <-client.closer:
