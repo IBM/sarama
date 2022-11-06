@@ -1152,7 +1152,7 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 	produceSet.bufferCount += len(pSet.msgs)
 	for _, msg := range pSet.msgs {
 		if msg.retries >= p.conf.Producer.Retry.Max {
-			p.returnError(msg, kerr)
+			p.returnErrors(pSet.msgs, kerr)
 			return
 		}
 		msg.retries++
