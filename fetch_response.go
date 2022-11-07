@@ -67,8 +67,10 @@ type FetchResponseBlock struct {
 func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
 	metricRegistry := pd.metricRegistry()
 	var sizeMetric metrics.Histogram
+	var lagMetric metrics.Histogram
 	if metricRegistry != nil {
 		sizeMetric = getOrRegisterHistogram("consumer-fetch-response-size", metricRegistry)
+		lagMetric = getOrRegisterHistogram("consumer-records-lag", metricRegistry)
 	}
 
 	tmp, err := pd.getInt16()
@@ -180,6 +182,16 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 
 		if partial || overflow {
 			break
+		}
+	}
+
+	// Follows the Java implementation for calculating the records lag:
+	// https://github.com/apache/kafka/blob/trunk/clients/src/main/java/org/apache/kafka/clients/consumer/internals/SubscriptionState.java
+	if len(b.RecordsSet) > 0 {
+		logEndOffset := *b.LastRecordsBatchOffset - 1
+		partitionLag := logEndOffset - b.RecordsSet[len(b.RecordsSet)-1].RecordBatch.LastOffset()
+		if lagMetric != nil {
+			lagMetric.Update(partitionLag)
 		}
 	}
 
