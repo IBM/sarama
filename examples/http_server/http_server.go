@@ -16,13 +16,13 @@ import (
 )
 
 var (
-	addr      = flag.String("addr", ":8080", "The address to bind to")
-	brokers   = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The Kafka brokers to connect to, as a comma separated list")
-	verbose   = flag.Bool("verbose", false, "Turn on Sarama logging")
-	certFile  = flag.String("certificate", "", "The optional certificate file for client authentication")
-	keyFile   = flag.String("key", "", "The optional key file for client authentication")
-	caFile    = flag.String("ca", "", "The optional certificate authority file for TLS client authentication")
-	verifySsl = flag.Bool("verify", false, "Optional verify ssl certificates chain")
+	addr          = flag.String("addr", ":8080", "The address to bind to")
+	brokers       = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The Kafka brokers to connect to, as a comma separated list")
+	verbose       = flag.Bool("verbose", false, "Turn on Sarama logging")
+	certFile      = flag.String("certificate", "", "The optional certificate file for client authentication")
+	keyFile       = flag.String("key", "", "The optional key file for client authentication")
+	caFile        = flag.String("ca", "", "The optional certificate authority file for TLS client authentication")
+	tlsSkipVerify = flag.Bool("tls-skip-verify", false, "Whether to skip TLS server cert verification")
 )
 
 func main() {
@@ -71,7 +71,7 @@ func createTlsConfiguration() (t *tls.Config) {
 		t = &tls.Config{
 			Certificates:       []tls.Certificate{cert},
 			RootCAs:            caCertPool,
-			InsecureSkipVerify: *verifySsl,
+			InsecureSkipVerify: *tlsSkipVerify,
 		}
 	}
 	// will be nil by default if nothing is provided
