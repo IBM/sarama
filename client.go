@@ -989,13 +989,8 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			DebugLogger.Printf("client/metadata fetching metadata for all topics from broker %s\n", broker.addr)
 		}
 
-		req := &MetadataRequest{Topics: topics, AllowAutoTopicCreation: allowAutoTopicCreation}
-		if client.conf.Version.IsAtLeast(V1_0_0_0) {
-			req.Version = 5
-		} else if client.conf.Version.IsAtLeast(V0_10_0_0) {
-			req.Version = 1
-		}
-
+		req := NewMetadataRequest(client.conf.Version, topics)
+		req.AllowAutoTopicCreation = allowAutoTopicCreation
 		t := atomic.LoadInt64(&client.updateMetaDataMs)
 		if !atomic.CompareAndSwapInt64(&client.updateMetaDataMs, t, time.Now().UnixNano()/int64(time.Millisecond)) {
 			return nil

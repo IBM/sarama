@@ -280,17 +280,7 @@ func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetada
 		return nil, err
 	}
 
-	request := &MetadataRequest{
-		Topics:                 topics,
-		AllowAutoTopicCreation: false,
-	}
-
-	if ca.conf.Version.IsAtLeast(V1_0_0_0) {
-		request.Version = 5
-	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 4
-	}
-
+	request := NewMetadataRequest(ca.conf.Version, topics)
 	response, err := controller.GetMetadata(request)
 	if err != nil {
 		return nil, err
@@ -304,14 +294,7 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32
 		return nil, int32(0), err
 	}
 
-	request := &MetadataRequest{
-		Topics: []string{},
-	}
-
-	if ca.conf.Version.IsAtLeast(V0_10_0_0) {
-		request.Version = 1
-	}
-
+	request := NewMetadataRequest(ca.conf.Version, nil)
 	response, err := controller.GetMetadata(request)
 	if err != nil {
 		return nil, int32(0), err
@@ -352,7 +335,7 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 	}
 	_ = b.Open(ca.client.Config())
 
-	metadataReq := &MetadataRequest{}
+	metadataReq := NewMetadataRequest(ca.conf.Version, nil)
 	metadataResp, err := b.GetMetadata(metadataReq)
 	if err != nil {
 		return nil, err

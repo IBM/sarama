@@ -125,7 +125,7 @@ func allocateBody(key, version int16) protocolBody {
 	case 2:
 		return &OffsetRequest{Version: version}
 	case 3:
-		return &MetadataRequest{}
+		return &MetadataRequest{Version: version}
 	case 8:
 		return &OffsetCommitRequest{Version: version}
 	case 9:
