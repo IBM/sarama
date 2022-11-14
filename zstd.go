@@ -6,28 +6,49 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
+// zstdMaxBufferedEncoders maximum number of not-in-use zstd encoders
+// If the pool of encoders is exhausted then new encoders will be created on the fly
+const zstdMaxBufferedEncoders = 1
+
 type ZstdEncoderParams struct {
 	Level int
 }
 type ZstdDecoderParams struct {
 }
 
-var zstdEncMap, zstdDecMap sync.Map
+var zstdDecMap sync.Map
 
-func getEncoder(params ZstdEncoderParams) *zstd.Encoder {
-	if ret, ok := zstdEncMap.Load(params); ok {
-		return ret.(*zstd.Encoder)
+var zstdAvailableEncoders sync.Map
+
+func getZstdEncoderChannel(params ZstdEncoderParams) chan *zstd.Encoder {
+	if c, ok := zstdAvailableEncoders.Load(params); ok {
+		return c.(chan *zstd.Encoder)
 	}
-	// It's possible to race and create multiple new writers.
-	// Only one will survive GC after use.
-	encoderLevel := zstd.SpeedDefault
-	if params.Level != CompressionLevelDefault {
-		encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
+	c, _ := zstdAvailableEncoders.LoadOrStore(params, make(chan *zstd.Encoder, zstdMaxBufferedEncoders))
+	return c.(chan *zstd.Encoder)
+}
+
+func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
+	select {
+	case enc := <-getZstdEncoderChannel(params):
+		return enc
+	default:
+		encoderLevel := zstd.SpeedDefault
+		if params.Level != CompressionLevelDefault {
+			encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
+		}
+		zstdEnc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
+			zstd.WithEncoderLevel(encoderLevel),
+			zstd.WithEncoderConcurrency(1))
+		return zstdEnc
 	}
-	zstdEnc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
-		zstd.WithEncoderLevel(encoderLevel))
-	zstdEncMap.Store(params, zstdEnc)
-	return zstdEnc
+}
+
+func releaseEncoder(params ZstdEncoderParams, enc *zstd.Encoder) {
+	select {
+	case getZstdEncoderChannel(params) <- enc:
+	default:
+	}
 }
 
 func getDecoder(params ZstdDecoderParams) *zstd.Decoder {
@@ -46,5 +67,8 @@ func zstdDecompress(params ZstdDecoderParams, dst, src []byte) ([]byte, error) {
 }
 
 func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {
-	return getEncoder(params).EncodeAll(src, dst), nil
+	enc := getZstdEncoder(params)
+	out := enc.EncodeAll(src, dst)
+	releaseEncoder(params, enc)
+	return out, nil
 }
