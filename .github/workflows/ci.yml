@@ -40,8 +40,8 @@ jobs:
     - name: Get Go environment
       id: go-env
       run: |
-        echo "::set-output name=cache::$(go env GOCACHE)"
-        echo "::set-output name=modcache::$(go env GOMODCACHE)"
+        echo "cache=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+        echo "modcache=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
     - name: Set up cache
       uses: actions/cache@v3
       with:
