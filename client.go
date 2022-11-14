@@ -50,6 +50,10 @@ type Client interface {
 	// topic/partition, as determined by querying the cluster metadata.
 	Leader(topic string, partitionID int32) (*Broker, error)
 
+	// LeaderAndEpoch returns the the leader and its epoch for the current
+	// topic/partition, as determined by querying the cluster metadata.
+	LeaderAndEpoch(topic string, partitionID int32) (*Broker, int32, error)
+
 	// Replicas returns the set of all replica IDs for the given partition.
 	Replicas(topic string, partitionID int32) ([]int32, error)
 
@@ -452,21 +456,25 @@ func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32,
 }
 
 func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
+	leader, _, err := client.LeaderAndEpoch(topic, partitionID)
+	return leader, err
+}
+
+func (client *client) LeaderAndEpoch(topic string, partitionID int32) (*Broker, int32, error) {
 	if client.Closed() {
-		return nil, ErrClosedClient
+		return nil, -1, ErrClosedClient
 	}
 
-	leader, err := client.cachedLeader(topic, partitionID)
-
+	leader, epoch, err := client.cachedLeader(topic, partitionID)
 	if leader == nil {
 		err = client.RefreshMetadata(topic)
 		if err != nil {
-			return nil, err
+			return nil, -1, err
 		}
-		leader, err = client.cachedLeader(topic, partitionID)
+		leader, epoch, err = client.cachedLeader(topic, partitionID)
 	}
 
-	return leader, err
+	return leader, epoch, err
 }
 
 func (client *client) RefreshBrokers(addrs []string) error {
@@ -848,7 +856,7 @@ func (client *client) setPartitionCache(topic string, partitionSet partitionType
 	return ret
 }
 
-func (client *client) cachedLeader(topic string, partitionID int32) (*Broker, error) {
+func (client *client) cachedLeader(topic string, partitionID int32) (*Broker, int32, error) {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
@@ -857,18 +865,18 @@ func (client *client) cachedLeader(topic string, partitionID int32) (*Broker, er
 		metadata, ok := partitions[partitionID]
 		if ok {
 			if errors.Is(metadata.Err, ErrLeaderNotAvailable) {
-				return nil, ErrLeaderNotAvailable
+				return nil, -1, ErrLeaderNotAvailable
 			}
 			b := client.brokers[metadata.Leader]
 			if b == nil {
-				return nil, ErrLeaderNotAvailable
+				return nil, -1, ErrLeaderNotAvailable
 			}
 			_ = b.Open(client.conf)
-			return b, nil
+			return b, metadata.LeaderEpoch, nil
 		}
 	}
 
-	return nil, ErrUnknownTopicOrPartition
+	return nil, -1, ErrUnknownTopicOrPartition
 }
 
 func (client *client) getOffset(topic string, partitionID int32, time int64) (int64, error) {

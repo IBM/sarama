@@ -8,7 +8,10 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
-const invalidPreferredReplicaID = -1
+const (
+	invalidLeaderEpoch        = -1
+	invalidPreferredReplicaID = -1
+)
 
 type AbortedTransaction struct {
 	// ProducerID contains the producer id associated with the aborted transaction.
