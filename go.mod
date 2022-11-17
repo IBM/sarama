@@ -21,6 +21,8 @@ require (
 	golang.org/x/sync v0.0.0-20220923202941-7f9b1623fab7
 )
 
+replace github.com/jcmturner/gokrb5/v8 v8.4.3 => github.com/MikhailMS/gokrb5/v8 v8.0.0-20221117215916-6c0148cf0a20
+
 require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
