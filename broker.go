@@ -29,6 +29,7 @@ type Broker struct {
 	conn          net.Conn
 	connErr       error
 	lock          sync.Mutex
+	metricsLock   sync.RWMutex
 	opened        int32
 	responses     chan *responsePromise
 	done          chan bool
@@ -175,7 +176,9 @@ func (b *Broker) Open(conf *Config) error {
 
 	b.lock.Lock()
 
+	b.metricsLock.Lock()
 	b.metricRegistry = newCleanupRegistry(conf.MetricRegistry)
+	b.metricsLock.Unlock()
 
 	go withRecover(func() {
 		defer func() {
@@ -211,6 +214,7 @@ func (b *Broker) Open(conf *Config) error {
 		b.conf = conf
 
 		// Create or reuse the global metrics shared between brokers
+		b.metricsLock.RLock()
 		b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", b.metricRegistry)
 		b.requestRate = metrics.GetOrRegisterMeter("request-rate", b.metricRegistry)
 		b.fetchRate = metrics.GetOrRegisterMeter("consumer-fetch-rate", b.metricRegistry)
@@ -221,6 +225,7 @@ func (b *Broker) Open(conf *Config) error {
 		b.responseSize = getOrRegisterHistogram("response-size", b.metricRegistry)
 		b.requestsInFlight = metrics.GetOrRegisterCounter("requests-in-flight", b.metricRegistry)
 		b.protocolRequestsRate = map[int16]metrics.Meter{}
+		b.metricsLock.RUnlock()
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
 		if b.id >= 0 && !metrics.UseNilMetrics {
@@ -330,7 +335,9 @@ func (b *Broker) Close() error {
 	b.done = nil
 	b.responses = nil
 
+	b.metricsLock.RLock()
 	b.metricRegistry.UnregisterAll()
+	b.metricsLock.RUnlock()
 
 	if err == nil {
 		DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
@@ -446,11 +453,14 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 					return
 				}
 
+				b.metricsLock.RLock()
 				if err := versionedDecode(packets, res, request.version(), b.metricRegistry); err != nil {
+					b.metricsLock.RUnlock()
 					// Malformed response
 					cb(nil, err)
 					return
 				}
+				b.metricsLock.RUnlock()
 
 				// Wellformed response
 				b.updateThrottleMetric(res.ThrottleTime)
@@ -991,7 +1001,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
+	b.metricsLock.RLock()
 	buf, err := encode(req, b.metricRegistry)
+	b.metricsLock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -1042,6 +1054,8 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 func (b *Broker) handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise) error {
 	select {
 	case buf := <-promise.packets:
+		b.metricsLock.RLock()
+		defer b.metricsLock.RUnlock()
 		return versionedDecode(buf, res, req.version(), b.metricRegistry)
 	case err := <-promise.errors:
 		return err
@@ -1134,7 +1148,9 @@ func (b *Broker) responseReceiver() {
 		}
 
 		decodedHeader := responseHeader{}
+		b.metricsLock.RLock()
 		err = versionedDecode(header, &decodedHeader, response.headerVersion, b.metricRegistry)
+		b.metricsLock.RUnlock()
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
@@ -1256,7 +1272,9 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	rb := &SaslHandshakeRequest{Mechanism: string(saslType), Version: version}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
+	b.metricsLock.RLock()
 	buf, err := encode(req, b.metricRegistry)
+	b.metricsLock.RUnlock()
 	if err != nil {
 		return err
 	}
@@ -1293,7 +1311,9 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	b.updateIncomingCommunicationMetrics(n+8, time.Since(requestTime))
 	res := &SaslHandshakeResponse{}
 
+	b.metricsLock.RLock()
 	err = versionedDecode(payload, res, 0, b.metricRegistry)
+	b.metricsLock.RUnlock()
 	if err != nil {
 		Logger.Printf("Failed to parse SASL handshake : %s\n", err.Error())
 		return err
@@ -1656,16 +1676,22 @@ func (b *Broker) registerMetrics() {
 
 func (b *Broker) registerMeter(name string) metrics.Meter {
 	nameForBroker := getMetricNameForBroker(name, b)
+	b.metricsLock.RLock()
+	defer b.metricsLock.RUnlock()
 	return metrics.GetOrRegisterMeter(nameForBroker, b.metricRegistry)
 }
 
 func (b *Broker) registerHistogram(name string) metrics.Histogram {
 	nameForBroker := getMetricNameForBroker(name, b)
+	b.metricsLock.RLock()
+	defer b.metricsLock.RUnlock()
 	return getOrRegisterHistogram(nameForBroker, b.metricRegistry)
 }
 
 func (b *Broker) registerCounter(name string) metrics.Counter {
 	nameForBroker := getMetricNameForBroker(name, b)
+	b.metricsLock.RLock()
+	defer b.metricsLock.RUnlock()
 	return metrics.GetOrRegisterCounter(nameForBroker, b.metricRegistry)
 }
 
