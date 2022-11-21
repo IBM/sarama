@@ -2,8 +2,11 @@ package sarama
 
 import (
 	"context"
+	"errors"
+	"log"
 	"sync"
 	"testing"
+	"time"
 )
 
 type handler struct {
@@ -92,4 +95,136 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 		wg.Done()
 	}()
 	wg.Wait()
+}
+
+type testConsumerGroupHandler struct {
+}
+
+func (h *testConsumerGroupHandler) Cleanup(session ConsumerGroupSession) error {
+	return nil
+}
+func (h *testConsumerGroupHandler) ConsumeClaim(session ConsumerGroupSession, claim ConsumerGroupClaim) error {
+	for {
+		select {
+		case msg, ok := <-claim.Messages():
+			session.MarkMessage(msg, "")
+			if !ok {
+				return nil
+			}
+		case <-session.Context().Done():
+			return nil
+		}
+	}
+}
+func (h *testConsumerGroupHandler) Setup(session ConsumerGroupSession) error {
+	return nil
+}
+
+func TestConsume_RaceTest(t *testing.T) {
+	const groupID = "test-group"
+	const topic = "test-topic"
+	const offsetStart = int64(1234)
+
+	Logger = log.Default()
+
+	cfg := NewConfig()
+	cfg.Version = V2_8_1_0
+	cfg.Consumer.Return.Errors = true
+
+	seedBroker := NewMockBroker(t, 1)
+
+	joinGroupResponse := &JoinGroupResponse{}
+
+	syncGroupResponse := &SyncGroupResponse{
+		Version: 3, // sarama > 2.3.0.0 uses version 3
+	}
+	// Leverage mock response to get the MemberAssignment bytes
+	mockSyncGroupResponse := NewMockSyncGroupResponse(t).SetMemberAssignment(&ConsumerGroupMemberAssignment{
+		Version:  1,
+		Topics:   map[string][]int32{topic: {0}}, // map "test-topic" to partition 0
+		UserData: []byte{0x01},
+	})
+	syncGroupResponse.MemberAssignment = mockSyncGroupResponse.MemberAssignment
+
+	heartbeatResponse := &HeartbeatResponse{
+		Err: ErrNoError,
+	}
+	offsetFetchResponse := &OffsetFetchResponse{
+		Version:        1,
+		ThrottleTimeMs: 0,
+		Err:            ErrNoError,
+	}
+	offsetFetchResponse.AddBlock(topic, 0, &OffsetFetchResponseBlock{
+		Offset:      offsetStart,
+		LeaderEpoch: 0,
+		Metadata:    "",
+		Err:         ErrNoError})
+
+	offsetResponse := &OffsetResponse{
+		Version: 1,
+	}
+	offsetResponse.AddTopicPartition(topic, 0, offsetStart)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddTopic("mismatched-topic", ErrUnknownTopicOrPartition)
+
+	handlerMap := map[string]MockResponse{
+		"ApiVersionsRequest": NewMockApiVersionsResponse(t),
+		"MetadataRequest":    NewMockSequence(metadataResponse),
+		"OffsetRequest":      NewMockSequence(offsetResponse),
+		"OffsetFetchRequest": NewMockSequence(offsetFetchResponse),
+		"FindCoordinatorRequest": NewMockSequence(NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorGroup, groupID, seedBroker)),
+		"JoinGroupRequest": NewMockSequence(joinGroupResponse),
+		"SyncGroupRequest": NewMockSequence(syncGroupResponse),
+		"HeartbeatRequest": NewMockSequence(heartbeatResponse),
+	}
+	seedBroker.SetHandlerByMap(handlerMap)
+
+	handler := &testConsumerGroupHandler{}
+	cancelCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(4*time.Second))
+
+	defer seedBroker.Close()
+
+	retryWait := 20 * time.Millisecond
+	var client ConsumerGroup
+	var err error
+	clientRetries := 0
+outerFor:
+	for {
+		client, err = NewConsumerGroup([]string{seedBroker.Addr()}, groupID, cfg)
+		if err == nil {
+			break
+		}
+
+		if retryWait < time.Minute {
+			retryWait *= 2
+		}
+
+		clientRetries++
+
+		timer := time.NewTimer(retryWait)
+		defer timer.Stop()
+		select {
+		case <-cancelCtx.Done():
+			err = cancelCtx.Err()
+			break outerFor
+		case <-timer.C:
+		}
+	}
+	if err == nil {
+		t.Fatalf("should not proceed to Consume")
+		err = client.Consume(cancelCtx, []string{topic}, handler)
+	}
+
+	if clientRetries <= 0 {
+		t.Errorf("clientRetries = %v; want > 0", clientRetries)
+	}
+
+	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatal(err)
+	}
+
+	cancel()
 }
