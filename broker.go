@@ -33,26 +33,28 @@ type Broker struct {
 	responses     chan *responsePromise
 	done          chan bool
 
-	metricRegistry         metrics.Registry
-	incomingByteRate       metrics.Meter
-	requestRate            metrics.Meter
-	fetchRate              metrics.Meter
-	requestSize            metrics.Histogram
-	requestLatency         metrics.Histogram
-	outgoingByteRate       metrics.Meter
-	responseRate           metrics.Meter
-	responseSize           metrics.Histogram
-	requestsInFlight       metrics.Counter
-	brokerIncomingByteRate metrics.Meter
-	brokerRequestRate      metrics.Meter
-	brokerFetchRate        metrics.Meter
-	brokerRequestSize      metrics.Histogram
-	brokerRequestLatency   metrics.Histogram
-	brokerOutgoingByteRate metrics.Meter
-	brokerResponseRate     metrics.Meter
-	brokerResponseSize     metrics.Histogram
-	brokerRequestsInFlight metrics.Counter
-	brokerThrottleTime     metrics.Histogram
+	metricRegistry             metrics.Registry
+	incomingByteRate           metrics.Meter
+	requestRate                metrics.Meter
+	fetchRate                  metrics.Meter
+	requestSize                metrics.Histogram
+	requestLatency             metrics.Histogram
+	outgoingByteRate           metrics.Meter
+	responseRate               metrics.Meter
+	responseSize               metrics.Histogram
+	requestsInFlight           metrics.Counter
+	protocolRequestsRate       map[int16]metrics.Meter
+	brokerIncomingByteRate     metrics.Meter
+	brokerRequestRate          metrics.Meter
+	brokerFetchRate            metrics.Meter
+	brokerRequestSize          metrics.Histogram
+	brokerRequestLatency       metrics.Histogram
+	brokerOutgoingByteRate     metrics.Meter
+	brokerResponseRate         metrics.Meter
+	brokerResponseSize         metrics.Histogram
+	brokerRequestsInFlight     metrics.Counter
+	brokerThrottleTime         metrics.Histogram
+	brokerProtocolRequestsRate map[int16]metrics.Meter
 
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
@@ -218,6 +220,7 @@ func (b *Broker) Open(conf *Config) error {
 		b.responseRate = metrics.GetOrRegisterMeter("response-rate", b.metricRegistry)
 		b.responseSize = getOrRegisterHistogram("response-size", b.metricRegistry)
 		b.requestsInFlight = metrics.GetOrRegisterCounter("requests-in-flight", b.metricRegistry)
+		b.protocolRequestsRate = map[int16]metrics.Meter{}
 		// Do not gather metrics for seeded broker (only used during bootstrap) because they share
 		// the same id (-1) and are already exposed through the global metrics above
 		if b.id >= 0 && !metrics.UseNilMetrics {
@@ -998,6 +1001,7 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	b.addRequestInFlightMetrics(1)
 	bytes, err := b.write(buf)
 	b.updateOutgoingCommunicationMetrics(bytes)
+	b.updateProtocolMetrics(rb)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		return err
@@ -1606,6 +1610,24 @@ func (b *Broker) updateOutgoingCommunicationMetrics(bytes int) {
 	}
 }
 
+func (b *Broker) updateProtocolMetrics(rb protocolBody) {
+	protocolRequestsRate := b.protocolRequestsRate[rb.key()]
+	if protocolRequestsRate == nil {
+		protocolRequestsRate = metrics.GetOrRegisterMeter(fmt.Sprintf("protocol-requests-rate-%d", rb.key()), b.metricRegistry)
+		b.protocolRequestsRate[rb.key()] = protocolRequestsRate
+	}
+	protocolRequestsRate.Mark(1)
+
+	if b.brokerProtocolRequestsRate != nil {
+		brokerProtocolRequestsRate := b.brokerProtocolRequestsRate[rb.key()]
+		if brokerProtocolRequestsRate == nil {
+			brokerProtocolRequestsRate = b.registerMeter(fmt.Sprintf("protocol-requests-rate-%d", rb.key()))
+			b.brokerProtocolRequestsRate[rb.key()] = brokerProtocolRequestsRate
+		}
+		brokerProtocolRequestsRate.Mark(1)
+	}
+}
+
 func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
 	if throttleTime != time.Duration(0) {
 		DebugLogger.Printf(
@@ -1629,6 +1651,7 @@ func (b *Broker) registerMetrics() {
 	b.brokerResponseSize = b.registerHistogram("response-size")
 	b.brokerRequestsInFlight = b.registerCounter("requests-in-flight")
 	b.brokerThrottleTime = b.registerHistogram("throttle-time-in-ms")
+	b.brokerProtocolRequestsRate = map[int16]metrics.Meter{}
 }
 
 func (b *Broker) registerMeter(name string) metrics.Meter {

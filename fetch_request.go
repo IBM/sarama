@@ -302,7 +302,7 @@ func (r *FetchRequest) requiredVersion() KafkaVersion {
 	}
 }
 
-func (r *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32) {
+func (r *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int64, maxBytes int32, leaderEpoch int32) {
 	if r.blocks == nil {
 		r.blocks = make(map[string]map[int32]*fetchRequestBlock)
 	}
@@ -320,7 +320,7 @@ func (r *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int
 	tmp.maxBytes = maxBytes
 	tmp.fetchOffset = fetchOffset
 	if r.Version >= 9 {
-		tmp.currentLeaderEpoch = int32(-1)
+		tmp.currentLeaderEpoch = leaderEpoch
 	}
 
 	r.blocks[topic][partitionID] = tmp
