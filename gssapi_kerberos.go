@@ -58,7 +58,6 @@ type KerberosClient interface {
 
 // writePackage appends length in big endian before the payload, and sends it to kafka
 func (krbAuth *GSSAPIKerberosAuth) writePackage(broker *Broker, payload []byte) (int, error) {
-	Logger.Printf("writePackage!")
 	length := uint64(len(payload))
 	size := length + 4 // 4 byte length header + payload
 	if size > math.MaxInt32 {
@@ -71,14 +70,11 @@ func (krbAuth *GSSAPIKerberosAuth) writePackage(broker *Broker, payload []byte) 
 	if err != nil {
 		return bytes, err
 	}
-	Logger.Println("writePackage! successes")
-	Logger.Printf("writePackage! bytes: %s", hex.EncodeToString(finalPackage))
 	return bytes, nil
 }
 
 // readPackage reads payload length (4 bytes) and then reads the payload into []byte
 func (krbAuth *GSSAPIKerberosAuth) readPackage(broker *Broker) ([]byte, int, error) {
-	Logger.Printf("readPackage!")
 	bytesRead     := 0
 	lengthInBytes := make([]byte, 4)
 	bytes, err    := io.ReadFull(broker.conn, lengthInBytes)
@@ -102,7 +98,6 @@ func (krbAuth *GSSAPIKerberosAuth) readPackage(broker *Broker) ([]byte, int, err
 }
 
 func (krbAuth *GSSAPIKerberosAuth) newAuthenticatorChecksum() []byte {
-	Logger.Printf("newAuthenticatorChecksum!")
 	a     := make([]byte, 24)
 	flags := []int{gssapi.ContextFlagInteg, gssapi.ContextFlagConf}
 	binary.LittleEndian.PutUint32(a[:4], 16)
@@ -125,7 +120,6 @@ func (krbAuth *GSSAPIKerberosAuth) createKrb5Token(
 	domain string, cname types.PrincipalName,
 	ticket messages.Ticket,
 	sessionKey types.EncryptionKey) ([]byte, error) {
-	Logger.Printf("createKrb5Token!")
 	auth, err := types.NewAuthenticator(domain, cname)
 	if err != nil {
 		return nil, err
@@ -167,7 +161,6 @@ func (krbAuth *GSSAPIKerberosAuth) createKrb5Token(
 *
  */
 func (krbAuth *GSSAPIKerberosAuth) appendGSSAPIHeader(payload []byte) ([]byte, error) {
-	Logger.Printf("appendGSSAPIHeader!")
 	oidBytes, err := asn1.Marshal(gssapi.OIDKRB5.OID())
 	if err != nil {
 		return nil, err
@@ -182,10 +175,8 @@ func (krbAuth *GSSAPIKerberosAuth) appendGSSAPIHeader(payload []byte) ([]byte, e
 }
 
 func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient KerberosClient) ([]byte, error) {
-	Logger.Printf("initSecContext!")
 	switch krbAuth.step {
 	case GSS_API_INITIAL:
-		Logger.Printf("API initial!")
 		aprBytes, err := krbAuth.createKrb5Token(
 			kerberosClient.Domain(),
 			kerberosClient.CName(),
@@ -199,24 +190,25 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 		return krbAuth.appendGSSAPIHeader(aprBytes)
 
 	case GSS_API_VERIFY:
-		Logger.Printf("API verify")
 
+		// Check for 0x60 as the first byte
 		// As per RFC 4121 § 4.4, these Token ID - 0x60 0x00 to 0x60 0xFF
-		// are reserved to indicate 'Generic GSS-API token framing' that is used by GSS-API v1
+		// are reserved to indicate 'Generic GSS-API token framing' that was used by
+		// GSS-API v1, and are not supported in GSS-API v2
 		if bytes[0] == 0x60 {
 			wrapTokenReq := gssapi.WrapTokenV1{}
 			if err := wrapTokenReq.Unmarshal(bytes, true); err != nil {
 				return nil, err
 			}
 
-			// keyusage.GSSAPI_ACCEPTOR_SIGN resolves into derivation salt = 13 which is the one we must use for RC4 WrapTokenV1
-			// even though https://datatracker.ietf.org/doc/html/rfc4757#section-7.3 uses derivation salt = 15
+			// keyusage.GSSAPI_ACCEPTOR_SIGN (=23) resolves into derivation salt = 13 which is the one we must use for RC4 WrapTokenV1
+			// even though https://datatracker.ietf.org/doc/html/rfc4757#section-7.3 suggests to use derivation salt = 15 (which is actually MIC's salt)
 			isValid, err := wrapTokenReq.Verify(krbAuth.encKey, keyusage.GSSAPI_ACCEPTOR_SIGN)
 			if !isValid {
 				return nil, err
 			}
 
-			wrapTokenResponse, err := gssapi.NewInitiatorWrapTokenV1(wrapTokenReq.Payload, wrapTokenReq.SndSeqNum, krbAuth.encKey)
+			wrapTokenResponse, err := gssapi.NewInitiatorWrapTokenV1(&wrapTokenReq, krbAuth.encKey)
 			if err != nil {
 				return nil, err
 			}
@@ -226,11 +218,10 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 		} else {
 			// Otherwise build WrapToken of GSS-API v2
 			wrapTokenReq := gssapi.WrapToken{}
-
 			if err := wrapTokenReq.Unmarshal(bytes, true); err != nil {
 				return nil, err
 			}
-			// Validate response.
+
 			isValid, err := wrapTokenReq.Verify(krbAuth.encKey, keyusage.GSSAPI_ACCEPTOR_SEAL)
 			if !isValid {
 				return nil, err
