@@ -17,25 +17,25 @@ func init() {
 }
 
 var (
-	brokers   = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The Kafka brokers to connect to, as a comma separated list")
-	userName  = flag.String("username", "", "The SASL username")
-	passwd    = flag.String("passwd", "", "The SASL password")
-	algorithm = flag.String("algorithm", "", "The SASL SCRAM SHA algorithm sha256 or sha512 as mechanism")
-	topic     = flag.String("topic", "default_topic", "The Kafka topic to use")
-	certFile  = flag.String("certificate", "", "The optional certificate file for client authentication")
-	keyFile   = flag.String("key", "", "The optional key file for client authentication")
-	caFile    = flag.String("ca", "", "The optional certificate authority file for TLS client authentication")
-	verifySSL = flag.Bool("verify", false, "Optional verify ssl certificates chain")
-	useTLS    = flag.Bool("tls", false, "Use TLS to communicate with the cluster")
-	mode      = flag.String("mode", "produce", "Mode to run in: \"produce\" to produce, \"consume\" to consume")
-	logMsg    = flag.Bool("logmsg", false, "True to log consumed messages to console")
+	brokers       = flag.String("brokers", os.Getenv("KAFKA_PEERS"), "The Kafka brokers to connect to, as a comma separated list")
+	userName      = flag.String("username", "", "The SASL username")
+	passwd        = flag.String("passwd", "", "The SASL password")
+	algorithm     = flag.String("algorithm", "", "The SASL SCRAM SHA algorithm sha256 or sha512 as mechanism")
+	topic         = flag.String("topic", "default_topic", "The Kafka topic to use")
+	certFile      = flag.String("certificate", "", "The optional certificate file for client authentication")
+	keyFile       = flag.String("key", "", "The optional key file for client authentication")
+	caFile        = flag.String("ca", "", "The optional certificate authority file for TLS client authentication")
+	tlsSkipVerify = flag.Bool("tls-skip-verify", false, "Whether to skip TLS server cert verification")
+	useTLS        = flag.Bool("tls", false, "Use TLS to communicate with the cluster")
+	mode          = flag.String("mode", "produce", "Mode to run in: \"produce\" to produce, \"consume\" to consume")
+	logMsg        = flag.Bool("logmsg", false, "True to log consumed messages to console")
 
 	logger = log.New(os.Stdout, "[Producer] ", log.LstdFlags)
 )
 
 func createTLSConfiguration() (t *tls.Config) {
 	t = &tls.Config{
-		InsecureSkipVerify: *verifySSL,
+		InsecureSkipVerify: *tlsSkipVerify,
 	}
 	if *certFile != "" && *keyFile != "" && *caFile != "" {
 		cert, err := tls.LoadX509KeyPair(*certFile, *keyFile)
@@ -54,7 +54,7 @@ func createTLSConfiguration() (t *tls.Config) {
 		t = &tls.Config{
 			Certificates:       []tls.Certificate{cert},
 			RootCAs:            caCertPool,
-			InsecureSkipVerify: *verifySSL,
+			InsecureSkipVerify: *tlsSkipVerify,
 		}
 	}
 	return t
