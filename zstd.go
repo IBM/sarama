@@ -57,7 +57,7 @@ func getDecoder(params ZstdDecoderParams) *zstd.Decoder {
 	}
 	// It's possible to race and create multiple new readers.
 	// Only one will survive GC after use.
-	zstdDec, _ := zstd.NewReader(nil)
+	zstdDec, _ := zstd.NewReader(nil, zstd.WithDecoderConcurrency(0))
 	zstdDecMap.Store(params, zstdDec)
 	return zstdDec
 }
