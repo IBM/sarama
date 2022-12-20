@@ -97,12 +97,10 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 	wg.Wait()
 }
 
-type testConsumerGroupHandler struct {
-}
+type testConsumerGroupHandler struct{}
 
-func (h *testConsumerGroupHandler) Cleanup(session ConsumerGroupSession) error {
-	return nil
-}
+func (h *testConsumerGroupHandler) Setup(session ConsumerGroupSession) error   { return nil }
+func (h *testConsumerGroupHandler) Cleanup(session ConsumerGroupSession) error { return nil }
 func (h *testConsumerGroupHandler) ConsumeClaim(session ConsumerGroupSession, claim ConsumerGroupClaim) error {
 	for {
 		select {
@@ -115,9 +113,6 @@ func (h *testConsumerGroupHandler) ConsumeClaim(session ConsumerGroupSession, cl
 			return nil
 		}
 	}
-}
-func (h *testConsumerGroupHandler) Setup(session ConsumerGroupSession) error {
-	return nil
 }
 
 func TestConsume_RaceTest(t *testing.T) {
