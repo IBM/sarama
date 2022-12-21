@@ -3,7 +3,6 @@ package sarama
 import (
 	"context"
 	"errors"
-	"log"
 	"sync"
 	"testing"
 	"time"
@@ -120,8 +119,6 @@ func TestConsume_RaceTest(t *testing.T) {
 	const topic = "test-topic"
 	const offsetStart = int64(1234)
 
-	Logger = log.Default()
-
 	cfg := NewConfig()
 	cfg.Version = V2_8_1_0
 	cfg.Consumer.Return.Errors = true
@@ -177,7 +174,6 @@ func TestConsume_RaceTest(t *testing.T) {
 	}
 	seedBroker.SetHandlerByMap(handlerMap)
 
-	handler := &testConsumerGroupHandler{}
 	cancelCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(4*time.Second))
 
 	defer seedBroker.Close()
@@ -188,7 +184,7 @@ func TestConsume_RaceTest(t *testing.T) {
 	clientRetries := 0
 outerFor:
 	for {
-		client, err = NewConsumerGroup([]string{seedBroker.Addr()}, groupID, cfg)
+		client, err = NewConsumerGroup([]string{seedBroker.Addr()}, groupID, cfg) //nolint //staticcheck - false positive, declared before for loop, used after for loop
 		if err == nil {
 			break
 		}
@@ -200,16 +196,18 @@ outerFor:
 		clientRetries++
 
 		timer := time.NewTimer(retryWait)
-		defer timer.Stop()
 		select {
 		case <-cancelCtx.Done():
 			err = cancelCtx.Err()
+			timer.Stop()
 			break outerFor
 		case <-timer.C:
 		}
+		timer.Stop()
 	}
 	if err == nil {
 		t.Fatalf("should not proceed to Consume")
+		handler := &testConsumerGroupHandler{}
 		err = client.Consume(cancelCtx, []string{topic}, handler)
 	}
 
