@@ -96,11 +96,11 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 	wg.Wait()
 }
 
-type testConsumerGroupHandler struct{} //notlint //unused false positive, required interface for Consume()
+type testConsumerGroupHandler struct{} //nolint //unused false positive, required interface for Consume()
 
-func (h *testConsumerGroupHandler) Setup(session ConsumerGroupSession) error   { return nil } //notlint //unused false positive, required interface for Consume()
-func (h *testConsumerGroupHandler) Cleanup(session ConsumerGroupSession) error { return nil } //notlint //unused false positive, required interface for Consume()
-func (h *testConsumerGroupHandler) ConsumeClaim(session ConsumerGroupSession, claim ConsumerGroupClaim) error { //notlint //unused false positive, required interface for Consume()
+func (h *testConsumerGroupHandler) Setup(session ConsumerGroupSession) error   { return nil } //nolint //unused false positive, required interface for Consume()
+func (h *testConsumerGroupHandler) Cleanup(session ConsumerGroupSession) error { return nil } //nolint //unused false positive, required interface for Consume()
+func (h *testConsumerGroupHandler) ConsumeClaim(session ConsumerGroupSession, claim ConsumerGroupClaim) error { //nolint //unused false positive, required interface for Consume()
 	for {
 		select {
 		case msg, ok := <-claim.Messages():
