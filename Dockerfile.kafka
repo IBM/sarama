@@ -15,12 +15,12 @@ RUN cd /etc/java/java-11-openjdk/*/conf/security \
   && echo 'networkaddress.cache.ttl=0' >> java.security \
   && echo 'networkaddress.cache.negative.ttl=0' >> java.security
 
-# https://github.com/apache/kafka/blob/0d518aaed158896ee9ee6949b8f38128d1d73634/tests/docker/Dockerfile#L65-L67
+# https://github.com/apache/kafka/blob/53eeaad946cd053e9eb1a762972d4efeacb8e4fc/tests/docker/Dockerfile#L65-L69
 ARG KAFKA_MIRROR="https://s3-us-west-2.amazonaws.com/kafka-packages"
 RUN mkdir -p "/opt/kafka-2.8.2" && chmod a+rw /opt/kafka-2.8.2 && curl -s "$KAFKA_MIRROR/kafka_2.12-2.8.2.tgz" | tar xz --strip-components=1 -C "/opt/kafka-2.8.2"
-RUN mkdir -p "/opt/kafka-3.0.2" && chmod a+rw /opt/kafka-3.0.2 && curl -s "$KAFKA_MIRROR/kafka_2.12-3.0.2.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.0.2"
 RUN mkdir -p "/opt/kafka-3.1.2" && chmod a+rw /opt/kafka-3.1.2 && curl -s "$KAFKA_MIRROR/kafka_2.12-3.1.2.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.1.2"
 RUN mkdir -p "/opt/kafka-3.2.3" && chmod a+rw /opt/kafka-3.2.3 && curl -s "$KAFKA_MIRROR/kafka_2.12-3.2.3.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.2.3"
+RUN mkdir -p "/opt/kafka-3.3.1" && chmod a+rw /opt/kafka-3.3.1 && curl -s "$KAFKA_MIRROR/kafka_2.12-3.3.1.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.3.1"
 
 COPY entrypoint.sh /
 
