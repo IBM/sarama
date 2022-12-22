@@ -1,6 +1,6 @@
 #!/bin/bash
 
-KAFKA_VERSION="${KAFKA_VERSION:-3.1.2}"
+KAFKA_VERSION="${KAFKA_VERSION:-3.3.1}"
 KAFKA_HOME="/opt/kafka-${KAFKA_VERSION}"
 
 if [ ! -d "${KAFKA_HOME}" ]; then
