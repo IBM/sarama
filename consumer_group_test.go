@@ -96,24 +96,6 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 	wg.Wait()
 }
 
-type testConsumerGroupHandler struct{} //nolint //unused false positive, required interface for Consume()
-
-func (h *testConsumerGroupHandler) Setup(session ConsumerGroupSession) error   { return nil } //nolint //unused false positive, required interface for Consume()
-func (h *testConsumerGroupHandler) Cleanup(session ConsumerGroupSession) error { return nil } //nolint //unused false positive, required interface for Consume()
-func (h *testConsumerGroupHandler) ConsumeClaim(session ConsumerGroupSession, claim ConsumerGroupClaim) error { //nolint //unused false positive, required interface for Consume()
-	for {
-		select {
-		case msg, ok := <-claim.Messages():
-			session.MarkMessage(msg, "")
-			if !ok {
-				return nil
-			}
-		case <-session.Context().Done():
-			return nil
-		}
-	}
-}
-
 func TestConsume_RaceTest(t *testing.T) {
 	const groupID = "test-group"
 	const topic = "test-topic"
@@ -179,12 +161,11 @@ func TestConsume_RaceTest(t *testing.T) {
 	defer seedBroker.Close()
 
 	retryWait := 20 * time.Millisecond
-	var client ConsumerGroup
 	var err error
 	clientRetries := 0
 outerFor:
 	for {
-		client, err = NewConsumerGroup([]string{seedBroker.Addr()}, groupID, cfg) //nolint //staticcheck - false positive, declared before for loop, used after for loop
+		_, err = NewConsumerGroup([]string{seedBroker.Addr()}, groupID, cfg)
 		if err == nil {
 			break
 		}
@@ -207,8 +188,6 @@ outerFor:
 	}
 	if err == nil {
 		t.Fatalf("should not proceed to Consume")
-		handler := &testConsumerGroupHandler{}
-		err = client.Consume(cancelCtx, []string{topic}, handler)
 	}
 
 	if clientRetries <= 0 {
