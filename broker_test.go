@@ -123,7 +123,7 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 				pendingNotify <- brokerMetrics{bytesRead, bytesWritten}
 			})
 			broker := NewBroker(mb.Addr())
-			// Set the broker id in order to validate local broujhjker metrics
+			// Set the broker id in order to validate local broker metrics
 			broker.id = 0
 			conf := NewTestConfig()
 			conf.ApiVersionsRequest = false

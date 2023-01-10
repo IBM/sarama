@@ -429,6 +429,7 @@ type ProduceCallback func(*ProduceResponse, error)
 //
 // Make sure not to Close the broker in the callback as it will lead to a deadlock.
 func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error {
+	metricRegistry := b.metricRegistry
 	needAcks := request.RequiredAcks != NoResponse
 	// Use a nil promise when no acks is required
 	var promise *responsePromise
@@ -446,7 +447,7 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 					return
 				}
 
-				if err := versionedDecode(packets, res, request.version(), b.metricRegistry); err != nil {
+				if err := versionedDecode(packets, res, request.version(), metricRegistry); err != nil {
 					// Malformed response
 					cb(nil, err)
 					return
@@ -459,6 +460,8 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 		}
 	}
 
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	return b.sendWithPromise(request, promise)
 }
 
@@ -939,6 +942,7 @@ func (b *Broker) write(buf []byte) (n int, err error) {
 	return b.conn.Write(buf)
 }
 
+// b.lock must be haled by caller
 func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersion int16) (*responsePromise, error) {
 	var promise *responsePromise
 	if promiseResponse {
@@ -963,10 +967,8 @@ func makeResponsePromise(responseHeaderVersion int16) *responsePromise {
 	return promise
 }
 
+// b.lock must be held by caller
 func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-
 	if b.conn == nil {
 		if b.connErr != nil {
 			return b.connErr
@@ -1022,6 +1024,8 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 }
 
 func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	responseHeaderVersion := int16(-1)
 	if res != nil {
 		responseHeaderVersion = res.headerVersion()
@@ -1036,13 +1040,13 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 		return nil
 	}
 
-	return b.handleResponsePromise(req, res, promise)
+	return handleResponsePromise(req, res, promise, b.metricRegistry)
 }
 
-func (b *Broker) handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise) error {
+func handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise, metricRegistry metrics.Registry) error {
 	select {
 	case buf := <-promise.packets:
-		return versionedDecode(buf, res, req.version(), b.metricRegistry)
+		return versionedDecode(buf, res, req.version(), metricRegistry)
 	case err := <-promise.errors:
 		return err
 	}
@@ -1185,6 +1189,7 @@ func (b *Broker) authenticateViaSASLv0() error {
 }
 
 func (b *Broker) authenticateViaSASLv1() error {
+	metricRegistry := b.metricRegistry
 	if b.conf.Net.SASL.Handshake {
 		handshakeRequest := &SaslHandshakeRequest{Mechanism: string(b.conf.Net.SASL.Mechanism), Version: b.conf.Net.SASL.Version}
 		handshakeResponse := new(SaslHandshakeResponse)
@@ -1195,7 +1200,7 @@ func (b *Broker) authenticateViaSASLv1() error {
 			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
 			return handshakeErr
 		}
-		handshakeErr = b.handleResponsePromise(handshakeRequest, handshakeResponse, prom)
+		handshakeErr = handleResponsePromise(handshakeRequest, handshakeResponse, prom, metricRegistry)
 		if handshakeErr != nil {
 			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
 			return handshakeErr
@@ -1215,7 +1220,7 @@ func (b *Broker) authenticateViaSASLv1() error {
 			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
 			return nil, authErr
 		}
-		authErr = b.handleResponsePromise(authenticateRequest, authenticateResponse, prom)
+		authErr = handleResponsePromise(authenticateRequest, authenticateResponse, prom, metricRegistry)
 		if authErr != nil {
 			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
 			return nil, authErr
