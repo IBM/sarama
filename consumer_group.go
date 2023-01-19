@@ -126,14 +126,17 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		return nil, ConfigurationError("consumer groups require Version to be >= V0_10_2_0")
 	}
 
-	consumer, err := NewConsumerFromClient(client)
-	if err != nil {
-		return nil, err
+	c := &consumer{
+		client:          client,
+		conf:            client.Config(),
+		children:        make(map[string]map[int32]*partitionConsumer),
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		metricRegistry:  newCleanupRegistry(client.Config().MetricRegistry),
 	}
 
 	cg := &consumerGroup{
 		client:         client,
-		consumer:       consumer,
+		consumer:       c,
 		config:         config,
 		groupID:        groupID,
 		errors:         make(chan error, config.ChannelBufferSize),
