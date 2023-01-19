@@ -126,14 +126,14 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		return nil, ConfigurationError("consumer groups require Version to be >= V0_10_2_0")
 	}
 
-	c, err := newConsumer(client)
+	consumer, err := newConsumer(client)
 	if err != nil {
 		return nil, err
 	}
 
 	cg := &consumerGroup{
 		client:         client,
-		consumer:       c,
+		consumer:       consumer,
 		config:         config,
 		groupID:        groupID,
 		errors:         make(chan error, config.ChannelBufferSize),
