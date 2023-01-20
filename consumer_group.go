@@ -126,7 +126,7 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		return nil, ConfigurationError("consumer groups require Version to be >= V0_10_2_0")
 	}
 
-	consumer, err := NewConsumerFromClient(client)
+	consumer, err := newConsumer(client)
 	if err != nil {
 		return nil, err
 	}
