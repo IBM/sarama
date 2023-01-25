@@ -6,6 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	assert "github.com/stretchr/testify/require"
 )
 
 type handler struct {
@@ -199,4 +201,47 @@ outerFor:
 	}
 
 	cancel()
+}
+
+// TestConsumerGroupSessionDoesNotRetryForever ensures that an error fetching
+// the coordinator decrements the retry attempts and doesn't end up retrying
+// forever
+func TestConsumerGroupSessionDoesNotRetryForever(t *testing.T) {
+	config := NewTestConfig()
+	config.ClientID = t.Name()
+	config.Version = V2_0_0_0
+	config.Consumer.Return.Errors = true
+	config.Consumer.Group.Rebalance.Retry.Max = 1
+	config.Consumer.Group.Rebalance.Retry.Backoff = 0
+
+	broker0 := NewMockBroker(t, 0)
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my-topic", 0, broker0.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+			SetError(CoordinatorGroup, "my-group", ErrGroupAuthorizationFailed),
+	})
+
+	group, err := NewConsumerGroup([]string{broker0.Addr()}, "my-group", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = group.Close() }()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	h := &handler{t, cancel}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+
+	go func() {
+		topics := []string{"my-topic"}
+		err := group.Consume(ctx, topics, h)
+		assert.Error(t, err)
+		wg.Done()
+	}()
+
+	wg.Wait()
 }
