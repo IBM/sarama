@@ -252,7 +252,10 @@ func (c *consumerGroup) retryNewSession(ctx context.Context, topics []string, ha
 	if refreshCoordinator {
 		err := c.client.RefreshCoordinator(c.groupID)
 		if err != nil {
-			return c.retryNewSession(ctx, topics, handler, retries, true)
+			if retries <= 0 {
+				return nil, err
+			}
+			return c.retryNewSession(ctx, topics, handler, retries-1, true)
 		}
 	}
 
