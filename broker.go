@@ -175,7 +175,9 @@ func (b *Broker) Open(conf *Config) error {
 
 	b.lock.Lock()
 
-	b.metricRegistry = newCleanupRegistry(conf.MetricRegistry)
+	if b.metricRegistry == nil {
+		b.metricRegistry = newCleanupRegistry(conf.MetricRegistry)
+	}
 
 	go withRecover(func() {
 		defer func() {
