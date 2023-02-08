@@ -1,5 +1,292 @@
 # Changelog
 
+## Version 1.38.1 (2023-01-22)
+
+## What's Changed
+### :bug: Fixes
+* fix(example): correct `records-number` param in txn producer readme by @diallo-han in https://github.com/Shopify/sarama/pull/2420
+* fix: use newConsumer method in newConsumerGroup method by @Lumotheninja in https://github.com/Shopify/sarama/pull/2424
+### :package: Dependency updates
+* chore(deps): bump module github.com/klauspost/compress to v1.15.14 by @dnwe in https://github.com/Shopify/sarama/pull/2410
+* chore(deps): bump module golang.org/x/net to v0.5.0 by @dnwe in https://github.com/Shopify/sarama/pull/2413
+* chore(deps): bump module github.com/stretchr/testify to v1.8.1 by @dnwe in https://github.com/Shopify/sarama/pull/2411
+* chore(deps): bump module github.com/xdg-go/scram to v1.1.2 by @dnwe in https://github.com/Shopify/sarama/pull/2412
+* chore(deps): bump module golang.org/x/sync to v0.1.0 by @dnwe in https://github.com/Shopify/sarama/pull/2414
+* chore(deps): bump github.com/eapache/go-xerial-snappy digest to bf00bc1 by @dnwe in https://github.com/Shopify/sarama/pull/2418
+
+## New Contributors
+* @diallo-han made their first contribution in https://github.com/Shopify/sarama/pull/2420
+* @Lumotheninja made their first contribution in https://github.com/Shopify/sarama/pull/2424
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.38.0...v1.38.1
+
+## Version 1.38.0 (2023-01-08)
+
+## What's Changed
+### :tada: New Features / Improvements
+* feat(producer): improve memory usage of zstd encoder by using our own pool management by @rtreffer in https://github.com/Shopify/sarama/pull/2375
+* feat(proto): implement and use MetadataRequest v7 by @dnwe in https://github.com/Shopify/sarama/pull/2388
+* feat(metrics): add protocol-requests-rate metric by @auntan in https://github.com/Shopify/sarama/pull/2373
+### :bug: Fixes
+* fix(proto): track and supply leader epoch to FetchRequest by @dnwe in https://github.com/Shopify/sarama/pull/2389
+* fix(example): improve arg name used for tls skip verify by @michaeljmarshall in https://github.com/Shopify/sarama/pull/2385
+* fix(zstd): default back to GOMAXPROCS concurrency by @bgreenlee in https://github.com/Shopify/sarama/pull/2404
+* fix(producer): add nil check while producer is retrying by @hsweif in https://github.com/Shopify/sarama/pull/2387
+* fix(producer): return errors for every message in retryBatch to avoid producer hang forever by @cch123 in https://github.com/Shopify/sarama/pull/2378
+* fix(metrics): fix race when accessing metric registry by @vincentbernat in https://github.com/Shopify/sarama/pull/2409
+### :package: Dependency updates
+* chore(deps): bump golang.org/x/net to v0.4.0 by @dnwe in https://github.com/Shopify/sarama/pull/2403
+### :wrench: Maintenance
+* chore(ci): replace set-output command in GH Action by @dnwe in https://github.com/Shopify/sarama/pull/2390
+* chore(ci): include kafka 3.3.1 in testing matrix by @dnwe in https://github.com/Shopify/sarama/pull/2406
+
+## New Contributors
+* @michaeljmarshall made their first contribution in https://github.com/Shopify/sarama/pull/2385
+* @bgreenlee made their first contribution in https://github.com/Shopify/sarama/pull/2404
+* @hsweif made their first contribution in https://github.com/Shopify/sarama/pull/2387
+* @cch123 made their first contribution in https://github.com/Shopify/sarama/pull/2378
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.37.2...v1.38.0
+
+## Version 1.37.2 (2022-10-04)
+
+## What's Changed
+### :bug: Fixes
+* fix: ensure updateMetaDataMs is 64-bit aligned by @dnwe in https://github.com/Shopify/sarama/pull/2356
+### :heavy_plus_sign: Other Changes
+* fix: bump go.mod specification to go 1.17 by @dnwe in https://github.com/Shopify/sarama/pull/2357
+
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.37.1...v1.37.2
+
+## Version 1.37.1 (2022-10-04)
+
+## What's Changed
+### :bug: Fixes
+* fix: support existing deprecated Rebalance.Strategy field usage by @spongecaptain in https://github.com/Shopify/sarama/pull/2352
+* fix(test): consumer group rebalance strategy compatibility by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2353
+* fix(producer): replace time.After with time.Timer to avoid high memory usage by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2355
+
+## New Contributors
+* @spongecaptain made their first contribution in https://github.com/Shopify/sarama/pull/2352
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.37.0...v1.37.1
+
+## Version 1.37.0 (2022-09-28)
+
+## What's Changed
+
+### :rotating_light: Breaking Changes
+* Due to a change in [github.com/klauspost/compress v1.15.10](https://github.com/klauspost/compress/releases/tag/v1.15.10), Sarama v1.37.0 requires Go 1.17 going forward, unfortunately due to an oversight this wasn't reflected in the go.mod declaration at time of release.
+
+### :tada: New Features / Improvements
+* feat(consumer): support multiple balance strategies by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2339
+* feat(producer): transactional API by @ryarnyah in https://github.com/Shopify/sarama/pull/2295
+* feat(mocks): support key in MockFetchResponse. by @Skandalik in https://github.com/Shopify/sarama/pull/2328
+### :bug: Fixes
+* fix: avoid panic when Metadata.RefreshFrequency is 0 by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2329
+* fix(consumer): avoid pushing unrelated responses to paused children by @pkoutsovasilis in https://github.com/Shopify/sarama/pull/2317
+* fix: prevent metrics leak with cleanup by @auntan in https://github.com/Shopify/sarama/pull/2340
+* fix: race condition(may panic) when closing consumer group by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2331
+* fix(consumer): default ResetInvalidOffsets to true by @dnwe in https://github.com/Shopify/sarama/pull/2345
+* Validate the `Config` when creating a mock producer/consumer by @joewreschnig in https://github.com/Shopify/sarama/pull/2327
+### :package: Dependency updates
+* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.16 by @dnwe in https://github.com/Shopify/sarama/pull/2335
+* chore(deps): bump golang.org/x/net digest to bea034e by @dnwe in https://github.com/Shopify/sarama/pull/2333
+* chore(deps): bump golang.org/x/sync digest to 7f9b162 by @dnwe in https://github.com/Shopify/sarama/pull/2334
+* chore(deps): bump golang.org/x/net digest to f486391 by @dnwe in https://github.com/Shopify/sarama/pull/2348
+* chore(deps): bump module github.com/shopify/toxiproxy/v2 to v2.5.0 by @dnwe in https://github.com/Shopify/sarama/pull/2336
+* chore(deps): bump module github.com/klauspost/compress to v1.15.11 by @dnwe in https://github.com/Shopify/sarama/pull/2349
+* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.17 by @dnwe in https://github.com/Shopify/sarama/pull/2350
+### :wrench: Maintenance
+* chore(ci): bump kafka-versions to latest by @dnwe in https://github.com/Shopify/sarama/pull/2346
+* chore(ci): bump go-versions to N and N-1 by @dnwe in https://github.com/Shopify/sarama/pull/2347
+
+## New Contributors
+* @Jacob-bzx made their first contribution in https://github.com/Shopify/sarama/pull/2329
+* @pkoutsovasilis made their first contribution in https://github.com/Shopify/sarama/pull/2317
+* @Skandalik made their first contribution in https://github.com/Shopify/sarama/pull/2328
+* @auntan made their first contribution in https://github.com/Shopify/sarama/pull/2340
+* @ryarnyah made their first contribution in https://github.com/Shopify/sarama/pull/2295
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.36.0...v1.37.0
+
+## Version 1.36.0 (2022-08-11)
+
+## What's Changed
+### :tada: New Features / Improvements
+* feat: add option to propagate OffsetOutOfRange error by @dkolistratova in https://github.com/Shopify/sarama/pull/2252
+* feat(producer): expose ProducerMessage.byteSize() function by @k8scat in https://github.com/Shopify/sarama/pull/2315
+* feat(metrics): track consumer fetch request rates by @dnwe in https://github.com/Shopify/sarama/pull/2299
+### :bug: Fixes
+* fix(consumer): avoid submitting empty fetch requests when paused by @raulnegreiros in https://github.com/Shopify/sarama/pull/2143
+### :package: Dependency updates
+* chore(deps): bump module github.com/klauspost/compress to v1.15.9 by @dnwe in https://github.com/Shopify/sarama/pull/2304
+* chore(deps): bump golang.org/x/net digest to c7608f3 by @dnwe in https://github.com/Shopify/sarama/pull/2301
+* chore(deps): bump golangci/golangci-lint-action action to v3 by @dnwe in https://github.com/Shopify/sarama/pull/2311
+* chore(deps): bump golang.org/x/net digest to 07c6da5 by @dnwe in https://github.com/Shopify/sarama/pull/2307
+* chore(deps): bump github actions versions (major) by @dnwe in https://github.com/Shopify/sarama/pull/2313
+* chore(deps): bump module github.com/jcmturner/gofork to v1.7.6 by @dnwe in https://github.com/Shopify/sarama/pull/2305
+* chore(deps): bump golang.org/x/sync digest to 886fb93 by @dnwe in https://github.com/Shopify/sarama/pull/2302
+* chore(deps): bump module github.com/jcmturner/gokrb5/v8 to v8.4.3 by @dnwe in https://github.com/Shopify/sarama/pull/2303
+### :wrench: Maintenance
+* chore: add kafka 3.1.1 to the version matrix by @dnwe in https://github.com/Shopify/sarama/pull/2300
+### :heavy_plus_sign: Other Changes
+* Migrate off probot-CLA to new GitHub Action by @cursedcoder in https://github.com/Shopify/sarama/pull/2294
+* Forgot to remove cla probot by @cursedcoder in https://github.com/Shopify/sarama/pull/2297
+* chore(lint): re-enable a small amount of go-critic by @dnwe in https://github.com/Shopify/sarama/pull/2312
+
+## New Contributors
+* @cursedcoder made their first contribution in https://github.com/Shopify/sarama/pull/2294
+* @dkolistratova made their first contribution in https://github.com/Shopify/sarama/pull/2252
+* @k8scat made their first contribution in https://github.com/Shopify/sarama/pull/2315
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.35.0...v1.36.0
+
+## Version 1.35.0 (2022-07-22)
+
+## What's Changed
+### :bug: Fixes
+* fix: fix metadata retry backoff invalid when get metadata failed by @Stephan14 in https://github.com/Shopify/sarama/pull/2256
+* fix(balance): sort and de-deplicate memberIDs by @dnwe in https://github.com/Shopify/sarama/pull/2285
+* fix: prevent DescribeLogDirs hang in admin client by @zerowidth in https://github.com/Shopify/sarama/pull/2269
+* fix: include assignment-less members in SyncGroup by @dnwe in https://github.com/Shopify/sarama/pull/2292
+### :package: Dependency updates
+* chore(deps): bump module github.com/stretchr/testify to v1.8.0 by @dnwe in https://github.com/Shopify/sarama/pull/2284
+* chore(deps): bump module github.com/eapache/go-resiliency to v1.3.0 by @dnwe in https://github.com/Shopify/sarama/pull/2283
+* chore(deps): bump golang.org/x/net digest to 1185a90 by @dnwe in https://github.com/Shopify/sarama/pull/2279
+* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.15 by @dnwe in https://github.com/Shopify/sarama/pull/2281
+* chore(deps): bump module github.com/klauspost/compress to v1.15.8 by @dnwe in https://github.com/Shopify/sarama/pull/2280
+### :wrench: Maintenance
+* chore: rename `any` func to avoid identifier by @dnwe in https://github.com/Shopify/sarama/pull/2272
+* chore: add and test against kafka 3.2.0 by @dnwe in https://github.com/Shopify/sarama/pull/2288
+* chore: document Fetch protocol fields by @dnwe in https://github.com/Shopify/sarama/pull/2289
+### :heavy_plus_sign: Other Changes
+* chore(ci): fix redirect with GITHUB_STEP_SUMMARY by @dnwe in https://github.com/Shopify/sarama/pull/2286
+* fix(test): permit ECONNRESET in TestInitProducerID by @dnwe in https://github.com/Shopify/sarama/pull/2287
+* fix: ensure empty or devel version valid by @dnwe in https://github.com/Shopify/sarama/pull/2291
+
+## New Contributors
+* @zerowidth made their first contribution in https://github.com/Shopify/sarama/pull/2269
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.34.1...v1.35.0
+
+##  Version 1.34.1 (2022-06-07)
+
+## What's Changed
+### :bug: Fixes
+* fix(examples): check session.Context().Done() in examples/consumergroup by @zxc111 in https://github.com/Shopify/sarama/pull/2240
+* fix(protocol): move AuthorizedOperations into GroupDescription of DescribeGroupsResponse by @aiquestion in https://github.com/Shopify/sarama/pull/2247
+* fix(protocol): tidyup DescribeGroupsResponse by @dnwe in https://github.com/Shopify/sarama/pull/2248
+* fix(consumer): range balance strategy not like reference by @njhartwell in https://github.com/Shopify/sarama/pull/2245
+### :wrench: Maintenance
+* chore(ci): experiment with using tparse by @dnwe in https://github.com/Shopify/sarama/pull/2236
+* chore(deps): bump thirdparty dependencies to latest releases by @dnwe in https://github.com/Shopify/sarama/pull/2242
+
+## New Contributors
+* @zxc111 made their first contribution in https://github.com/Shopify/sarama/pull/2240
+* @njhartwell made their first contribution in https://github.com/Shopify/sarama/pull/2245
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.34.0...v1.34.1
+
+## Version 1.34.0 (2022-05-30)
+
+## What's Changed
+### :tada: New Features / Improvements
+* KIP-345: support static membership by @aiquestion in https://github.com/Shopify/sarama/pull/2230
+### :bug: Fixes
+* fix: KIP-368 use receiver goroutine to process all sasl v1 responses by @k-wall in https://github.com/Shopify/sarama/pull/2234
+### :wrench: Maintenance
+* chore(deps): bump module github.com/pierrec/lz4 to v4 by @dnwe in https://github.com/Shopify/sarama/pull/2231
+* chore(deps): bump golang.org/x/net digest to 2e3eb7b by @dnwe in https://github.com/Shopify/sarama/pull/2232
+
+## New Contributors
+* @aiquestion made their first contribution in https://github.com/Shopify/sarama/pull/2230
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.33.0...v1.34.0
+
+## Version 1.33.0 (2022-05-11)
+
+## What's Changed
+### :rotating_light: Breaking Changes
+
+**Note: with this change, the user of Sarama is required to use Go 1.13's errors.Is etc (rather then ==) when forming conditionals returned by this library.**
+* feat: make `ErrOutOfBrokers` wrap the underlying error that prevented connections to the brokers by @k-wall in https://github.com/Shopify/sarama/pull/2131
+
+
+### :tada: New Features / Improvements
+* feat(message): add UnmarshalText method to CompressionCodec by @vincentbernat in https://github.com/Shopify/sarama/pull/2172
+* KIP-368 : Allow SASL Connections to Periodically Re-Authenticate by @k-wall in https://github.com/Shopify/sarama/pull/2197
+* feat: add batched CreateACLs func to ClusterAdmin by @nkostoulas in https://github.com/Shopify/sarama/pull/2191
+### :bug: Fixes
+* fix: TestRecordBatchDecoding failing sporadically by @k-wall in https://github.com/Shopify/sarama/pull/2154
+* feat(test): add an fvt for broker deadlock by @dnwe in https://github.com/Shopify/sarama/pull/2144
+* fix: avoid starvation in subscriptionManager by @dnwe in https://github.com/Shopify/sarama/pull/2109
+* fix: remove "Is your cluster reachable?" from msg by @dnwe in https://github.com/Shopify/sarama/pull/2165
+* fix: remove trailing fullstop from error strings by @dnwe in https://github.com/Shopify/sarama/pull/2166
+* fix: return underlying sasl error message by @dnwe in https://github.com/Shopify/sarama/pull/2164
+* fix: potential data race on a global variable by @pior in https://github.com/Shopify/sarama/pull/2171
+* fix: AdminClient | CreateACLs | check for error in response, return error if needed by @omris94 in https://github.com/Shopify/sarama/pull/2185
+* producer: ensure that the management message (fin) is never "leaked" by @niamster in https://github.com/Shopify/sarama/pull/2182
+* fix: prevent RefreshBrokers leaking old brokers  by @k-wall in https://github.com/Shopify/sarama/pull/2203
+* fix: prevent RefreshController leaking controller by @k-wall in https://github.com/Shopify/sarama/pull/2204
+* fix: prevent AsyncProducer retryBatch from leaking  by @k-wall in https://github.com/Shopify/sarama/pull/2208
+* fix: prevent metrics leak when authenticate fails  by @Stephan14 in https://github.com/Shopify/sarama/pull/2205
+* fix: prevent deadlock between subscription manager and consumer goroutines by @niamster in https://github.com/Shopify/sarama/pull/2194
+* fix: prevent idempotent producer epoch exhaustion by @ladislavmacoun in https://github.com/Shopify/sarama/pull/2178
+* fix(test): mockbroker offsetResponse vers behavior by @dnwe in https://github.com/Shopify/sarama/pull/2213
+* fix: cope with OffsetsLoadInProgress on Join+Sync  by @dnwe in https://github.com/Shopify/sarama/pull/2214
+* fix: make default MaxWaitTime 500ms by @dnwe in https://github.com/Shopify/sarama/pull/2227
+### :package: Dependency updates
+* chore(deps): bump xdg-go/scram and klauspost/compress by @dnwe in https://github.com/Shopify/sarama/pull/2170
+### :wrench: Maintenance
+* fix(test): skip TestReadOnlyAndAllCommittedMessages by @dnwe in https://github.com/Shopify/sarama/pull/2161
+* fix(test): remove t.Parallel() by @dnwe in https://github.com/Shopify/sarama/pull/2162
+* chore(ci): bump along to Go 1.17+1.18 and bump golangci-lint by @dnwe in https://github.com/Shopify/sarama/pull/2183
+* chore: switch to multi-arch compatible docker images by @dnwe in https://github.com/Shopify/sarama/pull/2210
+### :heavy_plus_sign: Other Changes
+* Remediate a number go-routine leaks (mainly test issues) by @k-wall in https://github.com/Shopify/sarama/pull/2198
+* chore: retract v1.32.0 due to #2150 by @dnwe in https://github.com/Shopify/sarama/pull/2199
+* chore: bump functional test timeout to 12m by @dnwe in https://github.com/Shopify/sarama/pull/2200
+* fix(admin): make DeleteRecords err consistent by @dnwe in https://github.com/Shopify/sarama/pull/2226
+
+## New Contributors
+* @k-wall made their first contribution in https://github.com/Shopify/sarama/pull/2154
+* @pior made their first contribution in https://github.com/Shopify/sarama/pull/2171
+* @omris94 made their first contribution in https://github.com/Shopify/sarama/pull/2185
+* @vincentbernat made their first contribution in https://github.com/Shopify/sarama/pull/2172
+* @niamster made their first contribution in https://github.com/Shopify/sarama/pull/2182
+* @ladislavmacoun made their first contribution in https://github.com/Shopify/sarama/pull/2178
+* @nkostoulas made their first contribution in https://github.com/Shopify/sarama/pull/2191
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.32.0...v1.33.0
+
+## Version 1.32.0 (2022-02-24)
+
+### ⚠️ This release has been superseded by v1.33.0 and should _not_ be used.
+
+* chore: retract v1.32.0 due to #2150 by @dnwe in https://github.com/Shopify/sarama/pull/2199
+
+---
+
+## What's Changed
+### :bug: Fixes
+* Fix deadlock when closing Broker in brokerProducer by @slaunay in https://github.com/Shopify/sarama/pull/2133
+### :package: Dependency updates
+* chore: refresh dependencies to latest by @dnwe in https://github.com/Shopify/sarama/pull/2159
+### :wrench: Maintenance
+* fix: rework RebalancingMultiplePartitions test by @dnwe in https://github.com/Shopify/sarama/pull/2130
+* fix(test): use Sarama transactional producer by @dnwe in https://github.com/Shopify/sarama/pull/1939
+* chore: enable t.Parallel() wherever possible by @dnwe in https://github.com/Shopify/sarama/pull/2138
+### :heavy_plus_sign: Other Changes
+* chore: restrict to 1 testbinary at once by @dnwe in https://github.com/Shopify/sarama/pull/2145
+* chore: restrict to 1 parallel test at once by @dnwe in https://github.com/Shopify/sarama/pull/2146
+* Remove myself from codeowners by @bai in https://github.com/Shopify/sarama/pull/2147
+* chore: add retractions for known bad versions by @dnwe in https://github.com/Shopify/sarama/pull/2160
+
+
+**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.31.1...v1.32.0
+
 ## Version 1.31.1 (2022-02-01)
 
 - #2126 - @bai - Populate missing kafka versions
