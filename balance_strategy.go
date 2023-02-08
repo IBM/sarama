@@ -102,8 +102,8 @@ var BalanceStrategySticky = &stickyBalanceStrategy{}
 // --------------------------------------------------------------------
 
 type balanceStrategy struct {
-	name   string
 	coreFn func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32)
+	name   string
 }
 
 // Name implements BalanceStrategy.
@@ -171,10 +171,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 	}
 
 	// determine if we're dealing with a completely fresh assignment, or if there's existing assignment state
-	isFreshAssignment := false
-	if len(currentAssignment) == 0 {
-		isFreshAssignment = true
-	}
+	isFreshAssignment := len(currentAssignment) == 0
 
 	// create a mapping of all current topic partitions and the consumers that can be assigned to them
 	partition2AllPotentialConsumers := make(map[topicPartitionAssignment][]string)
@@ -281,10 +278,7 @@ func strsContains(s []string, value string) bool {
 
 // Balance assignments across consumers for maximum fairness and stickiness.
 func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPartitionAssignment, prevAssignment map[topicPartitionAssignment]consumerGenerationPair, sortedPartitions []topicPartitionAssignment, unassignedPartitions []topicPartitionAssignment, sortedCurrentSubscriptions []string, consumer2AllPotentialPartitions map[string][]topicPartitionAssignment, partition2AllPotentialConsumers map[topicPartitionAssignment][]string, currentPartitionConsumer map[topicPartitionAssignment]string) {
-	initializing := false
-	if len(sortedCurrentSubscriptions) == 0 || len(currentAssignment[sortedCurrentSubscriptions[0]]) == 0 {
-		initializing = true
-	}
+	initializing := len(sortedCurrentSubscriptions) == 0 || len(currentAssignment[sortedCurrentSubscriptions[0]]) == 0
 
 	// assign all unassigned partitions
 	for _, partition := range unassignedPartitions {
@@ -414,8 +408,8 @@ func (tp *topicAndPartition) comparedValue() string {
 }
 
 type memberAndTopic struct {
-	memberID string
 	topics   map[string]struct{}
+	memberID string
 }
 
 func (m *memberAndTopic) hasTopic(topic string) bool {
@@ -681,11 +675,8 @@ func sortPartitions(currentAssignment map[string][]topicPartitionAssignment, par
 		}
 		heap.Init(&pq)
 
-		for {
-			// loop until no consumer-group members remain
-			if pq.Len() == 0 {
-				break
-			}
+		// loop until no consumer-group members remain
+		for pq.Len() != 0 {
 			member := pq[0]
 
 			// partitions that were assigned to a different consumer last time
