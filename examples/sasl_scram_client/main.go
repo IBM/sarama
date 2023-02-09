@@ -83,7 +83,6 @@ func main() {
 	conf.Metadata.Full = true
 	conf.Version = sarama.V0_10_0_0
 	conf.ClientID = "sasl_scram_client"
-	conf.Metadata.Full = true
 	conf.Net.SASL.Enable = true
 	conf.Net.SASL.User = *userName
 	conf.Net.SASL.Password = *passwd
