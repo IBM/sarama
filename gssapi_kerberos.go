@@ -36,7 +36,7 @@ type GSSAPIConfig struct {
 	Username           string
 	Password           string
 	Realm              string
-    Host               string
+	Host               string
 	DisablePAFXFAST    bool
 }
 
@@ -212,10 +212,10 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 	// Construct SPN using serviceName and host
 	// SPN format: <SERVICE>/<FQDN>
 
-    host := krbAuth.Config.Host
-    if host == "" {
-	    host := strings.SplitN(broker.addr, ":", 2)[0] // Strip port part
-    }
+	host := krbAuth.Config.Host
+	if host == "" {
+		host := strings.SplitN(broker.addr, ":", 2)[0] // Strip port part
+	}
 	spn := fmt.Sprintf("%s/%s", broker.conf.Net.SASL.GSSAPI.ServiceName, host)
 
 	ticket, encKey, err := kerberosClient.GetServiceTicket(spn)
