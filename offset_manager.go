@@ -362,11 +362,12 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 				// TODO close the whole consumer for instacne fenced....
 				om.tryCancelSession()
 			case ErrUnknownTopicOrPartition:
-				// let the user know *and* try redispatching - if topic-auto-create is
-				// enabled, redispatching should trigger a metadata req and create the
-				// topic; if not then re-dispatching won't help, but we've let the user
-				// know and it shouldn't hurt either (see https://github.com/Shopify/sarama/issues/706)
-				fallthrough
+				if om.conf.Metadata.AllowAutoTopicCreation {
+					pom.handleError(ErrNoError) // if topic-auto-create is enabled, then it's not an error
+				} else {
+					pom.handleError(err)
+				}
+				om.releaseCoordinator(broker)
 			default:
 				// dunno, tell the user and try redispatching
 				pom.handleError(err)
