@@ -365,7 +365,7 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 				if om.conf.Metadata.AllowAutoTopicCreation {
 					pom.handleError(ErrNoError) // if topic-auto-create is enabled, then it's not an error
 				} else {
-					pom.handleError(err)
+					pom.handleError(err) // otherwise report the error
 				}
 				om.releaseCoordinator(broker)
 			default:
