@@ -343,7 +343,7 @@ func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 }
 
 func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
-	return atomic.LoadInt64(&pc.highWaterMarkOffset) + 1
+	return atomic.LoadInt64(&pc.highWaterMarkOffset)
 }
 
 // Pause implements the Pause method from the sarama.PartitionConsumer interface.

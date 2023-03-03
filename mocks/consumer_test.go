@@ -99,7 +99,7 @@ func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
 		t.Error("Expected sarama.ErrOutOfBrokers, found:", test0_err.Err)
 	}
 
-	if pc_test0.HighWaterMarkOffset() != 1 {
+	if pc_test0.HighWaterMarkOffset() != 0 {
 		t.Error("High water mark offset with value different from the expected: ", pc_test0.HighWaterMarkOffset())
 	}
 
@@ -112,7 +112,7 @@ func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
 		t.Error("Message was not as expected:", test1_msg)
 	}
 
-	if pc_test1.HighWaterMarkOffset() != 2 {
+	if pc_test1.HighWaterMarkOffset() != 1 {
 		t.Error("High water mark offset with value different from the expected: ", pc_test1.HighWaterMarkOffset())
 	}
 
@@ -125,7 +125,7 @@ func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
 		t.Error("Message was not as expected:", other0_msg)
 	}
 
-	if pc_other0.HighWaterMarkOffset() != AnyOffset+2 {
+	if pc_other0.HighWaterMarkOffset() != AnyOffset+1 {
 		t.Error("High water mark offset with value different from the expected: ", pc_other0.HighWaterMarkOffset())
 	}
 
@@ -140,7 +140,7 @@ func TestConsumerHandlesExpectationsPausingResuming(t *testing.T) {
 		t.Error("Message was not as expected:", test0_msg2)
 	}
 
-	if pc_test0.HighWaterMarkOffset() != 3 {
+	if pc_test0.HighWaterMarkOffset() != 2 {
 		t.Error("High water mark offset with value different from the expected: ", pc_test0.HighWaterMarkOffset())
 	}
 }
@@ -394,6 +394,11 @@ func TestConsumerOffsetsAreManagedCorrectlyWithSpecifiedOffset(t *testing.T) {
 
 	if len(trm.errors) != 0 {
 		t.Errorf("Expected to not report any errors, found: %v", trm.errors)
+	}
+
+	if pc.HighWaterMarkOffset() != message2.Offset+1 {
+		diff := pc.HighWaterMarkOffset() - message2.Offset
+		t.Errorf("Difference between highwatermarkoffset and last message offset greater than 1, got: %v", diff)
 	}
 }
 
