@@ -3,6 +3,7 @@ package sarama
 import (
 	krb5client "github.com/jcmturner/gokrb5/v8/client"
 	krb5config "github.com/jcmturner/gokrb5/v8/config"
+	"github.com/jcmturner/gokrb5/v8/credentials"
 	"github.com/jcmturner/gokrb5/v8/keytab"
 	"github.com/jcmturner/gokrb5/v8/types"
 )
@@ -32,13 +33,23 @@ func NewKerberosClient(config *GSSAPIConfig) (KerberosClient, error) {
 
 func createClient(config *GSSAPIConfig, cfg *krb5config.Config) (KerberosClient, error) {
 	var client *krb5client.Client
-	if config.AuthType == KRB5_KEYTAB_AUTH {
+	switch config.AuthType {
+	case KRB5_KEYTAB_AUTH:
 		kt, err := keytab.Load(config.KeyTabPath)
 		if err != nil {
 			return nil, err
 		}
 		client = krb5client.NewWithKeytab(config.Username, config.Realm, kt, cfg, krb5client.DisablePAFXFAST(config.DisablePAFXFAST))
-	} else {
+	case KRB5_CCACHE_AUTH:
+		cc, err := credentials.LoadCCache(config.CCachePath)
+		if err != nil {
+			return nil, err
+		}
+		client, err = krb5client.NewFromCCache(cc, cfg, krb5client.DisablePAFXFAST(config.DisablePAFXFAST))
+		if err != nil {
+			return nil, err
+		}
+	default:
 		client = krb5client.NewWithPassword(config.Username,
 			config.Realm, config.Password, cfg, krb5client.DisablePAFXFAST(config.DisablePAFXFAST))
 	}
