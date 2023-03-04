@@ -23,6 +23,7 @@ const (
 	GSS_API_GENERIC_TAG = 0x60
 	KRB5_USER_AUTH      = 1
 	KRB5_KEYTAB_AUTH    = 2
+	KRB5_CCACHE_AUTH    = 3
 	GSS_API_INITIAL     = 1
 	GSS_API_VERIFY      = 2
 	GSS_API_FINISH      = 3
@@ -31,6 +32,7 @@ const (
 type GSSAPIConfig struct {
 	AuthType           int
 	KeyTabPath         string
+	CCachePath         string
 	KerberosConfigPath string
 	ServiceName        string
 	Username           string

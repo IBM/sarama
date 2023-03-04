@@ -650,19 +650,26 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.GSSAPI.ServiceName must not be empty when GSS-API mechanism is used")
 			}
 
-			if c.Net.SASL.GSSAPI.AuthType == KRB5_USER_AUTH {
+			switch c.Net.SASL.GSSAPI.AuthType {
+			case KRB5_USER_AUTH:
 				if c.Net.SASL.GSSAPI.Password == "" {
 					return ConfigurationError("Net.SASL.GSSAPI.Password must not be empty when GSS-API " +
 						"mechanism is used and Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH")
 				}
-			} else if c.Net.SASL.GSSAPI.AuthType == KRB5_KEYTAB_AUTH {
+			case KRB5_KEYTAB_AUTH:
 				if c.Net.SASL.GSSAPI.KeyTabPath == "" {
 					return ConfigurationError("Net.SASL.GSSAPI.KeyTabPath must not be empty when GSS-API mechanism is used" +
-						" and  Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH")
+						" and Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH")
 				}
-			} else {
-				return ConfigurationError("Net.SASL.GSSAPI.AuthType is invalid. Possible values are KRB5_USER_AUTH and KRB5_KEYTAB_AUTH")
+			case KRB5_CCACHE_AUTH:
+				if c.Net.SASL.GSSAPI.CCachePath == "" {
+					return ConfigurationError("Net.SASL.GSSAPI.CCachePath must not be empty when GSS-API mechanism is used" +
+						" and Net.SASL.GSSAPI.AuthType = KRB5_CCACHE_AUTH")
+				}
+			default:
+				return ConfigurationError("Net.SASL.GSSAPI.AuthType is invalid. Possible values are KRB5_USER_AUTH, KRB5_KEYTAB_AUTH, and KRB5_CCACHE_AUTH")
 			}
+
 			if c.Net.SASL.GSSAPI.KerberosConfigPath == "" {
 				return ConfigurationError("Net.SASL.GSSAPI.KerberosConfigPath must not be empty when GSS-API mechanism is used")
 			}

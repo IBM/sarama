@@ -162,7 +162,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
 			},
 			"Net.SASL.GSSAPI.KeyTabPath must not be empty when GSS-API mechanism is used" +
-				" and  Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH",
+				" and Net.SASL.GSSAPI.AuthType = KRB5_KEYTAB_AUTH",
 		},
 		{
 			"SASL.Mechanism GSSAPI (Kerberos) - Missing username",
@@ -201,7 +201,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.GSSAPI.Realm = "kafka"
 				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
 			},
-			"Net.SASL.GSSAPI.AuthType is invalid. Possible values are KRB5_USER_AUTH and KRB5_KEYTAB_AUTH",
+			"Net.SASL.GSSAPI.AuthType is invalid. Possible values are KRB5_USER_AUTH, KRB5_KEYTAB_AUTH, and KRB5_CCACHE_AUTH",
 		},
 		{
 			"SASL.Mechanism GSSAPI (Kerberos) - Missing KerberosConfigPath",
@@ -228,6 +228,18 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
 			},
 			"Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used",
+		},
+		{
+			"SASL.Mechanism GSSAPI (Kerberos) - Using Credentials Cache, Missing CCachePath field",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.GSSAPI.ServiceName = "kafka"
+				cfg.Net.SASL.Mechanism = SASLTypeGSSAPI
+				cfg.Net.SASL.GSSAPI.AuthType = KRB5_CCACHE_AUTH
+				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
+			},
+			"Net.SASL.GSSAPI.CCachePath must not be empty when GSS-API mechanism is used" +
+				" and Net.SASL.GSSAPI.AuthType = KRB5_CCACHE_AUTH",
 		},
 	}
 
