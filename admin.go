@@ -891,7 +891,7 @@ func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*Group
 		describeReq := &DescribeGroupsRequest{
 			Groups: brokerGroups,
 		}
-		if ca.conf.Version.IsAtLeast(V2_3_0_0) {
+		if ca.conf.Version.IsAtLeast(V2_4_0_0) {
 			describeReq.Version = 4
 		}
 		response, err := broker.DescribeGroups(describeReq)
