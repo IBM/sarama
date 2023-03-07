@@ -65,8 +65,14 @@ func (r *DescribeGroupsResponse) headerVersion() int16 {
 
 func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
-	case 1, 2, 3, 4:
+	case 1:
+		return V1_1_0_0
+	case 2:
+		return V2_0_0_0
+	case 3:
 		return V2_3_0_0
+	case 4:
+		return V2_4_0_0
 	}
 	return V0_9_0_0
 }
