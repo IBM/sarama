@@ -61,6 +61,13 @@ type Consumer interface {
 	// This method is the same as Client.Partitions(), and is provided for convenience.
 	Partitions(topic string) ([]int32, error)
 
+	// GetOffset queries the cluster to get the most recent available offset at the
+	// given time (in milliseconds) on the topic/partition combination.
+	// Time should be OffsetOldest for the earliest available offset,
+	// OffsetNewest for the offset of the message that will be produced next, or a time.
+	// This method is the same as Client.Partitions(), and is provided for convenience.
+	GetOffset(topic string, partitionID int32, time int64) (int64, error)
+
 	// ConsumePartition creates a PartitionConsumer on the given topic/partition with
 	// the given offset. It will return an error if this Consumer is already consuming
 	// on the given topic/partition. Offset can be a literal offset, or OffsetNewest
@@ -154,6 +161,10 @@ func (c *consumer) Topics() ([]string, error) {
 
 func (c *consumer) Partitions(topic string) ([]int32, error) {
 	return c.client.Partitions(topic)
+}
+
+func (c *consumer) GetOffset(topic string, partitionID int32, time int64) (int64, error) {
+	return c.client.GetOffset(topic, partitionID, time)
 }
 
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
