@@ -552,7 +552,7 @@ func (m *testFuncConsumerGroupMember) loop(topics []string) {
 
 func newTestStatefulStrategy(t *testing.T) *testStatefulStrategy {
 	return &testStatefulStrategy{
-		BalanceStrategy: BalanceStrategyRange,
+		BalanceStrategy: NewBalanceStrategyRange(),
 		t:               t,
 	}
 }

@@ -548,7 +548,7 @@ func TestGroupInstanceIdAndVersionValidation(t *testing.T) {
 
 func TestConsumerGroupStrategyCompatibility(t *testing.T) {
 	config := NewTestConfig()
-	config.Consumer.Group.Rebalance.Strategy = BalanceStrategySticky
+	config.Consumer.Group.Rebalance.Strategy = NewBalanceStrategySticky()
 	if err := config.Validate(); err != nil {
 		t.Error("Expected passing config validation, got ", err)
 	}

@@ -76,7 +76,7 @@ func main() {
 
 	config.Consumer.IsolationLevel = sarama.ReadCommitted
 	config.Consumer.Offsets.AutoCommit.Enable = false
-	config.Consumer.Group.Rebalance.Strategy = sarama.BalanceStrategyRoundRobin
+	config.Consumer.Group.Rebalance.Strategy = sarama.NewBalanceStrategyRoundRobin()
 
 	if oldest {
 		config.Consumer.Offsets.Initial = sarama.OffsetOldest
