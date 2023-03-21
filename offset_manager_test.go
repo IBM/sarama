@@ -213,7 +213,10 @@ func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
 	// Setup again to test manual commit
 	called = make(chan none)
 
-	om.Commit()
+	err := om.Commit()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	select {
 	case <-called:

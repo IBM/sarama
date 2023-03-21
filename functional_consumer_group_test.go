@@ -263,7 +263,9 @@ func TestFuncConsumerGroupOffsetDeletion(t *testing.T) {
 	defer safeClose(t, offsetMgr)
 	markOffset(t, offsetMgr, "test.1", 0, 1)
 	markOffset(t, offsetMgr, "test.4", 0, 2)
-	offsetMgr.Commit()
+	if err := offsetMgr.Commit(); err != nil {
+		t.Fatal(err)
+	}
 
 	admin, err := NewClusterAdminFromClient(client)
 	if err != nil {

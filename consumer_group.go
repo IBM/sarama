@@ -764,10 +764,14 @@ type ConsumerGroupSession interface {
 	// message twice, and your processing should ideally be idempotent.
 	MarkOffset(topic string, partition int32, offset int64, metadata string)
 
-	// Commit the offset to the backend
+	// Commit the offset to the backend synchronously, and block until it succeeds or
+	// fails.
 	//
-	// Note: calling Commit performs a blocking synchronous operation.
-	Commit()
+	// If the offsets could not be committed, an error will be returned here, and also
+	// if Consumer.Return.Errors is set over the group's Errors() channel. Even if an
+	// error is returned here, if Consumer.Offsets.AutoCommit is enabled marked
+	// offsets may still be successfully committed later.
+	Commit() error
 
 	// ResetOffset resets to the provided offset, alongside a metadata string that
 	// represents the state of the partition consumer at that point in time. Reset
@@ -880,8 +884,8 @@ func (s *consumerGroupSession) MarkOffset(topic string, partition int32, offset 
 	}
 }
 
-func (s *consumerGroupSession) Commit() {
-	s.offsets.Commit()
+func (s *consumerGroupSession) Commit() error {
+	return s.offsets.Commit()
 }
 
 func (s *consumerGroupSession) ResetOffset(topic string, partition int32, offset int64, metadata string) {

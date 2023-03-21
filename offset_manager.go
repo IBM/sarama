@@ -22,7 +22,7 @@ type OffsetManager interface {
 
 	// Commit commits the offsets. This method can be used if AutoCommit.Enable is
 	// set to false.
-	Commit()
+	Commit() error
 }
 
 type offsetManager struct {
@@ -45,6 +45,7 @@ type offsetManager struct {
 	closeOnce sync.Once
 	closing   chan none
 	closed    chan none
+	closeErr  error
 }
 
 // NewOffsetManagerFromClient creates a new OffsetManager from the given client.
@@ -121,7 +122,7 @@ func (om *offsetManager) Close() error {
 		// flush one last time
 		if om.conf.Consumer.Offsets.AutoCommit.Enable {
 			for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
-				om.flushToBroker()
+				om.closeErr = om.flushToBroker()
 				if om.releasePOMs(false) == 0 {
 					break
 				}
@@ -133,7 +134,7 @@ func (om *offsetManager) Close() error {
 		om.broker = nil
 		om.brokerLock.Unlock()
 	})
-	return nil
+	return om.closeErr
 }
 
 func (om *offsetManager) computeBackoff(retries int) time.Duration {
@@ -241,28 +242,29 @@ func (om *offsetManager) mainLoop() {
 	for {
 		select {
 		case <-om.ticker.C:
-			om.Commit()
+			_ = om.Commit()
 		case <-om.closing:
 			return
 		}
 	}
 }
 
-func (om *offsetManager) Commit() {
-	om.flushToBroker()
+func (om *offsetManager) Commit() error {
+	err := om.flushToBroker()
 	om.releasePOMs(false)
+	return err
 }
 
-func (om *offsetManager) flushToBroker() {
+func (om *offsetManager) flushToBroker() error {
 	req := om.constructRequest()
 	if req == nil {
-		return
+		return nil
 	}
 
 	broker, err := om.coordinator()
 	if err != nil {
 		om.handleError(err)
-		return
+		return err
 	}
 
 	resp, err := broker.CommitOffset(req)
@@ -270,10 +272,11 @@ func (om *offsetManager) flushToBroker() {
 		om.handleError(err)
 		om.releaseCoordinator(broker)
 		_ = broker.Close()
-		return
+		return err
 	}
 
 	om.handleResponse(broker, req, resp)
+	return nil
 }
 
 func (om *offsetManager) constructRequest() *OffsetCommitRequest {
