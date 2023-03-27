@@ -57,7 +57,8 @@ type BalanceStrategy interface {
 
 // --------------------------------------------------------------------
 
-// BalanceStrategyRange is the default and assigns partitions as ranges to consumer group members.
+// NewBalanceStrategyRange returns a range balance strategy,
+// which is the default and assigns partitions as ranges to consumer group members.
 // This follows the same logic as
 // https://kafka.apache.org/31/javadoc/org/apache/kafka/clients/consumer/RangeAssignor.html
 //
@@ -65,27 +66,33 @@ type BalanceStrategy interface {
 //
 //	M1: {T1: [0, 1, 2], T2: [0, 1, 2]}
 //	M2: {T2: [3, 4, 5], T2: [3, 4, 5]}
-var BalanceStrategyRange = &balanceStrategy{
-	name: RangeBalanceStrategyName,
-	coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
-		partitionsPerConsumer := len(partitions) / len(memberIDs)
-		consumersWithExtraPartition := len(partitions) % len(memberIDs)
+func NewBalanceStrategyRange() BalanceStrategy {
+	return &balanceStrategy{
+		name: RangeBalanceStrategyName,
+		coreFn: func(plan BalanceStrategyPlan, memberIDs []string, topic string, partitions []int32) {
+			partitionsPerConsumer := len(partitions) / len(memberIDs)
+			consumersWithExtraPartition := len(partitions) % len(memberIDs)
 
-		sort.Strings(memberIDs)
+			sort.Strings(memberIDs)
 
-		for i, memberID := range memberIDs {
-			min := i*partitionsPerConsumer + int(math.Min(float64(consumersWithExtraPartition), float64(i)))
-			extra := 0
-			if i < consumersWithExtraPartition {
-				extra = 1
+			for i, memberID := range memberIDs {
+				min := i*partitionsPerConsumer + int(math.Min(float64(consumersWithExtraPartition), float64(i)))
+				extra := 0
+				if i < consumersWithExtraPartition {
+					extra = 1
+				}
+				max := min + partitionsPerConsumer + extra
+				plan.Add(memberID, topic, partitions[min:max]...)
 			}
-			max := min + partitionsPerConsumer + extra
-			plan.Add(memberID, topic, partitions[min:max]...)
-		}
-	},
+		},
+	}
 }
 
-// BalanceStrategySticky assigns partitions to members with an attempt to preserve earlier assignments
+// Deprecated: use NewBalanceStrategyRange to avoid data race issue
+var BalanceStrategyRange = NewBalanceStrategyRange()
+
+// NewBalanceStrategySticky returns a sticky balance strategy,
+// which assigns partitions to members with an attempt to preserve earlier assignments
 // while maintain a balanced partition distribution.
 // Example with topic T with six partitions (0..5) and two members (M1, M2):
 //
@@ -97,7 +104,12 @@ var BalanceStrategyRange = &balanceStrategy{
 //	M1: {T: [0, 2]}
 //	M2: {T: [1, 3]}
 //	M3: {T: [4, 5]}
-var BalanceStrategySticky = &stickyBalanceStrategy{}
+func NewBalanceStrategySticky() BalanceStrategy {
+	return &stickyBalanceStrategy{}
+}
+
+// Deprecated: use NewBalanceStrategySticky to avoid data race issue
+var BalanceStrategySticky = NewBalanceStrategySticky()
 
 // --------------------------------------------------------------------
 
@@ -331,11 +343,17 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	}
 }
 
-// BalanceStrategyRoundRobin assigns partitions to members in alternating order.
+// NewBalanceStrategyRoundRobin returns a round-robin balance strategy,
+// which assigns partitions to members in alternating order.
 // For example, there are two topics (t0, t1) and two consumer (m0, m1), and each topic has three partitions (p0, p1, p2):
 // M0: [t0p0, t0p2, t1p1]
 // M1: [t0p1, t1p0, t1p2]
-var BalanceStrategyRoundRobin = new(roundRobinBalancer)
+func NewBalanceStrategyRoundRobin() BalanceStrategy {
+	return new(roundRobinBalancer)
+}
+
+// Deprecated: use NewBalanceStrategyRoundRobin to avoid data race issue
+var BalanceStrategyRoundRobin = NewBalanceStrategyRoundRobin()
 
 type roundRobinBalancer struct{}
 

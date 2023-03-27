@@ -294,7 +294,7 @@ type Config struct {
 				Interval time.Duration
 			}
 			Rebalance struct {
-				// Strategy for allocating topic partitions to members (default BalanceStrategyRange)
+				// Strategy for allocating topic partitions to members.
 				// Deprecated: Strategy exists for historical compatibility
 				// and should not be used. Please use GroupStrategies.
 				Strategy BalanceStrategy
@@ -302,7 +302,7 @@ type Config struct {
 				// GroupStrategies is the priority-ordered list of client-side consumer group
 				// balancing strategies that will be offered to the coordinator. The first
 				// strategy that all group members support will be chosen by the leader.
-				// default: [BalanceStrategyRange]
+				// default: [ NewBalanceStrategyRange() ]
 				GroupStrategies []BalanceStrategy
 
 				// The maximum allowed time for each worker to join the group once a rebalance has begun.
@@ -539,7 +539,7 @@ func NewConfig() *Config {
 
 	c.Consumer.Group.Session.Timeout = 10 * time.Second
 	c.Consumer.Group.Heartbeat.Interval = 3 * time.Second
-	c.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{BalanceStrategyRange}
+	c.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{NewBalanceStrategyRange()}
 	c.Consumer.Group.Rebalance.Timeout = 60 * time.Second
 	c.Consumer.Group.Rebalance.Retry.Max = 4
 	c.Consumer.Group.Rebalance.Retry.Backoff = 2 * time.Second

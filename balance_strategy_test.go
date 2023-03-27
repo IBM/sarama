@@ -73,7 +73,7 @@ func TestBalanceStrategyRange(t *testing.T) {
 		},
 	}
 
-	strategy := BalanceStrategyRange
+	strategy := NewBalanceStrategyRange()
 	if strategy.Name() != "range" {
 		t.Errorf("Unexpected stategy name\nexpected: range\nactual: %v", strategy.Name())
 	}
@@ -96,7 +96,7 @@ func TestBalanceStrategyRange(t *testing.T) {
 }
 
 func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
-	strategy := BalanceStrategyRange
+	strategy := NewBalanceStrategyRange()
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
 	members["consumer1"] = ConsumerGroupMemberMetadata{
@@ -177,7 +177,7 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 		},
 	}
 
-	strategy := BalanceStrategyRoundRobin
+	strategy := NewBalanceStrategyRoundRobin()
 	if strategy.Name() != "roundrobin" {
 		t.Errorf("Unexpected strategy name\nexpected: roundrobin\nactual: %v", strategy.Name())
 	}
@@ -284,7 +284,7 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 }
 
 func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
-	strategy := BalanceStrategyRoundRobin
+	strategy := NewBalanceStrategyRoundRobin()
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
 	members["consumer1"] = ConsumerGroupMemberMetadata{
@@ -2091,6 +2091,23 @@ func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
 	}
 	if !bytes.Equal(expected, actual) {
 		t.Error("Invalid assignment data returned from AssignmentData")
+	}
+}
+
+func Test_stickyBalanceStrategy_Plan_data_race(t *testing.T) {
+	for i := 0; i < 1000; i++ {
+		go func(bs BalanceStrategy) {
+			members := map[string]ConsumerGroupMemberMetadata{
+				"m1": {
+					Version: 3,
+					Topics:  []string{"topic"},
+				},
+			}
+			topics := map[string][]int32{
+				"topic": {0, 1, 2},
+			}
+			_, _ = bs.Plan(members, topics)
+		}(NewBalanceStrategySticky())
 	}
 }
 
