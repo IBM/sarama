@@ -1,8 +1,10 @@
 package sarama
 
 import (
+	"bytes"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -73,6 +75,8 @@ const (
 	// SASLTypeSCRAMSHA512 represents the SCRAM-SHA-512 mechanism.
 	SASLTypeSCRAMSHA512 = "SCRAM-SHA-512"
 	SASLTypeGSSAPI      = "GSSAPI"
+	// SASLTypeAWSMSKIAM represents the SASL IAM mechanism, supported by AWS MSK clusters
+	SASLTypeAWSMSKIAM = "AWS_MSK_IAM"
 	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL auth using opaque packets.
 	SASLHandshakeV0 = int16(0)
@@ -82,6 +86,8 @@ const (
 	// SASLExtKeyAuth is the reserved extension key name sent as part of the
 	// SASL/OAUTHBEARER initial client response
 	SASLExtKeyAuth = "auth"
+
+	IAMAuthVersion = "2020_10_22"
 )
 
 // AccessToken contains an access token used to authenticate a
@@ -230,6 +236,10 @@ func (b *Broker) Open(conf *Config) error {
 		}
 
 		if conf.Net.SASL.Mechanism == SASLTypeOAuth && conf.Net.SASL.Version == SASLHandshakeV0 {
+			conf.Net.SASL.Version = SASLHandshakeV1
+		}
+
+		if conf.Net.SASL.Mechanism == SASLTypeAWSMSKIAM && conf.Net.SASL.Version == SASLHandshakeV0 {
 			conf.Net.SASL.Version = SASLHandshakeV1
 		}
 
@@ -1246,6 +1256,8 @@ func (b *Broker) authenticateViaSASLv1() error {
 		return b.sendAndReceiveSASLOAuth(authSendReceiver, provider)
 	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
 		return b.sendAndReceiveSASLSCRAMv1(authSendReceiver, b.conf.Net.SASL.SCRAMClientGeneratorFunc())
+	case SASLTypeAWSMSKIAM:
+		return b.sendAndReceiveSASLIAM(authSendReceiver)
 	default:
 		return b.sendAndReceiveSASLPlainAuthV1(authSendReceiver)
 	}
@@ -1693,4 +1705,35 @@ func validServerNameTLS(addr string, cfg *tls.Config) *tls.Config {
 	}
 	c.ServerName = sn
 	return c
+}
+
+func (b *Broker) sendAndReceiveSASLIAM(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error)) error {
+	msg, err := buildAwsIAMPayload(
+		b.addr,
+		b.conf.ClientID,
+		b.conf.Net.SASL.AWSMSKIAM,
+	)
+	if err != nil {
+		return err
+	}
+
+	res, err := authSendReceiver(msg)
+	if err != nil {
+		return err
+	}
+
+	resp := struct {
+		Version   string `json:"version"`
+		RequestID string `json:"request-id"`
+	}{}
+	err = json.NewDecoder(bytes.NewReader(res.SaslAuthBytes)).Decode(&resp)
+	if err != nil {
+		return fmt.Errorf("unable to process msk response: %w", err)
+	}
+	if resp.Version != IAMAuthVersion {
+		return fmt.Errorf("unknown version found in response")
+	}
+
+	DebugLogger.Println("SASL authentication succeeded")
+	return nil
 }

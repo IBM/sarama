@@ -97,6 +97,8 @@ type Config struct {
 			TokenProvider AccessTokenProvider
 
 			GSSAPI GSSAPIConfig
+
+			AWSMSKIAM AWSMSKIAMConfig
 		}
 
 		// KeepAlive specifies the keep-alive period for an active network connection (defaults to 0).
@@ -672,9 +674,13 @@ func (c *Config) Validate() error {
 			if c.Net.SASL.GSSAPI.Realm == "" {
 				return ConfigurationError("Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used")
 			}
+		case SASLTypeAWSMSKIAM:
+			if c.Net.SASL.AWSMSKIAM.Region == "" {
+				return ConfigurationError("AWSMSKIAM.Region must be set when AWS_MSK_IAM is enabled")
+			}
 		default:
-			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s` and `%s`",
-				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI)
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s`, `%s` and `%s`",
+				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI, SASLTypeAWSMSKIAM)
 			return ConfigurationError(msg)
 		}
 	}

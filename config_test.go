@@ -103,7 +103,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Mechanism = "AnIncorrectSASLMechanism"
 				cfg.Net.SASL.TokenProvider = &DummyTokenProvider{}
 			},
-			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512` and `GSSAPI`",
+			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512`, `GSSAPI` and `AWS_MSK_IAM`",
 		},
 		{
 			"SASL.Mechanism.OAUTHBEARER - Missing token provider",
@@ -228,6 +228,14 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.GSSAPI.KerberosConfigPath = "/etc/krb5.conf"
 			},
 			"Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used",
+		},
+		{
+			"SASL.Mechanism AWS_MSK_IAM - Missing type",
+			func(cfg *Config) {
+				cfg.Net.SASL.Enable = true
+				cfg.Net.SASL.Mechanism = SASLTypeAWSMSKIAM
+			},
+			"AWSMSKIAM.Region must be set when AWS_MSK_IAM is enabled",
 		},
 	}
 
