@@ -73,6 +73,7 @@ const (
 	// SASLTypeSCRAMSHA512 represents the SCRAM-SHA-512 mechanism.
 	SASLTypeSCRAMSHA512 = "SCRAM-SHA-512"
 	SASLTypeGSSAPI      = "GSSAPI"
+	SASLTypeCustom			= "CUSTOM"
 	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL auth using opaque packets.
 	SASLHandshakeV0 = int16(0)
@@ -121,6 +122,20 @@ type SCRAMClient interface {
 	// Done should return true when the SCRAM conversation
 	// is over.
 	Done() bool
+}
+
+// SCRAMClient is a an interface to a SCRAM
+// client implementation.
+type SCRAMClientCustom interface {
+	// Begin prepares the client for the SCRAM exchange
+	Begin(addr string, config *Config) error
+	// Step steps client through the SCRAM exchange. It is
+	// called repeatedly until it errors or `Done` returns true.
+	Step(challenge string) (response string, err error)
+	// Done should return true when the SCRAM conversation
+	// is over.
+	Done() bool
+	MechanismName() string
 }
 
 type responsePromise struct {
@@ -230,6 +245,11 @@ func (b *Broker) Open(conf *Config) error {
 		}
 
 		if conf.Net.SASL.Mechanism == SASLTypeOAuth && conf.Net.SASL.Version == SASLHandshakeV0 {
+			conf.Net.SASL.Version = SASLHandshakeV1
+		}
+
+
+		if conf.Net.SASL.Mechanism == SASLTypeCustom && conf.Net.SASL.Version == SASLHandshakeV0 {
 			conf.Net.SASL.Version = SASLHandshakeV1
 		}
 
@@ -1191,9 +1211,19 @@ func (b *Broker) authenticateViaSASLv0() error {
 }
 
 func (b *Broker) authenticateViaSASLv1() error {
+	var scramClientGeneratorFuncCustom SCRAMClientCustom
+	if b.conf.Net.SASL.Mechanism == SASLTypeCustom {
+		scramClientGeneratorFuncCustom = b.conf.Net.SASL.SCRAMClientGeneratorFuncCustom()
+	}
 	metricRegistry := b.metricRegistry
 	if b.conf.Net.SASL.Handshake {
-		handshakeRequest := &SaslHandshakeRequest{Mechanism: string(b.conf.Net.SASL.Mechanism), Version: b.conf.Net.SASL.Version}
+		var name string
+		if scramClientGeneratorFuncCustom != nil {
+			name = scramClientGeneratorFuncCustom.MechanismName()
+		} else {
+			name = string(b.conf.Net.SASL.Mechanism)
+		}
+		handshakeRequest := &SaslHandshakeRequest{Mechanism: string(name), Version: b.conf.Net.SASL.Version}
 		handshakeResponse := new(SaslHandshakeResponse)
 		prom := makeResponsePromise(handshakeResponse.version())
 
@@ -1246,6 +1276,8 @@ func (b *Broker) authenticateViaSASLv1() error {
 		return b.sendAndReceiveSASLOAuth(authSendReceiver, provider)
 	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
 		return b.sendAndReceiveSASLSCRAMv1(authSendReceiver, b.conf.Net.SASL.SCRAMClientGeneratorFunc())
+	case SASLTypeCustom:
+		return b.sendAndReceiveSASLSCRAMv1Custom(authSendReceiver, scramClientGeneratorFuncCustom)
 	default:
 		return b.sendAndReceiveSASLPlainAuthV1(authSendReceiver)
 	}
@@ -1493,6 +1525,34 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1(authSendReceiver func(authBytes []byt
 		}
 
 		msg, err = scramClient.Step(string(res.SaslAuthBytes))
+		if err != nil {
+			Logger.Println("SASL authentication failed", err)
+			return err
+		}
+	}
+
+	DebugLogger.Println("SASL authentication succeeded")
+
+	return nil
+}
+
+func (b *Broker) sendAndReceiveSASLSCRAMv1Custom(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error), scramClientCustom SCRAMClientCustom) error {
+	if err := scramClientCustom.Begin(b.addr, b.conf); err != nil {
+		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
+	}
+
+	msg, err := scramClientCustom.Step("")
+	if err != nil {
+		return fmt.Errorf("failed to advance the SCRAM exchange: %w", err)
+	}
+
+	for !scramClientCustom.Done() {
+		res, err := authSendReceiver([]byte(msg))
+		if err != nil {
+			return err
+		}
+
+		msg, err = scramClientCustom.Step(string(res.SaslAuthBytes))
 		if err != nil {
 			Logger.Println("SASL authentication failed", err)
 			return err

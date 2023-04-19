@@ -90,6 +90,9 @@ type Config struct {
 			// SCRAMClientGeneratorFunc is a generator of a user provided implementation of a SCRAM
 			// client used to perform the SCRAM exchange with the server.
 			SCRAMClientGeneratorFunc func() SCRAMClient
+			// SCRAMClientGeneratorFuncCustom is a generator for user provided implementation
+			SCRAMClientGeneratorFuncCustom func() SCRAMClientCustom
+			MechanismCustom string
 			// TokenProvider is a user-defined callback for generating
 			// access tokens for SASL/OAUTHBEARER auth. See the
 			// AccessTokenProvider interface docs for proper implementation
@@ -644,6 +647,10 @@ func (c *Config) Validate() error {
 			}
 			if c.Net.SASL.SCRAMClientGeneratorFunc == nil {
 				return ConfigurationError("A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc")
+			}
+		case SASLTypeCustom:
+			if c.Net.SASL.SCRAMClientGeneratorFuncCustom == nil {
+				return ConfigurationError("A SCRAMClientGeneratorFuncCustom function must be provided to Net.SASL.SCRAMClientGeneratorFunc")
 			}
 		case SASLTypeGSSAPI:
 			if c.Net.SASL.GSSAPI.ServiceName == "" {
