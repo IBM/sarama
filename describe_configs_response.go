@@ -34,6 +34,19 @@ const (
 	SourceDefault
 )
 
+type DescribeConfigError struct {
+	Err    KError
+	ErrMsg string
+}
+
+func (c *DescribeConfigError) Error() string {
+	text := c.Err.Error()
+	if c.ErrMsg != "" {
+		text = fmt.Sprintf("%s - %s", text, c.ErrMsg)
+	}
+	return text
+}
+
 type DescribeConfigsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
