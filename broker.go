@@ -52,6 +52,7 @@ type Broker struct {
 	brokerResponseSize     metrics.Histogram
 	brokerRequestsInFlight metrics.Counter
 	brokerThrottleTime     metrics.Histogram
+	connLockWaitTime       metrics.Histogram
 
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
@@ -428,7 +429,7 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 	return b.sendWithPromise(request, promise)
 }
 
-//Produce returns a produce response or error
+// Produce returns a produce response or error
 func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 	var (
 		response *ProduceResponse
@@ -915,8 +916,10 @@ func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersi
 }
 
 func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) error {
+	lockRequestTime := time.Now()
 	b.lock.Lock()
 	defer b.lock.Unlock()
+	b.updateConnLockWaitTimeMetric(time.Since(lockRequestTime))
 
 	if b.conn == nil {
 		if b.connErr != nil {
@@ -1199,14 +1202,14 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 // In SASL Plain, Kafka expects the auth header to be in the following format
 // Message format (from https://tools.ietf.org/html/rfc4616):
 //
-//   message   = [authzid] UTF8NUL authcid UTF8NUL passwd
-//   authcid   = 1*SAFE ; MUST accept up to 255 octets
-//   authzid   = 1*SAFE ; MUST accept up to 255 octets
-//   passwd    = 1*SAFE ; MUST accept up to 255 octets
-//   UTF8NUL   = %x00 ; UTF-8 encoded NUL character
+//	message   = [authzid] UTF8NUL authcid UTF8NUL passwd
+//	authcid   = 1*SAFE ; MUST accept up to 255 octets
+//	authzid   = 1*SAFE ; MUST accept up to 255 octets
+//	passwd    = 1*SAFE ; MUST accept up to 255 octets
+//	UTF8NUL   = %x00 ; UTF-8 encoded NUL character
 //
-//   SAFE      = UTF1 / UTF2 / UTF3 / UTF4
-//                  ;; any UTF-8 encoded Unicode character except NUL
+//	SAFE      = UTF1 / UTF2 / UTF3 / UTF4
+//	               ;; any UTF-8 encoded Unicode character except NUL
 //
 // With SASL v0 handshake and auth then:
 // When credentials are valid, Kafka returns a 4 byte array of null characters.
@@ -1673,6 +1676,11 @@ func (b *Broker) updateRequestLatencyAndInFlightMetrics(requestLatency time.Dura
 	b.addRequestInFlightMetrics(-1)
 }
 
+func (b *Broker) updateConnLockWaitTimeMetric(waitTime time.Duration) {
+	waitTimeInMs := int64(waitTime / time.Millisecond)
+	b.connLockWaitTime.Update(waitTimeInMs)
+}
+
 func (b *Broker) addRequestInFlightMetrics(i int64) {
 	b.requestsInFlight.Inc(i)
 	if b.brokerRequestsInFlight != nil {
@@ -1720,6 +1728,7 @@ func (b *Broker) registerMetrics() {
 	b.brokerResponseSize = b.registerHistogram("response-size")
 	b.brokerRequestsInFlight = b.registerCounter("requests-in-flight")
 	b.brokerThrottleTime = b.registerHistogram("throttle-time-in-ms")
+	b.connLockWaitTime = b.registerHistogram("conn-lock-wait-time-in-ms")
 }
 
 func (b *Broker) unregisterMetrics() {
