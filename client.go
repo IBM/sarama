@@ -116,6 +116,9 @@ type Client interface {
 
 	// Closed returns true if the client has already had Close called on it
 	Closed() bool
+
+	// TopicPartitions returns the map of available topics to partition ids.
+	TopicPartitions() map[string]map[int32]*PartitionMetadata
 }
 
 const (
@@ -798,6 +801,14 @@ func (client *client) LeastLoadedBroker() *Broker {
 		_ = leastLoadedBroker.Open(client.conf)
 	}
 	return leastLoadedBroker
+}
+
+// TopicPartitions returns the map of available topics to partition ids.
+func (client *client) TopicPartitions() map[string]map[int32]*PartitionMetadata {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	return client.metadata
 }
 
 // private caching/lazy metadata helpers
