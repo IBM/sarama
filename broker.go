@@ -70,12 +70,8 @@ const (
 	SASLTypeOAuth = "OAUTHBEARER"
 	// SASLTypePlaintext represents the SASL/PLAIN mechanism
 	SASLTypePlaintext = "PLAIN"
-	// SASLTypeSCRAMSHA256 represents the SCRAM-SHA-256 mechanism.
-	SASLTypeSCRAMSHA256 = "SCRAM-SHA-256"
-	// SASLTypeSCRAMSHA512 represents the SCRAM-SHA-512 mechanism.
-	SASLTypeSCRAMSHA512 = "SCRAM-SHA-512"
-	SASLTypeGSSAPI      = "GSSAPI"
-	SASLTypeCustom			= "CUSTOM"
+	SASLTypeGSSAPI    = "GSSAPI"
+	SASLTypeCustom    = "CUSTOM"
 	// SASLHandshakeV0 is v0 of the Kafka SASL handshake protocol. Client and
 	// server negotiate SASL auth using opaque packets.
 	SASLHandshakeV0 = int16(0)
@@ -112,31 +108,18 @@ type AccessTokenProvider interface {
 	Token() (*AccessToken, error)
 }
 
-// SCRAMClient is a an interface to a SCRAM
+// SCRAMClient is a an interface to an external SCRAM
 // client implementation.
-type SCRAMClient interface {
+type SCRAMClientExternal interface {
 	// Begin prepares the client for the SCRAM exchange
-	// with the server with a user name and a password
-	Begin(userName, password, authzID string) error
+	Begin(addr string) error
 	// Step steps client through the SCRAM exchange. It is
 	// called repeatedly until it errors or `Done` returns true.
 	Step(challenge string) (response string, err error)
 	// Done should return true when the SCRAM conversation
 	// is over.
 	Done() bool
-}
-
-// SCRAMClient is a an interface to a SCRAM
-// client implementation.
-type SCRAMClientCustom interface {
-	// Begin prepares the client for the SCRAM exchange
-	Begin(addr string, config *Config) error
-	// Step steps client through the SCRAM exchange. It is
-	// called repeatedly until it errors or `Done` returns true.
-	Step(challenge string) (response string, err error)
-	// Done should return true when the SCRAM conversation
-	// is over.
-	Done() bool
+	// Name of mechanism to be used with SASL V1
 	MechanismName() string
 }
 
@@ -247,11 +230,6 @@ func (b *Broker) Open(conf *Config) error {
 		}
 
 		if conf.Net.SASL.Mechanism == SASLTypeOAuth && conf.Net.SASL.Version == SASLHandshakeV0 {
-			conf.Net.SASL.Version = SASLHandshakeV1
-		}
-
-
-		if conf.Net.SASL.Mechanism == SASLTypeCustom && conf.Net.SASL.Version == SASLHandshakeV0 {
 			conf.Net.SASL.Version = SASLHandshakeV1
 		}
 
@@ -1240,7 +1218,7 @@ func getHeaderLength(headerVersion int16) int8 {
 
 func (b *Broker) authenticateViaSASLv0() error {
 	switch b.conf.Net.SASL.Mechanism {
-	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
+	case SASLTypeCustom:
 		return b.sendAndReceiveSASLSCRAMv0()
 	case SASLTypeGSSAPI:
 		return b.sendAndReceiveKerberos()
@@ -1250,15 +1228,15 @@ func (b *Broker) authenticateViaSASLv0() error {
 }
 
 func (b *Broker) authenticateViaSASLv1() error {
-	var scramClientGeneratorFuncCustom SCRAMClientCustom
+	var scramClientExternalGeneratorFunc SCRAMClientExternal
 	if b.conf.Net.SASL.Mechanism == SASLTypeCustom {
-		scramClientGeneratorFuncCustom = b.conf.Net.SASL.SCRAMClientGeneratorFuncCustom()
+		scramClientExternalGeneratorFunc = b.conf.Net.SASL.SCRAMClientExternalGeneratorFunc()
 	}
 	metricRegistry := b.metricRegistry
 	if b.conf.Net.SASL.Handshake {
 		var name string
-		if scramClientGeneratorFuncCustom != nil {
-			name = scramClientGeneratorFuncCustom.MechanismName()
+		if scramClientExternalGeneratorFunc != nil {
+			name = scramClientExternalGeneratorFunc.MechanismName()
 		} else {
 			name = string(b.conf.Net.SASL.Mechanism)
 		}
@@ -1313,10 +1291,8 @@ func (b *Broker) authenticateViaSASLv1() error {
 	case SASLTypeOAuth:
 		provider := b.conf.Net.SASL.TokenProvider
 		return b.sendAndReceiveSASLOAuth(authSendReceiver, provider)
-	case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
-		return b.sendAndReceiveSASLSCRAMv1(authSendReceiver, b.conf.Net.SASL.SCRAMClientGeneratorFunc())
 	case SASLTypeCustom:
-		return b.sendAndReceiveSASLSCRAMv1Custom(authSendReceiver, scramClientGeneratorFuncCustom)
+		return b.sendAndReceiveSASLSCRAMv1(authSendReceiver, scramClientExternalGeneratorFunc)
 	default:
 		return b.sendAndReceiveSASLPlainAuthV1(authSendReceiver)
 	}
@@ -1495,8 +1471,8 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 		return err
 	}
 
-	scramClient := b.conf.Net.SASL.SCRAMClientGeneratorFunc()
-	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
+	scramClient := b.conf.Net.SASL.SCRAMClientExternalGeneratorFunc()
+	if err := scramClient.Begin(b.addr); err != nil {
 		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
 	}
 
@@ -1547,51 +1523,23 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 	return nil
 }
 
-func (b *Broker) sendAndReceiveSASLSCRAMv1(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error), scramClient SCRAMClient) error {
-	if err := scramClient.Begin(b.conf.Net.SASL.User, b.conf.Net.SASL.Password, b.conf.Net.SASL.SCRAMAuthzID); err != nil {
+func (b *Broker) sendAndReceiveSASLSCRAMv1(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error), scramClientExternal SCRAMClientExternal) error {
+	if err := scramClientExternal.Begin(b.addr); err != nil {
 		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
 	}
 
-	msg, err := scramClient.Step("")
+	msg, err := scramClientExternal.Step("")
 	if err != nil {
 		return fmt.Errorf("failed to advance the SCRAM exchange: %w", err)
 	}
 
-	for !scramClient.Done() {
+	for !scramClientExternal.Done() {
 		res, err := authSendReceiver([]byte(msg))
 		if err != nil {
 			return err
 		}
 
-		msg, err = scramClient.Step(string(res.SaslAuthBytes))
-		if err != nil {
-			Logger.Println("SASL authentication failed", err)
-			return err
-		}
-	}
-
-	DebugLogger.Println("SASL authentication succeeded")
-
-	return nil
-}
-
-func (b *Broker) sendAndReceiveSASLSCRAMv1Custom(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error), scramClientCustom SCRAMClientCustom) error {
-	if err := scramClientCustom.Begin(b.addr, b.conf); err != nil {
-		return fmt.Errorf("failed to start SCRAM exchange with the server: %w", err)
-	}
-
-	msg, err := scramClientCustom.Step("")
-	if err != nil {
-		return fmt.Errorf("failed to advance the SCRAM exchange: %w", err)
-	}
-
-	for !scramClientCustom.Done() {
-		res, err := authSendReceiver([]byte(msg))
-		if err != nil {
-			return err
-		}
-
-		msg, err = scramClientCustom.Step(string(res.SaslAuthBytes))
+		msg, err = scramClientExternal.Step(string(res.SaslAuthBytes))
 		if err != nil {
 			Logger.Println("SASL authentication failed", err)
 			return err

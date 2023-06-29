@@ -94,14 +94,9 @@ type Config struct {
 			User string
 			// Password for SASL/PLAIN authentication
 			Password string
-			// authz id used for SASL/SCRAM authentication
-			SCRAMAuthzID string
-			// SCRAMClientGeneratorFunc is a generator of a user provided implementation of a SCRAM
-			// client used to perform the SCRAM exchange with the server.
-			SCRAMClientGeneratorFunc func() SCRAMClient
-			// SCRAMClientGeneratorFuncCustom is a generator for user provided implementation
-			SCRAMClientGeneratorFuncCustom func() SCRAMClientCustom
-			MechanismCustom string
+			// SCRAMClientExternalGeneratorFunc is a generator for user provided implementation
+			// Mechanism must be set to CUSTOM
+			SCRAMClientExternalGeneratorFunc func() SCRAMClientExternal
 			// TokenProvider is a user-defined callback for generating
 			// access tokens for SASL/OAUTHBEARER auth. See the
 			// AccessTokenProvider interface docs for proper implementation
@@ -646,19 +641,9 @@ func (c *Config) Validate() error {
 			if c.Net.SASL.TokenProvider == nil {
 				return ConfigurationError("An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider")
 			}
-		case SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512:
-			if c.Net.SASL.User == "" {
-				return ConfigurationError("Net.SASL.User must not be empty when SASL is enabled")
-			}
-			if c.Net.SASL.Password == "" {
-				return ConfigurationError("Net.SASL.Password must not be empty when SASL is enabled")
-			}
-			if c.Net.SASL.SCRAMClientGeneratorFunc == nil {
-				return ConfigurationError("A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc")
-			}
 		case SASLTypeCustom:
-			if c.Net.SASL.SCRAMClientGeneratorFuncCustom == nil {
-				return ConfigurationError("A SCRAMClientGeneratorFuncCustom function must be provided to Net.SASL.SCRAMClientGeneratorFunc")
+			if c.Net.SASL.SCRAMClientExternalGeneratorFunc == nil {
+				return ConfigurationError("A SCRAMClientExternalGeneratorFunc function must be provided to Net.SASL.SCRAMClientExternalGeneratorFunc")
 			}
 		case SASLTypeGSSAPI:
 			if c.Net.SASL.GSSAPI.ServiceName == "" {
@@ -695,8 +680,8 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used")
 			}
 		default:
-			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s` and `%s`",
-				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI)
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s` and `%s`",
+				SASLTypeOAuth, SASLTypePlaintext, SASLTypeGSSAPI, SASLTypeCustom)
 			return ConfigurationError(msg)
 		}
 	}

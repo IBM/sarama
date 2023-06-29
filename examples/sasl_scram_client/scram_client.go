@@ -13,13 +13,17 @@ var (
 )
 
 type XDGSCRAMClient struct {
+	Mechanism string
+	UserName  string
+	Password  string
+	AuthzID   string
 	*scram.Client
 	*scram.ClientConversation
 	scram.HashGeneratorFcn
 }
 
-func (x *XDGSCRAMClient) Begin(userName, password, authzID string) (err error) {
-	x.Client, err = x.HashGeneratorFcn.NewClient(userName, password, authzID)
+func (x *XDGSCRAMClient) Begin(addr string) (err error) {
+	x.Client, err = x.HashGeneratorFcn.NewClient(x.UserName, x.Password, x.AuthzID)
 	if err != nil {
 		return err
 	}
@@ -34,4 +38,8 @@ func (x *XDGSCRAMClient) Step(challenge string) (response string, err error) {
 
 func (x *XDGSCRAMClient) Done() bool {
 	return x.ClientConversation.Done()
+}
+
+func (x *XDGSCRAMClient) MechanismName() string {
+	return x.Mechanism
 }

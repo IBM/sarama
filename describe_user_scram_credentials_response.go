@@ -13,9 +13,9 @@ const (
 func (s ScramMechanismType) String() string {
 	switch s {
 	case 1:
-		return SASLTypeSCRAMSHA256
+		return "SCRAM-SHA-256"
 	case 2:
-		return SASLTypeSCRAMSHA512
+		return "SCRAM-SHA-512"
 	default:
 		return "Unknown"
 	}

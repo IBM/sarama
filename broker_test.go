@@ -336,10 +336,11 @@ func TestSASLOAuthBearer(t *testing.T) {
 
 // A mock scram client.
 type MockSCRAMClient struct {
-	done bool
+	mechanism string
+	done      bool
 }
 
-func (m *MockSCRAMClient) Begin(_, _, _ string) (err error) {
+func (m *MockSCRAMClient) Begin(_ string) (err error) {
 	return nil
 }
 
@@ -358,7 +359,11 @@ func (m *MockSCRAMClient) Done() bool {
 	return m.done
 }
 
-var _ SCRAMClient = &MockSCRAMClient{}
+func (m *MockSCRAMClient) MechanismName() string {
+	return m.mechanism
+}
+
+var _ SCRAMClientExternal = &MockSCRAMClient{}
 
 func TestSASLSCRAMSHAXXX(t *testing.T) {
 	testTable := []struct {
@@ -416,7 +421,7 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 			broker.requestsInFlight = metrics.NilCounter{}
 
 			mockSASLAuthResponse := NewMockSaslAuthenticateResponse(t).SetAuthBytes([]byte(test.scramChallengeResp))
-			mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).SetEnabledMechanisms([]string{SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512})
+			mockSASLHandshakeResponse := NewMockSaslHandshakeResponse(t).SetEnabledMechanisms([]string{SASLTypeCustom})
 
 			if !errors.Is(test.mockSASLAuthErr, ErrNoError) {
 				mockSASLAuthResponse = mockSASLAuthResponse.SetError(test.mockSASLAuthErr)
@@ -431,12 +436,12 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 			})
 
 			conf := NewTestConfig()
-			conf.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
+			conf.Net.SASL.Mechanism = SASLTypeCustom
 			conf.Net.SASL.Version = SASLHandshakeV1
 			conf.Net.SASL.User = "user"
 			conf.Net.SASL.Password = "pass"
 			conf.Net.SASL.Enable = true
-			conf.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient { return test.scramClient }
+			conf.Net.SASL.SCRAMClientExternalGeneratorFunc = func() SCRAMClientExternal { return test.scramClient }
 			conf.Version = V1_0_0_0
 
 			err := broker.Open(conf)

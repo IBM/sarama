@@ -114,7 +114,7 @@ func TestNetConfigValidates(t *testing.T) {
 				cfg.Net.SASL.Mechanism = "AnIncorrectSASLMechanism"
 				cfg.Net.SASL.TokenProvider = &DummyTokenProvider{}
 			},
-			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `SCRAM-SHA-256`, `SCRAM-SHA-512` and `GSSAPI`",
+			"The SASL mechanism configuration is invalid. Possible values are `OAUTHBEARER`, `PLAIN`, `GSSAPI` and `CUSTOM`",
 		},
 		{
 			"SASL.Mechanism.OAUTHBEARER - Missing token provider",
@@ -126,26 +126,15 @@ func TestNetConfigValidates(t *testing.T) {
 			"An AccessTokenProvider instance must be provided to Net.SASL.TokenProvider",
 		},
 		{
-			"SASL.Mechanism SCRAM-SHA-256 - Missing SCRAM client",
+			"SASL.Mechanism Custom - Missing SCRAM client",
 			func(cfg *Config) {
 				cfg.Net.SASL.Enable = true
-				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA256
-				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
+				cfg.Net.SASL.Mechanism = SASLTypeCustom
+				cfg.Net.SASL.SCRAMClientExternalGeneratorFunc = nil
 				cfg.Net.SASL.User = "user"
 				cfg.Net.SASL.Password = "strong_password"
 			},
-			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
-		},
-		{
-			"SASL.Mechanism SCRAM-SHA-512 - Missing SCRAM client",
-			func(cfg *Config) {
-				cfg.Net.SASL.Enable = true
-				cfg.Net.SASL.Mechanism = SASLTypeSCRAMSHA512
-				cfg.Net.SASL.SCRAMClientGeneratorFunc = nil
-				cfg.Net.SASL.User = "user"
-				cfg.Net.SASL.Password = "strong_password"
-			},
-			"A SCRAMClientGeneratorFunc function must be provided to Net.SASL.SCRAMClientGeneratorFunc",
+			"A SCRAMClientExternalGeneratorFunc function must be provided to Net.SASL.SCRAMClientExternalGeneratorFunc",
 		},
 		{
 			"SASL.Mechanism GSSAPI (Kerberos) - Using User/Password, Missing password field",
