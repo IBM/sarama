@@ -7,6 +7,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"sync"
 )
 
 const (
@@ -910,9 +911,12 @@ type consumerPair struct {
 type partitionMovements struct {
 	PartitionMovementsByTopic map[string]map[consumerPair]map[topicPartitionAssignment]bool
 	Movements                 map[topicPartitionAssignment]consumerPair
+	sync.RWMutex
 }
 
 func (p *partitionMovements) removeMovementRecordOfPartition(partition topicPartitionAssignment) consumerPair {
+	p.RLock()
+	defer p.RUnlock()
 	pair := p.Movements[partition]
 	delete(p.Movements, partition)
 
@@ -928,6 +932,8 @@ func (p *partitionMovements) removeMovementRecordOfPartition(partition topicPart
 }
 
 func (p *partitionMovements) addPartitionMovementRecord(partition topicPartitionAssignment, pair consumerPair) {
+	p.Lock()
+	defer p.Unlock()
 	p.Movements[partition] = pair
 	if _, exists := p.PartitionMovementsByTopic[partition.Topic]; !exists {
 		p.PartitionMovementsByTopic[partition.Topic] = make(map[consumerPair]map[topicPartitionAssignment]bool)
@@ -944,6 +950,8 @@ func (p *partitionMovements) movePartition(partition topicPartitionAssignment, o
 		SrcMemberID: oldConsumer,
 		DstMemberID: newConsumer,
 	}
+	p.Lock()
+	defer p.Unlock()
 	if _, exists := p.Movements[partition]; exists {
 		// this partition has previously moved
 		existingPair := p.removeMovementRecordOfPartition(partition)
@@ -963,6 +971,8 @@ func (p *partitionMovements) movePartition(partition topicPartitionAssignment, o
 }
 
 func (p *partitionMovements) getTheActualPartitionToBeMoved(partition topicPartitionAssignment, oldConsumer, newConsumer string) topicPartitionAssignment {
+	p.Lock()
+	defer p.Unlock()
 	if _, exists := p.PartitionMovementsByTopic[partition.Topic]; !exists {
 		return partition
 	}
