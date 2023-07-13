@@ -915,10 +915,10 @@ type partitionMovements struct {
 }
 
 func (p *partitionMovements) removeMovementRecordOfPartition(partition topicPartitionAssignment) consumerPair {
-	p.RLock()
-	defer p.RUnlock()
+	p.Lock()
 	pair := p.Movements[partition]
 	delete(p.Movements, partition)
+	p.Unlock()
 
 	partitionMovementsForThisTopic := p.PartitionMovementsByTopic[partition.Topic]
 	delete(partitionMovementsForThisTopic[pair], partition)
@@ -933,8 +933,8 @@ func (p *partitionMovements) removeMovementRecordOfPartition(partition topicPart
 
 func (p *partitionMovements) addPartitionMovementRecord(partition topicPartitionAssignment, pair consumerPair) {
 	p.Lock()
-	defer p.Unlock()
 	p.Movements[partition] = pair
+	p.Unlock()
 	if _, exists := p.PartitionMovementsByTopic[partition.Topic]; !exists {
 		p.PartitionMovementsByTopic[partition.Topic] = make(map[consumerPair]map[topicPartitionAssignment]bool)
 	}
@@ -971,11 +971,10 @@ func (p *partitionMovements) movePartition(partition topicPartitionAssignment, o
 }
 
 func (p *partitionMovements) getTheActualPartitionToBeMoved(partition topicPartitionAssignment, oldConsumer, newConsumer string) topicPartitionAssignment {
-	p.Lock()
-	defer p.Unlock()
 	if _, exists := p.PartitionMovementsByTopic[partition.Topic]; !exists {
 		return partition
 	}
+	p.Lock()
 	if _, exists := p.Movements[partition]; exists {
 		// this partition has previously moved
 		if oldConsumer != p.Movements[partition].DstMemberID {
@@ -983,6 +982,7 @@ func (p *partitionMovements) getTheActualPartitionToBeMoved(partition topicParti
 		}
 		oldConsumer = p.Movements[partition].SrcMemberID
 	}
+	p.Unlock()
 
 	partitionMovementsForThisTopic := p.PartitionMovementsByTopic[partition.Topic]
 	reversePair := consumerPair{
