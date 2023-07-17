@@ -15,7 +15,7 @@ require (
 	github.com/klauspost/compress v1.15.14
 	github.com/pierrec/lz4/v4 v4.1.17
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.4
 	github.com/xdg-go/scram v1.1.2
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.1.0
