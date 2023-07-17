@@ -1,5 +1,42 @@
 # Changelog
 
+## Version 1.40.0 (2023-07-17)
+
+## What's Changed
+
+Note: this is the first release after the transition of Sarama ownership from Shopify to IBM in https://github.com/IBM/sarama/issues/2461
+
+### :rotating_light: Breaking Changes
+
+- chore: migrate module to github.com/IBM/sarama by @dnwe in https://github.com/IBM/sarama/pull/2492
+- fix: restore (\*OffsetCommitRequest) AddBlock func by @dnwe in https://github.com/IBM/sarama/pull/2494
+
+### :bug: Fixes
+
+- fix(consumer): don't retry FindCoordinator forever by @dnwe in https://github.com/IBM/sarama/pull/2427
+- fix(metrics): fix race condition when calling Broker.Open() twice by @vincentbernat in https://github.com/IBM/sarama/pull/2428
+- fix: use version 4 of DescribeGroupsRequest only if kafka broker vers… …ion is >= 2.4 by @faillefer in https://github.com/IBM/sarama/pull/2451
+- Fix HighWaterMarkOffset of mocks partition consumer by @gr8web in https://github.com/IBM/sarama/pull/2447
+- fix: prevent data race in balance strategy by @napallday in https://github.com/IBM/sarama/pull/2453
+
+### :package: Dependency updates
+
+- chore(deps): bump golang.org/x/net from 0.5.0 to 0.7.0 by @dependabot in https://github.com/IBM/sarama/pull/2452
+
+### :wrench: Maintenance
+
+- chore: add kafka 3.3.2 by @dnwe in https://github.com/IBM/sarama/pull/2434
+- chore(ci): remove Shopify/shopify-cla-action by @dnwe in https://github.com/IBM/sarama/pull/2489
+- chore: bytes.Equal instead bytes.Compare by @testwill in https://github.com/IBM/sarama/pull/2485
+
+## New Contributors
+
+- @dependabot made their first contribution in https://github.com/IBM/sarama/pull/2452
+- @gr8web made their first contribution in https://github.com/IBM/sarama/pull/2447
+- @testwill made their first contribution in https://github.com/IBM/sarama/pull/2485
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.38.1...v1.40.0
+
 ## Version 1.38.1 (2023-01-22)
 
 ## What's Changed
