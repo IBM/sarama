@@ -10,7 +10,6 @@ updates:
       - "ignore-for-release"
     commit-message:
       prefix: chore(ci)
-      include: "scope"
     groups:
       github-actions:
         patterns:
@@ -25,7 +24,6 @@ updates:
       - "dependencies"
     commit-message:
       prefix: chore(deps)
-      include: "scope"
     groups:
       golang-org-x:
         patterns:
