@@ -39,6 +39,13 @@ linters-settings:
     lines: 300
     statements: 300
 
+  depguard:
+    rules:
+      main:
+        deny:
+          - pkg: "io/ioutil"
+            desc: Use the "io" and "os" packages instead.
+
 linters:
   disable-all: true
   enable:
