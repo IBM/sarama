@@ -304,7 +304,7 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 		for _, pom := range topicManagers {
 			pom.lock.Lock()
 			if pom.dirty {
-				r.AddBlock(pom.topic, pom.partition, pom.offset, pom.leaderEpoch, perPartitionTimestamp, pom.metadata)
+				r.AddBlockWithLeaderEpoch(pom.topic, pom.partition, pom.offset, pom.leaderEpoch, perPartitionTimestamp, pom.metadata)
 			}
 			pom.lock.Unlock()
 		}

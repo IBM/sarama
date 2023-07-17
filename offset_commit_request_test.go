@@ -70,7 +70,7 @@ func TestOffsetCommitRequestV0(t *testing.T) {
 	request.ConsumerGroup = "foobar"
 	testRequest(t, "no blocks v0", request, offsetCommitRequestNoBlocksV0)
 
-	request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, 0, "metadata")
+	request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, "metadata")
 	testRequest(t, "one block v0", request, offsetCommitRequestOneBlockV0)
 }
 
@@ -82,7 +82,7 @@ func TestOffsetCommitRequestV1(t *testing.T) {
 	request.Version = 1
 	testRequest(t, "no blocks v1", request, offsetCommitRequestNoBlocksV1)
 
-	request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, ReceiveTime, "metadata")
+	request.AddBlock("topic", 0x5221, 0xDEADBEEF, ReceiveTime, "metadata")
 	testRequest(t, "one block v1", request, offsetCommitRequestOneBlockV1)
 }
 
@@ -96,7 +96,7 @@ func TestOffsetCommitRequestV2ToV4(t *testing.T) {
 		request.Version = int16(version)
 		testRequest(t, fmt.Sprintf("no blocks v%d", version), request, offsetCommitRequestNoBlocksV2)
 
-		request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, 0, "metadata")
+		request.AddBlock("topic", 0x5221, 0xDEADBEEF, 0, "metadata")
 		testRequest(t, fmt.Sprintf("one block v%d", version), request, offsetCommitRequestOneBlockV2)
 	}
 }
