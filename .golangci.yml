@@ -19,7 +19,7 @@ linters-settings:
   misspell:
     locale: US
   goimports:
-    local-prefixes: github.com/Shopify/sarama
+    local-prefixes: github.com/IBM/sarama
   gocritic:
     enabled-tags:
       - diagnostic
@@ -39,11 +39,18 @@ linters-settings:
     lines: 300
     statements: 300
 
+  depguard:
+    rules:
+      main:
+        deny:
+          - pkg: "io/ioutil"
+            desc: Use the "io" and "os" packages instead.
+
 linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
+    # - deadcode
     - depguard
     - exportloopref
     - dogsled
@@ -68,12 +75,12 @@ linters:
     # - paralleltest
     # - scopelint
     - staticcheck
-    - structcheck
+    # - structcheck
     # - stylecheck
     - typecheck
     - unconvert
     - unused
-    - varcheck
+    # - varcheck
     - whitespace
 
 issues:
