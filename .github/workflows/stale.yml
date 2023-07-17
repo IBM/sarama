@@ -31,6 +31,6 @@ jobs:
             branch has no conflicts with main and rebase if needed. If you
             are awaiting a (re-)review then please let us know.
           stale-issue-label: "stale"
-          exempt-issue-label: "stale/exempt,pinned"
+          exempt-issue-labels: "stale/exempt,pinned"
           stale-pr-label: "stale"
-          exempt-pr-label: "stale/exempt,pinned"
+          exempt-pr-labels: "stale/exempt,pinned"
