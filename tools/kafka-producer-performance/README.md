@@ -4,7 +4,7 @@ A command line tool to test producer performance.
 
 ### Installation
 
-    go get github.com/Shopify/sarama/tools/kafka-producer-performance
+    go get github.com/IBM/sarama/tools/kafka-producer-performance
 
 
 ### Usage

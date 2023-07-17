@@ -13,10 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Shopify/sarama"
+	_ "net/http/pprof"
+
 	"github.com/rcrowley/go-metrics"
 
-	_ "net/http/pprof"
+	"github.com/IBM/sarama"
 )
 
 // Sarama configuration options

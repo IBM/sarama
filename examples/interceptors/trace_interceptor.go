@@ -4,10 +4,11 @@ import (
 	"context"
 	"strings"
 
-	"github.com/Shopify/sarama"
 	"go.opentelemetry.io/otel/api/global"
 	"go.opentelemetry.io/otel/api/kv"
 	"go.opentelemetry.io/otel/api/trace"
+
+	"github.com/IBM/sarama"
 )
 
 type OTelInterceptor struct {

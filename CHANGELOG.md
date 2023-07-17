@@ -4,73 +4,73 @@
 
 ## What's Changed
 ### :bug: Fixes
-* fix(example): correct `records-number` param in txn producer readme by @diallo-han in https://github.com/Shopify/sarama/pull/2420
-* fix: use newConsumer method in newConsumerGroup method by @Lumotheninja in https://github.com/Shopify/sarama/pull/2424
+* fix(example): correct `records-number` param in txn producer readme by @diallo-han in https://github.com/IBM/sarama/pull/2420
+* fix: use newConsumer method in newConsumerGroup method by @Lumotheninja in https://github.com/IBM/sarama/pull/2424
 ### :package: Dependency updates
-* chore(deps): bump module github.com/klauspost/compress to v1.15.14 by @dnwe in https://github.com/Shopify/sarama/pull/2410
-* chore(deps): bump module golang.org/x/net to v0.5.0 by @dnwe in https://github.com/Shopify/sarama/pull/2413
-* chore(deps): bump module github.com/stretchr/testify to v1.8.1 by @dnwe in https://github.com/Shopify/sarama/pull/2411
-* chore(deps): bump module github.com/xdg-go/scram to v1.1.2 by @dnwe in https://github.com/Shopify/sarama/pull/2412
-* chore(deps): bump module golang.org/x/sync to v0.1.0 by @dnwe in https://github.com/Shopify/sarama/pull/2414
-* chore(deps): bump github.com/eapache/go-xerial-snappy digest to bf00bc1 by @dnwe in https://github.com/Shopify/sarama/pull/2418
+* chore(deps): bump module github.com/klauspost/compress to v1.15.14 by @dnwe in https://github.com/IBM/sarama/pull/2410
+* chore(deps): bump module golang.org/x/net to v0.5.0 by @dnwe in https://github.com/IBM/sarama/pull/2413
+* chore(deps): bump module github.com/stretchr/testify to v1.8.1 by @dnwe in https://github.com/IBM/sarama/pull/2411
+* chore(deps): bump module github.com/xdg-go/scram to v1.1.2 by @dnwe in https://github.com/IBM/sarama/pull/2412
+* chore(deps): bump module golang.org/x/sync to v0.1.0 by @dnwe in https://github.com/IBM/sarama/pull/2414
+* chore(deps): bump github.com/eapache/go-xerial-snappy digest to bf00bc1 by @dnwe in https://github.com/IBM/sarama/pull/2418
 
 ## New Contributors
-* @diallo-han made their first contribution in https://github.com/Shopify/sarama/pull/2420
-* @Lumotheninja made their first contribution in https://github.com/Shopify/sarama/pull/2424
+* @diallo-han made their first contribution in https://github.com/IBM/sarama/pull/2420
+* @Lumotheninja made their first contribution in https://github.com/IBM/sarama/pull/2424
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.38.0...v1.38.1
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.38.0...v1.38.1
 
 ## Version 1.38.0 (2023-01-08)
 
 ## What's Changed
 ### :tada: New Features / Improvements
-* feat(producer): improve memory usage of zstd encoder by using our own pool management by @rtreffer in https://github.com/Shopify/sarama/pull/2375
-* feat(proto): implement and use MetadataRequest v7 by @dnwe in https://github.com/Shopify/sarama/pull/2388
-* feat(metrics): add protocol-requests-rate metric by @auntan in https://github.com/Shopify/sarama/pull/2373
+* feat(producer): improve memory usage of zstd encoder by using our own pool management by @rtreffer in https://github.com/IBM/sarama/pull/2375
+* feat(proto): implement and use MetadataRequest v7 by @dnwe in https://github.com/IBM/sarama/pull/2388
+* feat(metrics): add protocol-requests-rate metric by @auntan in https://github.com/IBM/sarama/pull/2373
 ### :bug: Fixes
-* fix(proto): track and supply leader epoch to FetchRequest by @dnwe in https://github.com/Shopify/sarama/pull/2389
-* fix(example): improve arg name used for tls skip verify by @michaeljmarshall in https://github.com/Shopify/sarama/pull/2385
-* fix(zstd): default back to GOMAXPROCS concurrency by @bgreenlee in https://github.com/Shopify/sarama/pull/2404
-* fix(producer): add nil check while producer is retrying by @hsweif in https://github.com/Shopify/sarama/pull/2387
-* fix(producer): return errors for every message in retryBatch to avoid producer hang forever by @cch123 in https://github.com/Shopify/sarama/pull/2378
-* fix(metrics): fix race when accessing metric registry by @vincentbernat in https://github.com/Shopify/sarama/pull/2409
+* fix(proto): track and supply leader epoch to FetchRequest by @dnwe in https://github.com/IBM/sarama/pull/2389
+* fix(example): improve arg name used for tls skip verify by @michaeljmarshall in https://github.com/IBM/sarama/pull/2385
+* fix(zstd): default back to GOMAXPROCS concurrency by @bgreenlee in https://github.com/IBM/sarama/pull/2404
+* fix(producer): add nil check while producer is retrying by @hsweif in https://github.com/IBM/sarama/pull/2387
+* fix(producer): return errors for every message in retryBatch to avoid producer hang forever by @cch123 in https://github.com/IBM/sarama/pull/2378
+* fix(metrics): fix race when accessing metric registry by @vincentbernat in https://github.com/IBM/sarama/pull/2409
 ### :package: Dependency updates
-* chore(deps): bump golang.org/x/net to v0.4.0 by @dnwe in https://github.com/Shopify/sarama/pull/2403
+* chore(deps): bump golang.org/x/net to v0.4.0 by @dnwe in https://github.com/IBM/sarama/pull/2403
 ### :wrench: Maintenance
-* chore(ci): replace set-output command in GH Action by @dnwe in https://github.com/Shopify/sarama/pull/2390
-* chore(ci): include kafka 3.3.1 in testing matrix by @dnwe in https://github.com/Shopify/sarama/pull/2406
+* chore(ci): replace set-output command in GH Action by @dnwe in https://github.com/IBM/sarama/pull/2390
+* chore(ci): include kafka 3.3.1 in testing matrix by @dnwe in https://github.com/IBM/sarama/pull/2406
 
 ## New Contributors
-* @michaeljmarshall made their first contribution in https://github.com/Shopify/sarama/pull/2385
-* @bgreenlee made their first contribution in https://github.com/Shopify/sarama/pull/2404
-* @hsweif made their first contribution in https://github.com/Shopify/sarama/pull/2387
-* @cch123 made their first contribution in https://github.com/Shopify/sarama/pull/2378
+* @michaeljmarshall made their first contribution in https://github.com/IBM/sarama/pull/2385
+* @bgreenlee made their first contribution in https://github.com/IBM/sarama/pull/2404
+* @hsweif made their first contribution in https://github.com/IBM/sarama/pull/2387
+* @cch123 made their first contribution in https://github.com/IBM/sarama/pull/2378
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.37.2...v1.38.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.37.2...v1.38.0
 
 ## Version 1.37.2 (2022-10-04)
 
 ## What's Changed
 ### :bug: Fixes
-* fix: ensure updateMetaDataMs is 64-bit aligned by @dnwe in https://github.com/Shopify/sarama/pull/2356
+* fix: ensure updateMetaDataMs is 64-bit aligned by @dnwe in https://github.com/IBM/sarama/pull/2356
 ### :heavy_plus_sign: Other Changes
-* fix: bump go.mod specification to go 1.17 by @dnwe in https://github.com/Shopify/sarama/pull/2357
+* fix: bump go.mod specification to go 1.17 by @dnwe in https://github.com/IBM/sarama/pull/2357
 
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.37.1...v1.37.2
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.37.1...v1.37.2
 
 ## Version 1.37.1 (2022-10-04)
 
 ## What's Changed
 ### :bug: Fixes
-* fix: support existing deprecated Rebalance.Strategy field usage by @spongecaptain in https://github.com/Shopify/sarama/pull/2352
-* fix(test): consumer group rebalance strategy compatibility by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2353
-* fix(producer): replace time.After with time.Timer to avoid high memory usage by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2355
+* fix: support existing deprecated Rebalance.Strategy field usage by @spongecaptain in https://github.com/IBM/sarama/pull/2352
+* fix(test): consumer group rebalance strategy compatibility by @Jacob-bzx in https://github.com/IBM/sarama/pull/2353
+* fix(producer): replace time.After with time.Timer to avoid high memory usage by @Jacob-bzx in https://github.com/IBM/sarama/pull/2355
 
 ## New Contributors
-* @spongecaptain made their first contribution in https://github.com/Shopify/sarama/pull/2352
+* @spongecaptain made their first contribution in https://github.com/IBM/sarama/pull/2352
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.37.0...v1.37.1
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.37.0...v1.37.1
 
 ## Version 1.37.0 (2022-09-28)
 
@@ -80,130 +80,130 @@
 * Due to a change in [github.com/klauspost/compress v1.15.10](https://github.com/klauspost/compress/releases/tag/v1.15.10), Sarama v1.37.0 requires Go 1.17 going forward, unfortunately due to an oversight this wasn't reflected in the go.mod declaration at time of release.
 
 ### :tada: New Features / Improvements
-* feat(consumer): support multiple balance strategies by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2339
-* feat(producer): transactional API by @ryarnyah in https://github.com/Shopify/sarama/pull/2295
-* feat(mocks): support key in MockFetchResponse. by @Skandalik in https://github.com/Shopify/sarama/pull/2328
+* feat(consumer): support multiple balance strategies by @Jacob-bzx in https://github.com/IBM/sarama/pull/2339
+* feat(producer): transactional API by @ryarnyah in https://github.com/IBM/sarama/pull/2295
+* feat(mocks): support key in MockFetchResponse. by @Skandalik in https://github.com/IBM/sarama/pull/2328
 ### :bug: Fixes
-* fix: avoid panic when Metadata.RefreshFrequency is 0 by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2329
-* fix(consumer): avoid pushing unrelated responses to paused children by @pkoutsovasilis in https://github.com/Shopify/sarama/pull/2317
-* fix: prevent metrics leak with cleanup by @auntan in https://github.com/Shopify/sarama/pull/2340
-* fix: race condition(may panic) when closing consumer group by @Jacob-bzx in https://github.com/Shopify/sarama/pull/2331
-* fix(consumer): default ResetInvalidOffsets to true by @dnwe in https://github.com/Shopify/sarama/pull/2345
-* Validate the `Config` when creating a mock producer/consumer by @joewreschnig in https://github.com/Shopify/sarama/pull/2327
+* fix: avoid panic when Metadata.RefreshFrequency is 0 by @Jacob-bzx in https://github.com/IBM/sarama/pull/2329
+* fix(consumer): avoid pushing unrelated responses to paused children by @pkoutsovasilis in https://github.com/IBM/sarama/pull/2317
+* fix: prevent metrics leak with cleanup by @auntan in https://github.com/IBM/sarama/pull/2340
+* fix: race condition(may panic) when closing consumer group by @Jacob-bzx in https://github.com/IBM/sarama/pull/2331
+* fix(consumer): default ResetInvalidOffsets to true by @dnwe in https://github.com/IBM/sarama/pull/2345
+* Validate the `Config` when creating a mock producer/consumer by @joewreschnig in https://github.com/IBM/sarama/pull/2327
 ### :package: Dependency updates
-* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.16 by @dnwe in https://github.com/Shopify/sarama/pull/2335
-* chore(deps): bump golang.org/x/net digest to bea034e by @dnwe in https://github.com/Shopify/sarama/pull/2333
-* chore(deps): bump golang.org/x/sync digest to 7f9b162 by @dnwe in https://github.com/Shopify/sarama/pull/2334
-* chore(deps): bump golang.org/x/net digest to f486391 by @dnwe in https://github.com/Shopify/sarama/pull/2348
-* chore(deps): bump module github.com/shopify/toxiproxy/v2 to v2.5.0 by @dnwe in https://github.com/Shopify/sarama/pull/2336
-* chore(deps): bump module github.com/klauspost/compress to v1.15.11 by @dnwe in https://github.com/Shopify/sarama/pull/2349
-* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.17 by @dnwe in https://github.com/Shopify/sarama/pull/2350
+* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.16 by @dnwe in https://github.com/IBM/sarama/pull/2335
+* chore(deps): bump golang.org/x/net digest to bea034e by @dnwe in https://github.com/IBM/sarama/pull/2333
+* chore(deps): bump golang.org/x/sync digest to 7f9b162 by @dnwe in https://github.com/IBM/sarama/pull/2334
+* chore(deps): bump golang.org/x/net digest to f486391 by @dnwe in https://github.com/IBM/sarama/pull/2348
+* chore(deps): bump module github.com/shopify/toxiproxy/v2 to v2.5.0 by @dnwe in https://github.com/IBM/sarama/pull/2336
+* chore(deps): bump module github.com/klauspost/compress to v1.15.11 by @dnwe in https://github.com/IBM/sarama/pull/2349
+* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.17 by @dnwe in https://github.com/IBM/sarama/pull/2350
 ### :wrench: Maintenance
-* chore(ci): bump kafka-versions to latest by @dnwe in https://github.com/Shopify/sarama/pull/2346
-* chore(ci): bump go-versions to N and N-1 by @dnwe in https://github.com/Shopify/sarama/pull/2347
+* chore(ci): bump kafka-versions to latest by @dnwe in https://github.com/IBM/sarama/pull/2346
+* chore(ci): bump go-versions to N and N-1 by @dnwe in https://github.com/IBM/sarama/pull/2347
 
 ## New Contributors
-* @Jacob-bzx made their first contribution in https://github.com/Shopify/sarama/pull/2329
-* @pkoutsovasilis made their first contribution in https://github.com/Shopify/sarama/pull/2317
-* @Skandalik made their first contribution in https://github.com/Shopify/sarama/pull/2328
-* @auntan made their first contribution in https://github.com/Shopify/sarama/pull/2340
-* @ryarnyah made their first contribution in https://github.com/Shopify/sarama/pull/2295
+* @Jacob-bzx made their first contribution in https://github.com/IBM/sarama/pull/2329
+* @pkoutsovasilis made their first contribution in https://github.com/IBM/sarama/pull/2317
+* @Skandalik made their first contribution in https://github.com/IBM/sarama/pull/2328
+* @auntan made their first contribution in https://github.com/IBM/sarama/pull/2340
+* @ryarnyah made their first contribution in https://github.com/IBM/sarama/pull/2295
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.36.0...v1.37.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.36.0...v1.37.0
 
 ## Version 1.36.0 (2022-08-11)
 
 ## What's Changed
 ### :tada: New Features / Improvements
-* feat: add option to propagate OffsetOutOfRange error by @dkolistratova in https://github.com/Shopify/sarama/pull/2252
-* feat(producer): expose ProducerMessage.byteSize() function by @k8scat in https://github.com/Shopify/sarama/pull/2315
-* feat(metrics): track consumer fetch request rates by @dnwe in https://github.com/Shopify/sarama/pull/2299
+* feat: add option to propagate OffsetOutOfRange error by @dkolistratova in https://github.com/IBM/sarama/pull/2252
+* feat(producer): expose ProducerMessage.byteSize() function by @k8scat in https://github.com/IBM/sarama/pull/2315
+* feat(metrics): track consumer fetch request rates by @dnwe in https://github.com/IBM/sarama/pull/2299
 ### :bug: Fixes
-* fix(consumer): avoid submitting empty fetch requests when paused by @raulnegreiros in https://github.com/Shopify/sarama/pull/2143
+* fix(consumer): avoid submitting empty fetch requests when paused by @raulnegreiros in https://github.com/IBM/sarama/pull/2143
 ### :package: Dependency updates
-* chore(deps): bump module github.com/klauspost/compress to v1.15.9 by @dnwe in https://github.com/Shopify/sarama/pull/2304
-* chore(deps): bump golang.org/x/net digest to c7608f3 by @dnwe in https://github.com/Shopify/sarama/pull/2301
-* chore(deps): bump golangci/golangci-lint-action action to v3 by @dnwe in https://github.com/Shopify/sarama/pull/2311
-* chore(deps): bump golang.org/x/net digest to 07c6da5 by @dnwe in https://github.com/Shopify/sarama/pull/2307
-* chore(deps): bump github actions versions (major) by @dnwe in https://github.com/Shopify/sarama/pull/2313
-* chore(deps): bump module github.com/jcmturner/gofork to v1.7.6 by @dnwe in https://github.com/Shopify/sarama/pull/2305
-* chore(deps): bump golang.org/x/sync digest to 886fb93 by @dnwe in https://github.com/Shopify/sarama/pull/2302
-* chore(deps): bump module github.com/jcmturner/gokrb5/v8 to v8.4.3 by @dnwe in https://github.com/Shopify/sarama/pull/2303
+* chore(deps): bump module github.com/klauspost/compress to v1.15.9 by @dnwe in https://github.com/IBM/sarama/pull/2304
+* chore(deps): bump golang.org/x/net digest to c7608f3 by @dnwe in https://github.com/IBM/sarama/pull/2301
+* chore(deps): bump golangci/golangci-lint-action action to v3 by @dnwe in https://github.com/IBM/sarama/pull/2311
+* chore(deps): bump golang.org/x/net digest to 07c6da5 by @dnwe in https://github.com/IBM/sarama/pull/2307
+* chore(deps): bump github actions versions (major) by @dnwe in https://github.com/IBM/sarama/pull/2313
+* chore(deps): bump module github.com/jcmturner/gofork to v1.7.6 by @dnwe in https://github.com/IBM/sarama/pull/2305
+* chore(deps): bump golang.org/x/sync digest to 886fb93 by @dnwe in https://github.com/IBM/sarama/pull/2302
+* chore(deps): bump module github.com/jcmturner/gokrb5/v8 to v8.4.3 by @dnwe in https://github.com/IBM/sarama/pull/2303
 ### :wrench: Maintenance
-* chore: add kafka 3.1.1 to the version matrix by @dnwe in https://github.com/Shopify/sarama/pull/2300
+* chore: add kafka 3.1.1 to the version matrix by @dnwe in https://github.com/IBM/sarama/pull/2300
 ### :heavy_plus_sign: Other Changes
-* Migrate off probot-CLA to new GitHub Action by @cursedcoder in https://github.com/Shopify/sarama/pull/2294
-* Forgot to remove cla probot by @cursedcoder in https://github.com/Shopify/sarama/pull/2297
-* chore(lint): re-enable a small amount of go-critic by @dnwe in https://github.com/Shopify/sarama/pull/2312
+* Migrate off probot-CLA to new GitHub Action by @cursedcoder in https://github.com/IBM/sarama/pull/2294
+* Forgot to remove cla probot by @cursedcoder in https://github.com/IBM/sarama/pull/2297
+* chore(lint): re-enable a small amount of go-critic by @dnwe in https://github.com/IBM/sarama/pull/2312
 
 ## New Contributors
-* @cursedcoder made their first contribution in https://github.com/Shopify/sarama/pull/2294
-* @dkolistratova made their first contribution in https://github.com/Shopify/sarama/pull/2252
-* @k8scat made their first contribution in https://github.com/Shopify/sarama/pull/2315
+* @cursedcoder made their first contribution in https://github.com/IBM/sarama/pull/2294
+* @dkolistratova made their first contribution in https://github.com/IBM/sarama/pull/2252
+* @k8scat made their first contribution in https://github.com/IBM/sarama/pull/2315
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.35.0...v1.36.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.35.0...v1.36.0
 
 ## Version 1.35.0 (2022-07-22)
 
 ## What's Changed
 ### :bug: Fixes
-* fix: fix metadata retry backoff invalid when get metadata failed by @Stephan14 in https://github.com/Shopify/sarama/pull/2256
-* fix(balance): sort and de-deplicate memberIDs by @dnwe in https://github.com/Shopify/sarama/pull/2285
-* fix: prevent DescribeLogDirs hang in admin client by @zerowidth in https://github.com/Shopify/sarama/pull/2269
-* fix: include assignment-less members in SyncGroup by @dnwe in https://github.com/Shopify/sarama/pull/2292
+* fix: fix metadata retry backoff invalid when get metadata failed by @Stephan14 in https://github.com/IBM/sarama/pull/2256
+* fix(balance): sort and de-deplicate memberIDs by @dnwe in https://github.com/IBM/sarama/pull/2285
+* fix: prevent DescribeLogDirs hang in admin client by @zerowidth in https://github.com/IBM/sarama/pull/2269
+* fix: include assignment-less members in SyncGroup by @dnwe in https://github.com/IBM/sarama/pull/2292
 ### :package: Dependency updates
-* chore(deps): bump module github.com/stretchr/testify to v1.8.0 by @dnwe in https://github.com/Shopify/sarama/pull/2284
-* chore(deps): bump module github.com/eapache/go-resiliency to v1.3.0 by @dnwe in https://github.com/Shopify/sarama/pull/2283
-* chore(deps): bump golang.org/x/net digest to 1185a90 by @dnwe in https://github.com/Shopify/sarama/pull/2279
-* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.15 by @dnwe in https://github.com/Shopify/sarama/pull/2281
-* chore(deps): bump module github.com/klauspost/compress to v1.15.8 by @dnwe in https://github.com/Shopify/sarama/pull/2280
+* chore(deps): bump module github.com/stretchr/testify to v1.8.0 by @dnwe in https://github.com/IBM/sarama/pull/2284
+* chore(deps): bump module github.com/eapache/go-resiliency to v1.3.0 by @dnwe in https://github.com/IBM/sarama/pull/2283
+* chore(deps): bump golang.org/x/net digest to 1185a90 by @dnwe in https://github.com/IBM/sarama/pull/2279
+* chore(deps): bump module github.com/pierrec/lz4/v4 to v4.1.15 by @dnwe in https://github.com/IBM/sarama/pull/2281
+* chore(deps): bump module github.com/klauspost/compress to v1.15.8 by @dnwe in https://github.com/IBM/sarama/pull/2280
 ### :wrench: Maintenance
-* chore: rename `any` func to avoid identifier by @dnwe in https://github.com/Shopify/sarama/pull/2272
-* chore: add and test against kafka 3.2.0 by @dnwe in https://github.com/Shopify/sarama/pull/2288
-* chore: document Fetch protocol fields by @dnwe in https://github.com/Shopify/sarama/pull/2289
+* chore: rename `any` func to avoid identifier by @dnwe in https://github.com/IBM/sarama/pull/2272
+* chore: add and test against kafka 3.2.0 by @dnwe in https://github.com/IBM/sarama/pull/2288
+* chore: document Fetch protocol fields by @dnwe in https://github.com/IBM/sarama/pull/2289
 ### :heavy_plus_sign: Other Changes
-* chore(ci): fix redirect with GITHUB_STEP_SUMMARY by @dnwe in https://github.com/Shopify/sarama/pull/2286
-* fix(test): permit ECONNRESET in TestInitProducerID by @dnwe in https://github.com/Shopify/sarama/pull/2287
-* fix: ensure empty or devel version valid by @dnwe in https://github.com/Shopify/sarama/pull/2291
+* chore(ci): fix redirect with GITHUB_STEP_SUMMARY by @dnwe in https://github.com/IBM/sarama/pull/2286
+* fix(test): permit ECONNRESET in TestInitProducerID by @dnwe in https://github.com/IBM/sarama/pull/2287
+* fix: ensure empty or devel version valid by @dnwe in https://github.com/IBM/sarama/pull/2291
 
 ## New Contributors
-* @zerowidth made their first contribution in https://github.com/Shopify/sarama/pull/2269
+* @zerowidth made their first contribution in https://github.com/IBM/sarama/pull/2269
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.34.1...v1.35.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.34.1...v1.35.0
 
 ##  Version 1.34.1 (2022-06-07)
 
 ## What's Changed
 ### :bug: Fixes
-* fix(examples): check session.Context().Done() in examples/consumergroup by @zxc111 in https://github.com/Shopify/sarama/pull/2240
-* fix(protocol): move AuthorizedOperations into GroupDescription of DescribeGroupsResponse by @aiquestion in https://github.com/Shopify/sarama/pull/2247
-* fix(protocol): tidyup DescribeGroupsResponse by @dnwe in https://github.com/Shopify/sarama/pull/2248
-* fix(consumer): range balance strategy not like reference by @njhartwell in https://github.com/Shopify/sarama/pull/2245
+* fix(examples): check session.Context().Done() in examples/consumergroup by @zxc111 in https://github.com/IBM/sarama/pull/2240
+* fix(protocol): move AuthorizedOperations into GroupDescription of DescribeGroupsResponse by @aiquestion in https://github.com/IBM/sarama/pull/2247
+* fix(protocol): tidyup DescribeGroupsResponse by @dnwe in https://github.com/IBM/sarama/pull/2248
+* fix(consumer): range balance strategy not like reference by @njhartwell in https://github.com/IBM/sarama/pull/2245
 ### :wrench: Maintenance
-* chore(ci): experiment with using tparse by @dnwe in https://github.com/Shopify/sarama/pull/2236
-* chore(deps): bump thirdparty dependencies to latest releases by @dnwe in https://github.com/Shopify/sarama/pull/2242
+* chore(ci): experiment with using tparse by @dnwe in https://github.com/IBM/sarama/pull/2236
+* chore(deps): bump thirdparty dependencies to latest releases by @dnwe in https://github.com/IBM/sarama/pull/2242
 
 ## New Contributors
-* @zxc111 made their first contribution in https://github.com/Shopify/sarama/pull/2240
-* @njhartwell made their first contribution in https://github.com/Shopify/sarama/pull/2245
+* @zxc111 made their first contribution in https://github.com/IBM/sarama/pull/2240
+* @njhartwell made their first contribution in https://github.com/IBM/sarama/pull/2245
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.34.0...v1.34.1
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.34.0...v1.34.1
 
 ## Version 1.34.0 (2022-05-30)
 
 ## What's Changed
 ### :tada: New Features / Improvements
-* KIP-345: support static membership by @aiquestion in https://github.com/Shopify/sarama/pull/2230
+* KIP-345: support static membership by @aiquestion in https://github.com/IBM/sarama/pull/2230
 ### :bug: Fixes
-* fix: KIP-368 use receiver goroutine to process all sasl v1 responses by @k-wall in https://github.com/Shopify/sarama/pull/2234
+* fix: KIP-368 use receiver goroutine to process all sasl v1 responses by @k-wall in https://github.com/IBM/sarama/pull/2234
 ### :wrench: Maintenance
-* chore(deps): bump module github.com/pierrec/lz4 to v4 by @dnwe in https://github.com/Shopify/sarama/pull/2231
-* chore(deps): bump golang.org/x/net digest to 2e3eb7b by @dnwe in https://github.com/Shopify/sarama/pull/2232
+* chore(deps): bump module github.com/pierrec/lz4 to v4 by @dnwe in https://github.com/IBM/sarama/pull/2231
+* chore(deps): bump golang.org/x/net digest to 2e3eb7b by @dnwe in https://github.com/IBM/sarama/pull/2232
 
 ## New Contributors
-* @aiquestion made their first contribution in https://github.com/Shopify/sarama/pull/2230
+* @aiquestion made their first contribution in https://github.com/IBM/sarama/pull/2230
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.33.0...v1.34.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.33.0...v1.34.0
 
 ## Version 1.33.0 (2022-05-11)
 
@@ -211,81 +211,81 @@
 ### :rotating_light: Breaking Changes
 
 **Note: with this change, the user of Sarama is required to use Go 1.13's errors.Is etc (rather then ==) when forming conditionals returned by this library.**
-* feat: make `ErrOutOfBrokers` wrap the underlying error that prevented connections to the brokers by @k-wall in https://github.com/Shopify/sarama/pull/2131
+* feat: make `ErrOutOfBrokers` wrap the underlying error that prevented connections to the brokers by @k-wall in https://github.com/IBM/sarama/pull/2131
 
 
 ### :tada: New Features / Improvements
-* feat(message): add UnmarshalText method to CompressionCodec by @vincentbernat in https://github.com/Shopify/sarama/pull/2172
-* KIP-368 : Allow SASL Connections to Periodically Re-Authenticate by @k-wall in https://github.com/Shopify/sarama/pull/2197
-* feat: add batched CreateACLs func to ClusterAdmin by @nkostoulas in https://github.com/Shopify/sarama/pull/2191
+* feat(message): add UnmarshalText method to CompressionCodec by @vincentbernat in https://github.com/IBM/sarama/pull/2172
+* KIP-368 : Allow SASL Connections to Periodically Re-Authenticate by @k-wall in https://github.com/IBM/sarama/pull/2197
+* feat: add batched CreateACLs func to ClusterAdmin by @nkostoulas in https://github.com/IBM/sarama/pull/2191
 ### :bug: Fixes
-* fix: TestRecordBatchDecoding failing sporadically by @k-wall in https://github.com/Shopify/sarama/pull/2154
-* feat(test): add an fvt for broker deadlock by @dnwe in https://github.com/Shopify/sarama/pull/2144
-* fix: avoid starvation in subscriptionManager by @dnwe in https://github.com/Shopify/sarama/pull/2109
-* fix: remove "Is your cluster reachable?" from msg by @dnwe in https://github.com/Shopify/sarama/pull/2165
-* fix: remove trailing fullstop from error strings by @dnwe in https://github.com/Shopify/sarama/pull/2166
-* fix: return underlying sasl error message by @dnwe in https://github.com/Shopify/sarama/pull/2164
-* fix: potential data race on a global variable by @pior in https://github.com/Shopify/sarama/pull/2171
-* fix: AdminClient | CreateACLs | check for error in response, return error if needed by @omris94 in https://github.com/Shopify/sarama/pull/2185
-* producer: ensure that the management message (fin) is never "leaked" by @niamster in https://github.com/Shopify/sarama/pull/2182
-* fix: prevent RefreshBrokers leaking old brokers  by @k-wall in https://github.com/Shopify/sarama/pull/2203
-* fix: prevent RefreshController leaking controller by @k-wall in https://github.com/Shopify/sarama/pull/2204
-* fix: prevent AsyncProducer retryBatch from leaking  by @k-wall in https://github.com/Shopify/sarama/pull/2208
-* fix: prevent metrics leak when authenticate fails  by @Stephan14 in https://github.com/Shopify/sarama/pull/2205
-* fix: prevent deadlock between subscription manager and consumer goroutines by @niamster in https://github.com/Shopify/sarama/pull/2194
-* fix: prevent idempotent producer epoch exhaustion by @ladislavmacoun in https://github.com/Shopify/sarama/pull/2178
-* fix(test): mockbroker offsetResponse vers behavior by @dnwe in https://github.com/Shopify/sarama/pull/2213
-* fix: cope with OffsetsLoadInProgress on Join+Sync  by @dnwe in https://github.com/Shopify/sarama/pull/2214
-* fix: make default MaxWaitTime 500ms by @dnwe in https://github.com/Shopify/sarama/pull/2227
+* fix: TestRecordBatchDecoding failing sporadically by @k-wall in https://github.com/IBM/sarama/pull/2154
+* feat(test): add an fvt for broker deadlock by @dnwe in https://github.com/IBM/sarama/pull/2144
+* fix: avoid starvation in subscriptionManager by @dnwe in https://github.com/IBM/sarama/pull/2109
+* fix: remove "Is your cluster reachable?" from msg by @dnwe in https://github.com/IBM/sarama/pull/2165
+* fix: remove trailing fullstop from error strings by @dnwe in https://github.com/IBM/sarama/pull/2166
+* fix: return underlying sasl error message by @dnwe in https://github.com/IBM/sarama/pull/2164
+* fix: potential data race on a global variable by @pior in https://github.com/IBM/sarama/pull/2171
+* fix: AdminClient | CreateACLs | check for error in response, return error if needed by @omris94 in https://github.com/IBM/sarama/pull/2185
+* producer: ensure that the management message (fin) is never "leaked" by @niamster in https://github.com/IBM/sarama/pull/2182
+* fix: prevent RefreshBrokers leaking old brokers  by @k-wall in https://github.com/IBM/sarama/pull/2203
+* fix: prevent RefreshController leaking controller by @k-wall in https://github.com/IBM/sarama/pull/2204
+* fix: prevent AsyncProducer retryBatch from leaking  by @k-wall in https://github.com/IBM/sarama/pull/2208
+* fix: prevent metrics leak when authenticate fails  by @Stephan14 in https://github.com/IBM/sarama/pull/2205
+* fix: prevent deadlock between subscription manager and consumer goroutines by @niamster in https://github.com/IBM/sarama/pull/2194
+* fix: prevent idempotent producer epoch exhaustion by @ladislavmacoun in https://github.com/IBM/sarama/pull/2178
+* fix(test): mockbroker offsetResponse vers behavior by @dnwe in https://github.com/IBM/sarama/pull/2213
+* fix: cope with OffsetsLoadInProgress on Join+Sync  by @dnwe in https://github.com/IBM/sarama/pull/2214
+* fix: make default MaxWaitTime 500ms by @dnwe in https://github.com/IBM/sarama/pull/2227
 ### :package: Dependency updates
-* chore(deps): bump xdg-go/scram and klauspost/compress by @dnwe in https://github.com/Shopify/sarama/pull/2170
+* chore(deps): bump xdg-go/scram and klauspost/compress by @dnwe in https://github.com/IBM/sarama/pull/2170
 ### :wrench: Maintenance
-* fix(test): skip TestReadOnlyAndAllCommittedMessages by @dnwe in https://github.com/Shopify/sarama/pull/2161
-* fix(test): remove t.Parallel() by @dnwe in https://github.com/Shopify/sarama/pull/2162
-* chore(ci): bump along to Go 1.17+1.18 and bump golangci-lint by @dnwe in https://github.com/Shopify/sarama/pull/2183
-* chore: switch to multi-arch compatible docker images by @dnwe in https://github.com/Shopify/sarama/pull/2210
+* fix(test): skip TestReadOnlyAndAllCommittedMessages by @dnwe in https://github.com/IBM/sarama/pull/2161
+* fix(test): remove t.Parallel() by @dnwe in https://github.com/IBM/sarama/pull/2162
+* chore(ci): bump along to Go 1.17+1.18 and bump golangci-lint by @dnwe in https://github.com/IBM/sarama/pull/2183
+* chore: switch to multi-arch compatible docker images by @dnwe in https://github.com/IBM/sarama/pull/2210
 ### :heavy_plus_sign: Other Changes
-* Remediate a number go-routine leaks (mainly test issues) by @k-wall in https://github.com/Shopify/sarama/pull/2198
-* chore: retract v1.32.0 due to #2150 by @dnwe in https://github.com/Shopify/sarama/pull/2199
-* chore: bump functional test timeout to 12m by @dnwe in https://github.com/Shopify/sarama/pull/2200
-* fix(admin): make DeleteRecords err consistent by @dnwe in https://github.com/Shopify/sarama/pull/2226
+* Remediate a number go-routine leaks (mainly test issues) by @k-wall in https://github.com/IBM/sarama/pull/2198
+* chore: retract v1.32.0 due to #2150 by @dnwe in https://github.com/IBM/sarama/pull/2199
+* chore: bump functional test timeout to 12m by @dnwe in https://github.com/IBM/sarama/pull/2200
+* fix(admin): make DeleteRecords err consistent by @dnwe in https://github.com/IBM/sarama/pull/2226
 
 ## New Contributors
-* @k-wall made their first contribution in https://github.com/Shopify/sarama/pull/2154
-* @pior made their first contribution in https://github.com/Shopify/sarama/pull/2171
-* @omris94 made their first contribution in https://github.com/Shopify/sarama/pull/2185
-* @vincentbernat made their first contribution in https://github.com/Shopify/sarama/pull/2172
-* @niamster made their first contribution in https://github.com/Shopify/sarama/pull/2182
-* @ladislavmacoun made their first contribution in https://github.com/Shopify/sarama/pull/2178
-* @nkostoulas made their first contribution in https://github.com/Shopify/sarama/pull/2191
+* @k-wall made their first contribution in https://github.com/IBM/sarama/pull/2154
+* @pior made their first contribution in https://github.com/IBM/sarama/pull/2171
+* @omris94 made their first contribution in https://github.com/IBM/sarama/pull/2185
+* @vincentbernat made their first contribution in https://github.com/IBM/sarama/pull/2172
+* @niamster made their first contribution in https://github.com/IBM/sarama/pull/2182
+* @ladislavmacoun made their first contribution in https://github.com/IBM/sarama/pull/2178
+* @nkostoulas made their first contribution in https://github.com/IBM/sarama/pull/2191
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.32.0...v1.33.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.32.0...v1.33.0
 
 ## Version 1.32.0 (2022-02-24)
 
 ### ⚠️ This release has been superseded by v1.33.0 and should _not_ be used.
 
-* chore: retract v1.32.0 due to #2150 by @dnwe in https://github.com/Shopify/sarama/pull/2199
+* chore: retract v1.32.0 due to #2150 by @dnwe in https://github.com/IBM/sarama/pull/2199
 
 ---
 
 ## What's Changed
 ### :bug: Fixes
-* Fix deadlock when closing Broker in brokerProducer by @slaunay in https://github.com/Shopify/sarama/pull/2133
+* Fix deadlock when closing Broker in brokerProducer by @slaunay in https://github.com/IBM/sarama/pull/2133
 ### :package: Dependency updates
-* chore: refresh dependencies to latest by @dnwe in https://github.com/Shopify/sarama/pull/2159
+* chore: refresh dependencies to latest by @dnwe in https://github.com/IBM/sarama/pull/2159
 ### :wrench: Maintenance
-* fix: rework RebalancingMultiplePartitions test by @dnwe in https://github.com/Shopify/sarama/pull/2130
-* fix(test): use Sarama transactional producer by @dnwe in https://github.com/Shopify/sarama/pull/1939
-* chore: enable t.Parallel() wherever possible by @dnwe in https://github.com/Shopify/sarama/pull/2138
+* fix: rework RebalancingMultiplePartitions test by @dnwe in https://github.com/IBM/sarama/pull/2130
+* fix(test): use Sarama transactional producer by @dnwe in https://github.com/IBM/sarama/pull/1939
+* chore: enable t.Parallel() wherever possible by @dnwe in https://github.com/IBM/sarama/pull/2138
 ### :heavy_plus_sign: Other Changes
-* chore: restrict to 1 testbinary at once by @dnwe in https://github.com/Shopify/sarama/pull/2145
-* chore: restrict to 1 parallel test at once by @dnwe in https://github.com/Shopify/sarama/pull/2146
-* Remove myself from codeowners by @bai in https://github.com/Shopify/sarama/pull/2147
-* chore: add retractions for known bad versions by @dnwe in https://github.com/Shopify/sarama/pull/2160
+* chore: restrict to 1 testbinary at once by @dnwe in https://github.com/IBM/sarama/pull/2145
+* chore: restrict to 1 parallel test at once by @dnwe in https://github.com/IBM/sarama/pull/2146
+* Remove myself from codeowners by @bai in https://github.com/IBM/sarama/pull/2147
+* chore: add retractions for known bad versions by @dnwe in https://github.com/IBM/sarama/pull/2160
 
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.31.1...v1.32.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.31.1...v1.32.0
 
 ## Version 1.31.1 (2022-02-01)
 
@@ -304,57 +304,57 @@
 
 ## What's Changed
 ### :tada: New Features / Improvements
-* feat: expose IncrementalAlterConfigs API in admin.go by @fengyinqiao in https://github.com/Shopify/sarama/pull/2088
-* feat: allow AsyncProducer to have MaxOpenRequests inflight produce requests per broker by @xujianhai666 in https://github.com/Shopify/sarama/pull/1686
-* Support request pipelining in AsyncProducer by @slaunay in https://github.com/Shopify/sarama/pull/2094
+* feat: expose IncrementalAlterConfigs API in admin.go by @fengyinqiao in https://github.com/IBM/sarama/pull/2088
+* feat: allow AsyncProducer to have MaxOpenRequests inflight produce requests per broker by @xujianhai666 in https://github.com/IBM/sarama/pull/1686
+* Support request pipelining in AsyncProducer by @slaunay in https://github.com/IBM/sarama/pull/2094
 ### :bug: Fixes
-* fix(test): add fluent interface for mocks where missing by @grongor in https://github.com/Shopify/sarama/pull/2080
-* fix(test): test for ConsumePartition with OffsetOldest by @grongor in https://github.com/Shopify/sarama/pull/2081
-* fix: set HWMO during creation of partitionConsumer (fix incorrect HWMO before first fetch) by @grongor in https://github.com/Shopify/sarama/pull/2082
-* fix: ignore non-nil but empty error strings in Describe/Alter client quotas responses by @agriffaut in https://github.com/Shopify/sarama/pull/2096
-* fix: skip over KIP-482 tagged fields by @dnwe in https://github.com/Shopify/sarama/pull/2107
-* fix: clear preferredReadReplica if broker shutdown by @dnwe in https://github.com/Shopify/sarama/pull/2108
-* fix(test): correct wrong offsets in mock Consumer by @grongor in https://github.com/Shopify/sarama/pull/2078
-* fix: correct bugs in DescribeGroupsResponse by @dnwe in https://github.com/Shopify/sarama/pull/2111
+* fix(test): add fluent interface for mocks where missing by @grongor in https://github.com/IBM/sarama/pull/2080
+* fix(test): test for ConsumePartition with OffsetOldest by @grongor in https://github.com/IBM/sarama/pull/2081
+* fix: set HWMO during creation of partitionConsumer (fix incorrect HWMO before first fetch) by @grongor in https://github.com/IBM/sarama/pull/2082
+* fix: ignore non-nil but empty error strings in Describe/Alter client quotas responses by @agriffaut in https://github.com/IBM/sarama/pull/2096
+* fix: skip over KIP-482 tagged fields by @dnwe in https://github.com/IBM/sarama/pull/2107
+* fix: clear preferredReadReplica if broker shutdown by @dnwe in https://github.com/IBM/sarama/pull/2108
+* fix(test): correct wrong offsets in mock Consumer by @grongor in https://github.com/IBM/sarama/pull/2078
+* fix: correct bugs in DescribeGroupsResponse by @dnwe in https://github.com/IBM/sarama/pull/2111
 ### :wrench: Maintenance
-* chore: bump runtime and test dependencies by @dnwe in https://github.com/Shopify/sarama/pull/2100
+* chore: bump runtime and test dependencies by @dnwe in https://github.com/IBM/sarama/pull/2100
 ### :memo: Documentation
-* docs: refresh README.md for Kafka 3.0.0 by @dnwe in https://github.com/Shopify/sarama/pull/2099
+* docs: refresh README.md for Kafka 3.0.0 by @dnwe in https://github.com/IBM/sarama/pull/2099
 ### :heavy_plus_sign: Other Changes
-* Fix typo by @mosceo in https://github.com/Shopify/sarama/pull/2084
+* Fix typo by @mosceo in https://github.com/IBM/sarama/pull/2084
 
 ## New Contributors
-* @grongor made their first contribution in https://github.com/Shopify/sarama/pull/2080
-* @fengyinqiao made their first contribution in https://github.com/Shopify/sarama/pull/2088
-* @xujianhai666 made their first contribution in https://github.com/Shopify/sarama/pull/1686
-* @mosceo made their first contribution in https://github.com/Shopify/sarama/pull/2084
+* @grongor made their first contribution in https://github.com/IBM/sarama/pull/2080
+* @fengyinqiao made their first contribution in https://github.com/IBM/sarama/pull/2088
+* @xujianhai666 made their first contribution in https://github.com/IBM/sarama/pull/1686
+* @mosceo made their first contribution in https://github.com/IBM/sarama/pull/2084
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.30.1...v1.31.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.30.1...v1.31.0
 
 ## Version 1.30.1 (2021-12-04)
 
 ## What's Changed
 ### :tada: New Features / Improvements
-* feat(zstd): pass level param through to compress/zstd encoder by @lizthegrey in https://github.com/Shopify/sarama/pull/2045
+* feat(zstd): pass level param through to compress/zstd encoder by @lizthegrey in https://github.com/IBM/sarama/pull/2045
 ### :bug: Fixes
-* fix: set min-go-version to 1.16 by @troyanov in https://github.com/Shopify/sarama/pull/2048
-* logger: fix debug logs' formatting directives by @utrack in https://github.com/Shopify/sarama/pull/2054
-* fix: stuck on the batch with zero records length by @pachmu in https://github.com/Shopify/sarama/pull/2057
-* fix: only update preferredReadReplica if valid by @dnwe in https://github.com/Shopify/sarama/pull/2076
+* fix: set min-go-version to 1.16 by @troyanov in https://github.com/IBM/sarama/pull/2048
+* logger: fix debug logs' formatting directives by @utrack in https://github.com/IBM/sarama/pull/2054
+* fix: stuck on the batch with zero records length by @pachmu in https://github.com/IBM/sarama/pull/2057
+* fix: only update preferredReadReplica if valid by @dnwe in https://github.com/IBM/sarama/pull/2076
 ### :wrench: Maintenance
-* chore: add release notes configuration by @dnwe in https://github.com/Shopify/sarama/pull/2046
-* chore: confluent platform version bump by @lizthegrey in https://github.com/Shopify/sarama/pull/2070
+* chore: add release notes configuration by @dnwe in https://github.com/IBM/sarama/pull/2046
+* chore: confluent platform version bump by @lizthegrey in https://github.com/IBM/sarama/pull/2070
 
 ## Notes
 * ℹ️ from Sarama 1.30.x onward the minimum version of Go toolchain required is 1.16.x
 
 ## New Contributors
-* @troyanov made their first contribution in https://github.com/Shopify/sarama/pull/2048
-* @lizthegrey made their first contribution in https://github.com/Shopify/sarama/pull/2045
-* @utrack made their first contribution in https://github.com/Shopify/sarama/pull/2054
-* @pachmu made their first contribution in https://github.com/Shopify/sarama/pull/2057
+* @troyanov made their first contribution in https://github.com/IBM/sarama/pull/2048
+* @lizthegrey made their first contribution in https://github.com/IBM/sarama/pull/2045
+* @utrack made their first contribution in https://github.com/IBM/sarama/pull/2054
+* @pachmu made their first contribution in https://github.com/IBM/sarama/pull/2057
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.30.0...v1.30.1
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.30.0...v1.30.1
 
 ## Version 1.30.0 (2021-09-29)
 
@@ -408,18 +408,18 @@
 - #2038 - @dnwe - feat: add a fuzzing workflow to github actions
 
 ## New Contributors
-* @zifengyu made their first contribution in https://github.com/Shopify/sarama/pull/1983
-* @doxsch made their first contribution in https://github.com/Shopify/sarama/pull/1990
-* @LubergAlexander made their first contribution in https://github.com/Shopify/sarama/pull/1988
-* @HurSungYun made their first contribution in https://github.com/Shopify/sarama/pull/2001
-* @gdm85 made their first contribution in https://github.com/Shopify/sarama/pull/2003
-* @qiangmzsx made their first contribution in https://github.com/Shopify/sarama/pull/1973
-* @zhaomoran made their first contribution in https://github.com/Shopify/sarama/pull/1992
-* @faillefer made their first contribution in https://github.com/Shopify/sarama/pull/2006
-* @crivera-fastly made their first contribution in https://github.com/Shopify/sarama/pull/1718
-* @null-sleep made their first contribution in https://github.com/Shopify/sarama/pull/1984
+* @zifengyu made their first contribution in https://github.com/IBM/sarama/pull/1983
+* @doxsch made their first contribution in https://github.com/IBM/sarama/pull/1990
+* @LubergAlexander made their first contribution in https://github.com/IBM/sarama/pull/1988
+* @HurSungYun made their first contribution in https://github.com/IBM/sarama/pull/2001
+* @gdm85 made their first contribution in https://github.com/IBM/sarama/pull/2003
+* @qiangmzsx made their first contribution in https://github.com/IBM/sarama/pull/1973
+* @zhaomoran made their first contribution in https://github.com/IBM/sarama/pull/1992
+* @faillefer made their first contribution in https://github.com/IBM/sarama/pull/2006
+* @crivera-fastly made their first contribution in https://github.com/IBM/sarama/pull/1718
+* @null-sleep made their first contribution in https://github.com/IBM/sarama/pull/1984
 
-**Full Changelog**: https://github.com/Shopify/sarama/compare/v1.29.1...v1.30.0
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.29.1...v1.30.0
 
 ## Version 1.29.1 (2021-06-24)
 
@@ -567,477 +567,477 @@ This release has been marked as not ready for production and may be unstable, pl
 ## Version 1.26.1 (2020-02-04)
 
 Improvements:
-- Add requests-in-flight metric ([1539](https://github.com/Shopify/sarama/pull/1539))
-- Fix misleading example for cluster admin ([1595](https://github.com/Shopify/sarama/pull/1595))
-- Replace Travis with GitHub Actions, linters housekeeping ([1573](https://github.com/Shopify/sarama/pull/1573))
-- Allow BalanceStrategy to provide custom assignment data ([1592](https://github.com/Shopify/sarama/pull/1592))
+- Add requests-in-flight metric ([1539](https://github.com/IBM/sarama/pull/1539))
+- Fix misleading example for cluster admin ([1595](https://github.com/IBM/sarama/pull/1595))
+- Replace Travis with GitHub Actions, linters housekeeping ([1573](https://github.com/IBM/sarama/pull/1573))
+- Allow BalanceStrategy to provide custom assignment data ([1592](https://github.com/IBM/sarama/pull/1592))
 
 Bug Fixes:
-- Adds back Consumer.Offsets.CommitInterval to fix API ([1590](https://github.com/Shopify/sarama/pull/1590))
-- Fix error message s/CommitInterval/AutoCommit.Interval ([1589](https://github.com/Shopify/sarama/pull/1589))
+- Adds back Consumer.Offsets.CommitInterval to fix API ([1590](https://github.com/IBM/sarama/pull/1590))
+- Fix error message s/CommitInterval/AutoCommit.Interval ([1589](https://github.com/IBM/sarama/pull/1589))
 
 ## Version 1.26.0 (2020-01-24)
 
 New Features:
 - Enable zstd compression
-  ([1574](https://github.com/Shopify/sarama/pull/1574),
-  [1582](https://github.com/Shopify/sarama/pull/1582))
+  ([1574](https://github.com/IBM/sarama/pull/1574),
+  [1582](https://github.com/IBM/sarama/pull/1582))
 - Support headers in tools kafka-console-producer
-  ([1549](https://github.com/Shopify/sarama/pull/1549))
+  ([1549](https://github.com/IBM/sarama/pull/1549))
 
 Improvements:
 - Add SASL AuthIdentity to SASL frames (authzid)
-  ([1585](https://github.com/Shopify/sarama/pull/1585)).
+  ([1585](https://github.com/IBM/sarama/pull/1585)).
 
 Bug Fixes:
 - Sending messages with ZStd compression enabled fails in multiple ways
-  ([1252](https://github.com/Shopify/sarama/issues/1252)).
+  ([1252](https://github.com/IBM/sarama/issues/1252)).
 - Use the broker for any admin on BrokerConfig
-  ([1571](https://github.com/Shopify/sarama/pull/1571)).
+  ([1571](https://github.com/IBM/sarama/pull/1571)).
 - Set DescribeConfigRequest Version field
-  ([1576](https://github.com/Shopify/sarama/pull/1576)).
+  ([1576](https://github.com/IBM/sarama/pull/1576)).
 - ConsumerGroup flooding logs with client/metadata update req
-  ([1578](https://github.com/Shopify/sarama/pull/1578)).
+  ([1578](https://github.com/IBM/sarama/pull/1578)).
 - MetadataRequest version in DescribeCluster
-  ([1580](https://github.com/Shopify/sarama/pull/1580)).
+  ([1580](https://github.com/IBM/sarama/pull/1580)).
 - Fix deadlock in consumer group handleError
-  ([1581](https://github.com/Shopify/sarama/pull/1581))
+  ([1581](https://github.com/IBM/sarama/pull/1581))
 - Fill in the Fetch{Request,Response} protocol
-  ([1582](https://github.com/Shopify/sarama/pull/1582)).
+  ([1582](https://github.com/IBM/sarama/pull/1582)).
 - Retry topic request on ControllerNotAvailable
-  ([1586](https://github.com/Shopify/sarama/pull/1586)).
+  ([1586](https://github.com/IBM/sarama/pull/1586)).
 
 ## Version 1.25.0 (2020-01-13)
 
 New Features:
 - Support TLS protocol in kafka-producer-performance
-  ([1538](https://github.com/Shopify/sarama/pull/1538)).
+  ([1538](https://github.com/IBM/sarama/pull/1538)).
 - Add support for kafka 2.4.0
-  ([1552](https://github.com/Shopify/sarama/pull/1552)).
+  ([1552](https://github.com/IBM/sarama/pull/1552)).
 
 Improvements:
 - Allow the Consumer to disable auto-commit offsets
-  ([1164](https://github.com/Shopify/sarama/pull/1164)).
+  ([1164](https://github.com/IBM/sarama/pull/1164)).
 - Produce records with consistent timestamps
-  ([1455](https://github.com/Shopify/sarama/pull/1455)).
+  ([1455](https://github.com/IBM/sarama/pull/1455)).
 
 Bug Fixes:
 - Fix incorrect SetTopicMetadata name mentions
-  ([1534](https://github.com/Shopify/sarama/pull/1534)).
+  ([1534](https://github.com/IBM/sarama/pull/1534)).
 - Fix client.tryRefreshMetadata Println
-  ([1535](https://github.com/Shopify/sarama/pull/1535)).
+  ([1535](https://github.com/IBM/sarama/pull/1535)).
 - Fix panic on calling updateMetadata on closed client
-  ([1531](https://github.com/Shopify/sarama/pull/1531)).
+  ([1531](https://github.com/IBM/sarama/pull/1531)).
 - Fix possible faulty metrics in TestFuncProducing
-  ([1545](https://github.com/Shopify/sarama/pull/1545)).
+  ([1545](https://github.com/IBM/sarama/pull/1545)).
 
 ## Version 1.24.1 (2019-10-31)
 
 New Features:
 - Add DescribeLogDirs Request/Response pair
-  ([1520](https://github.com/Shopify/sarama/pull/1520)).
+  ([1520](https://github.com/IBM/sarama/pull/1520)).
 
 Bug Fixes:
 - Fix ClusterAdmin returning invalid controller ID on DescribeCluster
-  ([1518](https://github.com/Shopify/sarama/pull/1518)).
+  ([1518](https://github.com/IBM/sarama/pull/1518)).
 - Fix issue with consumergroup not rebalancing when new partition is added
-  ([1525](https://github.com/Shopify/sarama/pull/1525)).
+  ([1525](https://github.com/IBM/sarama/pull/1525)).
 - Ensure consistent use of read/write deadlines
-  ([1529](https://github.com/Shopify/sarama/pull/1529)).
+  ([1529](https://github.com/IBM/sarama/pull/1529)).
 
 ## Version 1.24.0 (2019-10-09)
 
 New Features:
 - Add sticky partition assignor
-  ([1416](https://github.com/Shopify/sarama/pull/1416)).
+  ([1416](https://github.com/IBM/sarama/pull/1416)).
 - Switch from cgo zstd package to pure Go implementation
-  ([1477](https://github.com/Shopify/sarama/pull/1477)).
+  ([1477](https://github.com/IBM/sarama/pull/1477)).
 
 Improvements:
 - Allow creating ClusterAdmin from client
-  ([1415](https://github.com/Shopify/sarama/pull/1415)).
+  ([1415](https://github.com/IBM/sarama/pull/1415)).
 - Set KafkaVersion in ListAcls method
-  ([1452](https://github.com/Shopify/sarama/pull/1452)).
+  ([1452](https://github.com/IBM/sarama/pull/1452)).
 - Set request version in CreateACL ClusterAdmin method
-  ([1458](https://github.com/Shopify/sarama/pull/1458)).
+  ([1458](https://github.com/IBM/sarama/pull/1458)).
 - Set request version in DeleteACL ClusterAdmin method
-  ([1461](https://github.com/Shopify/sarama/pull/1461)).
+  ([1461](https://github.com/IBM/sarama/pull/1461)).
 - Handle missed error codes on TopicMetaDataRequest and GroupCoordinatorRequest
-  ([1464](https://github.com/Shopify/sarama/pull/1464)).
+  ([1464](https://github.com/IBM/sarama/pull/1464)).
 - Remove direct usage of gofork
-  ([1465](https://github.com/Shopify/sarama/pull/1465)).
+  ([1465](https://github.com/IBM/sarama/pull/1465)).
 - Add support for Go 1.13
-  ([1478](https://github.com/Shopify/sarama/pull/1478)).
+  ([1478](https://github.com/IBM/sarama/pull/1478)).
 - Improve behavior of NewMockListAclsResponse
-  ([1481](https://github.com/Shopify/sarama/pull/1481)).
+  ([1481](https://github.com/IBM/sarama/pull/1481)).
 
 Bug Fixes:
 - Fix race condition in consumergroup example
-  ([1434](https://github.com/Shopify/sarama/pull/1434)).
+  ([1434](https://github.com/IBM/sarama/pull/1434)).
 - Fix brokerProducer goroutine leak
-  ([1442](https://github.com/Shopify/sarama/pull/1442)).
+  ([1442](https://github.com/IBM/sarama/pull/1442)).
 - Use released version of lz4 library
-  ([1469](https://github.com/Shopify/sarama/pull/1469)).
+  ([1469](https://github.com/IBM/sarama/pull/1469)).
 - Set correct version in MockDeleteTopicsResponse
-  ([1484](https://github.com/Shopify/sarama/pull/1484)).
+  ([1484](https://github.com/IBM/sarama/pull/1484)).
 - Fix CLI help message typo
-  ([1494](https://github.com/Shopify/sarama/pull/1494)).
+  ([1494](https://github.com/IBM/sarama/pull/1494)).
 
 Known Issues:
 - Please **don't** use Zstd, as it doesn't work right now.
-  See https://github.com/Shopify/sarama/issues/1252
+  See https://github.com/IBM/sarama/issues/1252
 
 ## Version 1.23.1 (2019-07-22)
 
 Bug Fixes:
 - Fix fetch delete bug record
-  ([1425](https://github.com/Shopify/sarama/pull/1425)).
+  ([1425](https://github.com/IBM/sarama/pull/1425)).
 - Handle SASL/OAUTHBEARER token rejection
-  ([1428](https://github.com/Shopify/sarama/pull/1428)).
+  ([1428](https://github.com/IBM/sarama/pull/1428)).
 
 ## Version 1.23.0 (2019-07-02)
 
 New Features:
 - Add support for Kafka 2.3.0
-  ([1418](https://github.com/Shopify/sarama/pull/1418)).
+  ([1418](https://github.com/IBM/sarama/pull/1418)).
 - Add support for ListConsumerGroupOffsets v2
-  ([1374](https://github.com/Shopify/sarama/pull/1374)).
+  ([1374](https://github.com/IBM/sarama/pull/1374)).
 - Add support for DeleteConsumerGroup
-  ([1417](https://github.com/Shopify/sarama/pull/1417)).
+  ([1417](https://github.com/IBM/sarama/pull/1417)).
 - Add support for SASLVersion configuration
-  ([1410](https://github.com/Shopify/sarama/pull/1410)).
+  ([1410](https://github.com/IBM/sarama/pull/1410)).
 - Add kerberos support
-  ([1366](https://github.com/Shopify/sarama/pull/1366)).
+  ([1366](https://github.com/IBM/sarama/pull/1366)).
 
 Improvements:
 - Improve sasl_scram_client example
-  ([1406](https://github.com/Shopify/sarama/pull/1406)).
+  ([1406](https://github.com/IBM/sarama/pull/1406)).
 - Fix shutdown and race-condition in consumer-group example
-  ([1404](https://github.com/Shopify/sarama/pull/1404)).
+  ([1404](https://github.com/IBM/sarama/pull/1404)).
 - Add support for error codes 77—81
-  ([1397](https://github.com/Shopify/sarama/pull/1397)).
+  ([1397](https://github.com/IBM/sarama/pull/1397)).
 - Pool internal objects allocated per message
-  ([1385](https://github.com/Shopify/sarama/pull/1385)).
+  ([1385](https://github.com/IBM/sarama/pull/1385)).
 - Reduce packet decoder allocations
-  ([1373](https://github.com/Shopify/sarama/pull/1373)).
+  ([1373](https://github.com/IBM/sarama/pull/1373)).
 - Support timeout when fetching metadata
-  ([1359](https://github.com/Shopify/sarama/pull/1359)).
+  ([1359](https://github.com/IBM/sarama/pull/1359)).
 
 Bug Fixes:
 - Fix fetch size integer overflow
-  ([1376](https://github.com/Shopify/sarama/pull/1376)).
+  ([1376](https://github.com/IBM/sarama/pull/1376)).
 - Handle and log throttled FetchResponses
-  ([1383](https://github.com/Shopify/sarama/pull/1383)).
+  ([1383](https://github.com/IBM/sarama/pull/1383)).
 - Refactor misspelled word Resouce to Resource
-  ([1368](https://github.com/Shopify/sarama/pull/1368)).
+  ([1368](https://github.com/IBM/sarama/pull/1368)).
 
 ## Version 1.22.1 (2019-04-29)
 
 Improvements:
 - Use zstd 1.3.8
-  ([1350](https://github.com/Shopify/sarama/pull/1350)).
+  ([1350](https://github.com/IBM/sarama/pull/1350)).
 - Add support for SaslHandshakeRequest v1
-  ([1354](https://github.com/Shopify/sarama/pull/1354)).
+  ([1354](https://github.com/IBM/sarama/pull/1354)).
 
 Bug Fixes:
 - Fix V5 MetadataRequest nullable topics array
-  ([1353](https://github.com/Shopify/sarama/pull/1353)).
+  ([1353](https://github.com/IBM/sarama/pull/1353)).
 - Use a different SCRAM client for each broker connection
-  ([1349](https://github.com/Shopify/sarama/pull/1349)).
+  ([1349](https://github.com/IBM/sarama/pull/1349)).
 - Fix AllowAutoTopicCreation for MetadataRequest greater than v3
-  ([1344](https://github.com/Shopify/sarama/pull/1344)).
+  ([1344](https://github.com/IBM/sarama/pull/1344)).
 
 ## Version 1.22.0 (2019-04-09)
 
 New Features:
 - Add Offline Replicas Operation to Client
-  ([1318](https://github.com/Shopify/sarama/pull/1318)).
+  ([1318](https://github.com/IBM/sarama/pull/1318)).
 - Allow using proxy when connecting to broker
-  ([1326](https://github.com/Shopify/sarama/pull/1326)).
+  ([1326](https://github.com/IBM/sarama/pull/1326)).
 - Implement ReadCommitted
-  ([1307](https://github.com/Shopify/sarama/pull/1307)).
+  ([1307](https://github.com/IBM/sarama/pull/1307)).
 - Add support for Kafka 2.2.0
-  ([1331](https://github.com/Shopify/sarama/pull/1331)).
+  ([1331](https://github.com/IBM/sarama/pull/1331)).
 - Add SASL SCRAM-SHA-512 and SCRAM-SHA-256 mechanismes
-  ([1331](https://github.com/Shopify/sarama/pull/1295)).
+  ([1331](https://github.com/IBM/sarama/pull/1295)).
 
 Improvements:
 - Unregister all broker metrics on broker stop
-  ([1232](https://github.com/Shopify/sarama/pull/1232)).
+  ([1232](https://github.com/IBM/sarama/pull/1232)).
 - Add SCRAM authentication example
-  ([1303](https://github.com/Shopify/sarama/pull/1303)).
+  ([1303](https://github.com/IBM/sarama/pull/1303)).
 - Add consumergroup examples
-  ([1304](https://github.com/Shopify/sarama/pull/1304)).
+  ([1304](https://github.com/IBM/sarama/pull/1304)).
 - Expose consumer batch size metric
-  ([1296](https://github.com/Shopify/sarama/pull/1296)).
+  ([1296](https://github.com/IBM/sarama/pull/1296)).
 - Add TLS options to console producer and consumer
-  ([1300](https://github.com/Shopify/sarama/pull/1300)).
+  ([1300](https://github.com/IBM/sarama/pull/1300)).
 - Reduce client close bookkeeping
-  ([1297](https://github.com/Shopify/sarama/pull/1297)).
+  ([1297](https://github.com/IBM/sarama/pull/1297)).
 - Satisfy error interface in create responses
-  ([1154](https://github.com/Shopify/sarama/pull/1154)).
+  ([1154](https://github.com/IBM/sarama/pull/1154)).
 - Please lint gods
-  ([1346](https://github.com/Shopify/sarama/pull/1346)).
+  ([1346](https://github.com/IBM/sarama/pull/1346)).
 
 Bug Fixes:
 - Fix multi consumer group instance crash
-  ([1338](https://github.com/Shopify/sarama/pull/1338)).
+  ([1338](https://github.com/IBM/sarama/pull/1338)).
 - Update lz4 to latest version
-  ([1347](https://github.com/Shopify/sarama/pull/1347)).
+  ([1347](https://github.com/IBM/sarama/pull/1347)).
 - Retry ErrNotCoordinatorForConsumer in new consumergroup session
-  ([1231](https://github.com/Shopify/sarama/pull/1231)).
+  ([1231](https://github.com/IBM/sarama/pull/1231)).
 - Fix cleanup error handler
-  ([1332](https://github.com/Shopify/sarama/pull/1332)).
+  ([1332](https://github.com/IBM/sarama/pull/1332)).
 - Fix rate condition in PartitionConsumer
-  ([1156](https://github.com/Shopify/sarama/pull/1156)).
+  ([1156](https://github.com/IBM/sarama/pull/1156)).
 
 ## Version 1.21.0 (2019-02-24)
 
 New Features:
 - Add CreateAclRequest, DescribeAclRequest, DeleteAclRequest
-  ([1236](https://github.com/Shopify/sarama/pull/1236)).
+  ([1236](https://github.com/IBM/sarama/pull/1236)).
 - Add DescribeTopic, DescribeConsumerGroup, ListConsumerGroups, ListConsumerGroupOffsets admin requests
-  ([1178](https://github.com/Shopify/sarama/pull/1178)).
+  ([1178](https://github.com/IBM/sarama/pull/1178)).
 - Implement SASL/OAUTHBEARER
-  ([1240](https://github.com/Shopify/sarama/pull/1240)).
+  ([1240](https://github.com/IBM/sarama/pull/1240)).
 
 Improvements:
 - Add Go mod support
-  ([1282](https://github.com/Shopify/sarama/pull/1282)).
+  ([1282](https://github.com/IBM/sarama/pull/1282)).
 - Add error codes 73—76
-  ([1239](https://github.com/Shopify/sarama/pull/1239)).
+  ([1239](https://github.com/IBM/sarama/pull/1239)).
 - Add retry backoff function
-  ([1160](https://github.com/Shopify/sarama/pull/1160)).
+  ([1160](https://github.com/IBM/sarama/pull/1160)).
 - Maintain metadata in the producer even when retries are disabled
-  ([1189](https://github.com/Shopify/sarama/pull/1189)).
+  ([1189](https://github.com/IBM/sarama/pull/1189)).
 - Include ReplicaAssignment in ListTopics
-  ([1274](https://github.com/Shopify/sarama/pull/1274)).
+  ([1274](https://github.com/IBM/sarama/pull/1274)).
 - Add producer performance tool
-  ([1222](https://github.com/Shopify/sarama/pull/1222)).
+  ([1222](https://github.com/IBM/sarama/pull/1222)).
 - Add support LogAppend timestamps
-  ([1258](https://github.com/Shopify/sarama/pull/1258)).
+  ([1258](https://github.com/IBM/sarama/pull/1258)).
 
 Bug Fixes:
 - Fix potential deadlock when a heartbeat request fails
-  ([1286](https://github.com/Shopify/sarama/pull/1286)).
+  ([1286](https://github.com/IBM/sarama/pull/1286)).
 - Fix consuming compacted topic
-  ([1227](https://github.com/Shopify/sarama/pull/1227)).
+  ([1227](https://github.com/IBM/sarama/pull/1227)).
 - Set correct Kafka version for DescribeConfigsRequest v1
-  ([1277](https://github.com/Shopify/sarama/pull/1277)).
+  ([1277](https://github.com/IBM/sarama/pull/1277)).
 - Update kafka test version
-  ([1273](https://github.com/Shopify/sarama/pull/1273)).
+  ([1273](https://github.com/IBM/sarama/pull/1273)).
 
 ## Version 1.20.1 (2019-01-10)
 
 New Features:
 - Add optional replica id in offset request
-  ([1100](https://github.com/Shopify/sarama/pull/1100)).
+  ([1100](https://github.com/IBM/sarama/pull/1100)).
 
 Improvements:
 - Implement DescribeConfigs Request + Response v1 & v2
-  ([1230](https://github.com/Shopify/sarama/pull/1230)).
+  ([1230](https://github.com/IBM/sarama/pull/1230)).
 - Reuse compression objects
-  ([1185](https://github.com/Shopify/sarama/pull/1185)).
+  ([1185](https://github.com/IBM/sarama/pull/1185)).
 - Switch from png to svg for GoDoc link in README
-  ([1243](https://github.com/Shopify/sarama/pull/1243)).
+  ([1243](https://github.com/IBM/sarama/pull/1243)).
 - Fix typo in deprecation notice for FetchResponseBlock.Records
-  ([1242](https://github.com/Shopify/sarama/pull/1242)).
+  ([1242](https://github.com/IBM/sarama/pull/1242)).
 - Fix typos in consumer metadata response file
-  ([1244](https://github.com/Shopify/sarama/pull/1244)).
+  ([1244](https://github.com/IBM/sarama/pull/1244)).
 
 Bug Fixes:
 - Revert to individual msg retries for non-idempotent
-  ([1203](https://github.com/Shopify/sarama/pull/1203)).
+  ([1203](https://github.com/IBM/sarama/pull/1203)).
 - Respect MaxMessageBytes limit for uncompressed messages
-  ([1141](https://github.com/Shopify/sarama/pull/1141)).
+  ([1141](https://github.com/IBM/sarama/pull/1141)).
 
 ## Version 1.20.0 (2018-12-10)
 
 New Features:
  - Add support for zstd compression
-   ([#1170](https://github.com/Shopify/sarama/pull/1170)).
+   ([#1170](https://github.com/IBM/sarama/pull/1170)).
  - Add support for Idempotent Producer
-   ([#1152](https://github.com/Shopify/sarama/pull/1152)).
+   ([#1152](https://github.com/IBM/sarama/pull/1152)).
  - Add support support for Kafka 2.1.0
-   ([#1229](https://github.com/Shopify/sarama/pull/1229)).
+   ([#1229](https://github.com/IBM/sarama/pull/1229)).
  - Add support support for OffsetCommit request/response pairs versions v1 to v5
-   ([#1201](https://github.com/Shopify/sarama/pull/1201)).
+   ([#1201](https://github.com/IBM/sarama/pull/1201)).
  - Add support support for OffsetFetch request/response pair up to version v5
-   ([#1198](https://github.com/Shopify/sarama/pull/1198)).
+   ([#1198](https://github.com/IBM/sarama/pull/1198)).
 
 Improvements:
  - Export broker's Rack setting
-   ([#1173](https://github.com/Shopify/sarama/pull/1173)).
+   ([#1173](https://github.com/IBM/sarama/pull/1173)).
  - Always use latest patch version of Go on CI
-   ([#1202](https://github.com/Shopify/sarama/pull/1202)).
+   ([#1202](https://github.com/IBM/sarama/pull/1202)).
  - Add error codes 61 to 72
-   ([#1195](https://github.com/Shopify/sarama/pull/1195)).
+   ([#1195](https://github.com/IBM/sarama/pull/1195)).
 
 Bug Fixes:
  - Fix build without cgo
-   ([#1182](https://github.com/Shopify/sarama/pull/1182)).
+   ([#1182](https://github.com/IBM/sarama/pull/1182)).
  - Fix go vet suggestion in consumer group file
-   ([#1209](https://github.com/Shopify/sarama/pull/1209)).
+   ([#1209](https://github.com/IBM/sarama/pull/1209)).
  - Fix typos in code and comments
-   ([#1228](https://github.com/Shopify/sarama/pull/1228)).
+   ([#1228](https://github.com/IBM/sarama/pull/1228)).
 
 ## Version 1.19.0 (2018-09-27)
 
 New Features:
  - Implement a higher-level consumer group
-   ([#1099](https://github.com/Shopify/sarama/pull/1099)).
+   ([#1099](https://github.com/IBM/sarama/pull/1099)).
 
 Improvements:
  - Add support for Go 1.11
-   ([#1176](https://github.com/Shopify/sarama/pull/1176)).
+   ([#1176](https://github.com/IBM/sarama/pull/1176)).
 
 Bug Fixes:
  - Fix encoding of `MetadataResponse` with version 2 and higher
-   ([#1174](https://github.com/Shopify/sarama/pull/1174)).
+   ([#1174](https://github.com/IBM/sarama/pull/1174)).
  - Fix race condition in mock async producer
-   ([#1174](https://github.com/Shopify/sarama/pull/1174)).
+   ([#1174](https://github.com/IBM/sarama/pull/1174)).
 
 ## Version 1.18.0 (2018-09-07)
 
 New Features:
  - Make `Partitioner.RequiresConsistency` vary per-message
-   ([#1112](https://github.com/Shopify/sarama/pull/1112)).
+   ([#1112](https://github.com/IBM/sarama/pull/1112)).
  - Add customizable partitioner
-   ([#1118](https://github.com/Shopify/sarama/pull/1118)).
+   ([#1118](https://github.com/IBM/sarama/pull/1118)).
  - Add `ClusterAdmin` support for `CreateTopic`, `DeleteTopic`, `CreatePartitions`,
    `DeleteRecords`, `DescribeConfig`, `AlterConfig`, `CreateACL`, `ListAcls`, `DeleteACL`
-   ([#1055](https://github.com/Shopify/sarama/pull/1055)).
+   ([#1055](https://github.com/IBM/sarama/pull/1055)).
 
 Improvements:
  - Add support for Kafka 2.0.0
-   ([#1149](https://github.com/Shopify/sarama/pull/1149)).
+   ([#1149](https://github.com/IBM/sarama/pull/1149)).
  - Allow setting `LocalAddr` when dialing an address to support multi-homed hosts
-   ([#1123](https://github.com/Shopify/sarama/pull/1123)).
+   ([#1123](https://github.com/IBM/sarama/pull/1123)).
  - Simpler offset management
-   ([#1127](https://github.com/Shopify/sarama/pull/1127)).
+   ([#1127](https://github.com/IBM/sarama/pull/1127)).
 
 Bug Fixes:
  - Fix mutation of `ProducerMessage.MetaData` when producing to Kafka
-   ([#1110](https://github.com/Shopify/sarama/pull/1110)).
+   ([#1110](https://github.com/IBM/sarama/pull/1110)).
  - Fix consumer block when response did not contain all the
    expected topic/partition blocks
-   ([#1086](https://github.com/Shopify/sarama/pull/1086)).
+   ([#1086](https://github.com/IBM/sarama/pull/1086)).
  - Fix consumer block when response contains only constrol messages
-   ([#1115](https://github.com/Shopify/sarama/pull/1115)).
+   ([#1115](https://github.com/IBM/sarama/pull/1115)).
  - Add timeout config for ClusterAdmin requests
-   ([#1142](https://github.com/Shopify/sarama/pull/1142)).
+   ([#1142](https://github.com/IBM/sarama/pull/1142)).
  - Add version check when producing message with headers
-   ([#1117](https://github.com/Shopify/sarama/pull/1117)).
+   ([#1117](https://github.com/IBM/sarama/pull/1117)).
  - Fix `MetadataRequest` for empty list of topics
-   ([#1132](https://github.com/Shopify/sarama/pull/1132)).
+   ([#1132](https://github.com/IBM/sarama/pull/1132)).
  - Fix producer topic metadata on-demand fetch when topic error happens in metadata response
-   ([#1125](https://github.com/Shopify/sarama/pull/1125)).
+   ([#1125](https://github.com/IBM/sarama/pull/1125)).
 
 ## Version 1.17.0 (2018-05-30)
 
 New Features:
  - Add support for gzip compression levels
-   ([#1044](https://github.com/Shopify/sarama/pull/1044)).
+   ([#1044](https://github.com/IBM/sarama/pull/1044)).
  - Add support for Metadata request/response pairs versions v1 to v5
-   ([#1047](https://github.com/Shopify/sarama/pull/1047),
-    [#1069](https://github.com/Shopify/sarama/pull/1069)).
+   ([#1047](https://github.com/IBM/sarama/pull/1047),
+    [#1069](https://github.com/IBM/sarama/pull/1069)).
  - Add versioning to JoinGroup request/response pairs
-   ([#1098](https://github.com/Shopify/sarama/pull/1098))
+   ([#1098](https://github.com/IBM/sarama/pull/1098))
  - Add support for CreatePartitions, DeleteGroups, DeleteRecords request/response pairs
-   ([#1065](https://github.com/Shopify/sarama/pull/1065),
-    [#1096](https://github.com/Shopify/sarama/pull/1096),
-    [#1027](https://github.com/Shopify/sarama/pull/1027)).
+   ([#1065](https://github.com/IBM/sarama/pull/1065),
+    [#1096](https://github.com/IBM/sarama/pull/1096),
+    [#1027](https://github.com/IBM/sarama/pull/1027)).
  - Add `Controller()` method to Client interface
-   ([#1063](https://github.com/Shopify/sarama/pull/1063)).
+   ([#1063](https://github.com/IBM/sarama/pull/1063)).
 
 Improvements:
  - ConsumerMetadataReq/Resp has been migrated to FindCoordinatorReq/Resp
-   ([#1010](https://github.com/Shopify/sarama/pull/1010)).
+   ([#1010](https://github.com/IBM/sarama/pull/1010)).
  - Expose missing protocol parts: `msgSet` and `recordBatch`
-   ([#1049](https://github.com/Shopify/sarama/pull/1049)).
+   ([#1049](https://github.com/IBM/sarama/pull/1049)).
  - Add support for v1 DeleteTopics Request
-   ([#1052](https://github.com/Shopify/sarama/pull/1052)).
+   ([#1052](https://github.com/IBM/sarama/pull/1052)).
  - Add support for Go 1.10
-   ([#1064](https://github.com/Shopify/sarama/pull/1064)).
+   ([#1064](https://github.com/IBM/sarama/pull/1064)).
  - Claim support for Kafka 1.1.0
-   ([#1073](https://github.com/Shopify/sarama/pull/1073)).
+   ([#1073](https://github.com/IBM/sarama/pull/1073)).
 
 Bug Fixes:
  - Fix FindCoordinatorResponse.encode to allow nil Coordinator
-   ([#1050](https://github.com/Shopify/sarama/pull/1050),
-    [#1051](https://github.com/Shopify/sarama/pull/1051)).
+   ([#1050](https://github.com/IBM/sarama/pull/1050),
+    [#1051](https://github.com/IBM/sarama/pull/1051)).
  - Clear all metadata when we have the latest topic info
-   ([#1033](https://github.com/Shopify/sarama/pull/1033)).
+   ([#1033](https://github.com/IBM/sarama/pull/1033)).
  - Make `PartitionConsumer.Close` idempotent
-   ([#1092](https://github.com/Shopify/sarama/pull/1092)).
+   ([#1092](https://github.com/IBM/sarama/pull/1092)).
 
 ## Version 1.16.0 (2018-02-12)
 
 New Features:
  - Add support for the Create/Delete Topics request/response pairs
-   ([#1007](https://github.com/Shopify/sarama/pull/1007),
-    [#1008](https://github.com/Shopify/sarama/pull/1008)).
+   ([#1007](https://github.com/IBM/sarama/pull/1007),
+    [#1008](https://github.com/IBM/sarama/pull/1008)).
  - Add support for the Describe/Create/Delete ACL request/response pairs
-   ([#1009](https://github.com/Shopify/sarama/pull/1009)).
+   ([#1009](https://github.com/IBM/sarama/pull/1009)).
  - Add support for the five transaction-related request/response pairs
-   ([#1016](https://github.com/Shopify/sarama/pull/1016)).
+   ([#1016](https://github.com/IBM/sarama/pull/1016)).
 
 Improvements:
  - Permit setting version on mock producer responses
-   ([#999](https://github.com/Shopify/sarama/pull/999)).
+   ([#999](https://github.com/IBM/sarama/pull/999)).
  - Add `NewMockBrokerListener` helper for testing TLS connections
-   ([#1019](https://github.com/Shopify/sarama/pull/1019)).
+   ([#1019](https://github.com/IBM/sarama/pull/1019)).
  - Changed the default value for `Consumer.Fetch.Default` from 32KiB to 1MiB
    which results in much higher throughput in most cases
-   ([#1024](https://github.com/Shopify/sarama/pull/1024)).
+   ([#1024](https://github.com/IBM/sarama/pull/1024)).
  - Reuse the `time.Ticker` across fetch requests in the PartitionConsumer to
    reduce CPU and memory usage when processing many partitions
-   ([#1028](https://github.com/Shopify/sarama/pull/1028)).
+   ([#1028](https://github.com/IBM/sarama/pull/1028)).
  - Assign relative offsets to messages in the producer to save the brokers a
    recompression pass
-   ([#1002](https://github.com/Shopify/sarama/pull/1002),
-    [#1015](https://github.com/Shopify/sarama/pull/1015)).
+   ([#1002](https://github.com/IBM/sarama/pull/1002),
+    [#1015](https://github.com/IBM/sarama/pull/1015)).
 
 Bug Fixes:
  - Fix producing uncompressed batches with the new protocol format
-   ([#1032](https://github.com/Shopify/sarama/issues/1032)).
+   ([#1032](https://github.com/IBM/sarama/issues/1032)).
  - Fix consuming compacted topics with the new protocol format
-   ([#1005](https://github.com/Shopify/sarama/issues/1005)).
+   ([#1005](https://github.com/IBM/sarama/issues/1005)).
  - Fix consuming topics with a mix of protocol formats
-   ([#1021](https://github.com/Shopify/sarama/issues/1021)).
+   ([#1021](https://github.com/IBM/sarama/issues/1021)).
  - Fix consuming when the broker includes multiple batches in a single response
-   ([#1022](https://github.com/Shopify/sarama/issues/1022)).
+   ([#1022](https://github.com/IBM/sarama/issues/1022)).
  - Fix detection of `PartialTrailingMessage` when the partial message was
    truncated before the magic value indicating its version
-   ([#1030](https://github.com/Shopify/sarama/pull/1030)).
+   ([#1030](https://github.com/IBM/sarama/pull/1030)).
  - Fix expectation-checking in the mock of `SyncProducer.SendMessages`
-   ([#1035](https://github.com/Shopify/sarama/pull/1035)).
+   ([#1035](https://github.com/IBM/sarama/pull/1035)).
 
 ## Version 1.15.0 (2017-12-08)
 
 New Features:
  - Claim official support for Kafka 1.0, though it did already work
-   ([#984](https://github.com/Shopify/sarama/pull/984)).
+   ([#984](https://github.com/IBM/sarama/pull/984)).
  - Helper methods for Kafka version numbers to/from strings
-   ([#989](https://github.com/Shopify/sarama/pull/989)).
+   ([#989](https://github.com/IBM/sarama/pull/989)).
  - Implement CreatePartitions request/response
-   ([#985](https://github.com/Shopify/sarama/pull/985)).
+   ([#985](https://github.com/IBM/sarama/pull/985)).
 
 Improvements:
  - Add error codes 45-60
-   ([#986](https://github.com/Shopify/sarama/issues/986)).
+   ([#986](https://github.com/IBM/sarama/issues/986)).
 
 Bug Fixes:
  - Fix slow consuming for certain Kafka 0.11/1.0 configurations
-   ([#982](https://github.com/Shopify/sarama/pull/982)).
+   ([#982](https://github.com/IBM/sarama/pull/982)).
  - Correctly determine when a FetchResponse contains the new message format
-   ([#990](https://github.com/Shopify/sarama/pull/990)).
+   ([#990](https://github.com/IBM/sarama/pull/990)).
  - Fix producing with multiple headers
-   ([#996](https://github.com/Shopify/sarama/pull/996)).
+   ([#996](https://github.com/IBM/sarama/pull/996)).
  - Fix handling of truncated record batches
-   ([#998](https://github.com/Shopify/sarama/pull/998)).
+   ([#998](https://github.com/IBM/sarama/pull/998)).
  - Fix leaking metrics when closing brokers
-   ([#991](https://github.com/Shopify/sarama/pull/991)).
+   ([#991](https://github.com/IBM/sarama/pull/991)).
 
 ## Version 1.14.0 (2017-11-13)
 
@@ -1048,76 +1048,76 @@ New Features:
    consuming should work with all the existing bells and whistles (batching,
    compression, etc) as well as the new custom headers. Thanks to Vlad Hanciuta
    of Arista Networks for this work. Part of
-   ([#901](https://github.com/Shopify/sarama/issues/901)).
+   ([#901](https://github.com/IBM/sarama/issues/901)).
 
 Bug Fixes:
  - Fix encoding of ProduceResponse versions in test
-   ([#970](https://github.com/Shopify/sarama/pull/970)).
+   ([#970](https://github.com/IBM/sarama/pull/970)).
  - Return partial replicas list when we have it
-   ([#975](https://github.com/Shopify/sarama/pull/975)).
+   ([#975](https://github.com/IBM/sarama/pull/975)).
 
 ## Version 1.13.0 (2017-10-04)
 
 New Features:
  - Support for FetchRequest version 3
-   ([#905](https://github.com/Shopify/sarama/pull/905)).
+   ([#905](https://github.com/IBM/sarama/pull/905)).
  - Permit setting version on mock FetchResponses
-   ([#939](https://github.com/Shopify/sarama/pull/939)).
+   ([#939](https://github.com/IBM/sarama/pull/939)).
  - Add a configuration option to support storing only minimal metadata for
    extremely large clusters
-   ([#937](https://github.com/Shopify/sarama/pull/937)).
+   ([#937](https://github.com/IBM/sarama/pull/937)).
  - Add `PartitionOffsetManager.ResetOffset` for backtracking tracked offsets
-   ([#932](https://github.com/Shopify/sarama/pull/932)).
+   ([#932](https://github.com/IBM/sarama/pull/932)).
 
 Improvements:
  - Provide the block-level timestamp when consuming compressed messages
-   ([#885](https://github.com/Shopify/sarama/issues/885)).
+   ([#885](https://github.com/IBM/sarama/issues/885)).
  - `Client.Replicas` and `Client.InSyncReplicas` now respect the order returned
    by the broker, which can be meaningful
-   ([#930](https://github.com/Shopify/sarama/pull/930)).
+   ([#930](https://github.com/IBM/sarama/pull/930)).
  - Use a `Ticker` to reduce consumer timer overhead at the cost of higher
    variance in the actual timeout
-   ([#933](https://github.com/Shopify/sarama/pull/933)).
+   ([#933](https://github.com/IBM/sarama/pull/933)).
 
 Bug Fixes:
  - Gracefully handle messages with negative timestamps
-   ([#907](https://github.com/Shopify/sarama/pull/907)).
+   ([#907](https://github.com/IBM/sarama/pull/907)).
  - Raise a proper error when encountering an unknown message version
-   ([#940](https://github.com/Shopify/sarama/pull/940)).
+   ([#940](https://github.com/IBM/sarama/pull/940)).
 
 ## Version 1.12.0 (2017-05-08)
 
 New Features:
  - Added support for the `ApiVersions` request and response pair, and Kafka
-   version 0.10.2 ([#867](https://github.com/Shopify/sarama/pull/867)). Note
+   version 0.10.2 ([#867](https://github.com/IBM/sarama/pull/867)). Note
    that you still need to specify the Kafka version in the Sarama configuration
    for the time being.
  - Added a `Brokers` method to the Client which returns the complete set of
-   active brokers ([#813](https://github.com/Shopify/sarama/pull/813)).
+   active brokers ([#813](https://github.com/IBM/sarama/pull/813)).
  - Added an `InSyncReplicas` method to the Client which returns the set of all
    in-sync broker IDs for the given partition, now that the Kafka versions for
    which this was misleading are no longer in our supported set
-   ([#872](https://github.com/Shopify/sarama/pull/872)).
+   ([#872](https://github.com/IBM/sarama/pull/872)).
  - Added a `NewCustomHashPartitioner` method which allows constructing a hash
    partitioner with a custom hash method in case the default (FNV-1a) is not
    suitable
-   ([#837](https://github.com/Shopify/sarama/pull/837),
-    [#841](https://github.com/Shopify/sarama/pull/841)).
+   ([#837](https://github.com/IBM/sarama/pull/837),
+    [#841](https://github.com/IBM/sarama/pull/841)).
 
 Improvements:
  - Recognize more Kafka error codes
-   ([#859](https://github.com/Shopify/sarama/pull/859)).
+   ([#859](https://github.com/IBM/sarama/pull/859)).
 
 Bug Fixes:
  - Fix an issue where decoding a malformed FetchRequest would not return the
-   correct error ([#818](https://github.com/Shopify/sarama/pull/818)).
+   correct error ([#818](https://github.com/IBM/sarama/pull/818)).
  - Respect ordering of group protocols in JoinGroupRequests. This fix is
    transparent if you're using the `AddGroupProtocol` or
    `AddGroupProtocolMetadata` helpers; otherwise you will need to switch from
    the `GroupProtocols` field (now deprecated) to use `OrderedGroupProtocols`
-   ([#812](https://github.com/Shopify/sarama/issues/812)).
+   ([#812](https://github.com/IBM/sarama/issues/812)).
  - Fix an alignment-related issue with atomics on 32-bit architectures
-   ([#859](https://github.com/Shopify/sarama/pull/859)).
+   ([#859](https://github.com/IBM/sarama/pull/859)).
 
 ## Version 1.11.0 (2016-12-20)
 
@@ -1128,43 +1128,43 @@ which led to unexpected values and data races.
 
 New Features:
  - Metrics! Thanks to Sébastien Launay for all his work on this feature
-   ([#701](https://github.com/Shopify/sarama/pull/701),
-    [#746](https://github.com/Shopify/sarama/pull/746),
-    [#766](https://github.com/Shopify/sarama/pull/766)).
+   ([#701](https://github.com/IBM/sarama/pull/701),
+    [#746](https://github.com/IBM/sarama/pull/746),
+    [#766](https://github.com/IBM/sarama/pull/766)).
  - Add support for LZ4 compression
-   ([#786](https://github.com/Shopify/sarama/pull/786)).
+   ([#786](https://github.com/IBM/sarama/pull/786)).
  - Add support for ListOffsetRequest v1 and Kafka 0.10.1
-   ([#775](https://github.com/Shopify/sarama/pull/775)).
+   ([#775](https://github.com/IBM/sarama/pull/775)).
  - Added a `HighWaterMarks` method to the Consumer which aggregates the
    `HighWaterMarkOffset` values of its child topic/partitions
-   ([#769](https://github.com/Shopify/sarama/pull/769)).
+   ([#769](https://github.com/IBM/sarama/pull/769)).
 
 Bug Fixes:
  - Fixed producing when using timestamps, compression and Kafka 0.10
-   ([#759](https://github.com/Shopify/sarama/pull/759)).
+   ([#759](https://github.com/IBM/sarama/pull/759)).
  - Added missing decoder methods to DescribeGroups response
-   ([#756](https://github.com/Shopify/sarama/pull/756)).
+   ([#756](https://github.com/IBM/sarama/pull/756)).
  - Fix producer shutdown when `Return.Errors` is disabled
-   ([#787](https://github.com/Shopify/sarama/pull/787)).
+   ([#787](https://github.com/IBM/sarama/pull/787)).
  - Don't mutate configuration in SyncProducer
-   ([#790](https://github.com/Shopify/sarama/pull/790)).
+   ([#790](https://github.com/IBM/sarama/pull/790)).
  - Fix crash on SASL initialization failure
-   ([#795](https://github.com/Shopify/sarama/pull/795)).
+   ([#795](https://github.com/IBM/sarama/pull/795)).
 
 ## Version 1.10.1 (2016-08-30)
 
 Bug Fixes:
  - Fix the documentation for `HashPartitioner` which was incorrect
-   ([#717](https://github.com/Shopify/sarama/pull/717)).
+   ([#717](https://github.com/IBM/sarama/pull/717)).
  - Permit client creation even when it is limited by ACLs
-   ([#722](https://github.com/Shopify/sarama/pull/722)).
+   ([#722](https://github.com/IBM/sarama/pull/722)).
  - Several fixes to the consumer timer optimization code, regressions introduced
    in v1.10.0. Go's timers are finicky
-   ([#730](https://github.com/Shopify/sarama/pull/730),
-    [#733](https://github.com/Shopify/sarama/pull/733),
-    [#734](https://github.com/Shopify/sarama/pull/734)).
+   ([#730](https://github.com/IBM/sarama/pull/730),
+    [#733](https://github.com/IBM/sarama/pull/733),
+    [#734](https://github.com/IBM/sarama/pull/734)).
  - Handle consuming compressed relative offsets with Kafka 0.10
-   ([#735](https://github.com/Shopify/sarama/pull/735)).
+   ([#735](https://github.com/IBM/sarama/pull/735)).
 
 ## Version 1.10.0 (2016-08-02)
 
@@ -1175,125 +1175,125 @@ specify this value it will default to 0.8.2 (the minimum supported), and trying
 to use more recent features (like the offset manager) will fail with an error.
 
 _Also:_ The offset-manager's behaviour has been changed to match the upstream
-java consumer (see [#705](https://github.com/Shopify/sarama/pull/705) and
-[#713](https://github.com/Shopify/sarama/pull/713)). If you use the
+java consumer (see [#705](https://github.com/IBM/sarama/pull/705) and
+[#713](https://github.com/IBM/sarama/pull/713)). If you use the
 offset-manager, please ensure that you are committing one *greater* than the
 last consumed message offset or else you may end up consuming duplicate
 messages.
 
 New Features:
  - Support for Kafka 0.10
-   ([#672](https://github.com/Shopify/sarama/pull/672),
-    [#678](https://github.com/Shopify/sarama/pull/678),
-    [#681](https://github.com/Shopify/sarama/pull/681), and others).
+   ([#672](https://github.com/IBM/sarama/pull/672),
+    [#678](https://github.com/IBM/sarama/pull/678),
+    [#681](https://github.com/IBM/sarama/pull/681), and others).
  - Support for configuring the target Kafka version
-   ([#676](https://github.com/Shopify/sarama/pull/676)).
+   ([#676](https://github.com/IBM/sarama/pull/676)).
  - Batch producing support in the SyncProducer
-   ([#677](https://github.com/Shopify/sarama/pull/677)).
+   ([#677](https://github.com/IBM/sarama/pull/677)).
  - Extend producer mock to allow setting expectations on message contents
-   ([#667](https://github.com/Shopify/sarama/pull/667)).
+   ([#667](https://github.com/IBM/sarama/pull/667)).
 
 Improvements:
  - Support `nil` compressed messages for deleting in compacted topics
-   ([#634](https://github.com/Shopify/sarama/pull/634)).
+   ([#634](https://github.com/IBM/sarama/pull/634)).
  - Pre-allocate decoding errors, greatly reducing heap usage and GC time against
-   misbehaving brokers ([#690](https://github.com/Shopify/sarama/pull/690)).
+   misbehaving brokers ([#690](https://github.com/IBM/sarama/pull/690)).
  - Re-use consumer expiry timers, removing one allocation per consumed message
-   ([#707](https://github.com/Shopify/sarama/pull/707)).
+   ([#707](https://github.com/IBM/sarama/pull/707)).
 
 Bug Fixes:
  - Actually default the client ID to "sarama" like we say we do
-   ([#664](https://github.com/Shopify/sarama/pull/664)).
+   ([#664](https://github.com/IBM/sarama/pull/664)).
  - Fix a rare issue where `Client.Leader` could return the wrong error
-   ([#685](https://github.com/Shopify/sarama/pull/685)).
+   ([#685](https://github.com/IBM/sarama/pull/685)).
  - Fix a possible tight loop in the consumer
-   ([#693](https://github.com/Shopify/sarama/pull/693)).
+   ([#693](https://github.com/IBM/sarama/pull/693)).
  - Match upstream's offset-tracking behaviour
-   ([#705](https://github.com/Shopify/sarama/pull/705)).
+   ([#705](https://github.com/IBM/sarama/pull/705)).
  - Report UnknownTopicOrPartition errors from the offset manager
-   ([#706](https://github.com/Shopify/sarama/pull/706)).
+   ([#706](https://github.com/IBM/sarama/pull/706)).
  - Fix possible negative partition value from the HashPartitioner
-   ([#709](https://github.com/Shopify/sarama/pull/709)).
+   ([#709](https://github.com/IBM/sarama/pull/709)).
 
 ## Version 1.9.0 (2016-05-16)
 
 New Features:
  - Add support for custom offset manager retention durations
-   ([#602](https://github.com/Shopify/sarama/pull/602)).
+   ([#602](https://github.com/IBM/sarama/pull/602)).
  - Publish low-level mocks to enable testing of third-party producer/consumer
-   implementations ([#570](https://github.com/Shopify/sarama/pull/570)).
+   implementations ([#570](https://github.com/IBM/sarama/pull/570)).
  - Declare support for Golang 1.6
-   ([#611](https://github.com/Shopify/sarama/pull/611)).
+   ([#611](https://github.com/IBM/sarama/pull/611)).
  - Support for SASL plain-text auth
-   ([#648](https://github.com/Shopify/sarama/pull/648)).
+   ([#648](https://github.com/IBM/sarama/pull/648)).
 
 Improvements:
  - Simplified broker locking scheme slightly
-   ([#604](https://github.com/Shopify/sarama/pull/604)).
+   ([#604](https://github.com/IBM/sarama/pull/604)).
  - Documentation cleanup
-   ([#605](https://github.com/Shopify/sarama/pull/605),
-    [#621](https://github.com/Shopify/sarama/pull/621),
-    [#654](https://github.com/Shopify/sarama/pull/654)).
+   ([#605](https://github.com/IBM/sarama/pull/605),
+    [#621](https://github.com/IBM/sarama/pull/621),
+    [#654](https://github.com/IBM/sarama/pull/654)).
 
 Bug Fixes:
  - Fix race condition shutting down the OffsetManager
-   ([#658](https://github.com/Shopify/sarama/pull/658)).
+   ([#658](https://github.com/IBM/sarama/pull/658)).
 
 ## Version 1.8.0 (2016-02-01)
 
 New Features:
  - Full support for Kafka 0.9:
    - All protocol messages and fields
-   ([#586](https://github.com/Shopify/sarama/pull/586),
-   [#588](https://github.com/Shopify/sarama/pull/588),
-   [#590](https://github.com/Shopify/sarama/pull/590)).
+   ([#586](https://github.com/IBM/sarama/pull/586),
+   [#588](https://github.com/IBM/sarama/pull/588),
+   [#590](https://github.com/IBM/sarama/pull/590)).
    - Verified that TLS support works
-   ([#581](https://github.com/Shopify/sarama/pull/581)).
+   ([#581](https://github.com/IBM/sarama/pull/581)).
    - Fixed the OffsetManager compatibility
-   ([#585](https://github.com/Shopify/sarama/pull/585)).
+   ([#585](https://github.com/IBM/sarama/pull/585)).
 
 Improvements:
  - Optimize for fewer system calls when reading from the network
-   ([#584](https://github.com/Shopify/sarama/pull/584)).
+   ([#584](https://github.com/IBM/sarama/pull/584)).
  - Automatically retry `InvalidMessage` errors to match upstream behaviour
-   ([#589](https://github.com/Shopify/sarama/pull/589)).
+   ([#589](https://github.com/IBM/sarama/pull/589)).
 
 ## Version 1.7.0 (2015-12-11)
 
 New Features:
  - Preliminary support for Kafka 0.9
-   ([#572](https://github.com/Shopify/sarama/pull/572)). This comes with several
+   ([#572](https://github.com/IBM/sarama/pull/572)). This comes with several
    caveats:
    - Protocol-layer support is mostly in place
-     ([#577](https://github.com/Shopify/sarama/pull/577)), however Kafka 0.9
+     ([#577](https://github.com/IBM/sarama/pull/577)), however Kafka 0.9
      renamed some messages and fields, which we did not in order to preserve API
      compatibility.
    - The producer and consumer work against 0.9, but the offset manager does
-     not ([#573](https://github.com/Shopify/sarama/pull/573)).
+     not ([#573](https://github.com/IBM/sarama/pull/573)).
    - TLS support may or may not work
-     ([#581](https://github.com/Shopify/sarama/pull/581)).
+     ([#581](https://github.com/IBM/sarama/pull/581)).
 
 Improvements:
  - Don't wait for request timeouts on dead brokers, greatly speeding recovery
    when the TCP connection is left hanging
-   ([#548](https://github.com/Shopify/sarama/pull/548)).
+   ([#548](https://github.com/IBM/sarama/pull/548)).
  - Refactored part of the producer. The new version provides a much more elegant
-   solution to [#449](https://github.com/Shopify/sarama/pull/449). It is also
+   solution to [#449](https://github.com/IBM/sarama/pull/449). It is also
    slightly more efficient, and much more precise in calculating batch sizes
    when compression is used
-   ([#549](https://github.com/Shopify/sarama/pull/549),
-   [#550](https://github.com/Shopify/sarama/pull/550),
-   [#551](https://github.com/Shopify/sarama/pull/551)).
+   ([#549](https://github.com/IBM/sarama/pull/549),
+   [#550](https://github.com/IBM/sarama/pull/550),
+   [#551](https://github.com/IBM/sarama/pull/551)).
 
 Bug Fixes:
  - Fix race condition in consumer test mock
-   ([#553](https://github.com/Shopify/sarama/pull/553)).
+   ([#553](https://github.com/IBM/sarama/pull/553)).
 
 ## Version 1.6.1 (2015-09-25)
 
 Bug Fixes:
  - Fix panic that could occur if a user-supplied message value failed to encode
-   ([#449](https://github.com/Shopify/sarama/pull/449)).
+   ([#449](https://github.com/IBM/sarama/pull/449)).
 
 ## Version 1.6.0 (2015-09-04)
 
@@ -1302,20 +1302,20 @@ New Features:
    Kafka 0.8.2. The API is designed mainly for integration into a future
    high-level consumer, not for direct use, although it is *possible* to use it
    directly.
-   ([#461](https://github.com/Shopify/sarama/pull/461)).
+   ([#461](https://github.com/IBM/sarama/pull/461)).
 
 Improvements:
  - CRC32 calculation is much faster on machines with SSE4.2 instructions,
    removing a major hotspot from most profiles
-   ([#255](https://github.com/Shopify/sarama/pull/255)).
+   ([#255](https://github.com/IBM/sarama/pull/255)).
 
 Bug Fixes:
  - Make protocol decoding more robust against some malformed packets generated
-   by go-fuzz ([#523](https://github.com/Shopify/sarama/pull/523),
-   [#525](https://github.com/Shopify/sarama/pull/525)) or found in other ways
-   ([#528](https://github.com/Shopify/sarama/pull/528)).
+   by go-fuzz ([#523](https://github.com/IBM/sarama/pull/523),
+   [#525](https://github.com/IBM/sarama/pull/525)) or found in other ways
+   ([#528](https://github.com/IBM/sarama/pull/528)).
  - Fix a potential race condition panic in the consumer on shutdown
-   ([#529](https://github.com/Shopify/sarama/pull/529)).
+   ([#529](https://github.com/IBM/sarama/pull/529)).
 
 ## Version 1.5.0 (2015-08-17)
 
@@ -1323,47 +1323,47 @@ New Features:
  - TLS-encrypted network connections are now supported. This feature is subject
    to change when Kafka releases built-in TLS support, but for now this is
    enough to work with TLS-terminating proxies
-   ([#154](https://github.com/Shopify/sarama/pull/154)).
+   ([#154](https://github.com/IBM/sarama/pull/154)).
 
 Improvements:
  - The consumer will not block if a single partition is not drained by the user;
    all other partitions will continue to consume normally
-   ([#485](https://github.com/Shopify/sarama/pull/485)).
+   ([#485](https://github.com/IBM/sarama/pull/485)).
  - Formatting of error strings has been much improved
-   ([#495](https://github.com/Shopify/sarama/pull/495)).
+   ([#495](https://github.com/IBM/sarama/pull/495)).
  - Internal refactoring of the producer for code cleanliness and to enable
-   future work ([#300](https://github.com/Shopify/sarama/pull/300)).
+   future work ([#300](https://github.com/IBM/sarama/pull/300)).
 
 Bug Fixes:
  - Fix a potential deadlock in the consumer on shutdown
-   ([#475](https://github.com/Shopify/sarama/pull/475)).
+   ([#475](https://github.com/IBM/sarama/pull/475)).
 
 ## Version 1.4.3 (2015-07-21)
 
 Bug Fixes:
  - Don't include the partitioner in the producer's "fetch partitions"
-   circuit-breaker ([#466](https://github.com/Shopify/sarama/pull/466)).
+   circuit-breaker ([#466](https://github.com/IBM/sarama/pull/466)).
  - Don't retry messages until the broker is closed when abandoning a broker in
-   the producer ([#468](https://github.com/Shopify/sarama/pull/468)).
+   the producer ([#468](https://github.com/IBM/sarama/pull/468)).
  - Update the import path for snappy-go, it has moved again and the API has
-   changed slightly ([#486](https://github.com/Shopify/sarama/pull/486)).
+   changed slightly ([#486](https://github.com/IBM/sarama/pull/486)).
 
 ## Version 1.4.2 (2015-05-27)
 
 Bug Fixes:
  - Update the import path for snappy-go, it has moved from google code to github
-   ([#456](https://github.com/Shopify/sarama/pull/456)).
+   ([#456](https://github.com/IBM/sarama/pull/456)).
 
 ## Version 1.4.1 (2015-05-25)
 
 Improvements:
  - Optimizations when decoding snappy messages, thanks to John Potocny
-   ([#446](https://github.com/Shopify/sarama/pull/446)).
+   ([#446](https://github.com/IBM/sarama/pull/446)).
 
 Bug Fixes:
  - Fix hypothetical race conditions on producer shutdown
-   ([#450](https://github.com/Shopify/sarama/pull/450),
-   [#451](https://github.com/Shopify/sarama/pull/451)).
+   ([#450](https://github.com/IBM/sarama/pull/450),
+   [#451](https://github.com/IBM/sarama/pull/451)).
 
 ## Version 1.4.0 (2015-05-01)
 
@@ -1371,36 +1371,36 @@ New Features:
  - The consumer now implements `Topics()` and `Partitions()` methods to enable
    users to dynamically choose what topics/partitions to consume without
    instantiating a full client
-   ([#431](https://github.com/Shopify/sarama/pull/431)).
+   ([#431](https://github.com/IBM/sarama/pull/431)).
  - The partition-consumer now exposes the high water mark offset value returned
-   by the broker via the `HighWaterMarkOffset()` method ([#339](https://github.com/Shopify/sarama/pull/339)).
+   by the broker via the `HighWaterMarkOffset()` method ([#339](https://github.com/IBM/sarama/pull/339)).
  - Added a `kafka-console-consumer` tool capable of handling multiple
    partitions, and deprecated the now-obsolete `kafka-console-partitionConsumer`
-   ([#439](https://github.com/Shopify/sarama/pull/439),
-   [#442](https://github.com/Shopify/sarama/pull/442)).
+   ([#439](https://github.com/IBM/sarama/pull/439),
+   [#442](https://github.com/IBM/sarama/pull/442)).
 
 Improvements:
  - The producer's logging during retry scenarios is more consistent, more
    useful, and slightly less verbose
-   ([#429](https://github.com/Shopify/sarama/pull/429)).
+   ([#429](https://github.com/IBM/sarama/pull/429)).
  - The client now shuffles its initial list of seed brokers in order to prevent
    thundering herd on the first broker in the list
-   ([#441](https://github.com/Shopify/sarama/pull/441)).
+   ([#441](https://github.com/IBM/sarama/pull/441)).
 
 Bug Fixes:
  - The producer now correctly manages its state if retries occur when it is
    shutting down, fixing several instances of confusing behaviour and at least
-   one potential deadlock ([#419](https://github.com/Shopify/sarama/pull/419)).
+   one potential deadlock ([#419](https://github.com/IBM/sarama/pull/419)).
  - The consumer now handles messages for different partitions asynchronously,
    making it much more resilient to specific user code ordering
-   ([#325](https://github.com/Shopify/sarama/pull/325)).
+   ([#325](https://github.com/IBM/sarama/pull/325)).
 
 ## Version 1.3.0 (2015-04-16)
 
 New Features:
  - The client now tracks consumer group coordinators using
    ConsumerMetadataRequests similar to how it tracks partition leadership using
-   regular MetadataRequests ([#411](https://github.com/Shopify/sarama/pull/411)).
+   regular MetadataRequests ([#411](https://github.com/IBM/sarama/pull/411)).
    This adds two methods to the client API:
    - `Coordinator(consumerGroup string) (*Broker, error)`
    - `RefreshCoordinator(consumerGroup string) error`
@@ -1409,57 +1409,57 @@ Improvements:
  - ConsumerMetadataResponses now automatically create a Broker object out of the
    ID/address/port combination for the Coordinator; accessing the fields
    individually has been deprecated
-   ([#413](https://github.com/Shopify/sarama/pull/413)).
+   ([#413](https://github.com/IBM/sarama/pull/413)).
  - Much improved handling of `OffsetOutOfRange` errors in the consumer.
    Consumers will fail to start if the provided offset is out of range
-   ([#418](https://github.com/Shopify/sarama/pull/418))
+   ([#418](https://github.com/IBM/sarama/pull/418))
    and they will automatically shut down if the offset falls out of range
-   ([#424](https://github.com/Shopify/sarama/pull/424)).
+   ([#424](https://github.com/IBM/sarama/pull/424)).
  - Small performance improvement in encoding and decoding protocol messages
-   ([#427](https://github.com/Shopify/sarama/pull/427)).
+   ([#427](https://github.com/IBM/sarama/pull/427)).
 
 Bug Fixes:
  - Fix a rare race condition in the client's background metadata refresher if
    it happens to be activated while the client is being closed
-   ([#422](https://github.com/Shopify/sarama/pull/422)).
+   ([#422](https://github.com/IBM/sarama/pull/422)).
 
 ## Version 1.2.0 (2015-04-07)
 
 Improvements:
  - The producer's behaviour when `Flush.Frequency` is set is now more intuitive
-   ([#389](https://github.com/Shopify/sarama/pull/389)).
+   ([#389](https://github.com/IBM/sarama/pull/389)).
  - The producer is now somewhat more memory-efficient during and after retrying
    messages due to an improved queue implementation
-   ([#396](https://github.com/Shopify/sarama/pull/396)).
+   ([#396](https://github.com/IBM/sarama/pull/396)).
  - The consumer produces much more useful logging output when leadership
-   changes ([#385](https://github.com/Shopify/sarama/pull/385)).
+   changes ([#385](https://github.com/IBM/sarama/pull/385)).
  - The client's `GetOffset` method will now automatically refresh metadata and
    retry once in the event of stale information or similar
-   ([#394](https://github.com/Shopify/sarama/pull/394)).
+   ([#394](https://github.com/IBM/sarama/pull/394)).
  - Broker connections now have support for using TCP keepalives
-   ([#407](https://github.com/Shopify/sarama/issues/407)).
+   ([#407](https://github.com/IBM/sarama/issues/407)).
 
 Bug Fixes:
  - The OffsetCommitRequest message now correctly implements all three possible
-   API versions ([#390](https://github.com/Shopify/sarama/pull/390),
-   [#400](https://github.com/Shopify/sarama/pull/400)).
+   API versions ([#390](https://github.com/IBM/sarama/pull/390),
+   [#400](https://github.com/IBM/sarama/pull/400)).
 
 ## Version 1.1.0 (2015-03-20)
 
 Improvements:
  - Wrap the producer's partitioner call in a circuit-breaker so that repeatedly
    broken topics don't choke throughput
-   ([#373](https://github.com/Shopify/sarama/pull/373)).
+   ([#373](https://github.com/IBM/sarama/pull/373)).
 
 Bug Fixes:
  - Fix the producer's internal reference counting in certain unusual scenarios
-   ([#367](https://github.com/Shopify/sarama/pull/367)).
+   ([#367](https://github.com/IBM/sarama/pull/367)).
  - Fix the consumer's internal reference counting in certain unusual scenarios
-   ([#369](https://github.com/Shopify/sarama/pull/369)).
+   ([#369](https://github.com/IBM/sarama/pull/369)).
  - Fix a condition where the producer's internal control messages could have
-   gotten stuck ([#368](https://github.com/Shopify/sarama/pull/368)).
+   gotten stuck ([#368](https://github.com/IBM/sarama/pull/368)).
  - Fix an issue where invalid partition lists would be cached when asking for
-   metadata for a non-existant topic ([#372](https://github.com/Shopify/sarama/pull/372)).
+   metadata for a non-existant topic ([#372](https://github.com/IBM/sarama/pull/372)).
 
 
 ## Version 1.0.0 (2015-03-17)
@@ -1468,7 +1468,7 @@ Version 1.0.0 is the first tagged version, and is almost a complete rewrite. The
 
 - The producer has been rewritten; there is now a `SyncProducer` with a blocking API, and an `AsyncProducer` that is non-blocking.
 - The consumer has been rewritten to only open one connection per broker instead of one connection per partition.
-- The main types of Sarama are now interfaces to make depedency injection easy; mock implementations for `Consumer`, `SyncProducer` and `AsyncProducer` are provided in the `github.com/Shopify/sarama/mocks` package.
+- The main types of Sarama are now interfaces to make depedency injection easy; mock implementations for `Consumer`, `SyncProducer` and `AsyncProducer` are provided in the `github.com/IBM/sarama/mocks` package.
 - For most uses cases, it is no longer necessary to open a `Client`; this will be done for you.
 - All the configuration values have been unified in the `Config` struct.
 - Much improved test suite.
