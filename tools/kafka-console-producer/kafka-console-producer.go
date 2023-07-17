@@ -10,8 +10,8 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 
-	"github.com/Shopify/sarama"
-	"github.com/Shopify/sarama/tools/tls"
+	"github.com/IBM/sarama"
+	"github.com/IBM/sarama/tools/tls"
 )
 
 var (

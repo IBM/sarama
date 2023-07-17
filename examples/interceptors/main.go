@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Shopify/sarama"
 	"go.opentelemetry.io/otel/exporters/stdout"
+
+	"github.com/IBM/sarama"
 )
 
 var (

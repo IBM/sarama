@@ -1105,7 +1105,7 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 // consumer connects back to the new leader to resume consumption and doesn't
 // continue consuming from the follower.
 //
-// See https://github.com/Shopify/sarama/issues/1927
+// See https://github.com/IBM/sarama/issues/1927
 func TestConsumeMessagesTrackLeader(t *testing.T) {
 	cfg := NewConfig()
 	cfg.ClientID = t.Name()

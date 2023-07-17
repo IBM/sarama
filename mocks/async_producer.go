@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 )
 
 // AsyncProducer implements sarama's Producer interface for testing purposes.

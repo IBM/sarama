@@ -895,7 +895,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 // cleanly recover if network connectivity to the remote brokers is lost and
 // then subsequently resumed.
 //
-// https://github.com/Shopify/sarama/issues/2129
+// https://github.com/IBM/sarama/issues/2129
 func TestAsyncProducerRemoteBrokerClosed(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)

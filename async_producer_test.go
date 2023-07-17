@@ -683,7 +683,7 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	}
 }
 
-// https://github.com/Shopify/sarama/issues/2129
+// https://github.com/IBM/sarama/issues/2129
 func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 	// Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 	seedBroker := NewMockBroker(t, 1)
@@ -1302,7 +1302,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 	}
 }
 
-// test case for https://github.com/Shopify/sarama/pull/2378
+// test case for https://github.com/IBM/sarama/pull/2378
 func TestAsyncProducerIdempotentRetryCheckBatch_2378(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
