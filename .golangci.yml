@@ -19,7 +19,7 @@ linters-settings:
   misspell:
     locale: US
   goimports:
-    local-prefixes: github.com/Shopify/sarama
+    local-prefixes: github.com/IBM/sarama
   gocritic:
     enabled-tags:
       - diagnostic
@@ -43,7 +43,7 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    - deadcode
+    # - deadcode
     - depguard
     - exportloopref
     - dogsled
@@ -68,12 +68,12 @@ linters:
     # - paralleltest
     # - scopelint
     - staticcheck
-    - structcheck
+    # - structcheck
     # - stylecheck
     - typecheck
     - unconvert
     - unused
-    - varcheck
+    # - varcheck
     - whitespace
 
 issues:
