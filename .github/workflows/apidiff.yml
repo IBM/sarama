@@ -6,7 +6,7 @@ jobs:
     if: github.base_ref
     steps:
       - name: Setup Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: 1.20.x
       - name: Add GOBIN to PATH
