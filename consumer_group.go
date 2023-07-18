@@ -922,9 +922,6 @@ func (s *consumerGroupSession) heartbeatLoop() {
 	pause := time.NewTicker(s.parent.config.Consumer.Group.Heartbeat.Interval)
 	defer pause.Stop()
 
-	retryBackoff := time.NewTimer(s.parent.config.Metadata.Retry.Backoff)
-	defer retryBackoff.Stop()
-
 	retries := s.parent.config.Metadata.Retry.Max
 	for {
 		coordinator, err := s.parent.client.Coordinator(s.parent.groupID)
@@ -933,13 +930,13 @@ func (s *consumerGroupSession) heartbeatLoop() {
 				s.parent.handleError(err, "", -1)
 				return
 			}
-			retryBackoff.Reset(s.parent.config.Metadata.Retry.Backoff)
+
 			select {
 			case <-s.hbDying:
 				return
-			case <-retryBackoff.C:
-				retries--
+			default:
 			}
+			retries--
 			continue
 		}
 
