@@ -10,11 +10,6 @@ updates:
       - "ignore-for-release"
     commit-message:
       prefix: chore(ci)
-      include: ""
-    groups:
-      github-actions:
-        patterns:
-          - "*"
   - package-ecosystem: gomod
     directory: /
     open-pull-requests-limit: 5
