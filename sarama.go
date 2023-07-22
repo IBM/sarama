@@ -91,7 +91,7 @@ import (
 
 var (
 	// Logger is the instance of a StdLogger interface that Sarama writes connection
-	// management events to. By default it is set to discard all log messages via ioutil.Discard,
+	// management events to. By default it is set to discard all log messages via io.Discard,
 	// but you can set it to redirect wherever you want.
 	Logger StdLogger = log.New(io.Discard, "[Sarama] ", log.LstdFlags)
 
