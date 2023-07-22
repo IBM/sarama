@@ -184,7 +184,7 @@ var (
 		0, 3, 'f', 'o', 'o', // Leader ID
 		0, 3, 'b', 'a', 'r', // Member ID
 		0, 0, 0, 1, // One member info
-		0, 3, 'm', 'i', 'd', // memeberId
+		0, 3, 'm', 'i', 'd', // memberId
 		0, 3, 'g', 'i', 'd', // GroupInstanceId
 		0, 0, 0, 3, 1, 2, 3, // Metadata
 	}

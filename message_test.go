@@ -51,7 +51,7 @@ var (
 		0xFF, 0xFF, 0xFF, 0xFF, // key
 		0x00, 0x00, 0x00, 0x0f, // len
 		0x04, 0x22, 0x4D, 0x18, // LZ4 magic number
-		100,                  // LZ4 flags: version 01, block indepedant, content checksum
+		100,                  // LZ4 flags: version 01, block independent, content checksum
 		112, 185, 0, 0, 0, 0, // LZ4 data
 		5, 93, 204, 2, // LZ4 checksum
 	}

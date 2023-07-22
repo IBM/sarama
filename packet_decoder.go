@@ -55,7 +55,7 @@ type pushDecoder interface {
 	// Saves the offset into the input buffer as the location to actually read the calculated value when able.
 	saveOffset(in int)
 
-	// Returns the length of data to reserve for the input of this encoder (eg 4 bytes for a CRC32).
+	// Returns the length of data to reserve for the input of this encoder (e.g. 4 bytes for a CRC32).
 	reserveLength() int
 
 	// Indicates that all required data is now available to calculate and check the field.

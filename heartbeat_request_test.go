@@ -8,19 +8,19 @@ import (
 var (
 	basicHeartbeatRequestV0 = []byte{
 		0, 3, 'f', 'o', 'o', // Group ID
-		0x00, 0x01, 0x02, 0x03, // Generatiuon ID
+		0x00, 0x01, 0x02, 0x03, // Generation ID
 		0, 3, 'b', 'a', 'z', // Member ID
 	}
 
 	basicHeartbeatRequestV3_GID = []byte{
 		0, 3, 'f', 'o', 'o', // Group ID
-		0x00, 0x01, 0x02, 0x03, // Generatiuon ID
+		0x00, 0x01, 0x02, 0x03, // Generation ID
 		0, 3, 'b', 'a', 'z', // Member ID
 		0, 3, 'g', 'i', 'd', // Group Instance ID
 	}
 	basicHeartbeatRequestV3_NOGID = []byte{
 		0, 3, 'f', 'o', 'o', // Group ID
-		0x00, 0x01, 0x02, 0x03, // Generatiuon ID
+		0x00, 0x01, 0x02, 0x03, // Generation ID
 		0, 3, 'b', 'a', 'z', // Member ID
 		255, 255, // Group Instance ID
 	}

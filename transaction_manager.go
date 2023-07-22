@@ -14,7 +14,7 @@ type ProducerTxnStatusFlag int16
 const (
 	// ProducerTxnFlagUninitialized when txnmgr is created
 	ProducerTxnFlagUninitialized ProducerTxnStatusFlag = 1 << iota
-	// ProducerTxnFlagInitializing when txnmgr is initilizing
+	// ProducerTxnFlagInitializing when txnmgr is initializing
 	ProducerTxnFlagInitializing
 	// ProducerTxnFlagReady when is ready to receive transaction
 	ProducerTxnFlagReady
@@ -22,7 +22,7 @@ const (
 	ProducerTxnFlagInTransaction
 	// ProducerTxnFlagEndTransaction when transaction will be committed
 	ProducerTxnFlagEndTransaction
-	// ProducerTxnFlagInError whan having abortable or fatal error
+	// ProducerTxnFlagInError when having abortable or fatal error
 	ProducerTxnFlagInError
 	// ProducerTxnFlagCommittingTransaction when committing txn
 	ProducerTxnFlagCommittingTransaction
@@ -117,13 +117,13 @@ var producerTxnTransitions = map[ProducerTxnStatusFlag][]ProducerTxnStatusFlag{
 		ProducerTxnFlagReady,
 		ProducerTxnFlagInError,
 	},
-	// When we need are initilizing
+	// When we need are initializing
 	ProducerTxnFlagInitializing: {
 		ProducerTxnFlagInitializing,
 		ProducerTxnFlagReady,
 		ProducerTxnFlagInError,
 	},
-	// When we have initilized transactional producer
+	// When we have initialized transactional producer
 	ProducerTxnFlagReady: {
 		ProducerTxnFlagInTransaction,
 	},
@@ -660,7 +660,7 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 
-	// Ensure no error when committing or abording
+	// Ensure no error when committing or aborting
 	if commit && t.currentTxnStatus()&ProducerTxnFlagInError != 0 {
 		return t.lastError
 	} else if !commit && t.currentTxnStatus()&ProducerTxnFlagFatalError != 0 {
