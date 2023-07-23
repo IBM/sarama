@@ -1852,11 +1852,11 @@ func Test_retryOnError(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error but was nil")
 		}
-		if attempts != 3 {
-			t.Errorf("expected 3 attempts to have been made but was %d", attempts)
+		if attempts != 4 {
+			t.Errorf("expected 4 attempts to have been made but was %d", attempts)
 		}
-		if time.Since(startTime) >= 3*testBackoffTime {
-			t.Errorf("attempt+sleep+attempt+sleep+attempt should take less than 3 * backoff time")
+		if time.Since(startTime) >= 4*testBackoffTime {
+			t.Errorf("attempt+sleep+retry+sleep+retry+sleep+retry should take less than 4 * backoff time")
 		}
 	})
 }
