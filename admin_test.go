@@ -1790,3 +1790,73 @@ func TestDescribeLogDirsUnknownBroker(t *testing.T) {
 		}
 	}
 }
+
+func Test_retryOnError(t *testing.T) {
+	testBackoffTime := 100 * time.Millisecond
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	config.Admin.Retry.Max = 3
+	config.Admin.Retry.Backoff = testBackoffTime
+
+	admin := &clusterAdmin{conf: config}
+
+	t.Run("immediate success", func(t *testing.T) {
+		startTime := time.Now()
+		attempts := 0
+		err := admin.retryOnError(
+			func(error) bool { return true },
+			func() error {
+				attempts++
+				return nil
+			})
+		if err != nil {
+			t.Fatalf("expected no error but was %v", err)
+		}
+		if attempts != 1 {
+			t.Fatalf("expected 1 attempt to have been made but was %d", attempts)
+		}
+		if time.Since(startTime) >= testBackoffTime {
+			t.Fatalf("single attempt should take less than backoff time")
+		}
+	})
+
+	t.Run("immediate failure", func(t *testing.T) {
+		startTime := time.Now()
+		attempts := 0
+		err := admin.retryOnError(
+			func(error) bool { return false },
+			func() error {
+				attempts++
+				return errors.New("mock error")
+			})
+		if err == nil {
+			t.Fatalf("expected error but was nil")
+		}
+		if attempts != 1 {
+			t.Fatalf("expected 1 attempt to have been made but was %d", attempts)
+		}
+		if time.Since(startTime) >= testBackoffTime {
+			t.Fatalf("single attempt should take less than backoff time")
+		}
+	})
+
+	t.Run("failing all attempts", func(t *testing.T) {
+		startTime := time.Now()
+		attempts := 0
+		err := admin.retryOnError(
+			func(error) bool { return true },
+			func() error {
+				attempts++
+				return errors.New("mock error")
+			})
+		if err == nil {
+			t.Errorf("expected error but was nil")
+		}
+		if attempts != 3 {
+			t.Errorf("expected 3 attempts to have been made but was %d", attempts)
+		}
+		if time.Since(startTime) >= 3*testBackoffTime {
+			t.Errorf("attempt+sleep+attempt+sleep+attempt should take less than 3 * backoff time")
+		}
+	})
+}
