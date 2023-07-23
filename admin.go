@@ -273,13 +273,19 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 }
 
 func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetadata, err error) {
-	controller, err := ca.Controller()
-	if err != nil {
-		return nil, err
-	}
-
-	request := NewMetadataRequest(ca.conf.Version, topics)
-	response, err := controller.GetMetadata(request)
+	var response *MetadataResponse
+	err = ca.retryOnError(isErrNoController, func() error {
+		controller, err := ca.Controller()
+		if err != nil {
+			return err
+		}
+		request := NewMetadataRequest(ca.conf.Version, topics)
+		response, err = controller.GetMetadata(request)
+		if isErrNoController(err) {
+			_, _ = ca.refreshController()
+		}
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
