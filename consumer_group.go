@@ -406,7 +406,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		claims = members.Topics
 
 		// in the case of stateful balance strategies, hold on to the returned
-		// assignment metadata, otherwise, reset the statically defined conusmer
+		// assignment metadata, otherwise, reset the statically defined consumer
 		// group metadata
 		if members.UserData != nil {
 			c.userData = members.UserData

@@ -3,7 +3,8 @@ FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 USER root
 
 RUN microdnf update \
-    && microdnf install curl gzip java-11-openjdk-headless tar \
+    && microdnf install curl gzip java-11-openjdk-headless tar tzdata-java \
+    && microdnf reinstall tzdata \
     && microdnf clean all
 
 ENV JAVA_HOME=/usr/lib/jvm/jre-11

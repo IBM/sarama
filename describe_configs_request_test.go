@@ -44,7 +44,7 @@ var (
 		2,                   // a topic
 		0, 3, 'f', 'o', 'o', // topic name: foo
 		255, 255, 255, 255, // no configs
-		1, // synoms
+		1, // synonyms
 	}
 )
 

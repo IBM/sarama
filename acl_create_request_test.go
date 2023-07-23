@@ -16,7 +16,7 @@ var (
 		0, 0, 0, 1,
 		3, // resource type = group
 		0, 5, 'g', 'r', 'o', 'u', 'p',
-		3, // resource pattten type = literal
+		3, // resource pattern type = literal
 		0, 9, 'p', 'r', 'i', 'n', 'c', 'i', 'p', 'a', 'l',
 		0, 4, 'h', 'o', 's', 't',
 		2, // all

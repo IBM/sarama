@@ -911,7 +911,7 @@ func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 
 	seedBroker.Returns(coordinatorResponse3)
 
-	// Refresh the locally cahced value because it's stale
+	// Refresh the locally cached value because it's stale
 	if err := client.RefreshCoordinator("my_group"); err != nil {
 		t.Error(err)
 	}

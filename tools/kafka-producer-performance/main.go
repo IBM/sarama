@@ -43,7 +43,7 @@ var (
 	securityProtocol = flag.String(
 		"security-protocol",
 		"PLAINTEXT",
-		"The name of the security protocol to talk to Kafka (PLAINTEXT, SSL) (default: PLAINTEXT).",
+		"The name of the security protocol to talk to Kafka (PLAINTEXT, SSL).",
 	)
 	tlsRootCACerts = flag.String(
 		"tls-ca-certs",
@@ -83,7 +83,7 @@ var (
 	maxOpenRequests = flag.Int(
 		"max-open-requests",
 		5,
-		"The maximum number of unacknowledged requests the client will send on a single connection before blocking (default: 5).",
+		"The maximum number of unacknowledged requests the client will send on a single connection before blocking.",
 	)
 	maxMessageBytes = flag.Int(
 		"max-message-bytes",

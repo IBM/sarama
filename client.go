@@ -50,7 +50,7 @@ type Client interface {
 	// topic/partition, as determined by querying the cluster metadata.
 	Leader(topic string, partitionID int32) (*Broker, error)
 
-	// LeaderAndEpoch returns the the leader and its epoch for the current
+	// LeaderAndEpoch returns the leader and its epoch for the current
 	// topic/partition, as determined by querying the cluster metadata.
 	LeaderAndEpoch(topic string, partitionID int32) (*Broker, int32, error)
 

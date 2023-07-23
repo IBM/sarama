@@ -1115,7 +1115,7 @@ type assignmentPriorityQueue []*consumerGroupMember
 func (pq assignmentPriorityQueue) Len() int { return len(pq) }
 
 func (pq assignmentPriorityQueue) Less(i, j int) bool {
-	// order asssignment priority queue in descending order using assignment-count/member-id
+	// order assignment priority queue in descending order using assignment-count/member-id
 	if len(pq[i].assignments) == len(pq[j].assignments) {
 		return strings.Compare(pq[i].id, pq[j].id) > 0
 	}

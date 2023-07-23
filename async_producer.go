@@ -50,7 +50,7 @@ type AsyncProducer interface {
 	// errors to be returned.
 	Errors() <-chan *ProducerError
 
-	// IsTransactional return true when current producer is is transactional.
+	// IsTransactional return true when current producer is transactional.
 	IsTransactional() bool
 
 	// TxnStatus return current producer transaction status.

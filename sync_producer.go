@@ -33,7 +33,7 @@ type SyncProducer interface {
 	// TxnStatus return current producer transaction status.
 	TxnStatus() ProducerTxnStatusFlag
 
-	// IsTransactional return true when current producer is is transactional.
+	// IsTransactional return true when current producer is transactional.
 	IsTransactional() bool
 
 	// BeginTxn mark current transaction as ready.

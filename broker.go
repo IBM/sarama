@@ -455,7 +455,7 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 					return
 				}
 
-				// Wellformed response
+				// Well-formed response
 				b.updateThrottleMetric(res.ThrottleTime)
 				cb(res, nil)
 			},
