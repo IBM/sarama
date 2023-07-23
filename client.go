@@ -979,9 +979,10 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			if time.Since(time.Unix(t/1e3, 0)) < backoff {
 				return err
 			}
+			attemptsRemaining--
 			Logger.Printf("client/metadata retrying after %dms... (%d attempts remaining)\n", backoff/time.Millisecond, attemptsRemaining)
 
-			return client.tryRefreshMetadata(topics, attemptsRemaining-1, deadline)
+			return client.tryRefreshMetadata(topics, attemptsRemaining, deadline)
 		}
 		return err
 	}
@@ -1160,9 +1161,10 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 	retry := func(err error) (*FindCoordinatorResponse, error) {
 		if attemptsRemaining > 0 {
 			backoff := client.computeBackoff(attemptsRemaining)
+			attemptsRemaining--
 			Logger.Printf("client/coordinator retrying after %dms... (%d attempts remaining)\n", backoff/time.Millisecond, attemptsRemaining)
 			time.Sleep(backoff)
-			return client.findCoordinator(coordinatorKey, coordinatorType, attemptsRemaining-1)
+			return client.findCoordinator(coordinatorKey, coordinatorType, attemptsRemaining)
 		}
 		return nil, err
 	}
