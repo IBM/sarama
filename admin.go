@@ -210,7 +210,7 @@ func (ca *clusterAdmin) retryOnError(retryable func(error) bool, fn func() error
 	for attemptsRemaining := ca.conf.Admin.Retry.Max + 1; ; {
 		err := fn()
 		attemptsRemaining--
-		if err == nil || attemptsRemaining == 0 || !retryable(err) {
+		if err == nil || attemptsRemaining <= 0 || !retryable(err) {
 			return err
 		}
 		Logger.Printf(
