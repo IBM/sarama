@@ -293,13 +293,20 @@ func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetada
 }
 
 func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32, err error) {
-	controller, err := ca.Controller()
-	if err != nil {
-		return nil, int32(0), err
-	}
+	var response *MetadataResponse
+	err = ca.retryOnError(isErrNoController, func() error {
+		controller, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	request := NewMetadataRequest(ca.conf.Version, nil)
-	response, err := controller.GetMetadata(request)
+		request := NewMetadataRequest(ca.conf.Version, nil)
+		response, err = controller.GetMetadata(request)
+		if isErrNoController(err) {
+			_, _ = ca.refreshController()
+		}
+		return err
+	})
 	if err != nil {
 		return nil, int32(0), err
 	}
