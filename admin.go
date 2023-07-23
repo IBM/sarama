@@ -207,7 +207,7 @@ func isErrNoController(err error) bool {
 // provided retryable func) up to the maximum number of tries permitted by
 // the admin client configuration
 func (ca *clusterAdmin) retryOnError(retryable func(error) bool, fn func() error) error {
-	for attemptsRemaining := ca.conf.Admin.Retry.Max; ; {
+	for attemptsRemaining := ca.conf.Admin.Retry.Max + 1; ; {
 		err := fn()
 		attemptsRemaining--
 		if err == nil || attemptsRemaining == 0 || !retryable(err) {
