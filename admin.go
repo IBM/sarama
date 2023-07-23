@@ -556,13 +556,20 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 
 	request.AddBlock(topic, partitions)
 
-	b, err := ca.Controller()
-	if err != nil {
-		return nil, err
-	}
-	_ = b.Open(ca.client.Config())
+	var rsp *ListPartitionReassignmentsResponse
+	err = ca.retryOnError(isErrNoController, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
+		_ = b.Open(ca.client.Config())
 
-	rsp, err := b.ListPartitionReassignments(request)
+		rsp, err = b.ListPartitionReassignments(request)
+		if isErrNoController(err) {
+			_, _ = ca.refreshController()
+		}
+		return err
+	})
 
 	if err == nil && rsp != nil {
 		return rsp.TopicStatus, nil
