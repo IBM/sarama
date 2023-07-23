@@ -207,19 +207,17 @@ func isErrNoController(err error) bool {
 // provided retryable func) up to the maximum number of tries permitted by
 // the admin client configuration
 func (ca *clusterAdmin) retryOnError(retryable func(error) bool, fn func() error) error {
-	var err error
-	for attempt := 0; attempt < ca.conf.Admin.Retry.Max; attempt++ {
-		err = fn()
-		if err == nil || !retryable(err) {
+	for attemptsRemaining := ca.conf.Admin.Retry.Max; ; {
+		err := fn()
+		attemptsRemaining--
+		if err == nil || attemptsRemaining == 0 || !retryable(err) {
 			return err
 		}
 		Logger.Printf(
 			"admin/request retrying after %dms... (%d attempts remaining)\n",
-			ca.conf.Admin.Retry.Backoff/time.Millisecond, ca.conf.Admin.Retry.Max-attempt)
+			ca.conf.Admin.Retry.Backoff/time.Millisecond, attemptsRemaining)
 		time.Sleep(ca.conf.Admin.Retry.Backoff)
-		continue
 	}
-	return err
 }
 
 func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error {
