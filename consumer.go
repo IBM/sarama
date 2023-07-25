@@ -85,13 +85,13 @@ type Consumer interface {
 	// New calls to the broker will return records from these partitions if there are any to be fetched.
 	Resume(topicPartitions map[string][]int32)
 
-	// Pause suspends fetching from all partitions. Future calls to the broker will not return any
+	// PauseAll suspends fetching from all partitions. Future calls to the broker will not return any
 	// records from these partitions until they have been resumed using Resume()/ResumeAll().
 	// Note that this method does not affect partition subscription.
 	// In particular, it does not cause a group rebalance when automatic assignment is used.
 	PauseAll()
 
-	// Resume resumes all partitions which have been paused with Pause()/PauseAll().
+	// ResumeAll resumes all partitions which have been paused with Pause()/PauseAll().
 	// New calls to the broker will return records from these partitions if there are any to be fetched.
 	ResumeAll()
 }
