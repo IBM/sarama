@@ -233,7 +233,8 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 	ps := &produceSet{
 		msgs: make(map[string]map[int32]*partitionSet),
 		parent: &asyncProducer{
-			conf: config,
+			conf:   config,
+			txnmgr: &transactionManager{},
 		},
 		producerID:    pidRes.ProducerID,
 		producerEpoch: pidRes.ProducerEpoch,
