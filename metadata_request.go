@@ -24,7 +24,7 @@ func NewMetadataRequest(version KafkaVersion, topics []string) *MetadataRequest 
 }
 
 func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
-	if r.Version < 0 || r.Version > 12 {
+	if r.Version < 0 || r.Version > 7 {
 		return PacketEncodingError{"invalid or unsupported MetadataRequest version field"}
 	}
 	if r.Version == 0 || len(r.Topics) > 0 {
