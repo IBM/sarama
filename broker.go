@@ -456,7 +456,7 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 				}
 
 				// Well-formed response
-				b.updateThrottleMetric(res.ThrottleTime)
+				b.updateThrottleMetric(res)
 				cb(res, nil)
 			},
 		}
@@ -479,7 +479,6 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 	} else {
 		response = new(ProduceResponse)
 		err = b.sendAndReceive(request, response)
-		b.updateThrottleMetric(response.ThrottleTime)
 	}
 
 	if err != nil {
@@ -1042,7 +1041,14 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 		return nil
 	}
 
-	return handleResponsePromise(req, res, promise, b.metricRegistry)
+	err = handleResponsePromise(req, res, promise, b.metricRegistry)
+	if err != nil {
+		return err
+	}
+	if res != nil {
+		b.updateThrottleMetric(res)
+	}
+	return nil
 }
 
 func handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise, metricRegistry metrics.Registry) error {
@@ -1635,15 +1641,24 @@ func (b *Broker) updateProtocolMetrics(rb protocolBody) {
 	}
 }
 
-func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
-	if throttleTime != time.Duration(0) {
-		DebugLogger.Printf(
-			"producer/broker/%d ProduceResponse throttled %v\n",
-			b.ID(), throttleTime)
-		if b.brokerThrottleTime != nil {
-			throttleTimeInMs := int64(throttleTime / time.Millisecond)
-			b.brokerThrottleTime.Update(throttleTimeInMs)
-		}
+type throttleSupport interface {
+	throttleTime() time.Duration
+}
+
+func (b *Broker) updateThrottleMetric(resp protocolBody) {
+	throttledResponse, ok := resp.(throttleSupport)
+	if !ok {
+		return
+	}
+	throttleTime := throttledResponse.throttleTime()
+	if throttleTime == time.Duration(0) {
+		return
+	}
+	DebugLogger.Printf(
+		"broker/%d %T throttled %v\n", b.ID(), resp, throttleTime)
+	if b.brokerThrottleTime != nil {
+		throttleTimeInMs := int64(throttleTime / time.Millisecond)
+		b.brokerThrottleTime.Update(throttleTimeInMs)
 	}
 }
 
