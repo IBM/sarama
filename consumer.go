@@ -920,7 +920,7 @@ func (bc *brokerConsumer) subscriptionManager() {
 }
 
 // subscriptionConsumer ensures we will get nil right away if no new subscriptions is available
-// this is a the main loop that fetches Kafka messages
+// this is the main loop that fetches Kafka messages
 func (bc *brokerConsumer) subscriptionConsumer() {
 	for newSubscriptions := range bc.newSubscriptions {
 		bc.updateSubscriptions(newSubscriptions)
@@ -942,6 +942,7 @@ func (bc *brokerConsumer) subscriptionConsumer() {
 		// if there isn't response, it means that not fetch was made
 		// so we don't need to handle any response
 		if response == nil {
+			time.Sleep(partitionConsumersBatchTimeout)
 			continue
 		}
 
