@@ -943,7 +943,7 @@ func (b *Broker) write(buf []byte) (n int, err error) {
 	return b.conn.Write(buf)
 }
 
-// b.lock must be haled by caller
+// b.lock must be held by caller
 func (b *Broker) send(rb protocolBody, promiseResponse bool, responseHeaderVersion int16) (*responsePromise, error) {
 	var promise *responsePromise
 	if promiseResponse {
