@@ -233,3 +233,7 @@ func (d *DescribeClientQuotasResponse) headerVersion() int16 {
 func (d *DescribeClientQuotasResponse) requiredVersion() KafkaVersion {
 	return V2_6_0_0
 }
+
+func (r *DescribeClientQuotasResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

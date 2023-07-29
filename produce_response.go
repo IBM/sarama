@@ -179,6 +179,10 @@ func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	return MinVersion
 }
 
+func (r *ProduceResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 func (r *ProduceResponse) GetBlock(topic string, partition int32) *ProduceResponseBlock {
 	if r.Blocks == nil {
 		return nil

@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type alterPartitionReassignmentsErrorBlock struct {
 	errorCode    KError
 	errorMessage *string
@@ -154,4 +156,8 @@ func (r *AlterPartitionReassignmentsResponse) headerVersion() int16 {
 
 func (r *AlterPartitionReassignmentsResponse) requiredVersion() KafkaVersion {
 	return V2_4_0_0
+}
+
+func (r *AlterPartitionReassignmentsResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
 }

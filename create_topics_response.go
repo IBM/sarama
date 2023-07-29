@@ -85,6 +85,10 @@ func (c *CreateTopicsResponse) requiredVersion() KafkaVersion {
 	}
 }
 
+func (r *CreateTopicsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 type TopicError struct {
 	Err    KError
 	ErrMsg *string

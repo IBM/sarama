@@ -413,6 +413,10 @@ func (r *FetchResponse) requiredVersion() KafkaVersion {
 	}
 }
 
+func (r *FetchResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 func (r *FetchResponse) GetBlock(topic string, partition int32) *FetchResponseBlock {
 	if r.Blocks == nil {
 		return nil

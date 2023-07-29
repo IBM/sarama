@@ -143,3 +143,7 @@ func (a *AlterClientQuotasResponse) headerVersion() int16 {
 func (a *AlterClientQuotasResponse) requiredVersion() KafkaVersion {
 	return V2_6_0_0
 }
+
+func (r *AlterClientQuotasResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

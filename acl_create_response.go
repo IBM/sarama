@@ -63,6 +63,10 @@ func (c *CreateAclsResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+func (r *CreateAclsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 // AclCreationResponse is an acl creation response type
 type AclCreationResponse struct {
 	Err    KError

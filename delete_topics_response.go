@@ -80,3 +80,7 @@ func (d *DeleteTopicsResponse) requiredVersion() KafkaVersion {
 		return V0_10_1_0
 	}
 }
+
+func (r *DeleteTopicsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

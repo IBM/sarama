@@ -88,6 +88,10 @@ func (d *DeleteRecordsResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+func (r *DeleteRecordsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 type DeleteRecordsResponseTopic struct {
 	Partitions map[int32]*DeleteRecordsResponsePartition
 }

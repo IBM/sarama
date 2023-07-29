@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 // PartitionMetadata contains each partition in the topic.
 type PartitionMetadata struct {
 	// Version defines the protocol version to use for encode and decode
@@ -290,6 +292,10 @@ func (r *MetadataResponse) requiredVersion() KafkaVersion {
 	default:
 		return MinVersion
 	}
+}
+
+func (r *MetadataResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
 }
 
 // testing API

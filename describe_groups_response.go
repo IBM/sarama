@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type DescribeGroupsResponse struct {
 	// Version defines the protocol version to use for encode and decode
 	Version int16
@@ -75,6 +77,10 @@ func (r *DescribeGroupsResponse) requiredVersion() KafkaVersion {
 		return V2_4_0_0
 	}
 	return V0_9_0_0
+}
+
+func (r *DescribeGroupsResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
 }
 
 // GroupDescription contains each described group.

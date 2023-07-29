@@ -85,3 +85,7 @@ func (a *TxnOffsetCommitResponse) headerVersion() int16 {
 func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
+
+func (r *TxnOffsetCommitResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

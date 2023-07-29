@@ -110,3 +110,7 @@ func (r *DeleteOffsetsResponse) headerVersion() int16 {
 func (r *DeleteOffsetsResponse) requiredVersion() KafkaVersion {
 	return V2_4_0_0
 }
+
+func (r *DeleteOffsetsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

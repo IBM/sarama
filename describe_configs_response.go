@@ -127,6 +127,10 @@ func (r *DescribeConfigsResponse) requiredVersion() KafkaVersion {
 	}
 }
 
+func (r *DescribeConfigsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 func (r *ResourceResponse) encode(pe packetEncoder, version int16) (err error) {
 	pe.putInt16(r.ErrorCode)
 

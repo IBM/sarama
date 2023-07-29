@@ -71,6 +71,10 @@ func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }
 
+func (r *CreatePartitionsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 type TopicPartitionError struct {
 	Err    KError
 	ErrMsg *string

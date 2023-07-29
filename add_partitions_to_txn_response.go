@@ -87,6 +87,10 @@ func (a *AddPartitionsToTxnResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+func (r *AddPartitionsToTxnResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 // PartitionError is a partition error type
 type PartitionError struct {
 	Partition int32

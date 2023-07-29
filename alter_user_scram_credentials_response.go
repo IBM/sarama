@@ -92,3 +92,7 @@ func (r *AlterUserScramCredentialsResponse) headerVersion() int16 {
 func (r *AlterUserScramCredentialsResponse) requiredVersion() KafkaVersion {
 	return V2_7_0_0
 }
+
+func (r *AlterUserScramCredentialsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
