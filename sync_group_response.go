@@ -1,9 +1,11 @@
 package sarama
 
+import "time"
+
 type SyncGroupResponse struct {
 	// Version defines the protocol version to use for encode and decode
 	Version int16
-	// ThrottleTimeMs contains the duration in milliseconds for which the
+	// ThrottleTime contains the duration in milliseconds for which the
 	// request was throttled due to a quota violation, or zero if the request
 	// did not violate any quota.
 	ThrottleTime int32
