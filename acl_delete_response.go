@@ -64,6 +64,10 @@ func (d *DeleteAclsResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
 
+func (r *DeleteAclsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 // FilterResponse is a filter response type
 type FilterResponse struct {
 	Err          KError

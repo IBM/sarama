@@ -94,3 +94,7 @@ func (f *FindCoordinatorResponse) requiredVersion() KafkaVersion {
 		return V0_8_2_0
 	}
 }
+
+func (r *FindCoordinatorResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

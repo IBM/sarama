@@ -47,3 +47,7 @@ func (a *AddOffsetsToTxnResponse) headerVersion() int16 {
 func (a *AddOffsetsToTxnResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
+
+func (r *AddOffsetsToTxnResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

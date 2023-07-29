@@ -89,3 +89,7 @@ func (d *DescribeAclsResponse) requiredVersion() KafkaVersion {
 		return V0_11_0_0
 	}
 }
+
+func (r *DescribeAclsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

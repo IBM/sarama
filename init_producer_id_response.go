@@ -83,3 +83,7 @@ func (i *InitProducerIDResponse) requiredVersion() KafkaVersion {
 		return V0_11_0_0
 	}
 }
+
+func (r *InitProducerIDResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

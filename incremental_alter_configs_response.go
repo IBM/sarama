@@ -64,3 +64,7 @@ func (a *IncrementalAlterConfigsResponse) headerVersion() int16 {
 func (a *IncrementalAlterConfigsResponse) requiredVersion() KafkaVersion {
 	return V2_3_0_0
 }
+
+func (r *IncrementalAlterConfigsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

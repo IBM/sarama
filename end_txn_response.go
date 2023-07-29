@@ -46,3 +46,7 @@ func (r *EndTxnResponse) headerVersion() int16 {
 func (e *EndTxnResponse) requiredVersion() KafkaVersion {
 	return V0_11_0_0
 }
+
+func (r *EndTxnResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

@@ -72,3 +72,7 @@ func (r *DeleteGroupsResponse) headerVersion() int16 {
 func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {
 	return V1_1_0_0
 }
+
+func (r *DeleteGroupsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}

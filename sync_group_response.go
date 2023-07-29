@@ -66,3 +66,7 @@ func (r *SyncGroupResponse) requiredVersion() KafkaVersion {
 	}
 	return V0_9_0_0
 }
+
+func (r *SyncGroupResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTime) * time.Millisecond
+}

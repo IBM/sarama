@@ -69,6 +69,10 @@ func (r *DescribeLogDirsResponse) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }
 
+func (r *DescribeLogDirsResponse) throttleTime() time.Duration {
+	return r.ThrottleTime
+}
+
 type DescribeLogDirsResponseDirMetadata struct {
 	ErrorCode KError
 
