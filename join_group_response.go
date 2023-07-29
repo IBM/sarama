@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type JoinGroupResponse struct {
 	Version       int16
 	ThrottleTime  int32
@@ -156,4 +158,8 @@ func (r *JoinGroupResponse) requiredVersion() KafkaVersion {
 	default:
 		return V0_9_0_0
 	}
+}
+
+func (r *JoinGroupResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTime) * time.Millisecond
 }

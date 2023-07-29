@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type OffsetFetchResponseBlock struct {
 	Offset      int64
 	LeaderEpoch int32
@@ -253,6 +255,10 @@ func (r *OffsetFetchResponse) requiredVersion() KafkaVersion {
 	default:
 		return MinVersion
 	}
+}
+
+func (r *OffsetFetchResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
 }
 
 func (r *OffsetFetchResponse) GetBlock(topic string, partition int32) *OffsetFetchResponseBlock {

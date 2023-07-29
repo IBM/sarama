@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type MemberResponse struct {
 	MemberId        string
 	GroupInstanceId *string
@@ -89,4 +91,8 @@ func (r *LeaveGroupResponse) requiredVersion() KafkaVersion {
 		return V2_3_0_0
 	}
 	return V0_9_0_0
+}
+
+func (r *LeaveGroupResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTime) * time.Millisecond
 }

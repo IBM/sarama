@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type OffsetCommitResponse struct {
 	Version        int16
 	ThrottleTimeMs int32
@@ -113,4 +115,8 @@ func (r *OffsetCommitResponse) requiredVersion() KafkaVersion {
 	default:
 		return MinVersion
 	}
+}
+
+func (r *OffsetCommitResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
 }

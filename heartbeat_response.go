@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type HeartbeatResponse struct {
 	Version      int16
 	ThrottleTime int32
@@ -49,4 +51,8 @@ func (r *HeartbeatResponse) requiredVersion() KafkaVersion {
 		return V2_3_0_0
 	}
 	return V0_9_0_0
+}
+
+func (r *HeartbeatResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTime) * time.Millisecond
 }

@@ -1,5 +1,7 @@
 package sarama
 
+import "time"
+
 type OffsetResponseBlock struct {
 	Err       KError
 	Offsets   []int64 // Version 0
@@ -174,6 +176,10 @@ func (r *OffsetResponse) requiredVersion() KafkaVersion {
 	default:
 		return MinVersion
 	}
+}
+
+func (r *OffsetResponse) throttleTime() time.Duration {
+	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
 }
 
 // testing API
