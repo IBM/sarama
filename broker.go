@@ -58,6 +58,8 @@ type Broker struct {
 
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
+
+	throttleTimer *time.Timer
 }
 
 // SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
@@ -456,7 +458,7 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 				}
 
 				// Well-formed response
-				b.updateThrottleMetric(res)
+				b.handleThrottledResponse(res)
 				cb(res, nil)
 			},
 		}
@@ -999,6 +1001,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 		return err
 	}
 
+	// check and wait if throttled
+	b.waitIfThrottled()
+
 	requestTime := time.Now()
 	// Will be decremented in responseReceiver (except error or request with NoResponse)
 	b.addRequestInFlightMetrics(1)
@@ -1046,7 +1051,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 		return err
 	}
 	if res != nil {
-		b.updateThrottleMetric(res)
+		b.handleThrottledResponse(res)
 	}
 	return nil
 }
@@ -1645,7 +1650,7 @@ type throttleSupport interface {
 	throttleTime() time.Duration
 }
 
-func (b *Broker) updateThrottleMetric(resp protocolBody) {
+func (b *Broker) handleThrottledResponse(resp protocolBody) {
 	throttledResponse, ok := resp.(throttleSupport)
 	if !ok {
 		return
@@ -1656,6 +1661,29 @@ func (b *Broker) updateThrottleMetric(resp protocolBody) {
 	}
 	DebugLogger.Printf(
 		"broker/%d %T throttled %v\n", b.ID(), resp, throttleTime)
+	b.setThrottle(throttleTime)
+	b.updateThrottleMetric(throttleTime)
+}
+
+func (b *Broker) setThrottle(throttleTime time.Duration) {
+	if b.throttleTimer != nil {
+		// if there is an existing timer stop/clear it
+		if !b.throttleTimer.Stop() {
+			<-b.throttleTimer.C
+		}
+	}
+	b.throttleTimer = time.NewTimer(throttleTime)
+}
+
+func (b *Broker) waitIfThrottled() {
+	if b.throttleTimer != nil {
+		DebugLogger.Printf("broker/%d waiting for throttle timer\n", b.ID())
+		<-b.throttleTimer.C
+		b.throttleTimer = nil
+	}
+}
+
+func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
 	if b.brokerThrottleTime != nil {
 		throttleTimeInMs := int64(throttleTime / time.Millisecond)
 		b.brokerThrottleTime.Update(throttleTimeInMs)
