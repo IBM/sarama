@@ -1,13 +1,18 @@
 package sarama
 
 import (
+	"context"
 	"errors"
 	"math"
 	"math/rand"
+	"net"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/net/proxy"
 )
 
 // Client is a generic Kafka client. It manages connections to one or more Kafka brokers.
@@ -189,6 +194,14 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 		coordinators:            make(map[string]int32),
 		transactionCoordinators: make(map[string]int32),
+	}
+
+	if conf.Net.ResolveCanonicalBootstrapServers {
+		var err error
+		addrs, err = client.resolveCanonicalNames(addrs)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	client.randomizeSeedBrokers(addrs)
@@ -1225,6 +1238,53 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 	Logger.Println("client/coordinator no available broker to send consumer metadata request to")
 	client.resurrectDeadBrokers()
 	return retry(Wrap(ErrOutOfBrokers, brokerErrors...))
+}
+
+func (client *client) resolveCanonicalNames(addrs []string) ([]string, error) {
+	ctx := context.Background()
+
+	dialer := client.Config().getDialer()
+	resolver := net.Resolver{
+		Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+			// dial func should only be called once, so switching within is acceptable
+			switch d := dialer.(type) {
+			case proxy.ContextDialer:
+				return d.DialContext(ctx, network, address)
+			default:
+				// we have no choice but to ignore the context
+				return d.Dial(network, address)
+			}
+		},
+	}
+
+	canonicalAddrs := make(map[string]struct{}, len(addrs)) // dedupe as we go
+	for _, addr := range addrs {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err // message includes addr
+		}
+
+		ips, err := resolver.LookupHost(ctx, host)
+		if err != nil {
+			return nil, err // message includes host
+		}
+		for _, ip := range ips {
+			ptrs, err := resolver.LookupAddr(ctx, ip)
+			if err != nil {
+				return nil, err // message includes ip
+			}
+
+			// unlike the Java client, we do not further check that PTRs resolve
+			ptr := strings.TrimSuffix(ptrs[0], ".") // trailing dot breaks GSSAPI
+			canonicalAddrs[net.JoinHostPort(ptr, port)] = struct{}{}
+		}
+	}
+
+	addrs = make([]string, 0, len(canonicalAddrs))
+	for addr := range canonicalAddrs {
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
 }
 
 // nopCloserClient embeds an existing Client, but disables

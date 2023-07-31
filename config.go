@@ -50,6 +50,15 @@ type Config struct {
 		ReadTimeout  time.Duration // How long to wait for a response.
 		WriteTimeout time.Duration // How long to wait for a transmit.
 
+		// ResolveCanonicalBootstrapServers turns each bootstrap broker address
+		// into a set of IPs, then does a reverse lookup on each one to get its
+		// canonical hostname. This list of hostnames then replaces the
+		// original address list. Similar to the `client.dns.lookup` option in
+		// the JVM client, this is especially useful with GSSAPI, where it
+		// allows providing an alias record instead of individual broker
+		// hostnames. Defaults to false.
+		ResolveCanonicalBootstrapServers bool
+
 		TLS struct {
 			// Whether or not to use TLS when connecting to the broker
 			// (defaults to false).
