@@ -1,8 +1,9 @@
 package sarama
 
 type ListGroupsResponse struct {
-	Err    KError
-	Groups map[string]string
+	Version int16
+	Err     KError
+	Groups  map[string]string
 }
 
 func (r *ListGroupsResponse) encode(pe packetEncoder) error {
@@ -61,13 +62,24 @@ func (r *ListGroupsResponse) key() int16 {
 }
 
 func (r *ListGroupsResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *ListGroupsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *ListGroupsResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 2
+}
+
 func (r *ListGroupsResponse) requiredVersion() KafkaVersion {
-	return V0_9_0_0
+	switch r.Version {
+	case 2:
+		return V2_0_0_0
+	case 1:
+		return V0_11_0_0
+	default:
+		return V0_9_0_0
+	}
 }

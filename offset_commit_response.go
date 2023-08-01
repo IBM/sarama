@@ -100,6 +100,10 @@ func (r *OffsetCommitResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *OffsetCommitResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 7
+}
+
 func (r *OffsetCommitResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:

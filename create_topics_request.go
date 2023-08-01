@@ -83,12 +83,18 @@ func (r *CreateTopicsRequest) headerVersion() int16 {
 	return 1
 }
 
+func (c *CreateTopicsRequest) isValidVersion() bool {
+	return c.Version >= 0 && c.Version <= 3
+}
+
 func (c *CreateTopicsRequest) requiredVersion() KafkaVersion {
 	switch c.Version {
+	case 3:
+		return V2_0_0_0
 	case 2:
-		return V1_0_0_0
-	case 1:
 		return V0_11_0_0
+	case 1:
+		return V0_10_2_0
 	default:
 		return V0_10_1_0
 	}

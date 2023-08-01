@@ -6,6 +6,7 @@ import (
 )
 
 type CreatePartitionsResponse struct {
+	Version              int16
 	ThrottleTime         time.Duration
 	TopicPartitionErrors map[string]*TopicPartitionError
 }
@@ -60,11 +61,15 @@ func (r *CreatePartitionsResponse) key() int16 {
 }
 
 func (r *CreatePartitionsResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *CreatePartitionsResponse) headerVersion() int16 {
 	return 0
+}
+
+func (r *CreatePartitionsResponse) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {

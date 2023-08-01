@@ -1,6 +1,7 @@
 package sarama
 
 type TxnOffsetCommitRequest struct {
+	Version         int16
 	TransactionalID string
 	GroupID         string
 	ProducerID      int64
@@ -88,11 +89,15 @@ func (a *TxnOffsetCommitRequest) key() int16 {
 }
 
 func (a *TxnOffsetCommitRequest) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *TxnOffsetCommitRequest) headerVersion() int16 {
 	return 1
+}
+
+func (a *TxnOffsetCommitRequest) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {

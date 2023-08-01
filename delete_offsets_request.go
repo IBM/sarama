@@ -1,6 +1,7 @@
 package sarama
 
 type DeleteOffsetsRequest struct {
+	Version    int16
 	Group      string
 	partitions map[string][]int32
 }
@@ -72,11 +73,15 @@ func (r *DeleteOffsetsRequest) key() int16 {
 }
 
 func (r *DeleteOffsetsRequest) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *DeleteOffsetsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (r *DeleteOffsetsRequest) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *DeleteOffsetsRequest) requiredVersion() KafkaVersion {

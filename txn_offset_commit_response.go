@@ -5,6 +5,7 @@ import (
 )
 
 type TxnOffsetCommitResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Topics       map[string][]*PartitionError
 }
@@ -75,11 +76,15 @@ func (a *TxnOffsetCommitResponse) key() int16 {
 }
 
 func (a *TxnOffsetCommitResponse) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *TxnOffsetCommitResponse) headerVersion() int16 {
 	return 0
+}
+
+func (a *TxnOffsetCommitResponse) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {

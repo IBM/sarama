@@ -12,6 +12,7 @@ package sarama
 //   validate_only => BOOLEAN
 
 type AlterClientQuotasRequest struct {
+	Version      int16
 	Entries      []AlterClientQuotasEntry // The quota configuration entries to alter.
 	ValidateOnly bool                     // Whether the alteration should be validated, but not performed.
 }
@@ -182,11 +183,15 @@ func (a *AlterClientQuotasRequest) key() int16 {
 }
 
 func (a *AlterClientQuotasRequest) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AlterClientQuotasRequest) headerVersion() int16 {
 	return 1
+}
+
+func (a *AlterClientQuotasRequest) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *AlterClientQuotasRequest) requiredVersion() KafkaVersion {

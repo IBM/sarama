@@ -55,8 +55,14 @@ func (r *FindCoordinatorRequest) headerVersion() int16 {
 	return 1
 }
 
+func (f *FindCoordinatorRequest) isValidVersion() bool {
+	return f.Version >= 0 && f.Version <= 2
+}
+
 func (f *FindCoordinatorRequest) requiredVersion() KafkaVersion {
 	switch f.Version {
+	case 2:
+		return V2_0_0_0
 	case 1:
 		return V0_11_0_0
 	default:

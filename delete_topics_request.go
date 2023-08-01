@@ -42,8 +42,16 @@ func (d *DeleteTopicsRequest) headerVersion() int16 {
 	return 1
 }
 
+func (d *DeleteTopicsRequest) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 3
+}
+
 func (d *DeleteTopicsRequest) requiredVersion() KafkaVersion {
 	switch d.Version {
+	case 3:
+		return V2_1_0_0
+	case 2:
+		return V2_0_0_0
 	case 1:
 		return V0_11_0_0
 	default:

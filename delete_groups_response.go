@@ -5,6 +5,7 @@ import (
 )
 
 type DeleteGroupsResponse struct {
+	Version         int16
 	ThrottleTime    time.Duration
 	GroupErrorCodes map[string]KError
 }
@@ -62,11 +63,15 @@ func (r *DeleteGroupsResponse) key() int16 {
 }
 
 func (r *DeleteGroupsResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *DeleteGroupsResponse) headerVersion() int16 {
 	return 0
+}
+
+func (r *DeleteGroupsResponse) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {

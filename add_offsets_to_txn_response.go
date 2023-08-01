@@ -6,6 +6,7 @@ import (
 
 // AddOffsetsToTxnResponse is a response type for adding offsets to txns
 type AddOffsetsToTxnResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Err          KError
 }
@@ -37,11 +38,15 @@ func (a *AddOffsetsToTxnResponse) key() int16 {
 }
 
 func (a *AddOffsetsToTxnResponse) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AddOffsetsToTxnResponse) headerVersion() int16 {
 	return 0
+}
+
+func (a *AddOffsetsToTxnResponse) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *AddOffsetsToTxnResponse) requiredVersion() KafkaVersion {

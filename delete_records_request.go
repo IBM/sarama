@@ -13,6 +13,7 @@ import (
 //  id(int32) offset(int64)
 
 type DeleteRecordsRequest struct {
+	Version int16
 	Topics  map[string]*DeleteRecordsRequestTopic
 	Timeout time.Duration
 }
@@ -74,11 +75,15 @@ func (d *DeleteRecordsRequest) key() int16 {
 }
 
 func (d *DeleteRecordsRequest) version() int16 {
-	return 0
+	return d.Version
 }
 
 func (d *DeleteRecordsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (d *DeleteRecordsRequest) isValidVersion() bool {
+	return d.Version == 0
 }
 
 func (d *DeleteRecordsRequest) requiredVersion() KafkaVersion {

@@ -7,6 +7,7 @@ import (
 
 // ConsumerMetadataResponse holds the response for a consumer group meta data requests
 type ConsumerMetadataResponse struct {
+	Version         int16
 	Err             KError
 	Coordinator     *Broker
 	CoordinatorID   int32  // deprecated: use Coordinator.ID()
@@ -70,11 +71,15 @@ func (r *ConsumerMetadataResponse) key() int16 {
 }
 
 func (r *ConsumerMetadataResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *ConsumerMetadataResponse) headerVersion() int16 {
 	return 0
+}
+
+func (r *ConsumerMetadataResponse) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *ConsumerMetadataResponse) requiredVersion() KafkaVersion {

@@ -2,6 +2,7 @@ package sarama
 
 // AddOffsetsToTxnRequest adds offsets to a transaction request
 type AddOffsetsToTxnRequest struct {
+	Version         int16
 	TransactionalID string
 	ProducerID      int64
 	ProducerEpoch   int16
@@ -45,11 +46,15 @@ func (a *AddOffsetsToTxnRequest) key() int16 {
 }
 
 func (a *AddOffsetsToTxnRequest) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AddOffsetsToTxnRequest) headerVersion() int16 {
 	return 1
+}
+
+func (a *AddOffsetsToTxnRequest) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *AddOffsetsToTxnRequest) requiredVersion() KafkaVersion {

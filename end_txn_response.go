@@ -5,6 +5,7 @@ import (
 )
 
 type EndTxnResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Err          KError
 }
@@ -36,11 +37,15 @@ func (e *EndTxnResponse) key() int16 {
 }
 
 func (e *EndTxnResponse) version() int16 {
-	return 0
+	return e.Version
 }
 
 func (r *EndTxnResponse) headerVersion() int16 {
 	return 0
+}
+
+func (e *EndTxnResponse) isValidVersion() bool {
+	return e.Version == 0
 }
 
 func (e *EndTxnResponse) requiredVersion() KafkaVersion {

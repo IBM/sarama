@@ -3,6 +3,7 @@ package sarama
 import "time"
 
 type CreatePartitionsRequest struct {
+	Version         int16
 	TopicPartitions map[string]*TopicPartition
 	Timeout         time.Duration
 	ValidateOnly    bool
@@ -64,11 +65,15 @@ func (r *CreatePartitionsRequest) key() int16 {
 }
 
 func (r *CreatePartitionsRequest) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *CreatePartitionsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (r *CreatePartitionsRequest) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *CreatePartitionsRequest) requiredVersion() KafkaVersion {

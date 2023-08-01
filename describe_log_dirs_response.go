@@ -65,6 +65,10 @@ func (r *DescribeLogDirsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *DescribeLogDirsResponse) isValidVersion() bool {
+	return r.Version == 0
+}
+
 func (r *DescribeLogDirsResponse) requiredVersion() KafkaVersion {
 	return V1_0_0_0
 }

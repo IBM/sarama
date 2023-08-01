@@ -60,6 +60,10 @@ func (r *HeartbeatRequest) headerVersion() int16 {
 	return 1
 }
 
+func (r *HeartbeatRequest) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 3
+}
+
 func (r *HeartbeatRequest) requiredVersion() KafkaVersion {
 	switch {
 	case r.Version >= 3:

@@ -1,7 +1,8 @@
 package sarama
 
 type DeleteGroupsRequest struct {
-	Groups []string
+	Version int16
+	Groups  []string
 }
 
 func (r *DeleteGroupsRequest) encode(pe packetEncoder) error {
@@ -18,11 +19,15 @@ func (r *DeleteGroupsRequest) key() int16 {
 }
 
 func (r *DeleteGroupsRequest) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *DeleteGroupsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (r *DeleteGroupsRequest) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *DeleteGroupsRequest) requiredVersion() KafkaVersion {

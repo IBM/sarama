@@ -4,6 +4,7 @@ import "time"
 
 // AlterConfigsResponse is a response type for alter config
 type AlterConfigsResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Resources    []*AlterConfigsResourceResponse
 }
@@ -104,11 +105,15 @@ func (a *AlterConfigsResponse) key() int16 {
 }
 
 func (a *AlterConfigsResponse) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AlterConfigsResponse) headerVersion() int16 {
 	return 0
+}
+
+func (a *AlterConfigsResponse) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *AlterConfigsResponse) requiredVersion() KafkaVersion {

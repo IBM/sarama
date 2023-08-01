@@ -42,6 +42,10 @@ func (r *DescribeGroupsRequest) headerVersion() int16 {
 	return 1
 }
 
+func (r *DescribeGroupsRequest) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 4
+}
+
 func (r *DescribeGroupsRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:

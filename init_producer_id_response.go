@@ -69,6 +69,10 @@ func (i *InitProducerIDResponse) headerVersion() int16 {
 	return 0
 }
 
+func (i *InitProducerIDResponse) isValidVersion() bool {
+	return i.Version >= 0 && i.Version <= 3
+}
+
 func (i *InitProducerIDResponse) requiredVersion() KafkaVersion {
 	switch i.Version {
 	case 2:

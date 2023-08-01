@@ -2,6 +2,7 @@ package sarama
 
 // ConsumerMetadataRequest is used for metadata requests
 type ConsumerMetadataRequest struct {
+	Version       int16
 	ConsumerGroup string
 }
 
@@ -26,11 +27,15 @@ func (r *ConsumerMetadataRequest) key() int16 {
 }
 
 func (r *ConsumerMetadataRequest) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *ConsumerMetadataRequest) headerVersion() int16 {
 	return 1
+}
+
+func (r *ConsumerMetadataRequest) isValidVersion() bool {
+	return r.Version == 0
 }
 
 func (r *ConsumerMetadataRequest) requiredVersion() KafkaVersion {

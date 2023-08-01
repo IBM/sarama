@@ -175,6 +175,10 @@ func (r *ProduceResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *ProduceResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 7
+}
+
 func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	return MinVersion
 }

@@ -386,6 +386,10 @@ func (r *FetchResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *FetchResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 11
+}
+
 func (r *FetchResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 0:

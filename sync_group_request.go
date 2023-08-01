@@ -123,6 +123,10 @@ func (r *SyncGroupRequest) headerVersion() int16 {
 	return 1
 }
 
+func (r *SyncGroupRequest) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 3
+}
+
 func (r *SyncGroupRequest) requiredVersion() KafkaVersion {
 	switch {
 	case r.Version >= 3:
