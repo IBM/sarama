@@ -1061,7 +1061,11 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 			defer wg.Done()
 			_ = b.Open(conf) // Ensure that broker is opened
 
-			response, err := b.DescribeLogDirs(&DescribeLogDirsRequest{})
+			request := &DescribeLogDirsRequest{}
+			if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+				request.Version = 1
+			}
+			response, err := b.DescribeLogDirs(request)
 			if err != nil {
 				errChan <- err
 				return
