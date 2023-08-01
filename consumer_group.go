@@ -79,12 +79,13 @@ type ConsumerGroup interface {
 type consumerGroup struct {
 	client Client
 
-	config          *Config
-	consumer        Consumer
-	groupID         string
-	groupInstanceId *string
-	memberID        string
-	errors          chan error
+	config               *Config
+	consumer             Consumer
+	groupID              string
+	groupInstanceId      *string
+	memberID             string
+	errors               chan error
+	startTopicPartitions map[string][]int32
 
 	lock       sync.Mutex
 	errorsLock sync.RWMutex
@@ -201,6 +202,16 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	if err := c.client.RefreshMetadata(topics...); err != nil {
 		return err
 	}
+	topicPartitions := make(map[string][]int32)
+	for _, topic := range topics {
+		partitions, err := c.client.Partitions(topic)
+		if err != nil {
+			return err
+		}
+		topicPartitions[topic] = partitions
+	}
+
+	c.startTopicPartitions = topicPartitions
 
 	// Init session
 	sess, err := c.newSession(ctx, topics, handler, c.config.Consumer.Group.Rebalance.Retry.Max)
@@ -622,10 +633,10 @@ func (c *consumerGroup) loopCheckPartitionNumbers(topics []string, session *cons
 	pause := time.NewTicker(c.config.Metadata.RefreshFrequency)
 	defer session.cancel()
 	defer pause.Stop()
-	var oldTopicToPartitionNum map[string]int
-	var err error
-	if oldTopicToPartitionNum, err = c.topicToPartitionNumbers(topics); err != nil {
-		return
+	oldTopicToPartitionNum := make(map[string]int, len(c.startTopicPartitions))
+
+	for topic, partitions := range c.startTopicPartitions {
+		oldTopicToPartitionNum[topic] = len(partitions)
 	}
 	for {
 		if newTopicToPartitionNum, err := c.topicToPartitionNumbers(topics); err != nil {

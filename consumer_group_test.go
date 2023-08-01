@@ -245,3 +245,138 @@ func TestConsumerGroupSessionDoesNotRetryForever(t *testing.T) {
 
 	wg.Wait()
 }
+
+// TestConsumerGroupLoopCheckPartitionRace checks a very edge case that if
+// between the first metadata refresh in group.Consume and loopCheckPartitionNumbers,
+// another metadata refresh gets new partitions, the consumer group needs a rebalance.
+// See issue #2460 for more details.
+func TestConsumerGroupLoopCheckPartitionRace(t *testing.T) {
+	// Logger = log.New(os.Stdout, "[sarama]", log.LstdFlags)
+	config := NewTestConfig()
+	config.ClientID = t.Name()
+	config.Version = V2_0_0_0
+	config.Metadata.RefreshFrequency = 0 // disable backgroundMetadataUpdater
+	config.Metadata.Full = false         // disable automatic metadata refresh when creating a client
+
+	broker0 := NewMockBroker(t, 0)
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockSequence(
+			NewMockMetadataResponse(t).
+				SetBroker(broker0.Addr(), broker0.BrokerID()).
+				SetLeader("my-topic", 0, broker0.BrokerID()),
+			NewMockMetadataResponse(t).
+				SetBroker(broker0.Addr(), broker0.BrokerID()).
+				SetLeader("my-topic", 0, broker0.BrokerID()).
+				SetLeader("my-topic", 1, broker0.BrokerID()),
+		),
+		"OffsetRequest": NewMockSequence(
+			NewMockOffsetResponse(t).
+				SetOffset("my-topic", 0, OffsetOldest, 0).
+				SetOffset("my-topic", 0, OffsetNewest, 1).
+				SetOffset("my-topic", 1, OffsetOldest, 0).
+				SetOffset("my-topic", 1, OffsetNewest, 1),
+		),
+
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorGroup, "my-group", broker0),
+		"HeartbeatRequest": NewMockHeartbeatResponse(t),
+		"JoinGroupRequest": NewMockSequence(
+			NewMockJoinGroupResponse(t).SetGroupProtocol(RangeBalanceStrategyName),
+		),
+		"SyncGroupRequest": NewMockSequence(
+			NewMockSyncGroupResponse(t).SetMemberAssignment(
+				&ConsumerGroupMemberAssignment{
+					Topics: map[string][]int32{
+						"my-topic": {0},
+					},
+				}),
+			NewMockSyncGroupResponse(t).SetMemberAssignment(
+				&ConsumerGroupMemberAssignment{
+					Topics: map[string][]int32{
+						"my-topic": {0, 1},
+					},
+				}),
+		),
+		"OffsetFetchRequest": NewMockOffsetFetchResponse(t).SetOffset(
+			"my-group", "my-topic", 0, 0, "", ErrNoError,
+		).SetOffset(
+			"my-group", "my-topic", 1, 0, "", ErrNoError,
+		).SetError(ErrNoError),
+		"FetchRequest": NewMockSequence(
+			NewMockFetchResponse(t, 1),
+		),
+	})
+
+	client, err := NewClient([]string{broker0.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = client.Close() }()
+
+	group, err := NewConsumerGroupFromClient("my-group", client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = group.Close() }()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+
+	h := &loopCheckerHandler{t, cancel, ctx, group.(*consumerGroup)}
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		topics := []string{"my-topic"}
+		for {
+			if err := group.Consume(ctx, topics, h); err != nil {
+				t.Error(err)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+		}
+	}()
+	wg.Wait()
+}
+
+type loopCheckerHandler struct {
+	*testing.T
+	cancel context.CancelFunc
+	ctx    context.Context
+	group  *consumerGroup
+}
+
+func (h *loopCheckerHandler) Setup(s ConsumerGroupSession) error {
+	if len(s.Claims()["my-topic"]) == 1 {
+		if err := h.group.client.RefreshMetadata("my-topic"); err != nil {
+			h.Error(err)
+		}
+		// change RefreshFrequency so that loopCheckPartitionNumbers won't return directly
+		h.group.client.(*nopCloserClient).Client.(*client).conf.Metadata.RefreshFrequency = 5 * time.Millisecond
+		go h.group.loopCheckPartitionNumbers([]string{"my-topic"}, s.(*consumerGroupSession))
+	} else {
+		h.cancel()
+	}
+	return nil
+}
+func (h *loopCheckerHandler) Cleanup(_ ConsumerGroupSession) error {
+	return nil
+}
+
+func (h *loopCheckerHandler) ConsumeClaim(sess ConsumerGroupSession, _ ConsumerGroupClaim) error {
+	for {
+		select {
+		case <-sess.Context().Done():
+			return nil
+		case <-h.ctx.Done():
+			if len(sess.Claims()["my-topic"]) == 1 {
+				h.Error("test timeout")
+			}
+			return nil
+		}
+	}
+}
