@@ -10,6 +10,7 @@ func (r *ConsumerMetadataRequest) encode(pe packetEncoder) error {
 	tmp := new(FindCoordinatorRequest)
 	tmp.CoordinatorKey = r.ConsumerGroup
 	tmp.CoordinatorType = CoordinatorGroup
+	tmp.Version = r.Version
 	return tmp.encode(pe)
 }
 
@@ -35,9 +36,16 @@ func (r *ConsumerMetadataRequest) headerVersion() int16 {
 }
 
 func (r *ConsumerMetadataRequest) isValidVersion() bool {
-	return r.Version == 0
+	return r.Version >= 0 && r.Version <= 2
 }
 
 func (r *ConsumerMetadataRequest) requiredVersion() KafkaVersion {
-	return V0_8_2_0
+	switch r.Version {
+	case 2:
+		return V2_0_0_0
+	case 1:
+		return V0_11_0_0
+	default:
+		return V0_8_2_0
+	}
 }
