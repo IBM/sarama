@@ -51,9 +51,16 @@ func (r *EndTxnRequest) headerVersion() int16 {
 }
 
 func (a *EndTxnRequest) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 2
 }
 
 func (a *EndTxnRequest) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch a.Version {
+	case 2:
+		return V2_7_0_0
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }

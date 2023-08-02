@@ -84,11 +84,16 @@ func (a *TxnOffsetCommitResponse) headerVersion() int16 {
 }
 
 func (a *TxnOffsetCommitResponse) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch a.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 func (r *TxnOffsetCommitResponse) throttleTime() time.Duration {

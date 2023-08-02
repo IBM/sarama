@@ -45,11 +45,18 @@ func (r *EndTxnResponse) headerVersion() int16 {
 }
 
 func (e *EndTxnResponse) isValidVersion() bool {
-	return e.Version == 0
+	return e.Version >= 0 && e.Version <= 2
 }
 
 func (e *EndTxnResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch e.Version {
+	case 2:
+		return V2_7_0_0
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 func (r *EndTxnResponse) throttleTime() time.Duration {

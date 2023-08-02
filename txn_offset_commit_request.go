@@ -97,11 +97,16 @@ func (a *TxnOffsetCommitRequest) headerVersion() int16 {
 }
 
 func (a *TxnOffsetCommitRequest) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch a.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 type PartitionOffsetMetadata struct {
