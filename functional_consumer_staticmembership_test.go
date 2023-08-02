@@ -67,7 +67,7 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 }
 
 func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
-	checkKafkaVersion(t, "2.3.0")
+	checkKafkaVersion(t, "2.4.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 	groupID := testFuncConsumerGroupID(t)
@@ -76,7 +76,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	config1 := NewTestConfig()
 	config1.ClientID = "M1"
-	config1.Version = V2_3_0_0
+	config1.Version = V2_4_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
 	config1.Consumer.Group.InstanceId = "Instance1"
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, math.MaxInt32, nil, "test.4")
@@ -84,7 +84,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	config2 := NewTestConfig()
 	config2.ClientID = "M2"
-	config2.Version = V2_3_0_0
+	config2.Version = V2_4_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
 	config2.Consumer.Group.InstanceId = "Instance2"
 	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, groupID, math.MaxInt32, nil, "test.4")

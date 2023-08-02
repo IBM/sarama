@@ -1212,6 +1212,10 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 }
 
 func (ca *clusterAdmin) RemoveMemberFromConsumerGroup(groupId string, groupInstanceIds []string) (*LeaveGroupResponse, error) {
+	if !ca.conf.Version.IsAtLeast(V2_4_0_0) {
+		return nil, ConfigurationError("Removing members from a consumer group headers requires Kafka version of at least v2.4.0")
+	}
+
 	controller, err := ca.client.Coordinator(groupId)
 	if err != nil {
 		return nil, err
