@@ -83,11 +83,16 @@ func (d *DeleteRecordsRequest) headerVersion() int16 {
 }
 
 func (d *DeleteRecordsRequest) isValidVersion() bool {
-	return d.Version == 0
+	return d.Version >= 0 && d.Version <= 1
 }
 
 func (d *DeleteRecordsRequest) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch d.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 type DeleteRecordsRequestTopic struct {
