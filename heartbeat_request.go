@@ -65,9 +65,14 @@ func (r *HeartbeatRequest) isValidVersion() bool {
 }
 
 func (r *HeartbeatRequest) requiredVersion() KafkaVersion {
-	switch {
-	case r.Version >= 3:
+	switch r.Version {
+	case 3:
 		return V2_3_0_0
+	case 2:
+		return V2_0_0_0
+	case 1:
+		return V0_11_0_0
+	default:
+		return V0_9_0_0
 	}
-	return V0_9_0_0
 }

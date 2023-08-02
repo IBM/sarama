@@ -86,11 +86,13 @@ func (r *LeaveGroupRequest) isValidVersion() bool {
 }
 
 func (r *LeaveGroupRequest) requiredVersion() KafkaVersion {
-	switch {
-	case r.Version >= 2:
+	switch r.Version {
+	case 3:
+		return V2_4_0_0
+	case 2:
 		return V2_0_0_0
-	case r.Version >= 1:
-		return V1_0_0_0
+	case 1:
+		return V0_11_0_0
 	default:
 		return V0_9_0_0
 	}
