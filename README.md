@@ -25,7 +25,7 @@ A changelog is available [here](CHANGELOG.md).
 
 ## Contributing
 
-- Get started by checking our [contribution guidelines](https://github.com/IBM/sarama/blob/main/.github/CONTRIBUTING.md).
+- Get started by checking our [contribution guidelines](https://github.com/IBM/sarama/blob/main/CONTRIBUTING.md).
 - Read the [Sarama wiki](https://github.com/IBM/sarama/wiki) for more technical and design details.
 - The [Kafka Protocol Specification](https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol) contains a wealth of useful information.
 - For more general issues, there is [a google group](https://groups.google.com/forum/#!forum/kafka-clients) for Kafka client developers.
