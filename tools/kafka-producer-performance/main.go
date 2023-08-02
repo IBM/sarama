@@ -313,9 +313,6 @@ func main() {
 
 	cancel()
 	<-done
-
-	// Print final metrics.
-	printMetrics(os.Stdout, config.MetricRegistry)
 }
 
 func runAsyncProducer(topic string, partition, messageLoad, messageSize int,
@@ -325,6 +322,8 @@ func runAsyncProducer(topic string, partition, messageLoad, messageSize int,
 		printErrorAndExit(69, "Failed to create producer: %s", err)
 	}
 	defer func() {
+		// Print final metrics.
+		printMetrics(os.Stdout, config.MetricRegistry)
 		if err := producer.Close(); err != nil {
 			printErrorAndExit(69, "Failed to close producer: %s", err)
 		}
@@ -370,6 +369,8 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 		printErrorAndExit(69, "Failed to create producer: %s", err)
 	}
 	defer func() {
+		// Print final metrics.
+		printMetrics(os.Stdout, config.MetricRegistry)
 		if err := producer.Close(); err != nil {
 			printErrorAndExit(69, "Failed to close producer: %s", err)
 		}
