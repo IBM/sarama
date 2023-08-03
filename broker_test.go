@@ -1484,8 +1484,8 @@ func Test_handleThrottledResponse(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			broker.metricRegistry = metrics.NewRegistry()
 			broker.brokerThrottleTime = broker.registerHistogram("throttle-time-in-ms")
-			broker.handleThrottledResponse(tt.response)
 			startTime := time.Now()
+			broker.handleThrottledResponse(tt.response)
 			broker.waitIfThrottled()
 			if tt.expectDelay {
 				if time.Since(startTime) < throttleTime {
