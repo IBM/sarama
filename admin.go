@@ -1033,6 +1033,9 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 	request := &DeleteGroupsRequest{
 		Groups: []string{group},
 	}
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 1
+	}
 
 	resp, err := coordinator.DeleteGroups(request)
 	if err != nil {
