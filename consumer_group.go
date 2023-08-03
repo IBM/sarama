@@ -318,8 +318,10 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		}
 		return c.retryNewSession(ctx, topics, handler, retries, true)
 	case ErrMemberIdRequired:
-		// from JoinGroupRequest v4, if client start with empty member id,
-		// it need to get member id from response and send another join request to join group
+		// from JoinGroupRequest v4 onwards (due to KIP-394) if the client starts
+		// with an empty member id, it needs to get the assigned id from the
+		// response and send another join request with that id to actually join the
+		// group
 		c.memberID = join.MemberId
 		return c.retryNewSession(ctx, topics, handler, retries+1 /*keep retry time*/, false)
 	case ErrFencedInstancedId:
@@ -442,14 +444,13 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 	if c.config.Version.IsAtLeast(V2_0_0_0) {
 		req.Version = 3
 	}
-	// XXX: protocol states "Starting from version 4, the client needs to issue a
-	// second request to join group", so not enabling this until we can
-	// investigate
-	/*
-		if c.config.Version.IsAtLeast(V2_2_0_0) {
-			req.Version = 4
-		}
-	*/
+	// from JoinGroupRequest v4 onwards (due to KIP-394) the client will actually
+	// send two JoinGroupRequests, once with the empty member id, and then again
+	// with the assigned id from the first response. This is handled via the
+	// ErrMemberIdRequired case.
+	if c.config.Version.IsAtLeast(V2_2_0_0) {
+		req.Version = 4
+	}
 	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 5
 		req.GroupInstanceId = c.groupInstanceId
