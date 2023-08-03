@@ -1825,7 +1825,7 @@ func TestTxnProduceBumpEpoch(t *testing.T) {
 	broker.Returns(addPartitionsToTxnResponse)
 
 	produceResponse := new(ProduceResponse)
-	produceResponse.Version = 3
+	produceResponse.Version = 7
 	produceResponse.AddTopicPartition("test-topic", 0, ErrOutOfOrderSequenceNumber)
 	broker.Returns(produceResponse)
 
