@@ -82,6 +82,13 @@ func (r *DescribeLogDirsRequest) headerVersion() int16 {
 	return 1
 }
 
+func (r *DescribeLogDirsRequest) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 1
+}
+
 func (r *DescribeLogDirsRequest) requiredVersion() KafkaVersion {
+	if r.Version > 0 {
+		return V2_0_0_0
+	}
 	return V1_0_0_0
 }

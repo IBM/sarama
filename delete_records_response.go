@@ -77,15 +77,24 @@ func (d *DeleteRecordsResponse) key() int16 {
 }
 
 func (d *DeleteRecordsResponse) version() int16 {
-	return 0
+	return d.Version
 }
 
 func (d *DeleteRecordsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (d *DeleteRecordsResponse) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 1
+}
+
 func (d *DeleteRecordsResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch d.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 func (r *DeleteRecordsResponse) throttleTime() time.Duration {

@@ -275,6 +275,10 @@ func (r *MetadataResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *MetadataResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 7
+}
+
 func (r *MetadataResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:

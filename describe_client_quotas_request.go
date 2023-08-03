@@ -11,6 +11,7 @@ package sarama
 // Components: the components to filter on
 // Strict: whether the filter only includes specified components
 type DescribeClientQuotasRequest struct {
+	Version    int16
 	Components []QuotaFilterComponent
 	Strict     bool
 }
@@ -129,11 +130,15 @@ func (d *DescribeClientQuotasRequest) key() int16 {
 }
 
 func (d *DescribeClientQuotasRequest) version() int16 {
-	return 0
+	return d.Version
 }
 
 func (d *DescribeClientQuotasRequest) headerVersion() int16 {
 	return 1
+}
+
+func (d *DescribeClientQuotasRequest) isValidVersion() bool {
+	return d.Version == 0
 }
 
 func (d *DescribeClientQuotasRequest) requiredVersion() KafkaVersion {

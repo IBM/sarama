@@ -84,18 +84,20 @@ func (i *InitProducerIDRequest) headerVersion() int16 {
 	return 1
 }
 
+func (i *InitProducerIDRequest) isValidVersion() bool {
+	return i.Version >= 0 && i.Version <= 4
+}
+
 func (i *InitProducerIDRequest) requiredVersion() KafkaVersion {
 	switch i.Version {
-	case 2:
-		// Added tagged fields
-		return V2_4_0_0
+	case 4:
+		return V2_7_0_0
 	case 3:
-		// Added ProducerID/Epoch
 		return V2_5_0_0
-	case 0:
-		fallthrough
+	case 2:
+		return V2_4_0_0
 	case 1:
-		fallthrough
+		return V2_0_0_0
 	default:
 		return V0_11_0_0
 	}

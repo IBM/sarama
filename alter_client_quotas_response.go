@@ -14,6 +14,7 @@ import (
 //       entity_name => NULLABLE_STRING
 
 type AlterClientQuotasResponse struct {
+	Version      int16
 	ThrottleTime time.Duration                    // The duration in milliseconds for which the request was throttled due to a quota violation, or zero if the request did not violate any quota.
 	Entries      []AlterClientQuotasEntryResponse // The quota configuration entries altered.
 }
@@ -133,11 +134,15 @@ func (a *AlterClientQuotasResponse) key() int16 {
 }
 
 func (a *AlterClientQuotasResponse) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AlterClientQuotasResponse) headerVersion() int16 {
 	return 0
+}
+
+func (a *AlterClientQuotasResponse) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *AlterClientQuotasResponse) requiredVersion() KafkaVersion {

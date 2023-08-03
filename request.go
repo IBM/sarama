@@ -12,6 +12,7 @@ type protocolBody interface {
 	key() int16
 	version() int16
 	headerVersion() int16
+	isValidVersion() bool
 	requiredVersion() KafkaVersion
 }
 
@@ -119,7 +120,7 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 func allocateBody(key, version int16) protocolBody {
 	switch key {
 	case 0:
-		return &ProduceRequest{}
+		return &ProduceRequest{Version: version}
 	case 1:
 		return &FetchRequest{Version: version}
 	case 2:
@@ -131,73 +132,73 @@ func allocateBody(key, version int16) protocolBody {
 	case 9:
 		return &OffsetFetchRequest{Version: version}
 	case 10:
-		return &FindCoordinatorRequest{}
+		return &FindCoordinatorRequest{Version: version}
 	case 11:
-		return &JoinGroupRequest{}
+		return &JoinGroupRequest{Version: version}
 	case 12:
-		return &HeartbeatRequest{}
+		return &HeartbeatRequest{Version: version}
 	case 13:
-		return &LeaveGroupRequest{}
+		return &LeaveGroupRequest{Version: version}
 	case 14:
-		return &SyncGroupRequest{}
+		return &SyncGroupRequest{Version: version}
 	case 15:
-		return &DescribeGroupsRequest{}
+		return &DescribeGroupsRequest{Version: version}
 	case 16:
-		return &ListGroupsRequest{}
+		return &ListGroupsRequest{Version: version}
 	case 17:
-		return &SaslHandshakeRequest{}
+		return &SaslHandshakeRequest{Version: version}
 	case 18:
 		return &ApiVersionsRequest{Version: version}
 	case 19:
-		return &CreateTopicsRequest{}
+		return &CreateTopicsRequest{Version: version}
 	case 20:
-		return &DeleteTopicsRequest{}
+		return &DeleteTopicsRequest{Version: version}
 	case 21:
-		return &DeleteRecordsRequest{}
+		return &DeleteRecordsRequest{Version: version}
 	case 22:
 		return &InitProducerIDRequest{Version: version}
 	case 24:
-		return &AddPartitionsToTxnRequest{}
+		return &AddPartitionsToTxnRequest{Version: version}
 	case 25:
-		return &AddOffsetsToTxnRequest{}
+		return &AddOffsetsToTxnRequest{Version: version}
 	case 26:
-		return &EndTxnRequest{}
+		return &EndTxnRequest{Version: version}
 	case 28:
-		return &TxnOffsetCommitRequest{}
+		return &TxnOffsetCommitRequest{Version: version}
 	case 29:
-		return &DescribeAclsRequest{}
+		return &DescribeAclsRequest{Version: int(version)}
 	case 30:
-		return &CreateAclsRequest{}
+		return &CreateAclsRequest{Version: version}
 	case 31:
-		return &DeleteAclsRequest{}
+		return &DeleteAclsRequest{Version: int(version)}
 	case 32:
-		return &DescribeConfigsRequest{}
+		return &DescribeConfigsRequest{Version: version}
 	case 33:
-		return &AlterConfigsRequest{}
+		return &AlterConfigsRequest{Version: version}
 	case 35:
-		return &DescribeLogDirsRequest{}
+		return &DescribeLogDirsRequest{Version: version}
 	case 36:
-		return &SaslAuthenticateRequest{}
+		return &SaslAuthenticateRequest{Version: version}
 	case 37:
-		return &CreatePartitionsRequest{}
+		return &CreatePartitionsRequest{Version: version}
 	case 42:
-		return &DeleteGroupsRequest{}
+		return &DeleteGroupsRequest{Version: version}
 	case 44:
-		return &IncrementalAlterConfigsRequest{}
+		return &IncrementalAlterConfigsRequest{Version: version}
 	case 45:
-		return &AlterPartitionReassignmentsRequest{}
+		return &AlterPartitionReassignmentsRequest{Version: version}
 	case 46:
-		return &ListPartitionReassignmentsRequest{}
+		return &ListPartitionReassignmentsRequest{Version: version}
 	case 47:
-		return &DeleteOffsetsRequest{}
+		return &DeleteOffsetsRequest{Version: version}
 	case 48:
-		return &DescribeClientQuotasRequest{}
+		return &DescribeClientQuotasRequest{Version: version}
 	case 49:
-		return &AlterClientQuotasRequest{}
+		return &AlterClientQuotasRequest{Version: version}
 	case 50:
-		return &DescribeUserScramCredentialsRequest{}
+		return &DescribeUserScramCredentialsRequest{Version: version}
 	case 51:
-		return &AlterUserScramCredentialsRequest{}
+		return &AlterUserScramCredentialsRequest{Version: version}
 	}
 	return nil
 }

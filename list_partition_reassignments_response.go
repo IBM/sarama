@@ -166,6 +166,10 @@ func (r *ListPartitionReassignmentsResponse) headerVersion() int16 {
 	return 1
 }
 
+func (r *ListPartitionReassignmentsResponse) isValidVersion() bool {
+	return r.Version == 0
+}
+
 func (r *ListPartitionReassignmentsResponse) requiredVersion() KafkaVersion {
 	return V2_4_0_0
 }

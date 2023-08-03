@@ -17,6 +17,7 @@ import (
 //       value => FLOAT64
 
 type DescribeClientQuotasResponse struct {
+	Version      int16
 	ThrottleTime time.Duration               // The duration in milliseconds for which the request was throttled due to a quota violation, or zero if the request did not violate any quota.
 	ErrorCode    KError                      // The error code, or `0` if the quota description succeeded.
 	ErrorMsg     *string                     // The error message, or `null` if the quota description succeeded.
@@ -223,11 +224,15 @@ func (d *DescribeClientQuotasResponse) key() int16 {
 }
 
 func (d *DescribeClientQuotasResponse) version() int16 {
-	return 0
+	return d.Version
 }
 
 func (d *DescribeClientQuotasResponse) headerVersion() int16 {
 	return 0
+}
+
+func (d *DescribeClientQuotasResponse) isValidVersion() bool {
+	return d.Version == 0
 }
 
 func (d *DescribeClientQuotasResponse) requiredVersion() KafkaVersion {

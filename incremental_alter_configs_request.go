@@ -11,6 +11,7 @@ const (
 
 // IncrementalAlterConfigsRequest is an incremental alter config request type
 type IncrementalAlterConfigsRequest struct {
+	Version      int16
 	Resources    []*IncrementalAlterConfigsResource
 	ValidateOnly bool
 }
@@ -161,11 +162,15 @@ func (a *IncrementalAlterConfigsRequest) key() int16 {
 }
 
 func (a *IncrementalAlterConfigsRequest) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *IncrementalAlterConfigsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (a *IncrementalAlterConfigsRequest) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *IncrementalAlterConfigsRequest) requiredVersion() KafkaVersion {

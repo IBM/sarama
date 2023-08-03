@@ -6,6 +6,7 @@ import (
 
 // AddPartitionsToTxnResponse is a partition errors to transaction type
 type AddPartitionsToTxnResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Errors       map[string][]*PartitionError
 }
@@ -76,15 +77,26 @@ func (a *AddPartitionsToTxnResponse) key() int16 {
 }
 
 func (a *AddPartitionsToTxnResponse) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AddPartitionsToTxnResponse) headerVersion() int16 {
 	return 0
 }
 
+func (a *AddPartitionsToTxnResponse) isValidVersion() bool {
+	return a.Version >= 0 && a.Version <= 2
+}
+
 func (a *AddPartitionsToTxnResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch a.Version {
+	case 2:
+		return V2_7_0_0
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 func (r *AddPartitionsToTxnResponse) throttleTime() time.Duration {

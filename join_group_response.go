@@ -147,6 +147,10 @@ func (r *JoinGroupResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *JoinGroupResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 5
+}
+
 func (r *JoinGroupResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 3, 4, 5:

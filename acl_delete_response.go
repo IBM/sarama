@@ -60,8 +60,17 @@ func (d *DeleteAclsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (d *DeleteAclsResponse) isValidVersion() bool {
+	return d.Version >= 0 && d.Version <= 1
+}
+
 func (d *DeleteAclsResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch d.Version {
+	case 1:
+		return V2_0_0_0
+	default:
+		return V0_11_0_0
+	}
 }
 
 func (r *DeleteAclsResponse) throttleTime() time.Duration {

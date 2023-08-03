@@ -4,6 +4,7 @@ import "time"
 
 // IncrementalAlterConfigsResponse is a response type for incremental alter config
 type IncrementalAlterConfigsResponse struct {
+	Version      int16
 	ThrottleTime time.Duration
 	Resources    []*AlterConfigsResourceResponse
 }
@@ -54,11 +55,15 @@ func (a *IncrementalAlterConfigsResponse) key() int16 {
 }
 
 func (a *IncrementalAlterConfigsResponse) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *IncrementalAlterConfigsResponse) headerVersion() int16 {
 	return 0
+}
+
+func (a *IncrementalAlterConfigsResponse) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *IncrementalAlterConfigsResponse) requiredVersion() KafkaVersion {

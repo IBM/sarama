@@ -146,6 +146,10 @@ func (r *ApiVersionsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *ApiVersionsResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 3
+}
+
 func (r *ApiVersionsResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 0:

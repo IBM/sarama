@@ -2,6 +2,7 @@ package sarama
 
 // AlterConfigsRequest is an alter config request type
 type AlterConfigsRequest struct {
+	Version      int16
 	Resources    []*AlterConfigsResource
 	ValidateOnly bool
 }
@@ -114,11 +115,15 @@ func (a *AlterConfigsRequest) key() int16 {
 }
 
 func (a *AlterConfigsRequest) version() int16 {
-	return 0
+	return a.Version
 }
 
 func (a *AlterConfigsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (a *AlterConfigsRequest) isValidVersion() bool {
+	return a.Version == 0
 }
 
 func (a *AlterConfigsRequest) requiredVersion() KafkaVersion {

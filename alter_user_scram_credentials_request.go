@@ -137,6 +137,10 @@ func (r *AlterUserScramCredentialsRequest) headerVersion() int16 {
 	return 2
 }
 
+func (r *AlterUserScramCredentialsRequest) isValidVersion() bool {
+	return r.Version == 0
+}
+
 func (r *AlterUserScramCredentialsRequest) requiredVersion() KafkaVersion {
 	return V2_7_0_0
 }

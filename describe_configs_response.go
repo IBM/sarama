@@ -116,6 +116,10 @@ func (r *DescribeConfigsResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *DescribeConfigsResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 2
+}
+
 func (r *DescribeConfigsResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:

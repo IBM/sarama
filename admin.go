@@ -605,6 +605,9 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 			Topics:  topics,
 			Timeout: ca.conf.Admin.Timeout,
 		}
+		if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+			request.Version = 1
+		}
 		rsp, err := broker.DeleteRecords(request)
 		if err != nil {
 			errs = append(errs, err)
@@ -1061,7 +1064,11 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 			defer wg.Done()
 			_ = b.Open(conf) // Ensure that broker is opened
 
-			response, err := b.DescribeLogDirs(&DescribeLogDirsRequest{})
+			request := &DescribeLogDirsRequest{}
+			if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+				request.Version = 1
+			}
+			response, err := b.DescribeLogDirs(request)
 			if err != nil {
 				errChan <- err
 				return
@@ -1208,6 +1215,10 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 }
 
 func (ca *clusterAdmin) RemoveMemberFromConsumerGroup(groupId string, groupInstanceIds []string) (*LeaveGroupResponse, error) {
+	if !ca.conf.Version.IsAtLeast(V2_4_0_0) {
+		return nil, ConfigurationError("Removing members from a consumer group headers requires Kafka version of at least v2.4.0")
+	}
+
 	controller, err := ca.client.Coordinator(groupId)
 	if err != nil {
 		return nil, err

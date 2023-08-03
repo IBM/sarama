@@ -7,6 +7,7 @@ import (
 
 // ConsumerMetadataResponse holds the response for a consumer group meta data requests
 type ConsumerMetadataResponse struct {
+	Version         int16
 	Err             KError
 	Coordinator     *Broker
 	CoordinatorID   int32  // deprecated: use Coordinator.ID()
@@ -53,7 +54,7 @@ func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
 	}
 
 	tmp := &FindCoordinatorResponse{
-		Version:     0,
+		Version:     r.Version,
 		Err:         r.Err,
 		Coordinator: r.Coordinator,
 	}
@@ -70,13 +71,24 @@ func (r *ConsumerMetadataResponse) key() int16 {
 }
 
 func (r *ConsumerMetadataResponse) version() int16 {
-	return 0
+	return r.Version
 }
 
 func (r *ConsumerMetadataResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *ConsumerMetadataResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 2
+}
+
 func (r *ConsumerMetadataResponse) requiredVersion() KafkaVersion {
-	return V0_8_2_0
+	switch r.Version {
+	case 2:
+		return V2_0_0_0
+	case 1:
+		return V0_11_0_0
+	default:
+		return V0_8_2_0
+	}
 }

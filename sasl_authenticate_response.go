@@ -59,6 +59,10 @@ func (r *SaslAuthenticateResponse) headerVersion() int16 {
 	return 0
 }
 
+func (r *SaslAuthenticateResponse) isValidVersion() bool {
+	return r.Version >= 0 && r.Version <= 1
+}
+
 func (r *SaslAuthenticateResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 1:
