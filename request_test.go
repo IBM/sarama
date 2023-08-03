@@ -241,6 +241,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				resp := allocateResponseBody(req)
 				assert.NotNil(t, resp, fmt.Sprintf("%s has no matching response type in allocateResponseBody", reflect.TypeOf(req)))
 				assert.Equal(t, req.isValidVersion(), resp.isValidVersion(), fmt.Sprintf("%s isValidVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp)))
+				assert.Equal(t, req.requiredVersion(), resp.requiredVersion(), fmt.Sprintf("%s requiredVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp)))
 				for _, body := range []protocolBody{req, resp} {
 					assert.Equal(t, key, body.key())
 					assert.Equal(t, version, body.version())
