@@ -163,7 +163,6 @@ type client struct {
 	cachedPartitionsResults map[string][maxPartitionIndex][]int32
 
 	lock sync.RWMutex // protects access to the maps that hold cluster state.
-
 }
 
 // NewClient creates a new Client. It connects to one of the given broker addresses
@@ -899,9 +898,20 @@ func (client *client) getOffset(topic string, partitionID int32, time int64) (in
 	}
 
 	request := &OffsetRequest{}
+	// Version 1 removes MaxNumOffsets.  From this version forward, only a single
+	// offset can be returned.
 	if client.conf.Version.IsAtLeast(V0_10_1_0) {
 		request.Version = 1
 	}
+	// Version 2 adds the isolation level, which is used for transactional reads.
+	if client.conf.Version.IsAtLeast(V0_11_0_0) {
+		request.Version = 2
+	}
+	// Version 3 is the same as version 2.
+	if client.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 3
+	}
+
 	request.AddBlock(topic, partitionID, time, 1)
 
 	response, err := broker.GetAvailableOffsets(request)
