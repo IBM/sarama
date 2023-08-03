@@ -73,7 +73,7 @@ func TestSyncProducerTransactional(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 
 	metadataResponse := new(MetadataResponse)
-	metadataResponse.Version = 1
+	metadataResponse.Version = 4
 	metadataResponse.ControllerID = leader.BrokerID()
 	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataResponse.AddTopic("my_topic", ErrNoError)

@@ -87,7 +87,7 @@ func TestTxnmgrInitProducerIdTxn(t *testing.T) {
 	defer broker.Close()
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	broker.Returns(metadataLeader)
@@ -217,7 +217,7 @@ func TestMaybeAddPartitionToCurrentTxn(t *testing.T) {
 	defer broker.Close()
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -351,7 +351,7 @@ func TestAddOffsetsToTxn(t *testing.T) {
 	defer broker.Close()
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -608,7 +608,7 @@ func TestTxnOffsetsCommit(t *testing.T) {
 	config.Producer.Transaction.Retry.Backoff = 0
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -739,7 +739,7 @@ func TestEndTxn(t *testing.T) {
 	defer broker.Close()
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -904,7 +904,7 @@ func TestPublishPartitionToTxn(t *testing.T) {
 	defer broker.Close()
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)

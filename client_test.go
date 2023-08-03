@@ -1071,7 +1071,7 @@ func TestClientCoordinatorConnectionRefused(t *testing.T) {
 func TestInitProducerIDConnectionRefused(t *testing.T) {
 	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
-	seedBroker.Returns(&MetadataResponse{Version: 1})
+	seedBroker.Returns(&MetadataResponse{Version: 4})
 
 	config := NewTestConfig()
 	config.Producer.Idempotent = true

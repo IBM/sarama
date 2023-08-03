@@ -1111,7 +1111,7 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
-		Version:      1,
+		Version:      4,
 		ControllerID: 1,
 	}
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
@@ -1169,7 +1169,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 		broker := NewMockBroker(t, 1)
 
 		metadataResponse := &MetadataResponse{
-			Version:      1,
+			Version:      4,
 			ControllerID: 1,
 		}
 		metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
@@ -1307,7 +1307,7 @@ func TestAsyncProducerIdempotentRetryCheckBatch_2378(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
-		Version:      1,
+		Version:      4,
 		ControllerID: 1,
 	}
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
@@ -1375,7 +1375,7 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
-		Version:      1,
+		Version:      4,
 		ControllerID: 1,
 	}
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
@@ -1425,7 +1425,7 @@ func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
 	defer broker.Close()
 
 	metadataResponse := &MetadataResponse{
-		Version:      1,
+		Version:      4,
 		ControllerID: 1,
 	}
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
@@ -1501,7 +1501,7 @@ func TestAsyncProducerIdempotentEpochExhaustion(t *testing.T) {
 	)
 
 	metadataResponse := &MetadataResponse{
-		Version:      1,
+		Version:      4,
 		ControllerID: 1,
 	}
 	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
@@ -1737,7 +1737,7 @@ func TestTxmngInitProducerId(t *testing.T) {
 	defer broker.Close()
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	broker.Returns(metadataLeader)
 
@@ -1879,7 +1879,7 @@ func TestTxnProduceRecordWithCommit(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -1960,7 +1960,7 @@ func TestTxnProduceBatchAddPartition(t *testing.T) {
 	config.Producer.Partitioner = NewManualPartitioner
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -2067,7 +2067,7 @@ func TestTxnProduceRecordWithAbort(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
@@ -2147,7 +2147,7 @@ func TestTxnCanAbort(t *testing.T) {
 	config.Net.MaxOpenRequests = 1
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 1
+	metadataLeader.Version = 4
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
