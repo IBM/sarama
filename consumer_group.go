@@ -433,7 +433,24 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		req.Version = 1
 		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond)
 	}
-	if c.groupInstanceId != nil {
+	if c.config.Version.IsAtLeast(V0_11_0_0) {
+		req.Version = 2
+	}
+	if c.config.Version.IsAtLeast(V0_11_0_0) {
+		req.Version = 2
+	}
+	if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 3
+	}
+	// XXX: protocol states "Starting from version 4, the client needs to issue a
+	// second request to join group", so not enabling this until we can
+	// investigate
+	/*
+		if c.config.Version.IsAtLeast(V2_2_0_0) {
+			req.Version = 4
+		}
+	*/
+	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 5
 		req.GroupInstanceId = c.groupInstanceId
 	}
