@@ -587,6 +587,7 @@ func (b *Broker) Heartbeat(request *HeartbeatRequest) (*HeartbeatResponse, error
 // ListGroups return a list group response or error
 func (b *Broker) ListGroups(request *ListGroupsRequest) (*ListGroupsResponse, error) {
 	response := new(ListGroupsResponse)
+	response.Version = request.Version // Required to ensure use of the correct response header version
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {
