@@ -141,8 +141,13 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 			req.TransactionalID = &ps.parent.conf.Producer.Transaction.ID
 		}
 	}
-
-	if ps.parent.conf.Producer.Compression == CompressionZSTD && ps.parent.conf.Version.IsAtLeast(V2_1_0_0) {
+	if ps.parent.conf.Version.IsAtLeast(V1_0_0_0) {
+		req.Version = 5
+	}
+	if ps.parent.conf.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 6
+	}
+	if ps.parent.conf.Version.IsAtLeast(V2_1_0_0) {
 		req.Version = 7
 	}
 
