@@ -1,5 +1,38 @@
 # Changelog
 
+## Version 1.40.1 (2023-07-27)
+
+## What's Changed
+### :tada: New Features / Improvements
+* Use buffer pools for decompression by @ronanh in https://github.com/IBM/sarama/pull/2484
+* feat: support for Kerberos authentication with a credentials cache. by @mrogaski in https://github.com/IBM/sarama/pull/2457
+### :bug: Fixes
+* Fix some retry issues by @hindessm in https://github.com/IBM/sarama/pull/2517
+* fix: admin retry logic by @hindessm in https://github.com/IBM/sarama/pull/2519
+* Add some retry logic to more admin client functions by @hindessm in https://github.com/IBM/sarama/pull/2520
+* fix: concurrent issue on updateMetadataMs by @napallday in https://github.com/IBM/sarama/pull/2522
+* fix(test): allow testing of skipped test without IsTransactional panic by @hindessm in https://github.com/IBM/sarama/pull/2525
+### :package: Dependency updates
+* chore(deps): bump the golang-org-x group with 2 updates by @dependabot in https://github.com/IBM/sarama/pull/2509
+* chore(deps): bump github.com/klauspost/compress from 1.15.14 to 1.16.6 by @dependabot in https://github.com/IBM/sarama/pull/2513
+* chore(deps): bump github.com/stretchr/testify from 1.8.1 to 1.8.3 by @dependabot in https://github.com/IBM/sarama/pull/2512
+### :wrench: Maintenance
+* chore(ci): migrate probot-stale to actions/stale by @dnwe in https://github.com/IBM/sarama/pull/2496
+* chore(ci): bump golangci version, cleanup, depguard config by @EladLeev in https://github.com/IBM/sarama/pull/2504
+* Clean up some typos and docs/help mistakes by @hindessm in https://github.com/IBM/sarama/pull/2514
+### :heavy_plus_sign: Other Changes
+* chore(ci): add simple apidiff workflow by @dnwe in https://github.com/IBM/sarama/pull/2497
+* chore(ci): bump actions/setup-go from 3 to 4 by @dependabot in https://github.com/IBM/sarama/pull/2508
+* fix(comments): PauseAll and ResumeAll by @napallday in https://github.com/IBM/sarama/pull/2523
+
+## New Contributors
+* @EladLeev made their first contribution in https://github.com/IBM/sarama/pull/2504
+* @hindessm made their first contribution in https://github.com/IBM/sarama/pull/2514
+* @ronanh made their first contribution in https://github.com/IBM/sarama/pull/2484
+* @mrogaski made their first contribution in https://github.com/IBM/sarama/pull/2457
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.40.0...v1.40.1
+
 ## Version 1.40.0 (2023-07-17)
 
 ## What's Changed
