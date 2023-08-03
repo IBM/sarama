@@ -468,6 +468,9 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		Timeout:         ca.conf.Admin.Timeout,
 		ValidateOnly:    validateOnly,
 	}
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 1
+	}
 
 	return ca.retryOnError(isErrNoController, func() error {
 		b, err := ca.Controller()
