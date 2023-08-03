@@ -1068,20 +1068,35 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
 		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
 	}
+	// Version 1 is the same as version 0.
 	if bc.consumer.conf.Version.IsAtLeast(V0_9_0_0) {
 		request.Version = 1
 	}
+	// Starting in Version 2, the requestor must be able to handle Kafka Log
+	// Message format version 1.
 	if bc.consumer.conf.Version.IsAtLeast(V0_10_0_0) {
 		request.Version = 2
 	}
+	// Version 3 adds MaxBytes.  Starting in version 3, the partition ordering in
+	// the request is now relevant.  Partitions will be processed in the order
+	// they appear in the request.
 	if bc.consumer.conf.Version.IsAtLeast(V0_10_1_0) {
 		request.Version = 3
 		request.MaxBytes = MaxResponseSize
 	}
+	// Version 4 adds IsolationLevel.  Starting in version 4, the reqestor must be
+	// able to handle Kafka log message format version 2.
+	// Version 5 adds LogStartOffset to indicate the earliest available offset of
+	// partition data that can be consumed.
 	if bc.consumer.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 4
+		request.Version = 5
 		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
 	}
+	// Version 6 is the same as version 5.
+	if bc.consumer.conf.Version.IsAtLeast(V1_0_0_0) {
+		request.Version = 6
+	}
+	// Version 7 adds incremental fetch request support.
 	if bc.consumer.conf.Version.IsAtLeast(V1_1_0_0) {
 		request.Version = 7
 		// We do not currently implement KIP-227 FetchSessions. Setting the id to 0
@@ -1090,9 +1105,17 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		request.SessionID = 0
 		request.SessionEpoch = -1
 	}
+	// Version 8 is the same as version 7.
+	if bc.consumer.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 8
+	}
+	// Version 9 adds CurrentLeaderEpoch, as described in KIP-320.
+	// Version 10 indicates that we can use the ZStd compression algorithm, as
+	// described in KIP-110.
 	if bc.consumer.conf.Version.IsAtLeast(V2_1_0_0) {
 		request.Version = 10
 	}
+	// Version 11 adds RackID for KIP-392 fetch from closest replica
 	if bc.consumer.conf.Version.IsAtLeast(V2_3_0_0) {
 		request.Version = 11
 		request.RackID = bc.consumer.conf.RackID
