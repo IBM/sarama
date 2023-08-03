@@ -73,11 +73,18 @@ func (r *CreatePartitionsRequest) headerVersion() int16 {
 }
 
 func (r *CreatePartitionsRequest) isValidVersion() bool {
-	return r.Version == 0
+	return r.Version >= 0 && r.Version <= 1
 }
 
 func (r *CreatePartitionsRequest) requiredVersion() KafkaVersion {
-	return V1_0_0_0
+	switch r.Version {
+	case 1:
+		return V2_0_0_0
+	case 0:
+		return V1_0_0_0
+	default:
+		return V2_0_0_0
+	}
 }
 
 type TopicPartition struct {
