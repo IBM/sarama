@@ -113,11 +113,18 @@ func (a *AlterConfigsResponse) headerVersion() int16 {
 }
 
 func (a *AlterConfigsResponse) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *AlterConfigsResponse) requiredVersion() KafkaVersion {
-	return V0_11_0_0
+	switch a.Version {
+	case 1:
+		return V2_0_0_0
+	case 0:
+		return V0_11_0_0
+	default:
+		return V2_0_0_0
+	}
 }
 
 func (r *AlterConfigsResponse) throttleTime() time.Duration {

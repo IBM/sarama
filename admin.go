@@ -716,6 +716,9 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		Resources:    resources,
 		ValidateOnly: validateOnly,
 	}
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 1
+	}
 
 	var (
 		b   *Broker
