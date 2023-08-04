@@ -534,7 +534,16 @@ func (c *consumerGroup) heartbeatRequest(coordinator *Broker, memberID string, g
 		MemberId:     memberID,
 		GenerationId: generationID,
 	}
-	if c.groupInstanceId != nil {
+
+	// Version 1 and version 2 are the same as version 0.
+	if c.config.Version.IsAtLeast(V0_11_0_0) {
+		req.Version = 1
+	}
+	if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 2
+	}
+	// Starting from version 3, we add a new field called groupInstanceId to indicate member identity across restarts.
+	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 3
 		req.GroupInstanceId = c.groupInstanceId
 	}
