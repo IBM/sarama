@@ -93,7 +93,9 @@ func (r *LeaveGroupRequest) requiredVersion() KafkaVersion {
 		return V2_0_0_0
 	case 1:
 		return V0_11_0_0
-	default:
+	case 0:
 		return V0_9_0_0
+	default:
+		return V2_4_0_0
 	}
 }

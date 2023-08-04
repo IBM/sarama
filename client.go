@@ -1197,8 +1197,13 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 		request.CoordinatorKey = coordinatorKey
 		request.CoordinatorType = coordinatorType
 
+		// Version 1 adds KeyType.
 		if client.conf.Version.IsAtLeast(V0_11_0_0) {
 			request.Version = 1
+		}
+		// Version 2 is the same as version 1.
+		if client.conf.Version.IsAtLeast(V2_0_0_0) {
+			request.Version = 2
 		}
 
 		response, err := broker.FindCoordinator(request)

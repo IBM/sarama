@@ -57,8 +57,10 @@ func (r *HeartbeatResponse) requiredVersion() KafkaVersion {
 		return V2_0_0_0
 	case 1:
 		return V0_11_0_0
+	case 0:
+		return V0_8_2_0
 	default:
-		return V0_9_0_0
+		return V2_3_0_0
 	}
 }
 
