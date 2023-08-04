@@ -11,7 +11,7 @@ A command line tool to test producer performance.
 
     # Display all command line options
     kafka-producer-performance -help
-	
+
 	# Minimum invocation
     kafka-producer-performance \
 		-brokers=kafka:9092 \
