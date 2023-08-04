@@ -1305,7 +1305,9 @@ func NewMockSyncGroupResponse(t TestReporter) *MockSyncGroupResponse {
 }
 
 func (m *MockSyncGroupResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*SyncGroupRequest)
 	resp := &SyncGroupResponse{
+		Version:          req.version(),
 		Err:              m.Err,
 		MemberAssignment: m.MemberAssignment,
 	}

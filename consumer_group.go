@@ -507,12 +507,19 @@ func (c *consumerGroup) syncGroupRequest(
 		GenerationId: generationID,
 	}
 
+	// Versions 1 and 2 are the same as version 0.
+	if c.config.Version.IsAtLeast(V0_11_0_0) {
+		req.Version = 1
+	}
+	if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 2
+	}
+	// Starting from version 3, we add a new field called groupInstanceId to indicate member identity across restarts.
 	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 3
-	}
-	if c.groupInstanceId != nil {
 		req.GroupInstanceId = c.groupInstanceId
 	}
+
 	for memberID, topics := range plan {
 		assignment := &ConsumerGroupMemberAssignment{Topics: topics}
 		userDataBytes, err := strategy.AssignmentData(memberID, topics, generationID)

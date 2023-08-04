@@ -15,7 +15,7 @@ repos:
       - id: conventional-commit-msg-validation
         name: commit message conventional validation
         language: pygrep
-        entry: '^(breaking|build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w `])+([\s\S]*)'
+        entry: '^(?:fixup! )?(breaking|build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test){1}(\([\w\-\.]+\))?(!)?: ([\w `])+([\s\S]*)'
         args: [--multiline, --negate]
         stages: [commit-msg]
       - id: commit-msg-needs-to-be-signed-off
