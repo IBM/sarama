@@ -1,13 +1,14 @@
 name: "CodeQL"
-
 on:
+  merge_group:
   push:
-    branches: [main]
+    branches:
+    - main
   pull_request:
-    branches: [main]
+    branches:
+    - "**"
   schedule:
-  - cron: '39 12 * * 1'
-
+  - cron: "39 12 * * 1"
 jobs:
   analyze:
     name: Analyze
@@ -16,28 +17,22 @@ jobs:
       actions: read
       contents: read
       security-events: write
-
     strategy:
       fail-fast: false
       matrix:
-        language: ['go']
-
+        language: ["go"]
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
-
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v2
       with:
         languages: ${{ matrix.language }}
-
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
         go-version: 1.17
-
     - name: Autobuild
       uses: github/codeql-action/autobuild@v2
-
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v2

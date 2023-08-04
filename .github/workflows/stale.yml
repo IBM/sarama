@@ -2,35 +2,32 @@
 name: "Stale issues and PRs"
 on:
   schedule:
-    - cron: "0 */2 * * *"
-
+  - cron: "0 */2 * * *"
 jobs:
   stale:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/stale@v8
-        with:
-          days-before-stale: 90
-          days-before-close: 30
-          stale-issue-message: >-
-            Thank you for taking the time to raise this issue. However, it has
-            not had any activity on it in the past 90 days and will be closed in
-            30 days if no updates occur.
+    - uses: actions/stale@v8
+      with:
+        days-before-stale: 90
+        days-before-close: 30
+        stale-issue-message: >-
+          Thank you for taking the time to raise this issue. However, it has not had
+          any activity on it in the past 90 days and will be closed in 30 days if
+          no updates occur.
 
-            Please check if the main branch has already resolved the issue
-            since it was raised. If you believe the issue is still valid and you
-            would like input from the maintainers then please comment to ask for
-            it to be reviewed.
-          stale-pr-message: >-
-            Thank you for your contribution! However, this pull request has not
-            had any activity in the past 90 days and will be closed in 30 days if
-            no updates occur.
+          Please check if the main branch has already resolved the issue since it
+          was raised. If you believe the issue is still valid and you would like input
+          from the maintainers then please comment to ask for it to be reviewed.
+        stale-pr-message: >-
+          Thank you for your contribution! However, this pull request has not had
+          any activity in the past 90 days and will be closed in 30 days if no updates
+          occur.
 
-            If you believe the changes are still valid then please verify your
-            branch has no conflicts with main and rebase if needed. If you
-            are awaiting a (re-)review then please let us know.
-          stale-issue-label: "stale"
-          exempt-issue-labels: "stale/exempt,pinned"
-          stale-pr-label: "stale"
-          exempt-pr-labels: "stale/exempt,pinned"
+          If you believe the changes are still valid then please verify your branch
+          has no conflicts with main and rebase if needed. If you are awaiting a (re-)review
+          then please let us know.
+        stale-issue-label: "stale"
+        exempt-issue-labels: "stale/exempt,pinned"
+        stale-pr-label: "stale"
+        exempt-pr-labels: "stale/exempt,pinned"
