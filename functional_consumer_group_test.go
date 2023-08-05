@@ -135,6 +135,51 @@ func TestFuncConsumerGroupExcessConsumers(t *testing.T) {
 	m5.AssertCleanShutdown()
 }
 
+func TestFuncConsumerGroupRebalanceAfterAddingPartitions(t *testing.T) {
+	checkKafkaVersion(t, "0.10.2")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewTestConfig()
+	config.Version = V2_3_0_0
+	admin, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = admin.Close()
+	}()
+
+	groupID := testFuncConsumerGroupID(t)
+
+	// start M1
+	m1 := runTestFuncConsumerGroupMember(t, groupID, "M1", 0, nil, "test.1")
+	defer m1.Stop()
+	m1.WaitForClaims(map[string]int{"test.1": 1})
+	m1.WaitForHandlers(1)
+
+	// start M2
+	m2 := runTestFuncConsumerGroupMember(t, groupID, "M2", 0, nil, "test.1_to_2")
+	defer m2.Stop()
+	m2.WaitForClaims(map[string]int{"test.1_to_2": 1})
+	m1.WaitForHandlers(1)
+
+	// add a new partition to topic "test.1_to_2"
+	err = admin.CreatePartitions("test.1_to_2", 2, nil, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// assert that claims are shared among both members
+	m2.WaitForClaims(map[string]int{"test.1_to_2": 2})
+	m2.WaitForHandlers(2)
+	m1.WaitForClaims(map[string]int{"test.1": 1})
+	m1.WaitForHandlers(1)
+
+	m1.AssertCleanShutdown()
+	m2.AssertCleanShutdown()
+}
+
 func TestFuncConsumerGroupFuzzy(t *testing.T) {
 	checkKafkaVersion(t, "0.10.2")
 	setupFunctionalTest(t)
@@ -360,6 +405,8 @@ func defaultConfig(clientID string) *Config {
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = OffsetOldest
 	config.Consumer.Group.Rebalance.Timeout = 10 * time.Second
+	config.Metadata.Full = false
+	config.Metadata.RefreshFrequency = 5 * time.Second
 	return config
 }
 

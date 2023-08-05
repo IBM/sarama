@@ -40,6 +40,10 @@ var (
 			NumPartitions:     1,
 			ReplicationFactor: 3,
 		},
+		"test.1_to_2": {
+			NumPartitions:     1,
+			ReplicationFactor: 3,
+		},
 	}
 
 	FunctionalTestEnv *testEnvironment
