@@ -35,6 +35,7 @@ func (a *AddPartitionsToTxnResponse) encode(pe packetEncoder) error {
 }
 
 func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (err error) {
+	a.Version = version
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err

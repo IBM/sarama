@@ -30,7 +30,7 @@ func (t *TxnOffsetCommitRequest) encode(pe packetEncoder) error {
 			return err
 		}
 		for _, partition := range partitions {
-			if err := partition.encode(pe); err != nil {
+			if err := partition.encode(pe, t.Version); err != nil {
 				return err
 			}
 		}
@@ -40,6 +40,7 @@ func (t *TxnOffsetCommitRequest) encode(pe packetEncoder) error {
 }
 
 func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err error) {
+	t.Version = version
 	if t.TransactionalID, err = pd.getString(); err != nil {
 		return err
 	}
@@ -97,27 +98,41 @@ func (a *TxnOffsetCommitRequest) headerVersion() int16 {
 }
 
 func (a *TxnOffsetCommitRequest) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 1
+	return a.Version >= 0 && a.Version <= 2
 }
 
 func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 2:
+		return V2_1_0_0
 	case 1:
 		return V2_0_0_0
-	default:
+	case 0:
 		return V0_11_0_0
+	default:
+		return V2_1_0_0
 	}
 }
 
 type PartitionOffsetMetadata struct {
+	// Partition contains the index of the partition within the topic.
 	Partition int32
-	Offset    int64
-	Metadata  *string
+	// Offset contains the message offset to be committed.
+	Offset int64
+	// LeaderEpoch contains the leader epoch of the last consumed record.
+	LeaderEpoch int32
+	// Metadata contains any associated metadata the client wants to keep.
+	Metadata *string
 }
 
-func (p *PartitionOffsetMetadata) encode(pe packetEncoder) error {
+func (p *PartitionOffsetMetadata) encode(pe packetEncoder, version int16) error {
 	pe.putInt32(p.Partition)
 	pe.putInt64(p.Offset)
+
+	if version >= 2 {
+		pe.putInt32(p.LeaderEpoch)
+	}
+
 	if err := pe.putNullableString(p.Metadata); err != nil {
 		return err
 	}
@@ -132,6 +147,13 @@ func (p *PartitionOffsetMetadata) decode(pd packetDecoder, version int16) (err e
 	if p.Offset, err = pd.getInt64(); err != nil {
 		return err
 	}
+
+	if version >= 2 {
+		if p.LeaderEpoch, err = pd.getInt32(); err != nil {
+			return err
+		}
+	}
+
 	if p.Metadata, err = pd.getNullableString(); err != nil {
 		return err
 	}

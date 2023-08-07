@@ -407,7 +407,10 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 			GroupID:         groupId,
 			Topics:          offsets.mapToRequest(),
 		}
-		if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
+		if t.client.Config().Version.IsAtLeast(V2_1_0_0) {
+			// Version 2 adds the committed leader epoch.
+			request.Version = 2
+		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
 			// Version 1 is the same as version 0.
 			request.Version = 1
 		}

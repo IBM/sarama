@@ -34,6 +34,7 @@ func (t *TxnOffsetCommitResponse) encode(pe packetEncoder) error {
 }
 
 func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err error) {
+	t.Version = version
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
@@ -84,15 +85,19 @@ func (a *TxnOffsetCommitResponse) headerVersion() int16 {
 }
 
 func (a *TxnOffsetCommitResponse) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 1
+	return a.Version >= 0 && a.Version <= 2
 }
 
 func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 2:
+		return V2_1_0_0
 	case 1:
 		return V2_0_0_0
-	default:
+	case 0:
 		return V0_11_0_0
+	default:
+		return V2_1_0_0
 	}
 }
 

@@ -21,6 +21,7 @@ func (b *offsetRequestBlock) encode(pe packetEncoder, version int16) error {
 }
 
 func (b *offsetRequestBlock) decode(pd packetDecoder, version int16) (err error) {
+	b.currentLeaderEpoch = -1
 	if version >= 4 {
 		if b.currentLeaderEpoch, err = pd.getInt32(); err != nil {
 			return err
