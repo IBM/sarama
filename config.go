@@ -856,7 +856,7 @@ func (c *Config) Validate() error {
 
 func (c *Config) getDialer() proxy.Dialer {
 	if c.Net.Proxy.Enable {
-		Logger.Printf("using proxy %s", c.Net.Proxy.Dialer)
+		Logger.Println("using proxy")
 		return c.Net.Proxy.Dialer
 	} else {
 		return &net.Dialer{
