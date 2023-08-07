@@ -371,6 +371,7 @@ func (b *Broker) Rack() string {
 // GetMetadata send a metadata request and returns a metadata response or error
 func (b *Broker) GetMetadata(request *MetadataRequest) (*MetadataResponse, error) {
 	response := new(MetadataResponse)
+	response.Version = request.Version // Required to ensure use of the correct response header version
 
 	err := b.sendAndReceive(request, response)
 	if err != nil {
@@ -1072,7 +1073,12 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	host, err := pd.getString()
+	var host string
+	if version < 9 {
+		host, err = pd.getString()
+	} else {
+		host, err = pd.getCompactString()
+	}
 	if err != nil {
 		return err
 	}
@@ -1082,16 +1088,25 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	if version >= 1 {
+	if version >= 1 && version < 9 {
 		b.rack, err = pd.getNullableString()
-		if err != nil {
-			return err
-		}
+	} else if version >= 9 {
+		b.rack, err = pd.getCompactNullableString()
+	}
+	if err != nil {
+		return err
 	}
 
 	b.addr = net.JoinHostPort(host, fmt.Sprint(port))
 	if _, _, err := net.SplitHostPort(b.addr); err != nil {
 		return err
+	}
+
+	if version >= 9 {
+		_, err := pd.getEmptyTaggedFieldArray()
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -1110,7 +1125,11 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 	pe.putInt32(b.id)
 
-	err = pe.putString(host)
+	if version < 9 {
+		err = pe.putString(host)
+	} else {
+		err = pe.putCompactString(host)
+	}
 	if err != nil {
 		return err
 	}
@@ -1118,10 +1137,18 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 	pe.putInt32(int32(port))
 
 	if version >= 1 {
-		err = pe.putNullableString(b.rack)
+		if version < 9 {
+			err = pe.putNullableString(b.rack)
+		} else {
+			err = pe.putNullableCompactString(b.rack)
+		}
 		if err != nil {
 			return err
 		}
+	}
+
+	if version >= 9 {
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	return nil

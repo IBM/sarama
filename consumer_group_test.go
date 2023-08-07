@@ -134,7 +134,8 @@ func TestConsume_RaceTest(t *testing.T) {
 		Offset:      offsetStart,
 		LeaderEpoch: 0,
 		Metadata:    "",
-		Err:         ErrNoError})
+		Err:         ErrNoError,
+	})
 
 	offsetResponse := &OffsetResponse{
 		Version: 1,
@@ -142,6 +143,7 @@ func TestConsume_RaceTest(t *testing.T) {
 	offsetResponse.AddTopicPartition(topic, 0, offsetStart)
 
 	metadataResponse := new(MetadataResponse)
+	metadataResponse.Version = 10
 	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
 	metadataResponse.AddTopic("mismatched-topic", ErrUnknownTopicOrPartition)
 

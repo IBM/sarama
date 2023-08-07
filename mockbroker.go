@@ -280,7 +280,7 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 
 			encodedRes, err := encode(res, nil)
 			if err != nil {
-				b.serverError(err)
+				b.serverError(fmt.Errorf("failed to encode %T - %w", res, err))
 				break
 			}
 			if len(encodedRes) == 0 {
@@ -359,6 +359,7 @@ func (b *MockBroker) defaultRequestHandler(req *request) (res encoderWithHeader)
 }
 
 func (b *MockBroker) serverError(err error) {
+	b.t.Helper()
 	isConnectionClosedError := false
 	opError := &net.OpError{}
 	if errors.As(err, &opError) {

@@ -13,6 +13,7 @@ type TestReporter interface {
 	Errorf(string, ...interface{})
 	Fatal(...interface{})
 	Fatalf(string, ...interface{})
+	Helper()
 }
 
 // MockResponse is a response builder interface it defines one method that

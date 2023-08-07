@@ -1780,7 +1780,7 @@ func TestTxnProduceBumpEpoch(t *testing.T) {
 	config.ApiVersionsRequest = false
 
 	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 7
+	metadataLeader.Version = 9
 	metadataLeader.ControllerID = broker.brokerID
 	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataLeader.AddTopic("test-topic", ErrNoError)
