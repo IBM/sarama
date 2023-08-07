@@ -1101,6 +1101,7 @@ func TestInitProducerIDConnectionRefused(t *testing.T) {
 
 func TestMetricsCleanup(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
 	seedBroker.Returns(new(MetadataResponse))
 
 	config := NewTestConfig()

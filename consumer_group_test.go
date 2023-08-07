@@ -218,6 +218,7 @@ func TestConsumerGroupSessionDoesNotRetryForever(t *testing.T) {
 	config.Consumer.Group.Rebalance.Retry.Backoff = 0
 
 	broker0 := NewMockBroker(t, 0)
+	defer broker0.Close()
 
 	broker0.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
