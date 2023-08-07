@@ -1340,7 +1340,10 @@ func NewMockHeartbeatResponse(t TestReporter) *MockHeartbeatResponse {
 }
 
 func (m *MockHeartbeatResponse) For(reqBody versionedDecoder) encoderWithHeader {
-	resp := &HeartbeatResponse{}
+	req := reqBody.(*HeartbeatRequest)
+	resp := &HeartbeatResponse{
+		Version: req.version(),
+	}
 	return resp
 }
 
