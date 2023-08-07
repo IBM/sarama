@@ -281,7 +281,6 @@ type Config struct {
 	// Consumer is the namespace for configuration related to consuming messages,
 	// used by the Consumer.
 	Consumer struct {
-
 		// Group is the namespace for configuring consumer group.
 		Group struct {
 			Session struct {
@@ -514,7 +513,7 @@ func NewConfig() *Config {
 	c.Net.ReadTimeout = 30 * time.Second
 	c.Net.WriteTimeout = 30 * time.Second
 	c.Net.SASL.Handshake = true
-	c.Net.SASL.Version = SASLHandshakeV0
+	c.Net.SASL.Version = SASLHandshakeV1
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
