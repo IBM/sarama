@@ -127,6 +127,10 @@ func allocateBody(key, version int16) protocolBody {
 		return &OffsetRequest{Version: version}
 	case 3:
 		return &MetadataRequest{Version: version}
+	// 4: LeaderAndIsrRequest
+	// 5: StopReplicaRequest
+	// 6: UpdateMetadataRequest
+	// 7: ControlledShutdownRequest
 	case 8:
 		return &OffsetCommitRequest{Version: version}
 	case 9:
@@ -157,12 +161,14 @@ func allocateBody(key, version int16) protocolBody {
 		return &DeleteRecordsRequest{Version: version}
 	case 22:
 		return &InitProducerIDRequest{Version: version}
+	// 23: OffsetForLeaderEpochRequest
 	case 24:
 		return &AddPartitionsToTxnRequest{Version: version}
 	case 25:
 		return &AddOffsetsToTxnRequest{Version: version}
 	case 26:
 		return &EndTxnRequest{Version: version}
+	// 27: WriteTxnMarkersRequest
 	case 28:
 		return &TxnOffsetCommitRequest{Version: version}
 	case 29:
@@ -175,14 +181,20 @@ func allocateBody(key, version int16) protocolBody {
 		return &DescribeConfigsRequest{Version: version}
 	case 33:
 		return &AlterConfigsRequest{Version: version}
+	// 34: AlterReplicaLogDirsRequest
 	case 35:
 		return &DescribeLogDirsRequest{Version: version}
 	case 36:
 		return &SaslAuthenticateRequest{Version: version}
 	case 37:
 		return &CreatePartitionsRequest{Version: version}
+	// 38: CreateDelegationTokenRequest
+	// 39: RenewDelegationTokenRequest
+	// 40: ExpireDelegationTokenRequest
+	// 41: DescribeDelegationTokenRequest
 	case 42:
 		return &DeleteGroupsRequest{Version: version}
+	// 43: ElectLeadersRequest
 	case 44:
 		return &IncrementalAlterConfigsRequest{Version: version}
 	case 45:
@@ -199,6 +211,23 @@ func allocateBody(key, version int16) protocolBody {
 		return &DescribeUserScramCredentialsRequest{Version: version}
 	case 51:
 		return &AlterUserScramCredentialsRequest{Version: version}
+		// 52: VoteRequest
+		// 53: BeginQuorumEpochRequest
+		// 54: EndQuorumEpochRequest
+		// 55: DescribeQuorumRequest
+		// 56: AlterPartitionRequest
+		// 57: UpdateFeaturesRequest
+		// 58: EnvelopeRequest
+		// 59: FetchSnapshotRequest
+		// 60: DescribeClusterRequest
+		// 61: DescribeProducersRequest
+		// 62: BrokerRegistrationRequest
+		// 63: BrokerHeartbeatRequest
+		// 64: UnregisterBrokerRequest
+		// 65: DescribeTransactionsRequest
+		// 66: ListTransactionsRequest
+		// 67: AllocateProducerIdsRequest
+		// 68: ConsumerGroupHeartbeatRequest
 	}
 	return nil
 }
