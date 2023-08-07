@@ -40,6 +40,7 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 	config.Consumer.Offsets.AutoCommit.Enable = false
 
 	broker0 := NewMockBroker(t, 0)
+	defer broker0.Close()
 
 	broker0.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
