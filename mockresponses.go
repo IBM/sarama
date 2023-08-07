@@ -82,9 +82,9 @@ func NewMockListGroupsResponse(t TestReporter) *MockListGroupsResponse {
 
 func (m *MockListGroupsResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	request := reqBody.(*ListGroupsRequest)
-	_ = request
 	response := &ListGroupsResponse{
-		Groups: m.groups,
+		Version: request.Version,
+		Groups:  m.groups,
 	}
 	return response
 }

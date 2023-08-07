@@ -946,7 +946,22 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 			defer wg.Done()
 			_ = b.Open(conf) // Ensure that broker is opened
 
-			response, err := b.ListGroups(&ListGroupsRequest{})
+			request := &ListGroupsRequest{}
+			if ca.conf.Version.IsAtLeast(V2_6_0_0) {
+				// Version 4 adds the StatesFilter field (KIP-518).
+				request.Version = 4
+			} else if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+				// Version 3 is the first flexible version.
+				request.Version = 3
+			} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+				// Version 2 is the same as version 0.
+				request.Version = 2
+			} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+				// Version 1 is the same as version 0.
+				request.Version = 1
+			}
+
+			response, err := b.ListGroups(request)
 			if err != nil {
 				errChan <- err
 				return
