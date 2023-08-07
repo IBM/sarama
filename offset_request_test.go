@@ -46,6 +46,18 @@ var (
 		0x00, 0x00, 0x00, 0x2a,
 		0x00, 0x00, 0x00, 0x00,
 	}
+
+	offsetRequestV4 = []byte{
+		0xff, 0xff, 0xff, 0xff, // replicaID
+		0x01, // IsolationLevel
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x04,
+		0x64, 0x6e, 0x77, 0x65, // topic name
+		0x00, 0x00, 0x00, 0x01,
+		0x00, 0x00, 0x00, 0x09, // partitionID
+		0xff, 0xff, 0xff, 0xff, // leader epoch
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // timestamp
+	}
 )
 
 func TestOffsetRequest(t *testing.T) {
@@ -85,4 +97,12 @@ func TestOffsetRequestReplicaID(t *testing.T) {
 	}
 
 	testRequest(t, "with replica ID", request, offsetRequestReplicaID)
+}
+
+func TestOffsetRequestV4(t *testing.T) {
+	request := new(OffsetRequest)
+	request.Version = 4
+	request.IsolationLevel = ReadCommitted
+	request.AddBlock("dnwe", 9, -1, -1)
+	testRequest(t, "V4", request, offsetRequestV4)
 }

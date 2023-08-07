@@ -3,10 +3,15 @@ package sarama
 import "time"
 
 type OffsetResponseBlock struct {
-	Err       KError
-	Offsets   []int64 // Version 0
-	Offset    int64   // Version 1
-	Timestamp int64   // Version 1
+	Err KError
+	// Offsets contains the result offsets (for V0/V1 compatibility)
+	Offsets []int64 // Version 0
+	// Timestamp contains the timestamp associated with the returned offset.
+	Timestamp int64 // Version 1
+	// Offset contains the returned offset.
+	Offset int64 // Version 1
+	// LeaderEpoch contains the current leader epoch of the partition.
+	LeaderEpoch int32
 }
 
 func (b *OffsetResponseBlock) decode(pd packetDecoder, version int16) (err error) {
@@ -18,22 +23,29 @@ func (b *OffsetResponseBlock) decode(pd packetDecoder, version int16) (err error
 
 	if version == 0 {
 		b.Offsets, err = pd.getInt64Array()
-
 		return err
 	}
 
-	b.Timestamp, err = pd.getInt64()
-	if err != nil {
-		return err
+	if version >= 1 {
+		b.Timestamp, err = pd.getInt64()
+		if err != nil {
+			return err
+		}
+
+		b.Offset, err = pd.getInt64()
+		if err != nil {
+			return err
+		}
+
+		// For backwards compatibility put the offset in the offsets array too
+		b.Offsets = []int64{b.Offset}
 	}
 
-	b.Offset, err = pd.getInt64()
-	if err != nil {
-		return err
+	if version >= 4 {
+		if b.LeaderEpoch, err = pd.getInt32(); err != nil {
+			return err
+		}
 	}
-
-	// For backwards compatibility put the offset in the offsets array too
-	b.Offsets = []int64{b.Offset}
 
 	return nil
 }
@@ -45,8 +57,14 @@ func (b *OffsetResponseBlock) encode(pe packetEncoder, version int16) (err error
 		return pe.putInt64Array(b.Offsets)
 	}
 
-	pe.putInt64(b.Timestamp)
-	pe.putInt64(b.Offset)
+	if version >= 1 {
+		pe.putInt64(b.Timestamp)
+		pe.putInt64(b.Offset)
+	}
+
+	if version >= 4 {
+		pe.putInt32(b.LeaderEpoch)
+	}
 
 	return nil
 }
@@ -168,11 +186,13 @@ func (r *OffsetResponse) headerVersion() int16 {
 }
 
 func (r *OffsetResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 3
+	return r.Version >= 0 && r.Version <= 4
 }
 
 func (r *OffsetResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 4:
+		return V2_1_0_0
 	case 3:
 		return V2_0_0_0
 	case 2:
