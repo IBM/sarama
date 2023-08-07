@@ -54,7 +54,9 @@ func (d *DeleteTopicsRequest) requiredVersion() KafkaVersion {
 		return V2_0_0_0
 	case 1:
 		return V0_11_0_0
-	default:
+	case 0:
 		return V0_10_1_0
+	default:
+		return V2_2_0_0
 	}
 }

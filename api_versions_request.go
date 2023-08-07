@@ -63,11 +63,15 @@ func (r *ApiVersionsRequest) isValidVersion() bool {
 
 func (r *ApiVersionsRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
-	case 0:
-		return V0_10_0_0
 	case 3:
 		return V2_4_0_0
-	default:
+	case 2:
+		return V2_0_0_0
+	case 1:
+		return V0_11_0_0
+	case 0:
 		return V0_10_0_0
+	default:
+		return V2_4_0_0
 	}
 }

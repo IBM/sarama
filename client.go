@@ -251,12 +251,26 @@ func (client *client) Broker(brokerID int32) (*Broker, error) {
 }
 
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
+	// FIXME: this InitProducerID seems to only be called from client_test.go (TestInitProducerIDConnectionRefused) and has been superceded by transaction_manager.go?
 	brokerErrors := make([]error, 0)
 	for broker := client.anyBroker(); broker != nil; broker = client.anyBroker() {
-		var response *InitProducerIDResponse
-		req := &InitProducerIDRequest{}
+		request := &InitProducerIDRequest{}
 
-		response, err := broker.InitProducerID(req)
+		if client.conf.Version.IsAtLeast(V2_7_0_0) {
+			// Version 4 adds the support for new error code PRODUCER_FENCED.
+			request.Version = 4
+		} else if client.conf.Version.IsAtLeast(V2_5_0_0) {
+			// Version 3 adds ProducerId and ProducerEpoch, allowing producers to try to resume after an INVALID_PRODUCER_EPOCH error
+			request.Version = 3
+		} else if client.conf.Version.IsAtLeast(V2_4_0_0) {
+			// Version 2 is the first flexible version.
+			request.Version = 2
+		} else if client.conf.Version.IsAtLeast(V2_0_0_0) {
+			// Version 1 is the same as version 0.
+			request.Version = 1
+		}
+
+		response, err := broker.InitProducerID(request)
 		if err == nil {
 			return response, nil
 		} else {

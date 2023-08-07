@@ -238,11 +238,15 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 		Timeout:      ca.conf.Admin.Timeout,
 	}
 
-	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 1
-	}
-	if ca.conf.Version.IsAtLeast(V1_0_0_0) {
+	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		// Version 3 is the same as version 2 (brokers response before throttling)
+		request.Version = 3
+	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+		// Version 2 is the same as version 1 (response has ThrottleTime)
 		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V0_10_2_0) {
+		// Version 1 adds validateOnly.
+		request.Version = 1
 	}
 
 	return ca.retryOnError(isErrNoController, func() error {
@@ -424,7 +428,12 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		Timeout: ca.conf.Admin.Timeout,
 	}
 
-	if ca.conf.Version.IsAtLeast(V0_11_0_0) {
+	// Versions 0, 1, 2, and 3 are the same.
+	if ca.conf.Version.IsAtLeast(V2_1_0_0) {
+		request.Version = 3
+	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
 		request.Version = 1
 	}
 
@@ -918,8 +927,19 @@ func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*Group
 		describeReq := &DescribeGroupsRequest{
 			Groups: brokerGroups,
 		}
+
 		if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+			// Starting in version 4, the response will include group.instance.id info for members.
 			describeReq.Version = 4
+		} else if ca.conf.Version.IsAtLeast(V2_3_0_0) {
+			// Starting in version 3, authorized operations can be requested.
+			describeReq.Version = 3
+		} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+			// Version 2 is the same as version 0.
+			describeReq.Version = 2
+		} else if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+			// Version 1 is the same as version 0.
+			describeReq.Version = 1
 		}
 		response, err := broker.DescribeGroups(describeReq)
 		if err != nil {
