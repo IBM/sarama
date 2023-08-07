@@ -161,8 +161,10 @@ type topicPartition struct {
 }
 
 // to ensure that we don't do a full scan every time a partition or an offset is added.
-type topicPartitionSet map[topicPartition]struct{}
-type topicPartitionOffsets map[topicPartition]*PartitionOffsetMetadata
+type (
+	topicPartitionSet     map[topicPartition]struct{}
+	topicPartitionOffsets map[topicPartition]*PartitionOffsetMetadata
+)
 
 func (s topicPartitionSet) mapToRequest() map[string][]int32 {
 	result := make(map[string][]int32, len(s))
@@ -315,12 +317,20 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		if err != nil {
 			return true, err
 		}
-		response, err := coordinator.AddOffsetsToTxn(&AddOffsetsToTxnRequest{
+		request := &AddOffsetsToTxnRequest{
 			TransactionalID: t.transactionalID,
 			ProducerEpoch:   t.producerEpoch,
 			ProducerID:      t.producerID,
 			GroupID:         groupId,
-		})
+		}
+		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+			// Version 2 adds the support for new error code PRODUCER_FENCED.
+			request.Version = 2
+		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
+			// Version 1 is the same as version 0.
+			request.Version = 1
+		}
+		response, err := coordinator.AddOffsetsToTxn(request)
 		if err != nil {
 			// If an error occurred try to refresh current transaction coordinator.
 			_ = coordinator.Close()
@@ -390,13 +400,18 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		if err != nil {
 			return resultOffsets, true, err
 		}
-		responses, err := consumerGroupCoordinator.TxnOffsetCommit(&TxnOffsetCommitRequest{
+		request := &TxnOffsetCommitRequest{
 			TransactionalID: t.transactionalID,
 			ProducerEpoch:   t.producerEpoch,
 			ProducerID:      t.producerID,
 			GroupID:         groupId,
 			Topics:          offsets.mapToRequest(),
-		})
+		}
+		if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
+			// Version 1 is the same as version 0.
+			request.Version = 1
+		}
+		responses, err := consumerGroupCoordinator.TxnOffsetCommit(request)
 		if err != nil {
 			_ = consumerGroupCoordinator.Close()
 			_ = t.client.RefreshCoordinator(groupId)
@@ -466,13 +481,24 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 	}
 
 	if t.client.Config().Version.IsAtLeast(V2_5_0_0) {
-		req.Version = 3
+		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+			// Version 4 adds the support for new error code PRODUCER_FENCED.
+			req.Version = 4
+		} else {
+			// Version 3 adds ProducerId and ProducerEpoch, allowing producers to try
+			// to resume after an INVALID_PRODUCER_EPOCH error
+			req.Version = 3
+		}
 		isEpochBump = t.producerID != noProducerID && t.producerEpoch != noProducerEpoch
 		t.coordinatorSupportsBumpingEpoch = true
 		req.ProducerID = t.producerID
 		req.ProducerEpoch = t.producerEpoch
 	} else if t.client.Config().Version.IsAtLeast(V2_4_0_0) {
+		// Version 2 is the first flexible version.
 		req.Version = 2
+	} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
+		// Version 1 is the same as version 0.
+		req.Version = 1
 	}
 
 	if isEpochBump {
@@ -610,12 +636,20 @@ func (t *transactionManager) endTxn(commit bool) error {
 		if err != nil {
 			return true, err
 		}
-		response, err := coordinator.EndTxn(&EndTxnRequest{
+		request := &EndTxnRequest{
 			TransactionalID:   t.transactionalID,
 			ProducerEpoch:     t.producerEpoch,
 			ProducerID:        t.producerID,
 			TransactionResult: commit,
-		})
+		}
+		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+			// Version 2 adds the support for new error code PRODUCER_FENCED.
+			request.Version = 2
+		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
+			// Version 1 is the same as version 0.
+			request.Version = 1
+		}
+		response, err := coordinator.EndTxn(request)
 		if err != nil {
 			// Always retry on network error
 			_ = coordinator.Close()
@@ -779,13 +813,20 @@ func (t *transactionManager) publishTxnPartitions() error {
 		if err != nil {
 			return true, err
 		}
-		addPartResponse, err := coordinator.AddPartitionsToTxn(&AddPartitionsToTxnRequest{
+		request := &AddPartitionsToTxnRequest{
 			TransactionalID: t.transactionalID,
 			ProducerID:      t.producerID,
 			ProducerEpoch:   t.producerEpoch,
 			TopicPartitions: t.pendingPartitionsInCurrentTxn.mapToRequest(),
-		})
-
+		}
+		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+			// Version 2 adds the support for new error code PRODUCER_FENCED.
+			request.Version = 2
+		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
+			// Version 1 is the same as version 0.
+			request.Version = 1
+		}
+		addPartResponse, err := coordinator.AddPartitionsToTxn(request)
 		if err != nil {
 			_ = coordinator.Close()
 			_ = t.client.RefreshTransactionCoordinator(t.transactionalID)
