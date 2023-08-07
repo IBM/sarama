@@ -63,7 +63,9 @@ func (a *AddOffsetsToTxnRequest) requiredVersion() KafkaVersion {
 		return V2_7_0_0
 	case 1:
 		return V2_0_0_0
-	default:
+	case 0:
 		return V0_11_0_0
+	default:
+		return V2_7_0_0
 	}
 }
