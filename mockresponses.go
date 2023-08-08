@@ -668,7 +668,8 @@ func (mr *MockCreateTopicsResponse) For(reqBody versionedDecoder) encoderWithHea
 }
 
 type MockDeleteTopicsResponse struct {
-	t TestReporter
+	t     TestReporter
+	error KError
 }
 
 func NewMockDeleteTopicsResponse(t TestReporter) *MockDeleteTopicsResponse {
@@ -681,10 +682,15 @@ func (mr *MockDeleteTopicsResponse) For(reqBody versionedDecoder) encoderWithHea
 	res.TopicErrorCodes = make(map[string]KError)
 
 	for _, topic := range req.Topics {
-		res.TopicErrorCodes[topic] = ErrNoError
+		res.TopicErrorCodes[topic] = mr.error
 	}
 	res.Version = req.Version
 	return res
+}
+
+func (mr *MockDeleteTopicsResponse) SetError(kerror KError) *MockDeleteTopicsResponse {
+	mr.error = kerror
+	return mr
 }
 
 type MockCreatePartitionsResponse struct {

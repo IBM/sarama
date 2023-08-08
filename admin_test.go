@@ -246,6 +246,35 @@ func TestClusterAdminDeleteEmptyTopic(t *testing.T) {
 	}
 }
 
+func TestClusterAdminDeleteTopicError(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DeleteTopicsRequest": NewMockDeleteTopicsResponse(t).SetError(ErrTopicDeletionDisabled),
+	})
+
+	config := NewTestConfig()
+	config.Version = V0_10_2_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = admin.DeleteTopic("my_topic")
+	if !errors.Is(err, ErrTopicDeletionDisabled) {
+		t.Fatal(err)
+	}
+
+	err = admin.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestClusterAdminCreatePartitions(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
