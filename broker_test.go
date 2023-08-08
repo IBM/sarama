@@ -1405,6 +1405,7 @@ func validateBrokerMetrics(t *testing.T, broker *Broker, mockBrokerMetrics broke
 
 func BenchmarkBroker_Open(b *testing.B) {
 	mb := NewMockBroker(nil, 0)
+	defer mb.Close()
 	broker := NewBroker(mb.Addr())
 	// Set the broker id in order to validate local broker metrics
 	broker.id = 0
@@ -1422,6 +1423,7 @@ func BenchmarkBroker_Open(b *testing.B) {
 
 func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
 	mb := NewMockBroker(nil, 0)
+	defer mb.Close()
 	broker := NewBroker(mb.Addr())
 	broker.id = 0
 	metrics.UseNilMetrics = true
@@ -1438,6 +1440,7 @@ func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
 
 func Test_handleThrottledResponse(t *testing.T) {
 	mb := NewMockBroker(nil, 0)
+	defer mb.Close()
 	broker := NewBroker(mb.Addr())
 	broker.id = 0
 	conf := NewTestConfig()
