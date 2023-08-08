@@ -261,7 +261,7 @@ var (
 	}
 	MinVersion     = V0_8_2_0
 	MaxVersion     = V3_5_1_0
-	DefaultVersion = V2_0_0_0
+	DefaultVersion = V2_1_0_0
 
 	// reduced set of protocol versions to matrix test
 	fvtRangeVersions = []KafkaVersion{
