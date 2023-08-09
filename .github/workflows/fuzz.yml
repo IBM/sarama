@@ -18,6 +18,6 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
-        go-version: 1.19.x
+        go-version: 1.21.x
     - name: Run any fuzzing tests
       run: go test -v -run=^Fuzz -test.fuzztime=5m ./...
