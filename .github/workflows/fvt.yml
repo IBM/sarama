@@ -22,6 +22,18 @@ jobs:
       KAFKA_VERSION: ${{ matrix.kafka-version }}
     steps:
     - uses: actions/checkout@v3
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@v2
+      id: buildx
+    - name: Build FVT Docker Image
+      uses: docker/bake-action@master
+      with:
+        builder: ${{ steps.buildx.outputs.name }}
+        files: docker-compose.yml
+        load: true
+        set: |
+          *.cache-from=type=gha,scope=${{ github.workflow }}
+          *.cache-to=type=gha,scope=${{ github.workflow }},mode=max
     - name: Setup Go
       uses: actions/setup-go@v4
       with:
