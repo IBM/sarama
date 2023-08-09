@@ -135,6 +135,7 @@ func (m *MockDescribeGroupsResponse) For(reqBody versionedDecoder) encoderWithHe
 // MockMetadataResponse is a `MetadataResponse` builder.
 type MockMetadataResponse struct {
 	controllerID int32
+	errors       map[string]KError
 	leaders      map[string]map[int32]int32
 	brokers      map[string]int32
 	t            TestReporter
@@ -142,10 +143,16 @@ type MockMetadataResponse struct {
 
 func NewMockMetadataResponse(t TestReporter) *MockMetadataResponse {
 	return &MockMetadataResponse{
+		errors:  make(map[string]KError),
 		leaders: make(map[string]map[int32]int32),
 		brokers: make(map[string]int32),
 		t:       t,
 	}
+}
+
+func (mmr *MockMetadataResponse) SetError(topic string, kerror KError) *MockMetadataResponse {
+	mmr.errors[topic] = kerror
+	return mmr
 }
 
 func (mmr *MockMetadataResponse) SetLeader(topic string, partition, brokerID int32) *MockMetadataResponse {
@@ -191,10 +198,22 @@ func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoderWithHeader
 				metadataResponse.AddTopicPartition(topic, partition, brokerID, replicas, replicas, offlineReplicas, ErrNoError)
 			}
 		}
+		for topic, err := range mmr.errors {
+			metadataResponse.AddTopic(topic, err)
+		}
 		return metadataResponse
 	}
 	for _, topic := range metadataRequest.Topics {
-		for partition, brokerID := range mmr.leaders[topic] {
+		leaders, ok := mmr.leaders[topic]
+		if !ok {
+			if err, ok := mmr.errors[topic]; ok {
+				metadataResponse.AddTopic(topic, err)
+			} else {
+				metadataResponse.AddTopic(topic, ErrUnknownTopicOrPartition)
+			}
+			continue
+		}
+		for partition, brokerID := range leaders {
 			metadataResponse.AddTopicPartition(topic, partition, brokerID, replicas, replicas, offlineReplicas, ErrNoError)
 		}
 	}

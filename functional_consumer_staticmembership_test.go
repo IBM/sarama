@@ -20,7 +20,7 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 
 	t.Helper()
 
-	config1 := NewTestConfig()
+	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
 	config1.Version = V2_3_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
@@ -28,7 +28,7 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, 100, nil, "test.4")
 	defer m1.Close()
 
-	config2 := NewTestConfig()
+	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
 	config2.Version = V2_3_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
@@ -74,7 +74,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	t.Helper()
 
-	config1 := NewTestConfig()
+	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
 	config1.Version = V2_4_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
@@ -82,7 +82,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, math.MaxInt32, nil, "test.4")
 	defer m1.Close()
 
-	config2 := NewTestConfig()
+	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
 	config2.Version = V2_4_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
@@ -177,7 +177,7 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 
 	t.Helper()
 
-	config1 := NewTestConfig()
+	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
 	config1.Version = V2_3_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
@@ -185,7 +185,7 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, math.MaxInt32, nil, "test.4")
 	defer m1.Close()
 
-	config2 := NewTestConfig()
+	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
 	config2.Version = V2_3_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
@@ -196,7 +196,7 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 	m1.WaitForState(2)
 	m2.WaitForState(2)
 
-	config3 := NewTestConfig()
+	config3 := NewFunctionalTestConfig()
 	config3.ClientID = "M3"
 	config3.Version = V2_3_0_0
 	config3.Consumer.Offsets.Initial = OffsetNewest
@@ -222,7 +222,7 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 // --------------------------------------------------------------------
 
 func testFuncConsumerGroupProduceMessage(topic string, count int) error {
-	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
 	if err != nil {
 		return err
 	}

@@ -175,6 +175,7 @@ func TestTLS(t *testing.T) {
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			doListenerTLSTest(t, tc.Succeed, tc.Server, tc.Client)
 		})
 	}

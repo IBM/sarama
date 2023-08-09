@@ -9,6 +9,17 @@ import (
 	"github.com/rcrowley/go-metrics"
 )
 
+// NewTestConfig returns a config meant to be used by tests.
+// Due to inconsistencies with the request versions the clients send using the default Kafka version
+// and the response versions our mocks use, we default to the minimum Kafka version in most tests
+func NewTestConfig() *Config {
+	config := NewConfig()
+	config.Consumer.Retry.Backoff = 0
+	config.Producer.Retry.Backoff = 0
+	config.Version = MinVersion
+	return config
+}
+
 func TestDefaultConfigValidates(t *testing.T) {
 	config := NewTestConfig()
 	if err := config.Validate(); err != nil {

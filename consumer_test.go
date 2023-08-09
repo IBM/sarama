@@ -860,7 +860,7 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 	block4 := fetchResponse4.GetBlock("my_topic", 0)
 	block4.PreferredReadReplica = -1
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V2_3_0_0
 	cfg.RackID = "consumer_rack"
 
@@ -925,7 +925,7 @@ func TestConsumeMessagesFromReadReplicaLeaderFallback(t *testing.T) {
 	block2 := fetchResponse2.GetBlock("my_topic", 0)
 	block2.PreferredReadReplica = -1
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V2_3_0_0
 	cfg.RackID = "consumer_rack"
 
@@ -981,7 +981,7 @@ func TestConsumeMessagesFromReadReplicaErrorReplicaNotAvailable(t *testing.T) {
 	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 3)
 	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 4)
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V2_3_0_0
 	cfg.RackID = "consumer_rack"
 
@@ -1051,7 +1051,7 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 3)
 	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 4)
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V2_3_0_0
 	cfg.RackID = "consumer_rack"
 
@@ -1109,9 +1109,10 @@ func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
 //
 // See https://github.com/IBM/sarama/issues/1927
 func TestConsumeMessagesTrackLeader(t *testing.T) {
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.ClientID = t.Name()
 	cfg.Metadata.RefreshFrequency = time.Millisecond * 50
+	cfg.Consumer.Retry.Backoff = 0
 	cfg.Net.MaxOpenRequests = 1
 	cfg.Version = V2_1_0_0
 
@@ -1996,7 +1997,7 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 		broker: &brokerConsumer{
 			broker: &Broker{},
 		},
-		conf:      NewConfig(),
+		conf:      NewTestConfig(),
 		topic:     "my_topic",
 		partition: 0,
 	}

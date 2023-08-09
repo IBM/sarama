@@ -19,7 +19,7 @@ func TestConsumerFetchFollowerFailover(t *testing.T) {
 	)
 
 	newConfig := func() *Config {
-		config := NewConfig()
+		config := NewFunctionalTestConfig()
 		config.ClientID = t.Name()
 		config.Version = V2_8_0_0
 		config.Producer.Return.Successes = true
@@ -81,7 +81,8 @@ func TestConsumerFetchFollowerFailover(t *testing.T) {
 	go func() {
 		for i := 0; i < numMsg; i++ {
 			msg := &ProducerMessage{
-				Topic: topic, Key: nil, Value: StringEncoder(fmt.Sprintf("%s %-3d", t.Name(), i))}
+				Topic: topic, Key: nil, Value: StringEncoder(fmt.Sprintf("%s %-3d", t.Name(), i)),
+			}
 			if _, offset, err := producer.SendMessage(msg); err != nil {
 				t.Error(i, err)
 			} else if offset%50 == 0 {

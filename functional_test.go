@@ -72,7 +72,7 @@ func testMain(m *testing.M) int {
 	var env testEnvironment
 
 	if os.Getenv("DEBUG") == "true" {
-		Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+		Logger = log.New(os.Stderr, "[DEBUG] ", log.Lmicroseconds|log.Ltime)
 	}
 
 	usingExisting, err := existingEnvironment(ctx, &env)
@@ -92,6 +92,13 @@ func testMain(m *testing.M) int {
 	}
 	FunctionalTestEnv = &env
 	return m.Run()
+}
+
+// NewFunctionalTestConfig returns a config meant to be used by functional tests.
+func NewFunctionalTestConfig() *Config {
+	config := NewConfig()
+	config.Version = MinVersion
+	return config
 }
 
 type testEnvironment struct {
@@ -139,7 +146,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	if version, ok := os.LookupEnv("KAFKA_VERSION"); ok {
 		env.KafkaVersion = version
 	} else {
-		env.KafkaVersion = "3.1.2"
+		env.KafkaVersion = "3.3.2"
 	}
 
 	c := exec.Command("docker-compose", "up", "-d")
@@ -163,7 +170,7 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 		return conn.Close()
 	}
 
-	config := NewTestConfig()
+	config := NewFunctionalTestConfig()
 	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
 	if err != nil {
 		return err
@@ -304,7 +311,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	}
 
 	Logger.Println("Creating topics")
-	config := NewTestConfig()
+	config := NewFunctionalTestConfig()
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-prepareTestTopics"
@@ -454,7 +461,7 @@ func teardownFunctionalTest(t testing.TB) {
 }
 
 func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Duration) {
-	config := NewTestConfig()
+	config := NewFunctionalTestConfig()
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-ensureFullyReplicated"

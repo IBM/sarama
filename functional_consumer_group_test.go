@@ -140,7 +140,7 @@ func TestFuncConsumerGroupRebalanceAfterAddingPartitions(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewTestConfig()
+	config := NewFunctionalTestConfig()
 	config.Version = V2_3_0_0
 	admin, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
@@ -245,7 +245,7 @@ func TestFuncConsumerGroupOffsetDeletion(t *testing.T) {
 	defer teardownFunctionalTest(t)
 	// create a client with 2.4.0 version as it is the minimal version
 	// that supports DeleteOffsets request
-	config := NewTestConfig()
+	config := NewFunctionalTestConfig()
 	config.Version = V2_4_0_0
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	defer safeClose(t, client)
@@ -315,7 +315,7 @@ func markOffset(t *testing.T, offsetMgr OffsetManager, topic string, partition i
 }
 
 func testFuncConsumerGroupFuzzySeed(topic string) error {
-	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ type testFuncConsumerGroupMember struct {
 }
 
 func defaultConfig(clientID string) *Config {
-	config := NewConfig()
+	config := NewFunctionalTestConfig()
 	config.ClientID = clientID
 	config.Version = V0_10_2_0
 	config.Consumer.Return.Errors = true

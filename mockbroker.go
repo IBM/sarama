@@ -178,7 +178,9 @@ func (b *MockBroker) serverLoop() {
 		i++
 	}
 	wg.Wait()
-	Logger.Printf("*** mockbroker/%d: listener closed, err=%v", b.BrokerID(), err)
+	if !isConnectionClosedError(err) {
+		Logger.Printf("*** mockbroker/%d: listener closed, err=%v", b.BrokerID(), err)
+	}
 }
 
 func (b *MockBroker) SetGSSAPIHandler(handler GSSApiHandlerFunc) {
@@ -243,8 +245,10 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 	for {
 		buffer, err := b.readToBytes(conn)
 		if err != nil {
-			Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(buffer))
-			b.serverError(err)
+			if !isConnectionClosedError(err) {
+				Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(buffer))
+				b.serverError(err)
+			}
 			break
 		}
 
@@ -253,8 +257,10 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 			req, br, err := decodeRequest(bytes.NewReader(buffer))
 			bytesRead = br
 			if err != nil {
-				Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(req))
-				b.serverError(err)
+				if !isConnectionClosedError(err) {
+					Logger.Printf("*** mockbroker/%d/%d: invalid request: err=%+v, %+v", b.brokerID, idx, err, spew.Sdump(req))
+					b.serverError(err)
+				}
 				break
 			}
 
@@ -358,22 +364,25 @@ func (b *MockBroker) defaultRequestHandler(req *request) (res encoderWithHeader)
 	}
 }
 
-func (b *MockBroker) serverError(err error) {
-	b.t.Helper()
-	isConnectionClosedError := false
+func isConnectionClosedError(err error) bool {
+	var result bool
 	opError := &net.OpError{}
 	if errors.As(err, &opError) {
-		isConnectionClosedError = true
+		result = true
 	} else if errors.Is(err, io.EOF) {
-		isConnectionClosedError = true
+		result = true
 	} else if err.Error() == "use of closed network connection" {
-		isConnectionClosedError = true
+		result = true
 	}
 
-	if isConnectionClosedError {
+	return result
+}
+
+func (b *MockBroker) serverError(err error) {
+	b.t.Helper()
+	if isConnectionClosedError(err) {
 		return
 	}
-
 	b.t.Errorf(err.Error())
 }
 

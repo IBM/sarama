@@ -56,7 +56,7 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 }
 
 func TestSyncProducerFailTxn(t *testing.T) {
-	config := sarama.NewConfig()
+	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Retry.Backoff = 0
@@ -86,7 +86,7 @@ func TestSyncProducerFailTxn(t *testing.T) {
 }
 
 func TestSyncProducerUseTxn(t *testing.T) {
-	config := sarama.NewConfig()
+	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Retry.Backoff = 0

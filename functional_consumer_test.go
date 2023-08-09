@@ -26,7 +26,7 @@ func TestFuncConsumerOffsetOutOfRange(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
+	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
+	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -167,7 +167,7 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	config := NewTestConfig()
+	config := NewFunctionalTestConfig()
 	config.ClientID = t.Name()
 	config.Net.MaxOpenRequests = 1
 	config.Consumer.IsolationLevel = ReadCommitted
@@ -306,6 +306,7 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 }
 
 func TestConsumerGroupDeadlock(t *testing.T) {
+	checkKafkaVersion(t, "1.1.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -317,7 +318,8 @@ func TestConsumerGroupDeadlock(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 
-	config := NewConfig()
+	config := NewFunctionalTestConfig()
+	config.Version = V1_1_0_0
 	config.ClientID = t.Name()
 	config.Producer.Return.Successes = true
 	config.ChannelBufferSize = 2 * msgQty
@@ -467,7 +469,7 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 	g := errgroup.Group{}
 	for _, prodVer := range clientVersions {
 		for _, codec := range codecs {
-			prodCfg := NewTestConfig()
+			prodCfg := NewFunctionalTestConfig()
 			prodCfg.ClientID = t.Name() + "-Producer-" + prodVer.String()
 			if idempotent {
 				prodCfg.ClientID += "-idempotent"
@@ -545,7 +547,7 @@ func consumeMsgs(t *testing.T, clientVersions []KafkaVersion, producedMessages [
 	for _, consVer := range clientVersions {
 		// Create a partition consumer that should start from the first produced
 		// message.
-		consCfg := NewTestConfig()
+		consCfg := NewFunctionalTestConfig()
 		consCfg.ClientID = t.Name() + "-Consumer-" + consVer.String()
 		consCfg.Consumer.MaxProcessingTime = time.Second
 		consCfg.Metadata.Full = false

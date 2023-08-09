@@ -109,7 +109,7 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 }
 
 func TestProducerFailTxn(t *testing.T) {
-	config := sarama.NewConfig()
+	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Retry.Backoff = 0
@@ -130,7 +130,7 @@ func TestProducerFailTxn(t *testing.T) {
 }
 
 func TestProducerWithTxn(t *testing.T) {
-	config := sarama.NewConfig()
+	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
 	config.Producer.Retry.Backoff = 0
@@ -208,7 +208,7 @@ func TestProducerWithCheckerFunction(t *testing.T) {
 
 func TestProducerWithBrokenPartitioner(t *testing.T) {
 	trm := newTestReporterMock()
-	config := sarama.NewConfig()
+	config := NewTestConfig()
 	config.Producer.Partitioner = func(string) sarama.Partitioner {
 		return brokePartitioner{}
 	}

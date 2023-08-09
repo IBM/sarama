@@ -37,6 +37,7 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 	config.Version = V2_0_0_0
 	config.Consumer.Return.Errors = true
 	config.Consumer.Group.Rebalance.Retry.Max = 2
+	config.Consumer.Group.Rebalance.Retry.Backoff = 0
 	config.Consumer.Offsets.AutoCommit.Enable = false
 
 	broker0 := NewMockBroker(t, 0)
@@ -100,72 +101,46 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 }
 
 func TestConsume_RaceTest(t *testing.T) {
-	const groupID = "test-group"
-	const topic = "test-topic"
-	const offsetStart = int64(1234)
+	const (
+		groupID     = "test-group"
+		topic       = "test-topic"
+		offsetStart = int64(1234)
+	)
 
-	cfg := NewConfig()
+	cfg := NewTestConfig()
 	cfg.Version = V2_8_1_0
 	cfg.Consumer.Return.Errors = true
+	cfg.Metadata.Full = true
 
 	seedBroker := NewMockBroker(t, 1)
-
-	joinGroupResponse := &JoinGroupResponse{}
-
-	syncGroupResponse := &SyncGroupResponse{
-		Version: 3, // sarama > 2.3.0.0 uses version 3
-	}
-	// Leverage mock response to get the MemberAssignment bytes
-	mockSyncGroupResponse := NewMockSyncGroupResponse(t).SetMemberAssignment(&ConsumerGroupMemberAssignment{
-		Version:  1,
-		Topics:   map[string][]int32{topic: {0}}, // map "test-topic" to partition 0
-		UserData: []byte{0x01},
-	})
-	syncGroupResponse.MemberAssignment = mockSyncGroupResponse.MemberAssignment
-
-	heartbeatResponse := &HeartbeatResponse{
-		Err: ErrNoError,
-	}
-	offsetFetchResponse := &OffsetFetchResponse{
-		Version:        1,
-		ThrottleTimeMs: 0,
-		Err:            ErrNoError,
-	}
-	offsetFetchResponse.AddBlock(topic, 0, &OffsetFetchResponseBlock{
-		Offset:      offsetStart,
-		LeaderEpoch: 0,
-		Metadata:    "",
-		Err:         ErrNoError,
-	})
-
-	offsetResponse := &OffsetResponse{
-		Version: 1,
-	}
-	offsetResponse.AddTopicPartition(topic, 0, offsetStart)
-
-	metadataResponse := new(MetadataResponse)
-	metadataResponse.Version = 10
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
-	metadataResponse.AddTopic("mismatched-topic", ErrUnknownTopicOrPartition)
+	defer seedBroker.Close()
 
 	handlerMap := map[string]MockResponse{
 		"ApiVersionsRequest": NewMockApiVersionsResponse(t),
-		"MetadataRequest":    NewMockSequence(metadataResponse),
-		"OffsetRequest":      NewMockSequence(offsetResponse),
-		"OffsetFetchRequest": NewMockSequence(offsetFetchResponse),
-		"FindCoordinatorRequest": NewMockSequence(NewMockFindCoordinatorResponse(t).
-			SetCoordinator(CoordinatorGroup, groupID, seedBroker)),
-		"JoinGroupRequest": NewMockSequence(joinGroupResponse),
-		"SyncGroupRequest": NewMockSequence(syncGroupResponse),
-		"HeartbeatRequest": NewMockSequence(heartbeatResponse),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetError("mismatched-topic", ErrUnknownTopicOrPartition),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset(topic, 0, -1, offsetStart),
+		"OffsetFetchRequest": NewMockOffsetFetchResponse(t).
+			SetOffset(groupID, topic, 0, offsetStart, "", ErrNoError),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorGroup, groupID, seedBroker),
+		"JoinGroupRequest": NewMockJoinGroupResponse(t),
+		"SyncGroupRequest": NewMockSyncGroupResponse(t).SetMemberAssignment(
+			&ConsumerGroupMemberAssignment{
+				Version:  1,
+				Topics:   map[string][]int32{topic: {0}}, // map "test-topic" to partition 0
+				UserData: []byte{0x01},
+			},
+		),
+		"HeartbeatRequest": NewMockHeartbeatResponse(t),
 	}
 	seedBroker.SetHandlerByMap(handlerMap)
 
-	cancelCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(4*time.Second))
+	cancelCtx, cancel := context.WithDeadline(context.Background(), time.Now().Add(time.Second))
 
-	defer seedBroker.Close()
-
-	retryWait := 20 * time.Millisecond
+	retryWait := 10 * time.Millisecond
 	var err error
 	clientRetries := 0
 outerFor:
@@ -195,8 +170,8 @@ outerFor:
 		t.Fatalf("should not proceed to Consume")
 	}
 
-	if clientRetries <= 0 {
-		t.Errorf("clientRetries = %v; want > 0", clientRetries)
+	if clientRetries <= 1 {
+		t.Errorf("clientRetries = %v; want > 1", clientRetries)
 	}
 
 	if err != nil && !errors.Is(err, context.DeadlineExceeded) {

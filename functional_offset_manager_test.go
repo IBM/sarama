@@ -12,7 +12,7 @@ func TestFuncOffsetManager(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewTestConfig())
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -2323,12 +2323,3 @@ ProducerLoop:
 
 	log.Printf("Successfully produced: %d; errors: %d\n", successes, producerErrors)
 }
-
-// NewTestConfig returns a config meant to be used by tests.
-// Due to inconsistencies with the request versions the clients send using the default Kafka version
-// and the response versions our mocks use, we default to the minimum Kafka version in most tests
-func NewTestConfig() *Config {
-	config := NewConfig()
-	config.Version = MinVersion
-	return config
-}
