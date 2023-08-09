@@ -97,7 +97,15 @@ func testMain(m *testing.M) int {
 // NewFunctionalTestConfig returns a config meant to be used by functional tests.
 func NewFunctionalTestConfig() *Config {
 	config := NewConfig()
+	// config.Consumer.Retry.Backoff = 0
+	// config.Producer.Retry.Backoff = 0
 	config.Version = MinVersion
+	version, err := ParseKafkaVersion(os.Getenv("KAFKA_VERSION"))
+	if err != nil {
+		config.Version = DefaultVersion
+	} else {
+		config.Version = version
+	}
 	return config
 }
 
@@ -171,7 +179,6 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	}
 
 	config := NewFunctionalTestConfig()
-	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
 	if err != nil {
 		return err
 	}
@@ -315,11 +322,6 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-prepareTestTopics"
-	var err error
-	config.Version, err = ParseKafkaVersion(env.KafkaVersion)
-	if err != nil {
-		return fmt.Errorf("failed to parse kafka version %s: %w", env.KafkaVersion, err)
-	}
 
 	client, err := NewClient(env.KafkaBrokerAddrs, config)
 	if err != nil {
@@ -465,7 +467,6 @@ func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Durat
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-ensureFullyReplicated"
-	config.Version = V2_6_0_0
 
 	var testTopicNames []string
 	for topic := range testTopicDetails {

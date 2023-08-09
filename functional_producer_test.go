@@ -40,7 +40,6 @@ func TestFuncProducingSnappy(t *testing.T) {
 
 func TestFuncProducingZstd(t *testing.T) {
 	config := NewFunctionalTestConfig()
-	config.Version = V2_1_0_0
 	config.Producer.Compression = CompressionZSTD
 	testProducingMessages(t, config)
 }
@@ -108,7 +107,6 @@ func TestFuncTxnProduceNoBegin(t *testing.T) {
 	config.Producer.Return.Errors = true
 	config.Producer.Transaction.Retry.Max = 200
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
 	defer producer.Close()
@@ -135,7 +133,6 @@ func TestFuncTxnCommitNoMessages(t *testing.T) {
 	config.Producer.Return.Errors = true
 	config.Producer.Transaction.Retry.Max = 200
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
 	defer producer.Close()
@@ -168,7 +165,6 @@ func TestFuncTxnProduce(t *testing.T) {
 	config.Producer.Transaction.Retry.Max = 200
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -222,7 +218,6 @@ func TestFuncTxnProduceWithBrokerFailure(t *testing.T) {
 	config.Producer.Transaction.Retry.Max = 200
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -289,7 +284,6 @@ func TestFuncTxnProduceEpochBump(t *testing.T) {
 	config.Producer.Transaction.Retry.Max = 200
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Net.MaxOpenRequests = 1
-	config.Version = V2_6_0_0
 
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -358,7 +352,6 @@ func TestFuncInitProducerId3(t *testing.T) {
 	config.Producer.Retry.Max = 50
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Net.MaxOpenRequests = 1
-	config.Version = V2_6_0_0
 
 	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -401,7 +394,6 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Consumer.Offsets.AutoCommit.Enable = false
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -499,7 +491,6 @@ func TestFuncTxnProduceMultiTxn(t *testing.T) {
 	config.Producer.Transaction.Retry.Max = 200
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 
 	configSecond := NewFunctionalTestConfig()
 	configSecond.ChannelBufferSize = 20
@@ -511,7 +502,6 @@ func TestFuncTxnProduceMultiTxn(t *testing.T) {
 	configSecond.Producer.Retry.Max = 50
 	configSecond.Consumer.IsolationLevel = ReadCommitted
 	configSecond.Net.MaxOpenRequests = 1
-	configSecond.Version = V0_11_0_0
 
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -585,7 +575,6 @@ func TestFuncTxnAbortedProduce(t *testing.T) {
 	config.Producer.Transaction.Retry.Max = 200
 	config.Consumer.IsolationLevel = ReadCommitted
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
@@ -671,7 +660,6 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 	config.Producer.Return.Errors = true
 	config.Producer.RequiredAcks = WaitForAll
 	config.Net.MaxOpenRequests = 1
-	config.Version = V0_11_0_0
 
 	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
@@ -907,7 +895,6 @@ func TestAsyncProducerRemoteBrokerClosed(t *testing.T) {
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 1024
 	config.Producer.Retry.Backoff = time.Millisecond * 50
-	config.Version, _ = ParseKafkaVersion(FunctionalTestEnv.KafkaVersion)
 
 	producer, err := NewAsyncProducer(
 		FunctionalTestEnv.KafkaBrokerAddrs,

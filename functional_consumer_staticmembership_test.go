@@ -22,7 +22,6 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 
 	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
-	config1.Version = V2_3_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
 	config1.Consumer.Group.InstanceId = "Instance1"
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, 100, nil, "test.4")
@@ -30,7 +29,6 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 
 	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
-	config2.Version = V2_3_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
 	config2.Consumer.Group.InstanceId = "Instance2"
 	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, groupID, 100, nil, "test.4")
@@ -76,7 +74,6 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
-	config1.Version = V2_4_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
 	config1.Consumer.Group.InstanceId = "Instance1"
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, math.MaxInt32, nil, "test.4")
@@ -84,7 +81,6 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
-	config2.Version = V2_4_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
 	config2.Consumer.Group.InstanceId = "Instance2"
 	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, groupID, math.MaxInt32, nil, "test.4")
@@ -179,7 +175,6 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 
 	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
-	config1.Version = V2_3_0_0
 	config1.Consumer.Offsets.Initial = OffsetNewest
 	config1.Consumer.Group.InstanceId = "Instance1"
 	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, math.MaxInt32, nil, "test.4")
@@ -187,7 +182,6 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 
 	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
-	config2.Version = V2_3_0_0
 	config2.Consumer.Offsets.Initial = OffsetNewest
 	config2.Consumer.Group.InstanceId = "Instance2"
 	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, groupID, math.MaxInt32, nil, "test.4")
@@ -198,7 +192,6 @@ func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
 
 	config3 := NewFunctionalTestConfig()
 	config3.ClientID = "M3"
-	config3.Version = V2_3_0_0
 	config3.Consumer.Offsets.Initial = OffsetNewest
 	config3.Consumer.Group.InstanceId = "Instance2" // same instance id as config2
 

@@ -174,7 +174,6 @@ func TestReadOnlyAndAllCommittedMessages(t *testing.T) {
 	config.Producer.Idempotent = true
 	config.Producer.Return.Successes = true
 	config.Producer.RequiredAcks = WaitForAll
-	config.Version = V0_11_0_0
 
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {

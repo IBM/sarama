@@ -21,7 +21,6 @@ func TestConsumerFetchFollowerFailover(t *testing.T) {
 	newConfig := func() *Config {
 		config := NewFunctionalTestConfig()
 		config.ClientID = t.Name()
-		config.Version = V2_8_0_0
 		config.Producer.Return.Successes = true
 		return config
 	}
