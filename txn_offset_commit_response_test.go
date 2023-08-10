@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var txnOffsetCommitResponse = []byte{
@@ -15,6 +17,9 @@ var txnOffsetCommitResponse = []byte{
 }
 
 func TestTxnOffsetCommitResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	resp := &TxnOffsetCommitResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Topics: map[string][]*PartitionError{

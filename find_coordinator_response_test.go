@@ -3,9 +3,14 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestFindCoordinatorResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	errMsg := "kaboom"
 
 	for _, tc := range []struct {

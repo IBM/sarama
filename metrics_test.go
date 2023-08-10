@@ -4,9 +4,13 @@ import (
 	"testing"
 
 	"github.com/rcrowley/go-metrics"
+	"go.uber.org/goleak"
 )
 
 func TestGetOrRegisterHistogram(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	metricRegistry := metrics.NewRegistry()
 	histogram := getOrRegisterHistogram("name", metricRegistry)
 
@@ -30,6 +34,9 @@ func TestGetOrRegisterHistogram(t *testing.T) {
 }
 
 func TestGetMetricNameForBroker(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	metricName := getMetricNameForBroker("name", &Broker{id: 1})
 
 	if metricName != "name-for-broker-1" {

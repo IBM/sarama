@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	// The v0 metadata request has a non-nullable array of topic names
@@ -111,6 +115,9 @@ var (
 )
 
 func TestMetadataRequestV0(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV0)
 
@@ -122,6 +129,9 @@ func TestMetadataRequestV0(t *testing.T) {
 }
 
 func TestMetadataRequestV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 1
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV1)
@@ -134,6 +144,9 @@ func TestMetadataRequestV1(t *testing.T) {
 }
 
 func TestMetadataRequestV2(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 2
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV2)
@@ -146,6 +159,9 @@ func TestMetadataRequestV2(t *testing.T) {
 }
 
 func TestMetadataRequestV3(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 3
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV3)
@@ -158,6 +174,9 @@ func TestMetadataRequestV3(t *testing.T) {
 }
 
 func TestMetadataRequestV4(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 4
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV4)
@@ -172,6 +191,9 @@ func TestMetadataRequestV4(t *testing.T) {
 }
 
 func TestMetadataRequestV5(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 5
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV5)
@@ -186,6 +208,9 @@ func TestMetadataRequestV5(t *testing.T) {
 }
 
 func TestMetadataRequestV6(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 6
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV6)
@@ -200,6 +225,9 @@ func TestMetadataRequestV6(t *testing.T) {
 }
 
 func TestMetadataRequestV7(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 7
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV7)
@@ -214,6 +242,9 @@ func TestMetadataRequestV7(t *testing.T) {
 }
 
 func TestMetadataRequestV8(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 8
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV8)
@@ -233,6 +264,9 @@ func TestMetadataRequestV8(t *testing.T) {
 }
 
 func TestMetadataRequestV9(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 9
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV9)
@@ -246,6 +280,9 @@ func TestMetadataRequestV9(t *testing.T) {
 }
 
 func TestMetadataRequestV10(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(MetadataRequest)
 	request.Version = 10
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV10)

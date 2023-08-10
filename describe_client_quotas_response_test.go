@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	describeClientQuotasResponseError = []byte{
@@ -44,6 +48,9 @@ var (
 )
 
 func TestDescribeClientQuotasResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Response With Error
 	errMsg := "Custom entity type 'faulty' not supported"
 	res := &DescribeClientQuotasResponse{

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func makeProduceSet() (*asyncProducer, *produceSet) {
@@ -23,6 +25,9 @@ func safeAddMessage(t *testing.T, ps *produceSet, msg *ProducerMessage) {
 }
 
 func TestProduceSetInitial(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	_, ps := makeProduceSet()
 
 	if !ps.empty() {
@@ -35,6 +40,9 @@ func TestProduceSetInitial(t *testing.T) {
 }
 
 func TestProduceSetAddingMessages(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	_, ps := makeProduceSet()
 	msg := &ProducerMessage{Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
 
@@ -50,6 +58,9 @@ func TestProduceSetAddingMessages(t *testing.T) {
 }
 
 func TestProduceSetAddingMessagesOverflowMessagesLimit(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	parent, ps := makeProduceSet()
 	parent.conf.Producer.Flush.MaxMessages = 1000
 
@@ -68,6 +79,9 @@ func TestProduceSetAddingMessagesOverflowMessagesLimit(t *testing.T) {
 }
 
 func TestProduceSetAddingMessagesOverflowBytesLimit(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	parent, ps := makeProduceSet()
 	parent.conf.Producer.MaxMessageBytes = 1000
 
@@ -86,6 +100,9 @@ func TestProduceSetAddingMessagesOverflowBytesLimit(t *testing.T) {
 }
 
 func TestProduceSetPartitionTracking(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	_, ps := makeProduceSet()
 
 	m1 := &ProducerMessage{Topic: "t1", Partition: 0}
@@ -133,6 +150,9 @@ func TestProduceSetPartitionTracking(t *testing.T) {
 }
 
 func TestProduceSetRequestBuilding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	parent, ps := makeProduceSet()
 	parent.conf.Producer.RequiredAcks = WaitForAll
 	parent.conf.Producer.Timeout = 10 * time.Second
@@ -171,6 +191,9 @@ func TestProduceSetRequestBuilding(t *testing.T) {
 }
 
 func TestProduceSetCompressedRequestBuilding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	parent, ps := makeProduceSet()
 	parent.conf.Producer.RequiredAcks = WaitForAll
 	parent.conf.Producer.Timeout = 10 * time.Second
@@ -216,6 +239,9 @@ func TestProduceSetCompressedRequestBuilding(t *testing.T) {
 }
 
 func TestProduceSetV3RequestBuilding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	parent, ps := makeProduceSet()
 	parent.conf.Producer.RequiredAcks = WaitForAll
 	parent.conf.Producer.Timeout = 10 * time.Second
@@ -282,6 +308,9 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 }
 
 func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	const pID = 1000
 	const pEpoch = 1234
 
@@ -370,6 +399,9 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 }
 
 func TestProduceSetConsistentTimestamps(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	parent, ps1 := makeProduceSet()
 	ps2 := newProduceSet(parent)
 	parent.conf.Producer.RequiredAcks = WaitForAll

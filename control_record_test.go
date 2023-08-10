@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -46,6 +48,9 @@ func assertRecordType(t *testing.T, r *ControlRecord, expected ControlRecordType
 }
 
 func TestDecodingControlRecords(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	abortTx := testDecode(t, "abort transaction", abortTxCtrlRecKey, abortTxCtrlRecValue)
 
 	assertRecordType(t, &abortTx, ControlRecordAbort)

@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var addPartitionsToTxnResponse = []byte{
@@ -15,6 +17,9 @@ var addPartitionsToTxnResponse = []byte{
 }
 
 func TestAddPartitionsToTxnResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	resp := &AddPartitionsToTxnResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Errors: map[string][]*PartitionError{

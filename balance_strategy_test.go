@@ -9,9 +9,14 @@ import (
 	"sort"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestBalanceStrategyRange(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	tests := []struct {
 		name     string
 		members  map[string][]string
@@ -96,6 +101,9 @@ func TestBalanceStrategyRange(t *testing.T) {
 }
 
 func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	strategy := NewBalanceStrategyRange()
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -116,6 +124,9 @@ func TestBalanceStrategyRangeAssignmentData(t *testing.T) {
 }
 
 func TestBalanceStrategyRoundRobin(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	tests := []struct {
 		members  map[string][]string
 		topics   map[string][]int32
@@ -198,6 +209,9 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 }
 
 func Test_deserializeTopicPartitionAssignment(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		userDataBytes []byte
 	}
@@ -284,6 +298,9 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 }
 
 func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	strategy := NewBalanceStrategyRoundRobin()
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -304,6 +321,9 @@ func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
 }
 
 func Test_prepopulateCurrentAssignments(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		members map[string]ConsumerGroupMemberMetadata
 	}
@@ -457,6 +477,9 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 }
 
 func Test_areSubscriptionsIdentical(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
 		consumer2AllPotentialPartitions map[string][]topicPartitionAssignment
@@ -582,6 +605,9 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 }
 
 func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		assignments map[string][]topicPartitionAssignment
 	}
@@ -639,6 +665,9 @@ func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
 }
 
 func Test_sortPartitions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		currentAssignment                          map[string][]topicPartitionAssignment
 		partitionsWithADifferentPreviousAssignment map[topicPartitionAssignment]consumerGenerationPair
@@ -751,6 +780,9 @@ func Test_sortPartitions(t *testing.T) {
 }
 
 func Test_filterAssignedPartitions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		currentAssignment               map[string][]topicPartitionAssignment
 		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
@@ -824,6 +856,9 @@ func Test_filterAssignedPartitions(t *testing.T) {
 }
 
 func Test_canConsumerParticipateInReassignment(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		memberID                        string
 		currentAssignment               map[string][]topicPartitionAssignment
@@ -926,6 +961,9 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 }
 
 func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		assignments []topicPartitionAssignment
 		topic       topicPartitionAssignment
@@ -1000,6 +1038,9 @@ func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
 }
 
 func Test_assignPartition(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		partition                       topicPartitionAssignment
 		sortedCurrentSubscriptions      []string
@@ -1125,6 +1166,9 @@ func Test_assignPartition(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		members map[string]ConsumerGroupMemberMetadata
 		topics  map[string][]int32
@@ -1355,6 +1399,9 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_KIP54_ExampleOne(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1395,6 +1442,9 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleOne(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_KIP54_ExampleTwo(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1439,6 +1489,9 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleTwo(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_KIP54_ExampleThree(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 	topicNames := []string{"topic1", "topic2"}
 
@@ -1476,6 +1529,9 @@ func Test_stickyBalanceStrategy_Plan_KIP54_ExampleThree(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_AddRemoveConsumerOneTopic(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1512,6 +1568,9 @@ func Test_stickyBalanceStrategy_Plan_AddRemoveConsumerOneTopic(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_PoorRoundRobinAssignmentScenario(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1543,6 +1602,9 @@ func Test_stickyBalanceStrategy_Plan_PoorRoundRobinAssignmentScenario(t *testing
 }
 
 func Test_stickyBalanceStrategy_Plan_AddRemoveTopicTwoConsumers(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1593,6 +1655,9 @@ func Test_stickyBalanceStrategy_Plan_AddRemoveTopicTwoConsumers(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerLeaves(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1633,6 +1698,9 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerLeaves(t *testi
 }
 
 func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerAdded(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1657,6 +1725,9 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerAdded(t *testin
 }
 
 func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	// PLAN 1
@@ -1694,6 +1765,9 @@ func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_LargeAssignmentWithMultipleConsumersLeaving(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -1734,6 +1808,9 @@ func Test_stickyBalanceStrategy_Plan_LargeAssignmentWithMultipleConsumersLeaving
 }
 
 func Test_stickyBalanceStrategy_Plan_NewSubscription(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
@@ -1763,6 +1840,9 @@ func Test_stickyBalanceStrategy_Plan_NewSubscription(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChanges(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	minNumConsumers := 20
@@ -1812,6 +1892,9 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChang
 }
 
 func Test_stickyBalanceStrategy_Plan_MoveExistingAssignments(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := make(map[string][]int32, 6)
@@ -1837,6 +1920,9 @@ func Test_stickyBalanceStrategy_Plan_MoveExistingAssignments(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_Stickiness(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2}}
@@ -1865,6 +1951,9 @@ func Test_stickyBalanceStrategy_Plan_Stickiness(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := make(map[string][]int32, 2)
@@ -1887,6 +1976,9 @@ func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing
 }
 
 func Test_stickyBalanceStrategy_Plan_NoExceptionRaisedWhenOnlySubscribedTopicDeleted(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2}}
@@ -1915,6 +2007,9 @@ func Test_stickyBalanceStrategy_Plan_NoExceptionRaisedWhenOnlySubscribedTopicDel
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
@@ -1965,6 +2060,9 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations1(t *testi
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
@@ -2011,6 +2109,9 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithMultipleGenerations2(t *testi
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGenerations(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2, 3, 4, 5}}
@@ -2034,6 +2135,9 @@ func Test_stickyBalanceStrategy_Plan_AssignmentWithConflictingPreviousGeneration
 }
 
 func Test_stickyBalanceStrategy_Plan_SchemaBackwardCompatibility(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1, 2}}
@@ -2054,6 +2158,9 @@ func Test_stickyBalanceStrategy_Plan_SchemaBackwardCompatibility(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	topics := map[string][]int32{"topic1": {0, 1}}
@@ -2073,6 +2180,9 @@ func Test_stickyBalanceStrategy_Plan_ConflictingPreviousAssignments(t *testing.T
 }
 
 func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	s := &stickyBalanceStrategy{}
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 2)
@@ -2095,6 +2205,9 @@ func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_data_race(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for i := 0; i < 1000; i++ {
 		go func(bs BalanceStrategy) {
 			members := map[string]ConsumerGroupMemberMetadata{
@@ -2379,6 +2492,9 @@ func getRandomSublist(r *rand.Rand, s []string) []string {
 }
 
 func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type args struct {
 		partition2AllPotentialConsumers map[topicPartitionAssignment][]string
 	}

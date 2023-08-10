@@ -5,6 +5,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func initOffsetManagerWithBackoffFunc(
@@ -77,6 +79,9 @@ func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 }
 
 func TestNewOffsetManager(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Returns(new(MetadataResponse))
 	defer seedBroker.Close()
@@ -122,6 +127,9 @@ var offsetsautocommitTestTable = []struct {
 }
 
 func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
 		tt := tt
@@ -175,6 +183,9 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 }
 
 func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Tests to validate configuration when `Consumer.Offsets.AutoCommit.Enable` is false
 	config := NewTestConfig()
 	config.Consumer.Offsets.AutoCommit.Enable = false
@@ -233,6 +244,9 @@ func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
 // Test recovery from ErrNotCoordinatorForConsumer
 // on first fetchInitialOffset call
 func TestOffsetManagerFetchInitialFail(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -276,6 +290,9 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 
 // Test fetchInitialOffset retry on ErrOffsetsLoadInProgress
 func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	retryCount := int32(0)
 	backoff := func(retries, maxRetries int) time.Duration {
 		atomic.AddInt32(&retryCount, 1)
@@ -318,6 +335,9 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerInitialOffset(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -340,6 +360,9 @@ func TestPartitionOffsetManagerInitialOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerNextOffset(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -359,6 +382,9 @@ func TestPartitionOffsetManagerNextOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerResetOffset(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -385,6 +411,9 @@ func TestPartitionOffsetManagerResetOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, time.Hour)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -421,6 +450,9 @@ func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -446,6 +478,9 @@ func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, time.Hour)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -481,6 +516,9 @@ func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerCommitErr(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
@@ -545,6 +583,9 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 
 // Test of recovery from abort
 func TestAbortPartitionOffsetManager(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")

@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -23,6 +25,9 @@ var (
 )
 
 func TestCreateTopicsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	retention := "-1"
 
 	req := &CreateTopicsRequest{

@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	apiVersionResponse = []byte{
@@ -24,6 +28,9 @@ var (
 )
 
 func TestApiVersionsResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := new(ApiVersionsResponse)
 	testVersionDecodable(t, "no error", response, apiVersionResponse, 0)
 	if response.ErrorCode != int16(ErrNoError) {
@@ -41,6 +48,9 @@ func TestApiVersionsResponse(t *testing.T) {
 }
 
 func TestApiVersionsResponseV3(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := new(ApiVersionsResponse)
 	response.Version = 3
 	testVersionDecodable(t, "no error", response, apiVersionResponseV3, 3)

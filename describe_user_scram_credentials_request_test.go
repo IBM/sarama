@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	emptyDescribeUserScramCredentialsRequest = []byte{
@@ -15,6 +19,9 @@ var (
 )
 
 func TestDescribeUserScramCredentialsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := &DescribeUserScramCredentialsRequest{
 		Version:       0,
 		DescribeUsers: []DescribeUserScramCredentialsRequestUser{},

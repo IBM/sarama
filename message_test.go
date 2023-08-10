@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -117,6 +119,9 @@ var (
 )
 
 func TestMessageEncoding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{}
 	testEncodable(t, "empty", &message, emptyMessage)
 
@@ -138,6 +143,9 @@ func TestMessageEncoding(t *testing.T) {
 }
 
 func TestMessageDecoding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{}
 	testDecodable(t, "empty", &message, emptyMessage)
 	if message.Codec != CompressionNone {
@@ -166,6 +174,9 @@ func TestMessageDecoding(t *testing.T) {
 }
 
 func TestMessageDecodingBulkSnappy(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{}
 	testDecodable(t, "bulk snappy", &message, emptyBulkSnappyMessage)
 	if message.Codec != CompressionSnappy {
@@ -182,6 +193,9 @@ func TestMessageDecodingBulkSnappy(t *testing.T) {
 }
 
 func TestMessageDecodingBulkGzip(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{}
 	testDecodable(t, "bulk gzip", &message, emptyBulkGzipMessage)
 	if message.Codec != CompressionGZIP {
@@ -198,6 +212,9 @@ func TestMessageDecodingBulkGzip(t *testing.T) {
 }
 
 func TestMessageDecodingBulkLZ4(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{}
 	testDecodable(t, "bulk lz4", &message, emptyBulkLZ4Message)
 	if message.Codec != CompressionLZ4 {
@@ -214,6 +231,9 @@ func TestMessageDecodingBulkLZ4(t *testing.T) {
 }
 
 func TestMessageDecodingBulkZSTD(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{}
 	testDecodable(t, "bulk zstd", &message, emptyBulkZSTDMessage)
 	if message.Codec != CompressionZSTD {
@@ -230,11 +250,17 @@ func TestMessageDecodingBulkZSTD(t *testing.T) {
 }
 
 func TestMessageDecodingVersion1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{Version: 1}
 	testDecodable(t, "decoding empty v1 message", &message, emptyV1Message)
 }
 
 func TestMessageDecodingUnknownVersions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	message := Message{Version: 2}
 	err := decode(emptyV2Message, &message, nil)
 	if err == nil {
@@ -246,6 +272,9 @@ func TestMessageDecodingUnknownVersions(t *testing.T) {
 }
 
 func TestCompressionCodecUnmarshal(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	cases := []struct {
 		Input         string
 		Expected      CompressionCodec

@@ -3,7 +3,7 @@ default: fmt get update test lint
 GO       := go
 GOBIN    := $(shell pwd)/bin
 GOBUILD  := CGO_ENABLED=0 $(GO) build $(BUILD_FLAG)
-GOTEST   := $(GO) test -v -race -coverprofile=profile.out -covermode=atomic
+GOTEST   := $(GO) test -v -race -coverprofile=profile.out -covermode=atomic -parallel 1 -p 1
 
 FILES    := $(shell find . -name '*.go' -type f -not -name '*.pb.go' -not -name '*_generated.go' -not -name '*_test.go')
 TESTS    := $(shell find . -name '*.go' -type f -not -name '*.pb.go' -not -name '*_generated.go' -name '*_test.go')

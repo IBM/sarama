@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -30,6 +32,9 @@ var (
 )
 
 func TestCreatePartitionsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &CreatePartitionsRequest{
 		TopicPartitions: map[string]*TopicPartition{
 			"topic": {

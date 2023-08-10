@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	alterClientQuotasResponseError = []byte{
@@ -40,6 +44,9 @@ var (
 )
 
 func TestAlterClientQuotasResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// default user
 	defaultUserComponent := QuotaEntityComponent{
 		EntityType: QuotaEntityUser,

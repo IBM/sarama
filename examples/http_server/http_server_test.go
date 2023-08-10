@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/IBM/sarama"
 	"github.com/IBM/sarama/mocks"
 )
@@ -14,6 +16,9 @@ import (
 // and one data collector entry. Let's assume both will succeed.
 // We should return a HTTP 200 status.
 func TestCollectSuccessfully(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	dataCollectorMock := mocks.NewSyncProducer(t, nil)
 	dataCollectorMock.ExpectSendMessageAndSucceed()
 
@@ -50,6 +55,9 @@ func TestCollectSuccessfully(t *testing.T) {
 // Now, let's see if we handle the case of not being able to produce
 // to the data collector properly. In this case we should return a 500 status.
 func TestCollectionFailure(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	dataCollectorMock := mocks.NewSyncProducer(t, nil)
 	dataCollectorMock.ExpectSendMessageAndFail(sarama.ErrRequestTimedOut)
 
@@ -78,6 +86,9 @@ func TestCollectionFailure(t *testing.T) {
 // so we are not setting any expectations on the dataCollectorMock. It
 // will still generate an access log entry though.
 func TestWrongPath(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	dataCollectorMock := mocks.NewSyncProducer(t, nil)
 
 	accessLogProducerMock := mocks.NewAsyncProducer(t, nil)

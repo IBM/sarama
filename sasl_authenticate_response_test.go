@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	saslAuthenticateResponseErr = []byte{
@@ -17,6 +21,9 @@ var (
 )
 
 func TestSaslAuthenticateResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := new(SaslAuthenticateResponse)
 	response.Err = ErrSASLAuthenticationFailed
 	msg := "err"
@@ -27,6 +34,9 @@ func TestSaslAuthenticateResponse(t *testing.T) {
 }
 
 func TestSaslAuthenticateResponseV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := new(SaslAuthenticateResponse)
 	response.Err = ErrSASLAuthenticationFailed
 	msg := "err"

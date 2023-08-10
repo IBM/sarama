@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	emptyDeleteGroupsRequest = []byte{0, 0, 0, 0}
@@ -18,6 +22,9 @@ var (
 )
 
 func TestDeleteGroupsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var request *DeleteGroupsRequest
 
 	request = new(DeleteGroupsRequest)

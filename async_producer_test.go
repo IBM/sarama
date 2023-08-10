@@ -15,6 +15,7 @@ import (
 	"github.com/fortytw2/leaktest"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 const TestMessage = "ABC THE MESSAGE"
@@ -139,6 +140,9 @@ func (f flakyEncoder) Encode() ([]byte, error) {
 }
 
 func TestAsyncProducer(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -188,6 +192,9 @@ done:
 }
 
 func TestAsyncProducerMultipleFlushes(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -223,6 +230,9 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 }
 
 func TestAsyncProducerMultipleBrokers(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader0 := NewMockBroker(t, 2)
 	leader1 := NewMockBroker(t, 3)
@@ -263,6 +273,9 @@ func TestAsyncProducerMultipleBrokers(t *testing.T) {
 }
 
 func TestAsyncProducerCustomPartitioner(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -305,6 +318,9 @@ func TestAsyncProducerCustomPartitioner(t *testing.T) {
 }
 
 func TestAsyncProducerFailureRetry(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -353,6 +369,9 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 }
 
 func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	tt := func(t *testing.T, kErr KError) {
 		seedBroker := NewMockBroker(t, 0)
 		broker1 := NewMockBroker(t, 1)
@@ -439,6 +458,9 @@ func TestAsyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 }
 
 func TestAsyncProducerEncoderFailures(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -477,6 +499,9 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 // If a Kafka broker becomes unavailable and then returns back in service, then
 // producer reconnects to it and continues sending messages.
 func TestAsyncProducerBrokerBounce(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Given
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
@@ -518,6 +543,9 @@ func TestAsyncProducerBrokerBounce(t *testing.T) {
 }
 
 func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -561,6 +589,9 @@ func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 }
 
 func TestAsyncProducerMultipleRetries(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -617,6 +648,9 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 }
 
 func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader1 := NewMockBroker(t, 2)
 	leader2 := NewMockBroker(t, 3)
@@ -685,6 +719,9 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 
 // https://github.com/IBM/sarama/issues/2129
 func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
@@ -734,6 +771,9 @@ func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 
 func TestAsyncProducerBrokerRestart(t *testing.T) {
 	// Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
@@ -839,6 +879,9 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 }
 
 func TestAsyncProducerOutOfRetries(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	t.Skip("Enable once bug #294 is fixed.")
 
 	seedBroker := NewMockBroker(t, 1)
@@ -896,6 +939,9 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 }
 
 func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 	leaderAddr := leader.Addr()
@@ -953,6 +999,9 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 }
 
 func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -1019,6 +1068,9 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 }
 
 func TestAsyncProducerRetryShutdown(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -1068,6 +1120,9 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 }
 
 func TestAsyncProducerNoReturns(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
 
@@ -1108,6 +1163,9 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
@@ -1156,6 +1214,9 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Logger = log.New(os.Stderr, "", log.LstdFlags)
 	tests := []struct {
 		name           string
@@ -1304,6 +1365,9 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 
 // test case for https://github.com/IBM/sarama/pull/2378
 func TestAsyncProducerIdempotentRetryCheckBatch_2378(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
@@ -1372,6 +1436,9 @@ func TestAsyncProducerIdempotentRetryCheckBatch_2378(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 
 	metadataResponse := &MetadataResponse{
@@ -1421,6 +1488,9 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 }
 
 func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -1492,6 +1562,9 @@ func TestAsyncProducerIdempotentEpochRollover(t *testing.T) {
 // TestAsyncProducerIdempotentEpochExhaustion ensures that producer requests
 // a new producerID when producerEpoch is exhausted
 func TestAsyncProducerIdempotentEpochExhaustion(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -1571,6 +1644,9 @@ func TestAsyncProducerIdempotentEpochExhaustion(t *testing.T) {
 //
 //nolint:paralleltest
 func TestBrokerProducerShutdown(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	defer leaktest.Check(t)()
 	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
 	defer func() {
@@ -1666,6 +1742,9 @@ func testProducerInterceptor(
 }
 
 func TestAsyncProducerInterceptors(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	tests := []struct {
 		name          string
 		interceptors  []ProducerInterceptor
@@ -1725,6 +1804,9 @@ func TestAsyncProducerInterceptors(t *testing.T) {
 }
 
 func TestProducerError(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	t.Parallel()
 	err := ProducerError{Err: ErrOutOfBrokers}
 	if !errors.Is(err, ErrOutOfBrokers) {
@@ -1733,6 +1815,9 @@ func TestProducerError(t *testing.T) {
 }
 
 func TestTxmngInitProducerId(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -1766,6 +1851,9 @@ func TestTxmngInitProducerId(t *testing.T) {
 }
 
 func TestTxnProduceBumpEpoch(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -1868,6 +1956,9 @@ func TestTxnProduceBumpEpoch(t *testing.T) {
 }
 
 func TestTxnProduceRecordWithCommit(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -1943,6 +2034,9 @@ func TestTxnProduceRecordWithCommit(t *testing.T) {
 }
 
 func TestTxnProduceBatchAddPartition(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -2056,6 +2150,9 @@ func TestTxnProduceBatchAddPartition(t *testing.T) {
 }
 
 func TestTxnProduceRecordWithAbort(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -2131,6 +2228,9 @@ func TestTxnProduceRecordWithAbort(t *testing.T) {
 }
 
 func TestTxnCanAbort(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 

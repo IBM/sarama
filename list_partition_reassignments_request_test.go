@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var listPartitionReassignmentsRequestOneBlock = []byte{
 	0, 0, 39, 16, // timeout 10000
@@ -12,6 +16,9 @@ var listPartitionReassignmentsRequestOneBlock = []byte{
 }
 
 func TestListPartitionReassignmentRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var request *ListPartitionReassignmentsRequest = &ListPartitionReassignmentsRequest{
 		TimeoutMs: int32(10000),
 		Version:   int16(0),

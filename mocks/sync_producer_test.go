@@ -5,10 +5,15 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/IBM/sarama"
 )
 
 func TestMockSyncProducerImplementsSyncProducerInterface(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var mp interface{} = &SyncProducer{}
 	if _, ok := mp.(sarama.SyncProducer); !ok {
 		t.Error("The mock async producer should implement the sarama.SyncProducer interface.")
@@ -16,6 +21,9 @@ func TestMockSyncProducerImplementsSyncProducerInterface(t *testing.T) {
 }
 
 func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	sp := NewSyncProducer(t, nil)
 	defer func() {
 		if err := sp.Close(); err != nil {
@@ -56,6 +64,9 @@ func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {
 }
 
 func TestSyncProducerFailTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
@@ -86,6 +97,9 @@ func TestSyncProducerFailTxn(t *testing.T) {
 }
 
 func TestSyncProducerUseTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
@@ -154,6 +168,9 @@ func TestSyncProducerUseTxn(t *testing.T) {
 }
 
 func TestSyncProducerWithTooManyExpectations(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -175,6 +192,9 @@ func TestSyncProducerWithTooManyExpectations(t *testing.T) {
 }
 
 func TestSyncProducerWithTooFewExpectations(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).ExpectSendMessageAndSucceed()
@@ -197,6 +217,9 @@ func TestSyncProducerWithTooFewExpectations(t *testing.T) {
 }
 
 func TestSyncProducerWithCheckerFunction(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -222,6 +245,9 @@ func TestSyncProducerWithCheckerFunction(t *testing.T) {
 }
 
 func TestSyncProducerWithCheckerFunctionForSendMessagesWithError(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -246,6 +272,9 @@ func TestSyncProducerWithCheckerFunctionForSendMessagesWithError(t *testing.T) {
 }
 
 func TestSyncProducerWithCheckerFunctionForSendMessagesWithoutError(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -275,6 +304,9 @@ func TestSyncProducerWithCheckerFunctionForSendMessagesWithoutError(t *testing.T
 }
 
 func TestSyncProducerSendMessagesExpectationsMismatchTooFew(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -299,6 +331,9 @@ func TestSyncProducerSendMessagesExpectationsMismatchTooFew(t *testing.T) {
 }
 
 func TestSyncProducerSendMessagesExpectationsMismatchTooMany(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -322,6 +357,9 @@ func TestSyncProducerSendMessagesExpectationsMismatchTooMany(t *testing.T) {
 }
 
 func TestSyncProducerSendMessagesFaultyEncoder(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 
 	sp := NewSyncProducer(trm, nil).
@@ -354,6 +392,9 @@ func (f faultyEncoder) Length() int {
 }
 
 func TestSyncProducerInvalidConfiguration(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 	config := NewTestConfig()
 	config.ClientID = "not a valid client ID"

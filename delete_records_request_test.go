@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var deleteRecordsRequest = []byte{
@@ -19,6 +21,9 @@ var deleteRecordsRequest = []byte{
 }
 
 func TestDeleteRecordsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &DeleteRecordsRequest{
 		Topics: map[string]*DeleteRecordsRequestTopic{
 			"topic": {

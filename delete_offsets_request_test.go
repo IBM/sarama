@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	emptyDeleteOffsetsRequest = []byte{
@@ -10,6 +14,9 @@ var (
 )
 
 func TestDeleteOffsetsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var request *DeleteOffsetsRequest
 
 	request = new(DeleteOffsetsRequest)

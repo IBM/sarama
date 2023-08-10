@@ -8,6 +8,7 @@ import (
 	"time"
 
 	assert "github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 type handler struct {
@@ -32,6 +33,9 @@ func (h *handler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupCla
 // OffsetsLoadInProgress error response, in the same way as it would for a
 // RebalanceInProgress.
 func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.ClientID = t.Name()
 	config.Version = V2_0_0_0
@@ -101,6 +105,9 @@ func TestConsumerGroupNewSessionDuringOffsetLoad(t *testing.T) {
 }
 
 func TestConsume_RaceTest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	const (
 		groupID     = "test-group"
 		topic       = "test-topic"
@@ -185,6 +192,9 @@ outerFor:
 // the coordinator decrements the retry attempts and doesn't end up retrying
 // forever
 func TestConsumerGroupSessionDoesNotRetryForever(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.ClientID = t.Name()
 	config.Version = V2_0_0_0

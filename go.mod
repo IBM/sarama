@@ -17,6 +17,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475
 	github.com/stretchr/testify v1.8.4
 	github.com/xdg-go/scram v1.1.2
+	go.uber.org/goleak v1.2.1
 	golang.org/x/net v0.14.0
 	golang.org/x/sync v0.3.0
 )

@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	aclDeleteRequestNullsv1 = []byte{
@@ -63,6 +67,9 @@ var (
 )
 
 func TestDeleteAclsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &DeleteAclsRequest{
 		Filters: []*AclFilter{{
 			ResourceType:   AclResourceAny,
@@ -91,6 +98,9 @@ func TestDeleteAclsRequest(t *testing.T) {
 }
 
 func TestDeleteAclsRequestV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &DeleteAclsRequest{
 		Version: 1,
 		Filters: []*AclFilter{{

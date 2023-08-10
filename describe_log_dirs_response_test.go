@@ -2,6 +2,8 @@ package sarama
 
 import (
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -32,6 +34,9 @@ var (
 )
 
 func TestDescribeLogDirsResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Test empty response
 	response := &DescribeLogDirsResponse{
 		LogDirs: []DescribeLogDirsResponseDirMetadata{},

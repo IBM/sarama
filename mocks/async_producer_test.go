@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"go.uber.org/goleak"
+
 	"github.com/IBM/sarama"
 )
 
@@ -36,6 +38,9 @@ func (trm *testReporterMock) Errorf(format string, args ...interface{}) {
 }
 
 func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var mp interface{} = &AsyncProducer{}
 	if _, ok := mp.(sarama.AsyncProducer); !ok {
 		t.Error("The mock producer should implement the sarama.Producer interface.")
@@ -43,6 +48,9 @@ func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
 }
 
 func TestProducerReturnsExpectationsToChannels(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.Producer.Return.Successes = true
 	mp := NewAsyncProducer(t, config).
@@ -76,6 +84,9 @@ func TestProducerReturnsExpectationsToChannels(t *testing.T) {
 }
 
 func TestProducerWithTooFewExpectations(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil)
 	mp.ExpectInputAndSucceed()
@@ -93,6 +104,9 @@ func TestProducerWithTooFewExpectations(t *testing.T) {
 }
 
 func TestProducerWithTooManyExpectations(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil).
 		ExpectInputAndSucceed().
@@ -109,6 +123,9 @@ func TestProducerWithTooManyExpectations(t *testing.T) {
 }
 
 func TestProducerFailTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
@@ -130,6 +147,9 @@ func TestProducerFailTxn(t *testing.T) {
 }
 
 func TestProducerWithTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewTestConfig()
 	config.Producer.Transaction.ID = "test"
 	config.Producer.RequiredAcks = sarama.WaitForAll
@@ -185,6 +205,9 @@ func TestProducerWithTxn(t *testing.T) {
 }
 
 func TestProducerWithCheckerFunction(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 	mp := NewAsyncProducer(trm, nil).
 		ExpectInputWithCheckerFunctionAndSucceed(generateRegexpChecker("^tes")).
@@ -207,6 +230,9 @@ func TestProducerWithCheckerFunction(t *testing.T) {
 }
 
 func TestProducerWithBrokenPartitioner(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 	config := NewTestConfig()
 	config.Producer.Partitioner = func(string) sarama.Partitioner {
@@ -249,6 +275,9 @@ func (brokePartitioner) Partition(msg *sarama.ProducerMessage, n int32) (int32, 
 func (brokePartitioner) RequiresConsistency() bool { return false }
 
 func TestProducerWithInvalidConfiguration(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	trm := newTestReporterMock()
 	config := NewTestConfig()
 	config.ClientID = "not a valid client ID"

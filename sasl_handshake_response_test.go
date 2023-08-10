@@ -3,6 +3,8 @@ package sarama
 import (
 	"errors"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var saslHandshakeResponse = []byte{
@@ -12,6 +14,9 @@ var saslHandshakeResponse = []byte{
 }
 
 func TestSaslHandshakeResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := new(SaslHandshakeResponse)
 	testVersionDecodable(t, "no error", response, saslHandshakeResponse, 0)
 	if !errors.Is(response.Err, ErrNoError) {

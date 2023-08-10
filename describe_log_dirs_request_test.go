@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	emptyDescribeLogDirsRequest = []byte{255, 255, 255, 255} // Empty array (array length -1 sent)
@@ -15,6 +19,9 @@ var (
 )
 
 func TestDescribeLogDirsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := &DescribeLogDirsRequest{
 		Version:        0,
 		DescribeTopics: []DescribeLogDirsRequestTopic{},

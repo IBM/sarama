@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	fetchRequestNoBlocks = []byte{
@@ -51,6 +55,9 @@ var (
 )
 
 func TestFetchRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	t.Run("no blocks", func(t *testing.T) {
 		request := new(FetchRequest)
 		testRequest(t, "no blocks", request, fetchRequestNoBlocks)

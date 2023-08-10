@@ -3,6 +3,8 @@ package sarama
 import (
 	"errors"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -22,6 +24,9 @@ var (
 )
 
 func TestConsumerMetadataResponseError(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := &ConsumerMetadataResponse{Err: ErrOffsetsLoadInProgress}
 	testEncodable(t, "", response, consumerMetadataResponseError)
 
@@ -36,6 +41,9 @@ func TestConsumerMetadataResponseError(t *testing.T) {
 }
 
 func TestConsumerMetadataResponseSuccess(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewBroker("foo:52445")
 	broker.id = 0xAB
 	response := ConsumerMetadataResponse{

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"go.uber.org/goleak"
 )
 
 func recordBatchTestCases() []struct {
@@ -270,6 +271,9 @@ func isOldGo(t *testing.T) bool {
 }
 
 func TestRecordBatchEncoding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for _, tc := range recordBatchTestCases() {
 		if tc.oldGoEncoded != nil && isOldGo(t) {
 			testEncodable(t, tc.name, &tc.batch, tc.oldGoEncoded)
@@ -280,6 +284,9 @@ func TestRecordBatchEncoding(t *testing.T) {
 }
 
 func TestRecordBatchDecoding(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for _, tc := range recordBatchTestCases() {
 		batch := RecordBatch{}
 		testDecodable(t, tc.name, &batch, tc.encoded)

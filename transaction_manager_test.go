@@ -5,9 +5,13 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 func TestTransitions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	testError := errors.New("test")
 	type testCase struct {
 		transitions   []ProducerTxnStatusFlag
@@ -83,6 +87,9 @@ func TestTransitions(t *testing.T) {
 }
 
 func TestTxnmgrInitProducerIdTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
@@ -126,6 +133,9 @@ func TestTxnmgrInitProducerIdTxn(t *testing.T) {
 }
 
 func TestMaybeAddPartitionToCurrentTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type testCase struct {
 		initialFlags                         ProducerTxnStatusFlag
 		initialPartitionsInCurrentTxn        topicPartitionSet
@@ -273,6 +283,9 @@ func TestMaybeAddPartitionToCurrentTxn(t *testing.T) {
 }
 
 func TestAddOffsetsToTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type testCase struct {
 		brokerErr     KError
 		initialFlags  ProducerTxnStatusFlag
@@ -446,6 +459,9 @@ func TestAddOffsetsToTxn(t *testing.T) {
 }
 
 func TestTxnOffsetsCommit(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type testCase struct {
 		brokerErr       KError
 		initialFlags    ProducerTxnStatusFlag
@@ -683,6 +699,9 @@ func TestTxnOffsetsCommit(t *testing.T) {
 }
 
 func TestEndTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type testCase struct {
 		brokerErr     KError
 		commit        bool
@@ -805,6 +824,9 @@ func TestEndTxn(t *testing.T) {
 }
 
 func TestPublishPartitionToTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type testCase struct {
 		brokerErr                 KError
 		expectedFlags             ProducerTxnStatusFlag

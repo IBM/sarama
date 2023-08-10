@@ -1,8 +1,15 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 func TestVersionCompare(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	if V0_8_2_0.IsAtLeast(V0_8_2_1) {
 		t.Error("0.8.2.0 >= 0.8.2.1")
 	}
@@ -27,6 +34,9 @@ func TestVersionCompare(t *testing.T) {
 }
 
 func TestVersionParsing(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	validVersions := []string{
 		"0.8.2.0",
 		"0.8.2.1",

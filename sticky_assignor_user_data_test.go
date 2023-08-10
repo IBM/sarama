@@ -3,9 +3,14 @@ package sarama
 import (
 	"encoding/base64"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestStickyAssignorUserDataV0(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Single topic with deterministic ordering across encode-decode
 	req := &StickyAssignorUserDataV0{}
 	data := decodeUserDataBytes(t, "AAAAAQADdDAzAAAAAQAAAAU=")
@@ -24,6 +29,9 @@ func TestStickyAssignorUserDataV0(t *testing.T) {
 }
 
 func TestStickyAssignorUserDataV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Single topic with deterministic ordering across encode-decode
 	req := &StickyAssignorUserDataV1{}
 	data := decodeUserDataBytes(t, "AAAAAQADdDA2AAAAAgAAAAAAAAAE/////w==")

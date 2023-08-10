@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var deleteTopicsRequest = []byte{
@@ -13,6 +15,9 @@ var deleteTopicsRequest = []byte{
 }
 
 func TestDeleteTopicsRequestV0(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &DeleteTopicsRequest{
 		Version: 0,
 		Topics:  []string{"topic", "other"},
@@ -23,6 +28,9 @@ func TestDeleteTopicsRequestV0(t *testing.T) {
 }
 
 func TestDeleteTopicsRequestV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &DeleteTopicsRequest{
 		Version: 1,
 		Topics:  []string{"topic", "other"},

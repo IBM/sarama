@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -24,6 +26,9 @@ var (
 )
 
 func TestCreateAclsResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	errmsg := "error"
 	resp := &CreateAclsResponse{
 		ThrottleTime: 100 * time.Millisecond,

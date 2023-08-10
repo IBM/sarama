@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	apiVersionRequest []byte
@@ -13,11 +17,17 @@ var (
 )
 
 func TestApiVersionsRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(ApiVersionsRequest)
 	testRequest(t, "basic", request, apiVersionRequest)
 }
 
 func TestApiVersionsRequestV3(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(ApiVersionsRequest)
 	request.Version = 3
 	request.ClientSoftwareName = "sarama"

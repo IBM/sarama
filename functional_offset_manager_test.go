@@ -5,9 +5,14 @@ package sarama
 
 import (
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestFuncOffsetManager(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.8.2")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)

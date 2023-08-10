@@ -10,9 +10,14 @@ import (
 	"reflect"
 	"sync/atomic"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "2.3.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -67,6 +72,9 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 }
 
 func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "2.4.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -170,6 +178,9 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 }
 
 func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "2.3.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)

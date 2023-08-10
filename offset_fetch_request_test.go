@@ -3,6 +3,8 @@ package sarama
 import (
 	"fmt"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -55,6 +57,9 @@ var (
 )
 
 func TestOffsetFetchRequestNoPartitions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for version := 0; version <= 5; version++ {
 		request := new(OffsetFetchRequest)
 		request.Version = int16(version)
@@ -88,6 +93,9 @@ func TestOffsetFetchRequestNoPartitions(t *testing.T) {
 }
 
 func TestOffsetFetchRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for version := 0; version <= 5; version++ {
 		request := new(OffsetFetchRequest)
 		request.Version = int16(version)
@@ -116,6 +124,9 @@ func TestOffsetFetchRequest(t *testing.T) {
 }
 
 func TestOffsetFetchRequestAllPartitions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for version := 2; version <= 5; version++ {
 		request := &OffsetFetchRequest{Version: int16(version), ConsumerGroup: "blah"}
 		testRequest(t, fmt.Sprintf("all partitions %d", version), request, offsetFetchRequestAllPartitions)

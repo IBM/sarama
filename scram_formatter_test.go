@@ -3,6 +3,8 @@ package sarama
 import (
 	"bytes"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 /*
@@ -36,6 +38,9 @@ public class App {
 */
 
 func TestScramSaltedPasswordSha512(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	password := []byte("hello")
 	salt := []byte("world")
 
@@ -60,6 +65,9 @@ func TestScramSaltedPasswordSha512(t *testing.T) {
 }
 
 func TestScramSaltedPasswordSha256(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	password := []byte("hello")
 	salt := []byte("world")
 

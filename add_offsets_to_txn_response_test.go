@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var addOffsetsToTxnResponse = []byte{
@@ -11,6 +13,9 @@ var addOffsetsToTxnResponse = []byte{
 }
 
 func TestAddOffsetsToTxnResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	resp := &AddOffsetsToTxnResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		Err:          ErrInvalidProducerEpoch,

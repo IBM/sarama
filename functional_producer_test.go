@@ -16,6 +16,7 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 
 	"github.com/IBM/sarama/internal/toxiproxy"
 )
@@ -23,6 +24,9 @@ import (
 const TestBatchSize = 1000
 
 func TestFuncProducing(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	// FIXME: KAFKA_VERSION seems to break this test
 	config.Version = MinVersion
@@ -30,6 +34,9 @@ func TestFuncProducing(t *testing.T) {
 }
 
 func TestFuncProducingGzip(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	// FIXME: KAFKA_VERSION seems to break this test
 	config.Version = MinVersion
@@ -38,18 +45,27 @@ func TestFuncProducingGzip(t *testing.T) {
 }
 
 func TestFuncProducingSnappy(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	config.Producer.Compression = CompressionSnappy
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingZstd(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	config.Producer.Compression = CompressionZSTD
 	testProducingMessages(t, config)
 }
 
 func TestFuncProducingNoResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	// FIXME: KAFKA_VERSION seems to break this test
 	config.Version = MinVersion
@@ -58,6 +74,9 @@ func TestFuncProducingNoResponse(t *testing.T) {
 }
 
 func TestFuncProducingFlushing(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	// FIXME: KAFKA_VERSION seems to break this test
 	config.Version = MinVersion
@@ -67,6 +86,9 @@ func TestFuncProducingFlushing(t *testing.T) {
 }
 
 func TestFuncMultiPartitionProduce(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -100,6 +122,9 @@ func TestFuncMultiPartitionProduce(t *testing.T) {
 }
 
 func TestFuncTxnProduceNoBegin(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -126,6 +151,9 @@ func TestFuncTxnProduceNoBegin(t *testing.T) {
 }
 
 func TestFuncTxnCommitNoMessages(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -160,6 +188,9 @@ func TestFuncTxnCommitNoMessages(t *testing.T) {
 }
 
 func TestFuncTxnProduce(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -213,6 +244,9 @@ func TestFuncTxnProduce(t *testing.T) {
 }
 
 func TestFuncTxnProduceWithBrokerFailure(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -279,6 +313,9 @@ func TestFuncTxnProduceWithBrokerFailure(t *testing.T) {
 }
 
 func TestFuncTxnProduceEpochBump(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "2.6.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -347,6 +384,9 @@ func TestFuncTxnProduceEpochBump(t *testing.T) {
 }
 
 func TestFuncInitProducerId3(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "2.6.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -388,6 +428,9 @@ func (h *messageHandler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerG
 }
 
 func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -486,6 +529,9 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 }
 
 func TestFuncTxnProduceMultiTxn(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -569,6 +615,9 @@ func TestFuncTxnProduceMultiTxn(t *testing.T) {
 }
 
 func TestFuncTxnAbortedProduce(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -641,6 +690,9 @@ func TestFuncTxnAbortedProduce(t *testing.T) {
 }
 
 func TestFuncProducingToInvalidTopic(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -657,6 +709,9 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 }
 
 func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -733,6 +788,9 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 }
 
 func TestInterceptors(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	config := NewFunctionalTestConfig()
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -895,6 +953,9 @@ func testProducingMessages(t *testing.T, config *Config) {
 //
 // https://github.com/IBM/sarama/issues/2129
 func TestAsyncProducerRemoteBrokerClosed(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 

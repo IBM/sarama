@@ -3,6 +3,8 @@ package sarama
 import (
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -32,6 +34,9 @@ var (
 )
 
 func TestInitProducerIDRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &InitProducerIDRequest{
 		TransactionTimeout: 100 * time.Millisecond,
 	}

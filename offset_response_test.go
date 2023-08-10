@@ -3,6 +3,8 @@ package sarama
 import (
 	"errors"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -53,6 +55,9 @@ var (
 )
 
 func TestEmptyOffsetResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "empty", &response, emptyOffsetResponse, 0)
@@ -69,6 +74,9 @@ func TestEmptyOffsetResponse(t *testing.T) {
 }
 
 func TestNormalOffsetResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "normal", &response, normalOffsetResponse, 0)
@@ -99,6 +107,9 @@ func TestNormalOffsetResponse(t *testing.T) {
 }
 
 func TestNormalOffsetResponseV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "normal", &response, normalOffsetResponseV1, 1)
@@ -129,6 +140,9 @@ func TestNormalOffsetResponseV1(t *testing.T) {
 }
 
 func TestOffsetResponseV4(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "v4", &response, offsetResponseV4, 4)

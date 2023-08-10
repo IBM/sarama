@@ -8,6 +8,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	assert "github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 var names = map[int16]string{
@@ -175,6 +176,9 @@ func allocateResponseBody(req protocolBody) protocolBody {
 }
 
 func TestAllocateBodyProtocolVersions(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	type test struct {
 		version     KafkaVersion
 		apiVersions map[int16]int16

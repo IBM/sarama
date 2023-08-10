@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -26,6 +28,9 @@ var (
 )
 
 func TestCreatePartitionsResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	resp := &CreatePartitionsResponse{
 		ThrottleTime: 100 * time.Millisecond,
 		TopicPartitionErrors: map[string]*TopicPartitionError{
@@ -53,6 +58,9 @@ func TestCreatePartitionsResponse(t *testing.T) {
 }
 
 func TestTopicPartitionError(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	// Assert that TopicPartitionError satisfies error interface
 	var err error = &TopicPartitionError{
 		Err: ErrTopicAuthorizationFailed,

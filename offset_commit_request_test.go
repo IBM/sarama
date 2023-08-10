@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -65,6 +67,9 @@ var (
 )
 
 func TestOffsetCommitRequestV0(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(OffsetCommitRequest)
 	request.Version = 0
 	request.ConsumerGroup = "foobar"
@@ -75,6 +80,9 @@ func TestOffsetCommitRequestV0(t *testing.T) {
 }
 
 func TestOffsetCommitRequestV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	request := new(OffsetCommitRequest)
 	request.ConsumerGroup = "foobar"
 	request.ConsumerID = "cons"
@@ -87,6 +95,9 @@ func TestOffsetCommitRequestV1(t *testing.T) {
 }
 
 func TestOffsetCommitRequestV2ToV4(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	for version := 2; version <= 4; version++ {
 		request := new(OffsetCommitRequest)
 		request.ConsumerGroup = "foobar"
@@ -141,6 +152,9 @@ var (
 )
 
 func TestOffsetCommitRequestV5AndPlus(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	groupInstanceId := "gid"
 	tests := []struct {
 		CaseName     string

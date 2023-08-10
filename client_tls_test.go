@@ -10,9 +10,14 @@ import (
 	"net"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestTLS(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	cakey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		t.Fatal(err)
@@ -220,6 +225,9 @@ func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientCon
 }
 
 func TestSetServerName(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	if validServerNameTLS("kafka-server.domain.com:9093", nil).ServerName != "kafka-server.domain.com" {
 		t.Fatal("Expected kafka-server.domain.com as tls.ServerName when tls config is nil")
 	}

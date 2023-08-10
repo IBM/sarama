@@ -3,6 +3,8 @@ package sarama
 import (
 	"reflect"
 	"testing"
+
+	"go.uber.org/goleak"
 )
 
 var (
@@ -24,6 +26,9 @@ var (
 )
 
 func TestSyncGroupRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var request *SyncGroupRequest
 
 	request = new(SyncGroupRequest)
@@ -53,6 +58,9 @@ var (
 )
 
 func TestSyncGroupRequestV3AndPlus(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	groupInstanceId := "gid"
 	tests := []struct {
 		CaseName     string

@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var listPartitionReassignmentsResponse = []byte{
 	0, 0, 39, 16, // ThrottleTimeMs 10000
@@ -17,6 +21,9 @@ var listPartitionReassignmentsResponse = []byte{
 }
 
 func TestListPartitionReassignmentResponse(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var response *ListPartitionReassignmentsResponse = &ListPartitionReassignmentsResponse{
 		ThrottleTimeMs: int32(10000),
 		Version:        int16(0),

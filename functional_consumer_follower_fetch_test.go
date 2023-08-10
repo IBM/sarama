@@ -10,9 +10,14 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"go.uber.org/goleak"
 )
 
 func TestConsumerFetchFollowerFailover(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	const (
 		topic  = "test.1"
 		numMsg = 1000

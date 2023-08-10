@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	responseHeaderBytesV0 = []byte{
@@ -15,6 +19,9 @@ var (
 )
 
 func TestResponseHeaderV0(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	header := responseHeader{}
 
 	testVersionDecodable(t, "response header", &header, responseHeaderBytesV0, 0)
@@ -27,6 +34,9 @@ func TestResponseHeaderV0(t *testing.T) {
 }
 
 func TestResponseHeaderV1(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	header := responseHeader{}
 
 	testVersionDecodable(t, "response header", &header, responseHeaderBytesV1, 1)

@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	txnOffsetCommitRequest = []byte{
@@ -32,6 +36,9 @@ var (
 )
 
 func TestTxnOffsetCommitRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &TxnOffsetCommitRequest{
 		TransactionalID: "txn",
 		GroupID:         "groupid",
@@ -49,6 +56,9 @@ func TestTxnOffsetCommitRequest(t *testing.T) {
 }
 
 func TestTxnOffsetCommitRequestV2(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &TxnOffsetCommitRequest{
 		Version:         2,
 		TransactionalID: "txn",

@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var (
 	emptyDescribeGroupsRequest = []byte{0, 0, 0, 0}
@@ -18,6 +22,9 @@ var (
 )
 
 func TestDescribeGroupsRequestV0(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var request *DescribeGroupsRequest
 
 	request = new(DescribeGroupsRequest)
@@ -51,6 +58,9 @@ var (
 )
 
 func TestDescribeGroupsRequestV3(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	var request *DescribeGroupsRequest
 
 	request = new(DescribeGroupsRequest)

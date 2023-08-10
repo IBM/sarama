@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"go.uber.org/goleak"
+)
 
 var addOffsetsToTxnRequest = []byte{
 	0, 3, 't', 'x', 'n',
@@ -10,6 +14,9 @@ var addOffsetsToTxnRequest = []byte{
 }
 
 func TestAddOffsetsToTxnRequest(t *testing.T) {
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
+	})
 	req := &AddOffsetsToTxnRequest{
 		TransactionalID: "txn",
 		ProducerID:      8000,
