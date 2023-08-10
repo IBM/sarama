@@ -84,6 +84,7 @@ func TestSyncProducerTransactional(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, client)
 
 	findCoordinatorResponse := new(FindCoordinatorResponse)
 	findCoordinatorResponse.Coordinator = client.Brokers()[0]

@@ -1794,6 +1794,7 @@ func TestDescribeLogDirsUnknownBroker(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, admin)
 
 	type result struct {
 		metadata map[int32][]DescribeLogDirsResponseDirMetadata
