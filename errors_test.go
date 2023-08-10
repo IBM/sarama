@@ -13,7 +13,6 @@ func TestSentinelWithSingleWrappedError(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	})
-	t.Parallel()
 	myNetError := &net.OpError{Op: "mock", Err: errors.New("op error")}
 	error := Wrap(ErrOutOfBrokers, myNetError)
 
@@ -48,7 +47,6 @@ func TestSentinelWithMultipleWrappedErrors(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	})
-	t.Parallel()
 	myNetError := &net.OpError{}
 	myAddrError := &net.AddrError{}
 

@@ -1807,7 +1807,6 @@ func TestProducerError(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	})
-	t.Parallel()
 	err := ProducerError{Err: ErrOutOfBrokers}
 	if !errors.Is(err, ErrOutOfBrokers) {
 		t.Error("unexpected errors.Is")

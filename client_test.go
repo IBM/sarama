@@ -1097,7 +1097,6 @@ func TestClientConnectionRefused(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	})
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Close()
 
@@ -1115,7 +1114,6 @@ func TestClientCoordinatorConnectionRefused(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	})
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Returns(new(MetadataResponse))
 
@@ -1143,7 +1141,6 @@ func TestInitProducerIDConnectionRefused(t *testing.T) {
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	})
-	t.Parallel()
 	seedBroker := NewMockBroker(t, 1)
 	seedBroker.Returns(&MetadataResponse{Version: 4})
 
