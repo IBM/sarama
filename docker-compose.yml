@@ -1,4 +1,4 @@
-version: '3.7'
+version: '3.9'
 services:
   zookeeper-1:
     image: 'docker.io/library/zookeeper:3.6.3'
@@ -34,13 +34,16 @@ services:
       ZOO_MAX_CLIENT_CNXNS: '0'
       ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   kafka-1:
-    image: 'sarama/fv-kafka'
+    image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
       dockerfile: Dockerfile.kafka
+      args:
+        KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
+        SCALA_VERSION: ${SCALA_VERSION:-2.13}
     restart: always
     environment:
-      KAFKA_VERSION: ${KAFKA_VERSION:-3.3.2}
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29091'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-1:9091,LISTENER_LOCAL://localhost:29091'
@@ -56,13 +59,16 @@ services:
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
   kafka-2:
-    image: 'sarama/fv-kafka'
+    image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
       dockerfile: Dockerfile.kafka
+      args:
+        KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
+        SCALA_VERSION: ${SCALA_VERSION:-2.13}
     restart: always
     environment:
-      KAFKA_VERSION: ${KAFKA_VERSION:-3.3.2}
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29092'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-2:9091,LISTENER_LOCAL://localhost:29092'
@@ -78,13 +84,16 @@ services:
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
   kafka-3:
-    image: 'sarama/fv-kafka'
+    image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
       dockerfile: Dockerfile.kafka
+      args:
+        KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
+        SCALA_VERSION: ${SCALA_VERSION:-2.13}
     restart: always
     environment:
-      KAFKA_VERSION: ${KAFKA_VERSION:-3.3.2}
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29093'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-3:9091,LISTENER_LOCAL://localhost:29093'
@@ -100,13 +109,16 @@ services:
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
   kafka-4:
-    image: 'sarama/fv-kafka'
+    image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
       dockerfile: Dockerfile.kafka
+      args:
+        KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
+        SCALA_VERSION: ${SCALA_VERSION:-2.13}
     restart: always
     environment:
-      KAFKA_VERSION: ${KAFKA_VERSION:-3.3.2}
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29094'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-4:9091,LISTENER_LOCAL://localhost:29094'
@@ -122,13 +134,16 @@ services:
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
   kafka-5:
-    image: 'sarama/fv-kafka'
+    image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
       dockerfile: Dockerfile.kafka
+      args:
+        KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
+        SCALA_VERSION: ${SCALA_VERSION:-2.13}
     restart: always
     environment:
-      KAFKA_VERSION: ${KAFKA_VERSION:-3.3.2}
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
       KAFKA_CFG_ZOOKEEPER_CONNECT: 'zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181'
       KAFKA_CFG_LISTENERS: 'LISTENER_INTERNAL://:9091,LISTENER_LOCAL://:29095'
       KAFKA_CFG_ADVERTISED_LISTENERS: 'LISTENER_INTERNAL://kafka-5:9091,LISTENER_LOCAL://localhost:29095'
@@ -146,11 +161,12 @@ services:
   toxiproxy:
     image: 'ghcr.io/shopify/toxiproxy:2.4.0'
     ports:
-      # The tests themselves actually start the proxies on these ports
-      - '29091:29091'
-      - '29092:29092'
-      - '29093:29093'
-      - '29094:29094'
-      - '29095:29095'
-      # This is the toxiproxy API port
-      - '8474:8474'
+    # The tests themselves actually start the proxies on these ports
+    - '29091:29091'
+    - '29092:29092'
+    - '29093:29093'
+    - '29094:29094'
+    - '29095:29095'
+
+    # This is the toxiproxy API port
+    - '8474:8474'

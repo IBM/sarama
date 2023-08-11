@@ -16,11 +16,23 @@ RUN cd /etc/java/java-11-openjdk/*/conf/security \
   && echo 'networkaddress.cache.ttl=0' >> java.security \
   && echo 'networkaddress.cache.negative.ttl=0' >> java.security
 
+ARG SCALA_VERSION="2.13"
+ARG KAFKA_VERSION="3.5.1"
+
 # https://github.com/apache/kafka/blob/53eeaad946cd053e9eb1a762972d4efeacb8e4fc/tests/docker/Dockerfile#L65-L69
 ARG KAFKA_MIRROR="https://s3-us-west-2.amazonaws.com/kafka-packages"
-RUN mkdir -p "/opt/kafka-3.3.2" && chmod a+rw /opt/kafka-3.3.2 && curl -s "$KAFKA_MIRROR/kafka_2.13-3.3.2.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.3.2"
-RUN mkdir -p "/opt/kafka-3.4.1" && chmod a+rw /opt/kafka-3.4.1 && curl -s "$KAFKA_MIRROR/kafka_2.13-3.4.1.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.4.1"
-RUN mkdir -p "/opt/kafka-3.5.1" && chmod a+rw /opt/kafka-3.5.1 && curl -s "$KAFKA_MIRROR/kafka_2.13-3.5.1.tgz" | tar xz --strip-components=1 -C "/opt/kafka-3.5.1"
+RUN mkdir -p "/opt/kafka-${KAFKA_VERSION}" \
+ && chmod a+rw "/opt/kafka-${KAFKA_VERSION}" \
+ && curl -s "$KAFKA_MIRROR/kafka_${SCALA_VERSION}-${KAFKA_VERSION}.tgz" | tar xz --strip-components=1 -C "/opt/kafka-${KAFKA_VERSION}"
+
+# older kafka versions depend upon jaxb-api being bundled with the JDK, but it
+# was removed from Java 11 so work around that by including it in the kafka
+# libs dir regardless
+RUN cd /tmp \
+ && curl -sLO "https://repo1.maven.org/maven2/javax/xml/bind/jaxb-api/2.3.0/jaxb-api-2.3.0.jar" \
+ && for DIR in /opt/kafka-*; do cp -v jaxb-api-2.3.0.jar $DIR/libs/ ; done \
+ && rm -f jaxb-api-2.3.0.jar
+
 
 COPY entrypoint.sh /
 
