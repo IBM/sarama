@@ -14,9 +14,10 @@ import (
 	"testing"
 	"time"
 
-	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/require"
+
+	"github.com/IBM/sarama/internal/toxiproxy"
 )
 
 const TestBatchSize = 1000
