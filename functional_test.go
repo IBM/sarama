@@ -17,7 +17,7 @@ import (
 	"testing"
 	"time"
 
-	toxiproxy "github.com/Shopify/toxiproxy/v2/client"
+	"github.com/IBM/sarama/internal/toxiproxy"
 )
 
 const uncommittedTopic = "uncommitted-topic-test-4"
@@ -456,7 +456,7 @@ func resetProxies(t testing.TB) {
 }
 
 func SaveProxy(t *testing.T, px string) {
-	if err := FunctionalTestEnv.Proxies[px].Save(); err != nil {
+	if _, err := FunctionalTestEnv.Proxies[px].Save(); err != nil {
 		t.Fatal(err)
 	}
 }
