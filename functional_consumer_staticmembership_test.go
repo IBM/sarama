@@ -46,6 +46,8 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, admin)
+
 	res, err := admin.DescribeConsumerGroups([]string{groupID})
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +95,8 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, admin)
+
 	res1, err := admin.DescribeConsumerGroups([]string{groupID})
 	if err != nil {
 		t.Fatal(err)

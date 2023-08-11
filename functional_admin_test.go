@@ -23,6 +23,7 @@ func TestFuncAdminQuotas(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, adminClient)
 
 	// Check that we can read the quotas, and that they are empty
 	quotas, err := adminClient.DescribeClientQuotas(nil, false)
@@ -143,6 +144,7 @@ func TestFuncAdminDescribeGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, adminClient)
 
 	config1 := NewFunctionalTestConfig()
 	config1.ClientID = "M1"
