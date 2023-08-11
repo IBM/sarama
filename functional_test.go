@@ -456,7 +456,7 @@ func resetProxies(t testing.TB) {
 }
 
 func SaveProxy(t *testing.T, px string) {
-	if err := FunctionalTestEnv.Proxies[px].Save(); err != nil {
+	if _, err := FunctionalTestEnv.Proxies[px].Save(); err != nil {
 		t.Fatal(err)
 	}
 }
