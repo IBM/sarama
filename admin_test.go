@@ -41,7 +41,10 @@ func TestClusterAdminInvalidController(t *testing.T) {
 
 	config := NewTestConfig()
 	config.Version = V1_0_0_0
-	_, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if admin != nil {
+		defer safeClose(t, admin)
+	}
 	if err == nil {
 		t.Fatal(errors.New("controller not set still cluster admin was created"))
 	}
