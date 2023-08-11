@@ -587,6 +587,7 @@ func TestFuncTxnAbortedProduce(t *testing.T) {
 
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
+	defer client.Close()
 
 	consumer, err := NewConsumerFromClient(client)
 	require.NoError(t, err)
@@ -745,6 +746,7 @@ func TestInterceptors(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, client)
 
 	initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
 	if err != nil {
@@ -800,7 +802,6 @@ func TestInterceptors(t *testing.T) {
 		}
 	}
 	safeClose(t, consumer)
-	safeClose(t, client)
 }
 
 func testProducingMessages(t *testing.T, config *Config) {
@@ -821,6 +822,7 @@ func testProducingMessages(t *testing.T, config *Config) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, client)
 
 	// Keep in mind the current offset
 	initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
@@ -885,7 +887,6 @@ func testProducingMessages(t *testing.T, config *Config) {
 	validateConsumerMetrics(t, client)
 
 	safeClose(t, consumer)
-	safeClose(t, client)
 }
 
 // TestAsyncProducerRemoteBrokerClosed ensures that the async producer can
