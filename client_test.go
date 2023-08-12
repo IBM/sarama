@@ -13,6 +13,7 @@ import (
 )
 
 func safeClose(t testing.TB, c io.Closer) {
+	t.Helper()
 	err := c.Close()
 	if err != nil {
 		t.Error(err)
@@ -51,6 +52,7 @@ func TestCachedPartitions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, c)
 	client := c.(*client)
 
 	// Verify they aren't cached the same
@@ -69,7 +71,6 @@ func TestCachedPartitions(t *testing.T) {
 	}
 
 	seedBroker.Close()
-	safeClose(t, client)
 }
 
 func TestClientDoesntCachePartitionsForTopicsWithErrors(t *testing.T) {
