@@ -3,9 +3,8 @@ module github.com/IBM/sarama
 go 1.17
 
 require (
-	github.com/Shopify/toxiproxy/v2 v2.5.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/eapache/go-resiliency v1.3.0
+	github.com/eapache/go-resiliency v1.4.0
 	github.com/eapache/go-xerial-snappy v0.0.0-20230731223053-c322873962e3
 	github.com/eapache/queue v1.1.0
 	github.com/fortytw2/leaktest v1.3.0
