@@ -1,11 +1,6 @@
-//go:build !functional
-// +build !functional
-
-package sarama
+package mocks
 
 import (
-	"flag"
-	"log"
 	"os"
 	"testing"
 
@@ -18,9 +13,5 @@ func TestMain(m *testing.M) {
 
 func testMain(m *testing.M) int {
 	defer goleak.VerifyTestMain(m, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
-	flag.Parse()
-	if f := flag.Lookup("test.v"); f != nil && f.Value.String() == "true" {
-		Logger = log.New(os.Stderr, "[DEBUG] ", log.Lmicroseconds|log.Ltime)
-	}
 	return m.Run()
 }

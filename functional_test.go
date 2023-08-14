@@ -17,6 +17,8 @@ import (
 	"testing"
 	"time"
 
+	"go.uber.org/goleak"
+
 	"github.com/IBM/sarama/internal/toxiproxy"
 )
 
@@ -68,6 +70,7 @@ func TestMain(m *testing.M) {
 }
 
 func testMain(m *testing.M) int {
+	defer goleak.VerifyTestMain(m, goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"))
 	ctx := context.Background()
 	var env testEnvironment
 
