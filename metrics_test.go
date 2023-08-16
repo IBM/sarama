@@ -105,6 +105,7 @@ func countMeterValidator(name string, expectedCount int) *metricValidator {
 
 func minCountMeterValidator(name string, minCount int) *metricValidator {
 	return meterValidator(name, func(t *testing.T, meter metrics.Meter) {
+		t.Helper()
 		count := meter.Count()
 		if count < int64(minCount) {
 			t.Errorf("Expected meter metric '%s' count >= %d, got %d", name, minCount, count)
@@ -116,6 +117,7 @@ func histogramValidator(name string, extraValidator func(*testing.T, metrics.His
 	return &metricValidator{
 		name: name,
 		validator: func(t *testing.T, metric interface{}) {
+			t.Helper()
 			if histogram, ok := metric.(metrics.Histogram); !ok {
 				t.Errorf("Expected histogram metric for '%s', got %T", name, metric)
 			} else {
@@ -127,6 +129,7 @@ func histogramValidator(name string, extraValidator func(*testing.T, metrics.His
 
 func countHistogramValidator(name string, expectedCount int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
+		t.Helper()
 		count := histogram.Count()
 		if count != int64(expectedCount) {
 			t.Errorf("Expected histogram metric '%s' count = %d, got %d", name, expectedCount, count)
@@ -136,6 +139,7 @@ func countHistogramValidator(name string, expectedCount int) *metricValidator {
 
 func minCountHistogramValidator(name string, minCount int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
+		t.Helper()
 		count := histogram.Count()
 		if count < int64(minCount) {
 			t.Errorf("Expected histogram metric '%s' count >= %d, got %d", name, minCount, count)
@@ -145,6 +149,7 @@ func minCountHistogramValidator(name string, minCount int) *metricValidator {
 
 func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
+		t.Helper()
 		min := int(histogram.Min())
 		if min != expectedMin {
 			t.Errorf("Expected histogram metric '%s' min = %d, got %d", name, expectedMin, min)
@@ -158,6 +163,7 @@ func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *me
 
 func minValHistogramValidator(name string, minMin int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
+		t.Helper()
 		min := int(histogram.Min())
 		if min < minMin {
 			t.Errorf("Expected histogram metric '%s' min >= %d, got %d", name, minMin, min)
@@ -167,6 +173,7 @@ func minValHistogramValidator(name string, minMin int) *metricValidator {
 
 func maxValHistogramValidator(name string, maxMax int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
+		t.Helper()
 		max := int(histogram.Max())
 		if max > maxMax {
 			t.Errorf("Expected histogram metric '%s' max <= %d, got %d", name, maxMax, max)
@@ -178,6 +185,7 @@ func counterValidator(name string, expectedCount int) *metricValidator {
 	return &metricValidator{
 		name: name,
 		validator: func(t *testing.T, metric interface{}) {
+			t.Helper()
 			if counter, ok := metric.(metrics.Counter); !ok {
 				t.Errorf("Expected counter metric for '%s', got %T", name, metric)
 			} else {
