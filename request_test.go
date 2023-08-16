@@ -353,6 +353,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 // implement the encoder or decoder interfaces that needed somewhere to live
 
 func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
+	t.Helper()
 	packet, err := encode(in, nil)
 	if err != nil {
 		t.Error(err)
@@ -362,6 +363,7 @@ func testEncodable(t *testing.T, name string, in encoder, expect []byte) {
 }
 
 func testDecodable(t *testing.T, name string, out decoder, in []byte) {
+	t.Helper()
 	err := decode(in, out, nil)
 	if err != nil {
 		t.Error("Decoding", name, "failed:", err)
@@ -369,6 +371,7 @@ func testDecodable(t *testing.T, name string, out decoder, in []byte) {
 }
 
 func testVersionDecodable(t *testing.T, name string, out versionedDecoder, in []byte, version int16) {
+	t.Helper()
 	err := versionedDecode(in, out, version, nil)
 	if err != nil {
 		t.Error("Decoding", name, "version", version, "failed:", err)
