@@ -157,7 +157,10 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 		env.KafkaVersion = "3.5.1"
 	}
 
-	c := exec.Command("docker-compose", "up", "-d")
+	// docker-compose v2.17.0 or newer required for `--wait-timeout` support
+	c := exec.Command(
+		"docker-compose", "up", "-d", "--quiet-pull", "--timestamps", "--wait", "--wait-timeout", "600",
+	)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Env = append(os.Environ(), fmt.Sprintf("KAFKA_VERSION=%s", env.KafkaVersion))

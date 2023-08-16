@@ -41,6 +41,26 @@ services:
       args:
         KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
         SCALA_VERSION: ${SCALA_VERSION:-2.13}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '--bootstrap-server',
+          'kafka-1:9091',
+          '--broker',
+          '1',
+          '--describe',
+        ]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 360s
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+      - toxiproxy
     restart: always
     environment:
       KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
@@ -66,6 +86,26 @@ services:
       args:
         KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
         SCALA_VERSION: ${SCALA_VERSION:-2.13}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '--bootstrap-server',
+          'kafka-2:9091',
+          '--broker',
+          '2',
+          '--describe',
+        ]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 360s
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+      - toxiproxy
     restart: always
     environment:
       KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
@@ -91,6 +131,26 @@ services:
       args:
         KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
         SCALA_VERSION: ${SCALA_VERSION:-2.13}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '--bootstrap-server',
+          'kafka-3:9091',
+          '--broker',
+          '3',
+          '--describe',
+        ]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 360s
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+      - toxiproxy
     restart: always
     environment:
       KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
@@ -116,6 +176,26 @@ services:
       args:
         KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
         SCALA_VERSION: ${SCALA_VERSION:-2.13}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '--bootstrap-server',
+          'kafka-4:9091',
+          '--broker',
+          '4',
+          '--describe',
+        ]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 360s
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+      - toxiproxy
     restart: always
     environment:
       KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
@@ -141,6 +221,26 @@ services:
       args:
         KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
         SCALA_VERSION: ${SCALA_VERSION:-2.13}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '--bootstrap-server',
+          'kafka-5:9091',
+          '--broker',
+          '5',
+          '--describe',
+        ]
+      interval: 15s
+      timeout: 15s
+      retries: 10
+      start_period: 360s
+    depends_on:
+      - zookeeper-1
+      - zookeeper-2
+      - zookeeper-3
+      - toxiproxy
     restart: always
     environment:
       KAFKA_VERSION: ${KAFKA_VERSION:-3.5.1}
@@ -160,13 +260,19 @@ services:
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
   toxiproxy:
     image: 'ghcr.io/shopify/toxiproxy:2.4.0'
+    healthcheck:
+      test: ['CMD', '/toxiproxy-cli', 'l']
+      interval: 15s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
     ports:
-    # The tests themselves actually start the proxies on these ports
-    - '29091:29091'
-    - '29092:29092'
-    - '29093:29093'
-    - '29094:29094'
-    - '29095:29095'
+      # The tests themselves actually start the proxies on these ports
+      - '29091:29091'
+      - '29092:29092'
+      - '29093:29093'
+      - '29094:29094'
+      - '29095:29095'
 
-    # This is the toxiproxy API port
-    - '8474:8474'
+      # This is the toxiproxy API port
+      - '8474:8474'
