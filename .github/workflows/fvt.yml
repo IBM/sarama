@@ -39,4 +39,8 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Test (Functional)
-      run: make test_functional
+      run: |
+        curl -sSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker-compose))"
+        docker-compose --version
+        make test_functional
