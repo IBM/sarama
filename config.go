@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"compress/gzip"
 	"crypto/tls"
 	"fmt"
 	"io"
@@ -9,6 +8,7 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/rcrowley/go-metrics"
 	"golang.org/x/net/proxy"
 )
