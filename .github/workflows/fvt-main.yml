@@ -1,0 +1,36 @@
+name: FVT
+on:
+  merge_group:
+  push:
+    branches:
+    - main
+jobs:
+  fvt:
+    name: Test with Kafka ${{ matrix.kafka-version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.21.x]
+        kafka-version: [1.0.2, 2.0.1, 2.2.2, 2.6.2, 2.8.2, 3.0.2, 3.3.2, 3.5.1]
+        include:
+        - kafka-version: 1.0.2
+          scala-version: 2.11
+        - kafka-version: 2.0.1
+          scala-version: 2.12
+        - kafka-version: 2.2.2
+          scala-version: 2.12
+        - kafka-version: 2.6.2
+          scala-version: 2.12
+        - kafka-version: 2.8.2
+          scala-version: 2.12
+        - kafka-version: 3.0.2
+          scala-version: 2.12
+        - kafka-version: 3.3.2
+          scala-version: 2.13
+        - kafka-version: 3.5.1
+          scala-version: 2.13
+    uses: ./.github/workflows/fvt.yml
+    with:
+      go-version: ${{ matrix.go-version }}
+      kafka-version: ${{ matrix.kafka-version }}
+      scala-version: ${{ matrix.scala-version }}
