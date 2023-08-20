@@ -30,6 +30,9 @@ func TestFuncOffsetManager(t *testing.T) {
 	pom1.MarkOffset(10, "test metadata")
 	safeClose(t, pom1)
 
+	// Avoid flaky test: submit offset & let om cleanup removed poms
+	offsetManager.Commit()
+
 	pom2, err := offsetManager.ManagePartition("test.1", 0)
 	if err != nil {
 		t.Fatal(err)
