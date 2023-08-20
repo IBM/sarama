@@ -5,7 +5,7 @@ type topicPartitionAssignment struct {
 	Partition int32
 }
 
-type StickyAssignorUserData interface {
+type MemberData interface {
 	partitions() []topicPartitionAssignment
 	hasGeneration() bool
 	generation() int

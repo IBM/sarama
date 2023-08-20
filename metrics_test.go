@@ -57,6 +57,7 @@ func (m *metricValidators) registerForBroker(broker *Broker, validator *metricVa
 	m.register(&metricValidator{getMetricNameForBroker(validator.name, broker), validator.validator})
 }
 
+// nolint:unused
 func (m *metricValidators) registerForGlobalAndTopic(topic string, validator *metricValidator) {
 	m.register(&metricValidator{validator.name, validator.validator})
 	m.register(&metricValidator{getMetricNameForTopic(validator.name, topic), validator.validator})
@@ -103,6 +104,7 @@ func countMeterValidator(name string, expectedCount int) *metricValidator {
 	})
 }
 
+// nolint:unused
 func minCountMeterValidator(name string, minCount int) *metricValidator {
 	return meterValidator(name, func(t *testing.T, meter metrics.Meter) {
 		t.Helper()
@@ -137,6 +139,7 @@ func countHistogramValidator(name string, expectedCount int) *metricValidator {
 	})
 }
 
+// nolint:unused
 func minCountHistogramValidator(name string, minCount int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
 		t.Helper()
@@ -161,6 +164,7 @@ func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *me
 	})
 }
 
+// nolint:unused
 func minValHistogramValidator(name string, minMin int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
 		t.Helper()
@@ -171,6 +175,7 @@ func minValHistogramValidator(name string, minMin int) *metricValidator {
 	})
 }
 
+// nolint:unused
 func maxValHistogramValidator(name string, maxMax int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
 		t.Helper()

@@ -244,3 +244,134 @@ func TestConsumerShouldNotRetrySessionIfContextCancelled(t *testing.T) {
 	_, err = c.retryNewSession(ctx, nil, nil, 1024, true)
 	assert.Equal(t, context.Canceled, err)
 }
+
+func Test_validateCooperativeAssignment(t *testing.T) {
+	type args struct {
+		previousAssignment map[string]ConsumerGroupMemberMetadata
+		currentAssignment  BalanceStrategyPlan
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "no previous assignment",
+			args: args{
+				previousAssignment: nil,
+				currentAssignment: BalanceStrategyPlan{
+					"member1": map[string][]int32{
+						"topic1": {0, 1},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "no current assignment",
+			args: args{
+				previousAssignment: map[string]ConsumerGroupMemberMetadata{
+					"member1": {
+						OwnedPartitions: []*OwnedPartition{
+							{
+								Topic:      "topic1",
+								Partitions: []int32{0, 1},
+							},
+						},
+					},
+				},
+				currentAssignment: make(BalanceStrategyPlan),
+			},
+			wantErr: false,
+		},
+		{
+			name: "directly transfer one partition",
+			args: args{
+				previousAssignment: map[string]ConsumerGroupMemberMetadata{
+					"member1": {
+						OwnedPartitions: []*OwnedPartition{
+							{
+								Topic:      "topic1",
+								Partitions: []int32{0, 1},
+							},
+						},
+					},
+					"member2": {
+						OwnedPartitions: []*OwnedPartition{},
+					},
+				},
+				currentAssignment: BalanceStrategyPlan{
+					"member1": map[string][]int32{
+						"topic1": {0},
+					},
+					"member2": map[string][]int32{
+						"topic1": {1},
+					},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "revoke one partition",
+			args: args{
+				previousAssignment: map[string]ConsumerGroupMemberMetadata{
+					"member1": {
+						OwnedPartitions: []*OwnedPartition{
+							{
+								Topic:      "topic1",
+								Partitions: []int32{0, 1},
+							},
+						},
+					},
+					"member2": {
+						OwnedPartitions: []*OwnedPartition{},
+					},
+				},
+				currentAssignment: BalanceStrategyPlan{
+					"member1": map[string][]int32{
+						"topic1": {0},
+					},
+					"member2": map[string][]int32{},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "add one partition",
+			args: args{
+				previousAssignment: map[string]ConsumerGroupMemberMetadata{
+					"member1": {
+						OwnedPartitions: []*OwnedPartition{
+							{
+								Topic:      "topic1",
+								Partitions: []int32{0},
+							},
+						},
+					},
+					"member2": {
+						OwnedPartitions: []*OwnedPartition{},
+					},
+				},
+				currentAssignment: BalanceStrategyPlan{
+					"member1": map[string][]int32{
+						"topic1": {0},
+					},
+					"member2": map[string][]int32{
+						"topic1": {1},
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateCooperativeAssignment(tt.args.previousAssignment, tt.args.currentAssignment)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

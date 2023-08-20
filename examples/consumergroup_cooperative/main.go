@@ -17,13 +17,13 @@ import (
 
 // Sarama configuration options
 var (
-	brokers  = ""
-	version  = ""
-	group    = ""
-	topics   = ""
-	assignor = ""
-	oldest   = true
-	verbose  = false
+	brokers   = ""
+	version   = ""
+	group     = ""
+	topics    = ""
+	assignors = ""
+	oldest    = true
+	verbose   = false
 )
 
 func init() {
@@ -31,9 +31,10 @@ func init() {
 	flag.StringVar(&group, "group", "", "Kafka consumer group definition")
 	flag.StringVar(&version, "version", "2.1.1", "Kafka cluster version")
 	flag.StringVar(&topics, "topics", "", "Kafka topics to be consumed, as a comma separated list")
-	flag.StringVar(&assignor, "assignor", "range", "Consumer group partition assignment strategy (range, roundrobin, sticky)")
+	flag.StringVar(&assignors, "assignors", "cooperative-sticky", "Consumer group partition assignment strategies (range, roundrobin, sticky, cooperative-sticky)")
 	flag.BoolVar(&oldest, "oldest", true, "Kafka consumer consume initial offset from oldest")
 	flag.BoolVar(&verbose, "verbose", false, "Sarama logging")
+
 	flag.Parse()
 
 	if len(brokers) == 0 {
@@ -50,7 +51,7 @@ func init() {
 }
 
 func main() {
-	keepRunning := true
+	sarama.Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags|log.Lshortfile|log.Lmsgprefix)
 	log.Println("Starting a new Sarama consumer")
 
 	if verbose {
@@ -69,24 +70,31 @@ func main() {
 	config := sarama.NewConfig()
 	config.Version = version
 
-	switch assignor {
-	case "sticky":
-		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategySticky()}
-	case "roundrobin":
-		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyRoundRobin()}
-	case "range":
-		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyRange()}
-	default:
-		log.Panicf("Unrecognized consumer group partition assignor: %s", assignor)
+	var strategies []sarama.BalanceStrategy
+	for _, assignor := range strings.Split(assignors, " ") {
+		switch assignor {
+		case "sticky":
+			strategies = append(strategies, sarama.NewBalanceStrategySticky())
+		case "roundrobin":
+			strategies = append(strategies, sarama.NewBalanceStrategyRoundRobin())
+		case "range":
+			strategies = append(strategies, sarama.NewBalanceStrategyRange())
+		case "cooperative-sticky":
+			strategies = append(strategies, sarama.NewBalanceStrategyCooperativeSticky())
+		default:
+			log.Panicf("Unrecognized consumer group partition assignor: %s", assignor)
+		}
 	}
+	config.Consumer.Group.Rebalance.GroupStrategies = strategies
 
 	if oldest {
 		config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	}
 
-	consumer := Consumer{
-		ready: make(chan bool),
-	}
+	/**
+	 * Setup a new Sarama consumer group
+	 */
+	consumer := Consumer{}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	client, err := sarama.NewConsumerGroup(strings.Split(brokers, ","), group, config)
@@ -99,25 +107,26 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+
+		var err error
 		for {
 			// `Consume` should be called inside an infinite loop, when a
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
-			if err := client.Consume(ctx, strings.Split(topics, ","), &consumer); err != nil {
-				if errors.Is(err, sarama.ErrClosedConsumerGroup) {
-					return
-				}
+			if err = client.ConsumeV2(ctx, strings.Split(topics, ","), &consumer); err != nil {
 				log.Panicf("Error from consumer: %v", err)
+			}
+			// return if consumer is closed
+			if errors.Is(err, sarama.ErrClosedConsumerGroup) {
+				return
 			}
 			// check if context was cancelled, signaling that the consumer should stop
 			if ctx.Err() != nil {
 				return
 			}
-			consumer.ready = make(chan bool)
 		}
 	}()
 
-	<-consumer.ready // Await till the consumer has been set up
 	log.Println("Sarama consumer up and running!...")
 
 	sigusr1 := make(chan os.Signal, 1)
@@ -126,23 +135,19 @@ func main() {
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 
-	for keepRunning {
-		select {
-		case <-ctx.Done():
-			log.Println("terminating: context cancelled")
-			keepRunning = false
-		case <-sigterm:
-			log.Println("terminating: via signal")
-			keepRunning = false
-		case <-sigusr1:
-			toggleConsumptionFlow(client, &consumptionIsPaused)
-		}
+	select {
+	case <-ctx.Done():
+		log.Println("terminating: context cancelled")
+	case <-sigterm:
+		log.Println("terminating: via signal")
+	case <-sigusr1:
+		toggleConsumptionFlow(client, &consumptionIsPaused)
 	}
 	cancel()
-	wg.Wait()
 	if err = client.Close(); err != nil {
 		log.Panicf("Error closing client: %v", err)
 	}
+	wg.Wait()
 }
 
 func toggleConsumptionFlow(client sarama.ConsumerGroup, isPaused *bool) {
@@ -158,44 +163,52 @@ func toggleConsumptionFlow(client sarama.ConsumerGroup, isPaused *bool) {
 }
 
 // Consumer represents a Sarama consumer group consumer
-type Consumer struct {
-	ready chan bool
+type Consumer struct{}
+
+// Setup runs at the beginning of setting up new assigned partitions, before ConsumeClaim.
+// For EAGER rebalance strategy, this is to set up all assigned partitions.
+// For COOPERATIVE rebalance strategy, this is only to set up new assigned partitions.
+// Note that even if there are no new assigned partitions, this method will still be called after rebalance.
+func (consumer *Consumer) Setup(offsetManger sarama.OffsetManager, newAssignedPartitions map[string][]int32) {
+	log.Printf("[Setup] newAssignedPartitions: %v", newAssignedPartitions)
 }
 
-// Setup is run at the beginning of a new session, before ConsumeClaim
-func (consumer *Consumer) Setup(sarama.ConsumerGroupSession) error {
-	// Mark the consumer as ready
-	close(consumer.ready)
-	return nil
-}
-
-// Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited
-func (consumer *Consumer) Cleanup(sarama.ConsumerGroupSession) error {
-	return nil
+// Cleanup runs after ConsumeClaim, but before the offsets are committed for the claim.
+// For EAGER rebalance strategy, this is to clean up all assigned partitions.
+// For COOPERATIVE rebalance strategy, this is only to clean up revoked partitions.
+func (consumer *Consumer) Cleanup(offsetManger sarama.OffsetManager, revokedPartitions map[string][]int32) {
+	log.Printf("[Cleanup] revokedPartitions: %v", revokedPartitions)
 }
 
 // ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
-// Once the Messages() channel is closed, the Handler must finish its processing
-// loop and exit.
-func (consumer *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+// Once ctx is done, ConsumeClaim should return as soon as possible.
+func (consumer *Consumer) ConsumeClaim(ctx context.Context, om sarama.OffsetManager, claim sarama.ConsumerGroupClaim) {
 	// NOTE:
 	// Do not move the code below to a goroutine.
 	// The `ConsumeClaim` itself is called within a goroutine, see:
 	// https://github.com/IBM/sarama/blob/main/consumer_group.go#L27-L29
 	for {
+		// `<-ctx.Done()` has a higher priority than `<-claim.Messages()`
 		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		select {
+		// Should return immediately when `ctx.Context()` is done.
+		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
+		// https://github.com/IBM/sarama/issues/1192
+		case <-ctx.Done():
+			return
+
 		case message, ok := <-claim.Messages():
 			if !ok {
 				log.Printf("message channel was closed")
-				return nil
+				return
 			}
-			log.Printf("Message claimed: value = %s, timestamp = %v, topic = %s", string(message.Value), message.Timestamp, message.Topic)
-			session.MarkMessage(message, "")
-		// Should return when `session.Context()` is done.
-		// If not, will raise `ErrRebalanceInProgress` or `read tcp <ip>:<port>: i/o timeout` when kafka rebalance. see:
-		// https://github.com/IBM/sarama/issues/1192
-		case <-session.Context().Done():
-			return nil
+			log.Printf("received message topic:%s, partition:%d, offset:%d, value:%s", message.Topic, message.Partition, message.Offset, message.Value)
+			om.MarkMessage(message, "")
 		}
 	}
 }

@@ -264,6 +264,7 @@ var (
 	DefaultVersion = V2_1_0_0
 
 	// reduced set of protocol versions to matrix test
+	// nolint:unused
 	fvtRangeVersions = []KafkaVersion{
 		V0_8_2_2,
 		V0_10_2_2,
@@ -312,4 +313,41 @@ func (v KafkaVersion) String() string {
 	}
 
 	return fmt.Sprintf("%d.%d.%d", v.version[0], v.version[1], v.version[2])
+}
+
+func diffAssignment(map1 map[string][]int32, map2 map[string][]int32) map[string][]int32 {
+	set := make(map[string]map[int32]bool)
+	for topic, partitions := range map2 {
+		if _, exist := set[topic]; !exist {
+			set[topic] = make(map[int32]bool)
+		}
+		for _, partition := range partitions {
+			set[topic][partition] = true
+		}
+	}
+
+	diff := make(map[string][]int32)
+	for topic, partitions := range map1 {
+		for _, partition := range partitions {
+			if _, exist := set[topic][partition]; !exist {
+				diff[topic] = append(diff[topic], partition)
+			}
+		}
+	}
+	return diff
+}
+
+func diffTopicSlice(s1 []string, s2 []string) map[string]bool {
+	set := make(map[string]bool)
+	for _, s := range s2 {
+		set[s] = true
+	}
+
+	diff := make(map[string]bool)
+	for _, s := range s1 {
+		if _, exist := set[s]; !exist {
+			diff[s] = true
+		}
+	}
+	return diff
 }

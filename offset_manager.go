@@ -1,6 +1,8 @@
 package sarama
 
 import (
+	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -13,6 +15,35 @@ type OffsetManager interface {
 	// It will return an error if this OffsetManager is already managing the given
 	// topic/partition.
 	ManagePartition(topic string, partition int32) (PartitionOffsetManager, error)
+
+	RemovePartitions(partitions map[string][]int32) error
+
+	Update(memberID string, generation int32)
+
+	// MarkOffset marks the provided offset, alongside a metadata string
+	// that represents the state of the partition consumer at that point in time. The
+	// metadata string can be used by another consumer to restore that state, so it
+	// can resume consumption.
+	//
+	// To follow upstream conventions, you are expected to mark the offset of the
+	// next message to read, not the last message read. Thus, when calling `MarkOffset`
+	// you should typically add one to the offset of the last consumed message.
+	//
+	// Note: calling MarkOffset does not necessarily commit the offset to the backend
+	// store immediately for efficiency reasons, and it may never be committed if
+	// your application crashes. This means that you may end up processing the same
+	// message twice, and your processing should ideally be idempotent.
+	MarkOffset(topic string, partition int32, offset int64, metadata string)
+
+	// ResetOffset resets to the provided offset, alongside a metadata string that
+	// represents the state of the partition consumer at that point in time. Reset
+	// acts as a counterpart to MarkOffset, the difference being that it allows to
+	// reset an offset to an earlier or smaller value, where MarkOffset only
+	// allows incrementing the offset. cf MarkOffset for more details.
+	ResetOffset(topic string, partition int32, offset int64, metadata string)
+
+	// MarkMessage marks a message as consumed.
+	MarkMessage(msg *ConsumerMessage, metadata string)
 
 	// Close stops the OffsetManager from managing offsets. It is required to call
 	// this function before an OffsetManager object passes out of scope, as it
@@ -35,6 +66,7 @@ type offsetManager struct {
 	memberID        string
 	groupInstanceId *string
 	generation      int32
+	updateLock      sync.RWMutex
 
 	broker     *Broker
 	brokerLock sync.RWMutex
@@ -100,11 +132,79 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 	}
 
 	if topicManagers[partition] != nil {
-		return nil, ConfigurationError("That topic/partition is already being managed")
+		return nil, ConfigurationError(fmt.Sprintf("topic:%s/partition:%d is already being managed", topic, partition))
 	}
 
 	topicManagers[partition] = pom
 	return pom, nil
+}
+
+func (om *offsetManager) RemovePartitions(topicPartitions map[string][]int32) error {
+	var errs ConsumerErrors
+	var errsLock sync.Mutex
+
+	var wg sync.WaitGroup
+	for topic, partitions := range topicPartitions {
+		for _, partition := range partitions {
+			wg.Add(1)
+			go func(topic string, partition int32) {
+				defer wg.Done()
+
+				om.pomsLock.RLock()
+				pom := om.poms[topic][partition]
+				om.pomsLock.RUnlock()
+				err := pom.Close()
+				if err != nil {
+					errsLock.Lock()
+					var consumerErrs ConsumerErrors
+					if errors.As(err, &consumerErrs) {
+						errs = append(errs, consumerErrs...)
+					}
+					errsLock.Unlock()
+				}
+			}(topic, partition)
+		}
+	}
+	wg.Wait()
+
+	// flush one last time
+	if om.conf.Consumer.Offsets.AutoCommit.Enable {
+		for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
+			om.flushToBroker()
+		}
+	}
+
+	om.pomsLock.Lock()
+	for topic, partitions := range topicPartitions {
+		for _, partition := range partitions {
+			delete(om.poms[topic], partition)
+			if len(om.poms[topic]) == 0 {
+				delete(om.poms, topic)
+			}
+		}
+	}
+
+	om.pomsLock.Unlock()
+	if len(errs) > 0 {
+		return errs
+	}
+	return nil
+}
+
+func (om *offsetManager) MarkOffset(topic string, partition int32, offset int64, metadata string) {
+	if pom := om.findPOM(topic, partition); pom != nil {
+		pom.MarkOffset(offset, metadata)
+	}
+}
+
+func (om *offsetManager) ResetOffset(topic string, partition int32, offset int64, metadata string) {
+	if pom := om.findPOM(topic, partition); pom != nil {
+		pom.ResetOffset(offset, metadata)
+	}
+}
+
+func (om *offsetManager) MarkMessage(msg *ConsumerMessage, metadata string) {
+	om.MarkOffset(msg.Topic, msg.Partition, msg.Offset+1, metadata)
 }
 
 func (om *offsetManager) Close() error {
@@ -248,6 +348,14 @@ func (om *offsetManager) mainLoop() {
 	}
 }
 
+func (om *offsetManager) Update(memberID string, generation int32) {
+	om.updateLock.Lock()
+	defer om.updateLock.Unlock()
+
+	om.memberID = memberID
+	om.generation = generation
+}
+
 func (om *offsetManager) Commit() {
 	om.flushToBroker()
 	om.releasePOMs(false)
@@ -277,12 +385,15 @@ func (om *offsetManager) flushToBroker() {
 }
 
 func (om *offsetManager) constructRequest() *OffsetCommitRequest {
+	om.updateLock.RLock()
 	r := &OffsetCommitRequest{
 		Version:                 1,
 		ConsumerGroup:           om.group,
 		ConsumerID:              om.memberID,
 		ConsumerGroupGeneration: om.generation,
 	}
+	om.updateLock.RUnlock()
+
 	// Version 1 adds timestamp and group membership information, as well as the commit timestamp.
 	//
 	// Version 2 adds retention time.  It removes the commit timestamp added in version 1.
@@ -369,6 +480,14 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 			case ErrNoError:
 				block := req.blocks[pom.topic][pom.partition]
 				pom.updateCommitted(block.offset, block.metadata)
+			case ErrRebalanceInProgress:
+				// do nothing here
+			case ErrIllegalGeneration:
+				// - For EAGER protocol: commit request with a stale generation is rejected by the coordinator.
+				// - For COOPERATIVE protocol: the partition is not assigned to this consumer in the new generation.
+				// Normally users don't need to do anything(include retry), Kafka has at-lease-once semantics
+				// and these messages will be redelivered to the consumer in the new generation.
+				pom.handleError(err)
 			case ErrNotLeaderForPartition, ErrLeaderNotAvailable,
 				ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer:
 				// not a critical error, we just need to redispatch
@@ -605,13 +724,14 @@ func (pom *partitionOffsetManager) AsyncClose() {
 func (pom *partitionOffsetManager) Close() error {
 	pom.AsyncClose()
 
-	var errors ConsumerErrors
+	pom.release()
+	var consumerErrors ConsumerErrors
 	for err := range pom.errors {
-		errors = append(errors, err)
+		consumerErrors = append(consumerErrors, err)
 	}
 
-	if len(errors) > 0 {
-		return errors
+	if len(consumerErrors) > 0 {
+		return consumerErrors
 	}
 	return nil
 }

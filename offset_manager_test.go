@@ -532,6 +532,9 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 
 	pom.MarkOffset(100, "modified_meta")
 
+	// flaky test: wait for sending commit requests
+	time.Sleep(10 * time.Millisecond)
+
 	err := pom.Close()
 	if err != nil {
 		t.Error(err)
