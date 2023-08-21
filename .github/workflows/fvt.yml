@@ -38,10 +38,27 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: ${{ matrix.go-version }}
-    - name: Test (Functional)
+    - name: Setup Docker Compose
       run: |
         curl -sSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
         sudo install -m755 /tmp/docker-compose "$(dirname $(which docker-compose))"
         docker version --format 'Docker Engine version v{{.Server.Version}}'
         docker-compose version
+    - name: Test (Functional)
+      run: |
+        nohup sudo tcpdump -i lo -w "fvt-kafka-${{ matrix.kafka-version }}.pcap" portrange 29091-29095 >/dev/null 2>&1 &
+        echo $! >tcpdump.pid
         make test_functional
+    - name: Stop tcpdump
+      if: always()
+      run: |
+        if [ -f "tcpdump.pid" ]; then sudo kill "$(cat tcpdump.pid)" || true; fi
+        if [ -f "fvt-kafka-${{ matrix.kafka-version }}.pcap" ]; then sudo chmod a+r "fvt-kafka-${{ matrix.kafka-version }}.pcap"; fi
+    - name: Upload pcap file
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: fvt-kafka-${{ matrix.kafka-version }}.pcap
+        path: fvt-kafka-${{ matrix.kafka-version }}.pcap
+        retention-days: 5
+        if-no-files-found: ignore
