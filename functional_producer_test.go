@@ -636,7 +636,9 @@ func TestFuncProducingToInvalidTopic(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
+	config := NewFunctionalTestConfig()
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -807,7 +809,6 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 		}
 	}
 
-	config.ClientID = t.Name()
 	config.Producer.Return.Successes = true
 	config.Consumer.Return.Errors = true
 
@@ -822,7 +823,9 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 	}
 
 	for version := range kafkaVersions {
-		t.Run(t.Name()+"-v"+version.String(), func(t *testing.T) {
+		name := t.Name() + "-v" + version.String()
+		t.Run(name, func(t *testing.T) {
+			config.ClientID = name
 			checkKafkaVersion(t, version.String())
 			config.Version = version
 			client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
