@@ -46,7 +46,10 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	p, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, nil)
+	config := NewFunctionalTestConfig()
+	config.Producer.Return.Successes = true
+
+	p, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +60,7 @@ func TestConsumerHighWaterMarkOffset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
+	c, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,6 +130,7 @@ func TestVersionMatrixLZ4(t *testing.T) {
 
 // Support for zstd codec was introduced in v2.1.0.0
 func TestVersionMatrixZstd(t *testing.T) {
+	checkKafkaVersion(t, "2.1.0")
 	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
 	t.Cleanup(func() {
 		metrics.UseNilMetrics = false
