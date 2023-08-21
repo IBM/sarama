@@ -33,6 +33,11 @@ RUN cd /tmp \
  && for DIR in /opt/kafka-*; do cp -v jaxb-api-2.3.0.jar $DIR/libs/ ; done \
  && rm -f jaxb-api-2.3.0.jar
 
+WORKDIR /opt/kafka-${KAFKA_VERSION}
+
+ENV JAVA_MAJOR_VERSION=11
+
+RUN sed -e "s/JAVA_MAJOR_VERSION=.*/JAVA_MAJOR_VERSION=${JAVA_MAJOR_VERSION}/" -i"" ./bin/kafka-run-class.sh
 
 COPY entrypoint.sh /
 

@@ -1,6 +1,7 @@
 version: '3.9'
 services:
   zookeeper-1:
+    hostname: 'zookeeper-1'
     image: 'docker.io/library/zookeeper:3.6.3'
     restart: always
     environment:
@@ -12,6 +13,7 @@ services:
       ZOO_MAX_CLIENT_CNXNS: '0'
       ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   zookeeper-2:
+    hostname: 'zookeeper-2'
     image: 'docker.io/library/zookeeper:3.6.3'
     restart: always
     environment:
@@ -23,6 +25,7 @@ services:
       ZOO_MAX_CLIENT_CNXNS: '0'
       ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   zookeeper-3:
+    hostname: 'zookeeper-3'
     image: 'docker.io/library/zookeeper:3.6.3'
     restart: always
     environment:
@@ -34,6 +37,7 @@ services:
       ZOO_MAX_CLIENT_CNXNS: '0'
       ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   kafka-1:
+    hostname: 'kafka-1'
     image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
@@ -45,12 +49,9 @@ services:
       test:
         [
           'CMD',
-          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-broker-api-versions.sh',
           '--bootstrap-server',
           'kafka-1:9091',
-          '--broker',
-          '1',
-          '--describe',
         ]
       interval: 15s
       timeout: 15s
@@ -78,7 +79,10 @@ services:
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JVM_PERFORMANCE_OPTS: "-XX:+IgnoreUnrecognizedVMOptions"
   kafka-2:
+    hostname: 'kafka-2'
     image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
@@ -90,12 +94,9 @@ services:
       test:
         [
           'CMD',
-          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-broker-api-versions.sh',
           '--bootstrap-server',
           'kafka-2:9091',
-          '--broker',
-          '2',
-          '--describe',
         ]
       interval: 15s
       timeout: 15s
@@ -123,7 +124,10 @@ services:
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JVM_PERFORMANCE_OPTS: "-XX:+IgnoreUnrecognizedVMOptions"
   kafka-3:
+    hostname: 'kafka-3'
     image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
@@ -135,12 +139,9 @@ services:
       test:
         [
           'CMD',
-          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-broker-api-versions.sh',
           '--bootstrap-server',
           'kafka-3:9091',
-          '--broker',
-          '3',
-          '--describe',
         ]
       interval: 15s
       timeout: 15s
@@ -168,7 +169,10 @@ services:
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JVM_PERFORMANCE_OPTS: "-XX:+IgnoreUnrecognizedVMOptions"
   kafka-4:
+    hostname: 'kafka-4'
     image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
@@ -180,12 +184,9 @@ services:
       test:
         [
           'CMD',
-          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-broker-api-versions.sh',
           '--bootstrap-server',
           'kafka-4:9091',
-          '--broker',
-          '4',
-          '--describe',
         ]
       interval: 15s
       timeout: 15s
@@ -213,7 +214,10 @@ services:
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JVM_PERFORMANCE_OPTS: "-XX:+IgnoreUnrecognizedVMOptions"
   kafka-5:
+    hostname: 'kafka-5'
     image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.5.1}'
     build:
       context: .
@@ -225,12 +229,9 @@ services:
       test:
         [
           'CMD',
-          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-configs.sh',
+          '/opt/kafka-${KAFKA_VERSION:-3.5.1}/bin/kafka-broker-api-versions.sh',
           '--bootstrap-server',
           'kafka-5:9091',
-          '--broker',
-          '5',
-          '--describe',
         ]
       interval: 15s
       timeout: 15s
@@ -258,7 +259,10 @@ services:
       KAFKA_CFG_REPLICA_SELECTOR_CLASS: 'org.apache.kafka.common.replica.RackAwareReplicaSelector'
       KAFKA_CFG_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      KAFKA_CFG_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_JVM_PERFORMANCE_OPTS: "-XX:+IgnoreUnrecognizedVMOptions"
   toxiproxy:
+    hostname: 'toxiproxy'
     image: 'ghcr.io/shopify/toxiproxy:2.4.0'
     healthcheck:
       test: ['CMD', '/toxiproxy-cli', 'l']

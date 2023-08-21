@@ -16,10 +16,18 @@ jobs:
       matrix:
         go-version: [1.21.x]
         kafka-version: [3.3.2, 3.4.1, 3.5.1]
+        include:
+          - kafka-version: 3.3.2
+            scala-version: 2.13
+          - kafka-version: 3.4.1
+            scala-version: 2.13
+          - kafka-version: 3.5.1
+            scala-version: 2.13
     env:
       DEBUG: true
       GOFLAGS: -trimpath
       KAFKA_VERSION: ${{ matrix.kafka-version }}
+      SCALA_VERSION: ${{ matrix.scala-version }}
     steps:
     - uses: actions/checkout@v3
     - name: Setup Docker
