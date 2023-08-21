@@ -475,9 +475,12 @@ func teardownFunctionalTest(t testing.TB) {
 
 func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Duration) {
 	config := NewFunctionalTestConfig()
+	config.Metadata.Full = false
+	config.Metadata.RefreshFrequency = 0
 	config.Metadata.Retry.Max = 5
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-ensureFullyReplicated"
+	config.ApiVersionsRequest = false
 
 	var testTopicNames []string
 	for topic := range testTopicDetails {
@@ -496,13 +499,10 @@ func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Durat
 				return nil, fmt.Errorf("failed to connect to kafka: %w", err)
 			}
 			defer client.Close()
-
-			controller, err := client.Controller()
-			if err != nil {
-				return nil, fmt.Errorf("failed to connect to kafka controller: %w", err)
-			}
-			defer controller.Close()
-			return controller.GetMetadata(&MetadataRequest{Version: 5, Topics: testTopicNames})
+			broker := client.LeastLoadedBroker()
+			defer broker.Close()
+			request := NewMetadataRequest(config.Version, testTopicNames)
+			return broker.GetMetadata(request)
 		}()
 		if err != nil {
 			Logger.Printf("failed to get metadata during test setup: %v\n", err)
