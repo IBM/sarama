@@ -3,6 +3,7 @@ package main
 // SIGUSR1 toggle the pause/resume consumption
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -106,6 +107,9 @@ func main() {
 			// server-side rebalance happens, the consumer session will need to be
 			// recreated to get the new claims
 			if err := client.Consume(ctx, strings.Split(topics, ","), &consumer); err != nil {
+				if errors.Is(err, sarama.ErrClosedConsumerGroup) {
+					return
+				}
 				log.Panicf("Error from consumer: %v", err)
 			}
 			// check if context was cancelled, signaling that the consumer should stop
