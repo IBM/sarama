@@ -826,8 +826,10 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 		name := t.Name() + "-v" + version.String()
 		t.Run(name, func(t *testing.T) {
 			config.ClientID = name
+			config.MetricRegistry = metrics.NewRegistry()
 			checkKafkaVersion(t, version.String())
 			config.Version = version
+
 			client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 			if err != nil {
 				t.Fatal(err)
