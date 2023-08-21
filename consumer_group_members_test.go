@@ -42,6 +42,16 @@ var (
 		0, 0, 0, 3, 0x01, 0x02, 0x03, // Userdata
 		0, 0, 0, 0, // OwnedPartitions KIP-429
 	}
+
+	groupMemberMetadataV3NilOwned = []byte{
+		0, 3, // Version
+		0, 0, 0, 1, // Topic array length
+		0, 3, 'o', 'n', 'e', // Topic one
+		0, 0, 0, 3, 0x01, 0x02, 0x03, // Userdata
+		0, 0, 0, 0, // OwnedPartitions KIP-429
+		0, 0, 0, 64, // GenerationID
+		0, 4, 'r', 'a', 'c', 'k', // RackID
+	}
 )
 
 func TestConsumerGroupMemberMetadata(t *testing.T) {
@@ -74,6 +84,13 @@ func TestConsumerGroupMemberMetadataV1Decode(t *testing.T) {
 	}
 	if err := decode(groupMemberMetadataV1Bad, meta, nil); err != nil {
 		t.Error("Failed to decode V1 'bad' data", err)
+	}
+}
+
+func TestConsumerGroupMemberMetadataV3Decode(t *testing.T) {
+	meta := new(ConsumerGroupMemberMetadata)
+	if err := decode(groupMemberMetadataV3NilOwned, meta, nil); err != nil {
+		t.Error("Failed to decode V3 data", err)
 	}
 }
 

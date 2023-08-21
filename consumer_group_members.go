@@ -9,6 +9,8 @@ type ConsumerGroupMemberMetadata struct {
 	Topics          []string
 	UserData        []byte
 	OwnedPartitions []*OwnedPartition
+	GenerationID    int32
+	RackID          *string
 }
 
 func (m *ConsumerGroupMemberMetadata) encode(pe packetEncoder) error {
@@ -20,6 +22,27 @@ func (m *ConsumerGroupMemberMetadata) encode(pe packetEncoder) error {
 
 	if err := pe.putBytes(m.UserData); err != nil {
 		return err
+	}
+
+	if m.Version >= 1 {
+		if err := pe.putArrayLength(len(m.OwnedPartitions)); err != nil {
+			return err
+		}
+		for _, op := range m.OwnedPartitions {
+			if err := op.encode(pe); err != nil {
+				return err
+			}
+		}
+	}
+
+	if m.Version >= 2 {
+		pe.putInt32(m.GenerationID)
+	}
+
+	if m.Version >= 3 {
+		if err := pe.putNullableString(m.RackID); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -48,15 +71,26 @@ func (m *ConsumerGroupMemberMetadata) decode(pd packetDecoder) (err error) {
 			}
 			return err
 		}
-		if n == 0 {
-			return nil
-		}
-		m.OwnedPartitions = make([]*OwnedPartition, n)
-		for i := 0; i < n; i++ {
-			m.OwnedPartitions[i] = &OwnedPartition{}
-			if err := m.OwnedPartitions[i].decode(pd); err != nil {
-				return err
+		if n > 0 {
+			m.OwnedPartitions = make([]*OwnedPartition, n)
+			for i := 0; i < n; i++ {
+				m.OwnedPartitions[i] = &OwnedPartition{}
+				if err := m.OwnedPartitions[i].decode(pd); err != nil {
+					return err
+				}
 			}
+		}
+	}
+
+	if m.Version >= 2 {
+		if m.GenerationID, err = pd.getInt32(); err != nil {
+			return err
+		}
+	}
+
+	if m.Version >= 3 {
+		if m.RackID, err = pd.getNullableString(); err != nil {
+			return err
 		}
 	}
 
@@ -66,6 +100,16 @@ func (m *ConsumerGroupMemberMetadata) decode(pd packetDecoder) (err error) {
 type OwnedPartition struct {
 	Topic      string
 	Partitions []int32
+}
+
+func (m *OwnedPartition) encode(pe packetEncoder) error {
+	if err := pe.putString(m.Topic); err != nil {
+		return err
+	}
+	if err := pe.putInt32Array(m.Partitions); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (m *OwnedPartition) decode(pd packetDecoder) (err error) {
