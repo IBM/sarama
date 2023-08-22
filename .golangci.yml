@@ -23,18 +23,24 @@ linters-settings:
   gocritic:
     enabled-tags:
       - diagnostic
+      - performance
       # - experimental
       # - opinionated
-      # - performance
       # - style
+    enabled-checks:
+      - importShadow
+      - nestingReduce
+      - stringsCompare
+      # - unnamedResult
+      # - whyNoLint
     disabled-checks:
       - assignOp
       - appendAssign
       - commentedOutCode
+      - hugeParam
       - ifElseChain
       - singleCaseSwitch
       - sloppyReassign
-      - wrapperFunc
   funlen:
     lines: 300
     statements: 300
@@ -50,37 +56,25 @@ linters:
   disable-all: true
   enable:
     - bodyclose
-    # - deadcode
     - depguard
     - exportloopref
     - dogsled
-    # - dupl
     - errcheck
     - errorlint
     - funlen
     - gochecknoinits
-    # - goconst
     - gocritic
     - gocyclo
     - gofmt
     - goimports
-    # - golint
     - gosec
-    # - gosimple
     - govet
-    # - ineffassign
     - misspell
-    # - nakedret
     - nilerr
-    # - paralleltest
-    # - scopelint
     - staticcheck
-    # - structcheck
-    # - stylecheck
     - typecheck
     - unconvert
     - unused
-    # - varcheck
     - whitespace
 
 issues:

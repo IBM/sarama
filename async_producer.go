@@ -20,7 +20,6 @@ import (
 // leaks and message lost: it will not be garbage-collected automatically when it passes
 // out of scope and buffered messages may not be flushed.
 type AsyncProducer interface {
-
 	// AsyncClose triggers a shutdown of the producer. The shutdown has completed
 	// when both the Errors and Successes channels have been closed. When calling
 	// AsyncClose, you *must* continue to read from those channels in order to
@@ -366,17 +365,17 @@ func (p *asyncProducer) Close() error {
 		})
 	}
 
-	var errors ProducerErrors
+	var pErrs ProducerErrors
 	if p.conf.Producer.Return.Errors {
 		for event := range p.errors {
-			errors = append(errors, event)
+			pErrs = append(pErrs, event)
 		}
 	} else {
 		<-p.errors
 	}
 
-	if len(errors) > 0 {
-		return errors
+	if len(pErrs) > 0 {
+		return pErrs
 	}
 	return nil
 }

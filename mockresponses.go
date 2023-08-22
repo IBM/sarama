@@ -253,7 +253,7 @@ func (mor *MockOffsetResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	offsetResponse := &OffsetResponse{Version: offsetRequest.Version}
 	for topic, partitions := range offsetRequest.blocks {
 		for partition, block := range partitions {
-			offset := mor.getOffset(topic, partition, block.time)
+			offset := mor.getOffset(topic, partition, block.timestamp)
 			offsetResponse.AddTopicPartition(topic, partition, offset)
 		}
 	}

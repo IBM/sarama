@@ -27,7 +27,7 @@ jobs:
         GOFLAGS: -tags=functional
       uses: golangci/golangci-lint-action@v3
       with:
-        version: v1.54.0
+        version: v1.54.2
   test:
     name: Unit Testing with Go ${{ matrix.go-version }}
     runs-on: ubuntu-latest

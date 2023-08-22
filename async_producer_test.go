@@ -66,12 +66,12 @@ func closeProducer(t *testing.T, p AsyncProducer) {
 	closeProducerWithTimeout(t, p, 5*time.Minute)
 }
 
-func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successes, errors int, timeout time.Duration) {
+func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successCount, errorCount int, timeout time.Duration) {
 	t.Helper()
-	expect := successes + errors
+	expect := successCount + errorCount
 	defer func() {
-		if successes != 0 || errors != 0 {
-			t.Error("Unexpected successes", successes, "or errors", errors)
+		if successCount != 0 || errorCount != 0 {
+			t.Error("Unexpected successes", successCount, "or errors", errorCount)
 		}
 	}()
 	timer := time.NewTimer(timeout)
@@ -84,26 +84,26 @@ func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successes, errors i
 			if msg.Msg.flags != 0 {
 				t.Error("Message had flags set")
 			}
-			errors--
+			errorCount--
 			expect--
-			if errors < 0 {
+			if errorCount < 0 {
 				t.Error(msg.Err)
 			}
 		case msg := <-p.Successes():
 			if msg.flags != 0 {
 				t.Error("Message had flags set")
 			}
-			successes--
+			successCount--
 			expect--
-			if successes < 0 {
+			if successCount < 0 {
 				t.Error("Too many successes")
 			}
 		}
 	}
 }
 
-func expectResults(t *testing.T, p AsyncProducer, successes, errors int) {
-	expectResultsWithTimeout(t, p, successes, errors, 5*time.Minute)
+func expectResults(t *testing.T, p AsyncProducer, successCount, errorCount int) {
+	expectResultsWithTimeout(t, p, successCount, errorCount, 5*time.Minute)
 }
 
 type testPartitioner chan *int32

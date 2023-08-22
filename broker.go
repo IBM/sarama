@@ -1480,7 +1480,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 		length := len(msg)
 		authBytes := make([]byte, length+4) // 4 byte length header + auth data
 		binary.BigEndian.PutUint32(authBytes, uint32(length))
-		copy(authBytes[4:], []byte(msg))
+		copy(authBytes[4:], msg)
 		_, err := b.write(authBytes)
 		b.updateOutgoingCommunicationMetrics(length + 4)
 		if err != nil {

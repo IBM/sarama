@@ -1004,20 +1004,21 @@ func (p *partitionMovements) isLinked(src, dst string, pairs []consumerPair, cur
 	}
 
 	for _, pair := range pairs {
-		if pair.SrcMemberID == src {
-			// create a deep copy of the pairs, excluding the current pair
-			reducedSet := make([]consumerPair, len(pairs)-1)
-			i := 0
-			for _, p := range pairs {
-				if p != pair {
-					reducedSet[i] = pair
-					i++
-				}
-			}
-
-			currentPath = append(currentPath, pair.SrcMemberID)
-			return p.isLinked(pair.DstMemberID, dst, reducedSet, currentPath)
+		if pair.SrcMemberID != src {
+			continue
 		}
+		// create a deep copy of the pairs, excluding the current pair
+		reducedSet := make([]consumerPair, len(pairs)-1)
+		i := 0
+		for _, p := range pairs {
+			if p != pair {
+				reducedSet[i] = pair
+				i++
+			}
+		}
+
+		currentPath = append(currentPath, pair.SrcMemberID)
+		return p.isLinked(pair.DstMemberID, dst, reducedSet, currentPath)
 	}
 	return currentPath, false
 }
@@ -1117,7 +1118,7 @@ func (pq assignmentPriorityQueue) Len() int { return len(pq) }
 func (pq assignmentPriorityQueue) Less(i, j int) bool {
 	// order assignment priority queue in descending order using assignment-count/member-id
 	if len(pq[i].assignments) == len(pq[j].assignments) {
-		return strings.Compare(pq[i].id, pq[j].id) > 0
+		return pq[i].id > pq[j].id
 	}
 	return len(pq[i].assignments) > len(pq[j].assignments)
 }
