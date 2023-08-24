@@ -7,8 +7,9 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/stale@v8
+    - uses: actions/stale@main # make use of https://github.com/actions/stale/pull/1033
       with:
+        ascending: true
         days-before-stale: 90
         days-before-close: 30
         stale-issue-message: >-
