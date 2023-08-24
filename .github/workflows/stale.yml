@@ -3,6 +3,7 @@ name: "Stale issues and PRs"
 on:
   schedule:
   - cron: "0 */2 * * *"
+  workflow_dispatch:
 jobs:
   stale:
     runs-on: ubuntu-latest
