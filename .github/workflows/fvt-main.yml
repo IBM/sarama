@@ -1,9 +1,11 @@
-name: FVT
+name: FVT (main)
 on:
   merge_group:
   push:
     branches:
     - main
+    paths-ignore:
+    - '**/*.md'
 jobs:
   fvt:
     name: Test with Kafka ${{ matrix.kafka-version }}

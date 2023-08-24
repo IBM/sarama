@@ -1,8 +1,10 @@
-name: FVT
+name: FVT (PR)
 on:
   pull_request:
     branches:
     - "**"
+    paths-ignore:
+    - '**/*.md'
 jobs:
   fvt:
     name: Test with Kafka ${{ matrix.kafka-version }}

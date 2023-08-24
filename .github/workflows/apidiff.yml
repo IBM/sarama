@@ -4,9 +4,13 @@ on:
   push:
     branches:
     - main
+    paths-ignore:
+    - '**/*.md'
   pull_request:
     branches:
     - "**"
+    paths-ignore:
+    - '**/*.md'
 jobs:
   apidiff:
     runs-on: ubuntu-latest
