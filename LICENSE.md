@@ -1,6 +1,7 @@
 # MIT License
 
 Copyright (c) 2013 Shopify
+
 Copyright (c) 2023 IBM Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining
