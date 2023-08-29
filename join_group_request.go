@@ -1,7 +1,9 @@
 package sarama
 
 type GroupProtocol struct {
-	Name     string
+	// Name contains the protocol name.
+	Name string
+	// Metadata contains the protocol metadata.
 	Metadata []byte
 }
 
@@ -25,14 +27,30 @@ func (p *GroupProtocol) encode(pe packetEncoder) (err error) {
 }
 
 type JoinGroupRequest struct {
-	Version               int16
-	GroupId               string
-	SessionTimeout        int32
-	RebalanceTimeout      int32
-	MemberId              string
-	GroupInstanceId       *string
-	ProtocolType          string
-	GroupProtocols        map[string][]byte // deprecated; use OrderedGroupProtocols
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// GroupId contains the group identifier.
+	GroupId string
+	// SessionTimeout specifies that the coordinator should consider the consumer
+	// dead if it receives no heartbeat after this timeout in milliseconds.
+	SessionTimeout int32
+	// RebalanceTimeout contains the maximum time in milliseconds that the
+	// coordinator will wait for each member to rejoin when rebalancing the
+	// group.
+	RebalanceTimeout int32
+	// MemberId contains the member id assigned by the group coordinator.
+	MemberId string
+	// GroupInstanceId contains the unique identifier of the consumer instance
+	// provided by end user.
+	GroupInstanceId *string
+	// ProtocolType contains the unique name the for class of protocols
+	// implemented by the group we want to join.
+	ProtocolType string
+	// GroupProtocols contains the list of protocols that the member supports.
+	// deprecated; use OrderedGroupProtocols
+	GroupProtocols map[string][]byte
+	// OrderedGroupProtocols contains an ordered list of protocols that the member
+	// supports.
 	OrderedGroupProtocols []*GroupProtocol
 }
 

@@ -6,9 +6,13 @@ import (
 )
 
 type CreateTopicsResponse struct {
-	Version      int16
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// ThrottleTime contains the duration for which the request was throttled due
+	// to a quota violation, or zero if the request did not violate any quota.
 	ThrottleTime time.Duration
-	TopicErrors  map[string]*TopicError
+	// TopicErrors contains a map of any errors for the topics we tried to create.
+	TopicErrors map[string]*TopicError
 }
 
 func (c *CreateTopicsResponse) encode(pe packetEncoder) error {

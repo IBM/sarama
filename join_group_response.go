@@ -3,20 +3,33 @@ package sarama
 import "time"
 
 type JoinGroupResponse struct {
-	Version       int16
-	ThrottleTime  int32
-	Err           KError
-	GenerationId  int32
+	// Version defines the protocol version to use for encode and decode
+	Version int16
+	// ThrottleTime contains the duration for which the request was throttled due
+	// to a quota violation, or zero if the request did not violate any quota.
+	ThrottleTime int32
+	// Err contains the error code, or 0 if there was no error.
+	Err KError
+	// GenerationId contains the generation ID of the group.
+	GenerationId int32
+	// GroupProtocol contains the group protocol selected by the coordinator.
 	GroupProtocol string
-	LeaderId      string
-	MemberId      string
-	Members       []GroupMember
+	// LeaderId contains the leader of the group.
+	LeaderId string
+	// MemberId contains the member ID assigned by the group coordinator.
+	MemberId string
+	// Members contains the per-group-member information.
+	Members []GroupMember
 }
 
 type GroupMember struct {
-	MemberId        string
+	// MemberId contains the group member ID.
+	MemberId string
+	// GroupInstanceId contains the unique identifier of the consumer instance
+	// provided by end user.
 	GroupInstanceId *string
-	Metadata        []byte
+	// Metadata contains the group member metadata.
+	Metadata []byte
 }
 
 func (r *JoinGroupResponse) GetMembers() (map[string]ConsumerGroupMemberMetadata, error) {
