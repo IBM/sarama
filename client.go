@@ -183,6 +183,13 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		return nil, ConfigurationError("You must provide at least one broker address")
 	}
 
+	if strings.Contains(addrs[0], ".servicebus.windows.net") {
+		if conf.Version.IsAtLeast(V1_1_0_0) || !conf.Version.IsAtLeast(V0_11_0_0) {
+			Logger.Println("Connecting to Azure Event Hubs, forcing version to V1_0_0_0 for compatibility")
+			conf.Version = V1_0_0_0
+		}
+	}
+
 	client := &client{
 		conf:                    conf,
 		closer:                  make(chan none),
