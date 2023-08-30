@@ -1203,12 +1203,16 @@ func (ca *clusterAdmin) AlterUserScramCredentials(u []AlterUserScramCredentialsU
 		Upsertions: u,
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return nil, err
-	}
+	var rsp *AlterUserScramCredentialsResponse
+	err := ca.retryOnError(isErrNoController, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	rsp, err := b.AlterUserScramCredentials(req)
+		rsp, err = b.AlterUserScramCredentials(req)
+		return err
+	})
 	if err != nil {
 		return nil, err
 	}
