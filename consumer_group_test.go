@@ -27,6 +27,14 @@ func (h *handler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupCla
 	return nil
 }
 
+func TestNewConsumerGroupFromClient(t *testing.T) {
+	t.Run("should not permit nil client", func(t *testing.T) {
+		group, err := NewConsumerGroupFromClient("group", nil)
+		assert.Nil(t, group)
+		assert.Error(t, err)
+	})
+}
+
 // TestConsumerGroupNewSessionDuringOffsetLoad ensures that the consumer group
 // will retry Join and Sync group operations, if it receives a temporary
 // OffsetsLoadInProgress error response, in the same way as it would for a
