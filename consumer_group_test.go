@@ -232,3 +232,15 @@ func TestConsumerGroupSessionDoesNotRetryForever(t *testing.T) {
 
 	wg.Wait()
 }
+
+func TestConsumerShouldNotRetrySessionIfContextCancelled(t *testing.T) {
+	c := &consumerGroup{
+		config: NewTestConfig(),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := c.newSession(ctx, nil, nil, 1024)
+	assert.Equal(t, context.Canceled, err)
+	_, err = c.retryNewSession(ctx, nil, nil, 1024, true)
+	assert.Equal(t, context.Canceled, err)
+}
