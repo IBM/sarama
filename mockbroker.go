@@ -98,6 +98,20 @@ func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
 	})
 }
 
+// SetHandlerFuncByMap defines mapping of Request types to RequestHandlerFunc. When a
+// request is received by the broker, it looks up the request type in the map
+// and invoke the found RequestHandlerFunc instance to generate an appropriate reply.
+func (b *MockBroker) SetHandlerFuncByMap(handlerMap map[string]requestHandlerFunc) {
+	fnMap := make(map[string]requestHandlerFunc)
+	for k, v := range handlerMap {
+		fnMap[k] = v
+	}
+	b.setHandler(func(req *request) (res encoderWithHeader) {
+		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
+		return fnMap[reqTypeName](req)
+	})
+}
+
 // SetNotifier set a function that will get invoked whenever a request has been
 // processed successfully and will provide the number of bytes read and written
 func (b *MockBroker) SetNotifier(notifier RequestNotifierFunc) {

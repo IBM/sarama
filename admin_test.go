@@ -1712,11 +1712,15 @@ func TestRefreshMetaDataWithDifferentController(t *testing.T) {
 			seedBroker1.BrokerID(), b.ID())
 	}
 
+	metadataResponse := NewMockMetadataResponse(t).
+		SetController(seedBroker2.BrokerID()).
+		SetBroker(seedBroker1.Addr(), seedBroker1.BrokerID()).
+		SetBroker(seedBroker2.Addr(), seedBroker2.BrokerID())
 	seedBroker1.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker2.BrokerID()).
-			SetBroker(seedBroker1.Addr(), seedBroker1.BrokerID()).
-			SetBroker(seedBroker2.Addr(), seedBroker2.BrokerID()),
+		"MetadataRequest": metadataResponse,
+	})
+	seedBroker2.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": metadataResponse,
 	})
 
 	if b, _ := ca.refreshController(); seedBroker2.BrokerID() != b.ID() {

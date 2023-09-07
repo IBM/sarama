@@ -505,7 +505,7 @@ func TestAsyncProducerBrokerBounce(t *testing.T) {
 	// When: a broker connection gets reset by a broker (network glitch, restart, you name it).
 	leader.Close()                               // producer should get EOF
 	leader = NewMockBrokerAddr(t, 2, leaderAddr) // start it up again right away for giggles
-	seedBroker.Returns(metadataResponse)         // tell it to go to broker 2 again
+	leader.Returns(metadataResponse)             // tell it to go to broker 2 again
 
 	// Then: a produced message goes through the new broker connection.
 	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
@@ -591,13 +591,13 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	metadataLeader2.AddBroker(leader2.Addr(), leader2.BrokerID())
 	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, nil, ErrNoError)
 
-	seedBroker.Returns(metadataLeader2)
+	leader1.Returns(metadataLeader2)
 	leader2.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader1)
+	leader2.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader1)
+	leader1.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader2)
+	leader1.Returns(metadataLeader2)
 
 	prodSuccess := new(ProduceResponse)
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
@@ -653,13 +653,13 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	metadataLeader2.AddTopicPartition("my_topic", 0, leader2.BrokerID(), nil, nil, nil, ErrNoError)
 
 	leader1.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader2)
+	leader1.Returns(metadataLeader2)
 	leader2.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader1)
+	leader2.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader1)
+	leader1.Returns(metadataLeader1)
 	leader1.Returns(prodNotLeader)
-	seedBroker.Returns(metadataLeader2)
+	leader1.Returns(metadataLeader2)
 	leader2.Returns(prodSuccess)
 
 	expectResults(t, producer, 1, 0)
@@ -739,16 +739,17 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	leader := NewMockBroker(t, 2)
 
 	var leaderLock sync.Mutex
-
-	// The seed broker only handles Metadata request
-	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+	metadataRequestHandlerFunc := func(req *request) (res encoderWithHeader) {
 		leaderLock.Lock()
 		defer leaderLock.Unlock()
 		metadataLeader := new(MetadataResponse)
 		metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
 		metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 		return metadataLeader
-	})
+	}
+
+	// The seed broker only handles Metadata request in bootstrap
+	seedBroker.setHandler(metadataRequestHandlerFunc)
 
 	var emptyValues int32 = 0
 
@@ -770,7 +771,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 		}
 	}
 
-	leader.setHandler(func(req *request) (res encoderWithHeader) {
+	failedProduceRequestHandlerFunc := func(req *request) (res encoderWithHeader) {
 		countRecordsWithEmptyValue(req)
 
 		time.Sleep(50 * time.Millisecond)
@@ -778,6 +779,19 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 		prodSuccess := new(ProduceResponse)
 		prodSuccess.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
 		return prodSuccess
+	}
+
+	succeededProduceRequestHandlerFunc := func(req *request) (res encoderWithHeader) {
+		countRecordsWithEmptyValue(req)
+
+		prodSuccess := new(ProduceResponse)
+		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+		return prodSuccess
+	}
+
+	leader.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"ProduceRequest":  failedProduceRequestHandlerFunc,
+		"MetadataRequest": metadataRequestHandlerFunc,
 	})
 
 	config := NewTestConfig()
@@ -816,12 +830,9 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	leaderLock.Lock()
 	leader = NewMockBroker(t, 2)
 	leaderLock.Unlock()
-	leader.setHandler(func(req *request) (res encoderWithHeader) {
-		countRecordsWithEmptyValue(req)
-
-		prodSuccess := new(ProduceResponse)
-		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-		return prodSuccess
+	leader.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"ProduceRequest":  succeededProduceRequestHandlerFunc,
+		"MetadataRequest": metadataRequestHandlerFunc,
 	})
 
 	wg.Wait()
@@ -938,7 +949,7 @@ func TestAsyncProducerRetryWithReferenceOpen(t *testing.T) {
 	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 
 	// tell partition 0 to go to that broker again
-	seedBroker.Returns(metadataResponse)
+	leader.Returns(metadataResponse)
 
 	// succeed this time
 	prodSuccess = new(ProduceResponse)
@@ -994,14 +1005,11 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	leader.SetHandlerByMap(map[string]MockResponse{
-		"ProduceRequest": NewMockProduceResponse(t).
-			SetVersion(0).
-			SetError("my_topic", 0, ErrNoError),
-	})
-
 	// tell partition 0 to go to that broker again
-	seedBroker.Returns(metadataResponse)
+	leader.Returns(metadataResponse)
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
 
 	// succeed this time
 	expectResults(t, producer, 5, 0)
@@ -1010,6 +1018,9 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 0}
 	}
+	prodSuccess = new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
 	expectResults(t, producer, 5, 0)
 
 	// shutdown
@@ -1051,7 +1062,7 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
 	leader.Returns(prodNotLeader)
 
-	seedBroker.Returns(metadataLeader)
+	leader.Returns(metadataLeader)
 
 	prodSuccess := new(ProduceResponse)
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)

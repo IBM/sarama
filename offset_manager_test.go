@@ -37,7 +37,7 @@ func initOffsetManagerWithBackoffFunc(
 		t.Fatal(err)
 	}
 
-	broker.Returns(&ConsumerMetadataResponse{
+	coordinator.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   coordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",
 		CoordinatorPort: coordinator.Port(),
@@ -251,7 +251,7 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	// Refresh coordinator
 	newCoordinator := NewMockBroker(t, 3)
 	defer newCoordinator.Close()
-	broker.Returns(&ConsumerMetadataResponse{
+	coordinator.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   newCoordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",
 		CoordinatorPort: newCoordinator.Port(),
@@ -492,36 +492,34 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	ocResponse.AddError("my_topic", 1, ErrNoError)
 	coordinator.Returns(ocResponse)
 
-	newCoordinator := NewMockBroker(t, 3)
-	defer newCoordinator.Close()
-
 	// For RefreshCoordinator()
-	broker.Returns(&ConsumerMetadataResponse{
-		CoordinatorID:   newCoordinator.BrokerID(),
+	coordinator.Returns(&ConsumerMetadataResponse{
+		CoordinatorID:   coordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",
-		CoordinatorPort: newCoordinator.Port(),
+		CoordinatorPort: coordinator.Port(),
 	})
 
 	// Nothing in response.Errors at all
 	ocResponse2 := new(OffsetCommitResponse)
-	newCoordinator.Returns(ocResponse2)
+	coordinator.Returns(ocResponse2)
 
 	// No error, no need to refresh coordinator
 
 	// Error on the wrong partition for this pom
 	ocResponse3 := new(OffsetCommitResponse)
 	ocResponse3.AddError("my_topic", 1, ErrNoError)
-	newCoordinator.Returns(ocResponse3)
-
-	// No error, no need to refresh coordinator
+	coordinator.Returns(ocResponse3)
 
 	// ErrUnknownTopicOrPartition/ErrNotLeaderForPartition/ErrLeaderNotAvailable block
 	ocResponse4 := new(OffsetCommitResponse)
 	ocResponse4.AddError("my_topic", 0, ErrUnknownTopicOrPartition)
-	newCoordinator.Returns(ocResponse4)
+	coordinator.Returns(ocResponse4)
+
+	newCoordinator := NewMockBroker(t, 3)
+	defer newCoordinator.Close()
 
 	// For RefreshCoordinator()
-	broker.Returns(&ConsumerMetadataResponse{
+	coordinator.Returns(&ConsumerMetadataResponse{
 		CoordinatorID:   newCoordinator.BrokerID(),
 		CoordinatorHost: "127.0.0.1",
 		CoordinatorPort: newCoordinator.Port(),

@@ -1142,6 +1142,10 @@ func TestConsumeMessagesTrackLeader(t *testing.T) {
 			SetMessage("my_topic", 0, 2, testMsg),
 	})
 
+	leader2.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": mockMetadataResponse1,
+	})
+
 	client, err := NewClient([]string{leader1.Addr()}, cfg)
 	if err != nil {
 		t.Fatal(err)
@@ -1362,21 +1366,23 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	                  seedBroker will give leader1 as serving my_topic/0 now
 	  * my_topic/1 -> leader1 will serve 0 messages`)
 
-	// seed broker tells that the new partition 0 leader is leader1
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetLeader("my_topic", 0, leader1.BrokerID()).
-			SetLeader("my_topic", 1, leader1.BrokerID()).
-			SetBroker(leader0.Addr(), leader0.BrokerID()).
-			SetBroker(leader1.Addr(), leader1.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
-	})
-
 	// leader0 says no longer leader of partition 0
 	fetchResponse := new(FetchResponse)
 	fetchResponse.AddError("my_topic", 0, ErrNotLeaderForPartition)
+	metadataResponse := NewMockMetadataResponse(t).
+		SetLeader("my_topic", 0, leader1.BrokerID()).
+		SetLeader("my_topic", 1, leader1.BrokerID()).
+		SetBroker(leader0.Addr(), leader0.BrokerID()).
+		SetBroker(leader1.Addr(), leader1.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID())
+
 	leader0.SetHandlerByMap(map[string]MockResponse{
-		"FetchRequest": NewMockWrapper(fetchResponse),
+		"FetchRequest":    NewMockWrapper(fetchResponse),
+		"MetadataRequest": metadataResponse,
+	})
+	leader1.SetHandlerByMap(map[string]MockResponse{
+		"FetchRequest":    NewMockFetchResponse(t, 1),
+		"MetadataRequest": metadataResponse,
 	})
 
 	time.Sleep(50 * time.Millisecond)
@@ -1393,7 +1399,8 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 		mockFetchResponse2.SetMessage("my_topic", 1, int64(i), testMsg)
 	}
 	leader1.SetHandlerByMap(map[string]MockResponse{
-		"FetchRequest": mockFetchResponse2,
+		"FetchRequest":    mockFetchResponse2,
+		"MetadataRequest": metadataResponse,
 	})
 
 	for i := 0; i < 8; i++ {
@@ -1409,21 +1416,17 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	  * my_topic/1 -> leader1 will return NotLeaderForPartition
 	                  seedBroker will give leader0 as serving my_topic/1 now`)
 
+	metadataResponse2 := NewMockMetadataResponse(t).
+		SetLeader("my_topic", 0, leader1.BrokerID()).
+		SetLeader("my_topic", 1, leader0.BrokerID()).
+		SetBroker(leader0.Addr(), leader0.BrokerID()).
+		SetBroker(leader1.Addr(), leader1.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID())
 	leader0.SetHandlerByMap(map[string]MockResponse{
 		"FetchRequest": NewMockFetchResponse(t, 1),
 	})
 	leader1.SetHandlerByMap(map[string]MockResponse{
 		"FetchRequest": NewMockFetchResponse(t, 1),
-	})
-
-	// metadata assigns 0 to leader1 and 1 to leader0
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetLeader("my_topic", 0, leader1.BrokerID()).
-			SetLeader("my_topic", 1, leader0.BrokerID()).
-			SetBroker(leader0.Addr(), leader0.BrokerID()).
-			SetBroker(leader1.Addr(), leader1.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
 	})
 
 	// leader1 provides three more messages on partition0, says no longer leader of partition1
@@ -1435,7 +1438,12 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 	fetchResponse4.AddError("my_topic", 0, ErrNoError)
 	fetchResponse4.AddError("my_topic", 1, ErrNotLeaderForPartition)
 	leader1.SetHandlerByMap(map[string]MockResponse{
-		"FetchRequest": NewMockSequence(mockFetchResponse3, fetchResponse4),
+		"FetchRequest":    NewMockSequence(mockFetchResponse3, fetchResponse4),
+		"MetadataRequest": metadataResponse2,
+	})
+	leader0.SetHandlerByMap(map[string]MockResponse{
+		"FetchRequest":    NewMockFetchResponse(t, 1),
+		"MetadataRequest": metadataResponse2,
 	})
 
 	t.Log(`    STAGE 5:
@@ -1448,7 +1456,8 @@ func TestConsumerRebalancingMultiplePartitions(t *testing.T) {
 		mockFetchResponse4.SetMessage("my_topic", 1, int64(i), testMsg)
 	}
 	leader0.SetHandlerByMap(map[string]MockResponse{
-		"FetchRequest": mockFetchResponse4,
+		"FetchRequest":    mockFetchResponse4,
+		"MetadataRequest": metadataResponse2,
 	})
 
 	for i := 7; i < 10; i++ {
@@ -1593,7 +1602,8 @@ func TestConsumerBounceWithReferenceOpen(t *testing.T) {
 	// Bring broker0 back to service.
 	broker0 = NewMockBrokerAddr(t, 0, broker0Addr)
 	broker0.SetHandlerByMap(map[string]MockResponse{
-		"FetchRequest": mockFetchResponse,
+		"MetadataRequest": mockMetadataResponse,
+		"FetchRequest":    mockFetchResponse,
 	})
 
 	// Read the rest of messages from both partitions.

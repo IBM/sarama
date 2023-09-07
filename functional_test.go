@@ -228,7 +228,7 @@ mainLoop:
 			}
 			for _, broker := range brokers {
 				err := broker.Open(client.Config())
-				if err != nil {
+				if err != nil && !errors.Is(err, ErrAlreadyConnected) {
 					client.Close()
 					continue retryLoop
 				}

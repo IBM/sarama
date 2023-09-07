@@ -260,7 +260,7 @@ func (client *client) Broker(brokerID int32) (*Broker, error) {
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 	// FIXME: this InitProducerID seems to only be called from client_test.go (TestInitProducerIDConnectionRefused) and has been superceded by transaction_manager.go?
 	brokerErrors := make([]error, 0)
-	for broker := client.anyBroker(); broker != nil; broker = client.anyBroker() {
+	for broker := client.LeastLoadedBroker(); broker != nil; broker = client.LeastLoadedBroker() {
 		request := &InitProducerIDRequest{}
 
 		if client.conf.Version.IsAtLeast(V2_7_0_0) {
@@ -763,22 +763,21 @@ func (client *client) registerBroker(broker *Broker) {
 	}
 }
 
-// deregisterBroker removes a broker from the seedsBroker list, and if it's
-// not the seedbroker, removes it from brokers map completely.
+// deregisterBroker removes a broker from the broker list, and if it's
+// not in the broker list, removes it from seedBrokers.
 func (client *client) deregisterBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
+	_, ok := client.brokers[broker.ID()]
+	if ok {
+		Logger.Printf("client/brokers deregistered broker #%d at %s", broker.ID(), broker.Addr())
+		delete(client.brokers, broker.ID())
+		return
+	}
 	if len(client.seedBrokers) > 0 && broker == client.seedBrokers[0] {
 		client.deadSeeds = append(client.deadSeeds, broker)
 		client.seedBrokers = client.seedBrokers[1:]
-	} else {
-		// we do this so that our loop in `tryRefreshMetadata` doesn't go on forever,
-		// but we really shouldn't have to; once that loop is made better this case can be
-		// removed, and the function generally can be renamed from `deregisterBroker` to
-		// `nextSeedBroker` or something
-		DebugLogger.Printf("client/brokers deregistered broker #%d at %s", broker.ID(), broker.Addr())
-		delete(client.brokers, broker.ID())
 	}
 }
 
@@ -791,32 +790,11 @@ func (client *client) resurrectDeadBrokers() {
 	client.deadSeeds = nil
 }
 
-func (client *client) anyBroker() *Broker {
-	client.lock.RLock()
-	defer client.lock.RUnlock()
-
-	if len(client.seedBrokers) > 0 {
-		_ = client.seedBrokers[0].Open(client.conf)
-		return client.seedBrokers[0]
-	}
-
-	// not guaranteed to be random *or* deterministic
-	for _, broker := range client.brokers {
-		_ = broker.Open(client.conf)
-		return broker
-	}
-
-	return nil
-}
-
+// LeastLoadedBroker returns the broker with the least pending requests.
+// Firstly, choose the broker from cached broker list. If the broker list is empty, choose from seed brokers.
 func (client *client) LeastLoadedBroker() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
-
-	if len(client.seedBrokers) > 0 {
-		_ = client.seedBrokers[0].Open(client.conf)
-		return client.seedBrokers[0]
-	}
 
 	var leastLoadedBroker *Broker
 	pendingRequests := math.MaxInt
@@ -826,10 +804,16 @@ func (client *client) LeastLoadedBroker() *Broker {
 			leastLoadedBroker = broker
 		}
 	}
-
 	if leastLoadedBroker != nil {
 		_ = leastLoadedBroker.Open(client.conf)
+		return leastLoadedBroker
 	}
+
+	if len(client.seedBrokers) > 0 {
+		_ = client.seedBrokers[0].Open(client.conf)
+		return client.seedBrokers[0]
+	}
+
 	return leastLoadedBroker
 }
 
@@ -1032,9 +1016,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		return err
 	}
 
-	broker := client.anyBroker()
+	broker := client.LeastLoadedBroker()
 	brokerErrors := make([]error, 0)
-	for ; broker != nil && !pastDeadline(0); broker = client.anyBroker() {
+	for ; broker != nil && !pastDeadline(0); broker = client.LeastLoadedBroker() {
 		allowAutoTopicCreation := client.conf.Metadata.AllowAutoTopicCreation
 		if len(topics) > 0 {
 			DebugLogger.Printf("client/metadata fetching metadata for %v from broker %s\n", topics, broker.addr)
@@ -1212,7 +1196,7 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 	}
 
 	brokerErrors := make([]error, 0)
-	for broker := client.anyBroker(); broker != nil; broker = client.anyBroker() {
+	for broker := client.LeastLoadedBroker(); broker != nil; broker = client.LeastLoadedBroker() {
 		DebugLogger.Printf("client/coordinator requesting coordinator for %s from %s\n", coordinatorKey, broker.Addr())
 
 		request := new(FindCoordinatorRequest)
