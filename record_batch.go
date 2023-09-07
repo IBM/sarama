@@ -20,12 +20,12 @@ func (e recordsArray) encode(pe packetEncoder) error {
 }
 
 func (e recordsArray) decode(pd packetDecoder) error {
+	records := make([]Record, len(e))
 	for i := range e {
-		rec := &Record{}
-		if err := rec.decode(pd); err != nil {
+		if err := records[i].decode(pd); err != nil {
 			return err
 		}
-		e[i] = rec
+		e[i] = &records[i]
 	}
 	return nil
 }
