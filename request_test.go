@@ -453,3 +453,15 @@ func testResponse(t *testing.T, name string, res protocolBody, expected []byte) 
 }
 
 func nullString(s string) *string { return &s }
+
+func FuzzDecodeRequest(f *testing.F) {
+	f.Fuzz(func(t *testing.T, packet []byte) {
+
+		decodeRequest(bytes.NewReader(packet))
+	})
+}
+
+func TestDecodeRequest(t *testing.T) {
+
+	decodeRequest(bytes.NewReader([]byte("\x00\x00\x00\x0e\x002000000\x00\x000000")))
+}

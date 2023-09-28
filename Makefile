@@ -37,3 +37,6 @@ test_functional: $(GOBIN)/tparse
 		| tee output.json | $(GOBIN)/tparse -follow -all
 	[ -z "$${GITHUB_STEP_SUMMARY:-}" ] \
 		|| NO_COLOR=1 $(GOBIN)/tparse -format markdown -file output.json -all >"$${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+fuzz:
+	@go test -fuzz=FuzzDecodeRequest .
