@@ -382,9 +382,9 @@ func (c *consumerGroup) start(ctx context.Context, topics []string, handlerV2 Co
 	if c.protocol == COOPERATIVE {
 		revokedPartitions := diffAssignment(c.ownedPartitions, claims)
 		Logger.Printf("updating consumer(group:%s, member:%s, generation:%d, isLeader:%v)\n"+
-			"All Assignments: %v\n"+
-			"New Partitions: %v\n"+
-			"Revoked Partitions: %v\n",
+			"*** All Assignments: %v\n"+
+			"*** New Partitions: %v\n"+
+			"*** Revoked Partitions: %v\n",
 			c.groupID, c.memberID, c.generationID, c.isLeader,
 			claims, newAssignedPartitions, revokedPartitions)
 
@@ -1664,6 +1664,10 @@ func (c *consumerGroup) addClaim(claim *consumerGroupClaim) (*partitionClaim, er
 
 func (c *consumerGroup) removeClaims(revokedPartitions map[string][]int32) {
 	var wg sync.WaitGroup
+	revokedPausedPartitions := c.consumer.(*consumer).collectPausedPartitions(revokedPartitions)
+	if len(revokedPausedPartitions) > 0 {
+		Logger.Printf("The pause flag in partitions %v will be removed due to revocation\n", revokedPausedPartitions)
+	}
 
 	for topic, partitions := range revokedPartitions {
 		for _, partition := range partitions {

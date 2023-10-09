@@ -135,13 +135,18 @@ func main() {
 	sigterm := make(chan os.Signal, 1)
 	signal.Notify(sigterm, syscall.SIGINT, syscall.SIGTERM)
 
-	select {
-	case <-ctx.Done():
-		log.Println("terminating: context cancelled")
-	case <-sigterm:
-		log.Println("terminating: via signal")
-	case <-sigusr1:
-		toggleConsumptionFlow(client, &consumptionIsPaused)
+	keepRunning := true
+	for keepRunning {
+		select {
+		case <-ctx.Done():
+			log.Println("terminating: context cancelled")
+			keepRunning = false
+		case <-sigterm:
+			log.Println("terminating: via signal")
+			keepRunning = false
+		case <-sigusr1:
+			toggleConsumptionFlow(client, &consumptionIsPaused)
+		}
 	}
 	cancel()
 	if err = client.Close(); err != nil {
