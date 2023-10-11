@@ -281,8 +281,11 @@ var (
 )
 
 var (
-	validKafkaVersion1 = regexp.MustCompile(`^0\.\d+\.\d+\.\d+$`)
-	validKafkaVersion2 = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
+	// This regex validates that a string complies with the pre kafka 1.0.0 format for version strings, for example 0.11.0.3
+	validPreKafka1Version = regexp.MustCompile(`^0\.\d+\.\d+\.\d+$`)
+
+	// This regex validates that a string complies with the post Kafka 1.0.0 format, for example 1.0.0
+	validPostKafka1Version = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 // ParseKafkaVersion parses and returns kafka version or error from a string
@@ -293,9 +296,9 @@ func ParseKafkaVersion(s string) (KafkaVersion, error) {
 	var major, minor, veryMinor, patch uint
 	var err error
 	if s[0] == '0' {
-		err = scanKafkaVersion(s, validKafkaVersion1, "0.%d.%d.%d", [3]*uint{&minor, &veryMinor, &patch})
+		err = scanKafkaVersion(s, validPreKafka1Version, "0.%d.%d.%d", [3]*uint{&minor, &veryMinor, &patch})
 	} else {
-		err = scanKafkaVersion(s, validKafkaVersion2, "%d.%d.%d", [3]*uint{&major, &minor, &veryMinor})
+		err = scanKafkaVersion(s, validPostKafka1Version, "%d.%d.%d", [3]*uint{&major, &minor, &veryMinor})
 	}
 	if err != nil {
 		return DefaultVersion, err
