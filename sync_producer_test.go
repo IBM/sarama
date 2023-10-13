@@ -271,6 +271,7 @@ func TestSyncProducerToNonExistingTopic(t *testing.T) {
 	}
 
 	metadataResponse = new(MetadataResponse)
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
 	metadataResponse.AddTopic("unknown", ErrUnknownTopicOrPartition)
 	broker.Returns(metadataResponse)
 

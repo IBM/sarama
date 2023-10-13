@@ -78,7 +78,9 @@ func initPartitionOffsetManager(t *testing.T, om OffsetManager,
 
 func TestNewOffsetManager(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
-	seedBroker.Returns(new(MetadataResponse))
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse)
 	defer seedBroker.Close()
 
 	testClient, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
