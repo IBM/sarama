@@ -197,7 +197,9 @@ func doListenerTLSTest(t *testing.T, expectSuccess bool, serverConfig, clientCon
 	seedBroker := NewMockBrokerListener(childT, 1, seedListener)
 	defer seedBroker.Close()
 
-	seedBroker.Returns(new(MetadataResponse))
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse)
 
 	config := NewTestConfig()
 	config.Net.TLS.Enable = true
