@@ -196,7 +196,7 @@ func TestBrokerFailedRequest(t *testing.T) {
 	}
 }
 
-var ErrTokenFailure = errors.New("Failure generating token")
+var errTokenFailure = errors.New("failure generating token")
 
 type TokenProvider struct {
 	accessToken *AccessToken
@@ -268,7 +268,7 @@ func TestSASLOAuthBearer(t *testing.T) {
 			mockSASLAuthResponse: NewMockSaslAuthenticateResponse(t),
 			expectClientErr:      true,
 			expectedBrokerError:  ErrNoError,
-			tokProvider:          newTokenProvider(&AccessToken{Token: "access-token-123"}, ErrTokenFailure),
+			tokProvider:          newTokenProvider(&AccessToken{Token: "access-token-123"}, errTokenFailure),
 		},
 		{
 			name: "SASL/OAUTHBEARER invalid extension",
