@@ -435,12 +435,16 @@ type ProduceCallback func(*ProduceResponse, error)
 //
 // Make sure not to Close the broker in the callback as it will lead to a deadlock.
 func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error {
-	metricRegistry := b.metricRegistry
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
 	needAcks := request.RequiredAcks != NoResponse
 	// Use a nil promise when no acks is required
 	var promise *responsePromise
 
 	if needAcks {
+		metricRegistry := b.metricRegistry
+
 		// Create ProduceResponse early to provide the header version
 		res := new(ProduceResponse)
 		promise = &responsePromise{
@@ -466,8 +470,6 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 		}
 	}
 
-	b.lock.Lock()
-	defer b.lock.Unlock()
 	return b.sendWithPromise(request, promise)
 }
 
