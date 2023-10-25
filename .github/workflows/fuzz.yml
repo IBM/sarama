@@ -28,4 +28,4 @@ jobs:
       with:
         go-version: 1.21.x
     - name: Run any fuzzing tests
-      run: go test -v -run=^Fuzz -test.fuzztime=5m ./...
+      run: go test -list . | grep '^Fuzz' | parallel 'go test -v -run=^{}$ -fuzz=^{}$ -fuzztime=5m'
