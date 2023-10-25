@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type MemberIdentity struct {
 	MemberId        string
 	GroupInstanceId *string
@@ -52,6 +54,9 @@ func (r *LeaveGroupRequest) decode(pd packetDecoder, version int16) (err error) 
 		memberCount, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if memberCount < 0 {
+			return fmt.Errorf("memberCount %d is invalid", memberCount)
 		}
 		r.Members = make([]MemberIdentity, memberCount)
 		for i := 0; i < memberCount; i++ {

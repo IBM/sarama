@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // CreateAclsRequest is an acl creation request
 type CreateAclsRequest struct {
 	Version      int16
@@ -25,6 +27,9 @@ func (c *CreateAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return fmt.Errorf("aclCreationsCount %d is invalid", n)
 	}
 
 	c.AclCreations = make([]*AclCreation, n)

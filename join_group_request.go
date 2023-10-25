@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type GroupProtocol struct {
 	// Name contains the protocol name.
 	Name string
@@ -142,8 +144,11 @@ func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 	if n == 0 {
 		return nil
 	}
+	if n < 0 {
+		return fmt.Errorf("groupProtocolCount %d is invalid", n)
+	}
 
-	r.GroupProtocols = make(map[string][]byte)
+	r.GroupProtocols = make(map[string][]byte, n)
 	for i := 0; i < n; i++ {
 		protocol := &GroupProtocol{}
 		if err := protocol.decode(pd); err != nil {

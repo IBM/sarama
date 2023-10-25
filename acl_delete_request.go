@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DeleteAclsRequest is a delete acl request
 type DeleteAclsRequest struct {
 	Version int
@@ -26,6 +28,9 @@ func (d *DeleteAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return fmt.Errorf("filterCount %d is invalid", n)
 	}
 
 	d.Filters = make([]*AclFilter, n)

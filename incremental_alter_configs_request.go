@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type IncrementalAlterConfigsOperation int8
 
 const (
@@ -47,7 +49,9 @@ func (a *IncrementalAlterConfigsRequest) decode(pd packetDecoder, version int16)
 	if err != nil {
 		return err
 	}
-
+	if resourceCount < 0 {
+		return fmt.Errorf("resourceCount %d is invalid", resourceCount)
+	}
 	a.Resources = make([]*IncrementalAlterConfigsResource, resourceCount)
 	for i := range a.Resources {
 		r := &IncrementalAlterConfigsResource{}

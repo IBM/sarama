@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type DescribeConfigsRequest struct {
 	Version         int16
 	Resources       []*ConfigResource
@@ -44,6 +46,9 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return fmt.Errorf("resourceCount %d is invalid", n)
+	}
 
 	r.Resources = make([]*ConfigResource, n)
 
@@ -67,6 +72,9 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 
 		if confLength == -1 {
 			continue
+		}
+		if confLength < 0 {
+			return fmt.Errorf("confLength %d is invalid", confLength)
 		}
 
 		cfnames := make([]string, confLength)

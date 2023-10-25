@@ -1,6 +1,9 @@
 package sarama
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // ReceiveTime is a special value for the timestamp field of Offset Commit Requests which
 // tells the broker to set the timestamp to the time at which the request was received.
@@ -163,7 +166,10 @@ func (r *OffsetCommitRequest) decode(pd packetDecoder, version int16) (err error
 	if topicCount == 0 {
 		return nil
 	}
-	r.blocks = make(map[string]map[int32]*offsetCommitRequestBlock)
+	if topicCount < 0 {
+		return fmt.Errorf("topicCount %d is invalid", topicCount)
+	}
+	r.blocks = make(map[string]map[int32]*offsetCommitRequestBlock, topicCount)
 	for i := 0; i < topicCount; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -172,6 +178,9 @@ func (r *OffsetCommitRequest) decode(pd packetDecoder, version int16) (err error
 		partitionCount, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if partitionCount < 0 {
+			return fmt.Errorf("partitionCount %d is invalid", partitionCount)
 		}
 		r.blocks[topic] = make(map[int32]*offsetCommitRequestBlock)
 		for j := 0; j < partitionCount; j++ {

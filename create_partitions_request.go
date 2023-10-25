@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type CreatePartitionsRequest struct {
 	Version         int16
@@ -34,6 +37,9 @@ func (c *CreatePartitionsRequest) decode(pd packetDecoder, version int16) (err e
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return fmt.Errorf("topicCount %d is invalid", n)
 	}
 	c.TopicPartitions = make(map[string]*TopicPartition, n)
 	for i := 0; i < n; i++ {

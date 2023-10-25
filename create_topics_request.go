@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -42,6 +43,9 @@ func (c *CreateTopicsRequest) decode(pd packetDecoder, version int16) (err error
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return fmt.Errorf("topicCount %d is invalid", n)
 	}
 
 	c.TopicDetails = make(map[string]*TopicDetail, n)

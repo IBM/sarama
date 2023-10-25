@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type alterPartitionReassignmentsBlock struct {
 	replicas []int32
 }
@@ -62,7 +64,7 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 		return err
 	}
 	if topicCount > 0 {
-		r.blocks = make(map[string]map[int32]*alterPartitionReassignmentsBlock)
+		r.blocks = make(map[string]map[int32]*alterPartitionReassignmentsBlock, topicCount)
 		for i := 0; i < topicCount; i++ {
 			topic, err := pd.getCompactString()
 			if err != nil {
@@ -72,7 +74,11 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 			if err != nil {
 				return err
 			}
-			r.blocks[topic] = make(map[int32]*alterPartitionReassignmentsBlock)
+			if partitionCount < 0 {
+				return fmt.Errorf("partitionCount %d is invalid", partitionCount)
+			}
+
+			r.blocks[topic] = make(map[int32]*alterPartitionReassignmentsBlock, partitionCount)
 			for j := 0; j < partitionCount; j++ {
 				partition, err := pd.getInt32()
 				if err != nil {

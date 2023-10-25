@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DescribeClientQuotas Request (Version: 0) => [components] strict
 //   components => entity_type match_type match
 //     entity_type => STRING
@@ -44,25 +46,22 @@ func (d *DescribeClientQuotasRequest) encode(pe packetEncoder) error {
 }
 
 func (d *DescribeClientQuotasRequest) decode(pd packetDecoder, version int16) error {
-	// Components
 	componentCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
-	if componentCount > 0 {
-		d.Components = make([]QuotaFilterComponent, componentCount)
-		for i := range d.Components {
-			c := QuotaFilterComponent{}
-			if err = c.decode(pd, version); err != nil {
-				return err
-			}
-			d.Components[i] = c
+	if componentCount < 0 {
+		return fmt.Errorf("componentCount %d is invalid", componentCount)
+	}
+	d.Components = make([]QuotaFilterComponent, componentCount)
+	for i := range d.Components {
+		c := QuotaFilterComponent{}
+		if err = c.decode(pd, version); err != nil {
+			return err
 		}
-	} else {
-		d.Components = []QuotaFilterComponent{}
+		d.Components[i] = c
 	}
 
-	// Strict
 	strict, err := pd.getBool()
 	if err != nil {
 		return err

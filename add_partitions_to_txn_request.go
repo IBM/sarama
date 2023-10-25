@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // AddPartitionsToTxnRequest is a add partition request
 type AddPartitionsToTxnRequest struct {
 	Version         int16
@@ -46,8 +48,11 @@ func (a *AddPartitionsToTxnRequest) decode(pd packetDecoder, version int16) (err
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return fmt.Errorf("topicCount %d is invalid", n)
+	}
 
-	a.TopicPartitions = make(map[string][]int32)
+	a.TopicPartitions = make(map[string][]int32, n)
 	for i := 0; i < n; i++ {
 		topic, err := pd.getString()
 		if err != nil {

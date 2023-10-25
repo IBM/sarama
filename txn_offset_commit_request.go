@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type TxnOffsetCommitRequest struct {
 	Version         int16
 	TransactionalID string
@@ -58,6 +60,9 @@ func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err er
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return fmt.Errorf("topicCount %d is invalid", n)
+	}
 
 	t.Topics = make(map[string][]*PartitionOffsetMetadata)
 	for i := 0; i < n; i++ {
@@ -69,6 +74,9 @@ func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err er
 		m, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if m < 0 {
+			return fmt.Errorf("partitionCount %d is invalid", m)
 		}
 
 		t.Topics[topic] = make([]*PartitionOffsetMetadata, m)

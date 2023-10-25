@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DescribeLogDirsRequest is a describe request to get partitions' log size
 type DescribeLogDirsRequest struct {
 	// Version 0 and 1 are equal
@@ -47,6 +49,9 @@ func (r *DescribeLogDirsRequest) decode(pd packetDecoder, version int16) error {
 	}
 	if n == -1 {
 		n = 0
+	}
+	if n < 0 {
+		return fmt.Errorf("topicCount %d is invalid", n)
 	}
 
 	topics := make([]DescribeLogDirsRequestTopic, n)

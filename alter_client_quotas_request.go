@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // AlterClientQuotas Request (Version: 0) => [entries] validate_only
 //   entries => [entity] [ops]
 //     entity => entity_type entity_name
@@ -46,25 +48,22 @@ func (a *AlterClientQuotasRequest) encode(pe packetEncoder) error {
 }
 
 func (a *AlterClientQuotasRequest) decode(pd packetDecoder, version int16) error {
-	// Entries
 	entryCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
-	if entryCount > 0 {
-		a.Entries = make([]AlterClientQuotasEntry, entryCount)
-		for i := range a.Entries {
-			e := AlterClientQuotasEntry{}
-			if err = e.decode(pd, version); err != nil {
-				return err
-			}
-			a.Entries[i] = e
+	if entryCount < 0 {
+		return fmt.Errorf("entryCount %d is invalid", entryCount)
+	}
+	a.Entries = make([]AlterClientQuotasEntry, entryCount)
+	for i := range a.Entries {
+		e := AlterClientQuotasEntry{}
+		if err = e.decode(pd, version); err != nil {
+			return err
 		}
-	} else {
-		a.Entries = []AlterClientQuotasEntry{}
+		a.Entries[i] = e
 	}
 
-	// ValidateOnly
 	validateOnly, err := pd.getBool()
 	if err != nil {
 		return err
@@ -99,40 +98,36 @@ func (a *AlterClientQuotasEntry) encode(pe packetEncoder) error {
 }
 
 func (a *AlterClientQuotasEntry) decode(pd packetDecoder, version int16) error {
-	// Entity
 	componentCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
-	if componentCount > 0 {
-		a.Entity = make([]QuotaEntityComponent, componentCount)
-		for i := 0; i < componentCount; i++ {
-			component := QuotaEntityComponent{}
-			if err := component.decode(pd, version); err != nil {
-				return err
-			}
-			a.Entity[i] = component
+	if componentCount < 0 {
+		return fmt.Errorf("componentCount %d is invalid", componentCount)
+	}
+	a.Entity = make([]QuotaEntityComponent, componentCount)
+	for i := 0; i < componentCount; i++ {
+		component := QuotaEntityComponent{}
+		if err := component.decode(pd, version); err != nil {
+			return err
 		}
-	} else {
-		a.Entity = []QuotaEntityComponent{}
+		a.Entity[i] = component
 	}
 
-	// Ops
 	opCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
-	if opCount > 0 {
-		a.Ops = make([]ClientQuotasOp, opCount)
-		for i := range a.Ops {
-			c := ClientQuotasOp{}
-			if err = c.decode(pd, version); err != nil {
-				return err
-			}
-			a.Ops[i] = c
+	if opCount < 0 {
+		return fmt.Errorf("opCount %d is invalid", opCount)
+	}
+	a.Ops = make([]ClientQuotasOp, opCount)
+	for i := range a.Ops {
+		c := ClientQuotasOp{}
+		if err = c.decode(pd, version); err != nil {
+			return err
 		}
-	} else {
-		a.Ops = []ClientQuotasOp{}
+		a.Ops[i] = c
 	}
 
 	return nil

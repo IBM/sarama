@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // AlterConfigsRequest is an alter config request type
 type AlterConfigsRequest struct {
 	Version      int16
@@ -33,6 +35,10 @@ func (a *AlterConfigsRequest) decode(pd packetDecoder, version int16) error {
 	resourceCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+
+	if resourceCount < 0 {
+		return fmt.Errorf("resourceCount %d is invalid", resourceCount)
 	}
 
 	a.Resources = make([]*AlterConfigsResource, resourceCount)

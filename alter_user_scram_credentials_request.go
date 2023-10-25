@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type AlterUserScramCredentialsRequest struct {
 	Version int16
 
@@ -71,6 +73,9 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	if err != nil {
 		return err
 	}
+	if numDeletions < 0 {
+		return fmt.Errorf("numDeletions %d is invalid", numDeletions)
+	}
 
 	r.Deletions = make([]AlterUserScramCredentialsDelete, numDeletions)
 	for i := 0; i < numDeletions; i++ {
@@ -91,6 +96,9 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	numUpsertions, err := pd.getCompactArrayLength()
 	if err != nil {
 		return err
+	}
+	if numUpsertions < 0 {
+		return fmt.Errorf("numUpsertions %d is invalid", numUpsertions)
 	}
 
 	r.Upsertions = make([]AlterUserScramCredentialsUpsert, numUpsertions)

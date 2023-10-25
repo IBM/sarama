@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DescribeUserScramCredentialsRequest is a request to get list of SCRAM user names
 type DescribeUserScramCredentialsRequest struct {
 	// Version 0 is currently only supported
@@ -34,6 +36,9 @@ func (r *DescribeUserScramCredentialsRequest) decode(pd packetDecoder, version i
 	}
 	if n == -1 {
 		n = 0
+	}
+	if n < 0 {
+		return fmt.Errorf("userCount %d is invalid", n)
 	}
 
 	r.DescribeUsers = make([]DescribeUserScramCredentialsRequestUser, n)
