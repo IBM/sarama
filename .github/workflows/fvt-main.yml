@@ -6,6 +6,10 @@ on:
     - main
     paths-ignore:
     - '**/*.md'
+
+permissions:
+  contents: read  # for actions/checkout to fetch code
+
 jobs:
   fvt:
     name: Test with Kafka ${{ matrix.kafka-version }}

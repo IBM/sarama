@@ -11,6 +11,10 @@ on:
     - "**"
     paths-ignore:
     - '**/*.md'
+
+permissions:
+  contents: read  # for actions/checkout to fetch code
+
 jobs:
   apidiff:
     runs-on: ubuntu-latest

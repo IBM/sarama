@@ -13,14 +13,18 @@ on:
     - '**/*.md'
   schedule:
   - cron: "39 12 * * 1"
+
+permissions:
+  contents: read  # for actions/checkout to fetch code
+
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
     permissions:
-      actions: read
-      contents: read
-      security-events: write
+      actions: read  # for github/codeql-action to list actions
+      contents: read  # for actions/checkout to fetch code
+      security-events: write  # for github/codeql-action to report security issues
     strategy:
       fail-fast: false
       matrix:

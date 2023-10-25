@@ -4,8 +4,15 @@ on:
   schedule:
   - cron: "0 */2 * * *"
   workflow_dispatch:
+
+permissions:
+  contents: read  # for actions/checkout to fetch code
+
 jobs:
   stale:
+    permissions:
+      issues: write  # for actions/stale to close stale issues
+      pull-requests: write  # for actions/stale to close stale PRs
     runs-on: ubuntu-latest
     steps:
     - uses: actions/stale@main # make use of https://github.com/actions/stale/pull/1033

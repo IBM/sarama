@@ -11,8 +11,15 @@ on:
     - "**"
     paths-ignore:
     - '**/*.md'
+
+permissions:
+  contents: read  # for actions/checkout to fetch code
+
 jobs:
   lint:
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
     name: Linting with Go ${{ matrix.go-version }}
     runs-on: ubuntu-latest
     strategy:
