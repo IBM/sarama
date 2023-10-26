@@ -9,7 +9,7 @@ on:
       kafka-version:
         required: false
         type: string
-        default: 3.5.1
+        default: 3.6.0
       scala-version:
         required: false
         type: string
@@ -38,6 +38,7 @@ jobs:
         builder: ${{ steps.buildx.outputs.name }}
         files: docker-compose.yml
         load: true
+        targets: kafka-1
         set: |
           *.cache-from=type=gha,scope=${{ github.workflow }}
           *.cache-to=type=gha,scope=${{ github.workflow }},mode=max
