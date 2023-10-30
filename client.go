@@ -519,16 +519,16 @@ func (client *client) RefreshBrokers(addrs []string) error {
 	defer client.lock.Unlock()
 
 	for _, broker := range client.brokers {
-		_ = broker.Close()
-		delete(client.brokers, broker.ID())
+		safeAsyncClose(broker)
 	}
+	client.brokers = make(map[int32]*Broker)
 
 	for _, broker := range client.seedBrokers {
-		_ = broker.Close()
+		safeAsyncClose(broker)
 	}
 
 	for _, broker := range client.deadSeeds {
-		_ = broker.Close()
+		safeAsyncClose(broker)
 	}
 
 	client.seedBrokers = nil
