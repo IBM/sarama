@@ -260,6 +260,7 @@ func (b *Broker) Open(conf *Config) error {
 			b.connErr = b.authenticateViaSASLv1()
 			if b.connErr != nil {
 				close(b.responses)
+				<-b.done
 				err = b.conn.Close()
 				if err == nil {
 					DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
