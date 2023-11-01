@@ -1,12 +1,15 @@
 package sarama
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"math"
 	"sync"
 	"time"
+
+	streamdal "github.com/streamdal/go-sdk"
 
 	"github.com/eapache/go-resiliency/breaker"
 	"github.com/eapache/queue"
@@ -87,6 +90,8 @@ type asyncProducer struct {
 	txLock sync.Mutex
 
 	metricsRegistry metrics.Registry
+
+	Streamdal *streamdal.Streamdal // Streamdal addition
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.
@@ -118,6 +123,16 @@ func newAsyncProducer(client Client) (AsyncProducer, error) {
 		return nil, err
 	}
 
+	// Begin streamdal shim
+	sd, err := streamdal.New(&streamdal.Config{
+		ShutdownCtx: context.Background(),
+		ClientType:  streamdal.ClientTypeShim,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create streamdal client: %s", err.Error())
+	}
+	// End streamdal shim
+
 	p := &asyncProducer{
 		client:          client,
 		conf:            client.Config(),
@@ -129,6 +144,7 @@ func newAsyncProducer(client Client) (AsyncProducer, error) {
 		brokerRefs:      make(map[*brokerProducer]int),
 		txnmgr:          txnmgr,
 		metricsRegistry: newCleanupRegistry(client.Config().MetricRegistry),
+		Streamdal:       sd, // streamdal addition
 	}
 
 	// launch our singleton dispatchers
@@ -441,6 +457,32 @@ func (p *asyncProducer) dispatcher() {
 		for _, interceptor := range p.conf.Producer.Interceptors {
 			msg.safelyApplyInterceptor(interceptor)
 		}
+
+		// Begin streamdal shim
+		if p.Streamdal != nil {
+			resp, err := p.Streamdal.Process(context.Background(), &streamdal.ProcessRequest{
+				ComponentName: "kafka",
+				OperationType: streamdal.OperationTypeProducer,
+			})
+
+			if err != nil {
+				p.returnError(msg, fmt.Errorf("error applying streamdal rules: "+err.Error()))
+				continue
+			}
+
+			if resp.Data == nil {
+				p.returnError(msg, errors.New("message dropped due to streamdal rules"))
+				continue
+			}
+
+			if resp.Error {
+				p.returnError(msg, fmt.Errorf("failed to run streamdal rule: %s", resp.Message))
+				continue
+			}
+
+			msg.Value = ByteEncoder(resp.Data)
+		}
+		// End streamdal shim
 
 		version := 1
 		if p.conf.Version.IsAtLeast(V0_11_0_0) {

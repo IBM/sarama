@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"math"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
+
+	streamdal "github.com/streamdal/go-sdk"
 )
 
 // ConsumerMessage encapsulates a Kafka message returned by the consumer.
@@ -106,6 +109,8 @@ type consumer struct {
 	client          Client
 	metricRegistry  metrics.Registry
 	lock            sync.Mutex
+
+	streamdal *streamdal.Streamdal // streamdal addition
 }
 
 // NewConsumer creates a new consumer using the given broker addresses and configuration.
@@ -132,12 +137,23 @@ func newConsumer(client Client) (Consumer, error) {
 		return nil, ErrClosedClient
 	}
 
+	// Begin streamdal shim
+	sd, err := streamdal.New(&streamdal.Config{
+		ShutdownCtx: context.Background(),
+		ClientType:  streamdal.ClientTypeShim,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create streamdal client: %s", err.Error())
+	}
+	// End streamdal shim
+
 	c := &consumer{
 		client:          client,
 		conf:            client.Config(),
 		children:        make(map[string]map[int32]*partitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
 		metricRegistry:  newCleanupRegistry(client.Config().MetricRegistry),
+		streamdal:       sd, // Streamdal addition
 	}
 
 	return c, nil
@@ -170,6 +186,7 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 		trigger:              make(chan none, 1),
 		dying:                make(chan none),
 		fetchSize:            c.conf.Consumer.Fetch.Default,
+		streamdal:            c.streamdal, // streamdal addition
 	}
 
 	if err := child.chooseStartingOffset(offset); err != nil {
@@ -414,6 +431,8 @@ type partitionConsumer struct {
 	retries        int32
 
 	paused int32
+
+	streamdal *streamdal.Streamdal // Streamdal addition
 }
 
 var errTimedOut = errors.New("timed out feeding messages to the user") // not user-facing
@@ -580,6 +599,47 @@ feederLoop:
 
 		for i, msg := range msgs {
 			child.interceptors(msg)
+
+			// Begin streamdal shim
+			if child.streamdal != nil {
+				resp, err := child.streamdal.Process(context.Background(), &streamdal.ProcessRequest{
+					ComponentName: "kafka",
+					OperationType: streamdal.OperationTypeConsumer,
+					OperationName: msg.Topic,
+				})
+
+				if err != nil {
+					child.errors <- &ConsumerError{
+						Topic:     msg.Topic,
+						Partition: msg.Partition,
+						Err:       fmt.Errorf("error applying streamdal rules: %s", err.Error()),
+					}
+					continue
+				}
+
+				if resp.Data == nil {
+					child.errors <- &ConsumerError{
+						Topic:     msg.Topic,
+						Partition: msg.Partition,
+						Err:       errors.New("message dropped due to streamdal rules"),
+					}
+					continue
+				}
+
+				if resp.Error {
+					child.errors <- &ConsumerError{
+						Topic:     msg.Topic,
+						Partition: msg.Partition,
+						Err:       fmt.Errorf("failed to run streamdal rule: %s", resp.Message),
+					}
+					continue
+				}
+
+				msg.Value = resp.Data
+
+			}
+			// End streamdal shim
+
 		messageSelect:
 			select {
 			case <-child.dying:
@@ -594,6 +654,47 @@ feederLoop:
 				remainingLoop:
 					for _, msg = range msgs[i:] {
 						child.interceptors(msg)
+
+						// Begin streamdal shim
+						if child.streamdal != nil {
+							resp, err := child.streamdal.Process(context.Background(), &streamdal.ProcessRequest{
+								ComponentName: "kafka",
+								OperationType: streamdal.OperationTypeConsumer,
+								OperationName: msg.Topic,
+							})
+
+							if err != nil {
+								child.errors <- &ConsumerError{
+									Topic:     msg.Topic,
+									Partition: msg.Partition,
+									Err:       fmt.Errorf("error applying streamdal rules: %s", err.Error()),
+								}
+								continue
+							}
+
+							if resp.Data == nil {
+								child.errors <- &ConsumerError{
+									Topic:     msg.Topic,
+									Partition: msg.Partition,
+									Err:       errors.New("message dropped due to streamdal rules"),
+								}
+								continue
+							}
+
+							if resp.Error {
+								child.errors <- &ConsumerError{
+									Topic:     msg.Topic,
+									Partition: msg.Partition,
+									Err:       fmt.Errorf("failed to run streamdal rule: %s", resp.Message),
+								}
+								continue
+							}
+
+							msg.Value = resp.Data
+
+						}
+						// End streamdal shim
+
 						select {
 						case child.messages <- msg:
 						case <-child.dying:
