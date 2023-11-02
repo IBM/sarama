@@ -318,9 +318,13 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 
 	// request controlled retention was only supported from V2-V4 (it became
 	// broker-only after that) so if the user has set the config options then
-	// flow those through as retention time on the commit request
-	if r.Version >= 2 && r.Version < 5 && om.conf.Consumer.Offsets.Retention > 0 {
-		r.RetentionTime = int64(om.conf.Consumer.Offsets.Retention / time.Millisecond)
+	// flow those through as retention time on the commit request.
+	if r.Version >= 2 && r.Version < 5 {
+		// Map Sarama's default of 0 to Kafka's default of -1
+		r.RetentionTime = -1
+		if om.conf.Consumer.Offsets.Retention > 0 {
+			r.RetentionTime = int64(om.conf.Consumer.Offsets.Retention / time.Millisecond)
+		}
 	}
 
 	om.pomsLock.RLock()
