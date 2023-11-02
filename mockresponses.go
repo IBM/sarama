@@ -1467,3 +1467,43 @@ func (m *MockApiVersionsResponse) For(reqBody versionedDecoder) encoderWithHeade
 	}
 	return res
 }
+
+// MockInitProducerIDResponse is an `InitPorducerIDResponse` builder.
+type MockInitProducerIDResponse struct {
+	producerID    int64
+	producerEpoch int16
+	err           KError
+	t             TestReporter
+}
+
+func NewMockInitProducerIDResponse(t TestReporter) *MockInitProducerIDResponse {
+	return &MockInitProducerIDResponse{
+		t: t,
+	}
+}
+
+func (m *MockInitProducerIDResponse) SetProducerID(id int) *MockInitProducerIDResponse {
+	m.producerID = int64(id)
+	return m
+}
+
+func (m *MockInitProducerIDResponse) SetProducerEpoch(epoch int) *MockInitProducerIDResponse {
+	m.producerEpoch = int16(epoch)
+	return m
+}
+
+func (m *MockInitProducerIDResponse) SetError(err KError) *MockInitProducerIDResponse {
+	m.err = err
+	return m
+}
+
+func (m *MockInitProducerIDResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*InitProducerIDRequest)
+	res := &InitProducerIDResponse{
+		Version:       req.Version,
+		Err:           m.err,
+		ProducerID:    m.producerID,
+		ProducerEpoch: m.producerEpoch,
+	}
+	return res
+}
