@@ -1018,35 +1018,7 @@ func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions m
 		return nil, err
 	}
 
-	request := &OffsetFetchRequest{
-		ConsumerGroup: group,
-		partitions:    topicPartitions,
-	}
-
-	if ca.conf.Version.IsAtLeast(V2_5_0_0) {
-		// Version 7 is adding the require stable flag.
-		request.Version = 7
-	} else if ca.conf.Version.IsAtLeast(V2_4_0_0) {
-		// Version 6 is the first flexible version.
-		request.Version = 6
-	} else if ca.conf.Version.IsAtLeast(V2_1_0_0) {
-		// Version 3, 4, and 5 are the same as version 2.
-		request.Version = 5
-	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
-		request.Version = 4
-	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 3
-	} else if ca.conf.Version.IsAtLeast(V0_10_2_0) {
-		// Starting in version 2, the request can contain a null topics array to indicate that offsets
-		// for all topics should be fetched. It also returns a top level error code
-		// for group or coordinator level errors.
-		request.Version = 2
-	} else if ca.conf.Version.IsAtLeast(V0_8_2_0) {
-		// In version 0, the request read offsets from ZK.
-		//
-		// Starting in version 1, the broker supports fetching offsets from the internal __consumer_offsets topic.
-		request.Version = 1
-	}
+	request := NewOffsetFetchRequest(ca.conf.Version, group, topicPartitions)
 
 	return coordinator.FetchOffset(request)
 }
