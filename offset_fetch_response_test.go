@@ -44,19 +44,19 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 
 	for version := 0; version <= 1; version++ {
 		response := OffsetFetchResponse{Version: int16(version)}
-		response.AddBlock("t", 0, &OffsetFetchResponseBlock{0, 0, "md", ErrRequestTimedOut})
+		response.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, "md", ErrRequestTimedOut})
 		response.Blocks["m"] = nil
 		testResponse(t, fmt.Sprintf("Normal v%d", version), &response, nil)
 	}
 
 	responseV2 := OffsetFetchResponse{Version: 2, Err: ErrInvalidRequest}
-	responseV2.AddBlock("t", 0, &OffsetFetchResponseBlock{0, 0, "md", ErrRequestTimedOut})
+	responseV2.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, "md", ErrRequestTimedOut})
 	responseV2.Blocks["m"] = nil
 	testResponse(t, "normal V2", &responseV2, nil)
 
 	for version := 3; version <= 4; version++ {
 		responseV3 := OffsetFetchResponse{Version: int16(version), Err: ErrInvalidRequest, ThrottleTimeMs: 9}
-		responseV3.AddBlock("t", 0, &OffsetFetchResponseBlock{0, 0, "md", ErrRequestTimedOut})
+		responseV3.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, "md", ErrRequestTimedOut})
 		responseV3.Blocks["m"] = nil
 		testResponse(t, fmt.Sprintf("Normal v%d", version), &responseV3, nil)
 	}

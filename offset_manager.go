@@ -153,11 +153,8 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	}
 
-	req := new(OffsetFetchRequest)
-	req.Version = 1
-	req.ConsumerGroup = om.group
-	req.AddPartition(topic, partition)
-
+	partitions := map[string][]int32{topic: {partition}}
+	req := NewOffsetFetchRequest(om.conf.Version, om.group, partitions)
 	resp, err := broker.FetchOffset(req)
 	if err != nil {
 		if retries <= 0 {
