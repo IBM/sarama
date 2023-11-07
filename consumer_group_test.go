@@ -26,6 +26,16 @@ func (h *handler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupCla
 	}
 	return nil
 }
+func (h *handler) BatchConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
+	for msgs := range claim.BatchMessages() {
+		for _, msg := range msgs {
+			sess.MarkMessage(msg, "")
+		}
+		h.Logf("consumed msgs %v", msgs)
+	}
+	h.cancel()
+	return nil
+}
 
 func TestNewConsumerGroupFromClient(t *testing.T) {
 	t.Run("should not permit nil client", func(t *testing.T) {

@@ -65,13 +65,13 @@ type ConsumerGroup interface {
 	// New calls to the broker will return records from these partitions if there are any to be fetched.
 	Resume(partitions map[string][]int32)
 
-	// Pause suspends fetching from all partitions. Future calls to the broker will not return any
+	// PauseAll suspends fetching from all partitions. Future calls to the broker will not return any
 	// records from these partitions until they have been resumed using Resume()/ResumeAll().
 	// Note that this method does not affect partition subscription.
 	// In particular, it does not cause a group rebalance when automatic assignment is used.
 	PauseAll()
 
-	// Resume resumes all partitions which have been paused with Pause()/PauseAll().
+	// ResumeAll resumes all partitions which have been paused with Pause()/PauseAll().
 	// New calls to the broker will return records from these partitions if there are any to be fetched.
 	ResumeAll()
 }
@@ -139,10 +139,14 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		consumer:       consumer,
 		config:         config,
 		groupID:        groupID,
-		errors:         make(chan error, config.ChannelBufferSize),
 		closed:         make(chan none),
 		userData:       config.Consumer.Group.Member.UserData,
 		metricRegistry: newCleanupRegistry(config.MetricRegistry),
+	}
+	if config.Consumer.Return.Batches {
+		cg.errors = make(chan error, config.BatchChannelBufferSize)
+	} else {
+		cg.errors = make(chan error, config.ChannelBufferSize)
 	}
 	if config.Consumer.Group.InstanceId != "" && config.Version.IsAtLeast(V2_3_0_0) {
 		cg.groupInstanceId = &config.Consumer.Group.InstanceId
@@ -871,7 +875,11 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 				defer sess.cancel()
 
 				// consume a single topic/partition, blocking
-				sess.consume(topic, partition)
+				if sess.parent.config.Consumer.Return.Batches {
+					sess.batchConsume(topic, partition)
+				} else {
+					sess.consume(topic, partition)
+				}
 			}(topic, partition)
 		}
 	}
@@ -947,6 +955,57 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 
 	// start processing
 	if err := s.handler.ConsumeClaim(s, claim); err != nil {
+		s.parent.handleError(err, topic, partition)
+	}
+
+	// ensure consumer is closed & drained
+	claim.AsyncClose()
+	for _, err := range claim.waitClosed() {
+		s.parent.handleError(err, topic, partition)
+	}
+}
+
+func (s *consumerGroupSession) batchConsume(topic string, partition int32) {
+	// quick exit if rebalance is due
+	select {
+	case <-s.ctx.Done():
+		return
+	case <-s.parent.closed:
+		return
+	default:
+	}
+
+	// get next offset
+	offset := s.parent.config.Consumer.Offsets.Initial
+	if pom := s.offsets.findPOM(topic, partition); pom != nil {
+		offset, _ = pom.NextOffset()
+	}
+
+	// create new claim
+	claim, err := newConsumerGroupClaim(s, topic, partition, offset)
+	if err != nil {
+		s.parent.handleError(err, topic, partition)
+		return
+	}
+
+	// handle errors
+	go func() {
+		for err := range claim.Errors() {
+			s.parent.handleError(err, topic, partition)
+		}
+	}()
+
+	// trigger close when session is done
+	go func() {
+		select {
+		case <-s.ctx.Done():
+		case <-s.parent.closed:
+		}
+		claim.AsyncClose()
+	}()
+
+	// start processing
+	if err := s.handler.BatchConsumeClaim(s, claim); err != nil {
 		s.parent.handleError(err, topic, partition)
 	}
 
@@ -1080,7 +1139,16 @@ type ConsumerGroupHandler interface {
 	// ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
 	// Once the Messages() channel is closed, the Handler must finish its processing
 	// loop and exit.
+	//
+	// It is called only if the config.Consumer.Return.Batches sets to false. (default)
 	ConsumeClaim(ConsumerGroupSession, ConsumerGroupClaim) error
+
+	// BatchConsumeClaim must start a consumer loop of ConsumerGroupClaim's BatchMessages().
+	// Once the BatchMessages() channel is closed, the Handler must finish its processing
+	// loop and exit.
+	//
+	// It is called only if the config.Consumer.Return.Batches sets to true.
+	BatchConsumeClaim(ConsumerGroupSession, ConsumerGroupClaim) error
 }
 
 // ConsumerGroupClaim processes Kafka messages from a given topic and partition within a consumer group.
@@ -1105,6 +1173,16 @@ type ConsumerGroupClaim interface {
 	// Config.Consumer.Group.Session.Timeout before the topic/partition is eventually
 	// re-assigned to another group member.
 	Messages() <-chan *ConsumerMessage
+
+	// BatchMessages returns the read channel for the messages that are returned by
+	// single fetch request from the broker. The messages channel will be closed
+	// when a new rebalance cycle is due. You must finish processing and mark offsets within
+	// Config.Consumer.Group.Session.Timeout before the topic/partition is eventually
+	// re-assigned to another group member.
+	//
+	// The size of ConsumerMessage slice must be equal to length of returned message set
+	// of a single FetchResponse.
+	BatchMessages() <-chan []*ConsumerMessage
 }
 
 type consumerGroupClaim struct {
@@ -1147,6 +1225,8 @@ func (c *consumerGroupClaim) InitialOffset() int64 { return c.offset }
 func (c *consumerGroupClaim) waitClosed() (errs ConsumerErrors) {
 	go func() {
 		for range c.Messages() {
+		}
+		for range c.BatchMessages() {
 		}
 	}()
 

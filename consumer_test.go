@@ -11,6 +11,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	assert "github.com/stretchr/testify/require"
 )
 
 var (
@@ -71,6 +73,68 @@ func TestConsumerOffsetManual(t *testing.T) {
 		case err := <-consumer.Errors():
 			t.Error(err)
 		}
+	}
+
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewestAfterFetchRequest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewestAfterFetchRequest, hwmo)
+	}
+
+	safeClose(t, consumer)
+	safeClose(t, master)
+	broker0.Close()
+}
+
+func TestConsumerOffsetManualInBatch(t *testing.T) {
+	// Given
+	broker0 := NewMockBroker(t, 0)
+
+	manualOffset := int64(1234)
+	offsetNewest := int64(2345)
+	offsetNewestAfterFetchRequest := int64(3456)
+
+	mockFetchResponse := NewMockFetchResponse(t, 10)
+
+	// skipped because parseRecords(): offset < child.offset
+	mockFetchResponse.SetMessage("my_topic", 0, manualOffset-1, testMsg)
+
+	for i := int64(0); i < 10; i++ {
+		mockFetchResponse.SetMessage("my_topic", 0, i+manualOffset, testMsg)
+	}
+
+	mockFetchResponse.SetHighWaterMark("my_topic", 0, offsetNewestAfterFetchRequest)
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetOldest, 0).
+			SetOffset("my_topic", 0, OffsetNewest, offsetNewest),
+		"FetchRequest": mockFetchResponse,
+	})
+
+	cfg := NewTestConfig()
+	cfg.Consumer.Return.Batches = true
+
+	// When
+	master, err := NewConsumer([]string{broker0.Addr()}, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	consumer, err := master.ConsumePartition("my_topic", 0, manualOffset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Then
+	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
+		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
+	}
+	messages := <-consumer.BatchMessages()
+	assert.Len(t, messages, 10)
+	for i := int64(0); i < 10; i++ {
+		assertMessageOffset(t, messages[i], i+manualOffset)
 	}
 
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewestAfterFetchRequest {

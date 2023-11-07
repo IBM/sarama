@@ -413,6 +413,10 @@ type Config struct {
 			// If enabled, any errors that occurred while consuming are returned on
 			// the Errors channel (default disabled).
 			Errors bool
+
+			// If enabled, ConsumerGroup will return messages on the
+			// ConsumerGroupClaim.BatchMessages() channel.
+			Batches bool
 		}
 
 		// Offsets specifies configuration for how and when to commit consumed
@@ -480,6 +484,11 @@ type Config struct {
 	// in the background while user code is working, greatly improving throughput.
 	// Defaults to 256.
 	ChannelBufferSize int
+	// The number of bunch of events to buffer in internal and external channels. This
+	// permits the producer and consumer to continue processing some messages
+	// in the background while user code is working, greatly improving throughput.
+	// Defaults to 4.
+	BatchChannelBufferSize int
 	// ApiVersionsRequest determines whether Sarama should send an
 	// ApiVersionsRequest message to each broker as part of its initial
 	// connection. This defaults to `true` to match the official Java client
@@ -555,6 +564,7 @@ func NewConfig() *Config {
 
 	c.ClientID = defaultClientID
 	c.ChannelBufferSize = 256
+	c.BatchChannelBufferSize = 4
 	c.ApiVersionsRequest = true
 	c.Version = DefaultVersion
 	c.MetricRegistry = metrics.NewRegistry()

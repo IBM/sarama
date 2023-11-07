@@ -162,14 +162,20 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 		conf:                 c.conf,
 		topic:                topic,
 		partition:            partition,
-		messages:             make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
-		errors:               make(chan *ConsumerError, c.conf.ChannelBufferSize),
 		feeder:               make(chan *FetchResponse, 1),
 		leaderEpoch:          invalidLeaderEpoch,
 		preferredReadReplica: invalidPreferredReplicaID,
 		trigger:              make(chan none, 1),
 		dying:                make(chan none),
 		fetchSize:            c.conf.Consumer.Fetch.Default,
+	}
+
+	if c.conf.Consumer.Return.Batches {
+		child.batchMessages = make(chan []*ConsumerMessage, c.conf.BatchChannelBufferSize)
+		child.errors = make(chan *ConsumerError, c.conf.BatchChannelBufferSize)
+	} else {
+		child.messages = make(chan *ConsumerMessage, c.conf.ChannelBufferSize)
+		child.errors = make(chan *ConsumerError, c.conf.ChannelBufferSize)
 	}
 
 	if err := child.chooseStartingOffset(offset); err != nil {
@@ -186,7 +192,11 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 	}
 
 	go withRecover(child.dispatcher)
-	go withRecover(child.responseFeeder)
+	if c.conf.Consumer.Return.Batches {
+		go withRecover(child.batchResponseFeeder)
+	} else {
+		go withRecover(child.responseFeeder)
+	}
 
 	child.leaderEpoch = epoch
 	child.broker = c.refBrokerConsumer(leader)
@@ -365,6 +375,10 @@ type PartitionConsumer interface {
 	// the broker.
 	Messages() <-chan *ConsumerMessage
 
+	// BatchMessages returns the read channel for the messages that are single
+	// fetch request from the broker.
+	BatchMessages() <-chan []*ConsumerMessage
+
 	// Errors returns a read channel of errors that occurred during consuming, if
 	// enabled. By default, errors are logged and not returned over this channel.
 	// If you want to implement any custom error handling, set your config's
@@ -398,8 +412,11 @@ type partitionConsumer struct {
 	conf     *Config
 	broker   *brokerConsumer
 	messages chan *ConsumerMessage
-	errors   chan *ConsumerError
-	feeder   chan *FetchResponse
+	// The size of ConsumerMessage slice must be equal to length of returned message set
+	// of a single FetchResponse.
+	batchMessages chan []*ConsumerMessage
+	errors        chan *ConsumerError
+	feeder        chan *FetchResponse
 
 	leaderEpoch          int32
 	preferredReadReplica int32
@@ -533,6 +550,10 @@ func (child *partitionConsumer) Messages() <-chan *ConsumerMessage {
 	return child.messages
 }
 
+func (child *partitionConsumer) BatchMessages() <-chan []*ConsumerMessage {
+	return child.batchMessages
+}
+
 func (child *partitionConsumer) Errors() <-chan *ConsumerError {
 	return child.errors
 }
@@ -616,6 +637,38 @@ feederLoop:
 
 	expiryTicker.Stop()
 	close(child.messages)
+	close(child.errors)
+}
+
+func (child *partitionConsumer) batchResponseFeeder() {
+	var msgs []*ConsumerMessage
+	expiryTicker := time.NewTicker(child.conf.Consumer.MaxProcessingTime)
+
+feederLoop:
+	for response := range child.feeder {
+		msgs, child.responseResult = child.parseResponse(response)
+
+		if child.responseResult == nil {
+			atomic.StoreInt32(&child.retries, 0)
+		}
+
+		select {
+		case <-child.dying:
+			child.broker.acks.Done()
+			continue feederLoop
+		case child.batchMessages <- msgs:
+		case <-expiryTicker.C:
+			child.responseResult = errTimedOut
+			child.broker.acks.Done()
+			child.batchMessages <- msgs
+			child.broker.input <- child
+			continue feederLoop
+		}
+		child.broker.acks.Done()
+	}
+
+	expiryTicker.Stop()
+	close(child.batchMessages)
 	close(child.errors)
 }
 

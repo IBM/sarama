@@ -16,6 +16,15 @@ func (h exampleConsumerGroupHandler) ConsumeClaim(sess ConsumerGroupSession, cla
 	}
 	return nil
 }
+func (h exampleConsumerGroupHandler) BatchConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
+	for msgs := range claim.BatchMessages() {
+		for _, msg := range msgs {
+			fmt.Printf("Message topic:%q partition:%d offset:%d\n", msg.Topic, msg.Partition, msg.Offset)
+			sess.MarkMessage(msg, "")
+		}
+	}
+	return nil
+}
 
 func ExampleConsumerGroup() {
 	config := NewTestConfig()
