@@ -1,6 +1,6 @@
 module github.com/IBM/sarama
 
-go 1.17
+go 1.18
 
 require (
 	github.com/davecgh/go-spew v1.1.1
