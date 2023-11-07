@@ -2,11 +2,13 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	"github.com/rcrowley/go-metrics"
+	assert "github.com/stretchr/testify/require"
 )
 
 // NewTestConfig returns a config meant to be used by tests.
@@ -30,23 +32,23 @@ func TestDefaultConfigValidates(t *testing.T) {
 	}
 }
 
-func TestInvalidClientIDConfigValidates(t *testing.T) {
-	config := NewTestConfig()
-	config.ClientID = "foo:bar"
-	err := config.Validate()
-	var target ConfigurationError
-	if !errors.As(err, &target) || string(target) != "ClientID is invalid" {
-		t.Error("Expected invalid ClientID, got ", err)
-	}
-}
-
-func TestEmptyClientIDConfigValidates(t *testing.T) {
-	config := NewTestConfig()
-	config.ClientID = ""
-	err := config.Validate()
-	var target ConfigurationError
-	if !errors.As(err, &target) || string(target) != "ClientID is invalid" {
-		t.Error("Expected invalid ClientID, got ", err)
+// TestInvalidClientIDValidated ensures that the ClientID field is checked
+// when Version is set to anything less than 1_0_0_0, but otherwise accepted
+func TestInvalidClientIDValidated(t *testing.T) {
+	for _, version := range SupportedVersions {
+		for _, clientID := range []string{"", "foo:bar", "foo|bar"} {
+			config := NewTestConfig()
+			config.ClientID = clientID
+			config.Version = version
+			err := config.Validate()
+			if config.Version.IsAtLeast(V1_0_0_0) {
+				assert.NoError(t, err)
+				continue
+			}
+			var target ConfigurationError
+			assert.ErrorAs(t, err, &target)
+			assert.ErrorContains(t, err, fmt.Sprintf("ClientID value %q is not valid for Kafka versions before 1.0.0", clientID))
+		}
 	}
 }
 

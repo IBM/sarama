@@ -356,7 +356,8 @@ func (f faultyEncoder) Length() int {
 func TestSyncProducerInvalidConfiguration(t *testing.T) {
 	trm := newTestReporterMock()
 	config := NewTestConfig()
-	config.ClientID = "not a valid client ID"
+	config.Version = sarama.V0_11_0_2
+	config.ClientID = "not a valid producer ID"
 	mp := NewSyncProducer(trm, config)
 	if err := mp.Close(); err != nil {
 		t.Error(err)
@@ -364,7 +365,7 @@ func TestSyncProducerInvalidConfiguration(t *testing.T) {
 
 	if len(trm.errors) != 1 {
 		t.Error("Expected to report a single error")
-	} else if !strings.Contains(trm.errors[0], "ClientID is invalid") {
+	} else if !strings.Contains(trm.errors[0], `ClientID value "not a valid producer ID" is not valid for Kafka versions before 1.0.0`) {
 		t.Errorf("Unexpected error: %s", trm.errors[0])
 	}
 }
