@@ -35,7 +35,7 @@ var (
 
 func init() {
 	flag.StringVar(&brokers, "brokers", "", "Kafka bootstrap brokers to connect to, as a comma separated list")
-	flag.StringVar(&version, "version", "0.11.0.0", "Kafka cluster version")
+	flag.StringVar(&version, "version", sarama.DefaultVersion.String(), "Kafka cluster version")
 	flag.StringVar(&topic, "topic", "", "Kafka topics where records will be copied from topics.")
 	flag.IntVar(&producers, "producers", 10, "Number of concurrent producers")
 	flag.Int64Var(&recordsNumber, "records-number", 10000, "Number of records sent per loop")
