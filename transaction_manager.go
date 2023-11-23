@@ -569,9 +569,8 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 			return response.ProducerID, response.ProducerEpoch, false, nil
 		}
 		switch response.Err {
-		case ErrConsumerCoordinatorNotAvailable:
-			fallthrough
-		case ErrNotCoordinatorForConsumer:
+		// Retriable errors
+		case ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer, ErrOffsetsLoadInProgress:
 			if t.isTransactional() {
 				_ = coordinator.Close()
 				_ = t.client.RefreshTransactionCoordinator(t.transactionalID)

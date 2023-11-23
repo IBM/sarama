@@ -1,6 +1,15 @@
 ---
 version: 2
 updates:
+  - package-ecosystem: docker
+    directory: "/Dockerfile.*"
+    schedule:
+      interval: daily
+    labels:
+      - "ignore-for-release"
+    commit-message:
+      prefix: chore(ci)
+
   - package-ecosystem: github-actions
     directory: /
     open-pull-requests-limit: 2
@@ -10,11 +19,72 @@ updates:
       - "ignore-for-release"
     commit-message:
       prefix: chore(ci)
+
   - package-ecosystem: gomod
     directory: /
     open-pull-requests-limit: 5
     schedule:
       interval: "daily"
+      time: "23:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: chore
+      include: "scope"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: gomod
+    directory: /examples/consumergroup
+    schedule:
+      interval: daily
+      time: "23:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: chore
+      include: "scope"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: gomod
+    directory: /examples/exactly_once
+    schedule:
+      interval: daily
+      time: "23:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: chore
+      include: "scope"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: gomod
+    directory: /examples/interceptors
+    schedule:
+      interval: daily
+      time: "23:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: chore
+      include: "scope"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: gomod
+    directory: /examples/txn_producer
+    schedule:
+      interval: daily
       time: "23:00"
     labels:
       - "dependencies"

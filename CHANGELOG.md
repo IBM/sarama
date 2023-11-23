@@ -1,5 +1,91 @@
 # Changelog
 
+## Version 1.42.1 (2023-11-07)
+
+## What's Changed
+### :bug: Fixes
+* fix: make fetchInitialOffset use correct protocol by @dnwe in https://github.com/IBM/sarama/pull/2705
+* fix(config): relax ClientID validation after 1.0.0 by @dnwe in https://github.com/IBM/sarama/pull/2706
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.42.0...v1.42.1
+
+## Version 1.42.0 (2023-11-02)
+
+## What's Changed
+### :bug: Fixes
+* Asynchronously close brokers during a RefreshBrokers by @bmassemin in https://github.com/IBM/sarama/pull/2693
+* Fix data race on Broker.done channel by @prestona in https://github.com/IBM/sarama/pull/2698
+* fix: data race in Broker.AsyncProduce by @lzakharov in https://github.com/IBM/sarama/pull/2678
+* Fix default retention time value in offset commit by @prestona in https://github.com/IBM/sarama/pull/2700
+* fix(txmgr): ErrOffsetsLoadInProgress is retriable by @dnwe in https://github.com/IBM/sarama/pull/2701
+### :wrench: Maintenance
+* chore(ci): improve ossf scorecard result by @dnwe in https://github.com/IBM/sarama/pull/2685
+* chore(ci): add kafka 3.6.0 to FVT and versions by @dnwe in https://github.com/IBM/sarama/pull/2692
+### :heavy_plus_sign: Other Changes
+* chore(ci): ossf scorecard.yml by @dnwe in https://github.com/IBM/sarama/pull/2683
+* fix(ci): always run CodeQL on every commit by @dnwe in https://github.com/IBM/sarama/pull/2689
+* chore(doc): add OpenSSF Scorecard badge by @dnwe in https://github.com/IBM/sarama/pull/2691
+
+## New Contributors
+* @bmassemin made their first contribution in https://github.com/IBM/sarama/pull/2693
+* @lzakharov made their first contribution in https://github.com/IBM/sarama/pull/2678
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.41.3...v1.42.0
+
+## Version 1.41.3 (2023-10-17)
+
+## What's Changed
+### :bug: Fixes
+* fix: pre-compile regex for parsing kafka version by @qshuai in https://github.com/IBM/sarama/pull/2663
+* fix(client): ignore empty Metadata responses when refreshing by @HaoSunUber in https://github.com/IBM/sarama/pull/2672
+### :package: Dependency updates
+* chore(deps): bump the golang-org-x group with 2 updates by @dependabot in https://github.com/IBM/sarama/pull/2661
+* chore(deps): bump golang.org/x/net from 0.16.0 to 0.17.0 by @dependabot in https://github.com/IBM/sarama/pull/2671
+### :memo: Documentation
+* fix(docs): correct topic name in rebalancing strategy example by @maksadbek in https://github.com/IBM/sarama/pull/2657
+
+## New Contributors
+* @maksadbek made their first contribution in https://github.com/IBM/sarama/pull/2657
+* @qshuai made their first contribution in https://github.com/IBM/sarama/pull/2663
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.41.2...v1.41.3
+
+## Version 1.41.2 (2023-09-12)
+
+## What's Changed
+### :tada: New Features / Improvements
+* perf: Alloc records in batch by @ronanh in https://github.com/IBM/sarama/pull/2646
+### :bug: Fixes
+* fix(consumer): guard against nil client by @dnwe in https://github.com/IBM/sarama/pull/2636
+* fix(consumer): don't retry session if ctx canceled by @dnwe in https://github.com/IBM/sarama/pull/2642
+* fix: use least loaded broker to refresh metadata by @HaoSunUber in https://github.com/IBM/sarama/pull/2645
+### :package: Dependency updates
+* chore(deps): bump the golang-org-x group with 1 update by @dependabot in https://github.com/IBM/sarama/pull/2641
+
+## New Contributors
+* @HaoSunUber made their first contribution in https://github.com/IBM/sarama/pull/2645
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.41.1...v1.41.2
+
+## Version 1.41.1 (2023-08-30)
+
+## What's Changed
+### :bug: Fixes
+* fix(proto): handle V3 member metadata and empty owned partitions by @dnwe in https://github.com/IBM/sarama/pull/2618
+* fix: make clear that error is configuration issue not server error by @hindessm in https://github.com/IBM/sarama/pull/2628
+* fix(client): force Event Hubs to use V1_0_0_0 by @dnwe in https://github.com/IBM/sarama/pull/2633
+* fix: add retries to alter user scram creds by @hindessm in https://github.com/IBM/sarama/pull/2632
+### :wrench: Maintenance
+* chore(lint): bump golangci-lint and tweak config by @dnwe in https://github.com/IBM/sarama/pull/2620
+### :memo: Documentation
+* fix(doc): add missing doc for mock consumer by @hsweif in https://github.com/IBM/sarama/pull/2386
+* chore(proto): doc CreateTopics/JoinGroup fields by @dnwe in https://github.com/IBM/sarama/pull/2627
+### :heavy_plus_sign: Other Changes
+* chore(gh): add new style issue templates by @dnwe in https://github.com/IBM/sarama/pull/2624
+
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.41.0...v1.41.1
+
 ## Version 1.41.0 (2023-08-21)
 
 ## What's Changed

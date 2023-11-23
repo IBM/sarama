@@ -65,7 +65,7 @@ type BalanceStrategy interface {
 // Example with two topics T1 and T2 with six partitions each (0..5) and two members (M1, M2):
 //
 //	M1: {T1: [0, 1, 2], T2: [0, 1, 2]}
-//	M2: {T2: [3, 4, 5], T2: [3, 4, 5]}
+//	M2: {T1: [3, 4, 5], T2: [3, 4, 5]}
 func NewBalanceStrategyRange() BalanceStrategy {
 	return &balanceStrategy{
 		name: RangeBalanceStrategyName,

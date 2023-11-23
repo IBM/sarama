@@ -519,16 +519,16 @@ func (client *client) RefreshBrokers(addrs []string) error {
 	defer client.lock.Unlock()
 
 	for _, broker := range client.brokers {
-		_ = broker.Close()
-		delete(client.brokers, broker.ID())
+		safeAsyncClose(broker)
 	}
+	client.brokers = make(map[int32]*Broker)
 
 	for _, broker := range client.seedBrokers {
-		_ = broker.Close()
+		safeAsyncClose(broker)
 	}
 
 	for _, broker := range client.deadSeeds {
-		_ = broker.Close()
+		safeAsyncClose(broker)
 	}
 
 	client.seedBrokers = nil
@@ -1035,6 +1035,13 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		var kerror KError
 		var packetEncodingError PacketEncodingError
 		if err == nil {
+			// When talking to the startup phase of a broker, it is possible to receive an empty metadata set. We should remove that broker and try next broker (https://issues.apache.org/jira/browse/KAFKA-7924).
+			if len(response.Brokers) == 0 {
+				Logger.Println("client/metadata receiving empty brokers from the metadata response when requesting the broker #%d at %s", broker.ID(), broker.addr)
+				_ = broker.Close()
+				client.deregisterBroker(broker)
+				continue
+			}
 			allKnownMetaData := len(topics) == 0
 			// valid response, use it
 			shouldRetry, err := client.updateMetadata(response, allKnownMetaData)

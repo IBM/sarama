@@ -1,6 +1,8 @@
 # sarama
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/IBM/sarama.svg)](https://pkg.go.dev/github.com/IBM/sarama)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/IBM/sarama/badge?style=flat)](https://securityscorecards.dev/viewer/?uri=github.com/IBM/sarama)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/7996/badge)](https://www.bestpractices.dev/projects/7996)
 
 Sarama is an MIT-licensed Go client library for [Apache Kafka](https://kafka.apache.org/).
 

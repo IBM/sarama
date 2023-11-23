@@ -198,6 +198,7 @@ var (
 	V3_4_1_0  = newKafkaVersion(3, 4, 1, 0)
 	V3_5_0_0  = newKafkaVersion(3, 5, 0, 0)
 	V3_5_1_0  = newKafkaVersion(3, 5, 1, 0)
+	V3_6_0_0  = newKafkaVersion(3, 6, 0, 0)
 
 	SupportedVersions = []KafkaVersion{
 		V0_8_2_0,
@@ -258,9 +259,10 @@ var (
 		V3_4_1_0,
 		V3_5_0_0,
 		V3_5_1_0,
+		V3_6_0_0,
 	}
 	MinVersion     = V0_8_2_0
-	MaxVersion     = V3_5_1_0
+	MaxVersion     = V3_6_0_0
 	DefaultVersion = V2_1_0_0
 
 	// reduced set of protocol versions to matrix test
@@ -275,9 +277,17 @@ var (
 		V2_6_2_0,
 		V2_8_2_0,
 		V3_1_2_0,
-		V3_2_3_0,
 		V3_3_2_0,
+		V3_6_0_0,
 	}
+)
+
+var (
+	// This regex validates that a string complies with the pre kafka 1.0.0 format for version strings, for example 0.11.0.3
+	validPreKafka1Version = regexp.MustCompile(`^0\.\d+\.\d+\.\d+$`)
+
+	// This regex validates that a string complies with the post Kafka 1.0.0 format, for example 1.0.0
+	validPostKafka1Version = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 )
 
 // ParseKafkaVersion parses and returns kafka version or error from a string
@@ -288,9 +298,9 @@ func ParseKafkaVersion(s string) (KafkaVersion, error) {
 	var major, minor, veryMinor, patch uint
 	var err error
 	if s[0] == '0' {
-		err = scanKafkaVersion(s, `^0\.\d+\.\d+\.\d+$`, "0.%d.%d.%d", [3]*uint{&minor, &veryMinor, &patch})
+		err = scanKafkaVersion(s, validPreKafka1Version, "0.%d.%d.%d", [3]*uint{&minor, &veryMinor, &patch})
 	} else {
-		err = scanKafkaVersion(s, `^\d+\.\d+\.\d+$`, "%d.%d.%d", [3]*uint{&major, &minor, &veryMinor})
+		err = scanKafkaVersion(s, validPostKafka1Version, "%d.%d.%d", [3]*uint{&major, &minor, &veryMinor})
 	}
 	if err != nil {
 		return DefaultVersion, err
@@ -298,8 +308,8 @@ func ParseKafkaVersion(s string) (KafkaVersion, error) {
 	return newKafkaVersion(major, minor, veryMinor, patch), nil
 }
 
-func scanKafkaVersion(s string, pattern string, format string, v [3]*uint) error {
-	if !regexp.MustCompile(pattern).MatchString(s) {
+func scanKafkaVersion(s string, pattern *regexp.Regexp, format string, v [3]*uint) error {
+	if !pattern.MatchString(s) {
 		return fmt.Errorf("invalid version `%s`", s)
 	}
 	_, err := fmt.Sscanf(s, format, v[0], v[1], v[2])

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -9,13 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/otel/exporters/stdout"
+	stdout "go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 
 	"github.com/IBM/sarama"
 )
 
 var (
 	brokers = flag.String("brokers", "localhost:9092", "The Kafka brokers to connect to, as a comma separated list")
+	version = flag.String("version", sarama.DefaultVersion.String(), "Kafka cluster version")
 	topic   = flag.String("topic", "default_topic", "The Kafka topic to use")
 	logger  = log.New(os.Stdout, "[OTelInterceptor] ", log.LstdFlags)
 )
@@ -29,18 +31,21 @@ func main() {
 	splitBrokers := strings.Split(*brokers, ",")
 	sarama.Logger = log.New(os.Stdout, "[Sarama] ", log.LstdFlags)
 
+	version, err := sarama.ParseKafkaVersion(*version)
+	if err != nil {
+		log.Panicf("Error parsing Kafka version: %v", err)
+	}
+
 	// oTel stdout example
-	pusher, err := stdout.InstallNewPipeline([]stdout.Option{
-		stdout.WithQuantiles([]float64{0.5, 0.9, 0.99}),
-	}, nil)
+	pusher, err := stdout.New()
 	if err != nil {
 		logger.Fatalf("failed to initialize stdout export pipeline: %v", err)
 	}
-	defer pusher.Stop()
+	defer pusher.Shutdown(context.Background())
 
 	// simple sarama producer that adds a new producer interceptor
 	conf := sarama.NewConfig()
-	conf.Version = sarama.V0_11_0_0
+	conf.Version = version
 	conf.Producer.Interceptors = []sarama.ProducerInterceptor{NewOTelInterceptor(splitBrokers)}
 
 	producer, err := sarama.NewAsyncProducer(splitBrokers, conf)
