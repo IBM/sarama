@@ -152,6 +152,14 @@ func allocateResponseBody(req protocolBody) protocolBody {
 		return &SaslAuthenticateResponse{Version: version}
 	case 37:
 		return &CreatePartitionsResponse{Version: version}
+	case 38:
+		return &CreateDelegationTokenRequest{Version: version}
+	case 39:
+		return &RenewDelegationTokenRequest{Version: version}
+	case 40:
+		return &ExpireDelegationTokenRequest{Version: version}
+	case 41:
+		return &DescribeDelegationTokenRequest{Version: version}
 	case 42:
 		return &DeleteGroupsResponse{Version: version}
 	case 44:

@@ -30,6 +30,8 @@ const (
 	AclOperationDescribeConfigs
 	AclOperationAlterConfigs
 	AclOperationIdempotentWrite
+	AclOperationCreateTokens
+	AclOperationDescribeTokens
 )
 
 func (a *AclOperation) String() string {
@@ -47,6 +49,8 @@ func (a *AclOperation) String() string {
 		AclOperationDescribeConfigs: "DescribeConfigs",
 		AclOperationAlterConfigs:    "AlterConfigs",
 		AclOperationIdempotentWrite: "IdempotentWrite",
+		AclOperationCreateTokens:    "CreateTokens",
+		AclOperationDescribeTokens:  "DescribeTokens",
 	}
 	s, ok := mapping[*a]
 	if !ok {
@@ -77,6 +81,8 @@ func (a *AclOperation) UnmarshalText(text []byte) error {
 		"describeconfigs": AclOperationDescribeConfigs,
 		"alterconfigs":    AclOperationAlterConfigs,
 		"idempotentwrite": AclOperationIdempotentWrite,
+		"createtokens":    AclOperationCreateTokens,
+		"describetokens":  AclOperationDescribeTokens,
 	}
 	ao, ok := mapping[normalized]
 	if !ok {
@@ -142,6 +148,7 @@ const (
 	AclResourceCluster
 	AclResourceTransactionalID
 	AclResourceDelegationToken
+	AclResourceUser
 )
 
 func (a *AclResourceType) String() string {
@@ -153,6 +160,7 @@ func (a *AclResourceType) String() string {
 		AclResourceCluster:         "Cluster",
 		AclResourceTransactionalID: "TransactionalID",
 		AclResourceDelegationToken: "DelegationToken",
+		AclResourceUser:            "User",
 	}
 	s, ok := mapping[*a]
 	if !ok {
@@ -177,6 +185,7 @@ func (a *AclResourceType) UnmarshalText(text []byte) error {
 		"cluster":         AclResourceCluster,
 		"transactionalid": AclResourceTransactionalID,
 		"delegationtoken": AclResourceDelegationToken,
+		"user":            AclResourceUser,
 	}
 
 	art, ok := mapping[normalized]

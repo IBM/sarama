@@ -930,6 +930,54 @@ func (b *Broker) AlterClientQuotas(request *AlterClientQuotasRequest) (*AlterCli
 	return response, nil
 }
 
+func (b *Broker) CreateDelegationToken(request *CreateDelegationTokenRequest) (*CreateDelegationTokenResponse, error) {
+	response := new(CreateDelegationTokenResponse)
+	response.Version = request.version()
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) RenewDelegationToken(request *RenewDelegationTokenRequest) (*RenewDelegationTokenResponse, error) {
+	response := new(RenewDelegationTokenResponse)
+	response.Version = request.version()
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) ExpireDelegationToken(request *ExpireDelegationTokenRequest) (*ExpireDelegationTokenResponse, error) {
+	response := new(ExpireDelegationTokenResponse)
+	response.Version = request.version()
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (b *Broker) DescribeDelegationToken(request *DescribeDelegationTokenRequest) (*DescribeDelegationTokenResponse, error) {
+	response := new(DescribeDelegationTokenResponse)
+	response.Version = request.version()
+
+	err := b.sendAndReceive(request, response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // readFull ensures the conn ReadDeadline has been setup before making a
 // call to io.ReadFull
 func (b *Broker) readFull(buf []byte) (n int, err error) {
