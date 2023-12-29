@@ -326,7 +326,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 		// response and send another join request with that id to actually join the
 		// group
 		c.memberID = join.MemberId
-		return c.retryNewSession(ctx, topics, handler, retries+1 /*keep retry time*/, false)
+		return c.newSession(ctx, topics, handler, retries)
 	case ErrFencedInstancedId:
 		if c.groupInstanceId != nil {
 			Logger.Printf("JoinGroup failed: group instance id %s has been fenced\n", *c.groupInstanceId)
