@@ -1295,8 +1295,8 @@ func (b *Broker) authenticateViaSASLv1() error {
 
 func (b *Broker) sendAndReceiveKerberos() error {
 	b.kerberosAuthenticator.Config = &b.conf.Net.SASL.GSSAPI
-	if b.kerberosAuthenticator.NewKerberosClientFunc == nil {
-		b.kerberosAuthenticator.NewKerberosClientFunc = NewKerberosClient
+	if b.kerberosAuthenticator.Config.NewKerberosClientFunc == nil {
+		b.kerberosAuthenticator.Config.NewKerberosClientFunc = NewKerberosClient
 	}
 	return b.kerberosAuthenticator.Authorize(b)
 }

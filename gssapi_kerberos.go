@@ -30,23 +30,23 @@ const (
 )
 
 type GSSAPIConfig struct {
-	AuthType           int
-	KeyTabPath         string
-	CCachePath         string
-	KerberosConfigPath string
-	ServiceName        string
-	Username           string
-	Password           string
-	Realm              string
-	DisablePAFXFAST    bool
+	AuthType              int
+	KeyTabPath            string
+	CCachePath            string
+	KerberosConfigPath    string
+	ServiceName           string
+	Username              string
+	Password              string
+	Realm                 string
+	DisablePAFXFAST       bool
+	NewKerberosClientFunc func(config *GSSAPIConfig) (KerberosClient, error)
 }
 
 type GSSAPIKerberosAuth struct {
-	Config                *GSSAPIConfig
-	ticket                messages.Ticket
-	encKey                types.EncryptionKey
-	NewKerberosClientFunc func(config *GSSAPIConfig) (KerberosClient, error)
-	step                  int
+	Config *GSSAPIConfig
+	ticket messages.Ticket
+	encKey types.EncryptionKey
+	step   int
 }
 
 type KerberosClient interface {
@@ -199,7 +199,7 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 
 /* This does the handshake for authorization */
 func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
-	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
+	kerberosClient, err := krbAuth.Config.NewKerberosClientFunc(krbAuth.Config)
 	if err != nil {
 		Logger.Printf("Kerberos client error: %s", err)
 		return err

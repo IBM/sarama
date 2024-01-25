@@ -723,14 +723,14 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			}
 			mockBroker.SetGSSAPIHandler(gssapiHandler.MockKafkaGSSAPI)
 			if test.mockKerberosClient {
-				broker.kerberosAuthenticator.NewKerberosClientFunc = func(config *GSSAPIConfig) (KerberosClient, error) {
+				conf.Net.SASL.GSSAPI.NewKerberosClientFunc = func(config *GSSAPIConfig) (KerberosClient, error) {
 					return &MockKerberosClient{
 						mockError:  test.error,
 						errorStage: test.errorStage,
 					}, nil
 				}
 			} else {
-				broker.kerberosAuthenticator.NewKerberosClientFunc = nil
+				conf.Net.SASL.GSSAPI.NewKerberosClientFunc = nil
 			}
 
 			err := broker.Open(conf)
