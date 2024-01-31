@@ -213,8 +213,11 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 		return err
 	}
 
-	// Wait for session exit signal
-	<-sess.ctx.Done()
+	// Wait for session exit signal or Close() call
+	select {
+	case <-c.closed:
+	case <-sess.ctx.Done():
+	}
 
 	// Gracefully release session claims
 	return sess.release(true)
