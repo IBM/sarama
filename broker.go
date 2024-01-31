@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -1046,6 +1047,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 	if err != nil {
 		return err
 	}
+	Logger.Printf("*** broker/%d: sent %v", b.id, spew.Sdump(res))
 
 	if promise == nil {
 		return nil
@@ -1058,6 +1060,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 	if res != nil {
 		b.handleThrottledResponse(res)
 	}
+	Logger.Printf("*** broker/%d: received %v", b.id, spew.Sdump(res))
 	return nil
 }
 
