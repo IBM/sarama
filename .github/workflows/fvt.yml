@@ -5,7 +5,7 @@ on:
       go-version:
         required: false
         type: string
-        default: 1.21.x
+        default: 1.22.x
       kafka-version:
         required: false
         type: string

@@ -1,9 +1,9 @@
 module github.com/IBM/sarama/examples/interceptors
 
-go 1.18
+go 1.19
 
 require (
-	github.com/IBM/sarama v1.42.1
+	github.com/IBM/sarama v1.42.2
 	go.opentelemetry.io/otel v1.23.1
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.23.1
 	go.opentelemetry.io/otel/sdk v1.23.1
@@ -31,9 +31,9 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	go.opentelemetry.io/otel/metric v1.23.1 // indirect
 	go.opentelemetry.io/otel/sdk/metric v1.23.1 // indirect
-	golang.org/x/crypto v0.18.0 // indirect
-	golang.org/x/net v0.20.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/crypto v0.19.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
+	golang.org/x/sys v0.17.0 // indirect
 )
 
 replace github.com/IBM/sarama => ../../

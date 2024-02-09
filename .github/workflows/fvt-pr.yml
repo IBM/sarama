@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.21.x]
+        go-version: [1.22.x]
         kafka-version: [1.0.2, 2.6.2, 3.6.0]
         include:
         - kafka-version: 1.0.2
