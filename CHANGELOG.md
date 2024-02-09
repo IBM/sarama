@@ -1,5 +1,46 @@
 # Changelog
 
+## Version 1.42.2 (2024-02-09)
+
+## What's Changed
+
+⚠️ The go.mod directive has been bumped to 1.18 as the minimum version of Go required for the module. This was necessary to continue to receive updates from some of the third party dependencies that Sarama makes use of for compression.
+
+### :tada: New Features / Improvements
+* feat: update go directive to 1.18 by @dnwe in https://github.com/IBM/sarama/pull/2713
+* feat: return KError instead of errors in AlterConfigs and DescribeConfig by @zhuliquan in https://github.com/IBM/sarama/pull/2472
+### :bug: Fixes
+* fix: don't waste time for backoff on member id required error by @lzakharov in https://github.com/IBM/sarama/pull/2759
+* fix: prevent ConsumerGroup.Close infinitely locking by @maqdev in https://github.com/IBM/sarama/pull/2717
+### :package: Dependency updates
+* chore(deps): bump golang.org/x/net from 0.17.0 to 0.18.0 by @dependabot in https://github.com/IBM/sarama/pull/2716
+* chore(deps): bump golang.org/x/sync to v0.5.0 by @dependabot in https://github.com/IBM/sarama/pull/2718
+* chore(deps): bump github.com/pierrec/lz4/v4 from 4.1.18 to 4.1.19 by @dependabot in https://github.com/IBM/sarama/pull/2739
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 by @dependabot in https://github.com/IBM/sarama/pull/2748
+* chore(deps): bump the golang-org-x group with 1 update by @dependabot in https://github.com/IBM/sarama/pull/2734
+* chore(deps): bump the golang-org-x group with 2 updates by @dependabot in https://github.com/IBM/sarama/pull/2764
+* chore(deps): bump github.com/pierrec/lz4/v4 from 4.1.19 to 4.1.21 by @dependabot in https://github.com/IBM/sarama/pull/2763
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 in /examples/exactly_once by @dependabot in https://github.com/IBM/sarama/pull/2749
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 in /examples/consumergroup by @dependabot in https://github.com/IBM/sarama/pull/2750
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 in /examples/sasl_scram_client by @dependabot in https://github.com/IBM/sarama/pull/2751
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 in /examples/interceptors by @dependabot in https://github.com/IBM/sarama/pull/2752
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 in /examples/http_server by @dependabot in https://github.com/IBM/sarama/pull/2753
+* chore(deps): bump github.com/eapache/go-resiliency from 1.4.0 to 1.5.0 by @dependabot in https://github.com/IBM/sarama/pull/2745
+* chore(deps): bump golang.org/x/crypto from 0.15.0 to 0.17.0 in /examples/txn_producer by @dependabot in https://github.com/IBM/sarama/pull/2754
+* chore(deps): bump go.opentelemetry.io/otel/sdk from 1.19.0 to 1.22.0 in /examples/interceptors by @dependabot in https://github.com/IBM/sarama/pull/2767
+* chore(deps): bump the golang-org-x group with 1 update by @dependabot in https://github.com/IBM/sarama/pull/2793
+* chore(deps): bump go.opentelemetry.io/otel/exporters/stdout/stdoutmetric from 0.42.0 to 1.23.1 in /examples/interceptors by @dependabot in https://github.com/IBM/sarama/pull/2792
+### :wrench: Maintenance
+* fix(examples): housekeeping of code and deps by @dnwe in https://github.com/IBM/sarama/pull/2720
+### :heavy_plus_sign: Other Changes
+* fix(test): retry MockBroker Listen for EADDRINUSE by @dnwe in https://github.com/IBM/sarama/pull/2721
+
+## New Contributors
+* @maqdev made their first contribution in https://github.com/IBM/sarama/pull/2717
+* @zhuliquan made their first contribution in https://github.com/IBM/sarama/pull/2472
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.42.1...v1.42.2
+
 ## Version 1.42.1 (2023-11-07)
 
 ## What's Changed
