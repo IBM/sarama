@@ -25,7 +25,7 @@ type ConsumerInterceptor interface {
 func (msg *ProducerMessage) safelyApplyInterceptor(interceptor ProducerInterceptor) {
 	defer func() {
 		if r := recover(); r != nil {
-			Logger.Printf("Error when calling producer interceptor: %s, %w\n", interceptor, r)
+			Logger.Printf("Error when calling producer interceptor: %v, %v", interceptor, r)
 		}
 	}()
 
@@ -35,7 +35,7 @@ func (msg *ProducerMessage) safelyApplyInterceptor(interceptor ProducerIntercept
 func (msg *ConsumerMessage) safelyApplyInterceptor(interceptor ConsumerInterceptor) {
 	defer func() {
 		if r := recover(); r != nil {
-			Logger.Printf("Error when calling consumer interceptor: %s, %w\n", interceptor, r)
+			Logger.Printf("Error when calling consumer interceptor: %v, %v", interceptor, r)
 		}
 	}()
 
