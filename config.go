@@ -523,7 +523,7 @@ func NewConfig() *Config {
 	c.Metadata.Full = true
 	c.Metadata.AllowAutoTopicCreation = true
 
-	c.Producer.MaxMessageBytes = 1000000
+	c.Producer.MaxMessageBytes = 1024 * 1024
 	c.Producer.RequiredAcks = WaitForLocal
 	c.Producer.Timeout = 10 * time.Second
 	c.Producer.Partitioner = NewHashPartitioner
