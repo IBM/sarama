@@ -25,7 +25,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.21.x]
+        go-version: [1.22.x]
     steps:
     - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
     - name: Setup Go
@@ -38,14 +38,14 @@ jobs:
         GOFLAGS: -tags=functional
       uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc # v3.7.0
       with:
-        version: v1.54.2
+        version: v1.56.1
   test:
     name: Unit Testing with Go ${{ matrix.go-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.18.x, 1.20.x, 1.21.x]
+        go-version: [1.19.x, 1.21.x, 1.22.x]
     env:
       DEBUG: true
       GOFLAGS: -trimpath
