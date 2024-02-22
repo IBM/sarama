@@ -39,6 +39,7 @@ type GSSAPIConfig struct {
 	Password           string
 	Realm              string
 	DisablePAFXFAST    bool
+	BuildSpn           BuildSpnFunc
 }
 
 type GSSAPIKerberosAuth struct {
@@ -56,6 +57,8 @@ type KerberosClient interface {
 	CName() types.PrincipalName
 	Destroy()
 }
+
+type BuildSpnFunc func(serviceName, host string) string
 
 // writePackage appends length in big endian before the payload, and sends it to kafka
 func (krbAuth *GSSAPIKerberosAuth) writePackage(broker *Broker, payload []byte) (int, error) {
@@ -211,10 +214,15 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 		return err
 	}
 	// Construct SPN using serviceName and host
-	// SPN format: <SERVICE>/<FQDN>
+	// default SPN format: <SERVICE>/<FQDN>
 
 	host := strings.SplitN(broker.addr, ":", 2)[0] // Strip port part
-	spn := fmt.Sprintf("%s/%s", broker.conf.Net.SASL.GSSAPI.ServiceName, host)
+	var spn string
+	if krbAuth.Config.BuildSpn != nil {
+		spn = krbAuth.Config.BuildSpn(broker.conf.Net.SASL.GSSAPI.ServiceName, host)
+	} else {
+		spn = fmt.Sprintf("%s/%s", broker.conf.Net.SASL.GSSAPI.ServiceName, host)
+	}
 
 	ticket, encKey, err := kerberosClient.GetServiceTicket(spn)
 	if err != nil {
