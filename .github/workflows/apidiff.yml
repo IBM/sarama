@@ -33,6 +33,7 @@ jobs:
       with:
         ref: ${{ github.base_ref }}
         path: "base"
+        persist-credentials: false
     - name: Capture apidiff baseline
       run: apidiff -m -w ../baseline.bin .
       working-directory: "base"
@@ -40,6 +41,7 @@ jobs:
       uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
       with:
         path: "updated"
+        persist-credentials: false
     - name: Run apidiff check
       run: apidiff -m -incompatible ../baseline.bin .
       working-directory: "updated"
