@@ -167,6 +167,10 @@ type Config struct {
 		// the broker may auto-create topics that we requested which do not already exist,
 		// if it is configured to do so (`auto.create.topics.enable` is true). Defaults to true.
 		AllowAutoTopicCreation bool
+
+		// Optional set of topics whose metadata will be fetched at startup. If empty it will default
+		// to fetch the metadata for all topics
+		InitialTopics []string
 	}
 
 	// Producer is the namespace for configuration related to producing messages,
