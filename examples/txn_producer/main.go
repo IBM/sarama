@@ -143,7 +143,7 @@ func produceTestRecord(producerProvider *producerProvider) {
 			if producer.TxnStatus()&sarama.ProducerTxnFlagAbortableError != 0 {
 				err = producer.AbortTxn()
 				if err != nil {
-					// If an error occured just retry it.
+					// If an error occurred just retry it.
 					log.Printf("Producer: unable to abort transaction: %+v", err)
 					continue
 				}
