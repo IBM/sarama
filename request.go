@@ -188,10 +188,14 @@ func allocateBody(key, version int16) protocolBody {
 		return &SaslAuthenticateRequest{Version: version}
 	case 37:
 		return &CreatePartitionsRequest{Version: version}
-	// 38: CreateDelegationTokenRequest
-	// 39: RenewDelegationTokenRequest
-	// 40: ExpireDelegationTokenRequest
-	// 41: DescribeDelegationTokenRequest
+	case 38:
+		return &CreateDelegationTokenRequest{Version: version}
+	case 39:
+		return &RenewDelegationTokenRequest{Version: version}
+	case 40:
+		return &ExpireDelegationTokenRequest{Version: version}
+	case 41:
+		return &DescribeDelegationTokenRequest{Version: version}
 	case 42:
 		return &DeleteGroupsRequest{Version: version}
 	// 43: ElectLeadersRequest

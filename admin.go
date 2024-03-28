@@ -146,6 +146,22 @@ type ClusterAdmin interface {
 	// This is for static membership feature. KIP-345
 	RemoveMemberFromConsumerGroup(groupId string, groupInstanceIds []string) (*LeaveGroupResponse, error)
 
+	// Creates a renewable delegation token based on the access privileges of the token's owner. If a nil argument
+	// is provided, the owner is assumed to be the admin client user.  The renewer argument allows users other
+	// than the token's owner to renew/expire the token.  When the maxLifetime argument is -1 milliseconds,
+	// the server default will be used.
+	CreateDelegationToken(renewers []string, owner *string, maxLifetime time.Duration) (*DelegationToken, error)
+
+	// Renews an existing delegation token (identified by its hmac), returning the new expiration time.
+	RenewDelegationToken(hmac []byte, period time.Duration) (time.Time, error)
+
+	// Changes the expiration time for an existing delegation token (identified by its hmac), returning the new
+	// expiration time. Set the period to -1 milliseconds to immediately expire a token.
+	ExpireDelegationToken(hmac []byte, period time.Duration) (time.Time, error)
+
+	// Returns the information for all delegation tokens owned by the users supplied in the argument.
+	DescribeDelegationToken(owners []string) ([]RenewableToken, error)
+
 	// Close shuts down the admin and closes underlying client.
 	Close() error
 }
@@ -1268,4 +1284,107 @@ func (ca *clusterAdmin) RemoveMemberFromConsumerGroup(groupId string, groupInsta
 		})
 	}
 	return controller.LeaveGroup(request)
+}
+
+func (ca *clusterAdmin) CreateDelegationToken(renewers []string, owner *string, maxLifetime time.Duration) (*DelegationToken, error) {
+
+	controller, err := ca.client.Controller()
+	if err != nil {
+		return nil, err
+	}
+
+	resource := AclResourceUser
+	request := &CreateDelegationTokenRequest{
+		Version:     2,
+		MaxLifetime: maxLifetime,
+		Renewers:    make([]Principal, len(renewers)),
+	}
+
+	if ca.conf.Version.IsAtLeast(V3_3_0_0) {
+		request.Version = 3
+		if owner != nil && len(*owner) > 0 {
+			user := resource.String()
+			request.OwnerPrincipalType = &user
+			request.OwnerName = owner
+		}
+	}
+
+	for i, r := range renewers {
+		request.Renewers[i] = Principal{resource.String(), r}
+	}
+
+	rsp, err := controller.CreateDelegationToken(request)
+	if err != nil {
+		return nil, err
+	}
+	if !errors.Is(rsp.ErrorCode, ErrNoError) {
+		return nil, rsp.ErrorCode
+	}
+
+	return &rsp.DelegationToken, nil
+}
+
+func (ca *clusterAdmin) RenewDelegationToken(hmac []byte, period time.Duration) (time.Time, error) {
+	var expiry time.Time
+	controller, err := ca.client.Controller()
+	if err != nil {
+		return expiry, err
+	}
+
+	request := RenewDelegationTokenRequest{Version: 2, HMAC: hmac, RenewalPeriod: period}
+	rsp, err := controller.RenewDelegationToken(&request)
+	if err != nil {
+		return expiry, err
+	}
+	if !errors.Is(rsp.ErrorCode, ErrNoError) {
+		return expiry, rsp.ErrorCode
+	}
+
+	return rsp.ExpiryTime, nil
+}
+
+func (ca *clusterAdmin) ExpireDelegationToken(hmac []byte, period time.Duration) (time.Time, error) {
+	var expiry time.Time
+
+	controller, err := ca.client.Controller()
+	if err != nil {
+		return expiry, err
+	}
+
+	request := ExpireDelegationTokenRequest{Version: 2, HMAC: hmac, ExpiryPeriod: period}
+	rsp, err := controller.ExpireDelegationToken(&request)
+	if err != nil {
+		return expiry, err
+	}
+	if !errors.Is(rsp.ErrorCode, ErrNoError) {
+		return expiry, rsp.ErrorCode
+	}
+
+	return rsp.ExpiryTime, nil
+}
+
+func (ca *clusterAdmin) DescribeDelegationToken(owners []string) ([]RenewableToken, error) {
+	var tokens []RenewableToken
+
+	controller, err := ca.client.Controller()
+	if err != nil {
+		return tokens, err
+	}
+
+	resource := AclResourceUser
+	principals := make([]Principal, len(owners))
+	for i, x := range owners {
+		principals[i] = Principal{resource.String(), x}
+	}
+
+	request := DescribeDelegationTokenRequest{Version: 2, Owners: principals}
+	rsp, err := controller.DescribeDelegationToken(&request)
+	if err != nil {
+		return tokens, err
+	}
+	if !errors.Is(rsp.ErrorCode, ErrNoError) {
+		return tokens, rsp.ErrorCode
+	}
+
+	return rsp.Tokens, nil
 }
