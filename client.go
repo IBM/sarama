@@ -212,9 +212,13 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 
 	client.randomizeSeedBrokers(addrs)
 
+	for _, t := range conf.Metadata.InitialTopics {
+		client.metadataTopics[t] = none{}
+	}
+
 	if conf.Metadata.Full {
-		// do an initial fetch of all cluster metadata by specifying an empty list of topics
-		err := client.RefreshMetadata()
+		// do an initial fetch of cluster metadata
+		err := client.RefreshMetadata(conf.Metadata.InitialTopics...)
 		if err == nil {
 		} else if errors.Is(err, ErrLeaderNotAvailable) || errors.Is(err, ErrReplicaNotAvailable) || errors.Is(err, ErrTopicAuthorizationFailed) || errors.Is(err, ErrClusterAuthorizationFailed) {
 			// indicates that maybe part of the cluster is down, but is not fatal to creating the client
