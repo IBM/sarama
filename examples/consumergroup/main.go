@@ -116,7 +116,6 @@ func main() {
 			if ctx.Err() != nil {
 				return
 			}
-			consumer.ready = make(chan bool)
 		}
 	}()
 
@@ -162,13 +161,16 @@ func toggleConsumptionFlow(client sarama.ConsumerGroup, isPaused *bool) {
 
 // Consumer represents a Sarama consumer group consumer
 type Consumer struct {
-	ready chan bool
+	ready       chan bool
+	readyCloser sync.Once
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim
 func (consumer *Consumer) Setup(sarama.ConsumerGroupSession) error {
 	// Mark the consumer as ready
-	close(consumer.ready)
+	consumer.readyCloser.Do(func() {
+		close(consumer.ready)
+	})
 	return nil
 }
 
