@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSentinelWithSingleWrappedError(t *testing.T) {
@@ -62,4 +64,10 @@ func TestSentinelWithMultipleWrappedErrors(t *testing.T) {
 	if errors.Is(unwrapped, ErrOutOfBrokers) || !errors.Is(unwrapped, myNetError) || !errors.Is(unwrapped, myAddrError) {
 		t.Errorf("unwrapped value unexpected result")
 	}
+}
+
+func TestIsMessageSizeTooLarge(t *testing.T) {
+	assert.True(t, IsMessageSizeTooLarge(ErrMessageSizeTooLarge), "broker side error must be regarded as a too large error")
+	assert.True(t, IsMessageSizeTooLarge(newMessageSizeTooLargeConfigurationError(2, 1)), "config side error must be regarded as a too large error")
+	assert.False(t, IsMessageSizeTooLarge(nil), "nil is not an error")
 }

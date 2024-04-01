@@ -167,6 +167,22 @@ func (err ConfigurationError) Error() string {
 	return "kafka: invalid configuration (" + string(err) + ")"
 }
 
+const (
+	// messageSizeTooLargePrefix used by newMessageSizeTooLargeConfigurationError and IsMessageSizeTooLarge
+	messageSizeTooLargePrefix = "Attempt to produce message larger than configured Producer.MaxMessageBytes"
+)
+
+// newMessageSizeTooLargeConfigurationError creates an error returned when a message payload is
+// attempted to be published that exceeds the configured maximum message size. We return a specific
+// string that is checked for by IsMessageSizeTooLarge() as several consumers of this library
+// need to differentiate this error from other ConfigurationErrors, and the actual type returned
+// has changed multiple times during the evolution of this library. While the string check is a hack,
+// it's better that it's done once within this library, than multiple users reimplementing in their
+// own clients.
+func newMessageSizeTooLargeConfigurationError(msgSize, configuredSize int) ConfigurationError {
+	return ConfigurationError(fmt.Sprintf("%s: %d > %d", messageSizeTooLargePrefix, msgSize, configuredSize))
+}
+
 // KError is the type of error that can be returned directly by the Kafka broker.
 // See https://cwiki.apache.org/confluence/display/KAFKA/A+Guide+To+The+Kafka+Protocol#AGuideToTheKafkaProtocol-ErrorCodes
 type KError int16
@@ -454,4 +470,19 @@ func (err KError) Error() string {
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
+}
+
+// IsMessageSizeTooLarge returns true if the error relates the message size
+// being either too large as reported by the broker, or too large because it
+// exceeds the configured maximum size.
+func IsMessageSizeTooLarge(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, ErrMessageSizeTooLarge) {
+		return true
+	}
+
+	return strings.Contains(err.Error(), messageSizeTooLargePrefix)
 }
