@@ -52,6 +52,35 @@ func TestSyncProducer(t *testing.T) {
 		}
 	}
 
+	// try to send a message too large
+	_, _, err = producer.SendMessage(&ProducerMessage{
+		Topic:    "my_topic",
+		Value:    ByteEncoder(make([]byte, config.Producer.MaxMessageBytes+1)), // will exceed default max size, e.g. configuration side
+		Metadata: "test",
+	})
+	if !IsMessageSizeTooLarge(err) {
+		t.Error("expected err to be message too large")
+	}
+
+	// try to send small message the server rejects because too large
+	leader.Returns(&ProduceResponse{
+		Blocks: map[string]map[int32]*ProduceResponseBlock{
+			"my_topic": {
+				0: &ProduceResponseBlock{
+					Err: ErrMessageSizeTooLarge,
+				},
+			},
+		},
+	})
+	_, _, err = producer.SendMessage(&ProducerMessage{
+		Topic:    "my_topic",
+		Value:    StringEncoder(TestMessage),
+		Metadata: "test",
+	})
+	if !IsMessageSizeTooLarge(err) {
+		t.Error("expected err to be message too large")
+	}
+
 	safeClose(t, producer)
 	leader.Close()
 	seedBroker.Close()
