@@ -58,8 +58,8 @@ func TestSyncProducer(t *testing.T) {
 		Value:    ByteEncoder(make([]byte, config.Producer.MaxMessageBytes+1)), // will exceed default max size, e.g. configuration side
 		Metadata: "test",
 	})
-	if err != ErrMessageSizeTooLarge {
-		t.Error("expected err to be ErrMessageSizeTooLarge - many people rely on this, please do not change with searching for previous discussions")
+	if err != ErrMessageSizeTooLarge { //nolint:errorlint // linter complains that we use errors.Is(), but we know code bases out there don't, so this test is specifically to test that we don't wrap this
+		t.Error("expected err to be ErrMessageSizeTooLarge - many people rely on this, please do not change without searching for previous discussions")
 	}
 
 	// try to send small message the server rejects because too large
@@ -77,8 +77,8 @@ func TestSyncProducer(t *testing.T) {
 		Value:    StringEncoder(TestMessage),
 		Metadata: "test",
 	})
-	if err != ErrMessageSizeTooLarge {
-		t.Error("expected err to be ErrMessageSizeTooLarge - many people rely on this, please do not change with searching for previous discussions")
+	if err != ErrMessageSizeTooLarge { //nolint:errorlint // linter complains that we use errors.Is(), but we know code bases out there don't, so this test is specifically to test that we don't wrap this
+		t.Error("expected err to be ErrMessageSizeTooLarge - many people rely on this, please do not change without searching for previous discussions")
 	}
 
 	safeClose(t, producer)
