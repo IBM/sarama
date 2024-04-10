@@ -116,7 +116,7 @@ func main() {
 			if ctx.Err() != nil {
 				return
 			}
-			consumer.ready = make(chan bool)
+			consumer.ready <- true
 		}
 	}()
 
