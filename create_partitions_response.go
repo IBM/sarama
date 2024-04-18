@@ -69,7 +69,7 @@ func (r *CreatePartitionsResponse) headerVersion() int16 {
 }
 
 func (r *CreatePartitionsResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 1
+	return r.Version == 0 || r.Version == 1
 }
 
 func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {

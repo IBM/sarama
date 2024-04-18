@@ -71,7 +71,7 @@ func (r *DeleteGroupsResponse) headerVersion() int16 {
 }
 
 func (r *DeleteGroupsResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 1
+	return r.Version == 0 || r.Version == 1
 }
 
 func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {
