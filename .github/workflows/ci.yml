@@ -33,14 +33,13 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
       with:
-        cache: false # golangci-lint-action has its own cache
         go-version: ${{ matrix.go-version }}
     - name: golangci-lint
       env:
         GOFLAGS: -tags=functional
       uses: golangci/golangci-lint-action@82d40c283aeb1f2b6595839195e95c2d6a49081b # v5.0.0
       with:
-        version: v1.56.1
+        version: v1.57.2
   test:
     name: Unit Testing with Go ${{ matrix.go-version }}
     runs-on: ubuntu-latest
