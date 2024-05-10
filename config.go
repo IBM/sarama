@@ -387,7 +387,7 @@ type Config struct {
 		// default is 250ms, since 0 causes the consumer to spin when no events are
 		// available. 100-500ms is a reasonable range for most cases. Kafka only
 		// supports precision up to milliseconds; nanoseconds will be truncated.
-		// Equivalent to the JVM's `fetch.wait.max.ms`.
+		// Equivalent to the JVM's `fetch.max.wait.ms`.
 		MaxWaitTime time.Duration
 
 		// The maximum amount of time the consumer expects a message takes to
