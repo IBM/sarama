@@ -742,6 +742,18 @@ func (client *client) updateBroker(brokers []*Broker) {
 			Logger.Printf("client/broker remove invalid broker #%d with %s", broker.ID(), broker.Addr())
 		}
 	}
+
+	// if already created client.brokers connections, need close client.seedBrokers connections to avoid connection leak
+	if len(client.brokers) > 0 {
+		for _, b := range client.seedBrokers {
+			Logger.Printf("[close seed broker] start %v %v\n", b.ID(), b.Addr())
+			if err := b.Close(); err != nil {
+				Logger.Printf("[close seed broker] err %v %v\n", b.ID(), b.Addr())
+				continue
+			}
+			Logger.Printf("[close seed broker] success %v %v\n", b.ID(), b.Addr())
+		}
+	}
 }
 
 // registerBroker makes sure a broker received by a Metadata or Coordinator request is registered
