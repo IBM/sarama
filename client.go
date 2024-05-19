@@ -746,12 +746,12 @@ func (client *client) updateBroker(brokers []*Broker) {
 	// if already created client.brokers connections, need close client.seedBrokers connections to avoid connection leak
 	if len(client.brokers) > 0 {
 		for _, b := range client.seedBrokers {
-			Logger.Printf("[close seed broker] id: %v, addr: %v start\n", b.ID(), b.Addr())
+			Logger.Printf("[close seed broker] id: %v, addr: %v, start\n", b.ID(), b.Addr())
 			if err := b.Close(); err != nil {
 				Logger.Printf("[close seed broker] id: %v, addr: %v, err: %v\n", b.ID(), b.Addr(), err)
 				continue
 			}
-			Logger.Printf("[close seed broker] id: %v, addr: %v success\n", b.ID(), b.Addr())
+			Logger.Printf("[close seed broker] id: %v, addr: %v, success\n", b.ID(), b.Addr())
 		}
 	}
 }
