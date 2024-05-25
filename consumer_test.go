@@ -2093,13 +2093,17 @@ func TestConsumerInterceptors(t *testing.T) {
 		},
 		{
 			name:         "interceptor chain",
-			interceptors: []ConsumerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}},
+			interceptors: []ConsumerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}, &metadataInterceptor{text: "sarama"}},
 			expectationFn: func(t *testing.T, i int, msg *ConsumerMessage) {
 				ev, _ := testMsg.Encode()
-				expected := string(ev) + strconv.Itoa(i) + strconv.Itoa(i+1000)
+				expectedValue := string(ev) + strconv.Itoa(i) + strconv.Itoa(i+1000)
 				v := string(msg.Value)
-				if v != expected {
-					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				if v != expectedValue {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expectedValue)
+				}
+
+				if str, ok := msg.Metadata.(string); ok != true || str != "sarama" {
+					t.Errorf("Interceptor should have set the metadata, got %s, expected %s", msg.Metadata, "sarama")
 				}
 			},
 		},
@@ -2117,13 +2121,17 @@ func TestConsumerInterceptors(t *testing.T) {
 		},
 		{
 			name:         "interceptor chain with all interceptors failing",
-			interceptors: []ConsumerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}},
+			interceptors: []ConsumerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}, &metadataInterceptor{"fail"}},
 			expectationFn: func(t *testing.T, i int, msg *ConsumerMessage) {
 				ev, _ := testMsg.Encode()
-				expected := string(ev)
+				expectedValue := string(ev)
 				v := string(msg.Value)
-				if v != expected {
-					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				if v != expectedValue {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expectedValue)
+				}
+
+				if msg.Metadata != nil {
+					t.Errorf("Interceptor should not have set the metadata, got %s, expected %s", msg.Metadata, "")
 				}
 			},
 		},

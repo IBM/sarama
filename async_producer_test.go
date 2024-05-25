@@ -1633,6 +1633,26 @@ func (b *appendInterceptor) OnConsume(msg *ConsumerMessage) {
 	b.i++
 }
 
+type metadataInterceptor struct {
+	text string
+}
+
+func (m *metadataInterceptor) OnSend(msg *ProducerMessage) {
+	if m.text == "fail" {
+		panic("hey, the interceptor has failed")
+	}
+
+	msg.Metadata = m.text
+}
+
+func (m *metadataInterceptor) OnConsume(msg *ConsumerMessage) {
+	if m.text == "fail" {
+		panic("hey, the interceptor has failed")
+	}
+
+	msg.Metadata = m.text
+}
+
 func testProducerInterceptor(
 	t *testing.T,
 	interceptors []ProducerInterceptor,
@@ -1695,12 +1715,16 @@ func TestAsyncProducerInterceptors(t *testing.T) {
 		},
 		{
 			name:         "interceptor chain",
-			interceptors: []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}},
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: 0}, &appendInterceptor{i: 1000}, &metadataInterceptor{text: "sarama"}},
 			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
 				v, _ := msg.Value.Encode()
-				expected := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+1000)
-				if string(v) != expected {
-					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expected)
+				expectedValue := TestMessage + strconv.Itoa(i) + strconv.Itoa(i+1000)
+				if string(v) != expectedValue {
+					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expectedValue)
+				}
+
+				if str, ok := msg.Metadata.(string); ok != true || str != "sarama" {
+					t.Errorf("Interceptor should have set the metadata, got %s, expected sarama", msg.Metadata)
 				}
 			},
 		},
@@ -1717,12 +1741,16 @@ func TestAsyncProducerInterceptors(t *testing.T) {
 		},
 		{
 			name:         "interceptor chain with all interceptors failing",
-			interceptors: []ProducerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}},
+			interceptors: []ProducerInterceptor{&appendInterceptor{i: -1}, &appendInterceptor{i: -1}, &metadataInterceptor{text: "fail"}},
 			expectationFn: func(t *testing.T, i int, msg *ProducerMessage) {
 				v, _ := msg.Value.Encode()
-				expected := TestMessage
-				if string(v) != expected {
-					t.Errorf("Interceptor should have not changed the value, got %s, expected %s", v, expected)
+				expectedValue := TestMessage
+				if string(v) != expectedValue {
+					t.Errorf("Interceptor should have not changed the value, got %s, expected %s", v, expectedValue)
+				}
+
+				if msg.Metadata != nil {
+					t.Errorf("Interceptor should have not set the metadata, got %s, expected empty", msg.Metadata)
 				}
 			},
 		},
