@@ -1723,8 +1723,9 @@ func TestAsyncProducerInterceptors(t *testing.T) {
 					t.Errorf("Interceptor should have incremented the value, got %s, expected %s", v, expectedValue)
 				}
 
-				if str, ok := msg.Metadata.(string); ok != true || str != "sarama" {
-					t.Errorf("Interceptor should have set the metadata, got %s, expected sarama", msg.Metadata)
+				expectedMetadata := "sarama"
+				if metadata, ok := msg.Metadata.(string); !ok || metadata != expectedMetadata {
+					t.Errorf("Interceptor should have set the metadata, got %s, expected %s", msg.Metadata, expectedMetadata)
 				}
 			},
 		},
