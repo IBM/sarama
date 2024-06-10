@@ -29,7 +29,7 @@ jobs:
     - name: Install apidiff cmd
       run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20231006140011-7918f672742d
     - name: Checkout base code
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       with:
         ref: ${{ github.base_ref }}
         path: "base"
@@ -38,7 +38,7 @@ jobs:
       run: apidiff -m -w ../baseline.bin .
       working-directory: "base"
     - name: Checkout updated code
-      uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+      uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       with:
         path: "updated"
         persist-credentials: false

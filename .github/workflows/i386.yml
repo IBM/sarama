@@ -1,4 +1,4 @@
-name: Fuzzing
+name: i386
 on:
   merge_group:
   push:
@@ -16,11 +16,11 @@ permissions:
   contents: read  # for actions/checkout to fetch code
 
 jobs:
-  test:
-    name: Fuzz
+  atomicalign:
+    permissions:
+      contents: read  # for actions/checkout to fetch code
+      pull-requests: read  # for golangci/golangci-lint-action to fetch pull requests
     runs-on: ubuntu-latest
-    env:
-      GOFLAGS: -trimpath
     steps:
     - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       with:
@@ -29,5 +29,11 @@ jobs:
       uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
       with:
         go-version: 1.22.x
-    - name: Run any fuzzing tests
-      run: go test -list . | grep '^Fuzz' | parallel 'go test -v -run=^{}$ -fuzz=^{}$ -fuzztime=5m'
+    - name: staticcheck
+      env:
+        GOARCH: 386
+        GOFLAGS: -tags=functional
+      run: |
+          git clone --depth=1 https://github.com/dominikh/go-tools /tmp/go-tools
+          ( cd /tmp/go-tools/cmd/staticcheck && go build -o /tmp/staticcheck )
+          /tmp/staticcheck -checks SA1027 ./...

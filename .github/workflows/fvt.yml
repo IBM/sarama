@@ -28,14 +28,14 @@ jobs:
       KAFKA_VERSION: ${{ inputs.kafka-version }}
       SCALA_VERSION: ${{ inputs.scala-version }}
     steps:
-    - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 # v4.1.1
+    - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
       with:
         persist-credentials: false
     - name: Setup Docker
-      uses: docker/setup-buildx-action@f95db51fddba0c2d1ec667646a06c2ce06100226 # v3.0.0
+      uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
       id: buildx
     - name: Build FVT Docker Image
-      uses: docker/bake-action@52a1696536aaa8818afd3753a71ec46298b8a19b # master
+      uses: docker/bake-action@33a1cc61dab930ceab0181de8cdc34a8cc55e61d # master
       with:
         builder: ${{ steps.buildx.outputs.name }}
         files: docker-compose.yml
@@ -66,7 +66,7 @@ jobs:
         if [ -f "fvt-kafka-${{ inputs.kafka-version }}.pcap" ]; then sudo chmod a+r "fvt-kafka-${{ inputs.kafka-version }}.pcap"; fi
     - name: Upload pcap file
       if: always()
-      uses: actions/upload-artifact@5d5d22a31266ced268874388b861e4b58bb5c2f3 # v4.3.1
+      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
       with:
         name: fvt-kafka-${{ inputs.kafka-version }}.pcap
         path: fvt-kafka-${{ inputs.kafka-version }}.pcap
