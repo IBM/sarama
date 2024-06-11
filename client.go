@@ -3,6 +3,7 @@ package sarama
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"net"
@@ -413,57 +414,42 @@ func (client *client) WritablePartitions(topic string) ([]int32, error) {
 	return partitions, nil
 }
 
+type replicasType int
+
+func (rt replicasType) String() string {
+	var str string
+	switch rt {
+	case replicasTypeAll:
+		str = "replicas"
+	case replicasTypeIsr:
+		str = "isr"
+	case replicasTypeOffline:
+		str = "offline"
+	default:
+		str = "unknown"
+	}
+	return str
+}
+
+const (
+	replicasTypeAll     replicasType = 1 // corresponds to metadata.Replicas
+	replicasTypeIsr     replicasType = 2 // corresponds to metadata.Isr
+	replicasTypeOffline replicasType = 3 // corresponds to metadata.Offline
+)
+
 func (client *client) Replicas(topic string, partitionID int32) ([]int32, error) {
-	if client.Closed() {
-		return nil, ErrClosedClient
-	}
-
-	metadata := client.cachedMetadata(topic, partitionID)
-
-	if metadata == nil {
-		err := client.RefreshMetadata(topic)
-		if err != nil {
-			return nil, err
-		}
-		metadata = client.cachedMetadata(topic, partitionID)
-	}
-
-	if metadata == nil {
-		return nil, ErrUnknownTopicOrPartition
-	}
-
-	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
-		return dupInt32Slice(metadata.Replicas), metadata.Err
-	}
-	return dupInt32Slice(metadata.Replicas), nil
+	return client.getReplicas(topic, partitionID, replicasTypeAll)
 }
 
 func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, error) {
-	if client.Closed() {
-		return nil, ErrClosedClient
-	}
-
-	metadata := client.cachedMetadata(topic, partitionID)
-
-	if metadata == nil {
-		err := client.RefreshMetadata(topic)
-		if err != nil {
-			return nil, err
-		}
-		metadata = client.cachedMetadata(topic, partitionID)
-	}
-
-	if metadata == nil {
-		return nil, ErrUnknownTopicOrPartition
-	}
-
-	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
-		return dupInt32Slice(metadata.Isr), metadata.Err
-	}
-	return dupInt32Slice(metadata.Isr), nil
+	return client.getReplicas(topic, partitionID, replicasTypeIsr)
 }
 
 func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32, error) {
+	return client.getReplicas(topic, partitionID, replicasTypeOffline)
+}
+
+func (client *client) getReplicas(topic string, partitionID int32, rt replicasType) ([]int32, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
@@ -482,10 +468,23 @@ func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32,
 		return nil, ErrUnknownTopicOrPartition
 	}
 
-	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
-		return dupInt32Slice(metadata.OfflineReplicas), metadata.Err
+	var replicas []int32
+	switch rt {
+	case replicasTypeAll:
+		replicas = metadata.Replicas
+	case replicasTypeIsr:
+		replicas = metadata.Isr
+	case replicasTypeOffline:
+		replicas = metadata.OfflineReplicas
+	default:
+		// help found error during test
+		panic(fmt.Sprintf("unexpected replicas type: %v", rt))
 	}
-	return dupInt32Slice(metadata.OfflineReplicas), nil
+
+	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
+		return dupInt32Slice(replicas), metadata.Err
+	}
+	return dupInt32Slice(replicas), nil
 }
 
 func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
