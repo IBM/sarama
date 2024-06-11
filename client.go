@@ -414,56 +414,24 @@ func (client *client) WritablePartitions(topic string) ([]int32, error) {
 }
 
 func (client *client) Replicas(topic string, partitionID int32) ([]int32, error) {
-	if client.Closed() {
-		return nil, ErrClosedClient
-	}
-
-	metadata := client.cachedMetadata(topic, partitionID)
-
-	if metadata == nil {
-		err := client.RefreshMetadata(topic)
-		if err != nil {
-			return nil, err
-		}
-		metadata = client.cachedMetadata(topic, partitionID)
-	}
-
-	if metadata == nil {
-		return nil, ErrUnknownTopicOrPartition
-	}
-
-	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
-		return dupInt32Slice(metadata.Replicas), metadata.Err
-	}
-	return dupInt32Slice(metadata.Replicas), nil
+	return client.getReplicas(topic, partitionID, func(metadata *PartitionMetadata) []int32 {
+		return metadata.Replicas
+	})
 }
 
 func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, error) {
-	if client.Closed() {
-		return nil, ErrClosedClient
-	}
-
-	metadata := client.cachedMetadata(topic, partitionID)
-
-	if metadata == nil {
-		err := client.RefreshMetadata(topic)
-		if err != nil {
-			return nil, err
-		}
-		metadata = client.cachedMetadata(topic, partitionID)
-	}
-
-	if metadata == nil {
-		return nil, ErrUnknownTopicOrPartition
-	}
-
-	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
-		return dupInt32Slice(metadata.Isr), metadata.Err
-	}
-	return dupInt32Slice(metadata.Isr), nil
+	return client.getReplicas(topic, partitionID, func(metadata *PartitionMetadata) []int32 {
+		return metadata.Isr
+	})
 }
 
 func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32, error) {
+	return client.getReplicas(topic, partitionID, func(metadata *PartitionMetadata) []int32 {
+		return metadata.OfflineReplicas
+	})
+}
+
+func (client *client) getReplicas(topic string, partitionID int32, extractor func(metadata *PartitionMetadata) []int32) ([]int32, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
@@ -482,10 +450,11 @@ func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32,
 		return nil, ErrUnknownTopicOrPartition
 	}
 
+	replicas := extractor(metadata)
 	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
-		return dupInt32Slice(metadata.OfflineReplicas), metadata.Err
+		return dupInt32Slice(replicas), metadata.Err
 	}
-	return dupInt32Slice(metadata.OfflineReplicas), nil
+	return dupInt32Slice(replicas), nil
 }
 
 func (client *client) Leader(topic string, partitionID int32) (*Broker, error) {
