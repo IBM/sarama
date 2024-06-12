@@ -363,34 +363,19 @@ func (client *client) MetadataTopics() ([]string, error) {
 }
 
 func (client *client) Partitions(topic string) ([]int32, error) {
-	if client.Closed() {
-		return nil, ErrClosedClient
-	}
-
-	partitions := client.cachedPartitions(topic, allPartitions)
-
-	if len(partitions) == 0 {
-		err := client.RefreshMetadata(topic)
-		if err != nil {
-			return nil, err
-		}
-		partitions = client.cachedPartitions(topic, allPartitions)
-	}
-
-	// no partitions found after refresh metadata
-	if len(partitions) == 0 {
-		return nil, ErrUnknownTopicOrPartition
-	}
-
-	return partitions, nil
+	return client.getPartitions(topic, allPartitions)
 }
 
 func (client *client) WritablePartitions(topic string) ([]int32, error) {
+	return client.getPartitions(topic, writablePartitions)
+}
+
+func (client *client) getPartitions(topic string, pt partitionType) ([]int32, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
 
-	partitions := client.cachedPartitions(topic, writablePartitions)
+	partitions := client.cachedPartitions(topic, pt)
 
 	// len==0 catches when it's nil (no such topic) and the odd case when every single
 	// partition is undergoing leader election simultaneously. Callers have to be able to handle
@@ -403,7 +388,7 @@ func (client *client) WritablePartitions(topic string) ([]int32, error) {
 		if err != nil {
 			return nil, err
 		}
-		partitions = client.cachedPartitions(topic, writablePartitions)
+		partitions = client.cachedPartitions(topic, pt)
 	}
 
 	if partitions == nil {
