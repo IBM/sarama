@@ -3,7 +3,6 @@ package sarama
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math"
 	"math/rand"
 	"net"
@@ -399,42 +398,25 @@ func (client *client) getPartitions(topic string, pt partitionType) ([]int32, er
 	return partitions, nil
 }
 
-type replicasType int
-
-func (rt replicasType) String() string {
-	var str string
-	switch rt {
-	case replicasTypeAll:
-		str = "replicas"
-	case replicasTypeIsr:
-		str = "isr"
-	case replicasTypeOffline:
-		str = "offline"
-	default:
-		str = "unknown"
-	}
-	return str
-}
-
-const (
-	replicasTypeAll     replicasType = 1 // corresponds to metadata.Replicas
-	replicasTypeIsr     replicasType = 2 // corresponds to metadata.Isr
-	replicasTypeOffline replicasType = 3 // corresponds to metadata.Offline
-)
-
 func (client *client) Replicas(topic string, partitionID int32) ([]int32, error) {
-	return client.getReplicas(topic, partitionID, replicasTypeAll)
+	return client.getReplicas(topic, partitionID, func(metadata *PartitionMetadata) []int32 {
+		return metadata.Replicas
+	})
 }
 
 func (client *client) InSyncReplicas(topic string, partitionID int32) ([]int32, error) {
-	return client.getReplicas(topic, partitionID, replicasTypeIsr)
+	return client.getReplicas(topic, partitionID, func(metadata *PartitionMetadata) []int32 {
+		return metadata.Isr
+	})
 }
 
 func (client *client) OfflineReplicas(topic string, partitionID int32) ([]int32, error) {
-	return client.getReplicas(topic, partitionID, replicasTypeOffline)
+	return client.getReplicas(topic, partitionID, func(metadata *PartitionMetadata) []int32 {
+		return metadata.OfflineReplicas
+	})
 }
 
-func (client *client) getReplicas(topic string, partitionID int32, rt replicasType) ([]int32, error) {
+func (client *client) getReplicas(topic string, partitionID int32, extractor func(metadata *PartitionMetadata) []int32) ([]int32, error) {
 	if client.Closed() {
 		return nil, ErrClosedClient
 	}
@@ -453,19 +435,7 @@ func (client *client) getReplicas(topic string, partitionID int32, rt replicasTy
 		return nil, ErrUnknownTopicOrPartition
 	}
 
-	var replicas []int32
-	switch rt {
-	case replicasTypeAll:
-		replicas = metadata.Replicas
-	case replicasTypeIsr:
-		replicas = metadata.Isr
-	case replicasTypeOffline:
-		replicas = metadata.OfflineReplicas
-	default:
-		// help found error during test
-		panic(fmt.Sprintf("unexpected replicas type: %v", rt))
-	}
-
+	replicas := extractor(metadata)
 	if errors.Is(metadata.Err, ErrReplicaNotAvailable) {
 		return dupInt32Slice(replicas), metadata.Err
 	}
