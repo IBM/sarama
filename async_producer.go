@@ -865,6 +865,9 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			select {
 			case res, ok := <-pending:
 				if !ok {
+					if buf.Length() != 0 {
+						time.Sleep(bp.parent.conf.Producer.Retry.Backoff)
+					}
 					continue
 				}
 				buf.Add(res)
