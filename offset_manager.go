@@ -140,6 +140,13 @@ func (om *offsetManager) ManagePartition(topic string, partition int32) (Partiti
 }
 
 func (om *offsetManager) RemovePartitions(topicPartitions map[string][]int32) error {
+	// flush one last time
+	if om.conf.Consumer.Offsets.AutoCommit.Enable {
+		for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
+			om.flushToBroker()
+		}
+	}
+
 	var errs ConsumerErrors
 	var errsLock sync.Mutex
 
@@ -150,10 +157,15 @@ func (om *offsetManager) RemovePartitions(topicPartitions map[string][]int32) er
 			go func(topic string, partition int32) {
 				defer wg.Done()
 
-				om.pomsLock.RLock()
+				om.pomsLock.Lock()
 				pom := om.poms[topic][partition]
-				om.pomsLock.RUnlock()
 				err := pom.Close()
+				delete(om.poms[topic], partition)
+				if len(om.poms[topic]) == 0 {
+					delete(om.poms, topic)
+				}
+				om.pomsLock.Unlock()
+
 				if err != nil {
 					errsLock.Lock()
 					var consumerErrs ConsumerErrors
@@ -167,24 +179,6 @@ func (om *offsetManager) RemovePartitions(topicPartitions map[string][]int32) er
 	}
 	wg.Wait()
 
-	// flush one last time
-	if om.conf.Consumer.Offsets.AutoCommit.Enable {
-		for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
-			om.flushToBroker()
-		}
-	}
-
-	om.pomsLock.Lock()
-	for topic, partitions := range topicPartitions {
-		for _, partition := range partitions {
-			delete(om.poms[topic], partition)
-			if len(om.poms[topic]) == 0 {
-				delete(om.poms, topic)
-			}
-		}
-	}
-
-	om.pomsLock.Unlock()
 	if len(errs) > 0 {
 		return errs
 	}

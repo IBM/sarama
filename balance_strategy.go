@@ -19,6 +19,7 @@ const (
 	// StickyBalanceStrategyName identifies strategies that use the sticky-partition assignment strategy
 	StickyBalanceStrategyName = "sticky"
 
+	// CooperativeStickyBalanceStrategyName identifies strategies that use the cooperative sticky-partition assignment strategy
 	CooperativeStickyBalanceStrategyName = "cooperative-sticky"
 
 	defaultGeneration = -1
