@@ -466,7 +466,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		resultOffsets = failedTxn
 
 		if len(resultOffsets) == 0 {
-			DebugLogger.Printf("txnmgr/txn-offset-commit [%s] successful txn-offset-commit with group %s %+v\n",
+			DebugLogger.Printf("txnmgr/txn-offset-commit [%s] successful txn-offset-commit with group %s\n",
 				t.transactionalID, groupId)
 			return resultOffsets, false, nil
 		}
