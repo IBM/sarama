@@ -21,6 +21,11 @@ type ConsumerMessage struct {
 	Topic      string
 	Partition  int32
 	Offset     int64
+
+	// This field is used to hold arbitrary data you wish to include
+	// Sarama completely ignores this field and is only to be used for
+	// pass-through data.
+	Metadata interface{}
 }
 
 // ConsumerError is what is provided to the user when an error occurs.
