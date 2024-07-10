@@ -85,7 +85,7 @@ func (d *DeleteRecordsResponse) headerVersion() int16 {
 }
 
 func (d *DeleteRecordsResponse) isValidVersion() bool {
-	return d.Version >= 0 && d.Version <= 1
+	return d.Version == 0 || d.Version == 1
 }
 
 func (d *DeleteRecordsResponse) requiredVersion() KafkaVersion {

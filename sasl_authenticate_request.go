@@ -32,7 +32,7 @@ func (r *SaslAuthenticateRequest) headerVersion() int16 {
 }
 
 func (r *SaslAuthenticateRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 1
+	return r.Version == 0 || r.Version == 1
 }
 
 func (r *SaslAuthenticateRequest) requiredVersion() KafkaVersion {

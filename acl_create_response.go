@@ -61,7 +61,7 @@ func (c *CreateAclsResponse) headerVersion() int16 {
 }
 
 func (c *CreateAclsResponse) isValidVersion() bool {
-	return c.Version >= 0 && c.Version <= 1
+	return c.Version == 0 || c.Version == 1
 }
 
 func (c *CreateAclsResponse) requiredVersion() KafkaVersion {
