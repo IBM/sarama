@@ -1101,7 +1101,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 			bp.parent.returnSuccesses(pSet.msgs)
 		// Retriable errors
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
-			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
+			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend, ErrKafkaStorageError:
 			if bp.parent.conf.Producer.Retry.Max <= 0 {
 				bp.parent.abandonBrokerConnection(bp.broker)
 				bp.parent.returnErrors(pSet.msgs, block.Err)
@@ -1134,7 +1134,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 
 			switch block.Err {
 			case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
-				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend:
+				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend, ErrKafkaStorageError:
 				Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
 					bp.broker.ID(), topic, partition, block.Err)
 				if bp.currentRetries[topic] == nil {
