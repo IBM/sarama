@@ -800,6 +800,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 
 			// Count the in flight requests to know when we can close the pending channel safely
 			wg.Add(1)
+
 			// Capture the current set to forward in the callback
 			sendResponse := func(set *produceSet) ProduceCallback {
 				return func(response *ProduceResponse, err error) {
@@ -826,7 +827,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			// Use AsyncProduce vs Produce to not block waiting for the response
 			// so that we can pipeline multiple produce requests and achieve higher throughput, see:
 			// https://kafka.apache.org/protocol#protocol_network
-			err := broker.AsyncProduce(request, sendResponse)
+			resp, err := broker.Produce(request)
 			if err != nil {
 				// Request failed to be sent
 				sendResponse(nil, err)
@@ -836,6 +837,8 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			if p.conf.Producer.RequiredAcks == NoResponse {
 				// Provide the expected nil response
 				sendResponse(nil, nil)
+			} else {
+				sendResponse(resp, nil)
 			}
 		}
 		// Wait for all in flight requests to close the pending channel safely
