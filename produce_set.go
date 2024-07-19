@@ -106,6 +106,7 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 		}
 	}
 
+	msg.hasBeenBatched = true
 	// Past this point we can't return an error, because we've already added the message to the set.
 	set.msgs = append(set.msgs, msg)
 
