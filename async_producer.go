@@ -197,6 +197,7 @@ type ProducerMessage struct {
 	sequenceNumber int32
 	producerEpoch  int16
 	hasSequence    bool
+	hasBeenBatched bool
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
@@ -695,8 +696,12 @@ func (pp *partitionProducer) dispatch() {
 		// All messages being retried (sent or not) have already had their retry count updated
 		// Also, ignore "special" syn/fin messages used to sync the brokerProducer and the topicProducer.
 		if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 {
+			if msg.hasSequence {
+				panic("already has sequence!?")
+			}
 			msg.sequenceNumber, msg.producerEpoch = pp.parent.txnmgr.getAndIncrementSequenceNumber(msg.Topic, msg.Partition)
 			msg.hasSequence = true
+			fmt.Println("sequencing", msg.producerEpoch, msg.sequenceNumber)
 		}
 
 		if pp.parent.IsTransactional() {
@@ -737,6 +742,7 @@ func (pp *partitionProducer) flushRetryBuffers() {
 		}
 
 		for _, msg := range pp.retryState[pp.highWatermark].buf {
+			// panic("shouldnt be here")
 			if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 && !msg.hasSequence {
 				if msg.hasSequence {
 					// wtf????
@@ -949,6 +955,7 @@ func (bp *brokerProducer) run() {
 			}
 
 			if reason := bp.needsRetry(msg); reason != nil {
+				// panic("this is gonna break")
 				bp.parent.retryMessage(msg, reason)
 
 				if bp.closing == nil && msg.flags&fin == fin {
@@ -1161,15 +1168,17 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 					go bp.parent.retryBatch(topic, partition, pSet, block.Err)
 				} else {
 					bp.parent.retryMessages(pSet.msgs, block.Err)
+					// dropping the following messages has the side effect of incrementing their retry count
+					bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
 				}
-				// dropping the following messages has the side effect of incrementing their retry count
-				bp.parent.retryMessages(bp.buffer.dropPartition(topic, partition), block.Err)
 			}
 		})
 	}
 }
 
 func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitionSet, kerr KError) {
+	time.Sleep(p.conf.Producer.Retry.Backoff)
+
 	Logger.Printf("Retrying batch for %v-%d because of %s\n", topic, partition, kerr)
 	produceSet := newProduceSet(p)
 	produceSet.msgs[topic] = make(map[int32]*partitionSet)
@@ -1180,24 +1189,32 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 	produceSet.producerEpoch = pSet.recordsToSend.RecordBatch.ProducerEpoch
 	for _, msg := range pSet.msgs {
 		if msg.retries >= p.conf.Producer.Retry.Max {
+			panic(fmt.Sprintf("no more retries in batch: %d >= %d", msg.retries, p.conf.Producer.Retry.Max))
 			p.returnErrors(pSet.msgs, kerr)
 			return
 		}
 		msg.retries++
 	}
 
-	// it's expected that a metadata refresh has been requested prior to calling retryBatch
-	leader, err := p.client.Leader(topic, partition)
-	if err != nil {
-		Logger.Printf("Failed retrying batch for %v-%d because of %v while looking up for new leader\n", topic, partition, err)
-		for _, msg := range pSet.msgs {
-			p.returnError(msg, kerr)
+	for {
+		// it's expected that a metadata refresh has been requested prior to calling retryBatch
+		leader, err := p.client.Leader(topic, partition)
+		if err != nil {
+			Logger.Printf("Failed retrying batch for %v-%d because of %v while looking up for new leader\n", topic, partition, err)
+			for _, msg := range pSet.msgs {
+				p.returnError(msg, kerr)
+			}
+
+			time.Sleep(p.conf.Producer.Retry.Backoff)
+			continue
+			// return
 		}
-		return
+		bp := p.getBrokerProducer(leader)
+		bp.output <- produceSet
+		p.unrefBrokerProducer(leader, bp)
+		break
 	}
-	bp := p.getBrokerProducer(leader)
-	bp.output <- produceSet
-	p.unrefBrokerProducer(leader, bp)
+
 }
 
 func (bp *brokerProducer) handleError(sent *produceSet, err error) {
@@ -1211,11 +1228,20 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		bp.parent.abandonBrokerConnection(bp.broker)
 		_ = bp.broker.Close()
 		bp.closing = err
+
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
-			bp.parent.retryMessages(pSet.msgs, err)
+			if bp.parent.conf.Producer.Idempotent {
+				go bp.parent.retryBatch(topic, partition, pSet, ErrKafkaStorageError)
+			} else {
+				bp.parent.retryMessages(pSet.msgs, err)
+			}
 		})
 		bp.buffer.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
-			bp.parent.retryMessages(pSet.msgs, err)
+			if bp.parent.conf.Producer.Idempotent {
+				go bp.parent.retryBatch(topic, partition, pSet, ErrKafkaStorageError)
+			} else {
+				bp.parent.retryMessages(pSet.msgs, err)
+			}
 		})
 		bp.rollOver()
 	}
@@ -1300,6 +1326,10 @@ func (p *asyncProducer) maybeTransitionToErrorState(err error) error {
 }
 
 func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
+	if msg.hasSequence && msg.hasBeenBatched {
+		panic("should not return error for idempotent")
+	}
+
 	if p.IsTransactional() {
 		_ = p.maybeTransitionToErrorState(err)
 	}
@@ -1337,6 +1367,10 @@ func (p *asyncProducer) returnSuccesses(batch []*ProducerMessage) {
 }
 
 func (p *asyncProducer) retryMessage(msg *ProducerMessage, err error) {
+	if msg.hasSequence && msg.hasBeenBatched {
+		panic("retrying msg with sequence that has been batched before")
+	}
+
 	if msg.retries >= p.conf.Producer.Retry.Max {
 		p.returnError(msg, err)
 	} else {
@@ -1347,6 +1381,9 @@ func (p *asyncProducer) retryMessage(msg *ProducerMessage, err error) {
 
 func (p *asyncProducer) retryMessages(batch []*ProducerMessage, err error) {
 	for _, msg := range batch {
+		if msg.hasSequence {
+			panic("retry messages with sequence")
+		}
 		p.retryMessage(msg, err)
 	}
 }
