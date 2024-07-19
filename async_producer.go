@@ -1255,6 +1255,12 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 		msg.retries++
 	}
 
+	// Previous versions of this library did not retry the call to p.client.Leader(topic, partition)
+	// if it failed. That was problematic because it meant during periods of time where we couldn't
+	// figure out who the leader was (because it had just died, or there was a network problem, or
+	// whatever) idempotent Produce requests would fail immediately instead of retrying for awhile
+	// as expected. This retry loop is very important since prematurely (and unnecessarily) failing
+	// an idempotent batch is ~equivalent to data loss.
 	succeeded := false
 	for i := 0; i < p.conf.Producer.Retry.Max; i++ {
 		// it's expected that a metadata refresh has been requested prior to calling retryBatch
