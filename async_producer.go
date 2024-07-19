@@ -985,6 +985,11 @@ func (bp *brokerProducer) run() {
 					continue
 				}
 			}
+
+			if !msg.hasSequence {
+				panic("wtf no sequence")
+			}
+
 			if err := bp.buffer.add(msg); err != nil {
 				bp.parent.returnError(msg, err)
 				continue
