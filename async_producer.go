@@ -1034,7 +1034,7 @@ func (bp *brokerProducer) run() {
 				}
 			}
 
-			if bp.parent.conf.Producer.Idempotent {
+			if bp.parent.conf.Producer.Idempotent && !msg.hasSequence {
 				panic("msg made it to brokerProducer goroutine without being sequenced while idempotency is enabled")
 			}
 
