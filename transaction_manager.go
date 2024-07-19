@@ -244,8 +244,6 @@ func (t *transactionManager) bumpEpoch() {
 	for k := range t.sequenceNumbers {
 		t.sequenceNumbers[k] = 0
 	}
-
-	fmt.Println("bumped epoch to", t.producerEpoch)
 }
 
 func (t *transactionManager) getProducerID() (int64, int16) {

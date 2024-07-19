@@ -3,7 +3,6 @@ package sarama
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -87,7 +86,8 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		if ps.parent.conf.Producer.Idempotent && msg.sequenceNumber < set.recordsToSend.RecordBatch.FirstSequence {
-			fmt.Println(
+			Logger.Println(
+				"assertion failed: message out of sequence added to batch",
 				"producer_id",
 				ps.producerID,
 				set.recordsToSend.RecordBatch.ProducerID,
@@ -101,7 +101,6 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 				ps.bufferCount,
 				"msg_has_sequence",
 				msg.hasSequence)
-			panic("out of order")
 			return errors.New("assertion failed: message out of sequence added to a batch")
 		}
 	}
