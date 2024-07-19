@@ -741,7 +741,7 @@ func (pp *partitionProducer) flushRetryBuffers() {
 		}
 
 		for _, msg := range pp.retryState[pp.highWatermark].buf {
-			if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 && !msg.hasSequence {
+			if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 {
 				if msg.hasSequence {
 					panic("assertion failure: reassigning producer epoch and sequence number to message that already has them")
 				}
