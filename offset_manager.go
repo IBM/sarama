@@ -42,6 +42,8 @@ type offsetManager struct {
 	poms     map[string]map[int32]*partitionOffsetManager
 	pomsLock sync.RWMutex
 
+	commitLock sync.Mutex
+
 	closeOnce sync.Once
 	closing   chan none
 	closed    chan none
@@ -251,14 +253,16 @@ func (om *offsetManager) Commit() {
 }
 
 func (om *offsetManager) flushToBroker() {
-	req := om.constructRequest()
-	if req == nil {
-		return
-	}
-
 	broker, err := om.coordinator()
 	if err != nil {
 		om.handleError(err)
+		return
+	}
+
+	om.commitLock.Lock()
+	defer om.commitLock.Unlock()
+	req := om.constructRequest()
+	if req == nil {
 		return
 	}
 
