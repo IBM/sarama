@@ -252,12 +252,15 @@ type ProducerErrors []*ProducerError
 func (pe ProducerErrors) Error() string {
 	if len(pe) > 0 {
 		return fmt.Sprintf(
-			"kafka: Failed to deliver %d messages, sample error: %v after %d retries on topic: %s and partition: %d",
+			"kafka: Failed to deliver %d messages, sample error: %v after %d retries on topic: %s and partition: %d with producerEpoch: %d and sequence: %d(%v)",
 			len(pe),
 			pe[0].Err,
 			pe[0].Msg.retries,
 			pe[0].Msg.Topic,
 			pe[0].Msg.Partition,
+			pe[0].Msg.producerEpoch,
+			pe[0].Msg.sequenceNumber,
+			pe[0].Msg.hasSequence,
 		)
 	}
 	return fmt.Sprintf("kafka: Failed to deliver %d messages.", len(pe))
