@@ -840,7 +840,11 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 				// the caller has communicated: I really care about ordering. As a result, we
 				// we do our best to guarantee that by using the synchronous (blocking) version
 				// of produce so that there is only one outstanding Produce request at any given
-				// time. A few notes:
+				// time. In addition, to ensure that the combination of this goroutine and retries
+				// (caused by calling sendResponse() with an error) doesn't lead to concurrent
+				// requests, we handle all the retries locally here.
+				//
+				// A few notes:
 				//
 				// 1. We shouldn't *have* to do this since that is what p.conf.Net.MaxOpenRequests
 				//    is for. However, as noted in the comments of the P.R that introduced pipeline
@@ -867,14 +871,23 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 				//    that happened to work because there was no request pipelining and the best path
 				//    forward is to just make sure there is no request pipelining when strict ordering
 				//    is required.
-				resp, err := broker.Produce(request)
-				if err != nil {
-					// Request failed to be sent
-					sendResponse(nil, err)
-					continue
+				var (
+					resp    *ProduceResponse
+					lastErr error
+				)
+				for i := 0; i < p.conf.Producer.Retry.Max; i++ {
+					resp, lastErr = broker.Produce(request)
+					if lastErr != nil {
+						// Request failed to be sent. Try again.
+						continue
+					}
+
+					break
 				}
-				// Callback is not called when using NoResponse
-				if p.conf.Producer.RequiredAcks == NoResponse {
+
+				if lastErr != nil {
+					sendResponse(nil, lastErr)
+				} else if p.conf.Producer.RequiredAcks == NoResponse {
 					// Provide the expected nil response
 					sendResponse(nil, nil)
 				} else {
