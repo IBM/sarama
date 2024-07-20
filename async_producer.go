@@ -1436,7 +1436,6 @@ func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
 		p.bumpIdempotentProducerEpoch()
 	}
 
-	msg.clear()
 	pErr := &ProducerError{Msg: msg, Err: err}
 	if p.conf.Producer.Return.Errors {
 		p.errors <- pErr
@@ -1455,7 +1454,6 @@ func (p *asyncProducer) returnErrors(batch []*ProducerMessage, err error) {
 func (p *asyncProducer) returnSuccesses(batch []*ProducerMessage) {
 	for _, msg := range batch {
 		if p.conf.Producer.Return.Successes {
-			msg.clear()
 			p.successes <- msg
 		}
 		p.inFlight.Done()
