@@ -250,6 +250,16 @@ func (pe ProducerError) Unwrap() error {
 type ProducerErrors []*ProducerError
 
 func (pe ProducerErrors) Error() string {
+	if len(pe) > 0 {
+		return fmt.Sprintf(
+			"kafka: Failed to deliver %d messages, sample error: %v after %d retries on topic: %s and partition: %d",
+			len(pe),
+			pe[0].Err,
+			pe[0].Msg.retries,
+			pe[0].Msg.Topic,
+			pe[0].Msg.Partition,
+		)
+	}
 	return fmt.Sprintf("kafka: Failed to deliver %d messages.", len(pe))
 }
 
