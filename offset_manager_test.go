@@ -82,6 +82,9 @@ func TestNewOffsetManager(t *testing.T) {
 	metadataResponse := new(MetadataResponse)
 	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
 	seedBroker.Returns(metadataResponse)
+	findCoordResponse := new(FindCoordinatorResponse)
+	findCoordResponse.Coordinator = &Broker{id: seedBroker.brokerID, addr: seedBroker.Addr()}
+	seedBroker.Returns(findCoordResponse)
 	defer seedBroker.Close()
 
 	testClient, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
