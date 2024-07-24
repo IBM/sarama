@@ -294,7 +294,7 @@ func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCom
 	if err != nil {
 		return nil, nil, err
 	}
-	return resp, promise, err
+	return resp, promise, nil
 }
 
 func (om *offsetManager) constructRequest() *OffsetCommitRequest {
