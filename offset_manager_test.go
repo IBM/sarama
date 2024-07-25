@@ -110,23 +110,22 @@ func TestNewOffsetManager(t *testing.T) {
 // Test that the correct sequence of offset commit messages is sent to a broker when
 // multiple goroutines for a group are committing offsets at the same time
 func TestOffsetManagerCommitSequence(t *testing.T) {
-	mu := &sync.Mutex{}
 	lastOffset := map[int32]int64{}
-	outOfOrder := ""
+	var outOfOrder atomic.Pointer[string]
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
 	seedBroker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
-		"MetadataRequest": func(req *request) (rest encoderWithHeader) {
+		"MetadataRequest": func(req *request) encoderWithHeader {
 			resp := new(MetadataResponse)
 			resp.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
 			return resp
 		},
-		"FindCoordinatorRequest": func(req *request) (rest encoderWithHeader) {
+		"FindCoordinatorRequest": func(req *request) encoderWithHeader {
 			resp := new(FindCoordinatorResponse)
 			resp.Coordinator = &Broker{id: seedBroker.brokerID, addr: seedBroker.Addr()}
 			return resp
 		},
-		"OffsetFetchRequest": func(r *request) (rest encoderWithHeader) {
+		"OffsetFetchRequest": func(r *request) encoderWithHeader {
 			req := r.body.(*OffsetFetchRequest)
 			resp := new(OffsetFetchResponse)
 			resp.Blocks = map[string]map[int32]*OffsetFetchResponseBlock{}
@@ -143,23 +142,19 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 			}
 			return resp
 		},
-		"OffsetCommitRequest": func(r *request) (rest encoderWithHeader) {
+		"OffsetCommitRequest": func(r *request) encoderWithHeader {
 			req := r.body.(*OffsetCommitRequest)
-			func() {
-				mu.Lock()
-				defer mu.Unlock()
-				if outOfOrder == "" {
-					for partition, offset := range req.blocks["topic"] {
-						last := lastOffset[partition]
-						if last > offset.offset {
-							outOfOrder =
-								fmt.Sprintf("out of order commit to partition %d, current committed offset: %d, offset in request: %d",
-									partition, last, offset.offset)
-						}
-						lastOffset[partition] = offset.offset
+			if outOfOrder.Load() == nil {
+				for partition, offset := range req.blocks["topic"] {
+					last := lastOffset[partition]
+					if last > offset.offset {
+						msg := fmt.Sprintf("out of order commit to partition %d, current committed offset: %d, offset in request: %d",
+							partition, last, offset.offset)
+						outOfOrder.Store(&msg)
 					}
+					lastOffset[partition] = offset.offset
 				}
-			}()
+			}
 
 			// Potentially yield, to try and avoid each Go routine running sequentially to completion
 			runtime.Gosched()
@@ -180,18 +175,18 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 	defer safeClose(t, testClient)
 	om, err := NewOffsetManagerFromClient("group", testClient)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 	defer safeClose(t, om)
 
 	const numPartitions = 10
 	const commitsPerPartition = 1000
 
-	wg := &sync.WaitGroup{}
+	var wg sync.WaitGroup
 	for p := 0; p < numPartitions; p++ {
 		pom, err := om.ManagePartition("topic", int32(p))
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
 		}
 
 		wg.Add(1)
@@ -205,10 +200,9 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 	}
 
 	wg.Wait()
-	mu.Lock()
-	defer mu.Unlock()
-	if outOfOrder != "" {
-		t.Error(outOfOrder)
+	errMsg := outOfOrder.Load()
+	if errMsg != nil {
+		t.Error(*errMsg)
 	}
 }
 
