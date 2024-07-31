@@ -304,6 +304,8 @@ type Config struct {
 				Interval time.Duration
 			}
 			Rebalance struct {
+				// IsIncremental to allow don't stopping the rebalance process when a new member joins the group.
+				IsIncremental bool
 				// Strategy for allocating topic partitions to members.
 				// Deprecated: Strategy exists for historical compatibility
 				// and should not be used. Please use GroupStrategies.
