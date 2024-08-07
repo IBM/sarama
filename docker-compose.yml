@@ -1,4 +1,3 @@
-version: '3.9'
 services:
   zookeeper-1:
     hostname: 'zookeeper-1'
