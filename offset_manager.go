@@ -251,18 +251,23 @@ func (om *offsetManager) Commit() {
 }
 
 func (om *offsetManager) flushToBroker() {
-	req := om.constructRequest()
-	if req == nil {
-		return
-	}
-
 	broker, err := om.coordinator()
 	if err != nil {
 		om.handleError(err)
 		return
 	}
 
-	resp, err := broker.CommitOffset(req)
+	// Care needs to be taken to unlock this. Don't want to defer the unlock as this would
+	// cause the lock to be held while waiting for the broker to reply.
+	broker.lock.Lock()
+	req := om.constructRequest()
+	if req == nil {
+		broker.lock.Unlock()
+		return
+	}
+	resp, rp, err := sendOffsetCommit(broker, req)
+	broker.lock.Unlock()
+
 	if err != nil {
 		om.handleError(err)
 		om.releaseCoordinator(broker)
@@ -270,7 +275,26 @@ func (om *offsetManager) flushToBroker() {
 		return
 	}
 
+	err = handleResponsePromise(req, resp, rp, nil)
+	if err != nil {
+		om.handleError(err)
+		om.releaseCoordinator(broker)
+		_ = broker.Close()
+		return
+	}
+
+	broker.handleThrottledResponse(resp)
 	om.handleResponse(broker, req, resp)
+}
+
+func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCommitResponse, *responsePromise, error) {
+	resp := new(OffsetCommitResponse)
+	responseHeaderVersion := resp.headerVersion()
+	promise, err := coordinator.send(req, true, responseHeaderVersion)
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp, promise, nil
 }
 
 func (om *offsetManager) constructRequest() *OffsetCommitRequest {
