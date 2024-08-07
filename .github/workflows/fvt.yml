@@ -50,8 +50,8 @@ jobs:
         go-version: ${{ inputs.go-version }}
     - name: Setup Docker Compose
       run: |
-        curl -sSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
-        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker-compose))"
+        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.29.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker))"
         docker version --format 'Docker Engine version v{{.Server.Version}}'
         docker-compose version
     - name: Test (Functional)
