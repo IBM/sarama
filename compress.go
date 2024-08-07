@@ -103,6 +103,11 @@ var (
 			return gz
 		},
 	}
+	bufPool = sync.Pool{
+		New: func() interface{} {
+			return new(bytes.Buffer)
+		},
+	}
 )
 
 func compress(cc CompressionCodec, level int, data []byte) ([]byte, error) {
@@ -188,6 +193,22 @@ func compress(cc CompressionCodec, level int, data []byte) ([]byte, error) {
 		return buf.Bytes(), nil
 	case CompressionZSTD:
 		return zstdCompress(ZstdEncoderParams{level}, nil, data)
+	case CompressionGzipRefactor:
+		buf := bufPool.Get().(*bytes.Buffer)
+		defer bufPool.Put(buf)
+		buf.Reset()
+
+		writer := gzipWriterPool.Get().(*gzip.Writer)
+		defer gzipWriterPool.Put(writer)
+		writer.Reset(buf)
+
+		if _, err := writer.Write(data); err != nil {
+			return nil, err
+		}
+		if err := writer.Close(); err != nil {
+			return nil, err
+		}
+		return buf.Bytes(), nil
 	default:
 		return nil, PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", cc)}
 	}

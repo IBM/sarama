@@ -17,6 +17,8 @@ const (
 	// CompressionZSTD compression using ZSTD
 	CompressionZSTD
 
+	CompressionGzipRefactor
+
 	// The lowest 3 bits contain the compression codec used for the message
 	compressionCodecMask int8 = 0x07
 
