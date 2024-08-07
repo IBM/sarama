@@ -175,6 +175,11 @@ type Config struct {
 		// The maximum permitted size of a message (defaults to 1000000). Should be
 		// set equal to or smaller than the broker's `message.max.bytes`.
 		MaxMessageBytes int
+		// If set don't check the uncompressed size of an individual message against
+		// MaxMessageBytes. MaxMessageBytes is still used to attempt to limit the
+		// overall message batch size (which applies after a set of messages is
+		// compressed)
+		SkipPerMessageSizeTest bool
 		// The level of acknowledgement reliability needed from the broker (defaults
 		// to WaitForLocal). Equivalent to the `request.required.acks` setting of the
 		// JVM producer.
