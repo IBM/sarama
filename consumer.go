@@ -876,6 +876,25 @@ func (c *consumer) newBrokerConsumer(broker *Broker) *brokerConsumer {
 	return bc
 }
 
+func (c *consumer) collectPausedPartitions(revokedPartitions map[string][]int32) []string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
+	var pausedPartitions []string
+	for topic, partitions := range revokedPartitions {
+		for _, partition := range partitions {
+			if topicConsumers, ok := c.children[topic]; ok {
+				if partitionConsumer, ok := topicConsumers[partition]; ok {
+					if partitionConsumer.IsPaused() {
+						pausedPartitions = append(pausedPartitions, fmt.Sprintf("%s/%d", topic, partition))
+					}
+				}
+			}
+		}
+	}
+	return pausedPartitions
+}
+
 // The subscriptionManager constantly accepts new subscriptions on `input` (even when the main subscriptionConsumer
 // goroutine is in the middle of a network request) and batches it up. The main worker goroutine picks
 // up a batch of new subscriptions between every network request by reading from `newSubscriptions`, so we give

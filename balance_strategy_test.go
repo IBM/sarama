@@ -197,14 +197,14 @@ func TestBalanceStrategyRoundRobin(t *testing.T) {
 	}
 }
 
-func Test_deserializeTopicPartitionAssignment(t *testing.T) {
+func Test_deserializeStickyUserData(t *testing.T) {
 	type args struct {
 		userDataBytes []byte
 	}
 	tests := []struct {
 		name    string
 		args    args
-		want    StickyAssignorUserData
+		want    MemberData
 		wantErr bool
 	}{
 		{
@@ -271,16 +271,20 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := deserializeTopicPartitionAssignment(tt.args.userDataBytes)
+			got, err := deserializeStickyUserData(tt.args.userDataBytes)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("deserializeTopicPartitionAssignment() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("deserializeStickyUserData() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("deserializeTopicPartitionAssignment() = %v, want %v", got, tt.want)
+				t.Errorf("deserializeStickyUserData() = %v, want %v", got, tt.want)
 			}
 		})
 	}
+}
+
+func Test_deserializeCooperativeStickyUserData(t *testing.T) {
+	// todo: add unit test
 }
 
 func TestBalanceStrategyRoundRobinAssignmentData(t *testing.T) {
@@ -443,14 +447,15 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			_, gotPrevAssignments, err := prepopulateCurrentAssignments(tt.args.members)
+			s := &stickyBalanceStrategy{}
+			_, gotPrevAssignments, err := s.prepopulateCurrentAssignments(tt.args.members)
 
 			if (err != nil) != tt.wantErr {
 				t.Errorf("prepopulateCurrentAssignments() error = %v, wantErr %v", err, tt.wantErr)
 			}
 
 			if !reflect.DeepEqual(gotPrevAssignments, tt.wantPrevAssignments) {
-				t.Errorf("deserializeTopicPartitionAssignment() prevAssignments = %v, want %v", gotPrevAssignments, tt.wantPrevAssignments)
+				t.Errorf("deserializeStickyUserData() prevAssignments = %v, want %v", gotPrevAssignments, tt.wantPrevAssignments)
 			}
 		})
 	}
