@@ -450,9 +450,8 @@ func (p *asyncProducer) dispatcher() {
 			continue
 		}
 
-		size := msg.ByteSize(version)
-		if size > p.conf.Producer.MaxMessageBytes {
-			p.returnError(msg, ConfigurationError(fmt.Sprintf("Attempt to produce message larger than configured Producer.MaxMessageBytes: %d > %d", size, p.conf.Producer.MaxMessageBytes)))
+		if msg.ByteSize(version) > p.conf.Producer.MaxMessageBytes {
+			p.returnError(msg, ErrMessageSizeTooLarge)
 			continue
 		}
 

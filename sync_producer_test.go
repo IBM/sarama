@@ -52,6 +52,35 @@ func TestSyncProducer(t *testing.T) {
 		}
 	}
 
+	// try to send a message too large
+	_, _, err = producer.SendMessage(&ProducerMessage{
+		Topic:    "my_topic",
+		Value:    ByteEncoder(make([]byte, config.Producer.MaxMessageBytes+1)), // will exceed default max size, e.g. configuration side
+		Metadata: "test",
+	})
+	if err != ErrMessageSizeTooLarge { //nolint:errorlint // linter complains that we use errors.Is(), but we know code bases out there don't, so this test is specifically to test that we don't wrap this
+		t.Error("expected err to be ErrMessageSizeTooLarge - many people rely on this, please do not change without searching for previous discussions")
+	}
+
+	// try to send small message the server rejects because too large
+	leader.Returns(&ProduceResponse{
+		Blocks: map[string]map[int32]*ProduceResponseBlock{
+			"my_topic": {
+				0: &ProduceResponseBlock{
+					Err: ErrMessageSizeTooLarge,
+				},
+			},
+		},
+	})
+	_, _, err = producer.SendMessage(&ProducerMessage{
+		Topic:    "my_topic",
+		Value:    StringEncoder(TestMessage),
+		Metadata: "test",
+	})
+	if err != ErrMessageSizeTooLarge { //nolint:errorlint // linter complains that we use errors.Is(), but we know code bases out there don't, so this test is specifically to test that we don't wrap this
+		t.Error("expected err to be ErrMessageSizeTooLarge - many people rely on this, please do not change without searching for previous discussions")
+	}
+
 	safeClose(t, producer)
 	leader.Close()
 	seedBroker.Close()
