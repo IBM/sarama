@@ -28,6 +28,6 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@0c52d547c9bc32b1aa3301fd7a9cb496313a4491 # v5.0.0
       with:
-        go-version: 1.22.x
+        go-version: 1.23.x
     - name: Run any fuzzing tests
       run: go test -list . | grep '^Fuzz' | parallel 'go test -v -run=^{}$ -fuzz=^{}$ -fuzztime=5m'

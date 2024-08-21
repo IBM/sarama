@@ -5,11 +5,11 @@ on:
       go-version:
         required: false
         type: string
-        default: 1.22.x
+        default: 1.23.x
       kafka-version:
         required: false
         type: string
-        default: 3.6.0
+        default: 3.6.2
       scala-version:
         required: false
         type: string
