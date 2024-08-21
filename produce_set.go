@@ -66,12 +66,13 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 	if set == nil {
 		if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 			batch := &RecordBatch{
-				FirstTimestamp:   timestamp,
-				Version:          2,
-				Codec:            ps.parent.conf.Producer.Compression,
-				CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
-				ProducerID:       ps.producerID,
-				ProducerEpoch:    ps.producerEpoch,
+				FirstTimestamp:                 timestamp,
+				Version:                        2,
+				Codec:                          ps.parent.conf.Producer.Compression,
+				CompressionLevel:               ps.parent.conf.Producer.CompressionLevel,
+				MaxBufferedCompressionEncoders: ps.parent.conf.Producer.MaxBufferedCompressionEncoders,
+				ProducerID:                     ps.producerID,
+				ProducerEpoch:                  ps.producerEpoch,
 			}
 			if ps.parent.conf.Producer.Idempotent {
 				batch.FirstSequence = msg.sequenceNumber
@@ -199,11 +200,12 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					panic(err)
 				}
 				compMsg := &Message{
-					Codec:            ps.parent.conf.Producer.Compression,
-					CompressionLevel: ps.parent.conf.Producer.CompressionLevel,
-					Key:              nil,
-					Value:            payload,
-					Set:              set.recordsToSend.MsgSet, // Provide the underlying message set for accurate metrics
+					Codec:                          ps.parent.conf.Producer.Compression,
+					CompressionLevel:               ps.parent.conf.Producer.CompressionLevel,
+					MaxBufferedCompressionEncoders: ps.parent.conf.Producer.MaxBufferedCompressionEncoders,
+					Key:                            nil,
+					Value:                          payload,
+					Set:                            set.recordsToSend.MsgSet, // Provide the underlying message set for accurate metrics
 				}
 				if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 					compMsg.Version = 1

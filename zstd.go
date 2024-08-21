@@ -8,11 +8,13 @@ import (
 
 // zstdMaxBufferedEncoders maximum number of not-in-use zstd encoders
 // If the pool of encoders is exhausted then new encoders will be created on the fly
-const zstdMaxBufferedEncoders = 1
+var zstdMaxBufferedEncoders int
 
 type ZstdEncoderParams struct {
-	Level int
+	Level               int
+	MaxBufferedEncoders int
 }
+
 type ZstdDecoderParams struct {
 }
 
@@ -20,11 +22,18 @@ var zstdDecMap sync.Map
 
 var zstdAvailableEncoders sync.Map
 
+func getZstdMaxBufferedEncoders(params ZstdEncoderParams) int {
+	if params.MaxBufferedEncoders > 0 {
+		return params.MaxBufferedEncoders
+	}
+	return 1
+}
+
 func getZstdEncoderChannel(params ZstdEncoderParams) chan *zstd.Encoder {
-	if c, ok := zstdAvailableEncoders.Load(params); ok {
+	if c, ok := zstdAvailableEncoders.Load(params.Level); ok {
 		return c.(chan *zstd.Encoder)
 	}
-	c, _ := zstdAvailableEncoders.LoadOrStore(params, make(chan *zstd.Encoder, zstdMaxBufferedEncoders))
+	c, _ := zstdAvailableEncoders.LoadOrStore(params.Level, make(chan *zstd.Encoder, getZstdMaxBufferedEncoders(params)))
 	return c.(chan *zstd.Encoder)
 }
 

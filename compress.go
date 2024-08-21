@@ -105,7 +105,7 @@ var (
 	}
 )
 
-func compress(cc CompressionCodec, level int, data []byte) ([]byte, error) {
+func compress(cc CompressionCodec, level int, maxEncoders int, data []byte) ([]byte, error) {
 	switch cc {
 	case CompressionNone:
 		return data, nil
@@ -187,7 +187,7 @@ func compress(cc CompressionCodec, level int, data []byte) ([]byte, error) {
 		}
 		return buf.Bytes(), nil
 	case CompressionZSTD:
-		return zstdCompress(ZstdEncoderParams{level}, nil, data)
+		return zstdCompress(ZstdEncoderParams{Level: level, MaxBufferedEncoders: maxEncoders}, nil, data)
 	default:
 		return nil, PacketEncodingError{fmt.Sprintf("unsupported compression codec (%d)", cc)}
 	}

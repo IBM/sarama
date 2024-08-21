@@ -66,14 +66,15 @@ func (cc CompressionCodec) MarshalText() ([]byte, error) {
 
 // Message is a kafka message type
 type Message struct {
-	Codec            CompressionCodec // codec used to compress the message contents
-	CompressionLevel int              // compression level
-	LogAppendTime    bool             // the used timestamp is LogAppendTime
-	Key              []byte           // the message key, may be nil
-	Value            []byte           // the message contents
-	Set              *MessageSet      // the message set a message might wrap
-	Version          int8             // v1 requires Kafka 0.10
-	Timestamp        time.Time        // the timestamp of the message (version 1+ only)
+	Codec                          CompressionCodec // codec used to compress the message contents
+	CompressionLevel               int              // compression level
+	MaxBufferedCompressionEncoders int              // pool size of encoders
+	LogAppendTime                  bool             // the used timestamp is LogAppendTime
+	Key                            []byte           // the message key, may be nil
+	Value                          []byte           // the message contents
+	Set                            *MessageSet      // the message set a message might wrap
+	Version                        int8             // v1 requires Kafka 0.10
+	Timestamp                      time.Time        // the timestamp of the message (version 1+ only)
 
 	compressedCache []byte
 	compressedSize  int // used for computing the compression ratio metrics
@@ -107,7 +108,7 @@ func (m *Message) encode(pe packetEncoder) error {
 		payload = m.compressedCache
 		m.compressedCache = nil
 	} else if m.Value != nil {
-		payload, err = compress(m.Codec, m.CompressionLevel, m.Value)
+		payload, err = compress(m.Codec, m.CompressionLevel, m.MaxBufferedCompressionEncoders, m.Value)
 		if err != nil {
 			return err
 		}
