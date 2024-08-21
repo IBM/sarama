@@ -16,7 +16,7 @@ func zstdMaxBufferedEncoders(maxBufferedEncoders int) int {
 }
 
 type ZstdEncoderParams struct {
-	Level               int
+	Level int
 }
 
 type ZstdDecoderParams struct {
