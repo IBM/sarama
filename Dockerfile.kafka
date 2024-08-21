@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10@sha256:de2a0a20c1c3b39c3de829196de9694d09f97cd18fda1004de855ed2b4c841ba
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10@sha256:5c6982aca8a8fdbc3ce304bc46e28c6a30572d6791ebd13968da197e75e4f042
 
 USER root
 
