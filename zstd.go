@@ -43,7 +43,6 @@ func newZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
 }
 
 func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
-
 	zstdMutex.Lock()
 	defer zstdMutex.Unlock()
 
