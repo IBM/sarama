@@ -248,7 +248,7 @@ func TestRecordBatchDecoding(t *testing.T) {
 		// anyway. We only set it here to ensure that comparison succeeds.
 		batch.CompressionLevel = tc.batch.CompressionLevel
 		if !reflect.DeepEqual(batch, tc.batch) {
-			t.Errorf(spew.Sprintf("invalid decode of %s\ngot %+v\nwanted %+v", tc.name, batch, tc.batch))
+			t.Error(spew.Sprintf("invalid decode of %s\ngot %+v\nwanted %+v", tc.name, batch, tc.batch))
 		}
 	}
 }

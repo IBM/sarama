@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.9@sha256:f30dbf77b075215f6c827c269c073b5e0973e5cea8dacdf7ecb6a19c868f37f2
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10@sha256:5c6982aca8a8fdbc3ce304bc46e28c6a30572d6791ebd13968da197e75e4f042
 
 USER root
 
@@ -19,7 +19,7 @@ RUN cd /etc/java/java-11-openjdk/*/conf/security \
 ARG SCALA_VERSION="2.13"
 ARG KAFKA_VERSION="3.6.0"
 
-# https://github.com/apache/kafka/blob/9989b68d0d38c8f1357f78bf9d53a58c1476188d/tests/docker/Dockerfile#L46-L72
+# https://github.com/apache/kafka/blob/0eaaff88cf68bc2c24d4874ff9bc1cc2b493c24b/tests/docker/Dockerfile#L75-L103
 ARG KAFKA_MIRROR="https://s3-us-west-2.amazonaws.com/kafka-packages"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN mkdir -p "/opt/kafka-${KAFKA_VERSION}" \

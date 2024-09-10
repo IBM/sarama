@@ -5,11 +5,11 @@ on:
       go-version:
         required: false
         type: string
-        default: 1.22.x
+        default: 1.23.x
       kafka-version:
         required: false
         type: string
-        default: 3.6.0
+        default: 3.6.2
       scala-version:
         required: false
         type: string
@@ -28,11 +28,11 @@ jobs:
       KAFKA_VERSION: ${{ inputs.kafka-version }}
       SCALA_VERSION: ${{ inputs.scala-version }}
     steps:
-    - uses: actions/checkout@0ad4b8fadaa221de15dcec353f45205ec38ea70b # v4.1.4
+    - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       with:
         persist-credentials: false
     - name: Setup Docker
-      uses: docker/setup-buildx-action@d70bba72b1f3fd22344832f00baa16ece964efeb # v3.3.0
+      uses: docker/setup-buildx-action@988b5a0280414f521da01fcc63a27aeeb4b104db # v3.6.1
       id: buildx
     - name: Build FVT Docker Image
       uses: docker/bake-action@33a1cc61dab930ceab0181de8cdc34a8cc55e61d # master
@@ -50,8 +50,8 @@ jobs:
         go-version: ${{ inputs.go-version }}
     - name: Setup Docker Compose
       run: |
-        curl -sSL "https://github.com/docker/compose/releases/download/v2.20.3/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
-        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker-compose))"
+        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.29.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker))"
         docker version --format 'Docker Engine version v{{.Server.Version}}'
         docker-compose version
     - name: Test (Functional)
@@ -66,7 +66,7 @@ jobs:
         if [ -f "fvt-kafka-${{ inputs.kafka-version }}.pcap" ]; then sudo chmod a+r "fvt-kafka-${{ inputs.kafka-version }}.pcap"; fi
     - name: Upload pcap file
       if: always()
-      uses: actions/upload-artifact@65462800fd760344b1a7b4382951275a0abb4808 # v4.3.3
+      uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.6
       with:
         name: fvt-kafka-${{ inputs.kafka-version }}.pcap
         path: fvt-kafka-${{ inputs.kafka-version }}.pcap

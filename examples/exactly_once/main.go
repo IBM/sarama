@@ -26,6 +26,7 @@ var (
 	destinationTopic = ""
 	oldest           = true
 	verbose          = false
+	assignor         = ""
 )
 
 func init() {
