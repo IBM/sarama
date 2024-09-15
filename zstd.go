@@ -38,6 +38,9 @@ func newZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
 	}
 	zstdEnc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
 		zstd.WithEncoderLevel(encoderLevel),
+		// 1MB is the default max message size in Kafka. We will usually not see messages larger than this.
+		// This results in a ~20% performance boost on high compression levels.
+		zstd.WithWindowSize(1024*1024),
 		zstd.WithEncoderConcurrency(1))
 	return zstdEnc
 }
