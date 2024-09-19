@@ -192,6 +192,8 @@ type Config struct {
 		// on the actual compression type used and defaults to default compression
 		// level for the codec.
 		CompressionLevel int
+		// The pool size of encoders used during compression
+		MaxBufferedCompressionEncoders int
 		// Generates partitioners for choosing the partition to send messages to
 		// (defaults to hashing the message key). Similar to the `partitioner.class`
 		// setting for the JVM producer.
@@ -531,6 +533,7 @@ func NewConfig() *Config {
 	c.Producer.Retry.Backoff = 100 * time.Millisecond
 	c.Producer.Return.Errors = true
 	c.Producer.CompressionLevel = CompressionLevelDefault
+	c.Producer.MaxBufferedCompressionEncoders = 1
 
 	c.Producer.Transaction.Timeout = 1 * time.Minute
 	c.Producer.Transaction.Retry.Max = 50
