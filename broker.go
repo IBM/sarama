@@ -1426,9 +1426,6 @@ func (b *Broker) sendAndReceiveSASLPlainAuthV0() error {
 func (b *Broker) sendAndReceiveSASLPlainAuthV1(authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error)) error {
 	authBytes := []byte(b.conf.Net.SASL.AuthIdentity + "\x00" + b.conf.Net.SASL.User + "\x00" + b.conf.Net.SASL.Password)
 	_, err := authSendReceiver(authBytes)
-	if err != nil {
-		return err
-	}
 	return err
 }
 
