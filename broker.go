@@ -243,9 +243,9 @@ func (b *Broker) Open(conf *Config) error {
 			if b.connErr != nil {
 				err = b.conn.Close()
 				if err == nil {
-					DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
+					DebugLogger.Printf("Closed connection to broker %s due to SASL v0 auth error: %s\n", b.addr, b.connErr)
 				} else {
-					Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
+					Logger.Printf("Error while closing connection to broker %s (due to SASL v0 auth error: %s): %s\n", b.addr, b.connErr, err)
 				}
 				b.conn = nil
 				atomic.StoreInt32(&b.opened, 0)
@@ -264,9 +264,9 @@ func (b *Broker) Open(conf *Config) error {
 				<-b.done
 				err = b.conn.Close()
 				if err == nil {
-					DebugLogger.Printf("Closed connection to broker %s\n", b.addr)
+					DebugLogger.Printf("Closed connection to broker %s due to SASL v1 auth error: %s\n", b.addr, b.connErr)
 				} else {
-					Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
+					Logger.Printf("Error while closing connection to broker %s (due to SASL v1 auth error: %s): %s\n", b.addr, b.connErr, err)
 				}
 				b.conn = nil
 				atomic.StoreInt32(&b.opened, 0)
@@ -1242,12 +1242,12 @@ func (b *Broker) authenticateViaSASLv1() error {
 
 		handshakeErr := b.sendInternal(handshakeRequest, prom)
 		if handshakeErr != nil {
-			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+			Logger.Printf("Error while performing SASL handshake %s: %s\n", b.addr, handshakeErr)
 			return handshakeErr
 		}
 		handshakeErr = handleResponsePromise(handshakeRequest, handshakeResponse, prom, metricRegistry)
 		if handshakeErr != nil {
-			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+			Logger.Printf("Error while handling SASL handshake response %s: %s\n", b.addr, handshakeErr)
 			return handshakeErr
 		}
 
@@ -1267,7 +1267,7 @@ func (b *Broker) authenticateViaSASLv1() error {
 		}
 		authErr = handleResponsePromise(authenticateRequest, authenticateResponse, prom, metricRegistry)
 		if authErr != nil {
-			Logger.Printf("Error while performing SASL Auth %s\n", b.addr)
+			Logger.Printf("Error while performing SASL Auth %s: %s\n", b.addr, authErr)
 			return nil, authErr
 		}
 
@@ -1385,7 +1385,7 @@ func (b *Broker) sendAndReceiveSASLPlainAuthV0() error {
 	if b.conf.Net.SASL.Handshake {
 		handshakeErr := b.sendAndReceiveSASLHandshake(SASLTypePlaintext, b.conf.Net.SASL.Version)
 		if handshakeErr != nil {
-			Logger.Printf("Error while performing SASL handshake %s\n", b.addr)
+			Logger.Printf("Error while performing SASL handshake %s: %s\n", b.addr, handshakeErr)
 			return handshakeErr
 		}
 	}
