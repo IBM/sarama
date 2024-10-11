@@ -31,22 +31,23 @@ func (e recordsArray) decode(pd packetDecoder) error {
 }
 
 type RecordBatch struct {
-	FirstOffset           int64
-	PartitionLeaderEpoch  int32
-	Version               int8
-	Codec                 CompressionCodec
-	CompressionLevel      int
-	Control               bool
-	LogAppendTime         bool
-	LastOffsetDelta       int32
-	FirstTimestamp        time.Time
-	MaxTimestamp          time.Time
-	ProducerID            int64
-	ProducerEpoch         int16
-	FirstSequence         int32
-	Records               []*Record
-	PartialTrailingRecord bool
-	IsTransactional       bool
+	FirstOffset                    int64
+	PartitionLeaderEpoch           int32
+	Version                        int8
+	Codec                          CompressionCodec
+	CompressionLevel               int
+	MaxBufferedCompressionEncoders int
+	Control                        bool
+	LogAppendTime                  bool
+	LastOffsetDelta                int32
+	FirstTimestamp                 time.Time
+	MaxTimestamp                   time.Time
+	ProducerID                     int64
+	ProducerEpoch                  int16
+	FirstSequence                  int32
+	Records                        []*Record
+	PartialTrailingRecord          bool
+	IsTransactional                bool
 
 	compressedRecords []byte
 	recordsLen        int // uncompressed records size
@@ -203,7 +204,7 @@ func (b *RecordBatch) encodeRecords(pe packetEncoder) error {
 	}
 	b.recordsLen = len(raw)
 
-	b.compressedRecords, err = compress(b.Codec, b.CompressionLevel, raw)
+	b.compressedRecords, err = compress(b.Codec, b.CompressionLevel, b.MaxBufferedCompressionEncoders, raw)
 	return err
 }
 
