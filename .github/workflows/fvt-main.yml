@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.23.x]
-        kafka-version: [1.0.2, 2.0.1, 2.2.2, 2.6.2, 2.8.2, 3.0.2, 3.3.2, 3.6.2, 3.8.0]
+        kafka-version: [1.0.2, 2.0.1, 2.2.2, 2.6.2, 2.8.2, 3.0.2, 3.3.2, 3.6.2, 3.8.1]
         include:
         - kafka-version: 1.0.2
           scala-version: 2.11
