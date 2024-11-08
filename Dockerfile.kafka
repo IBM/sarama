@@ -17,9 +17,9 @@ RUN cd /etc/java/java-11-openjdk/*/conf/security \
  && echo 'networkaddress.cache.negative.ttl=0' >> java.security
 
 ARG SCALA_VERSION="2.13"
-ARG KAFKA_VERSION="3.6.0"
+ARG KAFKA_VERSION="3.6.2"
 
-# https://github.com/apache/kafka/blob/0eaaff88cf68bc2c24d4874ff9bc1cc2b493c24b/tests/docker/Dockerfile#L75-L103
+# https://github.com/apache/kafka/blob/2e2b0a58eda3e677763af974a44a6aaa3c280214/tests/docker/Dockerfile#L77-L105
 ARG KAFKA_MIRROR="https://s3-us-west-2.amazonaws.com/kafka-packages"
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 RUN mkdir -p "/opt/kafka-${KAFKA_VERSION}" \

@@ -16,7 +16,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.23.x]
-        kafka-version: [1.0.2, 2.6.2, 3.6.2, 3.8.0]
+        kafka-version: [1.0.2, 2.6.2, 3.6.2, 3.8.1]
         include:
         - kafka-version: 1.0.2
           scala-version: 2.11
@@ -24,7 +24,7 @@ jobs:
           scala-version: 2.12
         - kafka-version: 3.6.2
           scala-version: 2.13
-        - kafka-version: 3.8.0
+        - kafka-version: 3.8.1
           scala-version: 2.13
     uses: ./.github/workflows/fvt.yml
     with:
