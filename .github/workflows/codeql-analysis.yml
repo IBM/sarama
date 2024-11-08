@@ -31,7 +31,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Initialize CodeQL
-      uses: github/codeql-action/init@eb055d739abdc2e8de2e5f4ba1a8b246daa779aa # v3.26.0
+      uses: github/codeql-action/init@662472033e021d55d94146f66f6058822b0b39fd # v3.27.0
       with:
         languages: ${{ matrix.language }}
     - name: Setup Go
@@ -39,6 +39,6 @@ jobs:
       with:
         go-version: 1.23.x
     - name: Autobuild
-      uses: github/codeql-action/autobuild@eb055d739abdc2e8de2e5f4ba1a8b246daa779aa # v3.26.0
+      uses: github/codeql-action/autobuild@662472033e021d55d94146f66f6058822b0b39fd # v3.27.0
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@eb055d739abdc2e8de2e5f4ba1a8b246daa779aa # v3.26.0
+      uses: github/codeql-action/analyze@662472033e021d55d94146f66f6058822b0b39fd # v3.27.0
