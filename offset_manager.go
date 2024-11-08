@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -39,8 +40,8 @@ type offsetManager struct {
 	broker     *Broker
 	brokerLock sync.RWMutex
 
-	poms     map[string]map[int32]*partitionOffsetManager
 	pomsLock sync.RWMutex
+	poms     map[string]map[int32]*partitionOffsetManager
 
 	closeOnce sync.Once
 	closing   chan none
@@ -82,6 +83,12 @@ func newOffsetManagerFromClient(group, memberID string, generation int32, client
 	}
 
 	return om, nil
+}
+
+func (om *offsetManager) updateGeneration(generation int32) {
+	om.pomsLock.Lock()
+	defer om.pomsLock.Unlock()
+	om.generation = generation
 }
 
 func (om *offsetManager) ManagePartition(topic string, partition int32) (PartitionOffsetManager, error) {
@@ -269,7 +276,7 @@ func (om *offsetManager) flushToBroker() {
 	broker.lock.Unlock()
 
 	if err != nil {
-		om.handleError(err)
+		om.handleError(fmt.Errorf("%w failed to commit offset", err))
 		om.releaseCoordinator(broker)
 		_ = broker.Close()
 		return
@@ -645,7 +652,7 @@ func (pom *partitionOffsetManager) handleError(err error) {
 	cErr := &ConsumerError{
 		Topic:     pom.topic,
 		Partition: pom.partition,
-		Err:       err,
+		Err:       fmt.Errorf("%w partitionOffsetManager error", err),
 	}
 
 	if pom.parent.conf.Consumer.Return.Errors {
