@@ -8,11 +8,17 @@ import (
 
 // zstdMaxBufferedEncoders maximum number of not-in-use zstd encoders
 // If the pool of encoders is exhausted then new encoders will be created on the fly
-const zstdMaxBufferedEncoders = 1
+func zstdMaxBufferedEncoders(maxBufferedEncoders int) int {
+	if maxBufferedEncoders > 0 {
+		return maxBufferedEncoders
+	}
+	return 1
+}
 
 type ZstdEncoderParams struct {
 	Level int
 }
+
 type ZstdDecoderParams struct {
 }
 
@@ -20,17 +26,17 @@ var zstdDecMap sync.Map
 
 var zstdAvailableEncoders sync.Map
 
-func getZstdEncoderChannel(params ZstdEncoderParams) chan *zstd.Encoder {
+func getZstdEncoderChannel(params ZstdEncoderParams, maxBufferedEncoders int) chan *zstd.Encoder {
 	if c, ok := zstdAvailableEncoders.Load(params); ok {
 		return c.(chan *zstd.Encoder)
 	}
-	c, _ := zstdAvailableEncoders.LoadOrStore(params, make(chan *zstd.Encoder, zstdMaxBufferedEncoders))
+	c, _ := zstdAvailableEncoders.LoadOrStore(params, make(chan *zstd.Encoder, zstdMaxBufferedEncoders(maxBufferedEncoders)))
 	return c.(chan *zstd.Encoder)
 }
 
-func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
+func getZstdEncoder(params ZstdEncoderParams, maxBufferedEncoders int) *zstd.Encoder {
 	select {
-	case enc := <-getZstdEncoderChannel(params):
+	case enc := <-getZstdEncoderChannel(params, maxBufferedEncoders):
 		return enc
 	default:
 		encoderLevel := zstd.SpeedDefault
@@ -44,9 +50,9 @@ func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
 	}
 }
 
-func releaseEncoder(params ZstdEncoderParams, enc *zstd.Encoder) {
+func releaseEncoder(params ZstdEncoderParams, maxBufferedEncoders int, enc *zstd.Encoder) {
 	select {
-	case getZstdEncoderChannel(params) <- enc:
+	case getZstdEncoderChannel(params, maxBufferedEncoders) <- enc:
 	default:
 	}
 }
@@ -66,9 +72,9 @@ func zstdDecompress(params ZstdDecoderParams, dst, src []byte) ([]byte, error) {
 	return getDecoder(params).DecodeAll(src, dst)
 }
 
-func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {
-	enc := getZstdEncoder(params)
+func zstdCompress(params ZstdEncoderParams, maxBufferedEncoders int, dst, src []byte) ([]byte, error) {
+	enc := getZstdEncoder(params, maxBufferedEncoders)
 	out := enc.EncodeAll(src, dst)
-	releaseEncoder(params, enc)
+	releaseEncoder(params, maxBufferedEncoders, enc)
 	return out, nil
 }
