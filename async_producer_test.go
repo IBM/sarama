@@ -2244,6 +2244,82 @@ func TestTxnCanAbort(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestPreventRetryBufferOverflow(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+	topic := "test-topic"
+
+	metadataRequestHandlerFunc := func(req *request) (res encoderWithHeader) {
+		r := new(MetadataResponse)
+		r.AddBroker(broker.Addr(), broker.BrokerID())
+		r.AddTopicPartition(topic, 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+		return r
+	}
+
+	produceRequestHandlerFunc := func(req *request) (res encoderWithHeader) {
+		r := new(ProduceResponse)
+		r.AddTopicPartition(topic, 0, ErrNotLeaderForPartition)
+		return r
+	}
+
+	broker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"ProduceRequest":  produceRequestHandlerFunc,
+		"MetadataRequest": metadataRequestHandlerFunc,
+	})
+
+	config := NewTestConfig()
+	config.Producer.Flush.MaxMessages = 1
+	config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength
+	config.Producer.Return.Successes = true
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var (
+		wg                        sync.WaitGroup
+		successes, producerErrors int
+		errorFound                bool
+	)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for range producer.Successes() {
+			successes++
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for errMsg := range producer.Errors() {
+			if errors.Is(errMsg.Err, ErrProducerRetryBufferOverflow) {
+				errorFound = true
+			}
+			producerErrors++
+		}
+	}()
+
+	numMessages := 100000
+	for i := 0; i < numMessages; i++ {
+		kv := StringEncoder(strconv.Itoa(i))
+		producer.Input() <- &ProducerMessage{
+			Topic:    topic,
+			Key:      kv,
+			Value:    kv,
+			Metadata: i,
+		}
+	}
+
+	producer.AsyncClose()
+	wg.Wait()
+
+	require.Equal(t, successes+producerErrors, numMessages, "Expected all messages to be processed")
+	require.True(t, errorFound, "Expected at least one error matching ErrProducerRetryBufferOverflow")
+}
+
 // This example shows how to use the producer while simultaneously
 // reading the Errors channel to know about any failures.
 func ExampleAsyncProducer_select() {
