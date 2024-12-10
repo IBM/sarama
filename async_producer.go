@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"golang.org/x/sync/semaphore"
 	"math"
 	"sync"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/eapache/go-resiliency/breaker"
 	"github.com/eapache/queue"
 	"github.com/rcrowley/go-metrics"
+	"golang.org/x/sync/semaphore"
 )
 
 // AsyncProducer publishes Kafka messages using a non-blocking API. It routes messages
