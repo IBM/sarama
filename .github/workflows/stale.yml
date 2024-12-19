@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # pinned to main commit to make use of https://github.com/actions/stale/pull/1033
-    - uses: actions/stale@3f3b0175e8c66fb49b9a6d5a0cd1f8436d4c3ab6 # main
+    - uses: actions/stale@28ca1036281a5e5922ead5184a1bbf96e5fc984e # v9.0.0
       with:
         ascending: true
         days-before-stale: 90
