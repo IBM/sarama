@@ -515,6 +515,9 @@ func TestLZ4ConfigValidation(t *testing.T) {
 
 func TestZstdConfigValidation(t *testing.T) {
 	config := NewTestConfig()
+	if config.Producer.MaxBufferedCompressionEncoders != 1 {
+		t.Error("Expects MaxBufferedCompressionEncoders to be 1, got ", config.Producer.MaxBufferedCompressionEncoders)
+	}
 	config.Producer.Compression = CompressionZSTD
 	err := config.Validate()
 	var target ConfigurationError
