@@ -1,17 +1,17 @@
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.10@sha256:cf095e5668919ba1b4ace3888107684ad9d587b1830d3eb56973e6a54f456e67
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.5@sha256:daa61d6103e98bccf40d7a69a0d4f8786ec390e2204fd94f7cc49053e9949360
 
 USER root
 
 RUN microdnf update -y \
- && microdnf install -y curl gzip java-11-openjdk-headless tar tzdata-java \
+ && microdnf install -y gzip java-17-openjdk-headless tar tzdata-java \
  && microdnf reinstall -y tzdata \
  && microdnf clean all
 
-ENV JAVA_HOME=/usr/lib/jvm/jre-11
+ENV JAVA_HOME=/usr/lib/jvm/jre-17
 
 # https://docs.oracle.com/javase/7/docs/technotes/guides/net/properties.html
 # Ensure Java doesn't cache any dns results
-RUN cd /etc/java/java-11-openjdk/*/conf/security \
+RUN cd /etc/java/java-17-openjdk/*/conf/security \
  && sed -e '/networkaddress.cache.ttl/d' -e '/networkaddress.cache.negative.ttl/d' -i java.security \
  && echo 'networkaddress.cache.ttl=0' >> java.security \
  && echo 'networkaddress.cache.negative.ttl=0' >> java.security
@@ -36,7 +36,7 @@ RUN curl -sLO "https://repo1.maven.org/maven2/javax/xml/bind/jaxb-api/2.3.0/jaxb
 
 WORKDIR /opt/kafka-${KAFKA_VERSION}
 
-ENV JAVA_MAJOR_VERSION=11
+ENV JAVA_MAJOR_VERSION=17
 
 RUN sed -e "s/JAVA_MAJOR_VERSION=.*/JAVA_MAJOR_VERSION=${JAVA_MAJOR_VERSION}/" -i"" ./bin/kafka-run-class.sh
 
