@@ -59,6 +59,10 @@ jobs:
         nohup sudo tcpdump -i lo -w "fvt-kafka-${{ inputs.kafka-version }}.pcap" portrange 29091-29095 >/dev/null 2>&1 &
         echo $! >tcpdump.pid
         make test_functional
+        echo "## Code Coverage" >>$GITHUB_STEP_SUMMARY
+        echo "|Filename|Function|Coverage|" >>$GITHUB_STEP_SUMMARY
+        echo "|--------|--------|--------|" >>$GITHUB_STEP_SUMMARY
+        go tool cover -func=profile.out | sed -E -e 's/[[:space:]]+/|/g' -e 's/$/|/g' -e 's/^/|/g' >>$GITHUB_STEP_SUMMARY
     - name: Stop tcpdump
       if: always()
       run: |

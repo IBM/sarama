@@ -1,3 +1,5 @@
+//go:build !functional
+
 package sarama
 
 import (
@@ -11,14 +13,6 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 )
-
-func safeClose(t testing.TB, c io.Closer) {
-	t.Helper()
-	err := c.Close()
-	if err != nil {
-		t.Error(err)
-	}
-}
 
 func TestSimpleClient(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
