@@ -447,6 +447,13 @@ func versionRange(lower KafkaVersion) []KafkaVersion {
 		upper = MaxVersion
 	}
 
+	// KIP-896 dictates a minimum lower bound of 2.1 protocol for Kafka 4.0 onwards
+	if upper.IsAtLeast(V4_0_0_0) {
+		if !lower.IsAtLeast(V2_1_0_0) {
+			lower = V2_1_0_0
+		}
+	}
+
 	versions := make([]KafkaVersion, 0, len(fvtRangeVersions))
 	for _, v := range fvtRangeVersions {
 		if !v.IsAtLeast(lower) {
