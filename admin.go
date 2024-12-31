@@ -117,6 +117,10 @@ type ClusterAdmin interface {
 	// Delete a consumer group.
 	DeleteConsumerGroup(group string) error
 
+	// RefreshCoordinator retrieves the coordinator for a consumer group and stores it
+	// in local cache. This function only works on Kafka 0.8.2 and higher.
+	RefreshCoordinator(consumerGroup string) error
+
 	// Get information about the nodes in the cluster
 	DescribeCluster() (brokers []*Broker, controllerID int32, err error)
 
@@ -1304,4 +1308,8 @@ func (ca *clusterAdmin) RemoveMemberFromConsumerGroup(groupId string, groupInsta
 		})
 	}
 	return controller.LeaveGroup(request)
+}
+
+func (ca *clusterAdmin) RefreshCoordinator(consumerGroup string) error {
+	return ca.client.RefreshCoordinator(consumerGroup)
 }
