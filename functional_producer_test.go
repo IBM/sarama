@@ -46,6 +46,7 @@ func TestFuncProducingZstd(t *testing.T) {
 
 func TestFuncProducingNoResponse(t *testing.T) {
 	config := NewFunctionalTestConfig()
+	config.ApiVersionsRequest = false
 	config.Producer.RequiredAcks = NoResponse
 	testProducingMessages(t, config, MinVersion)
 }
@@ -812,13 +813,24 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 	config.Consumer.Return.Errors = true
 
 	kafkaVersions := map[KafkaVersion]bool{}
-	for _, v := range []KafkaVersion{MinVersion, V0_10_0_0, V0_11_0_0, V1_0_0_0, V2_0_0_0, V2_1_0_0} {
-		if v.IsAtLeast(minVersion) {
-			kafkaVersions[v] = true
+	upper, err := ParseKafkaVersion(os.Getenv("KAFKA_VERSION"))
+	if err != nil {
+		t.Logf("warning: failed to parse kafka version: %v", err)
+	}
+	if upper.IsAtLeast(minVersion) {
+		kafkaVersions[upper] = true
+		// KIP-896 dictates a minimum lower bound of 2.1 protocol for Kafka 4.0 onwards
+		if upper.IsAtLeast(V4_0_0_0) {
+			if !minVersion.IsAtLeast(V2_1_0_0) {
+				minVersion = V2_1_0_0
+			}
 		}
 	}
-	if upper, err := ParseKafkaVersion(os.Getenv("KAFKA_VERSION")); err != nil {
-		kafkaVersions[upper] = true
+
+	for _, v := range []KafkaVersion{MinVersion, V0_10_0_0, V0_11_0_0, V1_0_0_0, V2_0_0_0, V2_1_0_0} {
+		if v.IsAtLeast(minVersion) && upper.IsAtLeast(v) {
+			kafkaVersions[v] = true
+		}
 	}
 
 	for version := range kafkaVersions {

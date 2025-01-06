@@ -346,16 +346,16 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	defer controller.Close()
 
 	// Start by deleting the test topics (if they already exist)
-	deleteRes, err := controller.DeleteTopics(&DeleteTopicsRequest{
-		Topics:  testTopicNames,
-		Timeout: time.Minute,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to delete test topics: %w", err)
-	}
-	for topic, topicErr := range deleteRes.TopicErrorCodes {
-		if !isTopicNotExistsErrorOrOk(topicErr) {
-			return fmt.Errorf("failed to delete topic %s: %w", topic, topicErr)
+	{
+		request := NewDeleteTopicsRequest(config.Version, testTopicNames, time.Minute)
+		deleteRes, err := controller.DeleteTopics(request)
+		if err != nil {
+			return fmt.Errorf("failed to delete test topics: %w", err)
+		}
+		for topic, topicErr := range deleteRes.TopicErrorCodes {
+			if !isTopicNotExistsErrorOrOk(topicErr) {
+				return fmt.Errorf("failed to delete topic %s: %w", topic, topicErr)
+			}
 		}
 	}
 
@@ -363,11 +363,10 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	// synchronously
 	{
 		var topicsOk bool
+		request := NewMetadataRequest(config.Version, testTopicNames)
 		for i := 0; i < 60 && !topicsOk; i++ {
 			time.Sleep(1 * time.Second)
-			md, err := controller.GetMetadata(&MetadataRequest{
-				Topics: testTopicNames,
-			})
+			md, err := controller.GetMetadata(request)
 			if err != nil {
 				return fmt.Errorf("failed to get metadata for test topics: %w", err)
 			}
@@ -387,16 +386,16 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	}
 
 	// now create the topics empty
-	createRes, err := controller.CreateTopics(&CreateTopicsRequest{
-		TopicDetails: testTopicDetails,
-		Timeout:      time.Minute,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create test topics: %w", err)
-	}
-	for topic, topicErr := range createRes.TopicErrors {
-		if !isTopicExistsErrorOrOk(topicErr.Err) {
-			return fmt.Errorf("failed to create test topic %s: %w", topic, topicErr)
+	{
+		request := NewCreateTopicsRequest(config.Version, testTopicDetails, time.Minute)
+		createRes, err := controller.CreateTopics(request)
+		if err != nil {
+			return fmt.Errorf("failed to create test topics: %w", err)
+		}
+		for topic, topicErr := range createRes.TopicErrors {
+			if !isTopicExistsErrorOrOk(topicErr.Err) {
+				return fmt.Errorf("failed to create test topic %s: %w", topic, topicErr)
+			}
 		}
 	}
 
@@ -404,11 +403,10 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	// synchronously
 	{
 		var topicsOk bool
+		request := NewMetadataRequest(config.Version, testTopicNames)
 		for i := 0; i < 60 && !topicsOk; i++ {
 			time.Sleep(1 * time.Second)
-			md, err := controller.GetMetadata(&MetadataRequest{
-				Topics: testTopicNames,
-			})
+			md, err := controller.GetMetadata(request)
 			if err != nil {
 				return fmt.Errorf("failed to get metadata for test topics: %w", err)
 			}
