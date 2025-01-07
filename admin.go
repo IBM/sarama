@@ -1066,25 +1066,24 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error) {
 	var response *OffsetFetchResponse
 	request := NewOffsetFetchRequest(ca.conf.Version, group, topicPartitions)
-	err := ca.retryOnError(isRetriableGroupCoordinatorError, func() error {
-		coordinator, err := ca.client.Coordinator(group)
-		if err != nil {
-			return err
-		}
-
+	err := ca.retryOnError(isRetriableGroupCoordinatorError, func() (err error) {
 		defer func() {
 			if err != nil && isRetriableGroupCoordinatorError(err) {
 				_ = ca.client.RefreshCoordinator(group)
 			}
 		}()
 
+		coordinator, err := ca.client.Coordinator(group)
+		if err != nil {
+			return err
+		}
+
 		response, err = coordinator.FetchOffset(request)
 		if err != nil {
 			return err
 		}
 		if !errors.Is(response.Err, ErrNoError) {
-			err = response.Err
-			return err
+			return response.Err
 		}
 
 		return nil
@@ -1102,29 +1101,27 @@ func (ca *clusterAdmin) DeleteConsumerGroupOffset(group string, topic string, pa
 		},
 	}
 
-	return ca.retryOnError(isRetriableGroupCoordinatorError, func() error {
-		coordinator, err := ca.client.Coordinator(group)
-		if err != nil {
-			return err
-		}
-
+	return ca.retryOnError(isRetriableGroupCoordinatorError, func() (err error) {
 		defer func() {
 			if err != nil && isRetriableGroupCoordinatorError(err) {
 				_ = ca.client.RefreshCoordinator(group)
 			}
 		}()
 
+		coordinator, err := ca.client.Coordinator(group)
+		if err != nil {
+			return err
+		}
+
 		response, err = coordinator.DeleteOffsets(request)
 		if err != nil {
 			return err
 		}
 		if !errors.Is(response.ErrorCode, ErrNoError) {
-			err = response.ErrorCode
-			return err
+			return response.ErrorCode
 		}
 		if !errors.Is(response.Errors[topic][partition], ErrNoError) {
-			err = response.Errors[topic][partition]
-			return err
+			return response.Errors[topic][partition]
 		}
 
 		return nil
@@ -1140,17 +1137,17 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 		request.Version = 1
 	}
 
-	return ca.retryOnError(isRetriableGroupCoordinatorError, func() error {
-		coordinator, err := ca.client.Coordinator(group)
-		if err != nil {
-			return err
-		}
-
+	return ca.retryOnError(isRetriableGroupCoordinatorError, func() (err error) {
 		defer func() {
 			if err != nil && isRetriableGroupCoordinatorError(err) {
 				_ = ca.client.RefreshCoordinator(group)
 			}
 		}()
+
+		coordinator, err := ca.client.Coordinator(group)
+		if err != nil {
+			return err
+		}
 
 		response, err = coordinator.DeleteGroups(request)
 		if err != nil {
@@ -1163,8 +1160,7 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 		}
 
 		if !errors.Is(groupErr, ErrNoError) {
-			err = groupErr
-			return err
+			return groupErr
 		}
 
 		return nil
@@ -1359,28 +1355,28 @@ func (ca *clusterAdmin) RemoveMemberFromConsumerGroup(group string, groupInstanc
 			GroupInstanceId: &groupInstanceId,
 		})
 	}
-	err := ca.retryOnError(isRetriableGroupCoordinatorError, func() error {
-		coordinator, err := ca.client.Coordinator(group)
-		if err != nil {
-			return err
-		}
-
+	err := ca.retryOnError(isRetriableGroupCoordinatorError, func() (err error) {
 		defer func() {
 			if err != nil && isRetriableGroupCoordinatorError(err) {
 				_ = ca.client.RefreshCoordinator(group)
 			}
 		}()
 
+		coordinator, err := ca.client.Coordinator(group)
+		if err != nil {
+			return err
+		}
+
 		response, err = coordinator.LeaveGroup(request)
 		if err != nil {
 			return err
 		}
 		if !errors.Is(response.Err, ErrNoError) {
-			err = response.Err
-			return err
+			return response.Err
 		}
 
 		return nil
 	})
+
 	return response, err
 }
