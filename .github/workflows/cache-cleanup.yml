@@ -1,0 +1,27 @@
+# https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/caching-dependencies-to-speed-up-workflows#force-deleting-cache-entries
+name: Cleanup caches on PR close/merge
+on:
+  pull_request:
+    types:
+      - closed
+
+permissions:
+  actions: write # for cache management
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Caches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          gh cache list --ref "$BRANCH" --limit 100
+          CACHE_KEYS="$(gh cache list --ref "$BRANCH" --limit 100 --json id --jq '.[].id')"
+          for KEY in ${CACHE_KEYS}; do
+            echo "Deleting cache $KEY for ref $BRANCH"
+            gh cache delete "$KEY" || true
+            echo
+          done
