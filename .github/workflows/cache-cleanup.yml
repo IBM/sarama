@@ -6,10 +6,12 @@ on:
       - closed
 
 permissions:
-  actions: write # for cache management
+  contents: read # for actions/checkout to fetch code
 
 jobs:
   cleanup:
+    permissions:
+      actions: write # for cache management
     runs-on: ubuntu-latest
     steps:
       - name: Delete Caches
