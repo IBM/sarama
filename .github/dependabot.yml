@@ -67,6 +67,36 @@ updates:
           - "golang.org/x/*"
 
   - package-ecosystem: gomod
+    directory: /examples/http_server
+    schedule:
+      interval: daily
+      time: "23:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: chore
+      include: "scope"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: gomod
+    directory: /examples/sasl_scram_client
+    schedule:
+      interval: daily
+      time: "23:00"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: chore
+      include: "scope"
+    groups:
+      golang-org-x:
+        patterns:
+          - "golang.org/x/*"
+
+  - package-ecosystem: gomod
     directory: /examples/interceptors
     schedule:
       interval: daily
