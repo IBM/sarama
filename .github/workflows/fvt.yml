@@ -42,8 +42,8 @@ jobs:
         load: true
         targets: kafka-1
         set: |
-          *.cache-from=type=gha,scope=${{ github.workflow }}
-          *.cache-to=type=gha,scope=${{ github.workflow }},mode=max
+          *.cache-from=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }}
+          *.cache-to=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }},mode=max
     - name: Setup Go
       uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
       with:
