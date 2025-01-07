@@ -42,18 +42,19 @@ jobs:
         load: true
         targets: kafka-1
         set: |
-          *.cache-from=type=gha,scope=${{ github.workflow }}
-          *.cache-to=type=gha,scope=${{ github.workflow }},mode=max
+          *.cache-from=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }}
+          *.cache-to=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }},mode=max
     - name: Setup Go
       uses: actions/setup-go@3041bf56c941b39c61721a86cd11f3bb1338122a # v5.2.0
       with:
         go-version: ${{ inputs.go-version }}
     - name: Setup Docker Compose
       run: |
-        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.29.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
-        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker))"
+        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.32.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        mkdir -p $HOME/.docker/cli-plugins
+        install -m755 /tmp/docker-compose $HOME/.docker/cli-plugins
         docker version --format 'Docker Engine version v{{.Server.Version}}'
-        docker-compose version
+        docker compose version
     - name: Test (Functional)
       run: |
         nohup sudo tcpdump -i lo -w "fvt-kafka-${{ inputs.kafka-version }}.pcap" portrange 29091-29095 >/dev/null 2>&1 &
