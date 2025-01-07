@@ -50,10 +50,11 @@ jobs:
         go-version: ${{ inputs.go-version }}
     - name: Setup Docker Compose
       run: |
-        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.29.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
-        sudo install -m755 /tmp/docker-compose "$(dirname $(which docker))"
+        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.32.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        mkdir -p $HOME/.docker/cli-plugins
+        install -m755 /tmp/docker-compose $HOME/.docker/cli-plugins
         docker version --format 'Docker Engine version v{{.Server.Version}}'
-        docker-compose version
+        docker compose version
     - name: Test (Functional)
       run: |
         nohup sudo tcpdump -i lo -w "fvt-kafka-${{ inputs.kafka-version }}.pcap" portrange 29091-29095 >/dev/null 2>&1 &

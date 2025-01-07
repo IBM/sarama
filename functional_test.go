@@ -156,16 +156,16 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 		env.KafkaVersion = "3.5.1"
 	}
 
-	// docker-compose v2.17.0 or newer required for `--wait-timeout` support
+	// docker compose v2.17.0 or newer required for `--wait-timeout` support
 	c := exec.Command(
-		"docker-compose", "up", "-d", "--quiet-pull", "--timestamps", "--wait", "--wait-timeout", "600",
+		"docker", "compose", "up", "-d", "--quiet-pull", "--timestamps", "--wait", "--wait-timeout", "600",
 	)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	c.Env = append(os.Environ(), fmt.Sprintf("KAFKA_VERSION=%s", env.KafkaVersion))
 	err := c.Run()
 	if err != nil {
-		return fmt.Errorf("failed to run docker-compose to start test environment: %w", err)
+		return fmt.Errorf("failed to run docker compose to start test environment: %w", err)
 	}
 
 	if err := setupToxiProxies(env, "http://localhost:8474"); err != nil {
@@ -249,7 +249,7 @@ mainLoop:
 	}
 
 	if !allBrokersUp {
-		c := exec.Command("docker-compose", "logs", "-t", "kafka-1", "kafka-2", "kafka-3", "kafka-4", "kafka-5")
+		c := exec.Command("docker", "compose", "logs", "-t", "kafka-1", "kafka-2", "kafka-3", "kafka-4", "kafka-5")
 		c.Stdout = os.Stdout
 		c.Stderr = os.Stderr
 		_ = c.Run()
@@ -280,42 +280,42 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 }
 
 func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) error {
-	c := exec.Command("docker-compose", "down", "--volumes")
+	c := exec.Command("docker", "compose", "down", "--volumes")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	downErr := c.Run()
 
-	c = exec.Command("docker-compose", "rm", "-v", "--force", "--stop")
+	c = exec.Command("docker", "compose", "rm", "-v", "--force", "--stop")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	rmErr := c.Run()
 	if downErr != nil {
-		return fmt.Errorf("failed to run docker-compose to stop test environment: %w", downErr)
+		return fmt.Errorf("failed to run docker compose to stop test environment: %w", downErr)
 	}
 	if rmErr != nil {
-		return fmt.Errorf("failed to run docker-compose to rm test environment: %w", rmErr)
+		return fmt.Errorf("failed to run docker compose to rm test environment: %w", rmErr)
 	}
 	return nil
 }
 
 func startDockerTestBroker(ctx context.Context, brokerID int32) error {
 	service := fmt.Sprintf("kafka-%d", brokerID)
-	c := exec.Command("docker-compose", "start", service)
+	c := exec.Command("docker", "compose", "start", service)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
-		return fmt.Errorf("failed to run docker-compose to start test broker kafka-%d: %w", brokerID, err)
+		return fmt.Errorf("failed to run docker compose to start test broker kafka-%d: %w", brokerID, err)
 	}
 	return nil
 }
 
 func stopDockerTestBroker(ctx context.Context, brokerID int32) error {
 	service := fmt.Sprintf("kafka-%d", brokerID)
-	c := exec.Command("docker-compose", "stop", service)
+	c := exec.Command("docker", "compose", "stop", service)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	if err := c.Run(); err != nil {
-		return fmt.Errorf("failed to run docker-compose to stop test broker kafka-%d: %w", brokerID, err)
+		return fmt.Errorf("failed to run docker compose to stop test broker kafka-%d: %w", brokerID, err)
 	}
 	return nil
 }
