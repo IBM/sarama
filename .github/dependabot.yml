@@ -1,10 +1,11 @@
----
 version: 2
 updates:
   - package-ecosystem: docker
     directory: /
     schedule:
       interval: daily
+      time: "21:00"
+      timezone: "Etc/UTC"
     labels:
       - "ignore-for-release"
     commit-message:
@@ -19,109 +20,34 @@ updates:
       - "ignore-for-release"
     commit-message:
       prefix: chore(ci)
+    groups:
+      actions:
+        patterns:
+          - "actions/*"
 
   - package-ecosystem: gomod
-    directory: /
+    directories:
+      - /
+      - /examples/consumergroup
+      - /examples/exactly_once
+      - /examples/http_server
+      - /examples/sasl_scram_client
+      - /examples/interceptors
+      - /examples/txn_producer
     open-pull-requests-limit: 5
     schedule:
-      interval: "daily"
-      time: "23:00"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: chore
-      include: "scope"
-    groups:
-      golang-org-x:
-        patterns:
-          - "golang.org/x/*"
-
-  - package-ecosystem: gomod
-    directory: /examples/consumergroup
-    schedule:
       interval: daily
-      time: "23:00"
+      time: "15:00"
+      timezone: "Etc/UTC"
     labels:
       - "dependencies"
     commit-message:
       prefix: chore
       include: "scope"
     groups:
-      golang-org-x:
+      otel:
         patterns:
-          - "golang.org/x/*"
-
-  - package-ecosystem: gomod
-    directory: /examples/exactly_once
-    schedule:
-      interval: daily
-      time: "23:00"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: chore
-      include: "scope"
-    groups:
-      golang-org-x:
-        patterns:
-          - "golang.org/x/*"
-
-  - package-ecosystem: gomod
-    directory: /examples/http_server
-    schedule:
-      interval: daily
-      time: "23:00"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: chore
-      include: "scope"
-    groups:
-      golang-org-x:
-        patterns:
-          - "golang.org/x/*"
-
-  - package-ecosystem: gomod
-    directory: /examples/sasl_scram_client
-    schedule:
-      interval: daily
-      time: "23:00"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: chore
-      include: "scope"
-    groups:
-      golang-org-x:
-        patterns:
-          - "golang.org/x/*"
-
-  - package-ecosystem: gomod
-    directory: /examples/interceptors
-    schedule:
-      interval: daily
-      time: "23:00"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: chore
-      include: "scope"
-    groups:
-      golang-org-x:
-        patterns:
-          - "golang.org/x/*"
-
-  - package-ecosystem: gomod
-    directory: /examples/txn_producer
-    schedule:
-      interval: daily
-      time: "23:00"
-    labels:
-      - "dependencies"
-    commit-message:
-      prefix: chore
-      include: "scope"
-    groups:
-      golang-org-x:
+          - "go.opentelemetry.io/otel/*"
+      golang-x:
         patterns:
           - "golang.org/x/*"
