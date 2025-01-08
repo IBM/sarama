@@ -51,3 +51,7 @@ updates:
       golang-x:
         patterns:
           - "golang.org/x/*"
+    ignore:
+      - dependency-name: "go.opentelemetry.io/*"
+        # ignore versions of otel that are equal to or greater than 1.30.0 as they require go1.22
+        versions: [">=1.30.0"]
