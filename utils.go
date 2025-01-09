@@ -203,6 +203,7 @@ var (
 	V3_6_2_0  = newKafkaVersion(3, 6, 2, 0)
 	V3_7_0_0  = newKafkaVersion(3, 7, 0, 0)
 	V3_7_1_0  = newKafkaVersion(3, 7, 1, 0)
+	V3_7_2_0  = newKafkaVersion(3, 7, 2, 0)
 	V3_8_0_0  = newKafkaVersion(3, 8, 0, 0)
 	V3_8_1_0  = newKafkaVersion(3, 8, 1, 0)
 	V3_9_0_0  = newKafkaVersion(3, 9, 0, 0)
@@ -275,6 +276,7 @@ var (
 		V3_6_2_0,
 		V3_7_0_0,
 		V3_7_1_0,
+		V3_7_2_0,
 		V3_8_0_0,
 		V3_8_1_0,
 		V3_9_0_0,
