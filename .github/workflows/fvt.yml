@@ -57,7 +57,7 @@ jobs:
         docker compose version
     - name: Test (Functional)
       run: |
-        nohup sudo tcpdump -i lo -w "fvt-kafka-${{ inputs.kafka-version }}.pcap" portrange 29091-29095 >/dev/null 2>&1 &
+        nohup sudo tcpdump -i lo -w "fvt-kafka-${KAFKA_VERSION}.pcap" portrange 29091-29095 >/dev/null 2>&1 &
         echo $! >tcpdump.pid
         make test_functional
         echo "## Code Coverage" >>$GITHUB_STEP_SUMMARY
@@ -68,7 +68,7 @@ jobs:
       if: always()
       run: |
         if [ -f "tcpdump.pid" ]; then sudo kill "$(cat tcpdump.pid)" || true; fi
-        if [ -f "fvt-kafka-${{ inputs.kafka-version }}.pcap" ]; then sudo chmod a+r "fvt-kafka-${{ inputs.kafka-version }}.pcap"; fi
+        if [ -f "fvt-kafka-${KAFKA_VERSION}.pcap" ]; then sudo chmod a+r "fvt-kafka-${KAFKA_VERSION}.pcap"; fi
     - name: Upload pcap file
       if: always()
       uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b # v4.5.0
