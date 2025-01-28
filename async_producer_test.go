@@ -4,11 +4,13 @@ package sarama
 
 import (
 	"errors"
+	"github.com/stretchr/testify/assert"
 	"log"
 	"math"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -2176,7 +2178,7 @@ func TestTxnCanAbort(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestPreventRetryBufferOverflow(t *testing.T) {
+func TestProducerRetryBufferLimits(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 	topic := "test-topic"
@@ -2199,57 +2201,86 @@ func TestPreventRetryBufferOverflow(t *testing.T) {
 		"MetadataRequest": metadataRequestHandlerFunc,
 	})
 
-	config := NewTestConfig()
-	config.Producer.Flush.MaxMessages = 1
-	config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength
-	config.Producer.Return.Successes = true
-
-	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
+	tests := []struct {
+		name            string
+		configureBuffer func(*Config)
+		messageSize     int
+		numMessages     int
+	}{
+		{
+			name: "MaxBufferLength",
+			configureBuffer: func(config *Config) {
+				config.Producer.Flush.MaxMessages = 1
+				config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength
+			},
+			messageSize: 1, // Small message size
+			numMessages: 10000,
+		},
+		{
+			name: "MaxBufferBytes",
+			configureBuffer: func(config *Config) {
+				config.Producer.Flush.MaxMessages = 1
+				config.Producer.Retry.MaxBufferBytes = minFunctionalRetryBufferBytes
+			},
+			messageSize: 950 * 1024, // 950 KB
+			numMessages: 1000,
+		},
 	}
 
-	var (
-		wg                        sync.WaitGroup
-		successes, producerErrors int
-		errorFound                bool
-	)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := NewTestConfig()
+			config.Producer.Return.Successes = true
+			tt.configureBuffer(config)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for range producer.Successes() {
-			successes++
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for errMsg := range producer.Errors() {
-			if errors.Is(errMsg.Err, ErrProducerRetryBufferOverflow) {
-				errorFound = true
+			producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+			if err != nil {
+				t.Fatal(err)
 			}
-			producerErrors++
-		}
-	}()
 
-	numMessages := 100000
-	for i := 0; i < numMessages; i++ {
-		kv := StringEncoder(strconv.Itoa(i))
-		producer.Input() <- &ProducerMessage{
-			Topic:    topic,
-			Key:      kv,
-			Value:    kv,
-			Metadata: i,
-		}
+			var (
+				wg                        sync.WaitGroup
+				successes, producerErrors int
+				errorFound                bool
+			)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for range producer.Successes() {
+					successes++
+				}
+			}()
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for errMsg := range producer.Errors() {
+					if errors.Is(errMsg.Err, ErrProducerRetryBufferOverflow) {
+						errorFound = true
+					}
+					producerErrors++
+				}
+			}()
+
+			longString := strings.Repeat("a", tt.messageSize)
+			val := StringEncoder(longString)
+
+			for i := 0; i < tt.numMessages; i++ {
+				msg := &ProducerMessage{
+					Topic: topic,
+					Value: val,
+				}
+				producer.Input() <- msg
+			}
+
+			producer.AsyncClose()
+			wg.Wait()
+
+			assert.Equal(t, successes+producerErrors, tt.numMessages, "Expected all messages to be processed")
+			assert.True(t, errorFound, "Expected at least one error matching ErrProducerRetryBufferOverflow")
+		})
 	}
-
-	producer.AsyncClose()
-	wg.Wait()
-
-	require.Equal(t, successes+producerErrors, numMessages, "Expected all messages to be processed")
-	require.True(t, errorFound, "Expected at least one error matching ErrProducerRetryBufferOverflow")
 }
 
 // This example shows how to use the producer while simultaneously
