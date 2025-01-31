@@ -74,7 +74,7 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 				partitioners[msg.Topic] = partitioner
 			}
 			mp.l.Lock()
-			if mp.expectations == nil || len(mp.expectations) == 0 {
+			if len(mp.expectations) == 0 {
 				mp.expectations = nil
 				mp.t.Errorf("No more expectation set on this mock producer to handle the input message.")
 			} else {
