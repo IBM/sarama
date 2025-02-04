@@ -116,7 +116,7 @@ func minCountHistogramValidator(name string, minCount int) *metricValidator {
 	})
 }
 
-//nolint:unused // this is used but only in unittests which are excluded by the integration build tag
+//lint:ignore U1000 // this is used but only in unittests which are excluded by the integration build tag
 func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
 		t.Helper()

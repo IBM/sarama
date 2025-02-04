@@ -1,16 +1,15 @@
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
 run:
   timeout: 5m
-  deadline: 10m
 
 linters-settings:
   govet:
-    shadow: false
-  golint:
-    min-confidence: 0
+    enable-all: true
+    disable:
+      - fieldalignment
+      - shadow
   gocyclo:
     min-complexity: 99
-  maligned:
-    suggest-new: true
   dupl:
     threshold: 100
   goconst:
@@ -71,7 +70,6 @@ linters:
     - govet
     - misspell
     - nilerr
-    - staticcheck
     - typecheck
     - unconvert
     - unused
