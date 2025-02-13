@@ -2,7 +2,11 @@
 
 package sarama
 
-import "testing"
+import (
+	"sync"
+	"testing"
+	"time"
+)
 
 func TestVersionCompare(t *testing.T) {
 	if V0_8_2_0.IsAtLeast(V0_8_2_1) {
@@ -94,4 +98,49 @@ func TestVersionParsing(t *testing.T) {
 			t.Errorf("invalid version %s parsed without error", s)
 		}
 	}
+}
+
+func TestExponentialBackoffCorrectness(t *testing.T) {
+	testCases := []struct {
+		backoff            time.Duration
+		maxBackoff         time.Duration
+		retries            int
+		maxRetries         int
+		minBackoff         time.Duration
+		maxBackoffExpected time.Duration
+	}{
+		{100 * time.Millisecond, 2 * time.Second, 0, 5, 100 * time.Millisecond, 100 * time.Millisecond},
+		{100 * time.Millisecond, 2 * time.Second, 1, 5, 80 * time.Millisecond, 120 * time.Millisecond},
+		{100 * time.Millisecond, 2 * time.Second, 3, 5, 320 * time.Millisecond, 480 * time.Millisecond},
+		{100 * time.Millisecond, 2 * time.Second, 5, 5, 1280 * time.Millisecond, 1920 * time.Millisecond},
+		{-100 * time.Millisecond, 2 * time.Second, 3, 5, 0, 480 * time.Millisecond},
+		{100 * time.Millisecond, -2 * time.Second, 3, 5, 0, 0},
+		{-100 * time.Millisecond, -2 * time.Second, 3, 5, 0, 0},
+		{0 * time.Millisecond, 2 * time.Second, 3, 5, 0, 480 * time.Millisecond},
+		{100 * time.Millisecond, 0 * time.Second, 3, 5, 0, 0},
+		{0 * time.Millisecond, 0 * time.Second, 3, 5, 0, 0},
+	}
+
+	for _, tc := range testCases {
+		backoffFunc := NewExponentialBackoff(tc.backoff, tc.maxBackoff)
+		backoff := backoffFunc(tc.retries, tc.maxRetries)
+		if backoff < tc.minBackoff || backoff > tc.maxBackoffExpected {
+			t.Errorf("backoff(%d, %d): expected between %v and %v, got %v", tc.retries, tc.maxRetries, tc.minBackoff, tc.maxBackoffExpected, backoff)
+		}
+	}
+}
+
+func TestExponentialBackoffRaceDetection(t *testing.T) {
+	backoffFunc := NewExponentialBackoff(100*time.Millisecond, 2*time.Second)
+	var wg sync.WaitGroup
+	concurrency := 1000
+
+	wg.Add(concurrency)
+	for i := 0; i < concurrency; i++ {
+		go func(i int) {
+			defer wg.Done()
+			_ = backoffFunc(i%10, 5)
+		}(i)
+	}
+	wg.Wait()
 }
