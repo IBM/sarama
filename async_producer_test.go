@@ -4,7 +4,6 @@ package sarama
 
 import (
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"log"
 	"math"
 	"os"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/fortytw2/leaktest"
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -635,6 +635,68 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	}
 	if atomic.LoadInt32(&backoffCalled[config.Producer.Retry.Max]) != 0 {
 		t.Errorf("expected no retry attempt #%d", config.Producer.Retry.Max)
+	}
+}
+
+func TestAsyncProducerWithExponentialBackoffDurations(t *testing.T) {
+	var backoffDurations []time.Duration
+	var mu sync.Mutex
+
+	topic := "my_topic"
+	maxBackoff := 2 * time.Second
+	config := NewTestConfig()
+
+	innerBackoffFunc := NewExponentialBackoff(defaultRetryBackoff, maxBackoff)
+	backoffFunc := func(retries, maxRetries int) time.Duration {
+		duration := innerBackoffFunc(retries, maxRetries)
+		mu.Lock()
+		backoffDurations = append(backoffDurations, duration)
+		mu.Unlock()
+		return duration
+	}
+
+	config.Producer.Flush.Messages = 5
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 3
+	config.Producer.Retry.BackoffFunc = backoffFunc
+
+	broker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition(topic, 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataResponse)
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	failResponse := new(ProduceResponse)
+	failResponse.AddTopicPartition(topic, 0, ErrNotLeaderForPartition)
+	successResponse := new(ProduceResponse)
+	successResponse.AddTopicPartition(topic, 0, ErrNoError)
+
+	broker.Returns(failResponse)
+	broker.Returns(metadataResponse)
+	broker.Returns(failResponse)
+	broker.Returns(metadataResponse)
+	broker.Returns(successResponse)
+
+	for i := 0; i < 5; i++ {
+		producer.Input() <- &ProducerMessage{Topic: topic, Value: StringEncoder("test")}
+	}
+
+	expectResults(t, producer, 5, 0)
+	closeProducer(t, producer)
+	broker.Close()
+
+	assert.Greater(t, backoffDurations[0], time.Duration(0),
+		"Expected first backoff duration to be greater than 0")
+	for i := 1; i < len(backoffDurations); i++ {
+		assert.Greater(t, backoffDurations[i], time.Duration(0))
+		assert.GreaterOrEqual(t, backoffDurations[i], backoffDurations[i-1])
+		assert.LessOrEqual(t, backoffDurations[i], maxBackoff)
 	}
 }
 
