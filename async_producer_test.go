@@ -638,6 +638,69 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	}
 }
 
+func TestAsyncProducerWithExponentialBackoffDurations(t *testing.T) {
+	var backoffDurations []time.Duration
+	var mu sync.Mutex
+
+	topic := "my_topic"
+	maxBackoff := 2 * time.Second
+	config := NewTestConfig()
+
+	innerBackoffFunc := NewExponentialBackoff(100*time.Millisecond, maxBackoff)
+	backoffFunc := func(retries, maxRetries int) time.Duration {
+		duration := innerBackoffFunc(retries, maxRetries)
+		mu.Lock()
+		backoffDurations = append(backoffDurations, duration)
+		mu.Unlock()
+		return duration
+	}
+
+	config.Producer.Flush.Messages = 5
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 3
+	config.Producer.Retry.BackoffFunc = backoffFunc
+
+	broker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition(topic, 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataResponse)
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	failResponse := new(ProduceResponse)
+	failResponse.AddTopicPartition(topic, 0, ErrNotLeaderForPartition)
+	successResponse := new(ProduceResponse)
+	successResponse.AddTopicPartition(topic, 0, ErrNoError)
+
+	broker.Returns(failResponse)
+	broker.Returns(metadataResponse)
+	broker.Returns(failResponse)
+	broker.Returns(metadataResponse)
+	broker.Returns(successResponse)
+
+	for i := 0; i < 5; i++ {
+		producer.Input() <- &ProducerMessage{Topic: topic, Value: StringEncoder("test")}
+	}
+
+	expectResults(t, producer, 5, 0)
+	closeProducer(t, producer)
+	broker.Close()
+
+	for i := 1; i < len(backoffDurations); i++ {
+		if backoffDurations[i] < backoffDurations[i-1] {
+			t.Errorf("expected backoff[%d] >= backoff[%d], got %v < %v", i, i-1, backoffDurations[i], backoffDurations[i-1])
+		}
+		if backoffDurations[i] > maxBackoff {
+			t.Errorf("backoff exceeded max: %v", backoffDurations[i])
+		}
+	}
+}
+
 // https://github.com/IBM/sarama/issues/2129
 func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 	// Logger = log.New(os.Stdout, "[sarama] ", log.LstdFlags)
