@@ -114,7 +114,6 @@ type Client interface {
 	LeastLoadedBroker() *Broker
 
 	// check if partition is readable
-	
 	ParttionNotReadable(topic string, partition int32) bool
 
 	// Close shuts down all broker connections managed by this client. It is required
