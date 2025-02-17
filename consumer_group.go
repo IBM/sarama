@@ -874,6 +874,7 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 							break
 						}
 					}
+					sess.waitGroup.Add(1)
 					defer sess.waitGroup.Done()
 					defer sess.cancel()
 					sess.consume(topic, partition)
