@@ -869,7 +869,7 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 				go func (topic string, partition int32) {
 					for {
 						if parent.client.ParttionNotReadable( topic,partition) {
-							time.Sleep(5000)
+							time.Sleep(5*time.Second)
 						} else {
 							break
 						}
