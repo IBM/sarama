@@ -864,6 +864,28 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 	// start consuming
 	for topic, partitions := range claims {
 		for _, partition := range partitions {
+			if parent.client.PartitionNotReadable(topic, partition) {
+				// partition not readable, wait for it to become readable
+				go func(topic string, partition int32) {
+					timer := time.NewTimer(5 * time.Second)
+					for parent.client.PartitionNotReadable(topic, partition) {
+						select {
+						case <-ctx.Done():
+							return
+						case <-parent.closed:
+							return
+						case <-timer.C:
+							timer.Reset(5 * time.Second)
+						}
+					}
+					timer.Stop()
+					sess.waitGroup.Add(1)
+					defer sess.waitGroup.Done()
+					defer sess.cancel()
+					sess.consume(topic, partition)
+				}(topic, partition)
+				continue
+			}
 			sess.waitGroup.Add(1)
 
 			go func(topic string, partition int32) {
