@@ -1288,6 +1288,9 @@ func (ncc *nopCloserClient) Close() error {
 }
 
 func (client *client) PartitionNotReadable(topic string, partition int32) bool {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
 	pm := client.metadata[topic][partition]
 	if pm == nil {
 		return true
