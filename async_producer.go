@@ -1119,6 +1119,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 
 	if len(retryTopics) > 0 {
 		if bp.parent.conf.Producer.Idempotent {
+			time.Sleep(1 * time.Second)
 			err := bp.parent.client.RefreshMetadata(retryTopics...)
 			if err != nil {
 				Logger.Printf("Failed refreshing metadata because of %v\n", err)
