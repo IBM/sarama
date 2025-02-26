@@ -351,3 +351,49 @@ func ExampleSyncProducer() {
 		log.Printf("> message sent to partition %d at offset %d\n", partition, offset)
 	}
 }
+
+func BenchmarkSendMessageComparison(b *testing.B) {
+	names := []string{"Old", "New"}
+
+	for _, name := range names {
+		prodSuccess := new(ProduceResponse)
+		prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+
+		seedBroker := NewMockBroker(b, 1)
+		leader := NewMockBroker(b, 2)
+		leader.setHandler(func(req *request) (res encoderWithHeader) {
+			return prodSuccess
+		})
+
+		metadataResponse := new(MetadataResponse)
+		metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+		metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+		seedBroker.Returns(metadataResponse)
+
+		config := NewTestConfig()
+		config.Producer.Return.Successes = true
+		var producer SyncProducer
+		var err error
+		if name == "Old" {
+			producer, err = NewSyncProducer([]string{seedBroker.Addr()}, config)
+		} else {
+			producer, err = NewSyncProducerOptimized([]string{seedBroker.Addr()}, config)
+		}
+		if err != nil {
+			b.Fatal(err)
+		}
+		msg := &ProducerMessage{
+			Topic:    "my_topic",
+			Value:    StringEncoder(TestMessage),
+			Metadata: "test",
+		}
+		b.Run("SendMessage/"+name, func(b *testing.B) {
+			for i := 0; i < 10; i++ {
+				producer.SendMessage(msg)
+			}
+		})
+		safeClose(b, producer)
+		leader.Close()
+		seedBroker.Close()
+	}
+}
