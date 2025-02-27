@@ -260,6 +260,9 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 	if !batch.FirstTimestamp.Equal(now.Truncate(time.Millisecond)) {
 		t.Errorf("Wrong first timestamp: %v", batch.FirstTimestamp)
 	}
+	if !batch.MaxTimestamp.Equal(now.Add(9 * time.Second).Truncate(time.Millisecond)) {
+		t.Errorf("Wrong max timestamp: %v", batch.MaxTimestamp)
+	}
 	for i := 0; i < 10; i++ {
 		rec := batch.Records[i]
 		if rec.TimestampDelta != time.Duration(i)*time.Second {
