@@ -130,19 +130,19 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 }
 
 func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
-	doneIDx := make(chan int, len(msgs))
+	indices := make(chan int, len(msgs))
 	go func() {
 		for i, msg := range msgs {
 			expectation := expectationsPool.Get().(chan *ProducerError)
 			msg.expectation = expectation
 			sp.producer.Input() <- msg
-			doneIDx <- i
+			indices <- i
 		}
-		close(doneIDx)
+		close(indices)
 	}()
 
 	var errors ProducerErrors
-	for i := range doneIDx {
+	for i := range indices {
 		expectation := msgs[i].expectation
 		pErr := <-expectation
 		msgs[i].expectation = nil
