@@ -2,7 +2,10 @@
 
 package sarama
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestVersionCompare(t *testing.T) {
 	if V0_8_2_0.IsAtLeast(V0_8_2_1) {
@@ -92,6 +95,50 @@ func TestVersionParsing(t *testing.T) {
 	for _, s := range invalidVersions {
 		if _, err := ParseKafkaVersion(s); err == nil {
 			t.Errorf("invalid version %s parsed without error", s)
+		}
+	}
+}
+
+func TestExponentialBackoffValidCases(t *testing.T) {
+	testCases := []struct {
+		retries            int
+		maxRetries         int
+		minBackoff         time.Duration
+		maxBackoffExpected time.Duration
+	}{
+		{1, 5, 80 * time.Millisecond, 120 * time.Millisecond},
+		{3, 5, 320 * time.Millisecond, 480 * time.Millisecond},
+		{5, 5, 1280 * time.Millisecond, 1920 * time.Millisecond},
+	}
+
+	for _, tc := range testCases {
+		backoffFunc := NewExponentialBackoff(100*time.Millisecond, 2*time.Second)
+		backoff := backoffFunc(tc.retries, tc.maxRetries)
+		if backoff < tc.minBackoff || backoff > tc.maxBackoffExpected {
+			t.Errorf("backoff(%d, %d): expected between %v and %v, got %v", tc.retries, tc.maxRetries, tc.minBackoff, tc.maxBackoffExpected, backoff)
+		}
+	}
+}
+
+func TestExponentialBackoffDefaults(t *testing.T) {
+	testCases := []struct {
+		backoff    time.Duration
+		maxBackoff time.Duration
+	}{
+		{-100 * time.Millisecond, 2 * time.Second},
+		{100 * time.Millisecond, -2 * time.Second},
+		{-100 * time.Millisecond, -2 * time.Second},
+		{0 * time.Millisecond, 2 * time.Second},
+		{100 * time.Millisecond, 0 * time.Second},
+		{0 * time.Millisecond, 0 * time.Second},
+	}
+
+	for _, tc := range testCases {
+		backoffFunc := NewExponentialBackoff(tc.backoff, tc.maxBackoff)
+		backoff := backoffFunc(2, 5)
+		if backoff < defaultRetryBackoff || backoff > defaultRetryMaxBackoff {
+			t.Errorf("backoff(%v, %v): expected between %v and %v, got %v",
+				tc.backoff, tc.maxBackoff, defaultRetryBackoff, defaultRetryMaxBackoff, backoff)
 		}
 	}
 }
