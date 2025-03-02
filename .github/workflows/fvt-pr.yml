@@ -9,13 +9,17 @@ on:
 permissions:
   contents: read  # for actions/checkout to fetch code
 
+env:
+  # Use the Go toolchain installed by setup-go
+  GOTOOLCHAIN: local
+
 jobs:
   fvt:
     name: Test with Kafka ${{ matrix.kafka-version }}
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.23.x]
+        go-version: [stable]
         kafka-version: [1.0.2, 2.6.3, 3.6.2, 3.8.1, 4.0.0]
         include:
         - kafka-version: 1.0.2

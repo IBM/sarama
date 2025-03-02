@@ -1,6 +1,6 @@
 module github.com/IBM/sarama/examples/sasl_scram_client
 
-go 1.21
+go 1.23.0
 
 require (
 	github.com/IBM/sarama v1.45.0
