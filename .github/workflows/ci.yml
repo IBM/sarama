@@ -46,7 +46,7 @@ jobs:
       shell: bash
       env:
         BUILDTAGS: "functional"
-        VERSION: "v0.5.1"
+        VERSION: "v0.6.0"
       run: |
         go install "honnef.co/go/tools/cmd/staticcheck@${VERSION}"
         echo "::add-matcher::./.github/actions/staticcheck-matchers.json"
