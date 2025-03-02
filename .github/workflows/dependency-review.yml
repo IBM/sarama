@@ -14,6 +14,10 @@ on:
     paths-ignore:
     - '**/*.md'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 permissions:
   contents: read  # for actions/checkout to fetch code
 

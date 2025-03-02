@@ -10,6 +10,10 @@ on:
   schedule:
   - cron: "39 12 * * 1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 permissions:
   contents: read  # for actions/checkout to fetch code
 
