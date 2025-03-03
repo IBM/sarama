@@ -86,10 +86,26 @@ func (ps *produceSet) add(msg *ProducerMessage) error {
 
 	if ps.parent.conf.Version.IsAtLeast(V0_11_0_0) {
 		if ps.parent.conf.Producer.Idempotent && msg.sequenceNumber < set.recordsToSend.RecordBatch.FirstSequence {
+			Logger.Println(
+				"assertion failed: message out of sequence added to batch",
+				"producer_id",
+				ps.producerID,
+				set.recordsToSend.RecordBatch.ProducerID,
+				"producer_epoch",
+				ps.producerEpoch,
+				set.recordsToSend.RecordBatch.ProducerEpoch,
+				"sequence_number",
+				msg.sequenceNumber,
+				set.recordsToSend.RecordBatch.FirstSequence,
+				"buffer_count",
+				ps.bufferCount,
+				"msg_has_sequence",
+				msg.hasSequence)
 			return errors.New("assertion failed: message out of sequence added to a batch")
 		}
 	}
 
+	msg.hasBeenBatched = true
 	// Past this point we can't return an error, because we've already added the message to the set.
 	set.msgs = append(set.msgs, msg)
 
