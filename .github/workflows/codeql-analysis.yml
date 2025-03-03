@@ -10,8 +10,16 @@ on:
   schedule:
   - cron: "39 12 * * 1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 permissions:
   contents: read  # for actions/checkout to fetch code
+
+env:
+  # Use the Go toolchain installed by setup-go
+  GOTOOLCHAIN: local
 
 jobs:
   analyze:
@@ -37,7 +45,7 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
       with:
-        go-version: 1.23.x
+        go-version: stable
     - name: Autobuild
       uses: github/codeql-action/autobuild@b56ba49b26e50535fa1e7f7db0f4f7b4bf65d80d # v3.28.10
     - name: Perform CodeQL Analysis

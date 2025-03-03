@@ -12,8 +12,16 @@ on:
     paths-ignore:
     - '**/*.md'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
 permissions:
   contents: read  # for actions/checkout to fetch code
+
+env:
+  # Use the Go toolchain installed by setup-go
+  GOTOOLCHAIN: local
 
 jobs:
   test:
@@ -28,6 +36,6 @@ jobs:
     - name: Setup Go
       uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
       with:
-        go-version: 1.23.x
+        go-version: stable
     - name: Run any fuzzing tests
       run: go test -list . | grep '^Fuzz' | parallel 'go test -v -run=^{}$ -fuzz=^{}$ -fuzztime=5m'

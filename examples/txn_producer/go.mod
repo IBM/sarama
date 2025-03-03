@@ -1,6 +1,6 @@
 module github.com/IBM/sarama/examples/txn_producer
 
-go 1.21
+go 1.23.0
 
 require (
 	github.com/IBM/sarama v1.45.0
