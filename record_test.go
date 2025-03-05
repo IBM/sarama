@@ -3,6 +3,7 @@
 package sarama
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -252,5 +253,42 @@ func TestRecordBatchDecoding(t *testing.T) {
 		if !reflect.DeepEqual(batch, tc.batch) {
 			t.Error(spew.Sprintf("invalid decode of %s\ngot %+v\nwanted %+v", tc.name, batch, tc.batch))
 		}
+	}
+}
+
+func TestRecordBatchInvalidNumRecords(t *testing.T) {
+	encodedBatch := []byte{
+		0, 0, 0, 0, 0, 0, 0, 0, // First Offset
+		0, 0, 0, 70, // Length
+		0, 0, 0, 0, // Partition Leader Epoch
+		2,               // Version
+		91, 48, 202, 99, // CRC
+		0, 0, // Attributes
+		0, 0, 0, 0, // Last Offset Delta
+		0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
+		0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
+		0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
+		0, 0, // Producer Epoch
+		0, 0, 0, 0, // First Sequence
+		0, 1, 255, 255, // Number of Records - 1 + 2*math.MaxUint16
+		40, // Record Length
+		0,  // Attributes
+		10, // Timestamp Delta
+		0,  // Offset Delta
+		8,  // Key Length
+		1, 2, 3, 4,
+		6, // Value Length
+		5, 6, 7,
+		2,        // Number of Headers
+		6,        // Header Key Length
+		8, 9, 10, // Header Key
+		4,      // Header Value Length
+		11, 12, // Header Value
+	}
+
+	batch := RecordBatch{}
+	err := decode(encodedBatch, &batch, nil)
+	if err != ErrInsufficientData {
+		t.Fatal(fmt.Errorf("was suppose to get ErrInsufficientData, instead got: %w", err))
 	}
 }

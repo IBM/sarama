@@ -121,6 +121,20 @@ func (rd *realDecoder) getArrayLength() (int, error) {
 	return tmp, nil
 }
 
+func (rd *realDecoder) getArrayLengthNoLimit() (int, error) {
+	if rd.remaining() < 4 {
+		rd.off = len(rd.raw)
+		return -1, ErrInsufficientData
+	}
+	tmp := int(int32(binary.BigEndian.Uint32(rd.raw[rd.off:])))
+	rd.off += 4
+	if tmp > rd.remaining() {
+		rd.off = len(rd.raw)
+		return -1, ErrInsufficientData
+	}
+	return tmp, nil
+}
+
 func (rd *realDecoder) getCompactArrayLength() (int, error) {
 	n, err := rd.getUVarint()
 	if err != nil {
