@@ -157,11 +157,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	// Using NoLimit because a single record batch could contain
-	// more then 2*math.MaxUint16 records. The packet decoder will
-	// check to make sure the array is not greater than the
-	// remaining bytes.
-	numRecs, err := pd.getArrayLengthNoLimit()
+	numRecs, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
