@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/eapache/go-resiliency/breaker"
 	"github.com/eapache/queue"
 	"github.com/rcrowley/go-metrics"
+	"golang.org/x/sync/semaphore"
 )
 
 // ErrProducerRetryBufferOverflow is returned when the bridging retry buffer is full and OOM prevention needs to be applied.
@@ -791,6 +793,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		bridge    = make(chan *produceSet)
 		pending   = make(chan *brokerProducerResponse)
 		responses = make(chan *brokerProducerResponse)
+		weighted  = semaphore.NewWeighted(int64(p.conf.Net.MaxOpenRequests))
 	)
 
 	bp := &brokerProducer{
@@ -804,13 +807,14 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 	}
 	go withRecover(bp.run)
 
+	ctx := context.Background()
 	// minimal bridge to make the network response `select`able
 	go withRecover(func() {
 		// Use a wait group to know if we still have in flight requests
 		var wg sync.WaitGroup
-
 		for set := range bridge {
 			request := set.buildRequest()
+			_ = weighted.Acquire(ctx, 1)
 
 			// Count the in flight requests to know when we can close the pending channel safely
 			wg.Add(1)
@@ -824,6 +828,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 						res: response,
 					}
 					wg.Done()
+					weighted.Release(1)
 				}
 			}(set)
 
