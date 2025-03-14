@@ -87,7 +87,7 @@ func (sp *SyncProducer) SendMessage(msg *sarama.ProducerMessage) (partition int3
 		if errors.Is(expectation.Result, errProduceSuccess) {
 			sp.lastOffset++
 			msg.Offset = sp.lastOffset
-			return 0, msg.Offset, nil
+			return msg.Partition, msg.Offset, nil
 		}
 		return -1, -1, expectation.Result
 	}
