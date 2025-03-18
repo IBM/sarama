@@ -51,7 +51,12 @@ func TestFuncAdminQuotas(t *testing.T) {
 	}
 
 	// Check that we now have a quota entry
-	quotas, err = adminClient.DescribeClientQuotas(nil, false)
+	// Check that we can query a specific quota entry
+	defaultUserFilter := QuotaFilterComponent{
+		EntityType: QuotaEntityUser,
+		MatchType:  QuotaMatchDefault,
+	}
+	quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{defaultUserFilter}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
