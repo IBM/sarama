@@ -51,7 +51,6 @@ func TestFuncAdminQuotas(t *testing.T) {
 	}
 
 	// Check that we now have a quota entry
-	// Check that we can query a specific quota entry
 	defaultUserFilter := QuotaFilterComponent{
 		EntityType: QuotaEntityUser,
 		MatchType:  QuotaMatchDefault,
