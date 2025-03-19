@@ -13,8 +13,8 @@ var (
 	describeClientQuotasRequestDefaultUser = []byte{
 		0, 0, 0, 1, // components len
 		0, 4, 'u', 's', 'e', 'r', // entity type
-		1,    // match type (default)
-		0, 0, // match *string
+		1,        // match type (default)
+		255, 255, // match *string
 		0, // strict
 	}
 
@@ -32,8 +32,8 @@ var (
 		2,        // match type (any)
 		255, 255, // match *string
 		0, 9, 'c', 'l', 'i', 'e', 'n', 't', '-', 'i', 'd', // entity type
-		1,    // match type (default)
-		0, 0, // match *string
+		1,        // match type (default)
+		255, 255, // match *string
 		0, // strict
 	}
 )
