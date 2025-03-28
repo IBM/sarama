@@ -2,6 +2,8 @@ module github.com/IBM/sarama/examples/sasl_scram_client
 
 go 1.23.0
 
+toolchain go1.24.1
+
 require (
 	github.com/IBM/sarama v1.45.0
 	github.com/xdg-go/scram v1.1.2
@@ -27,7 +29,7 @@ require (
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 )
 
