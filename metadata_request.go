@@ -45,25 +45,25 @@ func NewMetadataRequest(version KafkaVersion, topics []string) *MetadataRequest 
 	return m
 }
 
-func NewNegotiatedMetadataRequest(version KafkaVersion, brokerMinMaxVersions [2]int16, topics []string) (*MetadataRequest, error) {
+func NewNegotiatedMetadataRequest(version KafkaVersion, minVersion, maxVersion int16, topics []string) (*MetadataRequest, error) {
 	m := &MetadataRequest{Topics: topics}
-	if version.IsAtLeast(V2_8_0_0) && brokerMinMaxVersions[0] <= 10 && brokerMinMaxVersions[1] >= 10 {
+	if version.IsAtLeast(V2_8_0_0) && minVersion <= 10 && maxVersion >= 10 {
 		m.Version = 10
-	} else if version.IsAtLeast(V2_4_0_0) && brokerMinMaxVersions[0] <= 9 && brokerMinMaxVersions[1] >= 9 {
+	} else if version.IsAtLeast(V2_4_0_0) && minVersion <= 9 && maxVersion >= 9 {
 		m.Version = 9
-	} else if version.IsAtLeast(V2_3_0_0) && brokerMinMaxVersions[0] <= 8 && brokerMinMaxVersions[1] >= 8 {
+	} else if version.IsAtLeast(V2_3_0_0) && minVersion <= 8 && maxVersion >= 8 {
 		m.Version = 8
-	} else if version.IsAtLeast(V2_1_0_0) && brokerMinMaxVersions[0] <= 7 && brokerMinMaxVersions[1] >= 7 {
+	} else if version.IsAtLeast(V2_1_0_0) && minVersion <= 7 && maxVersion >= 7 {
 		m.Version = 7
-	} else if version.IsAtLeast(V2_0_0_0) && brokerMinMaxVersions[0] <= 6 && brokerMinMaxVersions[1] >= 6 {
+	} else if version.IsAtLeast(V2_0_0_0) && minVersion <= 6 && maxVersion >= 6 {
 		m.Version = 6
-	} else if version.IsAtLeast(V1_0_0_0) && brokerMinMaxVersions[0] <= 5 && brokerMinMaxVersions[1] >= 5 {
+	} else if version.IsAtLeast(V1_0_0_0) && minVersion <= 5 && maxVersion >= 5 {
 		m.Version = 5
-	} else if version.IsAtLeast(V0_11_0_0) && brokerMinMaxVersions[0] <= 4 && brokerMinMaxVersions[1] >= 4 {
+	} else if version.IsAtLeast(V0_11_0_0) && minVersion <= 4 && maxVersion >= 4 {
 		m.Version = 4
-	} else if version.IsAtLeast(V0_10_1_0) && brokerMinMaxVersions[0] <= 2 && brokerMinMaxVersions[1] >= 2 {
+	} else if version.IsAtLeast(V0_10_1_0) && minVersion <= 2 && maxVersion >= 2 {
 		m.Version = 2
-	} else if version.IsAtLeast(V0_10_0_0) && brokerMinMaxVersions[0] <= 1 && brokerMinMaxVersions[1] >= 1 {
+	} else if version.IsAtLeast(V0_10_0_0) && minVersion <= 1 && maxVersion >= 1 {
 		m.Version = 1
 	} else {
 		return nil, PacketEncodingError{"no supported version found for MetadataRequest"}
