@@ -1028,7 +1028,7 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	}
 
 	// validate the request is using a supported API version
-	if b.brokerAPIVersions != nil && b.brokerAPIVersions[rb.key()] != [2]int16{0, 0} {
+	if b.brokerAPIVersions[rb.key()] != [2]int16{0, 0} {
 		minMax := b.brokerAPIVersions[rb.key()]
 		if rb.version() < minMax[0] || rb.version() > minMax[1] {
 			return fmt.Errorf("%w: unsupported API version %d for %s, supported versions are [%d-%d]",
