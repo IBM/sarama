@@ -1031,9 +1031,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	if b.brokerAPIVersions != nil && b.brokerAPIVersions[rb.key()] != [2]int16{0, 0} {
 		minMax := b.brokerAPIVersions[rb.key()]
 		if rb.version() < minMax[0] || rb.version() > minMax[1] {
-			return fmt.Errorf("unsupported API version %d for %s, supported versions are [%d-%d]",
+			return fmt.Errorf("%w: unsupported API version %d for %s, supported versions are [%d-%d]",
 				// protocolBody is a *sarama.XXXRequest
-				rb.version(), reflect.TypeOf(rb).Elem().Name(), minMax[0], minMax[1])
+				ErrUnsupportedVersion, rb.version(), reflect.TypeOf(rb).Elem().Name(), minMax[0], minMax[1])
 		}
 	}
 
