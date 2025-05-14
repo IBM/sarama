@@ -8,7 +8,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -36,7 +35,7 @@ type Broker struct {
 
 	// brokerAPIVersions stores the broker-advertised min/max API versions for each
 	// request key, if ApiVersionsRequest is enabled.
-	brokerAPIVersions map[int16][2]int16
+	brokerAPIVersions map[int16]*ApiVersionsResponseKey
 
 	metricRegistry             metrics.Registry
 	incomingByteRate           metrics.Meter
@@ -208,9 +207,9 @@ func (b *Broker) Open(conf *Config) error {
 				b.lock.Lock()
 				defer b.lock.Unlock()
 
-				b.brokerAPIVersions = make(map[int16][2]int16, len(apiVersionsResponse.ApiKeys))
-				for _, key := range apiVersionsResponse.ApiKeys {
-					b.brokerAPIVersions[key.ApiKey] = [2]int16{key.MinVersion, key.MaxVersion}
+				b.brokerAPIVersions = make(map[int16]*ApiVersionsResponseKey, len(apiVersionsResponse.ApiKeys))
+				for i, key := range apiVersionsResponse.ApiKeys {
+					b.brokerAPIVersions[key.ApiKey] = &apiVersionsResponse.ApiKeys[i]
 				}
 			}
 		}()
@@ -1028,12 +1027,10 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	}
 
 	// validate the request is using a supported API version
-	if b.brokerAPIVersions[rb.key()] != [2]int16{0, 0} {
-		minMax := b.brokerAPIVersions[rb.key()]
-		if rb.version() < minMax[0] || rb.version() > minMax[1] {
-			return fmt.Errorf("%w: unsupported API version %d for %s, supported versions are [%d-%d]",
-				// protocolBody is a *sarama.XXXRequest
-				ErrUnsupportedVersion, rb.version(), reflect.TypeOf(rb).Elem().Name(), minMax[0], minMax[1])
+	if apiVersions, ok := b.brokerAPIVersions[rb.key()]; ok {
+		if rb.version() < apiVersions.MinVersion || rb.version() > apiVersions.MaxVersion {
+			return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are [%d-%d]",
+				ErrUnsupportedVersion, rb.version(), rb, apiVersions.MinVersion, apiVersions.MaxVersion)
 		}
 	}
 
