@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -1024,6 +1025,16 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
 		return ErrUnsupportedVersion
+	}
+
+	// validate the request is using a supported API version
+	if b.brokerAPIVersions != nil && b.brokerAPIVersions[rb.key()] != [2]int16{0, 0} {
+		minMax := b.brokerAPIVersions[rb.key()]
+		if rb.version() < minMax[0] || rb.version() > minMax[1] {
+			return fmt.Errorf("unsupported API version %d for %s, supported versions are [%d-%d]",
+				// protocolBody is a *sarama.XXXRequest
+				rb.version(), reflect.TypeOf(rb).Elem().Name(), minMax[0], minMax[1])
+		}
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
