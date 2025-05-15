@@ -208,8 +208,9 @@ func (b *Broker) Open(conf *Config) error {
 				defer b.lock.Unlock()
 
 				b.brokerAPIVersions = make(map[int16]*ApiVersionsResponseKey, len(apiVersionsResponse.ApiKeys))
-				for i, key := range apiVersionsResponse.ApiKeys {
-					b.brokerAPIVersions[key.ApiKey] = &apiVersionsResponse.ApiKeys[i]
+				for _, key := range apiVersionsResponse.ApiKeys {
+					key := key
+					b.brokerAPIVersions[key.ApiKey] = &key
 				}
 			}
 		}()
@@ -1027,7 +1028,7 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	}
 
 	// validate the request is using a supported API version
-	if apiVersions, ok := b.brokerAPIVersions[rb.key()]; ok {
+	if apiVersions := b.brokerAPIVersions[rb.key()]; apiVersions != nil {
 		if rb.version() < apiVersions.MinVersion || rb.version() > apiVersions.MaxVersion {
 			return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are [%d-%d]",
 				ErrUnsupportedVersion, rb.version(), rb, apiVersions.MinVersion, apiVersions.MaxVersion)
