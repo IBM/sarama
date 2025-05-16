@@ -33,6 +33,10 @@ type Broker struct {
 	responses     chan *responsePromise
 	done          chan bool
 
+	// brokerAPIVersions stores the broker-advertised min/max API versions for each
+	// request key, if ApiVersionsRequest is enabled.
+	brokerAPIVersions map[int16]*ApiVersionsResponseKey
+
 	metricRegistry             metrics.Registry
 	incomingByteRate           metrics.Meter
 	requestRate                metrics.Meter
@@ -187,16 +191,26 @@ func (b *Broker) Open(conf *Config) error {
 			b.lock.Unlock()
 
 			// Send an ApiVersionsRequest to identify the client (KIP-511).
-			// Ideally Sarama would use the response to control protocol versions,
-			// but for now just fire-and-forget just to send
+			// Store the response in the brokerAPIVersions map.
+			// It will be used to determine the supported API versions for each request.
 			if usingApiVersionsRequests {
-				_, err = b.ApiVersions(&ApiVersionsRequest{
+				apiVersionsResponse, err := b.ApiVersions(&ApiVersionsRequest{
 					Version:               3,
 					ClientSoftwareName:    defaultClientSoftwareName,
 					ClientSoftwareVersion: version(),
 				})
 				if err != nil {
 					Logger.Printf("Error while sending ApiVersionsRequest to broker %s: %s\n", b.addr, err)
+					return
+				}
+
+				b.lock.Lock()
+				defer b.lock.Unlock()
+
+				b.brokerAPIVersions = make(map[int16]*ApiVersionsResponseKey, len(apiVersionsResponse.ApiKeys))
+				for _, key := range apiVersionsResponse.ApiKeys {
+					key := key
+					b.brokerAPIVersions[key.ApiKey] = &key
 				}
 			}
 		}()
@@ -1011,6 +1025,14 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
 		return ErrUnsupportedVersion
+	}
+
+	// validate the request is using a supported API version
+	if apiVersions := b.brokerAPIVersions[rb.key()]; apiVersions != nil {
+		if rb.version() < apiVersions.MinVersion || rb.version() > apiVersions.MaxVersion {
+			return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+				ErrUnsupportedVersion, rb.version(), rb, apiVersions.MinVersion, apiVersions.MaxVersion)
+		}
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}
