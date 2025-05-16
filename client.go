@@ -988,13 +988,12 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 		// negotiate request version if enabled
 		if apiVersion := broker.brokerAPIVersions[req.key()]; apiVersion != nil {
-			negotiatedReq, err := NewNegotiatedMetadataRequest(client.conf.Version, apiVersion.MinVersion, apiVersion.MaxVersion, topics)
+			var err error
+			req, err = NewNegotiatedMetadataRequest(client.conf.Version, apiVersion.MinVersion, apiVersion.MaxVersion, topics)
 			if err != nil {
 				Logger.Printf("client/metadata failed to negotiate metadata request version: %v", err)
 				return retry(err)
 			}
-
-			req = negotiatedReq
 		}
 
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
