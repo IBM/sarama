@@ -43,7 +43,7 @@ jobs:
       uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
       id: buildx
     - name: Build FVT Docker Image
-      uses: docker/bake-action@4f08b22a19b3133912e9acbf7da9bfa25184a173 # v6.4.0
+      uses: docker/bake-action@212c36739681a6271d58dcfe0d001d2ad13f8e75 # v6.7.0
       with:
         builder: ${{ steps.buildx.outputs.name }}
         files: docker-compose.yml
