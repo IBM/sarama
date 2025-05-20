@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type TxnOffsetCommitRequest struct {
 	Version         int16
 	TransactionalID string
@@ -158,5 +160,14 @@ func (p *PartitionOffsetMetadata) decode(pd packetDecoder, version int16) (err e
 		return err
 	}
 
+	return nil
+}
+
+func (a *TxnOffsetCommitRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxVersion)
+	}
+	a.Version = max(a.Version, maxVersion)
 	return nil
 }

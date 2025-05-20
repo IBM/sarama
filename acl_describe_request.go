@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DescribeAclsRequest is a describe acl request type
 type DescribeAclsRequest struct {
 	Version int
@@ -40,4 +42,13 @@ func (d *DescribeAclsRequest) requiredVersion() KafkaVersion {
 	default:
 		return V0_11_0_0
 	}
+}
+
+func (d *DescribeAclsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if int16(d.Version) < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, d, d.Version, minVersion, maxVersion)
+	}
+	d.Version = int(max(int16(d.Version), maxVersion))
+	return nil
 }

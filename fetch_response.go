@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"time"
 
@@ -598,4 +599,13 @@ func (r *FetchResponse) SetLastOffsetDelta(topic string, partition int32, offset
 func (r *FetchResponse) SetLastStableOffset(topic string, partition int32, offset int64) {
 	frb := r.getOrCreateBlock(topic, partition)
 	frb.LastStableOffset = offset
+}
+
+func (r *FetchResponse) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

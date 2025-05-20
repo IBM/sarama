@@ -1,5 +1,9 @@
 package sarama
 
+import (
+	"fmt"
+)
+
 type GroupProtocol struct {
 	// Name contains the protocol name.
 	Name string
@@ -205,5 +209,14 @@ func (r *JoinGroupRequest) AddGroupProtocolMetadata(name string, metadata *Consu
 	}
 
 	r.AddGroupProtocol(name, bin)
+	return nil
+}
+
+func (r *JoinGroupRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
 	return nil
 }

@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type DescribeConfigsRequest struct {
 	Version         int16
 	Resources       []*ConfigResource
@@ -118,4 +120,13 @@ func (r *DescribeConfigsRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_0_0_0
 	}
+}
+
+func (r *DescribeConfigsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

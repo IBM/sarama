@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type SaslAuthenticateRequest struct {
 	// Version defines the protocol version to use for encode and decode
 	Version       int16
@@ -42,4 +44,13 @@ func (r *SaslAuthenticateRequest) requiredVersion() KafkaVersion {
 	default:
 		return V1_0_0_0
 	}
+}
+
+func (r *SaslAuthenticateRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

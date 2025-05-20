@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type OffsetCommitResponse struct {
 	Version        int16
@@ -102,6 +105,15 @@ func (r *OffsetCommitResponse) headerVersion() int16 {
 
 func (r *OffsetCommitResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 7
+}
+
+func (r *OffsetCommitResponse) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *OffsetCommitResponse) requiredVersion() KafkaVersion {

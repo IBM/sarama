@@ -1023,16 +1023,15 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 
 // b.lock must be held by caller
 func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
-	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
-		return ErrUnsupportedVersion
+	// restrict the request to a supported API version
+	if apiVersions := b.brokerAPIVersions[rb.key()]; apiVersions != nil {
+		if err := rb.restrictApiVersion(apiVersions.MinVersion, apiVersions.MaxVersion); err != nil {
+			return err
+		}
 	}
 
-	// validate the request is using a supported API version
-	if apiVersions := b.brokerAPIVersions[rb.key()]; apiVersions != nil {
-		if rb.version() < apiVersions.MinVersion || rb.version() > apiVersions.MaxVersion {
-			return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
-				ErrUnsupportedVersion, rb.version(), rb, apiVersions.MinVersion, apiVersions.MaxVersion)
-		}
+	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
+		return ErrUnsupportedVersion
 	}
 
 	req := &request{correlationID: b.correlationID, clientID: b.conf.ClientID, body: rb}

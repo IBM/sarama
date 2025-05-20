@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type ListPartitionReassignmentsRequest struct {
 	TimeoutMs int32
 	blocks    map[string][]int32
@@ -99,4 +101,13 @@ func (r *ListPartitionReassignmentsRequest) AddBlock(topic string, partitionIDs 
 	if r.blocks[topic] == nil {
 		r.blocks[topic] = partitionIDs
 	}
+}
+
+func (r *ListPartitionReassignmentsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

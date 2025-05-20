@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type HeartbeatRequest struct {
 	Version         int16
 	GroupId         string
@@ -77,4 +79,13 @@ func (r *HeartbeatRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_3_0_0
 	}
+}
+
+func (r *HeartbeatRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

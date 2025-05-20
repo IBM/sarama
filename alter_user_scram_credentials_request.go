@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type AlterUserScramCredentialsRequest struct {
 	Version int16
 
@@ -143,4 +145,13 @@ func (r *AlterUserScramCredentialsRequest) isValidVersion() bool {
 
 func (r *AlterUserScramCredentialsRequest) requiredVersion() KafkaVersion {
 	return V2_7_0_0
+}
+
+func (r *AlterUserScramCredentialsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

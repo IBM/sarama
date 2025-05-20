@@ -14,6 +14,7 @@ type protocolBody interface {
 	headerVersion() int16
 	isValidVersion() bool
 	requiredVersion() KafkaVersion
+	restrictApiVersion(minVersion, maxVersion int16) error
 }
 
 type request struct {

@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type OffsetFetchRequest struct {
 	Version       int16
 	ConsumerGroup string
@@ -247,4 +249,13 @@ func (r *OffsetFetchRequest) AddPartition(topic string, partitionID int32) {
 	}
 
 	r.partitions[topic] = append(r.partitions[topic], partitionID)
+}
+
+func (r *OffsetFetchRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

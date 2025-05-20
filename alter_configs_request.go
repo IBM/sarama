@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // AlterConfigsRequest is an alter config request type
 type AlterConfigsRequest struct {
 	Version      int16
@@ -135,4 +137,13 @@ func (a *AlterConfigsRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_0_0_0
 	}
+}
+
+func (a *AlterConfigsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxVersion)
+	}
+	a.Version = max(a.Version, maxVersion)
+	return nil
 }

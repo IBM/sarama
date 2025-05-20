@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type SyncGroupResponse struct {
 	// Version defines the protocol version to use for encode and decode
@@ -61,6 +64,15 @@ func (r *SyncGroupResponse) headerVersion() int16 {
 
 func (r *SyncGroupResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 3
+}
+
+func (r *SyncGroupResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *SyncGroupResponse) requiredVersion() KafkaVersion {

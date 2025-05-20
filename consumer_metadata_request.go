@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // ConsumerMetadataRequest is used for metadata requests
 type ConsumerMetadataRequest struct {
 	Version       int16
@@ -48,4 +50,13 @@ func (r *ConsumerMetadataRequest) requiredVersion() KafkaVersion {
 	default:
 		return V0_8_2_0
 	}
+}
+
+func (r *ConsumerMetadataRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

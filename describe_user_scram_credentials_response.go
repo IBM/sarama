@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type ScramMechanismType int8
 
@@ -173,4 +176,13 @@ func (r *DescribeUserScramCredentialsResponse) requiredVersion() KafkaVersion {
 
 func (r *DescribeUserScramCredentialsResponse) throttleTime() time.Duration {
 	return r.ThrottleTime
+}
+
+func (r *DescribeUserScramCredentialsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

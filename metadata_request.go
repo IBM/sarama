@@ -1,6 +1,9 @@
 package sarama
 
-import "encoding/base64"
+import (
+	"encoding/base64"
+	"fmt"
+)
 
 type Uuid [16]byte
 
@@ -43,32 +46,6 @@ func NewMetadataRequest(version KafkaVersion, topics []string) *MetadataRequest 
 		m.Version = 1
 	}
 	return m
-}
-
-func NewNegotiatedMetadataRequest(version KafkaVersion, minVersion, maxVersion int16, topics []string) (*MetadataRequest, error) {
-	m := &MetadataRequest{Topics: topics}
-	if version.IsAtLeast(V2_8_0_0) && minVersion <= 10 && maxVersion >= 10 {
-		m.Version = 10
-	} else if version.IsAtLeast(V2_4_0_0) && minVersion <= 9 && maxVersion >= 9 {
-		m.Version = 9
-	} else if version.IsAtLeast(V2_3_0_0) && minVersion <= 8 && maxVersion >= 8 {
-		m.Version = 8
-	} else if version.IsAtLeast(V2_1_0_0) && minVersion <= 7 && maxVersion >= 7 {
-		m.Version = 7
-	} else if version.IsAtLeast(V2_0_0_0) && minVersion <= 6 && maxVersion >= 6 {
-		m.Version = 6
-	} else if version.IsAtLeast(V1_0_0_0) && minVersion <= 5 && maxVersion >= 5 {
-		m.Version = 5
-	} else if version.IsAtLeast(V0_11_0_0) && minVersion <= 4 && maxVersion >= 4 {
-		m.Version = 4
-	} else if version.IsAtLeast(V0_10_1_0) && minVersion <= 2 && maxVersion >= 2 {
-		m.Version = 2
-	} else if version.IsAtLeast(V0_10_0_0) && minVersion <= 1 && maxVersion >= 1 {
-		m.Version = 1
-	} else {
-		return nil, PacketEncodingError{"no supported version found for MetadataRequest"}
-	}
-	return m, nil
 }
 
 func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
@@ -263,4 +240,13 @@ func (r *MetadataRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_8_0_0
 	}
+}
+
+func (m *MetadataRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if m.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, m, m.Version, minVersion, maxVersion)
+	}
+	m.Version = max(m.Version, maxVersion)
+	return nil
 }

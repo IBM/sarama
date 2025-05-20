@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // AddPartitionsToTxnRequest is a add partition request
 type AddPartitionsToTxnRequest struct {
 	Version         int16
@@ -90,4 +92,13 @@ func (a *AddPartitionsToTxnRequest) requiredVersion() KafkaVersion {
 	default:
 		return V0_11_0_0
 	}
+}
+
+func (a *AddPartitionsToTxnRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxVersion)
+	}
+	a.Version = max(a.Version, maxVersion)
+	return nil
 }
