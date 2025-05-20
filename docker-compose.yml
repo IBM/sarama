@@ -1,7 +1,7 @@
 services:
   zookeeper-1:
     container_name: 'zookeeper-1'
-    image: 'docker.io/library/zookeeper:3.7.2'
+    image: 'docker.io/library/zookeeper:3.9.3'
     init: true
     restart: always
     environment:
@@ -14,7 +14,7 @@ services:
       ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   zookeeper-2:
     container_name: 'zookeeper-2'
-    image: 'docker.io/library/zookeeper:3.7.2'
+    image: 'docker.io/library/zookeeper:3.9.3'
     init: true
     restart: always
     environment:
@@ -27,7 +27,7 @@ services:
       ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
   zookeeper-3:
     container_name: 'zookeeper-3'
-    image: 'docker.io/library/zookeeper:3.7.2'
+    image: 'docker.io/library/zookeeper:3.9.3'
     init: true
     restart: always
     environment:
