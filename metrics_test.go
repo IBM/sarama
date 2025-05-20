@@ -38,3 +38,27 @@ func TestGetMetricNameForBroker(t *testing.T) {
 		t.Error("Unexpected metric name", metricName)
 	}
 }
+
+func Benchmark_getMetricNameForTopic(b *testing.B) {
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		name := getMetricNameForTopic("sarama", "says.hello")
+		if name != "sarama-for-topic-says_hello" {
+			b.Fail()
+		}
+	}
+}
+
+func Benchmark_getMetricNameForBroker(b *testing.B) {
+	broker := &Broker{id: 1965}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		name := getMetricNameForBroker("summer", broker)
+		if name != "summer-for-broker-1965" {
+			b.Fail()
+		}
+	}
+}
