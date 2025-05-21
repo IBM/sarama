@@ -985,7 +985,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		}
 
 		req := NewMetadataRequest(client.conf.Version, topics)
+
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
+
 		atomic.StoreInt64(&client.updateMetadataMs, time.Now().UnixMilli())
 
 		response, err := broker.GetMetadata(req)

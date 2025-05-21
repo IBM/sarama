@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // AlterClientQuotas Request (Version: 0) => [entries] validate_only
 //   entries => [entity] [ops]
 //     entity => entity_type entity_name
@@ -196,4 +198,13 @@ func (a *AlterClientQuotasRequest) isValidVersion() bool {
 
 func (a *AlterClientQuotasRequest) requiredVersion() KafkaVersion {
 	return V2_6_0_0
+}
+
+func (a *AlterClientQuotasRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxVersion)
+	}
+	a.Version = max(a.Version, maxVersion)
+	return nil
 }

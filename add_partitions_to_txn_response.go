@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -127,5 +128,14 @@ func (p *PartitionError) decode(pd packetDecoder, version int16) (err error) {
 	}
 	p.Err = KError(kerr)
 
+	return nil
+}
+
+func (a *AddPartitionsToTxnResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if a.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			a, a.Version, minVersion, maxVersion)
+	}
+	a.Version = max(a.Version, maxVersion)
 	return nil
 }

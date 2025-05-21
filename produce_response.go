@@ -235,3 +235,12 @@ func (r *ProduceResponse) AddTopicPartition(topic string, partition int32, err K
 	}
 	byTopic[partition] = block
 }
+
+func (r *ProduceResponse) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
+}

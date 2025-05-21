@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // ApiVersionsResponseKey contains the APIs supported by the broker.
 type ApiVersionsResponseKey struct {
@@ -148,6 +151,15 @@ func (r *ApiVersionsResponse) headerVersion() int16 {
 
 func (r *ApiVersionsResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 3
+}
+
+func (r *ApiVersionsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *ApiVersionsResponse) requiredVersion() KafkaVersion {

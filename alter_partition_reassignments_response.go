@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type alterPartitionReassignmentsErrorBlock struct {
 	errorCode    KError
@@ -144,6 +147,15 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 
 func (r *AlterPartitionReassignmentsResponse) key() int16 {
 	return 45
+}
+
+func (r *AlterPartitionReassignmentsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *AlterPartitionReassignmentsResponse) version() int16 {

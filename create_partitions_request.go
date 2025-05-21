@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type CreatePartitionsRequest struct {
 	Version         int16
@@ -85,6 +88,15 @@ func (r *CreatePartitionsRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_0_0_0
 	}
+}
+
+func (r *CreatePartitionsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 type TopicPartition struct {

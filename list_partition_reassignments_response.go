@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type PartitionReplicaReassignmentsStatus struct {
 	Replicas         []int32
@@ -156,6 +159,15 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 
 func (r *ListPartitionReassignmentsResponse) key() int16 {
 	return 46
+}
+
+func (r *ListPartitionReassignmentsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *ListPartitionReassignmentsResponse) version() int16 {

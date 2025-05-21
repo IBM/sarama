@@ -334,3 +334,12 @@ func (r *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int
 
 	r.blocks[topic][partitionID] = tmp
 }
+
+func (r *FetchRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
+}

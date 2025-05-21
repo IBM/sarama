@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type MemberResponse struct {
 	MemberId        string
@@ -87,6 +90,15 @@ func (r *LeaveGroupResponse) headerVersion() int16 {
 
 func (r *LeaveGroupResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 3
+}
+
+func (r *LeaveGroupResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *LeaveGroupResponse) requiredVersion() KafkaVersion {

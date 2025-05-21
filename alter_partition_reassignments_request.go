@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type alterPartitionReassignmentsBlock struct {
 	replicas []int32
 }
@@ -131,4 +133,13 @@ func (r *AlterPartitionReassignmentsRequest) AddBlock(topic string, partitionID 
 	}
 
 	r.blocks[topic][partitionID] = &alterPartitionReassignmentsBlock{replicas}
+}
+
+func (r *AlterPartitionReassignmentsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

@@ -146,3 +146,12 @@ func (a *AlterConfigsResponse) requiredVersion() KafkaVersion {
 func (r *AlterConfigsResponse) throttleTime() time.Duration {
 	return r.ThrottleTime
 }
+
+func (a *AlterConfigsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if a.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			a, a.Version, minVersion, maxVersion)
+	}
+	a.Version = max(a.Version, maxVersion)
+	return nil
+}

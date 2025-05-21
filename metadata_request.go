@@ -1,6 +1,9 @@
 package sarama
 
-import "encoding/base64"
+import (
+	"encoding/base64"
+	"fmt"
+)
 
 type Uuid [16]byte
 
@@ -237,4 +240,13 @@ func (r *MetadataRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_8_0_0
 	}
+}
+
+func (m *MetadataRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if m.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, m, m.Version, minVersion, maxVersion)
+	}
+	m.Version = max(m.Version, maxVersion)
+	return nil
 }

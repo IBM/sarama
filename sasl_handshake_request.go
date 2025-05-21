@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type SaslHandshakeRequest struct {
 	Mechanism string
 	Version   int16
@@ -44,4 +46,13 @@ func (r *SaslHandshakeRequest) requiredVersion() KafkaVersion {
 	default:
 		return V0_10_0_0
 	}
+}
+
+func (r *SaslHandshakeRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

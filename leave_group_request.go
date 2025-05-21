@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type MemberIdentity struct {
 	MemberId        string
 	GroupInstanceId *string
@@ -98,4 +100,13 @@ func (r *LeaveGroupRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_4_0_0
 	}
+}
+
+func (r *LeaveGroupRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

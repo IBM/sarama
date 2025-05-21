@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // DeleteAclsResponse is a delete acl response
 type DeleteAclsResponse struct {
@@ -150,6 +153,15 @@ func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
 		return err
 	}
 
+	return nil
+}
+
+func (d *DeleteAclsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if d.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			d, d.Version, minVersion, maxVersion)
+	}
+	d.Version = max(d.Version, maxVersion)
 	return nil
 }
 

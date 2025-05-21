@@ -1,5 +1,9 @@
 package sarama
 
+import (
+	"fmt"
+)
+
 type offsetRequestBlock struct {
 	// currentLeaderEpoch contains the current leader epoch (used in version 4+).
 	currentLeaderEpoch int32
@@ -205,4 +209,13 @@ func (r *OffsetRequest) AddBlock(topic string, partitionID int32, timestamp int6
 	}
 
 	r.blocks[topic][partitionID] = tmp
+}
+
+func (r *OffsetRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

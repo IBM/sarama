@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type DescribeGroupsResponse struct {
 	// Version defines the protocol version to use for encode and decode
@@ -280,4 +283,13 @@ func (gmd *GroupMemberDescription) GetMemberMetadata() (*ConsumerGroupMemberMeta
 	metadata := new(ConsumerGroupMemberMetadata)
 	err := decode(gmd.MemberMetadata, metadata, nil)
 	return metadata, err
+}
+
+func (r *DescribeGroupsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }

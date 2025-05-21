@@ -1,8 +1,10 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
-// DescribeAclsResponse is a describe acl response type
 type DescribeAclsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
@@ -23,8 +25,8 @@ func (d *DescribeAclsResponse) encode(pe packetEncoder) error {
 		return err
 	}
 
-	for _, resourceAcl := range d.ResourceAcls {
-		if err := resourceAcl.encode(pe, d.Version); err != nil {
+	for _, r := range d.ResourceAcls {
+		if err := r.encode(pe, d.Version); err != nil {
 			return err
 		}
 	}
@@ -32,7 +34,8 @@ func (d *DescribeAclsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (d *DescribeAclsResponse) decode(pd packetDecoder, version int16) (err error) {
+func (d *DescribeAclsResponse) decode(pd packetDecoder, version int16) error {
+	d.Version = version
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
@@ -45,18 +48,15 @@ func (d *DescribeAclsResponse) decode(pd packetDecoder, version int16) (err erro
 	}
 	d.Err = KError(kerr)
 
-	errmsg, err := pd.getString()
-	if err != nil {
+	if d.ErrMsg, err = pd.getNullableString(); err != nil {
 		return err
-	}
-	if errmsg != "" {
-		d.ErrMsg = &errmsg
 	}
 
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
+
 	d.ResourceAcls = make([]*ResourceAcls, n)
 
 	for i := 0; i < n; i++ {
@@ -96,4 +96,13 @@ func (d *DescribeAclsResponse) requiredVersion() KafkaVersion {
 
 func (r *DescribeAclsResponse) throttleTime() time.Duration {
 	return r.ThrottleTime
+}
+
+func (d *DescribeAclsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if d.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, d, d.Version, minVersion, maxVersion)
+	}
+	d.Version = max(d.Version, maxVersion)
+	return nil
 }

@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -103,4 +104,13 @@ func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 
 func (r *TxnOffsetCommitResponse) throttleTime() time.Duration {
 	return r.ThrottleTime
+}
+
+func (t *TxnOffsetCommitResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if t.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			t, t.Version, minVersion, maxVersion)
+	}
+	t.Version = max(t.Version, maxVersion)
+	return nil
 }

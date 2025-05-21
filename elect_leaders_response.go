@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type PartitionResult struct {
 	ErrorCode    KError
@@ -149,6 +152,15 @@ func (r *ElectLeadersResponse) version() int16 {
 
 func (r *ElectLeadersResponse) headerVersion() int16 {
 	return 1
+}
+
+func (r *ElectLeadersResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	if r.Version < minVersion {
+		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
+			r, r.Version, minVersion, maxVersion)
+	}
+	r.Version = max(r.Version, maxVersion)
+	return nil
 }
 
 func (r *ElectLeadersResponse) isValidVersion() bool {
