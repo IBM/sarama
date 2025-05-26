@@ -107,10 +107,11 @@ func (r *TxnOffsetCommitResponse) throttleTime() time.Duration {
 }
 
 func (t *TxnOffsetCommitResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
 	if t.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			t, t.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, t.Version, t, minVersion, maxEncodedVersion)
 	}
-	t.Version = max(t.Version, maxVersion)
+	t.Version = min(t.Version, maxEncodedVersion)
 	return nil
 }

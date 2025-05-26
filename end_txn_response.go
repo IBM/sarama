@@ -65,10 +65,11 @@ func (r *EndTxnResponse) throttleTime() time.Duration {
 }
 
 func (e *EndTxnResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
 	if e.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			e, e.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, e.Version, e, minVersion, maxEncodedVersion)
 	}
-	e.Version = max(e.Version, maxVersion)
+	e.Version = min(e.Version, maxEncodedVersion)
 	return nil
 }

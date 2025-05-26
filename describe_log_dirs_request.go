@@ -96,10 +96,11 @@ func (r *DescribeLogDirsRequest) requiredVersion() KafkaVersion {
 }
 
 func (r *DescribeLogDirsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
 	if r.Version < minVersion {
-		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
 	}
-	r.Version = max(r.Version, maxVersion)
+	r.Version = min(r.Version, maxEncodedVersion)
 	return nil
 }

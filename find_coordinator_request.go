@@ -73,10 +73,11 @@ func (f *FindCoordinatorRequest) requiredVersion() KafkaVersion {
 }
 
 func (f *FindCoordinatorRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
 	if f.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			f, f.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, f.Version, f, minVersion, maxEncodedVersion)
 	}
-	f.Version = max(f.Version, maxVersion)
+	f.Version = min(f.Version, maxEncodedVersion)
 	return nil
 }

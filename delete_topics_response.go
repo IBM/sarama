@@ -80,11 +80,12 @@ func (d *DeleteTopicsResponse) isValidVersion() bool {
 }
 
 func (d *DeleteTopicsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
 	if d.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			d, d.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, d.Version, d, minVersion, maxEncodedVersion)
 	}
-	d.Version = max(d.Version, maxVersion)
+	d.Version = min(d.Version, maxEncodedVersion)
 	return nil
 }
 

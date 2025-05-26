@@ -58,11 +58,12 @@ func (a *IncrementalAlterConfigsResponse) key() int16 {
 }
 
 func (a *IncrementalAlterConfigsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(0, maxVersion)
 	if a.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			a, a.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, a.Version, a, minVersion, maxEncodedVersion)
 	}
-	a.Version = max(a.Version, maxVersion)
+	a.Version = min(a.Version, maxEncodedVersion)
 	return nil
 }
 

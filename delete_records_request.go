@@ -141,10 +141,11 @@ func (t *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) erro
 }
 
 func (d *DeleteRecordsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
 	if d.Version < minVersion {
-		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, d, d.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, d.Version, d, minVersion, maxEncodedVersion)
 	}
-	d.Version = max(d.Version, maxVersion)
+	d.Version = min(d.Version, maxEncodedVersion)
 	return nil
 }

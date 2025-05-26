@@ -88,11 +88,12 @@ func (i *InitProducerIDRequest) headerVersion() int16 {
 }
 
 func (i *InitProducerIDRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
 	if i.Version < minVersion {
-		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, i, i.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, i.Version, i, minVersion, maxEncodedVersion)
 	}
-	i.Version = max(i.Version, maxVersion)
+	i.Version = min(i.Version, maxEncodedVersion)
 	return nil
 }
 

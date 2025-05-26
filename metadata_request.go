@@ -243,10 +243,11 @@ func (r *MetadataRequest) requiredVersion() KafkaVersion {
 }
 
 func (m *MetadataRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(10, maxVersion)
 	if m.Version < minVersion {
-		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, m, m.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, m.Version, m, minVersion, maxEncodedVersion)
 	}
-	m.Version = max(m.Version, maxVersion)
+	m.Version = min(m.Version, maxEncodedVersion)
 	return nil
 }

@@ -175,10 +175,11 @@ func (r *ListGroupsResponse) requiredVersion() KafkaVersion {
 }
 
 func (r *ListGroupsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
 	if r.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			r, r.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
 	}
-	r.Version = max(r.Version, maxVersion)
+	r.Version = min(r.Version, maxEncodedVersion)
 	return nil
 }
