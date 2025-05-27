@@ -213,10 +213,11 @@ func (r *JoinGroupRequest) AddGroupProtocolMetadata(name string, metadata *Consu
 }
 
 func (r *JoinGroupRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(5, maxVersion)
 	if r.Version < minVersion {
 		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, r, r.Version, minVersion, maxVersion)
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxEncodedVersion)
 	}
-	r.Version = max(r.Version, maxVersion)
+	r.Version = max(r.Version, maxEncodedVersion)
 	return nil
 }
