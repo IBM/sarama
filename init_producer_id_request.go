@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type InitProducerIDRequest struct {
 	Version            int16
@@ -82,6 +85,16 @@ func (i *InitProducerIDRequest) headerVersion() int16 {
 	}
 
 	return 1
+}
+
+func (i *InitProducerIDRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
+	if i.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, i.Version, i, minVersion, maxEncodedVersion)
+	}
+	i.Version = min(i.Version, maxEncodedVersion)
+	return nil
 }
 
 func (i *InitProducerIDRequest) isValidVersion() bool {

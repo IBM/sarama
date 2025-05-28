@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // PartitionMetadata contains each partition in the topic.
 type PartitionMetadata struct {
@@ -476,6 +479,16 @@ func (r *MetadataResponse) requiredVersion() KafkaVersion {
 
 func (r *MetadataResponse) throttleTime() time.Duration {
 	return time.Duration(r.ThrottleTimeMs) * time.Millisecond
+}
+
+func (r *MetadataResponse) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(7, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }
 
 // testing API

@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"net"
 	"strconv"
 )
@@ -91,4 +92,14 @@ func (r *ConsumerMetadataResponse) requiredVersion() KafkaVersion {
 	default:
 		return V0_8_2_0
 	}
+}
+
+func (r *ConsumerMetadataResponse) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

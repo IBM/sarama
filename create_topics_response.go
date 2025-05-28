@@ -145,3 +145,13 @@ func (t *TopicError) decode(pd packetDecoder, version int16) (err error) {
 
 	return nil
 }
+
+func (c *CreateTopicsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
+	if c.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, c.Version, c, minVersion, maxEncodedVersion)
+	}
+	c.Version = min(c.Version, maxEncodedVersion)
+	return nil
+}

@@ -348,3 +348,13 @@ func (c *ConfigSynonym) decode(pd packetDecoder, version int16) error {
 	c.Source = ConfigSource(source)
 	return nil
 }
+
+func (r *DescribeConfigsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
+}

@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DescribeLogDirsRequest is a describe request to get partitions' log size
 type DescribeLogDirsRequest struct {
 	// Version 0 and 1 are equal
@@ -91,4 +93,14 @@ func (r *DescribeLogDirsRequest) requiredVersion() KafkaVersion {
 		return V2_0_0_0
 	}
 	return V1_0_0_0
+}
+
+func (r *DescribeLogDirsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"sort"
 	"time"
 )
@@ -136,5 +137,15 @@ func (t *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) erro
 		}
 	}
 
+	return nil
+}
+
+func (d *DeleteRecordsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if d.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, d.Version, d, minVersion, maxEncodedVersion)
+	}
+	d.Version = min(d.Version, maxEncodedVersion)
 	return nil
 }

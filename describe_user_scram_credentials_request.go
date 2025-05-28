@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // DescribeUserScramCredentialsRequest is a request to get list of SCRAM user names
 type DescribeUserScramCredentialsRequest struct {
 	// Version 0 is currently only supported
@@ -71,4 +73,14 @@ func (r *DescribeUserScramCredentialsRequest) isValidVersion() bool {
 
 func (r *DescribeUserScramCredentialsRequest) requiredVersion() KafkaVersion {
 	return V2_7_0_0
+}
+
+func (r *DescribeUserScramCredentialsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(0, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

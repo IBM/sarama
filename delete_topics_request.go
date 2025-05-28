@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type DeleteTopicsRequest struct {
 	Version int16
@@ -55,6 +58,16 @@ func (d *DeleteTopicsRequest) version() int16 {
 
 func (d *DeleteTopicsRequest) headerVersion() int16 {
 	return 1
+}
+
+func (d *DeleteTopicsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
+	if d.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, d.Version, d, minVersion, maxEncodedVersion)
+	}
+	d.Version = min(d.Version, maxEncodedVersion)
+	return nil
 }
 
 func (d *DeleteTopicsRequest) isValidVersion() bool {

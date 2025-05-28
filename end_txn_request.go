@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type EndTxnRequest struct {
 	Version           int16
 	TransactionalID   string
@@ -63,4 +65,14 @@ func (a *EndTxnRequest) requiredVersion() KafkaVersion {
 	default:
 		return V0_11_0_0
 	}
+}
+
+func (a *EndTxnRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, a.Version, a, minVersion, maxEncodedVersion)
+	}
+	a.Version = min(a.Version, maxEncodedVersion)
+	return nil
 }

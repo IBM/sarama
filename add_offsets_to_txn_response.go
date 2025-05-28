@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -17,7 +18,7 @@ func (a *AddOffsetsToTxnResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (a *AddOffsetsToTxnResponse) decode(pd packetDecoder, version int16) (err error) {
+func (a *AddOffsetsToTxnResponse) decode(pd packetDecoder, version int16) error {
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
@@ -64,4 +65,14 @@ func (a *AddOffsetsToTxnResponse) requiredVersion() KafkaVersion {
 
 func (r *AddOffsetsToTxnResponse) throttleTime() time.Duration {
 	return r.ThrottleTime
+}
+
+func (a *AddOffsetsToTxnResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxEncodedVersion)
+	}
+	a.Version = min(a.Version, maxEncodedVersion)
+	return nil
 }

@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // CreateAclsResponse is a an acl response creation type
 type CreateAclsResponse struct {
@@ -104,5 +107,15 @@ func (a *AclCreationResponse) decode(pd packetDecoder, version int16) (err error
 		return err
 	}
 
+	return nil
+}
+
+func (c *CreateAclsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if c.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, c, c.Version, minVersion, maxEncodedVersion)
+	}
+	c.Version = min(c.Version, maxEncodedVersion)
 	return nil
 }

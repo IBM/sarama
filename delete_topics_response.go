@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type DeleteTopicsResponse struct {
 	Version         int16
@@ -74,6 +77,16 @@ func (d *DeleteTopicsResponse) headerVersion() int16 {
 
 func (d *DeleteTopicsResponse) isValidVersion() bool {
 	return d.Version >= 0 && d.Version <= 3
+}
+
+func (d *DeleteTopicsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
+	if d.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, d.Version, d, minVersion, maxEncodedVersion)
+	}
+	d.Version = min(d.Version, maxEncodedVersion)
+	return nil
 }
 
 func (d *DeleteTopicsResponse) requiredVersion() KafkaVersion {

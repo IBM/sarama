@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type ListGroupsResponse struct {
 	Version      int16
 	ThrottleTime int32
@@ -170,4 +172,14 @@ func (r *ListGroupsResponse) requiredVersion() KafkaVersion {
 	default:
 		return V2_6_0_0
 	}
+}
+
+func (r *ListGroupsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }
