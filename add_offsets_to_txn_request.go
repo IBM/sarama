@@ -73,10 +73,11 @@ func (a *AddOffsetsToTxnRequest) requiredVersion() KafkaVersion {
 }
 
 func (a *AddOffsetsToTxnRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
 	if a.Version < minVersion {
 		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, a, a.Version, minVersion, maxVersion)
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxEncodedVersion)
 	}
-	a.Version = max(a.Version, maxVersion)
+	a.Version = min(a.Version, maxEncodedVersion)
 	return nil
 }

@@ -218,6 +218,6 @@ func (r *JoinGroupRequest) restrictApiVersion(minVersion, maxVersion int16) erro
 		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
 			ErrUnsupportedVersion, r, r.Version, minVersion, maxEncodedVersion)
 	}
-	r.Version = max(r.Version, maxEncodedVersion)
+	r.Version = min(r.Version, maxEncodedVersion)
 	return nil
 }

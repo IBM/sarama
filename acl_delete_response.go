@@ -157,11 +157,12 @@ func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
 }
 
 func (d *DeleteAclsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
 	if d.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			d, d.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, d, d.Version, minVersion, maxEncodedVersion)
 	}
-	d.Version = max(d.Version, maxVersion)
+	d.Version = min(d.Version, maxEncodedVersion)
 	return nil
 }
 

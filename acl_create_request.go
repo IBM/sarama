@@ -95,10 +95,11 @@ func (a *AclCreation) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (c *CreateAclsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
 	if c.Version < minVersion {
 		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, c, c.Version, minVersion, maxVersion)
+			ErrUnsupportedVersion, c, c.Version, minVersion, maxEncodedVersion)
 	}
-	c.Version = max(c.Version, maxVersion)
+	c.Version = min(c.Version, maxEncodedVersion)
 	return nil
 }

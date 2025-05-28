@@ -99,10 +99,11 @@ func (r *DescribeAclsResponse) throttleTime() time.Duration {
 }
 
 func (d *DescribeAclsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
 	if d.Version < minVersion {
 		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
-			ErrUnsupportedVersion, d, d.Version, minVersion, maxVersion)
+			ErrUnsupportedVersion, d, d.Version, minVersion, maxEncodedVersion)
 	}
-	d.Version = max(d.Version, maxVersion)
+	d.Version = min(d.Version, maxEncodedVersion)
 	return nil
 }

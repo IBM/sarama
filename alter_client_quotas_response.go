@@ -155,10 +155,11 @@ func (r *AlterClientQuotasResponse) throttleTime() time.Duration {
 }
 
 func (a *AlterClientQuotasResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(0, maxVersion)
 	if a.Version < minVersion {
-		return fmt.Errorf("%T: unsupported API version %d, supported versions are %d-%d",
-			a, a.Version, minVersion, maxVersion)
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, a, a.Version, minVersion, maxEncodedVersion)
 	}
-	a.Version = max(a.Version, maxVersion)
+	a.Version = min(a.Version, maxEncodedVersion)
 	return nil
 }
