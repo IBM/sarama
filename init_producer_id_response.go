@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type InitProducerIDResponse struct {
 	ThrottleTime  time.Duration
@@ -71,6 +74,16 @@ func (i *InitProducerIDResponse) headerVersion() int16 {
 
 func (i *InitProducerIDResponse) isValidVersion() bool {
 	return i.Version >= 0 && i.Version <= 4
+}
+
+func (i *InitProducerIDResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
+	if i.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, i.Version, i, minVersion, maxEncodedVersion)
+	}
+	i.Version = min(i.Version, maxEncodedVersion)
+	return nil
 }
 
 func (i *InitProducerIDResponse) requiredVersion() KafkaVersion {

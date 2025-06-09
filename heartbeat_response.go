@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type HeartbeatResponse struct {
 	Version      int16
@@ -47,6 +50,16 @@ func (r *HeartbeatResponse) headerVersion() int16 {
 
 func (r *HeartbeatResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 3
+}
+
+func (r *HeartbeatResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }
 
 func (r *HeartbeatResponse) requiredVersion() KafkaVersion {

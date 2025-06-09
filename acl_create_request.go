@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 // CreateAclsRequest is an acl creation request
 type CreateAclsRequest struct {
 	Version      int16
@@ -89,5 +91,15 @@ func (a *AclCreation) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
+	return nil
+}
+
+func (c *CreateAclsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if c.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, c, c.Version, minVersion, maxEncodedVersion)
+	}
+	c.Version = min(c.Version, maxEncodedVersion)
 	return nil
 }

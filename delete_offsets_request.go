@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type DeleteOffsetsRequest struct {
 	Version    int16
 	Group      string
@@ -94,4 +96,14 @@ func (r *DeleteOffsetsRequest) AddPartition(topic string, partitionID int32) {
 	}
 
 	r.partitions[topic] = append(r.partitions[topic], partitionID)
+}
+
+func (r *DeleteOffsetsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(0, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

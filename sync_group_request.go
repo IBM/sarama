@@ -1,5 +1,9 @@
 package sarama
 
+import (
+	"fmt"
+)
+
 type SyncGroupRequestAssignment struct {
 	// MemberId contains the ID of the member to assign.
 	MemberId string
@@ -159,5 +163,15 @@ func (r *SyncGroupRequest) AddGroupAssignmentMember(
 	}
 
 	r.AddGroupAssignment(memberId, bin)
+	return nil
+}
+
+func (r *SyncGroupRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
 	return nil
 }

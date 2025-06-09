@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 const defaultClientSoftwareName = "sarama"
 
 type ApiVersionsRequest struct {
@@ -74,4 +76,14 @@ func (r *ApiVersionsRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_4_0_0
 	}
+}
+
+func (r *ApiVersionsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(3, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

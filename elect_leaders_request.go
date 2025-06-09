@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type ElectLeadersRequest struct {
 	Version         int16
 	Type            ElectionType
@@ -131,4 +133,14 @@ func (r *ElectLeadersRequest) requiredVersion() KafkaVersion {
 	default:
 		return V2_4_0_0
 	}
+}
+
+func (r *ElectLeadersRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

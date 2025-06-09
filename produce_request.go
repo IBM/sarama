@@ -1,6 +1,10 @@
 package sarama
 
-import "github.com/rcrowley/go-metrics"
+import (
+	"fmt"
+
+	"github.com/rcrowley/go-metrics"
+)
 
 // RequiredAcks is used in Produce Requests to tell the broker how many replica acknowledgements
 // it must see before responding. Any of the constants defined here are valid. On broker versions
@@ -267,4 +271,14 @@ func (r *ProduceRequest) AddSet(topic string, partition int32, set *MessageSet) 
 func (r *ProduceRequest) AddBatch(topic string, partition int32, batch *RecordBatch) {
 	r.ensureRecords(topic, partition)
 	r.records[topic][partition] = newDefaultRecords(batch)
+}
+
+func (r *ProduceRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(7, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: %T: unsupported API version %d, supported versions are %d-%d",
+			ErrUnsupportedVersion, r, r.Version, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

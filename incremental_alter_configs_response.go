@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // IncrementalAlterConfigsResponse is a response type for incremental alter config
 type IncrementalAlterConfigsResponse struct {
@@ -52,6 +55,16 @@ func (a *IncrementalAlterConfigsResponse) decode(pd packetDecoder, version int16
 
 func (a *IncrementalAlterConfigsResponse) key() int16 {
 	return 44
+}
+
+func (a *IncrementalAlterConfigsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(0, maxVersion)
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, a.Version, a, minVersion, maxEncodedVersion)
+	}
+	a.Version = min(a.Version, maxEncodedVersion)
+	return nil
 }
 
 func (a *IncrementalAlterConfigsResponse) version() int16 {

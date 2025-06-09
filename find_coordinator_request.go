@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type CoordinatorType int8
 
 const (
@@ -68,4 +70,14 @@ func (f *FindCoordinatorRequest) requiredVersion() KafkaVersion {
 	default:
 		return V0_8_2_0
 	}
+}
+
+func (f *FindCoordinatorRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(2, maxVersion)
+	if f.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, f.Version, f, minVersion, maxEncodedVersion)
+	}
+	f.Version = min(f.Version, maxEncodedVersion)
+	return nil
 }

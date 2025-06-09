@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type DescribeGroupsRequest struct {
 	Version                     int16
 	Groups                      []string
@@ -65,4 +67,14 @@ func (r *DescribeGroupsRequest) requiredVersion() KafkaVersion {
 
 func (r *DescribeGroupsRequest) AddGroup(group string) {
 	r.Groups = append(r.Groups, group)
+}
+
+func (r *DescribeGroupsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

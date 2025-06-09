@@ -1,6 +1,9 @@
 package sarama
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // ReceiveTime is a special value for the timestamp field of Offset Commit Requests which
 // tells the broker to set the timestamp to the time at which the request was received.
@@ -250,4 +253,14 @@ func (r *OffsetCommitRequest) Offset(topic string, partitionID int32) (int64, st
 		return 0, "", errors.New("no such offset")
 	}
 	return block.offset, block.metadata, nil
+}
+
+func (r *OffsetCommitRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(7, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

@@ -127,3 +127,13 @@ func (t *TopicPartitionError) decode(pd packetDecoder, version int16) (err error
 
 	return nil
 }
+
+func (r *CreatePartitionsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
+}

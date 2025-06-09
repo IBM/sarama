@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type DescribeLogDirsResponse struct {
 	ThrottleTime time.Duration
@@ -236,5 +239,15 @@ func (r *DescribeLogDirsResponsePartition) decode(pd packetDecoder, version int1
 	}
 	r.IsTemporary = isTemp
 
+	return nil
+}
+
+func (r *DescribeLogDirsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
 	return nil
 }

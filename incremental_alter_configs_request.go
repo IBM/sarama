@@ -1,5 +1,7 @@
 package sarama
 
+import "fmt"
+
 type IncrementalAlterConfigsOperation int8
 
 const (
@@ -175,4 +177,14 @@ func (a *IncrementalAlterConfigsRequest) isValidVersion() bool {
 
 func (a *IncrementalAlterConfigsRequest) requiredVersion() KafkaVersion {
 	return V2_3_0_0
+}
+
+func (a *IncrementalAlterConfigsRequest) restrictApiVersion(minVersion, maxVersion int16) error {
+	maxEncodedVersion := min(0, maxVersion)
+	if a.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, a.Version, a, minVersion, maxEncodedVersion)
+	}
+	a.Version = min(a.Version, maxEncodedVersion)
+	return nil
 }

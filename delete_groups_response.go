@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -87,4 +88,14 @@ func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {
 
 func (r *DeleteGroupsResponse) throttleTime() time.Duration {
 	return r.ThrottleTime
+}
+
+func (r *DeleteGroupsResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(1, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }

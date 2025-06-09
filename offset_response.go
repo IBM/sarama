@@ -1,6 +1,9 @@
 package sarama
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type OffsetResponseBlock struct {
 	Err KError
@@ -222,4 +225,14 @@ func (r *OffsetResponse) AddTopicPartition(topic string, partition int32, offset
 		r.Blocks[topic] = byTopic
 	}
 	byTopic[partition] = &OffsetResponseBlock{Offsets: []int64{offset}, Offset: offset}
+}
+
+func (r *OffsetResponse) restrictApiVersion(minVersion int16, maxVersion int16) error {
+	maxEncodedVersion := min(4, maxVersion)
+	if r.Version < minVersion {
+		return fmt.Errorf("%w: unsupported API version %d for %T, supported versions are %d-%d",
+			ErrUnsupportedVersion, r.Version, r, minVersion, maxEncodedVersion)
+	}
+	r.Version = min(r.Version, maxEncodedVersion)
+	return nil
 }
