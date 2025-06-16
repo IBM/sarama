@@ -196,6 +196,8 @@ type Config struct {
 		// (defaults to hashing the message key). Similar to the `partitioner.class`
 		// setting for the JVM producer.
 		Partitioner PartitionerConstructor
+		// Controls whether the partitioner is rack-aware. This also affects custom partitioners.
+		PartitionerRackAware bool
 		// If enabled, the producer will ensure that exactly one copy of each message is
 		// written.
 		Idempotent bool
@@ -545,6 +547,8 @@ func NewConfig() *Config {
 	c.Producer.Retry.Backoff = 100 * time.Millisecond
 	c.Producer.Return.Errors = true
 	c.Producer.CompressionLevel = CompressionLevelDefault
+
+	c.Producer.PartitionerRackAware = false
 
 	c.Producer.Transaction.Timeout = 1 * time.Minute
 	c.Producer.Transaction.Retry.Max = 50
