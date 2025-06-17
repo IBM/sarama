@@ -557,16 +557,17 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 
 	// Select only partitions with leaders in this rack if configured so, falling back if none are available.
 	if tp.parent.conf.Producer.PartitionerRackAware {
-		var availablePartitionsInRack []int32
-		var clientRack = tp.parent.client.Config().RackID
+		clientRack := tp.parent.client.Config().RackID
+
+		var partitionsInRack []int32
 		for _, p := range partitions {
-			leaderBroker, err := tp.parent.client.Leader(msg.Topic, p)
-			if err == nil && leaderBroker.Rack() == clientRack {
-				availablePartitionsInRack = append(availablePartitionsInRack, p)
+			leader, err := tp.parent.client.Leader(msg.Topic, p)
+			if err == nil && leader.Rack() == clientRack {
+				partitionsInRack = append(partitionsInRack, p)
 			}
 		}
-		if len(availablePartitionsInRack) > 0 {
-			partitions = availablePartitionsInRack
+		if len(partitionsInRack) > 0 {
+			partitions = partitionsInRack
 		}
 	}
 
