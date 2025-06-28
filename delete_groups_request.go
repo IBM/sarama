@@ -15,7 +15,7 @@ func (r *DeleteGroupsRequest) decode(pd packetDecoder, version int16) (err error
 }
 
 func (r *DeleteGroupsRequest) key() int16 {
-	return 42
+	return APIKeyDeleteGroups
 }
 
 func (r *DeleteGroupsRequest) version() int16 {

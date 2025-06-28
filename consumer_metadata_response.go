@@ -67,7 +67,7 @@ func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
 }
 
 func (r *ConsumerMetadataResponse) key() int16 {
-	return 10
+	return APIKeyFindCoordinator
 }
 
 func (r *ConsumerMetadataResponse) version() int16 {

@@ -75,7 +75,7 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 }
 
 func (f *FindCoordinatorResponse) key() int16 {
-	return 10
+	return APIKeyFindCoordinator
 }
 
 func (f *FindCoordinatorResponse) version() int16 {

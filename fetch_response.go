@@ -375,7 +375,7 @@ func (r *FetchResponse) encode(pe packetEncoder) (err error) {
 }
 
 func (r *FetchResponse) key() int16 {
-	return 1
+	return APIKeyFetch
 }
 
 func (r *FetchResponse) version() int16 {

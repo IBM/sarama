@@ -46,7 +46,7 @@ func (r *ListGroupsRequest) decode(pd packetDecoder, version int16) (err error) 
 }
 
 func (r *ListGroupsRequest) key() int16 {
-	return 16
+	return APIKeyListGroups
 }
 
 func (r *ListGroupsRequest) version() int16 {

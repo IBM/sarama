@@ -269,7 +269,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (r *FetchRequest) key() int16 {
-	return 1
+	return APIKeyFetch
 }
 
 func (r *FetchRequest) version() int16 {

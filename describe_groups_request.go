@@ -31,7 +31,7 @@ func (r *DescribeGroupsRequest) decode(pd packetDecoder, version int16) (err err
 }
 
 func (r *DescribeGroupsRequest) key() int16 {
-	return 15
+	return APIKeyDescribeGroups
 }
 
 func (r *DescribeGroupsRequest) version() int16 {

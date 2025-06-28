@@ -59,7 +59,7 @@ func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 }
 
 func (r *DeleteGroupsResponse) key() int16 {
-	return 42
+	return APIKeyDeleteGroups
 }
 
 func (r *DeleteGroupsResponse) version() int16 {

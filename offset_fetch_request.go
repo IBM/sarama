@@ -193,7 +193,7 @@ func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error)
 }
 
 func (r *OffsetFetchRequest) key() int16 {
-	return 9
+	return APIKeyOffsetFetch
 }
 
 func (r *OffsetFetchRequest) version() int16 {

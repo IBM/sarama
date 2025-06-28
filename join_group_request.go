@@ -157,7 +157,7 @@ func (r *JoinGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (r *JoinGroupRequest) key() int16 {
-	return 11
+	return APIKeyJoinGroup
 }
 
 func (r *JoinGroupRequest) version() int16 {

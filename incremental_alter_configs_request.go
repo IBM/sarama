@@ -158,7 +158,7 @@ func (a *IncrementalAlterConfigsEntry) decode(pd packetDecoder, version int16) e
 }
 
 func (a *IncrementalAlterConfigsRequest) key() int16 {
-	return 44
+	return APIKeyIncrementalAlterConfigs
 }
 
 func (a *IncrementalAlterConfigsRequest) version() int16 {

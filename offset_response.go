@@ -174,7 +174,7 @@ func (r *OffsetResponse) encode(pe packetEncoder) (err error) {
 }
 
 func (r *OffsetResponse) key() int16 {
-	return 2
+	return APIKeyListOffsets
 }
 
 func (r *OffsetResponse) version() int16 {

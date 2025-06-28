@@ -54,7 +54,7 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 }
 
 func (r *DescribeGroupsResponse) key() int16 {
-	return 15
+	return APIKeyDescribeGroups
 }
 
 func (r *DescribeGroupsResponse) version() int16 {

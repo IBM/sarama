@@ -34,7 +34,7 @@ func (r *HeartbeatResponse) decode(pd packetDecoder, version int16) error {
 }
 
 func (r *HeartbeatResponse) key() int16 {
-	return 12
+	return APIKeyHeartbeat
 }
 
 func (r *HeartbeatResponse) version() int16 {

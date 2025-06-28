@@ -201,7 +201,7 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 }
 
 func (r *ProduceRequest) key() int16 {
-	return 0
+	return APIKeyProduce
 }
 
 func (r *ProduceRequest) version() int16 {

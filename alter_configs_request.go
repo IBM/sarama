@@ -111,7 +111,7 @@ func (a *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 }
 
 func (a *AlterConfigsRequest) key() int16 {
-	return 33
+	return APIKeyAlterConfigs
 }
 
 func (a *AlterConfigsRequest) version() int16 {

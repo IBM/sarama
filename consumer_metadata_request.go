@@ -24,7 +24,7 @@ func (r *ConsumerMetadataRequest) decode(pd packetDecoder, version int16) (err e
 }
 
 func (r *ConsumerMetadataRequest) key() int16 {
-	return 10
+	return APIKeyFindCoordinator
 }
 
 func (r *ConsumerMetadataRequest) version() int16 {

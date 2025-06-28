@@ -97,7 +97,7 @@ func (r *DeleteOffsetsResponse) decode(pd packetDecoder, version int16) error {
 }
 
 func (r *DeleteOffsetsResponse) key() int16 {
-	return 47
+	return APIKeyOffsetDelete
 }
 
 func (r *DeleteOffsetsResponse) version() int16 {

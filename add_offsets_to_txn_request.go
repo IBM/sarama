@@ -42,7 +42,7 @@ func (a *AddOffsetsToTxnRequest) decode(pd packetDecoder, version int16) (err er
 }
 
 func (a *AddOffsetsToTxnRequest) key() int16 {
-	return 25
+	return APIKeyAddOffsetsToTxn
 }
 
 func (a *AddOffsetsToTxnRequest) version() int16 {

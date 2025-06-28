@@ -194,7 +194,7 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (r *MetadataRequest) key() int16 {
-	return 3
+	return APIKeyMetadata
 }
 
 func (r *MetadataRequest) version() int16 {

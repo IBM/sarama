@@ -164,7 +164,7 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 }
 
 func (r *ProduceResponse) key() int16 {
-	return 0
+	return APIKeyProduce
 }
 
 func (r *ProduceResponse) version() int16 {

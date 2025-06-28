@@ -54,7 +54,7 @@ func (r *DescribeUserScramCredentialsRequest) decode(pd packetDecoder, version i
 }
 
 func (r *DescribeUserScramCredentialsRequest) key() int16 {
-	return 50
+	return APIKeyDescribeUserScramCredentials
 }
 
 func (r *DescribeUserScramCredentialsRequest) version() int16 {

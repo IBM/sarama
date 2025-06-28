@@ -144,7 +144,7 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 }
 
 func (r *OffsetRequest) key() int16 {
-	return 2
+	return APIKeyListOffsets
 }
 
 func (r *OffsetRequest) version() int16 {
