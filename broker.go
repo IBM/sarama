@@ -1015,6 +1015,11 @@ func (b *Broker) sendWithPromise(rb protocolBody, promise *responsePromise) erro
 
 // b.lock must be held by caller
 func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
+	// try restricting API version to ranges advertised by the broker
+	if err := restrictApiVersion(rb, b.brokerAPIVersions); err != nil {
+		return err
+	}
+
 	if !b.conf.Version.IsAtLeast(rb.requiredVersion()) {
 		return ErrUnsupportedVersion
 	}

@@ -7,6 +7,27 @@ type apiVersionRange struct {
 
 type apiVersionMap map[int16]*apiVersionRange
 
+// restrictApiVersion selects the appropriate API version for a given protocol body according to
+// the client and broker version ranges. By default, it selects the maximum version supported by both
+// client and broker, capped by the maximum Kafka version from Config.
+// It then calls setVersion() on the protocol body.
+// If no valid version is found, an error is returned.
+func restrictApiVersion(pb protocolBody, brokerVersions apiVersionMap) error {
+	key := pb.key()
+	// Since message constructors take a Kafka version and select the maximum supported protocol version already, we can
+	// rely on pb.version() being the max version supported for the user-selected Kafka API version.
+	clientMax := pb.version()
+
+	if brokerVersionRange := brokerVersions[key]; brokerVersionRange != nil {
+		// Select the maximum version that both client and server support
+		// Clamp to the client max to respect user preference above broker advertised version range
+		pb.setVersion(min(clientMax, max(min(clientMax, brokerVersionRange.maxVersion), brokerVersionRange.minVersion)))
+		return nil
+	}
+
+	return nil // no version ranges available, no restriction
+}
+
 const (
 	APIKeyProduce                      = 0
 	APIKeyFetch                        = 1
