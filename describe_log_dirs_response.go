@@ -12,6 +12,10 @@ type DescribeLogDirsResponse struct {
 	LogDirs []DescribeLogDirsResponseDirMetadata
 }
 
+func (r *DescribeLogDirsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *DescribeLogDirsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
 

@@ -10,6 +10,10 @@ type AlterUserScramCredentialsResponse struct {
 	Results []*AlterUserScramCredentialsResult
 }
 
+func (r *AlterUserScramCredentialsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 type AlterUserScramCredentialsResult struct {
 	User string
 

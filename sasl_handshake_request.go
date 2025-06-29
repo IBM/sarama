@@ -5,6 +5,10 @@ type SaslHandshakeRequest struct {
 	Version   int16
 }
 
+func (r *SaslHandshakeRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *SaslHandshakeRequest) encode(pe packetEncoder) error {
 	if err := pe.putString(r.Mechanism); err != nil {
 		return err

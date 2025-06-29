@@ -6,6 +6,10 @@ type DescribeConfigsRequest struct {
 	IncludeSynonyms bool
 }
 
+func (r *DescribeConfigsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 type ConfigResource struct {
 	Type        ConfigResourceType
 	Name        string

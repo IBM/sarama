@@ -10,6 +10,10 @@ type TxnOffsetCommitResponse struct {
 	Topics       map[string][]*PartitionError
 }
 
+func (t *TxnOffsetCommitResponse) setVersion(v int16) {
+	t.Version = v
+}
+
 func (t *TxnOffsetCommitResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(t.ThrottleTime / time.Millisecond))
 	if err := pe.putArrayLength(len(t.Topics)); err != nil {

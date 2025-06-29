@@ -33,6 +33,10 @@ type DescribeUserScramCredentialsResponse struct {
 	Results []*DescribeUserScramCredentialsResult
 }
 
+func (r *DescribeUserScramCredentialsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 type DescribeUserScramCredentialsResult struct {
 	User string
 

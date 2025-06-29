@@ -9,6 +9,10 @@ type AddOffsetsToTxnRequest struct {
 	GroupID         string
 }
 
+func (a *AddOffsetsToTxnRequest) setVersion(v int16) {
+	a.Version = v
+}
+
 func (a *AddOffsetsToTxnRequest) encode(pe packetEncoder) error {
 	if err := pe.putString(a.TransactionalID); err != nil {
 		return err

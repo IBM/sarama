@@ -26,6 +26,10 @@ type AlterPartitionReassignmentsRequest struct {
 	Version   int16
 }
 
+func (r *AlterPartitionReassignmentsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *AlterPartitionReassignmentsRequest) encode(pe packetEncoder) error {
 	pe.putInt32(r.TimeoutMs)
 

@@ -9,6 +9,10 @@ type DeleteAclsResponse struct {
 	FilterResponses []*FilterResponse
 }
 
+func (d *DeleteAclsResponse) setVersion(v int16) {
+	d.Version = v
+}
+
 func (d *DeleteAclsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
 

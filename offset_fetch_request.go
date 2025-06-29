@@ -7,6 +7,10 @@ type OffsetFetchRequest struct {
 	partitions    map[string][]int32
 }
 
+func (r *OffsetFetchRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func NewOffsetFetchRequest(
 	version KafkaVersion,
 	group string,

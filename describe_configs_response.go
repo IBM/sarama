@@ -53,6 +53,10 @@ type DescribeConfigsResponse struct {
 	Resources    []*ResourceResponse
 }
 
+func (r *DescribeConfigsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 type ResourceResponse struct {
 	ErrorCode int16
 	ErrorMsg  string

@@ -89,6 +89,10 @@ type FetchRequest struct {
 	RackID string
 }
 
+func (r *FetchRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 type IsolationLevel int8
 
 const (

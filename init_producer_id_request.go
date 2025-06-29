@@ -10,6 +10,10 @@ type InitProducerIDRequest struct {
 	ProducerEpoch      int16
 }
 
+func (i *InitProducerIDRequest) setVersion(v int16) {
+	i.Version = v
+}
+
 func (i *InitProducerIDRequest) encode(pe packetEncoder) error {
 	if i.Version < 2 {
 		if err := pe.putNullableString(i.TransactionalID); err != nil {

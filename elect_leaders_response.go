@@ -48,6 +48,10 @@ type ElectLeadersResponse struct {
 	ReplicaElectionResults map[string]map[int32]*PartitionResult
 }
 
+func (r *ElectLeadersResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
 

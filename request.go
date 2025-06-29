@@ -11,6 +11,7 @@ type protocolBody interface {
 	versionedDecoder
 	key() int16
 	version() int16
+	setVersion(int16)
 	headerVersion() int16
 	isValidVersion() bool
 	requiredVersion() KafkaVersion

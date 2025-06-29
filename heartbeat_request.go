@@ -8,6 +8,10 @@ type HeartbeatRequest struct {
 	GroupInstanceId *string
 }
 
+func (r *HeartbeatRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *HeartbeatRequest) encode(pe packetEncoder) error {
 	if err := pe.putString(r.GroupId); err != nil {
 		return err

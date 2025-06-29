@@ -8,6 +8,10 @@ type ListGroupsResponse struct {
 	GroupsData   map[string]GroupData // version 4 or later
 }
 
+func (r *ListGroupsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 type GroupData struct {
 	GroupState string // version 4 or later
 }

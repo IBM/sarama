@@ -11,6 +11,10 @@ type AddOffsetsToTxnResponse struct {
 	Err          KError
 }
 
+func (a *AddOffsetsToTxnResponse) setVersion(v int16) {
+	a.Version = v
+}
+
 func (a *AddOffsetsToTxnResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(a.ThrottleTime / time.Millisecond))
 	pe.putInt16(int16(a.Err))

@@ -19,6 +19,10 @@ type AlterClientQuotasResponse struct {
 	Entries      []AlterClientQuotasEntryResponse // The quota configuration entries altered.
 }
 
+func (a *AlterClientQuotasResponse) setVersion(v int16) {
+	a.Version = v
+}
+
 type AlterClientQuotasEntryResponse struct {
 	ErrorCode KError                 // The error code, or `0` if the quota alteration succeeded.
 	ErrorMsg  *string                // The error message, or `null` if the quota alteration succeeded.

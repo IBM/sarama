@@ -14,6 +14,10 @@ type LeaveGroupResponse struct {
 	Members      []MemberResponse
 }
 
+func (r *LeaveGroupResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *LeaveGroupResponse) encode(pe packetEncoder) error {
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTime)

@@ -15,6 +15,10 @@ type CreateTopicsResponse struct {
 	TopicErrors map[string]*TopicError
 }
 
+func (c *CreateTopicsResponse) setVersion(v int16) {
+	c.Version = v
+}
+
 func (c *CreateTopicsResponse) encode(pe packetEncoder) error {
 	if c.Version >= 2 {
 		pe.putInt32(int32(c.ThrottleTime / time.Millisecond))

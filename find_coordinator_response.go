@@ -14,6 +14,10 @@ type FindCoordinatorResponse struct {
 	Coordinator  *Broker
 }
 
+func (f *FindCoordinatorResponse) setVersion(v int16) {
+	f.Version = v
+}
+
 func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err error) {
 	if version >= 1 {
 		f.Version = version

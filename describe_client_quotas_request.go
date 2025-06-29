@@ -16,6 +16,10 @@ type DescribeClientQuotasRequest struct {
 	Strict     bool
 }
 
+func (d *DescribeClientQuotasRequest) setVersion(v int16) {
+	d.Version = v
+}
+
 // Describe a component for applying a client quota filter.
 // EntityType: the entity type the filter component applies to ("user", "client-id", "ip")
 // MatchType: the match type of the filter component (any, exact, default)

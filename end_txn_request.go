@@ -8,6 +8,10 @@ type EndTxnRequest struct {
 	TransactionResult bool
 }
 
+func (a *EndTxnRequest) setVersion(v int16) {
+	a.Version = v
+}
+
 func (a *EndTxnRequest) encode(pe packetEncoder) error {
 	if err := pe.putString(a.TransactionalID); err != nil {
 		return err

@@ -85,6 +85,10 @@ type ProduceResponse struct {
 	ThrottleTime time.Duration // v1, throttle_time_ms
 }
 
+func (r *ProduceResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 

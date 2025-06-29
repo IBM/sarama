@@ -8,6 +8,10 @@ type DeleteTopicsRequest struct {
 	Timeout time.Duration
 }
 
+func (d *DeleteTopicsRequest) setVersion(v int16) {
+	d.Version = v
+}
+
 func NewDeleteTopicsRequest(version KafkaVersion, topics []string, timeout time.Duration) *DeleteTopicsRequest {
 	d := &DeleteTopicsRequest{
 		Topics:  topics,

@@ -18,6 +18,10 @@ type DeleteRecordsResponse struct {
 	Topics       map[string]*DeleteRecordsResponseTopic
 }
 
+func (d *DeleteRecordsResponse) setVersion(v int16) {
+	d.Version = v
+}
+
 func (d *DeleteRecordsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
 

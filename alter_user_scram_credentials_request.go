@@ -10,6 +10,10 @@ type AlterUserScramCredentialsRequest struct {
 	Upsertions []AlterUserScramCredentialsUpsert
 }
 
+func (r *AlterUserScramCredentialsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 type AlterUserScramCredentialsDelete struct {
 	Name      string
 	Mechanism ScramMechanismType

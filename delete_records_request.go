@@ -18,6 +18,10 @@ type DeleteRecordsRequest struct {
 	Timeout time.Duration
 }
 
+func (d *DeleteRecordsRequest) setVersion(v int16) {
+	d.Version = v
+}
+
 func (d *DeleteRecordsRequest) encode(pe packetEncoder) error {
 	if err := pe.putArrayLength(len(d.Topics)); err != nil {
 		return err

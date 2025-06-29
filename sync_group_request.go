@@ -46,6 +46,10 @@ type SyncGroupRequest struct {
 	GroupAssignments []SyncGroupRequestAssignment
 }
 
+func (s *SyncGroupRequest) setVersion(v int16) {
+	s.Version = v
+}
+
 func (s *SyncGroupRequest) encode(pe packetEncoder) (err error) {
 	if err := pe.putString(s.GroupId); err != nil {
 		return err

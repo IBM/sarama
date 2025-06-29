@@ -13,6 +13,10 @@ type DeleteOffsetsResponse struct {
 	Errors map[string]map[int32]KError
 }
 
+func (r *DeleteOffsetsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *DeleteOffsetsResponse) AddError(topic string, partition int32, errorCode KError) {
 	if r.Errors == nil {
 		r.Errors = make(map[string]map[int32]KError)

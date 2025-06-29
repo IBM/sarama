@@ -16,6 +16,10 @@ type IncrementalAlterConfigsRequest struct {
 	ValidateOnly bool
 }
 
+func (a *IncrementalAlterConfigsRequest) setVersion(v int16) {
+	a.Version = v
+}
+
 type IncrementalAlterConfigsResource struct {
 	Type          ConfigResourceType
 	Name          string

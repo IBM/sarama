@@ -8,6 +8,10 @@ type HeartbeatResponse struct {
 	Err          KError
 }
 
+func (r *HeartbeatResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *HeartbeatResponse) encode(pe packetEncoder) error {
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTime)

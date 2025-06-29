@@ -13,6 +13,10 @@ type DescribeGroupsResponse struct {
 	Groups []*GroupDescription
 }
 
+func (r *DescribeGroupsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *DescribeGroupsResponse) encode(pe packetEncoder) (err error) {
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTimeMs)

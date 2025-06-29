@@ -15,6 +15,10 @@ type SyncGroupResponse struct {
 	MemberAssignment []byte
 }
 
+func (r *SyncGroupResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *SyncGroupResponse) GetMemberAssignment() (*ConsumerGroupMemberAssignment, error) {
 	assignment := new(ConsumerGroupMemberAssignment)
 	err := decode(r.MemberAssignment, assignment, nil)

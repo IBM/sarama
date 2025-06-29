@@ -10,6 +10,10 @@ type DescribeLogDirsRequest struct {
 	DescribeTopics []DescribeLogDirsRequestTopic
 }
 
+func (r *DescribeLogDirsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 // DescribeLogDirsRequestTopic is a describe request about the log dir of one or more partitions within a Topic
 type DescribeLogDirsRequestTopic struct {
 	Topic        string

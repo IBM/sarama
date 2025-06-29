@@ -6,6 +6,10 @@ type CreateAclsRequest struct {
 	AclCreations []*AclCreation
 }
 
+func (c *CreateAclsRequest) setVersion(v int16) {
+	c.Version = v
+}
+
 func (c *CreateAclsRequest) encode(pe packetEncoder) error {
 	if err := pe.putArrayLength(len(c.AclCreations)); err != nil {
 		return err

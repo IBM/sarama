@@ -54,6 +54,10 @@ type JoinGroupRequest struct {
 	OrderedGroupProtocols []*GroupProtocol
 }
 
+func (r *JoinGroupRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 	if err := pe.putString(r.GroupId); err != nil {
 		return err

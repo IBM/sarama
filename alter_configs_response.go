@@ -12,6 +12,10 @@ type AlterConfigsResponse struct {
 	Resources    []*AlterConfigsResourceResponse
 }
 
+func (a *AlterConfigsResponse) setVersion(v int16) {
+	a.Version = v
+}
+
 type AlterConfigError struct {
 	Err    KError
 	ErrMsg string

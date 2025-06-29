@@ -5,6 +5,10 @@ type ListGroupsRequest struct {
 	StatesFilter []string // version 4 or later
 }
 
+func (r *ListGroupsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 	if r.Version >= 4 {
 		pe.putCompactArrayLength(len(r.StatesFilter))

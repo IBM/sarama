@@ -22,6 +22,10 @@ type JoinGroupResponse struct {
 	Members []GroupMember
 }
 
+func (r *JoinGroupResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 type GroupMember struct {
 	// MemberId contains the group member ID.
 	MemberId string

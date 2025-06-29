@@ -7,6 +7,10 @@ type AlterConfigsRequest struct {
 	ValidateOnly bool
 }
 
+func (a *AlterConfigsRequest) setVersion(v int16) {
+	a.Version = v
+}
+
 // AlterConfigsResource is an alter config resource type
 type AlterConfigsResource struct {
 	Type          ConfigResourceType

@@ -63,6 +63,10 @@ type ApiVersionsResponse struct {
 	ThrottleTimeMs int32
 }
 
+func (r *ApiVersionsResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *ApiVersionsResponse) encode(pe packetEncoder) (err error) {
 	pe.putInt16(r.ErrorCode)
 

@@ -6,6 +6,10 @@ type DeleteOffsetsRequest struct {
 	partitions map[string][]int32
 }
 
+func (r *DeleteOffsetsRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *DeleteOffsetsRequest) encode(pe packetEncoder) (err error) {
 	err = pe.putString(r.Group)
 	if err != nil {

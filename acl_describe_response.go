@@ -11,6 +11,10 @@ type DescribeAclsResponse struct {
 	ResourceAcls []*ResourceAcls
 }
 
+func (d *DescribeAclsResponse) setVersion(v int16) {
+	d.Version = v
+}
+
 func (d *DescribeAclsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
 	pe.putInt16(int16(d.Err))

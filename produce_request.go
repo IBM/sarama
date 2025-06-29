@@ -28,6 +28,10 @@ type ProduceRequest struct {
 	records         map[string]map[int32]Records
 }
 
+func (r *ProduceRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func updateMsgSetMetrics(msgSet *MessageSet, compressionRatioMetric metrics.Histogram,
 	topicCompressionRatioMetric metrics.Histogram,
 ) int64 {

@@ -6,6 +6,10 @@ type SaslAuthenticateRequest struct {
 	SaslAuthBytes []byte
 }
 
+func (r *SaslAuthenticateRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *SaslAuthenticateRequest) encode(pe packetEncoder) error {
 	return pe.putBytes(r.SaslAuthBytes)
 }

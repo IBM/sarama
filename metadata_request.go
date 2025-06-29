@@ -21,6 +21,10 @@ type MetadataRequest struct {
 	IncludeTopicAuthorizedOperations   bool // version 8 and up
 }
 
+func (r *MetadataRequest) setVersion(v int16) {
+	r.Version = v
+}
+
 func NewMetadataRequest(version KafkaVersion, topics []string) *MetadataRequest {
 	m := &MetadataRequest{Topics: topics}
 	if version.IsAtLeast(V2_8_0_0) {

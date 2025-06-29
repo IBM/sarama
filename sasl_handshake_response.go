@@ -6,6 +6,10 @@ type SaslHandshakeResponse struct {
 	EnabledMechanisms []string
 }
 
+func (r *SaslHandshakeResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *SaslHandshakeResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(r.Err))
 	return pe.putStringArray(r.EnabledMechanisms)
