@@ -114,7 +114,6 @@ func (p produceResponsePromise) Get() (*ProduceResponse, error) {
 
 func TestSimpleBrokerCommunication(t *testing.T) {
 	for _, tt := range brokerTestTable {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			Logger.Printf("Testing broker communication for %s", tt.name)
 			mb := NewMockBroker(t, 0)
@@ -158,7 +157,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 
 func TestBrokerFailedRequest(t *testing.T) {
 	for _, tt := range brokerFailedReqTestTable {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Logf("Testing broker communication for %s", tt.name)
 			mb := NewMockBroker(t, 0)
@@ -287,7 +285,6 @@ func TestSASLOAuthBearer(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
@@ -402,7 +399,6 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
@@ -500,7 +496,6 @@ func TestSASLPlainAuth(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
@@ -688,7 +683,6 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 		},
 	}
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			mockBroker := NewMockBroker(t, 0)
 			// broker executes SASL requests against mockBroker
@@ -793,7 +787,6 @@ func TestBuildClientFirstMessage(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := buildClientFirstMessage(test.token)
 

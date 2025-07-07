@@ -236,7 +236,6 @@ func recordBatchTestCases() []struct {
 
 func TestRecordBatchEncoding(t *testing.T) {
 	for _, tc := range recordBatchTestCases() {
-		tc := tc
 		testEncodable(t, tc.name, &tc.batch, tc.encoded)
 	}
 }
