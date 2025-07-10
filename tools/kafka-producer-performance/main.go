@@ -388,7 +388,6 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 	var wg gosync.WaitGroup
 	if throughput > 0 {
 		for _, messages := range messages {
-			messages := messages
 			wg.Add(1)
 			go func() {
 				ticker := time.NewTicker(time.Second)
@@ -407,7 +406,6 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 		}
 	} else {
 		for _, messages := range messages {
-			messages := messages
 			wg.Add(1)
 			go func() {
 				for _, message := range messages {

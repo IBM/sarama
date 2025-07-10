@@ -233,7 +233,6 @@ var offsetsautocommitTestTable = []struct {
 func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 	// Tests to validate configuration of `Consumer.Offsets.AutoCommit.Enable`
 	for _, tt := range offsetsautocommitTestTable {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			config := NewTestConfig()
 			if tt.set {
