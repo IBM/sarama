@@ -166,6 +166,8 @@ type client struct {
 	cachedPartitionsResults map[string][maxPartitionIndex][]int32
 
 	lock sync.RWMutex // protects access to the maps that hold cluster state.
+
+	metadataRefresh MetadataRefresh
 }
 
 // NewClient creates a new Client. It connects to one of the given broker addresses
@@ -192,7 +194,6 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 			conf.Version = V1_0_0_0
 		}
 	}
-
 	client := &client{
 		conf:                    conf,
 		closer:                  make(chan none),
@@ -204,6 +205,14 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		coordinators:            make(map[string]int32),
 		transactionCoordinators: make(map[string]int32),
 	}
+	var refresh = func(topics []string) error {
+		deadline := time.Time{}
+		if client.conf.Metadata.Timeout > 0 {
+			deadline = time.Now().Add(client.conf.Metadata.Timeout)
+		}
+		return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
+	}
+	client.metadataRefresh = refresh
 
 	if conf.Net.ResolveCanonicalBootstrapServers {
 		var err error
@@ -509,12 +518,7 @@ func (client *client) RefreshMetadata(topics ...string) error {
 			return ErrInvalidTopic // this is the error that 0.8.2 and later correctly return
 		}
 	}
-
-	deadline := time.Time{}
-	if client.conf.Metadata.Timeout > 0 {
-		deadline = time.Now().Add(client.conf.Metadata.Timeout)
-	}
-	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
+	return client.metadataRefresh(topics)
 }
 
 func (client *client) GetOffset(topic string, partitionID int32, timestamp int64) (int64, error) {
