@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -877,10 +879,25 @@ func TestClientMetadataTimeout(t *testing.T) {
 
 func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
+	var called atomic.Int32
 
-	metadataResponse1 := new(MetadataResponse)
-	metadataResponse1.AddBroker(seedBroker.Addr(), 1)
-	seedBroker.Returns(metadataResponse1)
+	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		require.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
+		var topics = req.body.(*MetadataRequest).Topics
+		var resp = new(MetadataResponse)
+		for _, topic := range topics {
+			if topic == "new_topic" {
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version: 1,
+					Name:    "new_topic",
+					Err:     ErrUnknownTopicOrPartition,
+				})
+			}
+		}
+		called.Add(1)
+		resp.AddBroker(seedBroker.Addr(), 1)
+		return resp
+	})
 
 	config := NewTestConfig()
 	config.Metadata.Retry.Max = 3
@@ -897,15 +914,72 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer waitGroup.Done()
-			var failedMetadataResponse MetadataResponse
-			failedMetadataResponse.AddBroker(seedBroker.Addr(), 1)
-			failedMetadataResponse.AddTopic("new_topic", ErrUnknownTopicOrPartition)
-			seedBroker.Returns(&failedMetadataResponse)
-			err := client.RefreshMetadata()
+			err := client.RefreshMetadata("new_topic")
 			if err == nil {
 				t.Error("should return error")
 				return
 			}
+		}()
+	}
+	waitGroup.Wait()
+	safeClose(t, client)
+	seedBroker.Close()
+	// The refresh metadata is always for the same topic,
+	// it should have been batched.
+	require.Less(t, called.Load(), int32(7))
+}
+
+func TestClientRefreshesMetadataConcurrently(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		time.Sleep(10 * time.Millisecond)
+		require.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
+		var topics = req.body.(*MetadataRequest).Topics
+		var resp = new(MetadataResponse)
+		for _, topic := range topics {
+			if topic == "topic1" {
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version:    1,
+					Name:       "topic1",
+					Partitions: []*PartitionMetadata{},
+				})
+			}
+			if topic == "topic2" {
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version:    1,
+					Name:       "topic2",
+					Partitions: []*PartitionMetadata{},
+				})
+			}
+			if topic == "topic3" {
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version: 1,
+					Name:    "topic3",
+					Err:     ErrUnknownTopicOrPartition,
+				})
+			}
+		}
+		resp.AddBroker(seedBroker.Addr(), 1)
+		return resp
+	})
+
+	config := NewTestConfig()
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitGroup := sync.WaitGroup{}
+	waitGroup.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer waitGroup.Done()
+			require.NoError(t, client.RefreshMetadata("topic1"))
+			require.NoError(t, client.RefreshMetadata("topic2"))
+			require.Error(t, client.RefreshMetadata("topic3"))
+			topics, err := client.Topics()
+			require.NoError(t, err)
+			require.Len(t, topics, 2)
 		}()
 	}
 	waitGroup.Wait()
