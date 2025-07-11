@@ -37,7 +37,7 @@ func (e *EndTxnResponse) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (e *EndTxnResponse) key() int16 {
-	return APIKeyEndTxn
+	return apiKeyEndTxn
 }
 
 func (e *EndTxnResponse) version() int16 {

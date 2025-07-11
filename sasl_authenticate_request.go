@@ -21,7 +21,7 @@ func (r *SaslAuthenticateRequest) decode(pd packetDecoder, version int16) (err e
 }
 
 func (r *SaslAuthenticateRequest) key() int16 {
-	return APIKeySASLAuth
+	return apiKeySASLAuth
 }
 
 func (r *SaslAuthenticateRequest) version() int16 {

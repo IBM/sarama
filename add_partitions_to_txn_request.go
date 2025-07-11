@@ -70,7 +70,7 @@ func (a *AddPartitionsToTxnRequest) decode(pd packetDecoder, version int16) (err
 }
 
 func (a *AddPartitionsToTxnRequest) key() int16 {
-	return APIKeyAddPartitionsToTxn
+	return apiKeyAddPartitionsToTxn
 }
 
 func (a *AddPartitionsToTxnRequest) version() int16 {

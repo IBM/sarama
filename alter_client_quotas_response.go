@@ -134,7 +134,7 @@ func (a *AlterClientQuotasEntryResponse) decode(pd packetDecoder, version int16)
 }
 
 func (a *AlterClientQuotasResponse) key() int16 {
-	return APIKeyAlterClientQuotas
+	return apiKeyAlterClientQuotas
 }
 
 func (a *AlterClientQuotasResponse) version() int16 {

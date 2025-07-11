@@ -73,7 +73,7 @@ func (i *InitProducerIDRequest) decode(pd packetDecoder, version int16) (err err
 }
 
 func (i *InitProducerIDRequest) key() int16 {
-	return APIKeyInitProducerId
+	return apiKeyInitProducerId
 }
 
 func (i *InitProducerIDRequest) version() int16 {

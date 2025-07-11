@@ -75,7 +75,7 @@ func (r *DescribeLogDirsRequest) decode(pd packetDecoder, version int16) error {
 }
 
 func (r *DescribeLogDirsRequest) key() int16 {
-	return APIKeyDescribeLogDirs
+	return apiKeyDescribeLogDirs
 }
 
 func (r *DescribeLogDirsRequest) version() int16 {

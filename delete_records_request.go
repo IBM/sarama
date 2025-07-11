@@ -75,7 +75,7 @@ func (d *DeleteRecordsRequest) decode(pd packetDecoder, version int16) error {
 }
 
 func (d *DeleteRecordsRequest) key() int16 {
-	return APIKeyDeleteRecords
+	return apiKeyDeleteRecords
 }
 
 func (d *DeleteRecordsRequest) version() int16 {

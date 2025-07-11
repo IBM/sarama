@@ -116,7 +116,7 @@ func (s *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (r *SyncGroupRequest) key() int16 {
-	return APIKeySyncGroup
+	return apiKeySyncGroup
 }
 
 func (r *SyncGroupRequest) version() int16 {

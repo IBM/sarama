@@ -130,7 +130,7 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 }
 
 func (r *AlterUserScramCredentialsRequest) key() int16 {
-	return APIKeyAlterUserScramCredentials
+	return apiKeyAlterUserScramCredentials
 }
 
 func (r *AlterUserScramCredentialsRequest) version() int16 {

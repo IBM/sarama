@@ -122,7 +122,7 @@ func (r *DescribeConfigsResponse) decode(pd packetDecoder, version int16) (err e
 }
 
 func (r *DescribeConfigsResponse) key() int16 {
-	return APIKeyDescribeConfigs
+	return apiKeyDescribeConfigs
 }
 
 func (r *DescribeConfigsResponse) version() int16 {

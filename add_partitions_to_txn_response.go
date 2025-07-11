@@ -78,7 +78,7 @@ func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (er
 }
 
 func (a *AddPartitionsToTxnResponse) key() int16 {
-	return APIKeyAddPartitionsToTxn
+	return apiKeyAddPartitionsToTxn
 }
 
 func (a *AddPartitionsToTxnResponse) version() int16 {

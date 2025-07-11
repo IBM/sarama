@@ -48,7 +48,7 @@ func (f *FindCoordinatorRequest) decode(pd packetDecoder, version int16) (err er
 }
 
 func (f *FindCoordinatorRequest) key() int16 {
-	return APIKeyFindCoordinator
+	return apiKeyFindCoordinator
 }
 
 func (f *FindCoordinatorRequest) version() int16 {

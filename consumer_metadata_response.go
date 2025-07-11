@@ -71,7 +71,7 @@ func (r *ConsumerMetadataResponse) encode(pe packetEncoder) error {
 }
 
 func (r *ConsumerMetadataResponse) key() int16 {
-	return APIKeyFindCoordinator
+	return apiKeyFindCoordinator
 }
 
 func (r *ConsumerMetadataResponse) version() int16 {

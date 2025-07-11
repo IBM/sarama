@@ -77,7 +77,7 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 }
 
 func (a *TxnOffsetCommitResponse) key() int16 {
-	return APIKeyTxnOffsetCommit
+	return apiKeyTxnOffsetCommit
 }
 
 func (a *TxnOffsetCommitResponse) version() int16 {

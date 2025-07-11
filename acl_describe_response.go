@@ -74,7 +74,7 @@ func (d *DescribeAclsResponse) decode(pd packetDecoder, version int16) (err erro
 }
 
 func (d *DescribeAclsResponse) key() int16 {
-	return APIKeyDescribeAcls
+	return apiKeyDescribeAcls
 }
 
 func (d *DescribeAclsResponse) version() int16 {

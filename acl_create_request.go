@@ -44,7 +44,7 @@ func (c *CreateAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 }
 
 func (c *CreateAclsRequest) key() int16 {
-	return APIKeyCreateAcls
+	return apiKeyCreateAcls
 }
 
 func (c *CreateAclsRequest) version() int16 {

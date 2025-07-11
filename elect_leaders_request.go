@@ -109,7 +109,7 @@ func (r *ElectLeadersRequest) decode(pd packetDecoder, version int16) (err error
 }
 
 func (r *ElectLeadersRequest) key() int16 {
-	return APIKeyElectLeaders
+	return apiKeyElectLeaders
 }
 
 func (r *ElectLeadersRequest) version() int16 {

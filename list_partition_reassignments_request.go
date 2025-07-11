@@ -76,7 +76,7 @@ func (r *ListPartitionReassignmentsRequest) decode(pd packetDecoder, version int
 }
 
 func (r *ListPartitionReassignmentsRequest) key() int16 {
-	return APIKeyListPartitionReassignments
+	return apiKeyListPartitionReassignments
 }
 
 func (r *ListPartitionReassignmentsRequest) version() int16 {

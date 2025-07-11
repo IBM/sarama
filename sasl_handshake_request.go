@@ -26,7 +26,7 @@ func (r *SaslHandshakeRequest) decode(pd packetDecoder, version int16) (err erro
 }
 
 func (r *SaslHandshakeRequest) key() int16 {
-	return APIKeySaslHandshake
+	return apiKeySaslHandshake
 }
 
 func (r *SaslHandshakeRequest) version() int16 {

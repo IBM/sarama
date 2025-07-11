@@ -121,7 +121,7 @@ func (a *AlterConfigsResourceResponse) decode(pd packetDecoder, version int16) e
 }
 
 func (a *AlterConfigsResponse) key() int16 {
-	return APIKeyAlterConfigs
+	return apiKeyAlterConfigs
 }
 
 func (a *AlterConfigsResponse) version() int16 {

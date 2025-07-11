@@ -78,7 +78,7 @@ func (r *LeaveGroupResponse) decode(pd packetDecoder, version int16) (err error)
 }
 
 func (r *LeaveGroupResponse) key() int16 {
-	return APIKeyLeaveGroup
+	return apiKeyLeaveGroup
 }
 
 func (r *LeaveGroupResponse) version() int16 {

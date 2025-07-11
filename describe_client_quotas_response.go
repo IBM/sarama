@@ -224,7 +224,7 @@ func (c *QuotaEntityComponent) decode(pd packetDecoder, version int16) error {
 }
 
 func (d *DescribeClientQuotasResponse) key() int16 {
-	return APIKeyDescribeClientQuotas
+	return apiKeyDescribeClientQuotas
 }
 
 func (d *DescribeClientQuotasResponse) version() int16 {

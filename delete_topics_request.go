@@ -50,7 +50,7 @@ func (d *DeleteTopicsRequest) decode(pd packetDecoder, version int16) (err error
 }
 
 func (d *DeleteTopicsRequest) key() int16 {
-	return APIKeyDeleteTopics
+	return apiKeyDeleteTopics
 }
 
 func (d *DeleteTopicsRequest) version() int16 {

@@ -93,7 +93,7 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err erro
 }
 
 func (r *OffsetCommitResponse) key() int16 {
-	return APIKeyOffsetCommit
+	return apiKeyOffsetCommit
 }
 
 func (r *OffsetCommitResponse) version() int16 {

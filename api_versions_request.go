@@ -47,7 +47,7 @@ func (r *ApiVersionsRequest) decode(pd packetDecoder, version int16) (err error)
 }
 
 func (r *ApiVersionsRequest) key() int16 {
-	return APIKeyApiVersions
+	return apiKeyApiVersions
 }
 
 func (r *ApiVersionsRequest) version() int16 {

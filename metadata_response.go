@@ -432,7 +432,7 @@ func (r *MetadataResponse) encode(pe packetEncoder) (err error) {
 }
 
 func (r *MetadataResponse) key() int16 {
-	return APIKeyMetadata
+	return apiKeyMetadata
 }
 
 func (r *MetadataResponse) version() int16 {

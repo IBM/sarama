@@ -147,7 +147,7 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 }
 
 func (r *AlterPartitionReassignmentsResponse) key() int16 {
-	return APIKeyAlterPartitionReassignments
+	return apiKeyAlterPartitionReassignments
 }
 
 func (r *AlterPartitionReassignmentsResponse) version() int16 {

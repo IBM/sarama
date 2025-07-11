@@ -95,7 +95,7 @@ func (c *CreateTopicsRequest) decode(pd packetDecoder, version int16) (err error
 }
 
 func (c *CreateTopicsRequest) key() int16 {
-	return APIKeyCreateTopics
+	return apiKeyCreateTopics
 }
 
 func (c *CreateTopicsRequest) version() int16 {

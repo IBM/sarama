@@ -43,7 +43,7 @@ func (a *EndTxnRequest) decode(pd packetDecoder, version int16) (err error) {
 }
 
 func (a *EndTxnRequest) key() int16 {
-	return APIKeyEndTxn
+	return apiKeyEndTxn
 }
 
 func (a *EndTxnRequest) version() int16 {

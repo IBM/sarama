@@ -130,7 +130,7 @@ func (d *QuotaFilterComponent) decode(pd packetDecoder, version int16) error {
 }
 
 func (d *DescribeClientQuotasRequest) key() int16 {
-	return APIKeyDescribeClientQuotas
+	return apiKeyDescribeClientQuotas
 }
 
 func (d *DescribeClientQuotasRequest) version() int16 {

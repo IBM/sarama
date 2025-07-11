@@ -53,7 +53,7 @@ func (d *DeleteAclsResponse) decode(pd packetDecoder, version int16) (err error)
 }
 
 func (d *DeleteAclsResponse) key() int16 {
-	return APIKeyDeleteAcls
+	return apiKeyDeleteAcls
 }
 
 func (d *DeleteAclsResponse) version() int16 {

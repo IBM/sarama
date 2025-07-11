@@ -183,7 +183,7 @@ func (c *ClientQuotasOp) decode(pd packetDecoder, version int16) error {
 }
 
 func (a *AlterClientQuotasRequest) key() int16 {
-	return APIKeyAlterClientQuotas
+	return apiKeyAlterClientQuotas
 }
 
 func (a *AlterClientQuotasRequest) version() int16 {

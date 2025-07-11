@@ -1265,25 +1265,31 @@ func (b *Broker) sendAndReceiveApiVersions() (*ApiVersionsResponse, error) {
 	b.updateOutgoingCommunicationMetrics(bytes)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to send ApiVersions request to %s: %s\n", b.addr, err.Error())
+		Logger.Printf("Failed to send ApiVersions request to %s: %s\n", b.addr, err)
 		return nil, err
 	}
 	b.correlationID++
 
-	header := make([]byte, 8) // response header
+	// Kafka protocol response structure:
+	// - Message length (4 bytes): Total length of the response excluding this field
+	// - ResponseHeader v0 (4 bytes): Contains correlation ID for request-response matching
+	header := make([]byte, 8)
 	_, err = b.readFull(header)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to read ApiVersions response header from %s: %s\n", b.addr, err.Error())
+		Logger.Printf("Failed to read ApiVersions response header from %s: %s\n", b.addr, err)
 		return nil, err
 	}
 
 	length := binary.BigEndian.Uint32(header[:4])
+	// we're not using the correlation ID here, but it is part of the response header
+	// correlationID := binary.BigEndian.Uint32(header[4:])
+
 	payload := make([]byte, length-4)
 	n, err := b.readFull(payload)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to read ApiVersions response payload from %s: %s\n", b.addr, err.Error())
+		Logger.Printf("Failed to read ApiVersions response payload from %s: %s\n", b.addr, err)
 		return nil, err
 	}
 
@@ -1292,7 +1298,7 @@ func (b *Broker) sendAndReceiveApiVersions() (*ApiVersionsResponse, error) {
 
 	err = versionedDecode(payload, res, rb.version(), b.metricRegistry)
 	if err != nil {
-		Logger.Printf("Failed to parse ApiVersions response from %s: %s\n", b.addr, err.Error())
+		Logger.Printf("Failed to parse ApiVersions response from %s: %s\n", b.addr, err)
 		return nil, err
 	}
 

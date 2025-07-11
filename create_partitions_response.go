@@ -61,7 +61,7 @@ func (c *CreatePartitionsResponse) decode(pd packetDecoder, version int16) (err 
 }
 
 func (r *CreatePartitionsResponse) key() int16 {
-	return APIKeyCreatePartitions
+	return apiKeyCreatePartitions
 }
 
 func (r *CreatePartitionsResponse) version() int16 {
