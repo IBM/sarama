@@ -88,6 +88,9 @@ var ErrCannotTransitionNilError = errors.New("transaction manager: cannot transi
 // ErrTxnUnableToParseResponse when response is nil
 var ErrTxnUnableToParseResponse = errors.New("transaction manager: unable to parse response")
 
+// ErrUnknownMessage when the protocol message key is not recognized
+var ErrUnknownMessage = errors.New("kafka: unknown protocol message key")
+
 // MultiErrorFormat specifies the formatter applied to format multierrors. The
 // default implementation is a condensed version of the hashicorp/go-multierror
 // default one

@@ -278,6 +278,10 @@ type FetchResponse struct {
 	Timestamp     time.Time
 }
 
+func (r *FetchResponse) setVersion(v int16) {
+	r.Version = v
+}
+
 func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 
@@ -375,7 +379,7 @@ func (r *FetchResponse) encode(pe packetEncoder) (err error) {
 }
 
 func (r *FetchResponse) key() int16 {
-	return 1
+	return apiKeyFetch
 }
 
 func (r *FetchResponse) version() int16 {
