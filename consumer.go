@@ -743,7 +743,12 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 		} else if block.LastRecordsBatchOffset != nil && *block.LastRecordsBatchOffset < block.HighWaterMarkOffset {
 			// check last record offset to avoid stuck if high watermark was not reached
 			Logger.Printf("consumer/broker/%d received batch with zero records but high watermark was not reached, topic %s, partition %d, offset %d\n", child.broker.broker.ID(), child.topic, child.partition, *block.LastRecordsBatchOffset)
-			child.offset = *block.LastRecordsBatchOffset + 1
+
+			if child.offset <= *block.LastRecordsBatchOffset {
+				child.offset = *block.LastRecordsBatchOffset + 1
+			} else {
+				child.offset++
+			}
 		}
 
 		return nil, nil
