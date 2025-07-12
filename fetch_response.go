@@ -48,8 +48,10 @@ type FetchResponseBlock struct {
 	// partition. This is the last offset such that the state of all
 	// transactional records prior to this offset have been decided (ABORTED or
 	// COMMITTED)
-	LastStableOffset       int64
-	LastRecordsBatchOffset *int64
+	LastStableOffset int64
+	// RecordsNextOffset contains the next consecutive offset following this response block.
+	// This field is computed locally and is not part of the server's binary response.
+	RecordsNextOffset *int64
 	// LogStartOffset contains the current log start offset.
 	LogStartOffset int64
 	// AbortedTransactions contains the aborted transactions.
@@ -150,7 +152,7 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 			return err
 		}
 
-		b.LastRecordsBatchOffset, err = records.recordsOffset()
+		b.RecordsNextOffset, err = records.nextOffset()
 		if err != nil {
 			return err
 		}
