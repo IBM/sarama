@@ -212,7 +212,11 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		}
 		return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
 	}
-	client.metadataRefresh = refresh
+	if conf.Metadata.SingleFlight {
+		client.metadataRefresh = newSingleFlightRefresher(refresh)
+	} else {
+		client.metadataRefresh = refresh
+	}
 
 	if conf.Net.ResolveCanonicalBootstrapServers {
 		var err error
