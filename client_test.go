@@ -816,7 +816,7 @@ func TestClientMetadataTimeout(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+		var test = func(t *testing.T, singleFlight bool) {
 			// Use a responsive broker to create a working client
 			initialSeed := NewMockBroker(t, 0)
 			emptyMetadata := new(MetadataResponse)
@@ -873,6 +873,12 @@ func TestClientMetadataTimeout(t *testing.T) {
 			}
 
 			safeClose(t, c)
+		}
+		t.Run("singleflight_"+tc.name, func(t *testing.T) {
+			test(t, true)
+		})
+		t.Run("concurrent_"+tc.name, func(t *testing.T) {
+			test(t, false)
 		})
 	}
 }
@@ -905,6 +911,7 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	config.Metadata.RefreshFrequency = 0
 	config.Net.ReadTimeout = 10 * time.Millisecond
 	config.Net.WriteTimeout = 10 * time.Millisecond
+	config.Metadata.SingleFlight = true
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -965,6 +972,7 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 	})
 
 	config := NewTestConfig()
+	config.Metadata.SingleFlight = true
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
