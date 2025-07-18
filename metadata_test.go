@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMetadataRefresh(t *testing.T) {
-	var called = make(map[string]int)
+	called := make(map[string]int)
 	refresh := newSingleFlightRefresher(func(topics []string) error {
 		time.Sleep(100 * time.Millisecond)
 		// There should never be two refreshes that run concurrently,
@@ -20,18 +21,18 @@ func TestMetadataRefresh(t *testing.T) {
 		return nil
 	})
 	go func() {
-		require.NoError(t, refresh([]string{"topic1"}))
+		assert.NoError(t, refresh([]string{"topic1"}))
 	}()
 	go func() {
 		// This one and the next one will be batched together because the first
 		// call is still ongoing when they run.
 		// So we will issue a single refresh call, for topic2 and topic3.
 		time.Sleep(10 * time.Millisecond)
-		require.NoError(t, refresh([]string{"topic2", "topic3"}))
+		assert.NoError(t, refresh([]string{"topic2", "topic3"}))
 	}()
 	go func() {
 		time.Sleep(10 * time.Millisecond)
-		require.NoError(t, refresh([]string{"topic3", "topic4"}))
+		assert.NoError(t, refresh([]string{"topic3", "topic4"}))
 	}()
 	time.Sleep(100 * time.Millisecond)
 	require.NoError(t, refresh([]string{"topic4"}))
@@ -42,7 +43,7 @@ func TestMetadataRefresh(t *testing.T) {
 }
 
 func TestMetadataRefreshConcurrency(t *testing.T) {
-	var called = make(map[string]int)
+	called := make(map[string]int)
 	refresh := newSingleFlightRefresher(func(topics []string) error {
 		time.Sleep(100 * time.Millisecond)
 		// There should never be two refreshes that run concurrently,
@@ -58,7 +59,7 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 		time.Sleep(time.Millisecond)
 		go func() {
 			defer wg.Done()
-			require.NoError(t, refresh([]string{"topic1"}))
+			assert.NoError(t, refresh([]string{"topic1"}))
 		}()
 	}
 	wg.Add(2)
@@ -67,14 +68,14 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 		time.Sleep(200 * time.Millisecond)
 		// Throw in one that doesn't get cached with the other ones
 		// because it does not target the same topics.
-		require.NoError(t, refresh([]string{"topic2", "topic3"}))
+		assert.NoError(t, refresh([]string{"topic2", "topic3"}))
 	}()
 	go func() {
 		defer wg.Done()
 		time.Sleep(600 * time.Millisecond)
 		// Throw in one that doesn't get cached with the other ones
 		// because it does not target the same topics.
-		require.NoError(t, refresh([]string{"topic3", "topic4"}))
+		assert.NoError(t, refresh([]string{"topic3", "topic4"}))
 	}()
 	wg.Wait()
 	require.LessOrEqual(t, called["topic1"], 20)
