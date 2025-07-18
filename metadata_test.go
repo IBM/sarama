@@ -5,81 +5,89 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestMetadataRefresh(t *testing.T) {
-	called := make(map[string]int)
-	refresh := newSingleFlightRefresher(func(topics []string) error {
-		time.Sleep(100 * time.Millisecond)
-		// There should never be two refreshes that run concurrently,
-		// so it's safe to change the map with no lock.
-		for _, topic := range topics {
-			called[topic]++
-		}
+	releaseRefresh := make(chan struct{})
+	refresh := newMetadataRefresh(func(topics []string) error {
+		<-releaseRefresh
 		return nil
 	})
-	go func() {
-		assert.NoError(t, refresh([]string{"topic1"}))
-	}()
-	go func() {
-		// This one and the next one will be batched together because the first
-		// call is still ongoing when they run.
-		// So we will issue a single refresh call, for topic2 and topic3.
-		time.Sleep(10 * time.Millisecond)
-		assert.NoError(t, refresh([]string{"topic2", "topic3"}))
-	}()
-	go func() {
-		time.Sleep(10 * time.Millisecond)
-		assert.NoError(t, refresh([]string{"topic3", "topic4"}))
-	}()
-	time.Sleep(100 * time.Millisecond)
-	require.NoError(t, refresh([]string{"topic4"}))
-	require.Equal(t, 1, called["topic1"])
-	require.Equal(t, 1, called["topic2"])
-	require.Equal(t, 1, called["topic3"])
-	require.Equal(t, 1, called["topic4"])
+
+	ch, queued := refresh.refreshOrQueue([]string{"topic1"})
+	// It's the first call, it's not queued.
+	require.False(t, queued)
+
+	// This one is requesting different topics, so it's queued.
+	ch2, queued := refresh.refreshOrQueue([]string{"topic2", "topic3"})
+	require.True(t, queued)
+
+	// This one is requesting the same topics as the second one => queued.
+	ch3, queued := refresh.refreshOrQueue([]string{"topic3"})
+	require.True(t, queued)
+
+	// This one is requesting different topics, so it's queued.
+	ch4, queued := refresh.refreshOrQueue([]string{"topic4"})
+	require.True(t, queued)
+
+	// Same topics as the first call, piggy backing on that call, so it's not queued.
+	ch5, queued := refresh.refreshOrQueue([]string{"topic1"})
+	require.False(t, queued)
+
+	releaseRefresh <- struct{}{}
+	require.NoError(t, <-ch)
+	require.NoError(t, <-ch5)
+
+	require.NoError(t, <-ch2)
+	require.NoError(t, <-ch3)
+	require.NoError(t, <-ch4)
 }
 
 func TestMetadataRefreshConcurrency(t *testing.T) {
-	called := make(map[string]int)
-	refresh := newSingleFlightRefresher(func(topics []string) error {
-		time.Sleep(100 * time.Millisecond)
-		// There should never be two refreshes that run concurrently,
-		// so it's safe to change the map with no lock.
-		for _, topic := range topics {
-			called[topic]++
-		}
+	var firstRefreshChans []chan error
+	var lock sync.Mutex
+	releaseRefresh := make(chan struct{})
+	refresh := newMetadataRefresh(func(topics []string) error {
+		<-releaseRefresh
 		return nil
 	})
+
+	ch, queued := refresh.refreshOrQueue([]string{"topic1"})
+	firstRefreshChans = append(firstRefreshChans, ch)
+	// This refresh starts a refresh.
+	require.False(t, queued)
+
 	var wg sync.WaitGroup
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		time.Sleep(time.Millisecond)
 		go func() {
 			defer wg.Done()
-			assert.NoError(t, refresh([]string{"topic1"}))
+
+			ch, refreshQueued := refresh.refreshOrQueue([]string{"topic1"})
+			require.False(t, refreshQueued)
+			lock.Lock()
+			firstRefreshChans = append(firstRefreshChans, ch)
+			lock.Unlock()
 		}()
 	}
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		time.Sleep(200 * time.Millisecond)
-		// Throw in one that doesn't get cached with the other ones
-		// because it does not target the same topics.
-		assert.NoError(t, refresh([]string{"topic2", "topic3"}))
-	}()
-	go func() {
-		defer wg.Done()
-		time.Sleep(600 * time.Millisecond)
-		// Throw in one that doesn't get cached with the other ones
-		// because it does not target the same topics.
-		assert.NoError(t, refresh([]string{"topic3", "topic4"}))
-	}()
 	wg.Wait()
-	require.LessOrEqual(t, called["topic1"], 20)
-	require.Equal(t, called["topic2"], 1)
-	require.Equal(t, called["topic3"], 2)
-	require.Equal(t, called["topic4"], 1)
+	// We have now queued all the refreshes, and they're all blocked with the first one.
+	releaseRefresh <- struct{}{}
+	// Now they are all finished, we can pull from the channels
+	for _, ch := range firstRefreshChans {
+		require.NoError(t, <-ch)
+	}
+
+	// This one should not be queued: no refresh is ongoing.
+	ch, queued = refresh.refreshOrQueue([]string{"topic2", "topic3"})
+	require.False(t, queued)
+	// But now there is a refresh ongoing, so this one should be queued.
+	ch2, queued := refresh.refreshOrQueue([]string{"topic3", "topic4"})
+	require.True(t, queued)
+
+	releaseRefresh <- struct{}{}
+	require.NoError(t, <-ch)
+	require.NoError(t, <-ch2)
 }

@@ -153,14 +153,17 @@ type singleFlightMetadataRefresher struct {
 }
 
 func newSingleFlightRefresher(f func(topics []string) error) metadataRefresh {
-	refresher := &singleFlightMetadataRefresher{
+	return newMetadataRefresh(f).Refresh
+}
+
+func newMetadataRefresh(f func(topics []string) error) *singleFlightMetadataRefresher {
+	return &singleFlightMetadataRefresher{
 		current: &currentRefresh{
 			topicsMap: make(map[string]struct{}),
 			refresh:   f,
 		},
 		next: &nextRefresh{},
 	}
-	return refresher.Refresh
 }
 
 // Refresh is the function that clients call when they want to refresh
