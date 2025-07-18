@@ -167,7 +167,7 @@ type client struct {
 
 	lock sync.RWMutex // protects access to the maps that hold cluster state.
 
-	metadataRefresh MetadataRefresh
+	metadataRefresh metadataRefresh
 }
 
 // NewClient creates a new Client. It connects to one of the given broker addresses

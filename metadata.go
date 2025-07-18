@@ -4,7 +4,7 @@ import (
 	"sync"
 )
 
-type MetadataRefresh func(topics []string) error
+type metadataRefresh func(topics []string) error
 
 // currentRefresh makes sure sarama does not issue metadata requests
 // in parallel. If we need to refresh the metadata for a list of topics,
@@ -13,7 +13,7 @@ type MetadataRefresh func(topics []string) error
 // When the current refresh is over, it will queue a new metadata refresh call
 // with the accumulated list of topics.
 type currentRefresh struct {
-	sync.Mutex
+	mu        sync.Mutex
 	ongoing   bool
 	topicsMap map[string]struct{}
 	topics    []string
@@ -26,25 +26,15 @@ type currentRefresh struct {
 	refresh func(topics []string) error
 }
 
-func newCurrentRefresh(f func(topics []string) error) *currentRefresh {
-	mr := &currentRefresh{
-		topicsMap: make(map[string]struct{}),
-		topics:    make([]string, 0),
-		refresh:   f,
-		chans:     make([]chan error, 0),
-	}
-	return mr
-}
-
-// AddTopicsFrom adds topics from the next refresh to the current refresh.
+// addTopicsFrom adds topics from the next refresh to the current refresh.
 // You need to hold the lock to call this method.
-func (r *currentRefresh) AddTopicsFrom(next *nextRefresh) {
+func (r *currentRefresh) addTopicsFrom(next *nextRefresh) {
 	if next.allTopics {
 		r.allTopics = true
 		return
 	}
 	if len(next.topics) > 0 {
-		r.AddTopics(next.topics)
+		r.addTopics(next.topics)
 		next.topics = next.topics[:0]
 	}
 }
@@ -55,14 +45,14 @@ func (r *currentRefresh) AddTopicsFrom(next *nextRefresh) {
 // accumulated in this struct, so that we can immediately issue another
 // refresh when the current refresh is over.
 type nextRefresh struct {
-	sync.Mutex
+	mu        sync.Mutex
 	topics    []string
 	allTopics bool
 }
 
-// AddTopics adds topics to the refresh.
+// addTopics adds topics to the refresh.
 // You need to hold the lock to call this method.
-func (r *currentRefresh) AddTopics(topics []string) {
+func (r *currentRefresh) addTopics(topics []string) {
 	if len(topics) == 0 {
 		r.allTopics = true
 		return
@@ -76,15 +66,18 @@ func (r *currentRefresh) AddTopics(topics []string) {
 	}
 }
 
-func (r *nextRefresh) AddTopics(topics []string) {
+func (r *nextRefresh) addTopics(topics []string) {
 	if len(topics) == 0 {
 		r.allTopics = true
+		// All topics are requested, so we can clear the topics
+		// that were previously accumulated.
+		r.topics = r.topics[:0]
 		return
 	}
 	r.topics = append(r.topics, topics...)
 }
 
-func (r *currentRefresh) HasTopics(topics []string) bool {
+func (r *currentRefresh) hasTopics(topics []string) bool {
 	if len(topics) == 0 {
 		// This means that the caller wants to know if the refresh is for all topics.
 		// In this case, we return true if the refresh is for all topics, or false if it is not.
@@ -101,29 +94,29 @@ func (r *currentRefresh) HasTopics(topics []string) bool {
 	return true
 }
 
-// Start starts a new refresh.
+// start starts a new refresh.
 // The refresh is started in a new goroutine, and this function
 // returns a channel on which the caller can wait for the refresh
 // to complete.
 // You need to hold the lock to call this method.
-func (r *currentRefresh) Start() chan error {
+func (r *currentRefresh) start() chan error {
 	r.ongoing = true
-	var ch = make(chan error, 1)
+	ch := make(chan error, 1)
 	r.chans = append(r.chans, ch)
-	var topics = r.topics
+	topics := r.topics
 	if r.allTopics {
 		topics = nil
 	}
 	go func() {
 		err := r.refresh(topics)
-		r.Lock()
+		r.mu.Lock()
 		r.ongoing = false
 		for _, ch := range r.chans {
 			ch <- err
 			close(ch)
 		}
 		r.clear()
-		r.Unlock()
+		r.mu.Unlock()
 	}()
 	return ch
 }
@@ -139,22 +132,16 @@ func (r *currentRefresh) clear() {
 	r.chans = r.chans[:0]
 }
 
-// Wait returns the channel on which you can wait for the refresh
+// wait returns the channel on which you can wait for the refresh
 // to complete.
 // You need to hold the lock to call this method.
-func (r *currentRefresh) Wait() chan error {
+func (r *currentRefresh) wait() chan error {
 	if !r.ongoing {
 		panic("waiting for a refresh that is not ongoing")
 	}
-	var ch = make(chan error, 1)
+	ch := make(chan error, 1)
 	r.chans = append(r.chans, ch)
 	return ch
-}
-
-// Ongoing returns true if the refresh is ongoing.
-// You need to hold the lock to call this method.
-func (r *currentRefresh) Ongoing() bool {
-	return r.ongoing
 }
 
 // singleFlightMetadataRefresher helps managing metadata refreshes.
@@ -165,12 +152,13 @@ type singleFlightMetadataRefresher struct {
 	next    *nextRefresh
 }
 
-func newSingleFlightRefresher(f func(topics []string) error) MetadataRefresh {
-	var refresher = &singleFlightMetadataRefresher{
-		current: newCurrentRefresh(f),
-		next: &nextRefresh{
-			topics: make([]string, 0),
+func newSingleFlightRefresher(f func(topics []string) error) metadataRefresh {
+	refresher := &singleFlightMetadataRefresher{
+		current: &currentRefresh{
+			topicsMap: make(map[string]struct{}),
+			refresh:   f,
 		},
+		next: &nextRefresh{},
 	}
 	return refresher.Refresh
 }
@@ -185,37 +173,59 @@ func newSingleFlightRefresher(f func(topics []string) error) MetadataRefresh {
 // If no refresh is ongoing, it will start a new refresh, and return its result.
 func (m *singleFlightMetadataRefresher) Refresh(topics []string) error {
 	for {
-		var current = m.current
-		current.Lock()
-		if !current.Ongoing() {
-			// If no refresh is ongoing, we can start a new one, in which
-			// we add the topics that have been accumulated in the next refresh
-			// and the topics that have been provided by the caller.
-			m.next.Lock()
-			m.current.AddTopicsFrom(m.next)
-			m.next.Unlock()
-			current.AddTopics(topics)
-			var ch = current.Start()
-			current.Unlock()
+		ch, queued := m.refreshOrQueue(topics)
+		if !queued {
 			return <-ch
 		}
-		if current.HasTopics(topics) {
-			// A refresh is ongoing, and we were lucky: it is refreshing the topics we need already:
-			// we just have to wait for it to finish and return its results.
-			var ch = current.Wait()
-			current.Unlock()
-			var err = <-ch
-			return err
-		}
-		// There is a refresh ongoing, but it is not refreshing the topics we need.
-		// We need to wait for it to finish, and then start a new refresh.
-		var ch = current.Wait()
-		current.Unlock()
-		m.next.Lock()
-		m.next.AddTopics(topics)
-		m.next.Unlock()
-		// This is where we wait for that refresh to finish, and the loop will take care
-		// of starting the new one.
 		<-ch
 	}
+}
+
+// refreshOrQueue returns a channel the refresh needs to wait on, and a boolean
+// that indicates whether waiting on the channel will return the result of that refresh
+// or whether the refresh was "queued" and the caller needs to wait for the channel to
+// return, and then call refreshOrQueue again.
+// When calling refreshOrQueue, three things can happen:
+//  1. either no refresh is ongoing.
+//     In this case, a new refresh is started, and the channel that's returned will
+//     contain the result of that refresh, so it returns "false" as the second return value.
+//  2. a refresh is ongoing, and it contains the topics we need.
+//     In this case, the channel that's returned will contain the result of that refresh,
+//     so it returns "false" as the second return value.
+//     In this case, the channel that's returned will contain the result of that refresh,
+//     so it returns "false" as the second return value.
+//  3. a refresh is already ongoing, but doesn't contain the topics we need. In this case,
+//     the caller needs to wait for the refresh to finish, and then call refreshOrQueue again.
+//     The channel that's returned is for the current refresh (not the one the caller is
+//     interested in), so it returns "true" as the second return value. The caller needs to
+//     wait on the channel, disregard the value, and call refreshOrQueue again.
+func (m *singleFlightMetadataRefresher) refreshOrQueue(topics []string) (chan error, bool) {
+	m.current.mu.Lock()
+	defer m.current.mu.Unlock()
+	if !m.current.ongoing {
+		// If no refresh is ongoing, we can start a new one, in which
+		// we add the topics that have been accumulated in the next refresh
+		// and the topics that have been provided by the caller.
+		m.next.mu.Lock()
+		m.current.addTopicsFrom(m.next)
+		m.next.mu.Unlock()
+		m.current.addTopics(topics)
+		ch := m.current.start()
+		return ch, false
+	}
+	if m.current.hasTopics(topics) {
+		// A refresh is ongoing, and we were lucky: it is refreshing the topics we need already:
+		// we just have to wait for it to finish and return its results.
+		ch := m.current.wait()
+		return ch, false
+	}
+	// There is a refresh ongoing, but it is not refreshing the topics we need.
+	// We need to wait for it to finish, and then start a new refresh.
+	ch := m.current.wait()
+	m.next.mu.Lock()
+	m.next.addTopics(topics)
+	m.next.mu.Unlock()
+	// This is where we wait for that refresh to finish, and the loop will take care
+	// of starting the new one.
+	return ch, true
 }

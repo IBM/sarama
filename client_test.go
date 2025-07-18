@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/rcrowley/go-metrics"
@@ -815,71 +817,68 @@ func TestClientMetadataTimeout(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		var test = func(t *testing.T, singleFlight bool) {
-			// Use a responsive broker to create a working client
-			initialSeed := NewMockBroker(t, 0)
-			emptyMetadata := new(MetadataResponse)
-			emptyMetadata.AddBroker(initialSeed.Addr(), initialSeed.BrokerID())
-			initialSeed.Returns(emptyMetadata)
+	for _, singleFlight := range []bool{true, false} {
+		for _, tc := range tests {
+			t.Run(fmt.Sprintf("%s_singleflight_is_%t", tc.name, singleFlight), func(t *testing.T) {
+				// Use a responsive broker to create a working client
+				initialSeed := NewMockBroker(t, 0)
+				emptyMetadata := new(MetadataResponse)
+				emptyMetadata.AddBroker(initialSeed.Addr(), initialSeed.BrokerID())
+				initialSeed.Returns(emptyMetadata)
 
-			conf := NewTestConfig()
-			// Speed up the metadata request failure because of a read timeout
-			conf.Net.ReadTimeout = 100 * time.Millisecond
-			// Disable backoff and refresh
-			conf.Metadata.Retry.Backoff = 0
-			conf.Metadata.RefreshFrequency = 0
-			// But configure a "global" timeout
-			conf.Metadata.Timeout = tc.timeout
-			c, err := NewClient([]string{initialSeed.Addr()}, conf)
-			if err != nil {
-				t.Fatal(err)
-			}
-			initialSeed.Close()
-
-			client := c.(*client)
-
-			// Start seed brokers that do not reply to anything and therefore a read
-			// on the TCP connection will timeout to simulate unresponsive brokers
-			seed1 := NewMockBroker(t, 1)
-			defer seed1.Close()
-			seed2 := NewMockBroker(t, 2)
-			defer seed2.Close()
-
-			// Overwrite the seed brokers with a fixed ordering to make this test deterministic
-			safeClose(t, client.seedBrokers[0])
-			client.seedBrokers = []*Broker{NewBroker(seed1.Addr()), NewBroker(seed2.Addr())}
-			client.deadSeeds = []*Broker{}
-
-			// Start refreshing metadata in the background
-			errChan := make(chan error)
-			go func() {
-				errChan <- c.RefreshMetadata()
-			}()
-
-			// Check that the refresh fails fast enough (less than twice the configured timeout)
-			// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
-			maxRefreshDuration := 2 * tc.timeout
-			select {
-			case err := <-errChan:
-				if err == nil {
-					t.Fatal("Expected failed RefreshMetadata, got nil")
+				conf := NewTestConfig()
+				// Speed up the metadata request failure because of a read timeout
+				conf.Net.ReadTimeout = 100 * time.Millisecond
+				// Disable backoff and refresh
+				conf.Metadata.Retry.Backoff = 0
+				conf.Metadata.RefreshFrequency = 0
+				// But configure a "global" timeout
+				conf.Metadata.Timeout = tc.timeout
+				conf.Metadata.SingleFlight = singleFlight
+				c, err := NewClient([]string{initialSeed.Addr()}, conf)
+				if err != nil {
+					t.Fatal(err)
 				}
-				if !errors.Is(err, ErrOutOfBrokers) {
-					t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
-				}
-			case <-time.After(maxRefreshDuration):
-				t.Fatalf("RefreshMetadata did not fail fast enough after waiting for %v", maxRefreshDuration)
-			}
+				initialSeed.Close()
 
-			safeClose(t, c)
+				client := c.(*client)
+
+				// Start seed brokers that do not reply to anything and therefore a read
+				// on the TCP connection will timeout to simulate unresponsive brokers
+				seed1 := NewMockBroker(t, 1)
+				defer seed1.Close()
+				seed2 := NewMockBroker(t, 2)
+				defer seed2.Close()
+
+				// Overwrite the seed brokers with a fixed ordering to make this test deterministic
+				safeClose(t, client.seedBrokers[0])
+				client.seedBrokers = []*Broker{NewBroker(seed1.Addr()), NewBroker(seed2.Addr())}
+				client.deadSeeds = []*Broker{}
+
+				// Start refreshing metadata in the background
+				errChan := make(chan error)
+				go func() {
+					errChan <- c.RefreshMetadata()
+				}()
+
+				// Check that the refresh fails fast enough (less than twice the configured timeout)
+				// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
+				maxRefreshDuration := 2 * tc.timeout
+				select {
+				case err := <-errChan:
+					if err == nil {
+						t.Fatal("Expected failed RefreshMetadata, got nil")
+					}
+					if !errors.Is(err, ErrOutOfBrokers) {
+						t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
+					}
+				case <-time.After(maxRefreshDuration):
+					t.Fatalf("RefreshMetadata did not fail fast enough after waiting for %v", maxRefreshDuration)
+				}
+
+				safeClose(t, c)
+			})
 		}
-		t.Run("singleflight_"+tc.name, func(t *testing.T) {
-			test(t, true)
-		})
-		t.Run("concurrent_"+tc.name, func(t *testing.T) {
-			test(t, false)
-		})
 	}
 }
 
@@ -888,10 +887,9 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	var called atomic.Int32
 
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
-		require.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
-		var topics = req.body.(*MetadataRequest).Topics
-		var resp = new(MetadataResponse)
-		for _, topic := range topics {
+		assert.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
+		resp := new(MetadataResponse)
+		for _, topic := range req.body.(*MetadataRequest).Topics {
 			if topic == "new_topic" {
 				resp.Topics = append(resp.Topics, &TopicMetadata{
 					Version: 1,
@@ -933,7 +931,9 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	seedBroker.Close()
 	// The refresh metadata is always for the same topic,
 	// it should have been batched.
-	require.Less(t, called.Load(), int32(7))
+	if count := called.Load(); count >= 7 {
+		t.Errorf("Refresh metadata was called %d times, this should be less than 7.", count)
+	}
 }
 
 func TestClientRefreshesMetadataConcurrently(t *testing.T) {
@@ -942,8 +942,8 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
 		time.Sleep(10 * time.Millisecond)
 		require.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
-		var topics = req.body.(*MetadataRequest).Topics
-		var resp = new(MetadataResponse)
+		topics := req.body.(*MetadataRequest).Topics
+		resp := new(MetadataResponse)
 		for _, topic := range topics {
 			if topic == "topic1" {
 				resp.Topics = append(resp.Topics, &TopicMetadata{
@@ -977,17 +977,17 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	waitGroup := sync.WaitGroup{}
+	var waitGroup sync.WaitGroup
 	waitGroup.Add(1000)
 	for i := 0; i < 1000; i++ {
 		go func() {
 			defer waitGroup.Done()
-			require.NoError(t, client.RefreshMetadata("topic1"))
-			require.NoError(t, client.RefreshMetadata("topic2"))
-			require.Error(t, client.RefreshMetadata("topic3"))
+			assert.NoError(t, client.RefreshMetadata("topic1"))
+			assert.NoError(t, client.RefreshMetadata("topic2"))
+			assert.Error(t, client.RefreshMetadata("topic3"))
 			topics, err := client.Topics()
-			require.NoError(t, err)
-			require.Len(t, topics, 2)
+			assert.NoError(t, err)
+			assert.Len(t, topics, 2)
 		}()
 	}
 	waitGroup.Wait()
