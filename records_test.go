@@ -74,7 +74,7 @@ func TestLegacyRecords(t *testing.T) {
 	if c {
 		t.Errorf("MessageSet can't be a control batch")
 	}
-	f, err := r.recordsOffset()
+	f, err := r.nextOffset()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,11 +151,11 @@ func TestDefaultRecords(t *testing.T) {
 	if c {
 		t.Errorf("RecordBatch shouldn't be a control batch")
 	}
-	f, err := r.recordsOffset()
+	f, err := r.nextOffset()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f == nil || *f != 1 {
+	if f == nil || *f != 2 {
 		t.Errorf("RecordBatch record offset is invalid")
 	}
 }
