@@ -35,7 +35,6 @@ func (r *currentRefresh) addTopicsFrom(next *nextRefresh) {
 	}
 	if len(next.topics) > 0 {
 		r.addTopics(next.topics)
-		next.topics = next.topics[:0]
 	}
 }
 
@@ -77,6 +76,11 @@ func (r *nextRefresh) addTopics(topics []string) {
 	r.topics = append(r.topics, topics...)
 }
 
+func (r *nextRefresh) clear() {
+	r.topics = r.topics[:0]
+	r.allTopics = false
+}
+
 func (r *currentRefresh) hasTopics(topics []string) bool {
 	if len(topics) == 0 {
 		// This means that the caller wants to know if the refresh is for all topics.
@@ -110,13 +114,14 @@ func (r *currentRefresh) start() chan error {
 	go func() {
 		err := r.refresh(topics)
 		r.mu.Lock()
+		defer r.mu.Unlock()
+
 		r.ongoing = false
 		for _, ch := range r.chans {
 			ch <- err
 			close(ch)
 		}
 		r.clear()
-		r.mu.Unlock()
 	}()
 	return ch
 }
@@ -211,6 +216,7 @@ func (m *singleFlightMetadataRefresher) refreshOrQueue(topics []string) (chan er
 		// and the topics that have been provided by the caller.
 		m.next.mu.Lock()
 		m.current.addTopicsFrom(m.next)
+		m.next.clear()
 		m.next.mu.Unlock()
 		m.current.addTopics(topics)
 		ch := m.current.start()
