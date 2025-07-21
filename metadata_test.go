@@ -16,24 +16,29 @@ func TestMetadataRefresh(t *testing.T) {
 	})
 
 	ch, queued := refresh.refreshOrQueue([]string{"topic1"})
-	// It's the first call, it's not queued.
-	require.False(t, queued)
+	if queued {
+		t.Errorf("It's the first call, it should not be queued")
+	}
 
-	// This one is requesting different topics, so it's queued.
 	ch2, queued := refresh.refreshOrQueue([]string{"topic2", "topic3"})
-	require.True(t, queued)
+	if !queued {
+		t.Errorf("This one is requesting different topics, it should be queued")
+	}
 
-	// This one is requesting the same topics as the second one => queued.
 	ch3, queued := refresh.refreshOrQueue([]string{"topic3"})
-	require.True(t, queued)
+	if !queued {
+		t.Errorf("This one is requesting the same topics as the second one, it should be queued")
+	}
 
-	// This one is requesting different topics, so it's queued.
 	ch4, queued := refresh.refreshOrQueue([]string{"topic4"})
-	require.True(t, queued)
+	if !queued {
+		t.Errorf("This one is requesting different topics, it should be queued too")
+	}
 
-	// Same topics as the first call, piggy backing on that call, so it's not queued.
 	ch5, queued := refresh.refreshOrQueue([]string{"topic1"})
-	require.False(t, queued)
+	if queued {
+		t.Errorf("Same topics as the first call, piggy backing on that call, so it's not queued")
+	}
 
 	releaseRefresh <- struct{}{}
 	require.NoError(t, <-ch)
@@ -55,8 +60,9 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 
 	ch, queued := refresh.refreshOrQueue([]string{"topic1"})
 	firstRefreshChans = append(firstRefreshChans, ch)
-	// This refresh starts a refresh.
-	require.False(t, queued)
+	if queued {
+		t.Errorf("First call, should start a refresh")
+	}
 
 	var wg sync.WaitGroup
 	for i := 0; i < 1000; i++ {
@@ -66,7 +72,9 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 			defer wg.Done()
 
 			ch, refreshQueued := refresh.refreshOrQueue([]string{"topic1"})
-			require.False(t, refreshQueued)
+			if refreshQueued {
+				t.Errorf("This one should not be queued: they are all requesting the topic that's already started")
+			}
 			lock.Lock()
 			firstRefreshChans = append(firstRefreshChans, ch)
 			lock.Unlock()
@@ -80,12 +88,14 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 		require.NoError(t, <-ch)
 	}
 
-	// This one should not be queued: no refresh is ongoing.
 	ch, queued = refresh.refreshOrQueue([]string{"topic2", "topic3"})
-	require.False(t, queued)
-	// But now there is a refresh ongoing, so this one should be queued.
+	if queued {
+		t.Errorf("This one should not be queued: no refresh is ongoing")
+	}
 	ch2, queued := refresh.refreshOrQueue([]string{"topic3", "topic4"})
-	require.True(t, queued)
+	if !queued {
+		t.Errorf("But now there is a refresh ongoing, so this one should be queued")
+	}
 
 	releaseRefresh <- struct{}{}
 	require.NoError(t, <-ch)

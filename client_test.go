@@ -12,10 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/rcrowley/go-metrics"
 )
 
 func TestSimpleClient(t *testing.T) {
@@ -945,26 +944,27 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 		topics := req.body.(*MetadataRequest).Topics
 		resp := new(MetadataResponse)
 		for _, topic := range topics {
-			if topic == "topic1" {
+			switch topic {
+			case "topic1":
 				resp.Topics = append(resp.Topics, &TopicMetadata{
 					Version:    1,
 					Name:       "topic1",
 					Partitions: []*PartitionMetadata{},
 				})
-			}
-			if topic == "topic2" {
+			case "topic2":
 				resp.Topics = append(resp.Topics, &TopicMetadata{
 					Version:    1,
 					Name:       "topic2",
 					Partitions: []*PartitionMetadata{},
 				})
-			}
-			if topic == "topic3" {
+			case "topic3":
 				resp.Topics = append(resp.Topics, &TopicMetadata{
 					Version: 1,
 					Name:    "topic3",
 					Err:     ErrUnknownTopicOrPartition,
 				})
+			default:
+				t.Errorf("unexpected topic: %s", topic)
 			}
 		}
 		resp.AddBroker(seedBroker.Addr(), 1)
