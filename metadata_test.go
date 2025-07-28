@@ -10,32 +10,32 @@ import (
 
 func TestMetadataRefresh(t *testing.T) {
 	releaseRefresh := make(chan struct{})
-	refresh := newMetadataRefresh(func(topics []string) error {
+	step := newMetadataRefresh(func(topics []string) error {
 		<-releaseRefresh
 		return nil
 	})
 
-	ch, queued := refresh.refreshOrQueue([]string{"topic1"})
+	ch, queued := step.refreshOrQueue([]string{"topic1"})
 	if queued {
 		t.Errorf("It's the first call, it should not be queued")
 	}
 
-	ch2, queued := refresh.refreshOrQueue([]string{"topic2", "topic3"})
+	ch2, queued := step.refreshOrQueue([]string{"topic2", "topic3"})
 	if !queued {
 		t.Errorf("This one is requesting different topics, it should be queued")
 	}
 
-	ch3, queued := refresh.refreshOrQueue([]string{"topic3"})
+	ch3, queued := step.refreshOrQueue([]string{"topic3"})
 	if !queued {
 		t.Errorf("This one is requesting the same topics as the second one, it should be queued")
 	}
 
-	ch4, queued := refresh.refreshOrQueue([]string{"topic4"})
+	ch4, queued := step.refreshOrQueue([]string{"topic4"})
 	if !queued {
 		t.Errorf("This one is requesting different topics, it should be queued too")
 	}
 
-	ch5, queued := refresh.refreshOrQueue([]string{"topic1"})
+	ch5, queued := step.refreshOrQueue([]string{"topic1"})
 	if queued {
 		t.Errorf("Same topics as the first call, piggy backing on that call, so it's not queued")
 	}
@@ -53,12 +53,12 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 	var firstRefreshChans []chan error
 	var lock sync.Mutex
 	releaseRefresh := make(chan struct{})
-	refresh := newMetadataRefresh(func(topics []string) error {
+	step := newMetadataRefresh(func(topics []string) error {
 		<-releaseRefresh
 		return nil
 	})
 
-	ch, queued := refresh.refreshOrQueue([]string{"topic1"})
+	ch, queued := step.refreshOrQueue([]string{"topic1"})
 	firstRefreshChans = append(firstRefreshChans, ch)
 	if queued {
 		t.Errorf("First call, should start a refresh")
@@ -71,7 +71,7 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 		go func() {
 			defer wg.Done()
 
-			ch, refreshQueued := refresh.refreshOrQueue([]string{"topic1"})
+			ch, refreshQueued := step.refreshOrQueue([]string{"topic1"})
 			if refreshQueued {
 				t.Errorf("This one should not be queued: they are all requesting the topic that's already started")
 			}
@@ -88,11 +88,11 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 		require.NoError(t, <-ch)
 	}
 
-	ch, queued = refresh.refreshOrQueue([]string{"topic2", "topic3"})
+	ch, queued = step.refreshOrQueue([]string{"topic2", "topic3"})
 	if queued {
 		t.Errorf("This one should not be queued: no refresh is ongoing")
 	}
-	ch2, queued := refresh.refreshOrQueue([]string{"topic3", "topic4"})
+	ch2, queued := step.refreshOrQueue([]string{"topic3", "topic4"})
 	if !queued {
 		t.Errorf("But now there is a refresh ongoing, so this one should be queued")
 	}

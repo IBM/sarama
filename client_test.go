@@ -14,7 +14,6 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestSimpleClient(t *testing.T) {
@@ -886,7 +885,10 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	var called atomic.Int32
 
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
-		assert.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
+		if req.body.key() != 3 {
+			t.Fatal("this test sends only Metadata requests")
+			return
+		}
 		resp := new(MetadataResponse)
 		for _, topic := range req.body.(*MetadataRequest).Topics {
 			if topic == "new_topic" {
@@ -940,7 +942,10 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
 		time.Sleep(10 * time.Millisecond)
-		require.EqualValues(t, 3, req.body.key(), "this test sends only Metadata requests")
+		if req.body.key() != 3 {
+			t.Fatal("this test sends only Metadata requests")
+			return
+		}
 		topics := req.body.(*MetadataRequest).Topics
 		resp := new(MetadataResponse)
 		for _, topic := range topics {

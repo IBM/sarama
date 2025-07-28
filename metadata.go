@@ -13,17 +13,17 @@ type metadataRefresh func(topics []string) error
 // When the current refresh is over, it will queue a new metadata refresh call
 // with the accumulated list of topics.
 type currentRefresh struct {
+	// This is the function that gets called when to refresh the metadata.
+	// It is called with the list of all topics that need to be refreshed
+	// or with nil if all topics need to be refreshed.
+	refresh func(topics []string) error
+
 	mu        sync.Mutex
 	ongoing   bool
 	topicsMap map[string]struct{}
 	topics    []string
 	allTopics bool
 	chans     []chan error
-
-	// This is the function that gets called when to refresh the metadata.
-	// It is called with the list of all topics that need to be refreshed
-	// or with nil if all topics need to be refreshed.
-	refresh func(topics []string) error
 }
 
 // addTopicsFrom adds topics from the next refresh to the current refresh.
@@ -105,8 +105,7 @@ func (r *currentRefresh) hasTopics(topics []string) bool {
 // You need to hold the lock to call this method.
 func (r *currentRefresh) start() chan error {
 	r.ongoing = true
-	ch := make(chan error, 1)
-	r.chans = append(r.chans, ch)
+	ch := r.wait()
 	topics := r.topics
 	if r.allTopics {
 		topics = nil
