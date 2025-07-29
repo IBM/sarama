@@ -886,7 +886,7 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
 		if req.body.key() != 3 {
-			t.Fatal("this test sends only Metadata requests")
+			t.Error("this test sends only Metadata requests")
 			return
 		}
 		resp := new(MetadataResponse)
@@ -943,7 +943,7 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
 		time.Sleep(10 * time.Millisecond)
 		if req.body.key() != 3 {
-			t.Fatal("this test sends only Metadata requests")
+			t.Error("this test sends only Metadata requests")
 			return
 		}
 		topics := req.body.(*MetadataRequest).Topics
