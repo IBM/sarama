@@ -167,6 +167,14 @@ type Config struct {
 		// the broker may auto-create topics that we requested which do not already exist,
 		// if it is configured to do so (`auto.create.topics.enable` is true). Defaults to true.
 		AllowAutoTopicCreation bool
+
+		// SingleFlight controls whether to send a single metadata refresh request at a given time
+		// or whether to allow anyone to refresh the metadata concurrently.
+		// If this is set to true and the client needs to refresh the metadata from different goroutines,
+		// the requests will be batched together so that a single refresh is sent at a time.
+		// See https://github.com/IBM/sarama/issues/3224 for more details.
+		// SingleFlight defaults to false.
+		SingleFlight bool
 	}
 
 	// Producer is the namespace for configuration related to producing messages,

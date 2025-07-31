@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSimpleClient(t *testing.T) {
@@ -813,74 +815,94 @@ func TestClientMetadataTimeout(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			// Use a responsive broker to create a working client
-			initialSeed := NewMockBroker(t, 0)
-			emptyMetadata := new(MetadataResponse)
-			emptyMetadata.AddBroker(initialSeed.Addr(), initialSeed.BrokerID())
-			initialSeed.Returns(emptyMetadata)
+	for _, singleFlight := range []bool{true, false} {
+		for _, tc := range tests {
+			t.Run(fmt.Sprintf("%s_singleflight_is_%t", tc.name, singleFlight), func(t *testing.T) {
+				// Use a responsive broker to create a working client
+				initialSeed := NewMockBroker(t, 0)
+				emptyMetadata := new(MetadataResponse)
+				emptyMetadata.AddBroker(initialSeed.Addr(), initialSeed.BrokerID())
+				initialSeed.Returns(emptyMetadata)
 
-			conf := NewTestConfig()
-			// Speed up the metadata request failure because of a read timeout
-			conf.Net.ReadTimeout = 100 * time.Millisecond
-			// Disable backoff and refresh
-			conf.Metadata.Retry.Backoff = 0
-			conf.Metadata.RefreshFrequency = 0
-			// But configure a "global" timeout
-			conf.Metadata.Timeout = tc.timeout
-			c, err := NewClient([]string{initialSeed.Addr()}, conf)
-			if err != nil {
-				t.Fatal(err)
-			}
-			initialSeed.Close()
-
-			client := c.(*client)
-
-			// Start seed brokers that do not reply to anything and therefore a read
-			// on the TCP connection will timeout to simulate unresponsive brokers
-			seed1 := NewMockBroker(t, 1)
-			defer seed1.Close()
-			seed2 := NewMockBroker(t, 2)
-			defer seed2.Close()
-
-			// Overwrite the seed brokers with a fixed ordering to make this test deterministic
-			safeClose(t, client.seedBrokers[0])
-			client.seedBrokers = []*Broker{NewBroker(seed1.Addr()), NewBroker(seed2.Addr())}
-			client.deadSeeds = []*Broker{}
-
-			// Start refreshing metadata in the background
-			errChan := make(chan error)
-			go func() {
-				errChan <- c.RefreshMetadata()
-			}()
-
-			// Check that the refresh fails fast enough (less than twice the configured timeout)
-			// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
-			maxRefreshDuration := 2 * tc.timeout
-			select {
-			case err := <-errChan:
-				if err == nil {
-					t.Fatal("Expected failed RefreshMetadata, got nil")
+				conf := NewTestConfig()
+				// Speed up the metadata request failure because of a read timeout
+				conf.Net.ReadTimeout = 100 * time.Millisecond
+				// Disable backoff and refresh
+				conf.Metadata.Retry.Backoff = 0
+				conf.Metadata.RefreshFrequency = 0
+				// But configure a "global" timeout
+				conf.Metadata.Timeout = tc.timeout
+				conf.Metadata.SingleFlight = singleFlight
+				c, err := NewClient([]string{initialSeed.Addr()}, conf)
+				if err != nil {
+					t.Fatal(err)
 				}
-				if !errors.Is(err, ErrOutOfBrokers) {
-					t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
-				}
-			case <-time.After(maxRefreshDuration):
-				t.Fatalf("RefreshMetadata did not fail fast enough after waiting for %v", maxRefreshDuration)
-			}
+				initialSeed.Close()
 
-			safeClose(t, c)
-		})
+				client := c.(*client)
+
+				// Start seed brokers that do not reply to anything and therefore a read
+				// on the TCP connection will timeout to simulate unresponsive brokers
+				seed1 := NewMockBroker(t, 1)
+				defer seed1.Close()
+				seed2 := NewMockBroker(t, 2)
+				defer seed2.Close()
+
+				// Overwrite the seed brokers with a fixed ordering to make this test deterministic
+				safeClose(t, client.seedBrokers[0])
+				client.seedBrokers = []*Broker{NewBroker(seed1.Addr()), NewBroker(seed2.Addr())}
+				client.deadSeeds = []*Broker{}
+
+				// Start refreshing metadata in the background
+				errChan := make(chan error)
+				go func() {
+					errChan <- c.RefreshMetadata()
+				}()
+
+				// Check that the refresh fails fast enough (less than twice the configured timeout)
+				// instead of at least: 100 ms * 2 brokers * 3 retries = 800 ms
+				maxRefreshDuration := 2 * tc.timeout
+				select {
+				case err := <-errChan:
+					if err == nil {
+						t.Fatal("Expected failed RefreshMetadata, got nil")
+					}
+					if !errors.Is(err, ErrOutOfBrokers) {
+						t.Error("Expected failed RefreshMetadata with ErrOutOfBrokers, got:", err)
+					}
+				case <-time.After(maxRefreshDuration):
+					t.Fatalf("RefreshMetadata did not fail fast enough after waiting for %v", maxRefreshDuration)
+				}
+
+				safeClose(t, c)
+			})
+		}
 	}
 }
 
 func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
+	var called atomic.Int32
 
-	metadataResponse1 := new(MetadataResponse)
-	metadataResponse1.AddBroker(seedBroker.Addr(), 1)
-	seedBroker.Returns(metadataResponse1)
+	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		if req.body.key() != 3 {
+			t.Error("this test sends only Metadata requests")
+			return
+		}
+		resp := new(MetadataResponse)
+		for _, topic := range req.body.(*MetadataRequest).Topics {
+			if topic == "new_topic" {
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version: 1,
+					Name:    "new_topic",
+					Err:     ErrUnknownTopicOrPartition,
+				})
+			}
+		}
+		called.Add(1)
+		resp.AddBroker(seedBroker.Addr(), 1)
+		return resp
+	})
 
 	config := NewTestConfig()
 	config.Metadata.Retry.Max = 3
@@ -888,6 +910,7 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	config.Metadata.RefreshFrequency = 0
 	config.Net.ReadTimeout = 10 * time.Millisecond
 	config.Net.WriteTimeout = 10 * time.Millisecond
+	config.Metadata.SingleFlight = true
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
 	if err != nil {
 		t.Fatal(err)
@@ -897,15 +920,79 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		go func() {
 			defer waitGroup.Done()
-			var failedMetadataResponse MetadataResponse
-			failedMetadataResponse.AddBroker(seedBroker.Addr(), 1)
-			failedMetadataResponse.AddTopic("new_topic", ErrUnknownTopicOrPartition)
-			seedBroker.Returns(&failedMetadataResponse)
-			err := client.RefreshMetadata()
+			err := client.RefreshMetadata("new_topic")
 			if err == nil {
 				t.Error("should return error")
 				return
 			}
+		}()
+	}
+	waitGroup.Wait()
+	safeClose(t, client)
+	seedBroker.Close()
+	// The refresh metadata is always for the same topic,
+	// it should have been batched.
+	if count := called.Load(); count >= 7 {
+		t.Errorf("Refresh metadata was called %d times, this should be less than 7.", count)
+	}
+}
+
+func TestClientRefreshesMetadataConcurrently(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	seedBroker.setHandler(func(req *request) (res encoderWithHeader) {
+		time.Sleep(10 * time.Millisecond)
+		if req.body.key() != 3 {
+			t.Error("this test sends only Metadata requests")
+			return
+		}
+		topics := req.body.(*MetadataRequest).Topics
+		resp := new(MetadataResponse)
+		for _, topic := range topics {
+			switch topic {
+			case "topic1":
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version:    1,
+					Name:       "topic1",
+					Partitions: []*PartitionMetadata{},
+				})
+			case "topic2":
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version:    1,
+					Name:       "topic2",
+					Partitions: []*PartitionMetadata{},
+				})
+			case "topic3":
+				resp.Topics = append(resp.Topics, &TopicMetadata{
+					Version: 1,
+					Name:    "topic3",
+					Err:     ErrUnknownTopicOrPartition,
+				})
+			default:
+				t.Errorf("unexpected topic: %s", topic)
+			}
+		}
+		resp.AddBroker(seedBroker.Addr(), 1)
+		return resp
+	})
+
+	config := NewTestConfig()
+	config.Metadata.SingleFlight = true
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(1000)
+	for i := 0; i < 1000; i++ {
+		go func() {
+			defer waitGroup.Done()
+			assert.NoError(t, client.RefreshMetadata("topic1"))
+			assert.NoError(t, client.RefreshMetadata("topic2"))
+			assert.Error(t, client.RefreshMetadata("topic3"))
+			topics, err := client.Topics()
+			assert.NoError(t, err)
+			assert.Len(t, topics, 2)
 		}()
 	}
 	waitGroup.Wait()
