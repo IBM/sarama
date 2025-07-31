@@ -1061,7 +1061,7 @@ func (bc *brokerConsumer) abort(err error) {
 	}
 }
 
-// fetchResponse can be nil if no fetch is made, it can occur when
+// fetchNewMessages can be nil if no fetch is made, it can occur when
 // all partitions are paused
 func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
