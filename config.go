@@ -544,6 +544,7 @@ func NewConfig() *Config {
 	c.Metadata.RefreshFrequency = 10 * time.Minute
 	c.Metadata.Full = true
 	c.Metadata.AllowAutoTopicCreation = true
+	c.Metadata.SingleFlight = true
 
 	c.Producer.MaxMessageBytes = 1024 * 1024
 	c.Producer.RequiredAcks = WaitForLocal
