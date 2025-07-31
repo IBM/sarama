@@ -740,10 +740,10 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 					child.fetchSize = child.conf.Consumer.Fetch.Max
 				}
 			}
-		} else if block.RecordsNextOffset != nil && *block.RecordsNextOffset <= block.HighWaterMarkOffset {
+		} else if block.recordsNextOffset != nil && *block.recordsNextOffset <= block.HighWaterMarkOffset {
 			// check last record next offset to avoid stuck if high watermark was not reached
-			Logger.Printf("consumer/broker/%d received batch with zero records but high watermark was not reached, topic %s, partition %d, next offset %d\n", child.broker.broker.ID(), child.topic, child.partition, *block.RecordsNextOffset)
-			child.offset = *block.RecordsNextOffset
+			Logger.Printf("consumer/broker/%d received batch with zero records but high watermark was not reached, topic %s, partition %d, next offset %d\n", child.broker.broker.ID(), child.topic, child.partition, *block.recordsNextOffset)
+			child.offset = *block.recordsNextOffset
 		}
 
 		return nil, nil

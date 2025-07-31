@@ -1997,7 +1997,7 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 	block := &FetchResponseBlock{
 		HighWaterMarkOffset: 10,
 		LastStableOffset:    10,
-		RecordsNextOffset:   &lrbOffset,
+		recordsNextOffset:   &lrbOffset,
 		LogStartOffset:      0,
 	}
 	response := &FetchResponse{
@@ -2021,7 +2021,7 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 		t.Errorf("partitionConsumer.parseResponse() should be nil, got %v", got)
 	}
 	if child.offset != 6 {
-		t.Errorf("child.offset should be RecordsNextOffset: %d, got %d", lrbOffset, child.offset)
+		t.Errorf("child.offset should be recordsNextOffset: %d, got %d", lrbOffset, child.offset)
 	}
 }
 
