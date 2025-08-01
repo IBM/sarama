@@ -257,16 +257,11 @@ func (om *offsetManager) flushToBroker() {
 		return
 	}
 
-	// Care needs to be taken to unlock this. Don't want to defer the unlock as this would
-	// cause the lock to be held while waiting for the broker to reply.
-	broker.lock.Lock()
 	req := om.constructRequest()
 	if req == nil {
-		broker.lock.Unlock()
 		return
 	}
 	resp, rp, err := sendOffsetCommit(broker, req)
-	broker.lock.Unlock()
 
 	if err != nil {
 		om.handleError(err)
@@ -290,6 +285,10 @@ func (om *offsetManager) flushToBroker() {
 func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCommitResponse, *responsePromise, error) {
 	resp := new(OffsetCommitResponse)
 	responseHeaderVersion := resp.headerVersion()
+
+	coordinator.lock.Lock()
+	defer coordinator.lock.Unlock()
+
 	promise, err := coordinator.send(req, true, responseHeaderVersion)
 	if err != nil {
 		return nil, nil, err
