@@ -175,8 +175,6 @@ func (b *Broker) Open(conf *Config) error {
 		return err
 	}
 
-	usingApiVersionsRequests := conf.Version.IsAtLeast(V2_4_0_0) && conf.ApiVersionsRequest
-
 	b.lock.Lock()
 
 	if b.metricRegistry == nil {
@@ -222,12 +220,14 @@ func (b *Broker) Open(conf *Config) error {
 		// Store the response in the brokerAPIVersions map.
 		// It will be used to determine the supported API versions for each request.
 		// This should happen before SASL authentication: https://kafka.apache.org/26/protocol.html#api_versions
-		if usingApiVersionsRequests {
-			apiVersionsResponse, err := b.sendAndReceiveApiVersions()
+		if conf.ApiVersionsRequest {
+			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
 				Logger.Printf("Error while sending ApiVersionsRequest to broker %s: %s\n", b.addr, err)
-				// Don't return here - continue without API version discovery
-			} else {
+				// send a v0 request in case remote cluster is < 2.4.0.0
+				apiVersionsResponse, _ = b.sendAndReceiveApiVersions(0)
+			}
+			if apiVersionsResponse != nil {
 				b.brokerAPIVersions = make(apiVersionMap, len(apiVersionsResponse.ApiKeys))
 				for _, key := range apiVersionsResponse.ApiKeys {
 					b.brokerAPIVersions[key.ApiKey] = &apiVersionRange{
@@ -1248,9 +1248,9 @@ func getHeaderLength(headerVersion int16) int8 {
 	}
 }
 
-func (b *Broker) sendAndReceiveApiVersions() (*ApiVersionsResponse, error) {
+func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error) {
 	rb := &ApiVersionsRequest{
-		Version:               3,
+		Version:               v,
 		ClientSoftwareName:    defaultClientSoftwareName,
 		ClientSoftwareVersion: version(),
 	}
