@@ -18,6 +18,7 @@ import (
 // and the response versions our mocks use, we default to the minimum Kafka version in most tests
 func NewTestConfig() *Config {
 	config := NewConfig()
+	config.ApiVersionsRequest = false
 	config.Consumer.Retry.Backoff = 0
 	config.Producer.Retry.Backoff = 0
 	config.Version = MinVersion
