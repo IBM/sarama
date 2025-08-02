@@ -205,7 +205,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		coordinators:            make(map[string]int32),
 		transactionCoordinators: make(map[string]int32),
 	}
-	var refresh = func(topics []string) error {
+	refresh := func(topics []string) error {
 		deadline := time.Time{}
 		if client.conf.Metadata.Timeout > 0 {
 			deadline = time.Now().Add(client.conf.Metadata.Timeout)
@@ -1002,7 +1002,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		if err == nil {
 			// When talking to the startup phase of a broker, it is possible to receive an empty metadata set. We should remove that broker and try next broker (https://issues.apache.org/jira/browse/KAFKA-7924).
 			if len(response.Brokers) == 0 {
-				Logger.Println("client/metadata receiving empty brokers from the metadata response when requesting the broker #%d at %s", broker.ID(), broker.addr)
+				Logger.Printf("client/metadata receiving empty brokers from the metadata response when requesting the broker #%d at %s", broker.ID(), broker.addr)
 				_ = broker.Close()
 				client.deregisterBroker(broker)
 				continue
