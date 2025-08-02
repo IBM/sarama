@@ -98,13 +98,13 @@ func NewFunctionalTestConfig() *Config {
 	config := NewConfig()
 	// config.Consumer.Retry.Backoff = 0
 	// config.Producer.Retry.Backoff = 0
-	config.Version = MinVersion
-	version, err := ParseKafkaVersion(os.Getenv("KAFKA_VERSION"))
-	if err != nil {
-		config.Version = DefaultVersion
-	} else {
-		config.Version = version
-	}
+
+	// Always use the maximum Sarama-supported API versions.
+	config.Version = MaxVersion
+	// Enable API versions negotiation with brokers. This will reduce the maximum
+	// API versions Sarama uses to never exceed the broker's supported versions.
+	config.ApiVersionsRequest = true
+
 	return config
 }
 
