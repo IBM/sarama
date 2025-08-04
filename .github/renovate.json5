@@ -1,0 +1,73 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:best-practices",
+    "enableVulnerabilityAlertsWithLabel(security)",
+    "customManagers:dockerfileVersions",
+    "customManagers:githubActionsVersions",
+    "customManagers:makefileVersions",
+    "security:openssf-scorecard",
+    ":gitSignOff",
+  ],
+  branchConcurrentLimit: 4,
+  prConcurrentLimit: 4,
+  prHourlyLimit: 4,
+  branchPrefix: "mend/",
+  labels: ["dependencies"],
+  timezone: "Etc/UTC",
+  major: {
+    addLabels: ["bump/major"],
+  },
+  minor: {
+    addLabels: ["bump/minor"],
+  },
+  patch: {
+    addLabels: ["bump/patch"],
+  },
+  pin: {
+    addLabels: ["bump/pin"],
+  },
+  digest: {
+    addLabels: ["bump/digest"],
+  },
+  packageRules: [
+    {
+      description: "Update Docker and Docker Compose dependencies daily at 9:00 PM UTC, grouped into a single PR",
+      matchManagers: ["dockerfile", "docker-compose"],
+      schedule: ["every day at 9:00pm"],
+      commitMessagePrefix: "chore(ci): ",
+      groupName: "docker dependencies",
+      addLabels: ["docker", "ignore-for-release"],
+    },
+    {
+      description: "Update GitHub Actions weekly, grouped into a single PR for actions/* packages",
+      matchManagers: ["github-actions"],
+      schedule: ["every week"],
+      commitMessagePrefix: "chore(ci): ",
+      groupName: "actions",
+      matchPackageNames: ["actions/*", "github/codeql-action"],
+      prConcurrentLimit: 2,
+      addLabels: ["github-actions", "ignore-for-release"],
+    },
+    {
+      description: "Update Go modules daily at 3:00 PM UTC",
+      matchManagers: ["gomod"],
+      matchPaths: ["/**"],
+      schedule: ["every day at 3:00pm"],
+    },
+    {
+      description: "Group OpenTelemetry Go dependencies into a single PR",
+      matchManagers: ["gomod"],
+      matchPackagePatterns: ["go.opentelemetry.io/otel/*"],
+      groupName: "otel",
+    },
+    {
+      description: "Group golang.org/x Go dependencies into a single PR",
+      matchManagers: ["gomod"],
+      matchPackagePatterns: ["golang.org/x/*"],
+      groupName: "golang-x",
+      matchDepTypes: ["direct", "indirect"],
+      enabled: true,
+    },
+  ],
+}
