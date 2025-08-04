@@ -522,6 +522,13 @@ type Config struct {
 	// prior to starting Sarama.
 	// See Examples on how to use the metrics registry
 	MetricRegistry metrics.Registry
+	// Confluent Kafka 4.0 CreateTopic version bump.
+	// Defaults to false.
+	// If you want to push request version up to 4 when sending create topic request
+	// to broker hosted by confluent (host doesn't actually matter, problem noticed
+	// on confluent. With version 3, broker returns EOF error on CreateTopic request.
+	// With version 4, broker successfully creates topic on CreateTopic request.)
+	ConfluentRequestVersionBump bool
 }
 
 // NewConfig returns a new configuration instance with sane defaults.
@@ -582,6 +589,7 @@ func NewConfig() *Config {
 	c.ApiVersionsRequest = true
 	c.Version = DefaultVersion
 	c.MetricRegistry = metrics.NewRegistry()
+	c.ConfluentRequestVersionBump = false
 
 	return c
 }

@@ -267,6 +267,10 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 		// Version 1 adds validateOnly.
 		request.Version = 1
 	}
+	if ca.conf.ConfluentRequestVersionBump {
+		// It is unkown why version 4 works, but 3 gives EOF error.
+		request.Version = 4
+	}
 
 	return ca.retryOnError(isRetriableControllerError, func() error {
 		b, err := ca.Controller()
