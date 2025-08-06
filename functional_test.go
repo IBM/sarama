@@ -387,7 +387,7 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 
 	// now create the topics empty
 	{
-		request := NewCreateTopicsRequest(config.Version, testTopicDetails, time.Minute)
+		request := NewCreateTopicsRequest(config.Version, testTopicDetails, time.Minute, false)
 		createRes, err := controller.CreateTopics(request)
 		if err != nil {
 			return fmt.Errorf("failed to create test topics: %w", err)
