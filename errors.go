@@ -4,8 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/hashicorp/go-multierror"
 )
 
 // ErrOutOfBrokers is the error returned when the client has run out of brokers to talk to because all of them errored
@@ -91,24 +89,6 @@ var ErrTxnUnableToParseResponse = errors.New("transaction manager: unable to par
 // ErrUnknownMessage when the protocol message key is not recognized
 var ErrUnknownMessage = errors.New("kafka: unknown protocol message key")
 
-// MultiErrorFormat specifies the formatter applied to format multierrors. The
-// default implementation is a condensed version of the hashicorp/go-multierror
-// default one
-var MultiErrorFormat multierror.ErrorFormatFunc = func(es []error) string {
-	if len(es) == 1 {
-		return es[0].Error()
-	}
-
-	points := make([]string, len(es))
-	for i, err := range es {
-		points[i] = fmt.Sprintf("* %s", err)
-	}
-
-	return fmt.Sprintf(
-		"%d errors occurred:\n\t%s\n",
-		len(es), strings.Join(points, "\n\t"))
-}
-
 type sentinelError struct {
 	sentinel error
 	wrapped  error
@@ -135,11 +115,51 @@ func Wrap(sentinel error, wrapped ...error) sentinelError {
 }
 
 func multiError(wrapped ...error) error {
-	merr := multierror.Append(nil, wrapped...)
-	if MultiErrorFormat != nil {
-		merr.ErrorFormat = MultiErrorFormat
+	if len(wrapped) == 0 {
+		return nil
 	}
-	return merr.ErrorOrNil()
+	
+	if len(wrapped) == 1 {
+		return wrapped[0]
+	}
+	
+	// Create a proper multi-error that supports errors.Is and errors.As
+	// This mimics the behavior of github.com/hashicorp/go-multierror
+	return &multiErrorImpl{wrapped: wrapped}
+}
+
+type multiErrorImpl struct {
+	wrapped []error
+}
+
+func (m *multiErrorImpl) Error() string {
+	var points []string
+	for _, err := range m.wrapped {
+		points = append(points, fmt.Sprintf("* %s", err))
+	}
+	return fmt.Sprintf("%d errors occurred: %s", len(m.wrapped), strings.Join(points, "\n\t"))
+}
+
+func (m *multiErrorImpl) Unwrap() []error {
+	return m.wrapped
+}
+
+func (m *multiErrorImpl) Is(target error) bool {
+	for _, err := range m.wrapped {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *multiErrorImpl) As(target interface{}) bool {
+	for _, err := range m.wrapped {
+		if errors.As(err, target) {
+			return true
+		}
+	}
+	return false
 }
 
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
