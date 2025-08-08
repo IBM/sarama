@@ -118,11 +118,11 @@ func multiError(wrapped ...error) error {
 	if len(wrapped) == 0 {
 		return nil
 	}
-	
+
 	if len(wrapped) == 1 {
 		return wrapped[0]
 	}
-	
+
 	// Create a proper multi-error that supports errors.Is and errors.As
 	// This mimics the behavior of github.com/hashicorp/go-multierror
 	return &multiErrorImpl{wrapped: wrapped}
