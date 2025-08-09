@@ -147,40 +147,6 @@ func Wrap(sentinel error, wrapped ...error) sentinelError {
 	return sentinelError{sentinel: sentinel, wrapped: errors.Join(wrapped...)}
 }
 
-type multiErrorImpl struct {
-	wrapped []error
-}
-
-func (m *multiErrorImpl) Error() string {
-	var points []string
-	for _, err := range m.wrapped {
-		points = append(points, fmt.Sprintf("* %s", err))
-	}
-	return fmt.Sprintf("%d errors occurred: %s", len(m.wrapped), strings.Join(points, "\n\t"))
-}
-
-func (m *multiErrorImpl) Unwrap() []error {
-	return m.wrapped
-}
-
-func (m *multiErrorImpl) Is(target error) bool {
-	for _, err := range m.wrapped {
-		if errors.Is(err, target) {
-			return true
-		}
-	}
-	return false
-}
-
-func (m *multiErrorImpl) As(target interface{}) bool {
-	for _, err := range m.wrapped {
-		if errors.As(err, target) {
-			return true
-		}
-	}
-	return false
-}
-
 // PacketEncodingError is returned from a failure while encoding a Kafka packet. This can happen, for example,
 // if you try to encode a string over 2^15 characters in length, since Kafka's encoding rules do not permit that.
 type PacketEncodingError struct {
