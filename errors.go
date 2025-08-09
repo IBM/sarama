@@ -89,6 +89,39 @@ var ErrTxnUnableToParseResponse = errors.New("transaction manager: unable to par
 // ErrUnknownMessage when the protocol message key is not recognized
 var ErrUnknownMessage = errors.New("kafka: unknown protocol message key")
 
+// Deprecated: MultiErrorFormat specifies the formatter applied to format multierrors.
+// Please move to MultiErrorComposer function.
+var MultiErrorFormat = func(es []error) string {
+	if len(es) == 1 {
+		return es[0].Error()
+	}
+
+	points := make([]string, len(es))
+	for i, err := range es {
+		points[i] = fmt.Sprintf("* %s", err)
+	}
+
+	return fmt.Sprintf(
+		"%d errors occurred:\n\t%s\n",
+		len(es), strings.Join(points, "\n\t"))
+}
+
+// MultiErrorComposer compose multiple error in a single error
+func MultiErrorComposer(es []error) string {
+	if len(es) == 1 {
+		return es[0].Error()
+	}
+
+	points := make([]string, len(es))
+	for i, err := range es {
+		points[i] = fmt.Sprintf("* %s", err)
+	}
+
+	return fmt.Sprintf(
+		"%d errors occurred:\n\t%s\n",
+		len(es), strings.Join(points, "\n\t"))
+}
+
 type sentinelError struct {
 	sentinel error
 	wrapped  error
@@ -111,7 +144,7 @@ func (err sentinelError) Unwrap() error {
 }
 
 func Wrap(sentinel error, wrapped ...error) sentinelError {
-	return sentinelError{sentinel: sentinel, wrapped: multiError(wrapped...)}
+	return sentinelError{sentinel: sentinel, wrapped: errors.Join(wrapped...)}
 }
 
 func multiError(wrapped ...error) error {
