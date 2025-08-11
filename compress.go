@@ -13,7 +13,11 @@ import (
 var (
 	lz4WriterPool = sync.Pool{
 		New: func() interface{} {
-			return lz4.NewWriter(nil)
+			lz := lz4.NewWriter(nil)
+			if err := lz.Apply(lz4.BlockSizeOption(lz4.Block64Kb)); err != nil {
+				panic(err)
+			}
+			return lz
 		},
 	}
 

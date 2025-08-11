@@ -46,15 +46,15 @@ var (
 	}
 
 	emptyLZ4Message = []byte{
-		132, 219, 238, 101, // CRC
+		136, 42, 245, 190, // CRC
 		0x01,                          // version byte
 		0x03,                          // attribute flags: lz4
 		0, 0, 1, 88, 141, 205, 89, 56, // timestamp
 		0xFF, 0xFF, 0xFF, 0xFF, // key
 		0x00, 0x00, 0x00, 0x0f, // len
 		0x04, 0x22, 0x4D, 0x18, // LZ4 magic number
-		100,                  // LZ4 flags: version 01, block independent, content checksum
-		112, 185, 0, 0, 0, 0, // LZ4 data
+		100,                 // LZ4 flags: version 01, block independent, content checksum
+		64, 167, 0, 0, 0, 0, // LZ4 data
 		5, 93, 204, 2, // LZ4 checksum
 	}
 
