@@ -55,22 +55,25 @@
     {
       description: "Update Go modules daily at 3:00 PM UTC",
       matchManagers: ["gomod"],
-      matchPaths: ["/**"],
+      matchFileNames: ["/**"],
       schedule: ["* 15 * * *"],
     },
     {
       description: "Group OpenTelemetry Go dependencies into a single PR",
       matchManagers: ["gomod"],
-      matchPackagePatterns: ["go.opentelemetry.io/otel/*"],
       groupName: "otel",
+      matchPackageNames: [
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/*",
+      ],
     },
     {
       description: "Group golang.org/x Go dependencies into a single PR",
       matchManagers: ["gomod"],
-      matchPackagePatterns: ["golang.org/x/*"],
       groupName: "golang-x",
       matchDepTypes: ["direct", "indirect"],
       enabled: true,
+      matchPackageNames: ["golang.org/x/*"],
     },
   ],
 }
