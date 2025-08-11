@@ -34,7 +34,7 @@
     {
       description: "Update Docker and Docker Compose dependencies daily at 9:00 PM UTC, grouped into a single PR",
       matchManagers: ["dockerfile", "docker-compose"],
-      schedule: ["every day at 9:00pm"],
+      schedule: ["* 21 * * *"],
       commitMessagePrefix: "chore(ci): ",
       groupName: "docker dependencies",
       addLabels: ["docker", "ignore-for-release"],
@@ -42,7 +42,7 @@
     {
       description: "Update GitHub Actions weekly, grouped into a single PR for actions/* packages",
       matchManagers: ["github-actions"],
-      schedule: ["every week"],
+      schedule: ["* 0 * * 0"],
       commitMessagePrefix: "chore(ci): ",
       groupName: "actions",
       matchPackageNames: ["actions/*", "github/codeql-action"],
@@ -53,7 +53,7 @@
       description: "Update Go modules daily at 3:00 PM UTC",
       matchManagers: ["gomod"],
       matchPaths: ["/**"],
-      schedule: ["every day at 3:00pm"],
+      schedule: ["* 15 * * *"],
     },
     {
       description: "Group OpenTelemetry Go dependencies into a single PR",
