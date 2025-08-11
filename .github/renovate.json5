@@ -2,7 +2,6 @@
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: [
     "config:best-practices",
-    "enableVulnerabilityAlertsWithLabel(security)",
     "customManagers:dockerfileVersions",
     "customManagers:githubActionsVersions",
     "customManagers:makefileVersions",
@@ -29,6 +28,10 @@
   },
   digest: {
     addLabels: ["bump/digest"],
+  },
+  vulnerabilityAlerts: {
+    enabled: true,
+    labels: ["security"],
   },
   packageRules: [
     {
