@@ -11,9 +11,17 @@ import (
 )
 
 var (
-	lz4WriterPool = sync.Pool{
+	lz4DefaultWriterPool = sync.Pool{
 		New: func() interface{} {
 			return lz4.NewWriter(nil)
+		},
+	}
+
+	lz4WriterPool = sync.Pool{
+		New: func() interface{} {
+			w := lz4.NewWriter(nil)
+			w.Apply(lz4.BlockSizeOption(lz4.Block64Kb))
+			return w
 		},
 	}
 
@@ -173,8 +181,14 @@ func compress(cc CompressionCodec, level int, data []byte) ([]byte, error) {
 	case CompressionSnappy:
 		return snappy.Encode(data), nil
 	case CompressionLZ4:
-		writer := lz4WriterPool.Get().(*lz4.Writer)
-		defer lz4WriterPool.Put(writer)
+		var writer *lz4.Writer
+		if len(data) == 0 {
+			writer = lz4DefaultWriterPool.Get().(*lz4.Writer)
+			defer lz4DefaultWriterPool.Put(writer)
+		} else {
+			writer = lz4WriterPool.Get().(*lz4.Writer)
+			defer lz4WriterPool.Put(writer)
+		}
 
 		var buf bytes.Buffer
 		writer.Reset(&buf)
