@@ -87,5 +87,10 @@
       matchPackageNames: ["docker.io/library/zookeeper"],
       allowedVersions: "< 3.8",
     },
+    {
+      description: "Do not pin digests in docker-compose files",
+      matchManagers: ["docker-compose"],
+      pinDigests: false,
+    },
   ],
 }
