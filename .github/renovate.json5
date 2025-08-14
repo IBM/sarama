@@ -75,5 +75,18 @@
       enabled: true,
       matchPackageNames: ["golang.org/x/*"],
     },
+    {
+      description: "Pin ubi-minimal docker image to major.minor tags only"
+      matchManagers: ["docker"],
+      matchPackageNames: ["registry.access.redhat.com/ubi9/ubi-minimal"],
+      versioning: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)$",
+      matchUpdateTypes: ["minor", "major"],
+    },
+    {
+      description: "Pin zookeeper docker image to 3.7.x"
+      matchManagers: ["docker"],
+      matchPackageNames: ["docker.io/library/zookeeper"],
+      allowedVersions: "< 3.8",
+    },
   ],
 }
