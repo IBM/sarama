@@ -89,8 +89,9 @@ var ErrTxnUnableToParseResponse = errors.New("transaction manager: unable to par
 // ErrUnknownMessage when the protocol message key is not recognized
 var ErrUnknownMessage = errors.New("kafka: unknown protocol message key")
 
-// Deprecated: MultiErrorFormat specifies the formatter applied to format multierrors.
-// Please use errors.Join() instead
+// MultiErrorFormat specifies the formatter applied to format multierrors.
+//
+// Deprecated: Please use [errors.Join] instead.
 func MultiErrorFormat(es []error) string {
 	if len(es) == 1 {
 		return es[0].Error()
