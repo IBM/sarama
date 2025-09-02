@@ -222,7 +222,7 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 			highWatermarkOffset = 0
 		}
 
-		c.partitionConsumers[topic][partition] = &PartitionConsumer{
+		consumer := &PartitionConsumer{
 			t:                  c.t,
 			topic:              topic,
 			partition:          partition,
@@ -231,7 +231,8 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 			suppressedMessages: make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
 			errors:             make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
 		}
-		c.partitionConsumers[topic][partition].highWaterMarkOffset.Store(highWatermarkOffset)
+		consumer.highWaterMarkOffset.Store(highWatermarkOffset)
+		c.partitionConsumers[topic][partition] = consumer
 	}
 
 	return c.partitionConsumers[topic][partition]
@@ -248,7 +249,7 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 // channels using YieldMessage and YieldError.
 type PartitionConsumer struct {
 	highWaterMarkOffset           atomic.Int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
-	suppressedHighWaterMarkOffset atomic.Int64
+	suppressedHighWaterMarkOffset int64
 	l                             sync.Mutex
 	t                             ErrorReporter
 	topic                         string
@@ -353,7 +354,7 @@ func (pc *PartitionConsumer) Pause() {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
-	pc.suppressedHighWaterMarkOffset.Store(pc.highWaterMarkOffset.Load())
+	pc.suppressedHighWaterMarkOffset = pc.highWaterMarkOffset.Load()
 
 	pc.paused = true
 }
@@ -363,7 +364,7 @@ func (pc *PartitionConsumer) Resume() {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
-	pc.highWaterMarkOffset.Store(pc.suppressedHighWaterMarkOffset.Load())
+	pc.highWaterMarkOffset.Store(pc.suppressedHighWaterMarkOffset)
 	for len(pc.suppressedMessages) > 0 {
 		msg := <-pc.suppressedMessages
 		pc.messages <- msg
@@ -397,7 +398,7 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *Partitio
 	msg.Partition = pc.partition
 
 	if pc.paused {
-		msg.Offset = pc.suppressedHighWaterMarkOffset.Add(1) - 1
+		msg.Offset = atomic.AddInt64(&pc.suppressedHighWaterMarkOffset, 1)
 		pc.suppressedMessages <- msg
 	} else {
 		msg.Offset = pc.highWaterMarkOffset.Add(1) - 1

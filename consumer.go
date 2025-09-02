@@ -413,7 +413,7 @@ type partitionConsumer struct {
 	offset         int64
 	retries        atomic.Int32
 
-	paused atomic.Int32 // accessed atomically, 0 = not paused, 1 = paused
+	paused atomic.Bool // accessed atomically, 0 = not paused, 1 = paused
 }
 
 var errTimedOut = errors.New("timed out feeding messages to the user") // not user-facing
@@ -837,17 +837,17 @@ func (child *partitionConsumer) interceptors(msg *ConsumerMessage) {
 
 // Pause implements PartitionConsumer.
 func (child *partitionConsumer) Pause() {
-	child.paused.Store(1)
+	child.paused.Store(true)
 }
 
 // Resume implements PartitionConsumer.
 func (child *partitionConsumer) Resume() {
-	child.paused.Store(0)
+	child.paused.Store(false)
 }
 
 // IsPaused implements PartitionConsumer.
 func (child *partitionConsumer) IsPaused() bool {
-	return child.paused.Load() == 1
+	return child.paused.Load()
 }
 
 type brokerConsumer struct {
