@@ -222,16 +222,17 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 			highWatermarkOffset = 0
 		}
 
-		c.partitionConsumers[topic][partition] = &PartitionConsumer{
-			highWaterMarkOffset: highWatermarkOffset,
-			t:                   c.t,
-			topic:               topic,
-			partition:           partition,
-			offset:              offset,
-			messages:            make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
-			suppressedMessages:  make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
-			errors:              make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
+		consumer := &PartitionConsumer{
+			t:                  c.t,
+			topic:              topic,
+			partition:          partition,
+			offset:             offset,
+			messages:           make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
+			suppressedMessages: make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
+			errors:             make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
 		}
+		consumer.highWaterMarkOffset.Store(highWatermarkOffset)
+		c.partitionConsumers[topic][partition] = consumer
 	}
 
 	return c.partitionConsumers[topic][partition]
@@ -247,7 +248,7 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 // Errors and Messages channel, you should specify what values will be provided on these
 // channels using YieldMessage and YieldError.
 type PartitionConsumer struct {
-	highWaterMarkOffset           int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
+	highWaterMarkOffset           atomic.Int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
 	suppressedHighWaterMarkOffset int64
 	l                             sync.Mutex
 	t                             ErrorReporter
@@ -345,7 +346,7 @@ func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 }
 
 func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
-	return atomic.LoadInt64(&pc.highWaterMarkOffset)
+	return pc.highWaterMarkOffset.Load()
 }
 
 // Pause implements the Pause method from the sarama.PartitionConsumer interface.
@@ -353,7 +354,7 @@ func (pc *PartitionConsumer) Pause() {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
-	pc.suppressedHighWaterMarkOffset = atomic.LoadInt64(&pc.highWaterMarkOffset)
+	pc.suppressedHighWaterMarkOffset = pc.highWaterMarkOffset.Load()
 
 	pc.paused = true
 }
@@ -363,7 +364,7 @@ func (pc *PartitionConsumer) Resume() {
 	pc.l.Lock()
 	defer pc.l.Unlock()
 
-	pc.highWaterMarkOffset = atomic.LoadInt64(&pc.suppressedHighWaterMarkOffset)
+	pc.highWaterMarkOffset.Store(pc.suppressedHighWaterMarkOffset)
 	for len(pc.suppressedMessages) > 0 {
 		msg := <-pc.suppressedMessages
 		pc.messages <- msg
@@ -400,7 +401,7 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *Partitio
 		msg.Offset = atomic.AddInt64(&pc.suppressedHighWaterMarkOffset, 1) - 1
 		pc.suppressedMessages <- msg
 	} else {
-		msg.Offset = atomic.AddInt64(&pc.highWaterMarkOffset, 1) - 1
+		msg.Offset = pc.highWaterMarkOffset.Add(1) - 1
 		pc.messages <- msg
 	}
 

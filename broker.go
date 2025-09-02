@@ -29,7 +29,7 @@ type Broker struct {
 	conn          net.Conn
 	connErr       error
 	lock          sync.Mutex
-	opened        int32
+	opened        atomic.Bool
 	responses     chan *responsePromise
 	done          chan bool
 
@@ -162,7 +162,7 @@ func NewBroker(addr string) *Broker {
 // follow it by a call to Connected(). The only errors Open will return directly are ConfigurationError or
 // AlreadyConnected. If conf is nil, the result of NewConfig() is used.
 func (b *Broker) Open(conf *Config) error {
-	if !atomic.CompareAndSwapInt32(&b.opened, 0, 1) {
+	if !b.opened.CompareAndSwap(false, true) {
 		return ErrAlreadyConnected
 	}
 
@@ -189,7 +189,7 @@ func (b *Broker) Open(conf *Config) error {
 		if b.connErr != nil {
 			Logger.Printf("Failed to connect to broker %s: %s\n", b.addr, b.connErr)
 			b.conn = nil
-			atomic.StoreInt32(&b.opened, 0)
+			b.opened.Store(false)
 			return
 		}
 		if conf.Net.TLS.Enable {
@@ -254,7 +254,7 @@ func (b *Broker) Open(conf *Config) error {
 					Logger.Printf("Error while closing connection to broker %s (due to SASL v0 auth error: %s): %s\n", b.addr, b.connErr, err)
 				}
 				b.conn = nil
-				atomic.StoreInt32(&b.opened, 0)
+				b.opened.Store(false)
 				return
 			}
 		}
@@ -275,7 +275,7 @@ func (b *Broker) Open(conf *Config) error {
 					Logger.Printf("Error while closing connection to broker %s (due to SASL v1 auth error: %s): %s\n", b.addr, b.connErr, err)
 				}
 				b.conn = nil
-				atomic.StoreInt32(&b.opened, 0)
+				b.opened.Store(false)
 				return
 			}
 		}
@@ -349,8 +349,7 @@ func (b *Broker) Close() error {
 	} else {
 		Logger.Printf("Error while closing connection to broker %s: %s\n", b.addr, err)
 	}
-
-	atomic.StoreInt32(&b.opened, 0)
+	b.opened.Store(false)
 
 	return err
 }
