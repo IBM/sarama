@@ -90,7 +90,7 @@ func (b *MockBroker) SetHandlerByMap(handlerMap map[string]MockResponse) {
 		fnMap[k] = v
 	}
 	b.setHandler(func(req *request) (res encoderWithHeader) {
-		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
+		reqTypeName := reflect.TypeFor[protocolBody]().Name()
 		mockResponse := fnMap[reqTypeName]
 		if mockResponse == nil {
 			return nil
@@ -108,7 +108,7 @@ func (b *MockBroker) SetHandlerFuncByMap(handlerMap map[string]requestHandlerFun
 		fnMap[k] = v
 	}
 	b.setHandler(func(req *request) (res encoderWithHeader) {
-		reqTypeName := reflect.TypeOf(req.body).Elem().Name()
+		reqTypeName := reflect.TypeFor[protocolBody]().Name()
 		return fnMap[reqTypeName](req)
 	})
 }
