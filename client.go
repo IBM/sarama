@@ -143,7 +143,7 @@ type client struct {
 	// updateMetadataMs stores the time at which metadata was lasted updated.
 	// Note: this accessed atomically so must be the first word in the struct
 	// as per golang/go#41970
-	updateMetadataMs int64
+	updateMetadataMs atomic.Int64
 
 	conf           *Config
 	closer, closed chan none // for shutting down background metadata updater
@@ -969,7 +969,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				time.Sleep(backoff)
 			}
 
-			t := atomic.LoadInt64(&client.updateMetadataMs)
+			t := client.updateMetadataMs.Load()
 			if time.Since(time.UnixMilli(t)) < backoff {
 				return err
 			}
@@ -994,7 +994,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 		req := NewMetadataRequest(client.conf.Version, topics)
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
-		atomic.StoreInt64(&client.updateMetadataMs, time.Now().UnixMilli())
+		client.updateMetadataMs.Store(time.Now().UnixMilli())
 
 		response, err := broker.GetMetadata(req)
 		var kerror KError
