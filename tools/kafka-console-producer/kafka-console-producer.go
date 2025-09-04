@@ -22,6 +22,7 @@ var (
 	value         = flag.String("value", "", "REQUIRED: the value of the message to produce. You can also provide the value on stdin.")
 	partitioner   = flag.String("partitioner", "", "The partitioning scheme to use. Can be `hash`, `manual`, or `random`")
 	partition     = flag.Int("partition", -1, "The partition to produce to.")
+	rackID        = flag.String("rackid", "", "Produce to leaders with the same client.rack")
 	verbose       = flag.Bool("verbose", false, "Turn on sarama logging to stderr")
 	showMetrics   = flag.Bool("metrics", false, "Output metrics on successful publish to stderr")
 	silent        = flag.Bool("silent", false, "Turn off printing the message's topic, partition, and offset to stdout")
@@ -81,6 +82,11 @@ func main() {
 		}
 	default:
 		printUsageErrorAndExit(fmt.Sprintf("Partitioner %s not supported.", *partitioner))
+	}
+
+	if *rackID != "" {
+		config.Producer.PartitionerRackAware = true
+		config.RackID = *rackID
 	}
 
 	message := &sarama.ProducerMessage{Topic: *topic, Partition: int32(*partition)}
