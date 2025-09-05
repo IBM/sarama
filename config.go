@@ -655,7 +655,9 @@ func (c *Config) Validate() error {
 		if c.Net.SASL.Mechanism == "" {
 			c.Net.SASL.Mechanism = SASLTypePlaintext
 		}
-
+		if c.Net.SASL.Version == SASLHandshakeV0 && c.ApiVersionsRequest {
+			return ConfigurationError("ApiVersionsRequest must be disabled when SASL v0 is enabled")
+		}
 		switch c.Net.SASL.Mechanism {
 		case SASLTypePlaintext:
 			if c.Net.SASL.User == "" {
