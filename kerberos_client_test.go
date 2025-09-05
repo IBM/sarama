@@ -60,7 +60,7 @@ const (
 )
 
 func TestFaildToCreateKerberosConfig(t *testing.T) {
-	expectedErr := errors.New("configuration file could not be opened: krb5.conf open krb5.conf: no such file or directory")
+	expectedErr := errors.New("configuration file could not be opened: testdata/krb5.conf open testdata/krb5.conf: no such file or directory")
 	clientConfig := NewTestConfig()
 	clientConfig.Net.SASL.Mechanism = SASLTypeGSSAPI
 	clientConfig.Net.SASL.Enable = true
@@ -69,7 +69,7 @@ func TestFaildToCreateKerberosConfig(t *testing.T) {
 	clientConfig.Net.SASL.GSSAPI.Username = "client"
 	clientConfig.Net.SASL.GSSAPI.AuthType = KRB5_USER_AUTH
 	clientConfig.Net.SASL.GSSAPI.Password = "qwerty"
-	clientConfig.Net.SASL.GSSAPI.KerberosConfigPath = "krb5.conf"
+	clientConfig.Net.SASL.GSSAPI.KerberosConfigPath = "testdata/krb5.conf"
 	_, err := NewKerberosClient(&clientConfig.Net.SASL.GSSAPI)
 	// Expect to create client with password
 	if err.Error() != expectedErr.Error() {
