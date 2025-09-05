@@ -117,7 +117,8 @@ func (krbAuth *GSSAPIKerberosAuth) newAuthenticatorChecksum() []byte {
 func (krbAuth *GSSAPIKerberosAuth) createKrb5Token(
 	domain string, cname types.PrincipalName,
 	ticket messages.Ticket,
-	sessionKey types.EncryptionKey) ([]byte, error) {
+	sessionKey types.EncryptionKey,
+) ([]byte, error) {
 	auth, err := types.NewAuthenticator(domain, cname)
 	if err != nil {
 		return nil, err
@@ -200,63 +201,122 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 	return nil, nil
 }
 
-/* This does the handshake for authorization */
-func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
-	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
-	if err != nil {
-		Logger.Printf("Kerberos client error: %s", err)
-		return err
-	}
-
-	err = kerberosClient.Login()
-	if err != nil {
-		Logger.Printf("Kerberos client error: %s", err)
-		return err
-	}
-	// Construct SPN using serviceName and host
-	// default SPN format: <SERVICE>/<FQDN>
-
-	host := strings.SplitN(broker.addr, ":", 2)[0] // Strip port part
+func (krbAuth *GSSAPIKerberosAuth) spn(broker *Broker) string {
+	host := strings.SplitN(broker.addr, ":", 2)[0]
 	var spn string
 	if krbAuth.Config.BuildSpn != nil {
 		spn = krbAuth.Config.BuildSpn(broker.conf.Net.SASL.GSSAPI.ServiceName, host)
 	} else {
 		spn = fmt.Sprintf("%s/%s", broker.conf.Net.SASL.GSSAPI.ServiceName, host)
 	}
+	return spn
+}
+
+// Login will use the given KerberosClient to login and get a ticket for the given spn.
+func (krbAuth *GSSAPIKerberosAuth) Login(kerberosClient KerberosClient, spn string) (*messages.Ticket, error) {
+	if err := kerberosClient.Login(); err != nil {
+		Logger.Printf("Kerberos client login error: %s", err)
+		return nil, err
+	}
 
 	ticket, encKey, err := kerberosClient.GetServiceTicket(spn)
 	if err != nil {
-		Logger.Printf("Error getting Kerberos service ticket : %s", err)
-		return err
+		Logger.Printf("Kerberos service ticket error for %s: %s", spn, err)
+		return nil, err
 	}
 	krbAuth.ticket = ticket
 	krbAuth.encKey = encKey
 	krbAuth.step = GSS_API_INITIAL
-	var receivedBytes []byte = nil
+
+	return &ticket, nil
+}
+
+// Authorize performs the kerberos auth handshake for authorization
+func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
+	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
+	if err != nil {
+		Logger.Printf("Kerberos client initialization error: %s", err)
+		return err
+	}
 	defer kerberosClient.Destroy()
+
+	ticket, err := krbAuth.Login(kerberosClient, krbAuth.spn(broker))
+	if err != nil {
+		return err
+	}
+
+	principal := strings.Join(ticket.SName.NameString, "/") + "@" + ticket.Realm
+	var receivedBytes []byte
+
 	for {
 		packBytes, err := krbAuth.initSecContext(receivedBytes, kerberosClient)
 		if err != nil {
-			Logger.Printf("Error while performing GSSAPI Kerberos Authentication: %s\n", err)
+			Logger.Printf("Kerberos init error as %s: %s", principal, err)
 			return err
 		}
+
 		requestTime := time.Now()
 		bytesWritten, err := krbAuth.writePackage(broker, packBytes)
 		if err != nil {
-			Logger.Printf("Error while performing GSSAPI Kerberos Authentication: %s\n", err)
+			Logger.Printf("Kerberos write error as %s: %s", principal, err)
 			return err
 		}
 		broker.updateOutgoingCommunicationMetrics(bytesWritten)
-		if krbAuth.step == GSS_API_VERIFY {
-			bytesRead := 0
+
+		switch krbAuth.step {
+		case GSS_API_VERIFY:
+			var bytesRead int
 			receivedBytes, bytesRead, err = krbAuth.readPackage(broker)
 			requestLatency := time.Since(requestTime)
 			broker.updateIncomingCommunicationMetrics(bytesRead, requestLatency)
 			if err != nil {
-				Logger.Printf("Error while performing GSSAPI Kerberos Authentication: %s\n", err)
+				Logger.Printf("Kerberos read error as %s: %s", principal, err)
 				return err
 			}
-		} else if krbAuth.step == GSS_API_FINISH {
+		case GSS_API_FINISH:
+			return nil
+		}
+	}
+}
+
+// AuthorizeV2 performs the SASL v2 GSSAPI authentication with the Kafka broker.
+func (krbAuth *GSSAPIKerberosAuth) AuthorizeV2(broker *Broker, authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error)) error {
+	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
+	if err != nil {
+		Logger.Printf("Kerberos client initialization error: %s", err)
+		return err
+	}
+	defer kerberosClient.Destroy()
+
+	ticket, err := krbAuth.Login(kerberosClient, krbAuth.spn(broker))
+	if err != nil {
+		return err
+	}
+
+	principal := strings.Join(ticket.SName.NameString, "/") + "@" + ticket.Realm
+	var receivedBytes []byte
+
+	for {
+		token, err := krbAuth.initSecContext(receivedBytes, kerberosClient)
+		if err != nil {
+			Logger.Printf("SASL Kerberos init error as %s: %s", principal, err)
+			return err
+		}
+
+		authResponse, err := authSendReceiver(token)
+		if err != nil {
+			Logger.Printf("SASL Kerberos authenticate error as %s: %s", principal, err)
+			return err
+		}
+
+		if authResponse.Err != ErrNoError {
+			Logger.Printf("SASL Kerberos authentication failed as %s: %s", principal, authResponse.Err)
+			return authResponse.Err
+		}
+
+		receivedBytes = authResponse.SaslAuthBytes
+
+		if krbAuth.step == GSS_API_FINISH {
 			return nil
 		}
 	}
