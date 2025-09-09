@@ -958,11 +958,20 @@ func (b *Broker) readFull(buf []byte) (n int, err error) {
 	return io.ReadFull(b.conn, buf)
 }
 
-// write  ensures the conn WriteDeadline has been setup before making a
+// write ensures the conn Deadline has been setup before making a
 // call to conn.Write
 func (b *Broker) write(buf []byte) (n int, err error) {
-	if err := b.conn.SetWriteDeadline(time.Now().Add(b.conf.Net.WriteTimeout)); err != nil {
+	now := time.Now()
+	if err := b.conn.SetWriteDeadline(now.Add(b.conf.Net.WriteTimeout)); err != nil {
 		return 0, err
+	}
+	// TLS connections require both read and write deadlines to be set
+	// to avoid handshake indefinite blocking
+	// see https://github.com/golang/go/blob/go1.23.0/src/crypto/tls/conn.go#L1192-L1195
+	if b.conf.Net.TLS.Enable {
+		if err := b.conn.SetReadDeadline(now.Add(b.conf.Net.ReadTimeout)); err != nil {
+			return 0, err
+		}
 	}
 
 	return b.conn.Write(buf)
