@@ -35,6 +35,18 @@ var (
 		0, // Empty tag buffer
 		0, // Empty tag buffer
 	}
+
+	listGroupResponseV5 = []byte{
+		0, 0, 0, 0, // no throttle time
+		0, 0, // no error
+		2,                // compact array length (1)
+		4, 'f', 'o', 'o', // group name (compact string)
+		9, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', // protocol type (compact string)
+		6, 'E', 'm', 'p', 't', 'y', // state (compact string)
+		8, 'C', 'l', 'a', 's', 's', 'i', 'c', // type (compact string)
+		0, // Empty tag buffer
+		0, // Empty tag buffer
+	}
 )
 
 func TestListGroupsResponse(t *testing.T) {
@@ -82,6 +94,24 @@ func TestListGroupsResponse(t *testing.T) {
 		t.Error("Expected foo group to use consumer protocol")
 	}
 	if response.GroupsData["foo"].GroupState != "Empty" {
-		t.Error("Expected foo grup to have empty state")
+		t.Error("Expected foo group to have empty state")
+	}
+
+	response = new(ListGroupsResponse)
+	testVersionDecodable(t, "no error", response, listGroupResponseV5, 5)
+	if !errors.Is(response.Err, ErrNoError) {
+		t.Error("Expected no gerror, found:", response.Err)
+	}
+	if len(response.Groups) != 1 {
+		t.Error("Expected one group")
+	}
+	if response.Groups["foo"] != "consumer" {
+		t.Error("Expected foo group to use consumer protocol")
+	}
+	if response.GroupsData["foo"].GroupState != "Empty" {
+		t.Error("Expected foo group to have empty state")
+	}
+	if response.GroupsData["foo"].GroupType != "Classic" {
+		t.Error("Expected foo group to have type 'Classic', found: ", response.GroupsData["foo"].GroupType)
 	}
 }

@@ -36,4 +36,16 @@ func TestListGroupsRequest(t *testing.T) {
 		6, 'E', 'm', 'p', 't', 'y', // compact string
 		0, // empty tag buffer
 	})
+
+	testRequest(t, "ListGroupsRequest", &ListGroupsRequest{
+		Version:      5,
+		StatesFilter: []string{"Empty"},
+		TypesFilter:  []string{"Classic"},
+	}, []byte{
+		2,                          // compact array length (1)
+		6, 'E', 'm', 'p', 't', 'y', // compact string
+		2,                                    // compact array length (1)
+		8, 'C', 'l', 'a', 's', 's', 'i', 'c', // compact string
+		0, // empty tag buffer
+	})
 }

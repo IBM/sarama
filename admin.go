@@ -1008,7 +1008,10 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 			_ = b.Open(conf) // Ensure that broker is opened
 
 			request := &ListGroupsRequest{}
-			if ca.conf.Version.IsAtLeast(V2_6_0_0) {
+			if ca.conf.Version.IsAtLeast(V3_8_0_0) {
+				// Version 5 adds the TypesFilter field (KIP-848).
+				request.Version = 5
+			} else if ca.conf.Version.IsAtLeast(V2_6_0_0) {
 				// Version 4 adds the StatesFilter field (KIP-518).
 				request.Version = 4
 			} else if ca.conf.Version.IsAtLeast(V2_4_0_0) {
