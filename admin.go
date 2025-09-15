@@ -1176,12 +1176,22 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 			_ = b.Open(conf) // Ensure that broker is opened
 
 			request := &DescribeLogDirsRequest{}
-			if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+			if ca.conf.Version.IsAtLeast(V3_3_0_0) {
+				request.Version = 4
+			} else if ca.conf.Version.IsAtLeast(V3_2_0_0) {
+				request.Version = 3
+			} else if ca.conf.Version.IsAtLeast(V2_6_0_0) {
+				request.Version = 2
+			} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 				request.Version = 1
 			}
 			response, err := b.DescribeLogDirs(request)
 			if err != nil {
 				errChan <- err
+				return
+			}
+			if !errors.Is(response.ErrorCode, ErrNoError) {
+				errChan <- response.ErrorCode
 				return
 			}
 			logDirs := make(map[int32][]DescribeLogDirsResponseDirMetadata)
