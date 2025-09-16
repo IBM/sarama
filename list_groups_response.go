@@ -123,7 +123,7 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 		r.Groups[groupId] = protocolType
 
 		if r.Version >= 4 {
-			var groupData = GroupData{}
+			var groupData GroupData
 			groupState, err := pd.getCompactString()
 			if err != nil {
 				return err
