@@ -168,12 +168,12 @@ func (krbAuth *GSSAPIKerberosAuth) appendGSSAPIHeader(payload []byte) ([]byte, e
 	return GSSPackage, nil
 }
 
-func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient KerberosClient) ([]byte, error) {
+func (krbAuth *GSSAPIKerberosAuth) initSecContext(client KerberosClient, bytes []byte) ([]byte, error) {
 	switch krbAuth.step {
 	case GSS_API_INITIAL:
 		aprBytes, err := krbAuth.createKrb5Token(
-			kerberosClient.Domain(),
-			kerberosClient.CName(),
+			client.Domain(),
+			client.CName(),
 			krbAuth.ticket,
 			krbAuth.encKey)
 		if err != nil {
@@ -214,13 +214,13 @@ func (krbAuth *GSSAPIKerberosAuth) spn(broker *Broker) string {
 }
 
 // Login will use the given KerberosClient to login and get a ticket for the given spn.
-func (krbAuth *GSSAPIKerberosAuth) Login(kerberosClient KerberosClient, spn string) (*messages.Ticket, error) {
-	if err := kerberosClient.Login(); err != nil {
+func (krbAuth *GSSAPIKerberosAuth) Login(client KerberosClient, spn string) (*messages.Ticket, error) {
+	if err := client.Login(); err != nil {
 		Logger.Printf("Kerberos client login error: %s", err)
 		return nil, err
 	}
 
-	ticket, encKey, err := kerberosClient.GetServiceTicket(spn)
+	ticket, encKey, err := client.GetServiceTicket(spn)
 	if err != nil {
 		Logger.Printf("Kerberos service ticket error for %s: %s", spn, err)
 		return nil, err
@@ -234,14 +234,14 @@ func (krbAuth *GSSAPIKerberosAuth) Login(kerberosClient KerberosClient, spn stri
 
 // Authorize performs the kerberos auth handshake for authorization
 func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
-	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
+	client, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
 	if err != nil {
 		Logger.Printf("Kerberos client initialization error: %s", err)
 		return err
 	}
-	defer kerberosClient.Destroy()
+	defer client.Destroy()
 
-	ticket, err := krbAuth.Login(kerberosClient, krbAuth.spn(broker))
+	ticket, err := krbAuth.Login(client, krbAuth.spn(broker))
 	if err != nil {
 		return err
 	}
@@ -250,7 +250,7 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 	var receivedBytes []byte
 
 	for {
-		packBytes, err := krbAuth.initSecContext(receivedBytes, kerberosClient)
+		packBytes, err := krbAuth.initSecContext(client, receivedBytes)
 		if err != nil {
 			Logger.Printf("Kerberos init error as %s: %s", principal, err)
 			return err
@@ -282,14 +282,14 @@ func (krbAuth *GSSAPIKerberosAuth) Authorize(broker *Broker) error {
 
 // AuthorizeV2 performs the SASL v2 GSSAPI authentication with the Kafka broker.
 func (krbAuth *GSSAPIKerberosAuth) AuthorizeV2(broker *Broker, authSendReceiver func(authBytes []byte) (*SaslAuthenticateResponse, error)) error {
-	kerberosClient, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
+	client, err := krbAuth.NewKerberosClientFunc(krbAuth.Config)
 	if err != nil {
 		Logger.Printf("Kerberos client initialization error: %s", err)
 		return err
 	}
-	defer kerberosClient.Destroy()
+	defer client.Destroy()
 
-	ticket, err := krbAuth.Login(kerberosClient, krbAuth.spn(broker))
+	ticket, err := krbAuth.Login(client, krbAuth.spn(broker))
 	if err != nil {
 		return err
 	}
@@ -298,7 +298,7 @@ func (krbAuth *GSSAPIKerberosAuth) AuthorizeV2(broker *Broker, authSendReceiver 
 	var receivedBytes []byte
 
 	for {
-		token, err := krbAuth.initSecContext(receivedBytes, kerberosClient)
+		token, err := krbAuth.initSecContext(client, receivedBytes)
 		if err != nil {
 			Logger.Printf("SASL Kerberos init error as %s: %s", principal, err)
 			return err
