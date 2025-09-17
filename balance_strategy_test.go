@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -2203,13 +2204,7 @@ func verifyValidityAndBalance(t *testing.T, consumers map[string]ConsumerGroupMe
 
 	for i, memberID := range members {
 		for assignedTopic := range plan[memberID] {
-			found := false
-			for _, assignableTopic := range consumers[memberID].Topics {
-				if assignableTopic == assignedTopic {
-					found = true
-					break
-				}
-			}
+			found := slices.Contains(consumers[memberID].Topics, assignedTopic)
 			if !found {
 				t.Errorf("Consumer %s had assigned topic %q that wasn't in the list of assignable topics %v", memberID, assignedTopic, consumers[memberID].Topics)
 				t.FailNow()

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -280,12 +281,7 @@ func (s *stickyBalanceStrategy) AssignmentData(memberID string, topics map[strin
 }
 
 func strsContains(s []string, value string) bool {
-	for _, entry := range s {
-		if entry == value {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(s, value)
 }
 
 // Balance assignments across consumers for maximum fairness and stickiness.
@@ -659,12 +655,7 @@ func removeTopicPartitionFromMemberAssignments(assignments []topicPartitionAssig
 }
 
 func memberAssignmentsIncludeTopicPartition(assignments []topicPartitionAssignment, topic topicPartitionAssignment) bool {
-	for _, assignment := range assignments {
-		if assignment == topic {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(assignments, topic)
 }
 
 func sortPartitions(currentAssignment map[string][]topicPartitionAssignment, partitionsWithADifferentPreviousAssignment map[topicPartitionAssignment]consumerGenerationPair, isFreshAssignment bool, partition2AllPotentialConsumers map[topicPartitionAssignment][]string, consumer2AllPotentialPartitions map[string][]topicPartitionAssignment) []topicPartitionAssignment {
