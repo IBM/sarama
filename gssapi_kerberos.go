@@ -310,11 +310,6 @@ func (krbAuth *GSSAPIKerberosAuth) AuthorizeV2(broker *Broker, authSendReceiver 
 			return err
 		}
 
-		if authResponse.Err != ErrNoError {
-			Logger.Printf("SASL Kerberos authentication failed as %s: %s", principal, authResponse.Err)
-			return authResponse.Err
-		}
-
 		receivedBytes = authResponse.SaslAuthBytes
 
 		if krbAuth.step == GSS_API_FINISH {
