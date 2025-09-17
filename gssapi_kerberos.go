@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"strings"
 	"time"
 
@@ -202,7 +203,7 @@ func (krbAuth *GSSAPIKerberosAuth) initSecContext(bytes []byte, kerberosClient K
 }
 
 func (krbAuth *GSSAPIKerberosAuth) spn(broker *Broker) string {
-	host := strings.SplitN(broker.addr, ":", 2)[0]
+	host, _, _ := net.SplitHostPort(broker.addr)
 	var spn string
 	if krbAuth.Config.BuildSpn != nil {
 		spn = krbAuth.Config.BuildSpn(broker.conf.Net.SASL.GSSAPI.ServiceName, host)
