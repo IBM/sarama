@@ -4,6 +4,8 @@ package sarama
 
 import (
 	"context"
+	"maps"
+	"slices"
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
@@ -184,6 +186,48 @@ func TestFuncAdminDescribeGroups(t *testing.T) {
 	if len(res[1].Members) != 1 {
 		t.Errorf("should have 1 members in group , got %v\n", len(res[1].Members))
 	}
+
+	m1.AssertCleanShutdown()
+	m2.AssertCleanShutdown()
+}
+
+func TestFuncAdminListConsumerGroups(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	group1 := testFuncConsumerGroupID(t)
+	group2 := testFuncConsumerGroupID(t)
+
+	config := NewFunctionalTestConfig()
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	config1 := NewFunctionalTestConfig()
+	config1.ClientID = "M1"
+	config1.Consumer.Offsets.Initial = OffsetNewest
+	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, group1, 100, nil, "test.4")
+	defer m1.Close()
+
+	config2 := NewFunctionalTestConfig()
+	config2.ClientID = "M2"
+	config2.Consumer.Offsets.Initial = OffsetNewest
+	config2.Consumer.Group.InstanceId = "Instance2"
+	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, group2, 100, nil, "test.4")
+	defer m2.Close()
+
+	m1.WaitForState(2)
+	m2.WaitForState(2)
+
+	res, err := adminClient.ListConsumerGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	assert.GreaterOrEqual(t, len(res), 2)
+	assert.Contains(t, slices.Collect(maps.Keys(res)), group1)
+	assert.Contains(t, slices.Collect(maps.Keys(res)), group2)
 
 	m1.AssertCleanShutdown()
 	m2.AssertCleanShutdown()
