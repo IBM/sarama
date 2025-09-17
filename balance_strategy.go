@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"slices"
 	"sort"
@@ -317,9 +318,7 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	// create a deep copy of the current assignment so we can revert to it if we do not get a more balanced assignment later
 	preBalanceAssignment := deepCopyAssignment(currentAssignment)
 	preBalancePartitionConsumers := make(map[topicPartitionAssignment]string, len(currentPartitionConsumer))
-	for k, v := range currentPartitionConsumer {
-		preBalancePartitionConsumers[k] = v
-	}
+	maps.Copy(preBalancePartitionConsumers, currentPartitionConsumer)
 
 	reassignmentPerformed := s.performReassignments(sortedPartitions, currentAssignment, prevAssignment, sortedCurrentSubscriptions, consumer2AllPotentialPartitions, partition2AllPotentialConsumers, currentPartitionConsumer)
 
@@ -328,15 +327,11 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	if !initializing && reassignmentPerformed && getBalanceScore(currentAssignment) >= getBalanceScore(preBalanceAssignment) {
 		currentAssignment = deepCopyAssignment(preBalanceAssignment)
 		currentPartitionConsumer = make(map[topicPartitionAssignment]string, len(preBalancePartitionConsumers))
-		for k, v := range preBalancePartitionConsumers {
-			currentPartitionConsumer[k] = v
-		}
+		maps.Copy(currentPartitionConsumer, preBalancePartitionConsumers)
 	}
 
 	// add the fixed assignments (those that could not change) back
-	for consumer, assignments := range fixedAssignments {
-		currentAssignment[consumer] = assignments
-	}
+	maps.Copy(currentAssignment, fixedAssignments)
 }
 
 // NewBalanceStrategyRoundRobin returns a round-robin balance strategy,

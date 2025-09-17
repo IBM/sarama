@@ -16,6 +16,7 @@ package mocks
 import (
 	"errors"
 	"fmt"
+	"maps"
 
 	"github.com/IBM/sarama"
 )
@@ -86,9 +87,7 @@ func (pc *TopicConfig) SetDefaultPartitions(n int32) {
 // SetPartitions sets the number of partitions the partitioners will see for specific topics. This
 // only applies to messages produced after setting them.
 func (pc *TopicConfig) SetPartitions(partitions map[string]int32) {
-	for p, n := range partitions {
-		pc.overridePartitions[p] = n
-	}
+	maps.Copy(pc.overridePartitions, partitions)
 }
 
 func (pc *TopicConfig) partitions(topic string) int32 {
