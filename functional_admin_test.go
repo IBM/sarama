@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFuncAdminQuotas(t *testing.T) {
@@ -259,4 +260,46 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 	}
 
 	t.Logf("coordinator broker %d", coordinator.id)
+}
+
+func TestFuncAdminDescribeLogDirs(t *testing.T) {
+	checkKafkaVersion(t, "2.0.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	kafkaVersion, err := ParseKafkaVersion(FunctionalTestEnv.KafkaVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewFunctionalTestConfig()
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	brokerIDs := make([]int32, len(FunctionalTestEnv.KafkaBrokerAddrs))
+	for i := range brokerIDs {
+		brokerIDs[i] = int32(i + 1)
+	}
+
+	res, err := adminClient.DescribeLogDirs(brokerIDs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res) != len(FunctionalTestEnv.KafkaBrokerAddrs) {
+		t.Errorf("should have %d broker replies, got %v\n", len(FunctionalTestEnv.KafkaBrokerAddrs), len(res))
+	}
+
+	for _, resp := range res {
+		for _, logDir := range resp {
+			assert.Equal(t, logDir.ErrorCode, ErrNoError)
+			// assert that total bytes and usable bytes were returned for kafka 3.3 and newer
+			if kafkaVersion.IsAtLeast(V3_3_0_0) {
+				assert.NotZero(t, logDir.TotalBytes)
+				assert.NotZero(t, logDir.UsableBytes)
+			}
+		}
+	}
 }
