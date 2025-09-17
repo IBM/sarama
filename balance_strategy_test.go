@@ -2124,9 +2124,8 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopics(b *testing.B) {
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions
 	}
-	b.ResetTimer()
 
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		if _, err := s.Plan(members, topics); err != nil {
 			b.Errorf("Error building plan in benchmark: %v", err)
 		}
@@ -2164,9 +2163,8 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopicsAndExistingAssig
 	for i := 0; i < 1; i++ {
 		delete(members, fmt.Sprintf("consumer%d", i))
 	}
-	b.ResetTimer()
 
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		if _, err := s.Plan(members, topics); err != nil {
 			b.Errorf("Error building plan in benchmark: %v", err)
 		}

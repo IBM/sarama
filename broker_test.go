@@ -1408,7 +1408,7 @@ func BenchmarkBroker_Open(b *testing.B) {
 	metrics.UseNilMetrics = false
 	conf := NewTestConfig()
 	conf.Version = V1_0_0_0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := broker.Open(conf)
 		if err != nil {
 			b.Fatal(err)
@@ -1425,7 +1425,7 @@ func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
 	metrics.UseNilMetrics = true
 	conf := NewTestConfig()
 	conf.Version = V1_0_0_0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := broker.Open(conf)
 		if err != nil {
 			b.Fatal(err)
