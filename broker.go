@@ -1670,7 +1670,7 @@ func buildClientFirstMessage(token *AccessToken) ([]byte, error) {
 		ext = "\x01" + mapToString(token.Extensions, "=", "\x01")
 	}
 
-	resp := []byte(fmt.Sprintf("n,,\x01auth=Bearer %s%s\x01\x01", token.Token, ext))
+	resp := fmt.Appendf(nil, "n,,\x01auth=Bearer %s%s\x01\x01", token.Token, ext)
 
 	return resp, nil
 }
