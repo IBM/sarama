@@ -41,8 +41,8 @@ func TestGetMetricNameForBroker(t *testing.T) {
 
 func Benchmark_getMetricNameForTopic(b *testing.B) {
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		name := getMetricNameForTopic("sarama", "says.hello")
 		if name != "sarama-for-topic-says_hello" {
 			b.Fail()
@@ -54,8 +54,8 @@ func Benchmark_getMetricNameForBroker(b *testing.B) {
 	broker := &Broker{id: 1965}
 
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+
+	for b.Loop() {
 		name := getMetricNameForBroker("summer", broker)
 		if name != "summer-for-broker-1965" {
 			b.Fail()

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -1032,9 +1033,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 			}
 
 			groups := make(map[string]string)
-			for group, typ := range response.Groups {
-				groups[group] = typ
-			}
+			maps.Copy(groups, response.Groups)
 
 			groupMaps <- groups
 		}(b, ca.conf)
@@ -1045,9 +1044,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 	close(errChan)
 
 	for groupMap := range groupMaps {
-		for group, protocolType := range groupMap {
-			allGroups[group] = protocolType
-		}
+		maps.Copy(allGroups, groupMap)
 	}
 
 	// Intentionally return only the first error for simplicity
@@ -1208,9 +1205,7 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 	close(errChan)
 
 	for logDirsMap := range logDirsMaps {
-		for id, logDirs := range logDirsMap {
-			allLogDirs[id] = logDirs
-		}
+		maps.Copy(allLogDirs, logDirsMap)
 	}
 
 	// Intentionally return only the first error for simplicity
