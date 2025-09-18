@@ -235,7 +235,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 			delete(unvisitedPartitions, partition)
 			currentPartitionConsumers[partition] = memberID
 
-			if !strsContains(members[memberID].Topics, partition.Topic) {
+			if !slices.Contains(members[memberID].Topics, partition.Topic) {
 				unassignedPartitions = append(unassignedPartitions, partition)
 				continue
 			}
@@ -279,10 +279,6 @@ func (s *stickyBalanceStrategy) AssignmentData(memberID string, topics map[strin
 		Topics:     topics,
 		Generation: generationID,
 	}, nil)
-}
-
-func strsContains(s []string, value string) bool {
-	return slices.Contains(s, value)
 }
 
 // Balance assignments across consumers for maximum fairness and stickiness.
