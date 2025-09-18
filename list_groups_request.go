@@ -11,6 +11,7 @@ func (r *ListGroupsRequest) setVersion(v int16) {
 }
 
 func (r *ListGroupsRequest) encode(pe packetEncoder) error {
+	pe.setFlexible(r.Version >= 3)
 	if r.Version >= 4 {
 		pe.putCompactArrayLength(len(r.StatesFilter))
 		for _, filter := range r.StatesFilter {
@@ -29,9 +30,7 @@ func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 			}
 		}
 	}
-	if r.Version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 

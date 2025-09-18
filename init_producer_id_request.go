@@ -15,23 +15,16 @@ func (i *InitProducerIDRequest) setVersion(v int16) {
 }
 
 func (i *InitProducerIDRequest) encode(pe packetEncoder) error {
-	if i.Version < 2 {
-		if err := pe.putNullableString(i.TransactionalID); err != nil {
-			return err
-		}
-	} else {
-		if err := pe.putNullableCompactString(i.TransactionalID); err != nil {
-			return err
-		}
+	pe.setFlexible(i.Version >= 2)
+	if err := pe.putNullableString(i.TransactionalID); err != nil {
+		return err
 	}
 	pe.putInt32(int32(i.TransactionTimeout / time.Millisecond))
 	if i.Version >= 3 {
 		pe.putInt64(i.ProducerID)
 		pe.putInt16(i.ProducerEpoch)
 	}
-	if i.Version >= 2 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }

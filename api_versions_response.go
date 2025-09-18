@@ -17,15 +17,9 @@ type ApiVersionsResponseKey struct {
 func (a *ApiVersionsResponseKey) encode(pe packetEncoder, version int16) (err error) {
 	a.Version = version
 	pe.putInt16(a.ApiKey)
-
 	pe.putInt16(a.MinVersion)
-
 	pe.putInt16(a.MaxVersion)
-
-	if version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -68,14 +62,11 @@ func (r *ApiVersionsResponse) setVersion(v int16) {
 }
 
 func (r *ApiVersionsResponse) encode(pe packetEncoder) (err error) {
+	pe.setFlexible(r.Version >= 3)
 	pe.putInt16(r.ErrorCode)
 
-	if r.Version >= 3 {
-		pe.putCompactArrayLength(len(r.ApiKeys))
-	} else {
-		if err := pe.putArrayLength(len(r.ApiKeys)); err != nil {
-			return err
-		}
+	if err := pe.putArrayLength(len(r.ApiKeys)); err != nil {
+		return err
 	}
 	for _, block := range r.ApiKeys {
 		if err := block.encode(pe, r.Version); err != nil {
@@ -87,9 +78,7 @@ func (r *ApiVersionsResponse) encode(pe packetEncoder) (err error) {
 		pe.putInt32(r.ThrottleTimeMs)
 	}
 
-	if r.Version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }

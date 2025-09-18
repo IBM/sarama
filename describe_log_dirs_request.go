@@ -21,44 +21,28 @@ type DescribeLogDirsRequestTopic struct {
 }
 
 func (r *DescribeLogDirsRequest) encode(pe packetEncoder) error {
-	isFlexible := r.Version >= 2
+	pe.setFlexible(r.Version >= 2)
 
 	length := len(r.DescribeTopics)
 	if length == 0 {
 		// In order to query all topics we must send null
 		length = -1
 	}
-	if isFlexible {
-		pe.putCompactArrayLength(length)
-	} else {
-		if err := pe.putArrayLength(length); err != nil {
-			return err
-		}
+	if err := pe.putArrayLength(length); err != nil {
+		return err
 	}
 
 	for _, d := range r.DescribeTopics {
-		if isFlexible {
-			if err := pe.putCompactString(d.Topic); err != nil {
-				return err
-			}
-
-			if err := pe.putCompactInt32Array(d.PartitionIDs); err != nil {
-				return err
-			}
-			pe.putEmptyTaggedFieldArray()
-		} else {
-			if err := pe.putString(d.Topic); err != nil {
-				return err
-			}
-
-			if err := pe.putInt32Array(d.PartitionIDs); err != nil {
-				return err
-			}
+		if err := pe.putString(d.Topic); err != nil {
+			return err
 		}
+
+		if err := pe.putInt32Array(d.PartitionIDs); err != nil {
+			return err
+		}
+		pe.maybePutEmptyTaggedFieldArray()
 	}
-	if isFlexible {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }

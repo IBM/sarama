@@ -9,10 +9,11 @@ import (
 )
 
 type realEncoder struct {
-	raw      []byte
-	off      int
-	stack    []pushEncoder
-	registry metrics.Registry
+	raw        []byte
+	off        int
+	stack      []pushEncoder
+	registry   metrics.Registry
+	isFlexible bool
 }
 
 // primitives
@@ -51,6 +52,10 @@ func (re *realEncoder) putFloat64(in float64) {
 }
 
 func (re *realEncoder) putArrayLength(in int) error {
+	if re.isFlexible {
+		re.putCompactArrayLength(in)
+		return nil
+	}
 	re.putInt32(int32(in))
 	return nil
 }
@@ -77,6 +82,9 @@ func (re *realEncoder) putRawBytes(in []byte) error {
 }
 
 func (re *realEncoder) putBytes(in []byte) error {
+	if re.isFlexible {
+		return re.putBytes(in)
+	}
 	if in == nil {
 		re.putInt32(-1)
 		return nil
@@ -113,6 +121,9 @@ func (re *realEncoder) putNullableCompactString(in *string) error {
 }
 
 func (re *realEncoder) putString(in string) error {
+	if re.isFlexible {
+		return re.putCompactString(in)
+	}
 	re.putInt16(int16(len(in)))
 	copy(re.raw[re.off:], in)
 	re.off += len(in)
@@ -120,6 +131,9 @@ func (re *realEncoder) putString(in string) error {
 }
 
 func (re *realEncoder) putNullableString(in *string) error {
+	if re.isFlexible {
+		return re.putNullableCompactString(in)
+	}
 	if in == nil {
 		re.putInt16(-1)
 		return nil
@@ -189,6 +203,12 @@ func (re *realEncoder) putInt64Array(in []int64) error {
 	return nil
 }
 
+func (re *realEncoder) maybePutEmptyTaggedFieldArray() {
+	if re.isFlexible {
+		re.putEmptyTaggedFieldArray()
+	}
+}
+
 func (re *realEncoder) putEmptyTaggedFieldArray() {
 	re.putUVarint(0)
 }
@@ -216,4 +236,8 @@ func (re *realEncoder) pop() error {
 // we do record metrics during the real encoder pass
 func (re *realEncoder) metricRegistry() metrics.Registry {
 	return re.registry
+}
+
+func (re *realEncoder) setFlexible(v bool) {
+	re.isFlexible = v
 }

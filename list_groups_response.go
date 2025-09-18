@@ -18,46 +18,35 @@ type GroupData struct {
 }
 
 func (r *ListGroupsResponse) encode(pe packetEncoder) error {
+	pe.setFlexible(r.Version >= 3)
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTime)
 	}
 
 	pe.putInt16(int16(r.Err))
 
-	if r.Version <= 2 {
-		if err := pe.putArrayLength(len(r.Groups)); err != nil {
+	if err := pe.putArrayLength(len(r.Groups)); err != nil {
+		return err
+	}
+	for groupId, protocolType := range r.Groups {
+		if err := pe.putString(groupId); err != nil {
 			return err
 		}
-		for groupId, protocolType := range r.Groups {
-			if err := pe.putString(groupId); err != nil {
-				return err
-			}
-			if err := pe.putString(protocolType); err != nil {
+		if err := pe.putString(protocolType); err != nil {
+			return err
+		}
+
+		if r.Version >= 4 {
+			groupData := r.GroupsData[groupId]
+			if err := pe.putCompactString(groupData.GroupState); err != nil {
 				return err
 			}
 		}
-	} else {
-		pe.putCompactArrayLength(len(r.Groups))
-		for groupId, protocolType := range r.Groups {
-			if err := pe.putCompactString(groupId); err != nil {
-				return err
-			}
-			if err := pe.putCompactString(protocolType); err != nil {
-				return err
-			}
 
-			if r.Version >= 4 {
-				groupData := r.GroupsData[groupId]
-				if err := pe.putCompactString(groupData.GroupState); err != nil {
-					return err
-				}
-			}
-
-			if r.Version >= 5 {
-				groupData := r.GroupsData[groupId]
-				if err := pe.putCompactString(groupData.GroupType); err != nil {
-					return err
-				}
+		if r.Version >= 5 {
+			groupData := r.GroupsData[groupId]
+			if err := pe.putCompactString(groupData.GroupType); err != nil {
+				return err
 			}
 		}
 	}

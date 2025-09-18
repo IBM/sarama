@@ -53,46 +53,27 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 	if r.Version < 0 || r.Version > 10 {
 		return PacketEncodingError{"invalid or unsupported MetadataRequest version field"}
 	}
+	pe.setFlexible(r.Version >= 9)
 	if r.Version == 0 || len(r.Topics) > 0 {
-		if r.Version < 9 {
-			err := pe.putArrayLength(len(r.Topics))
-			if err != nil {
-				return err
-			}
-
-			for i := range r.Topics {
-				err = pe.putString(r.Topics[i])
-				if err != nil {
-					return err
-				}
-			}
-		} else if r.Version == 9 {
-			pe.putCompactArrayLength(len(r.Topics))
-			for _, topicName := range r.Topics {
-				if err := pe.putCompactString(topicName); err != nil {
-					return err
-				}
-				pe.putEmptyTaggedFieldArray()
-			}
-		} else { // r.Version = 10
-			pe.putCompactArrayLength(len(r.Topics))
-			for _, topicName := range r.Topics {
+		if err := pe.putArrayLength(len(r.Topics)); err != nil {
+			return err
+		}
+		for _, topicName := range r.Topics {
+			if r.Version == 10 {
 				if err := pe.putRawBytes(NullUUID); err != nil {
 					return err
 				}
-				// Avoid implicit memory aliasing in for loop
-				tn := topicName
-				if err := pe.putNullableCompactString(&tn); err != nil {
-					return err
-				}
-				pe.putEmptyTaggedFieldArray()
 			}
+			// Avoid implicit memory aliasing in for loop
+			tn := topicName
+			if err := pe.putNullableString(&tn); err != nil {
+				return err
+			}
+			pe.maybePutEmptyTaggedFieldArray()
 		}
 	} else {
-		if r.Version < 9 {
-			pe.putInt32(-1)
-		} else {
-			pe.putCompactArrayLength(-1)
+		if err := pe.putArrayLength(-1); err != nil {
+			return err
 		}
 	}
 
@@ -103,9 +84,7 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 		pe.putBool(r.IncludeClusterAuthorizedOperations)
 		pe.putBool(r.IncludeTopicAuthorizedOperations)
 	}
-	if r.Version > 8 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 

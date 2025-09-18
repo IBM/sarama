@@ -9,18 +9,10 @@ type PartitionResult struct {
 
 func (b *PartitionResult) encode(pe packetEncoder, version int16) error {
 	pe.putInt16(int16(b.ErrorCode))
-	if version < 2 {
-		if err := pe.putNullableString(b.ErrorMessage); err != nil {
-			return err
-		}
-	} else {
-		if err := pe.putNullableCompactString(b.ErrorMessage); err != nil {
-			return err
-		}
+	if err := pe.putNullableString(b.ErrorMessage); err != nil {
+		return err
 	}
-	if version >= 2 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -53,6 +45,7 @@ func (r *ElectLeadersResponse) setVersion(v int16) {
 }
 
 func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
+	pe.setFlexible(r.Version >= 2)
 	pe.putInt32(r.ThrottleTimeMs)
 
 	if r.Version > 0 {
@@ -61,14 +54,8 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 
 	pe.putCompactArrayLength(len(r.ReplicaElectionResults))
 	for topic, partitions := range r.ReplicaElectionResults {
-		if r.Version < 2 {
-			if err := pe.putString(topic); err != nil {
-				return err
-			}
-		} else {
-			if err := pe.putCompactString(topic); err != nil {
-				return err
-			}
+		if err := pe.putString(topic); err != nil {
+			return err
 		}
 		pe.putCompactArrayLength(len(partitions))
 		for partition, result := range partitions {
@@ -77,10 +64,10 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
-		pe.putEmptyTaggedFieldArray()
+		pe.maybePutEmptyTaggedFieldArray()
 	}
 
-	pe.putEmptyTaggedFieldArray()
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }
