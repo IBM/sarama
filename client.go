@@ -97,13 +97,13 @@ type Client interface {
 	// in local cache. This function only works on Kafka 0.8.2 and higher.
 	RefreshCoordinator(consumerGroup string) error
 
-	// Coordinator returns the coordinating broker for a transaction id. It will
+	// TransactionCoordinator returns the coordinating broker for a transaction id. It will
 	// return a locally cached value if it's available. You can call
 	// RefreshCoordinator to update the cached value. This function only works on
 	// Kafka 0.11.0.0 and higher.
 	TransactionCoordinator(transactionID string) (*Broker, error)
 
-	// RefreshCoordinator retrieves the coordinator for a transaction id and stores it
+	// RefreshTransactionCoordinator retrieves the coordinator for a transaction id and stores it
 	// in local cache. This function only works on Kafka 0.11.0.0 and higher.
 	RefreshTransactionCoordinator(transactionID string) error
 
@@ -113,7 +113,7 @@ type Client interface {
 	// LeastLoadedBroker retrieves broker that has the least responses pending
 	LeastLoadedBroker() *Broker
 
-	// check if partition is readable
+	// PartitionNotReadable checks if partition is not readable
 	PartitionNotReadable(topic string, partition int32) bool
 
 	// Close shuts down all broker connections managed by this client. It is required
