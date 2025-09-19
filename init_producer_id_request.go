@@ -30,15 +30,10 @@ func (i *InitProducerIDRequest) encode(pe packetEncoder) error {
 }
 
 func (i *InitProducerIDRequest) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 2)
 	i.Version = version
-	if i.Version < 2 {
-		if i.TransactionalID, err = pd.getNullableString(); err != nil {
-			return err
-		}
-	} else {
-		if i.TransactionalID, err = pd.getCompactNullableString(); err != nil {
-			return err
-		}
+	if i.TransactionalID, err = pd.getNullableString(); err != nil {
+		return err
 	}
 
 	timeout, err := pd.getInt32()
@@ -56,10 +51,8 @@ func (i *InitProducerIDRequest) decode(pd packetDecoder, version int16) (err err
 		}
 	}
 
-	if i.Version >= 2 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

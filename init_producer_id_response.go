@@ -25,6 +25,7 @@ func (i *InitProducerIDResponse) encode(pe packetEncoder) error {
 }
 
 func (i *InitProducerIDResponse) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 2)
 	i.Version = version
 	throttleTime, err := pd.getInt32()
 	if err != nil {
@@ -46,10 +47,8 @@ func (i *InitProducerIDResponse) decode(pd packetDecoder, version int16) (err er
 		return err
 	}
 
-	if i.Version >= 2 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

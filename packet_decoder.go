@@ -17,6 +17,7 @@ type packetDecoder interface {
 	getArrayLength() (int, error)
 	getCompactArrayLength() (int, error)
 	getBool() (bool, error)
+	maybeGetEmptyTaggedFieldArray() (int, error)
 	getEmptyTaggedFieldArray() (int, error)
 
 	// Collections
@@ -45,6 +46,8 @@ type packetDecoder interface {
 
 	// To record metrics when provided
 	metricRegistry() metrics.Registry
+
+	setFlexible(bool)
 }
 
 // PushDecoder is the interface for decoding fields like CRCs and lengths where the validity

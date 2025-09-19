@@ -89,9 +89,10 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 }
 
 func (r *MetadataRequest) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 9)
 	r.Version = version
-	if r.Version < 9 {
-		size, err := pd.getInt32()
+	if version < 10 {
+		size, err := pd.getArrayLength()
 		if err != nil {
 			return err
 		}
@@ -103,24 +104,9 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) (err error) {
 					return err
 				}
 				r.Topics[i] = topic
-			}
-		}
-	} else if r.Version == 9 {
-		size, err := pd.getCompactArrayLength()
-		if err != nil {
-			return err
-		}
-		if size > 0 {
-			r.Topics = make([]string, size)
-		}
-		for i := range r.Topics {
-			topic, err := pd.getCompactString()
-			if err != nil {
-				return err
-			}
-			r.Topics[i] = topic
-			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-				return err
+				if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+					return err
+				}
 			}
 		}
 	} else { // version 10+
@@ -168,10 +154,8 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) (err error) {
 		}
 		r.IncludeTopicAuthorizedOperations = includeTopicAuthz
 	}
-	if r.Version > 8 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 	return nil
 }

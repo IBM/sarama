@@ -48,15 +48,9 @@ func (r *DescribeLogDirsRequest) encode(pe packetEncoder) error {
 }
 
 func (r *DescribeLogDirsRequest) decode(pd packetDecoder, version int16) error {
-	isFlexible := r.Version >= 2
+	pd.setFlexible(version >= 2)
 
-	var n int
-	var err error
-	if isFlexible {
-		n, err = pd.getCompactArrayLength()
-	} else {
-		n, err = pd.getArrayLength()
-	}
+	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -68,42 +62,25 @@ func (r *DescribeLogDirsRequest) decode(pd packetDecoder, version int16) error {
 	topics := make([]DescribeLogDirsRequestTopic, n)
 	for i := 0; i < n; i++ {
 		topics[i] = DescribeLogDirsRequestTopic{}
-
-		var topic string
-		if isFlexible {
-			topic, err = pd.getCompactString()
-		} else {
-			topic, err = pd.getString()
-		}
+		topic, err := pd.getString()
 		if err != nil {
 			return err
 		}
 		topics[i].Topic = topic
 
-		var pIDs []int32
-		if isFlexible {
-			pIDs, err = pd.getCompactInt32Array()
-		} else {
-			pIDs, err = pd.getInt32Array()
-		}
+		pIDs, err := pd.getInt32Array()
 		if err != nil {
 			return err
 		}
 		topics[i].PartitionIDs = pIDs
-		if isFlexible {
-			_, err = pd.getEmptyTaggedFieldArray()
-			if err != nil {
-				return err
-			}
+		if _, err = pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+			return err
 		}
 	}
 	r.DescribeTopics = topics
 
-	if isFlexible {
-		_, err = pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
+	if _, err = pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

@@ -23,6 +23,7 @@ type PartitionMetadata struct {
 }
 
 func (p *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 9)
 	p.Version = version
 	tmp, err := pd.getInt16()
 	if err != nil {
@@ -44,40 +45,26 @@ func (p *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) 
 		}
 	}
 
-	if p.Version < 9 {
-		p.Replicas, err = pd.getInt32Array()
-	} else {
-		p.Replicas, err = pd.getCompactInt32Array()
-	}
+	p.Replicas, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
 
-	if p.Version < 9 {
-		p.Isr, err = pd.getInt32Array()
-	} else {
-		p.Isr, err = pd.getCompactInt32Array()
-	}
+	p.Isr, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
 
 	if p.Version >= 5 {
-		if p.Version < 9 {
-			p.OfflineReplicas, err = pd.getInt32Array()
-		} else {
-			p.OfflineReplicas, err = pd.getCompactInt32Array()
-		}
+		p.OfflineReplicas, err = pd.getInt32Array()
 		if err != nil {
 			return err
 		}
 	}
 
-	if p.Version >= 9 {
-		_, err = pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
+	_, err = pd.maybeGetEmptyTaggedFieldArray()
+	if err != nil {
+		return err
 	}
 
 	return nil

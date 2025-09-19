@@ -35,6 +35,7 @@ func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 }
 
 func (r *ListGroupsRequest) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 3)
 	r.Version = version
 	if r.Version >= 4 {
 		filterLen, err := pd.getCompactArrayLength()
@@ -64,10 +65,8 @@ func (r *ListGroupsRequest) decode(pd packetDecoder, version int16) (err error) 
 			}
 		}
 	}
-	if r.Version >= 3 {
-		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err = pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 	return nil
 }

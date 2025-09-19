@@ -100,24 +100,16 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 }
 
 func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 6)
 	r.Version = version
-	isFlexible := r.Version >= 6
-	if isFlexible {
-		r.ConsumerGroup, err = pd.getCompactString()
-	} else {
-		r.ConsumerGroup, err = pd.getString()
-	}
+	r.ConsumerGroup, err = pd.getString()
 	if err != nil {
 		return err
 	}
 
 	var partitionCount int
 
-	if isFlexible {
-		partitionCount, err = pd.getCompactArrayLength()
-	} else {
-		partitionCount, err = pd.getArrayLength()
-	}
+	partitionCount, err = pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -128,30 +120,18 @@ func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error)
 
 	r.partitions = make(map[string][]int32, partitionCount)
 	for i := 0; i < partitionCount; i++ {
-		var topic string
-		if isFlexible {
-			topic, err = pd.getCompactString()
-		} else {
-			topic, err = pd.getString()
-		}
+		topic, err := pd.getString()
 		if err != nil {
 			return err
 		}
 
-		var partitions []int32
-		if isFlexible {
-			partitions, err = pd.getCompactInt32Array()
-		} else {
-			partitions, err = pd.getInt32Array()
-		}
+		partitions, err := pd.getInt32Array()
 		if err != nil {
 			return err
 		}
-		if isFlexible {
-			_, err = pd.getEmptyTaggedFieldArray()
-			if err != nil {
-				return err
-			}
+		_, err = pd.maybeGetEmptyTaggedFieldArray()
+		if err != nil {
+			return err
 		}
 
 		r.partitions[topic] = partitions
@@ -164,11 +144,9 @@ func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error)
 		}
 	}
 
-	if isFlexible {
-		_, err = pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
+	_, err = pd.maybeGetEmptyTaggedFieldArray()
+	if err != nil {
+		return err
 	}
 
 	return nil
