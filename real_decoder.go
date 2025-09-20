@@ -304,10 +304,6 @@ func (rd *realDecoder) getCompactInt32Array() ([]int32, error) {
 }
 
 func (rd *realDecoder) getInt32Array() ([]int32, error) {
-	if rd.remaining() < 4 {
-		rd.off = len(rd.raw)
-		return nil, ErrInsufficientData
-	}
 	n, err := rd.getArrayLength()
 	if err != nil {
 		return nil, err
@@ -330,10 +326,6 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 }
 
 func (rd *realDecoder) getInt64Array() ([]int64, error) {
-	if rd.remaining() < 4 {
-		rd.off = len(rd.raw)
-		return nil, ErrInsufficientData
-	}
 	n, err := rd.getArrayLength()
 	if err != nil {
 		return nil, err
@@ -356,11 +348,6 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 }
 
 func (rd *realDecoder) getStringArray() ([]string, error) {
-	if rd.remaining() < 4 {
-		rd.off = len(rd.raw)
-		return nil, ErrInsufficientData
-	}
-
 	n, err := rd.getArrayLength()
 	if err != nil {
 		return nil, err
