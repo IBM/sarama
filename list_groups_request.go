@@ -13,19 +13,11 @@ func (r *ListGroupsRequest) setVersion(v int16) {
 func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 	pe.setFlexible(r.Version >= 3)
 	if r.Version >= 4 {
-		pe.putCompactArrayLength(len(r.StatesFilter))
-		for _, filter := range r.StatesFilter {
-			err := pe.putCompactString(filter)
-			if err != nil {
-				return err
-			}
+		if err := pe.putStringArray(r.StatesFilter); err != nil {
+			return err
 		}
-	}
-	if r.Version >= 5 {
-		pe.putCompactArrayLength(len(r.TypesFilter))
-		for _, filter := range r.TypesFilter {
-			err := pe.putCompactString(filter)
-			if err != nil {
+		if r.Version >= 5 {
+			if err := pe.putStringArray(r.TypesFilter); err != nil {
 				return err
 			}
 		}
@@ -38,30 +30,12 @@ func (r *ListGroupsRequest) decode(pd packetDecoder, version int16) (err error) 
 	pd.setFlexible(version >= 3)
 	r.Version = version
 	if r.Version >= 4 {
-		filterLen, err := pd.getCompactArrayLength()
-		if err != nil {
+		if r.StatesFilter, err = pd.getStringArray(); err != nil {
 			return err
 		}
-		if filterLen > 0 {
-			r.StatesFilter = make([]string, filterLen)
-			for i := 0; i < filterLen; i++ {
-				if r.StatesFilter[i], err = pd.getCompactString(); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	if r.Version >= 5 {
-		filterLen, err := pd.getCompactArrayLength()
-		if err != nil {
-			return err
-		}
-		if filterLen > 0 {
-			r.TypesFilter = make([]string, filterLen)
-			for i := 0; i < filterLen; i++ {
-				if r.TypesFilter[i], err = pd.getCompactString(); err != nil {
-					return err
-				}
+		if r.Version >= 5 {
+			if r.TypesFilter, err = pd.getStringArray(); err != nil {
+				return err
 			}
 		}
 	}
