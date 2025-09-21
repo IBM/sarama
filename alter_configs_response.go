@@ -89,6 +89,7 @@ func (a *AlterConfigsResourceResponse) encode(pe packetEncoder) error {
 	if err != nil {
 		return err
 	}
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -117,6 +118,9 @@ func (a *AlterConfigsResourceResponse) decode(pd packetDecoder, version int16) e
 	}
 	a.Name = name
 
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return nil
 }
 

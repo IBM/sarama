@@ -14,6 +14,7 @@ func (a *IncrementalAlterConfigsResponse) setVersion(v int16) {
 }
 
 func (a *IncrementalAlterConfigsResponse) encode(pe packetEncoder) error {
+	pe.setFlexible(a.Version >= 1)
 	pe.putInt32(int32(a.ThrottleTime / time.Millisecond))
 
 	if err := pe.putArrayLength(len(a.Resources)); err != nil {
@@ -30,6 +31,7 @@ func (a *IncrementalAlterConfigsResponse) encode(pe packetEncoder) error {
 }
 
 func (a *IncrementalAlterConfigsResponse) decode(pd packetDecoder, version int16) error {
+	pd.setFlexible(version >= 1)
 	throttleTime, err := pd.getInt32()
 	if err != nil {
 		return err
@@ -51,6 +53,9 @@ func (a *IncrementalAlterConfigsResponse) decode(pd packetDecoder, version int16
 		}
 	}
 
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -63,15 +68,23 @@ func (a *IncrementalAlterConfigsResponse) version() int16 {
 }
 
 func (a *IncrementalAlterConfigsResponse) headerVersion() int16 {
+	if a.Version >= 1 {
+		return 1
+	}
 	return 0
 }
 
 func (a *IncrementalAlterConfigsResponse) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *IncrementalAlterConfigsResponse) requiredVersion() KafkaVersion {
-	return V2_3_0_0
+	switch a.Version {
+	case 1:
+		return V2_4_0_0
+	default:
+		return V2_3_0_0
+	}
 }
 
 func (r *IncrementalAlterConfigsResponse) throttleTime() time.Duration {

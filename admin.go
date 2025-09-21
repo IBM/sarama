@@ -791,6 +791,10 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 		ValidateOnly: validateOnly,
 	}
 
+	if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+		request.Version = 1
+	}
+
 	var (
 		b   *Broker
 		err error
