@@ -1157,10 +1157,12 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 }
 
 func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32][]DescribeLogDirsResponseDirMetadata, err error) {
-	allLogDirs = make(map[int32][]DescribeLogDirsResponseDirMetadata)
-
+	type result struct {
+		id      int32
+		logdirs []DescribeLogDirsResponseDirMetadata
+	}
 	// Query brokers in parallel, since we may have to query multiple brokers
-	logDirsMaps := make(chan map[int32][]DescribeLogDirsResponseDirMetadata, len(brokerIds))
+	logDirsResults := make(chan result, len(brokerIds))
 	errChan := make(chan error, len(brokerIds))
 	wg := sync.WaitGroup{}
 
@@ -1194,18 +1196,17 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 				errChan <- response.ErrorCode
 				return
 			}
-			logDirs := make(map[int32][]DescribeLogDirsResponseDirMetadata)
-			logDirs[b.ID()] = response.LogDirs
-			logDirsMaps <- logDirs
+			logDirsResults <- result{id: b.ID(), logdirs: response.LogDirs}
 		}(broker, ca.conf)
 	}
 
 	wg.Wait()
-	close(logDirsMaps)
+	close(logDirsResults)
 	close(errChan)
 
-	for logDirsMap := range logDirsMaps {
-		maps.Copy(allLogDirs, logDirsMap)
+	allLogDirs = make(map[int32][]DescribeLogDirsResponseDirMetadata)
+	for logDirsResult := range logDirsResults {
+		allLogDirs[logDirsResult.id] = logDirsResult.logdirs
 	}
 
 	// Intentionally return only the first error for simplicity
