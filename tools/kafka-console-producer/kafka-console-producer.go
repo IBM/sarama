@@ -103,8 +103,7 @@ func main() {
 
 	if *headers != "" {
 		var hdrs []sarama.RecordHeader
-		arrHdrs := strings.SplitSeq(*headers, ",")
-		for h := range arrHdrs {
+		for h := range strings.SplitSeq(*headers, ",") {
 			if header := strings.Split(h, ":"); len(header) != 2 {
 				printUsageErrorAndExit("-header should be key:value. Example: -headers=foo:bar,bar:foo")
 			} else {

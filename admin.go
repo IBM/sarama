@@ -481,7 +481,7 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 	}
 
 	topicPartitions := map[string]*TopicPartition{
-		topic: &TopicPartition{
+		topic: {
 			Count:      count,
 			Assignment: assignment,
 		},
@@ -620,13 +620,14 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 		partitionPerBroker[broker] = append(partitionPerBroker[broker], partition)
 	}
 	for broker, partitions := range partitionPerBroker {
-		topics := make(map[string]*DeleteRecordsRequestTopic, 1)
 		recordsToDelete := make(map[int32]int64, len(partitions))
 		for _, p := range partitions {
 			recordsToDelete[p] = partitionOffsets[p]
 		}
-		topics[topic] = &DeleteRecordsRequestTopic{
-			PartitionOffsets: recordsToDelete,
+		topics := map[string]*DeleteRecordsRequestTopic{
+			topic: {
+				PartitionOffsets: recordsToDelete,
+			},
 		}
 		request := &DeleteRecordsRequest{
 			Topics:  topics,
@@ -1037,10 +1038,7 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 				return
 			}
 
-			groups := make(map[string]string, len(response.Groups))
-			maps.Copy(groups, response.Groups)
-
-			groupMaps <- groups
+			groupMaps <- maps.Clone(response.Groups)
 		}(b, ca.conf)
 	}
 
