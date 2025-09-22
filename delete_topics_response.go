@@ -1,6 +1,8 @@
 package sarama
 
-import "time"
+import (
+	"time"
+)
 
 type DeleteTopicsResponse struct {
 	Version         int16
@@ -13,6 +15,7 @@ func (d *DeleteTopicsResponse) setVersion(v int16) {
 }
 
 func (d *DeleteTopicsResponse) encode(pe packetEncoder) error {
+	pe.setFlexible(d.Version >= 4)
 	if d.Version >= 1 {
 		pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
 	}
@@ -25,12 +28,15 @@ func (d *DeleteTopicsResponse) encode(pe packetEncoder) error {
 			return err
 		}
 		pe.putInt16(int16(errorCode))
+		pe.maybePutEmptyTaggedFieldArray()
 	}
 
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
 func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 4)
 	if version >= 1 {
 		throttleTime, err := pd.getInt32()
 		if err != nil {
@@ -59,8 +65,14 @@ func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 		}
 
 		d.TopicErrorCodes[topic] = KError(errorCode)
+		if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+			return err
+		}
 	}
 
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -73,15 +85,20 @@ func (d *DeleteTopicsResponse) version() int16 {
 }
 
 func (d *DeleteTopicsResponse) headerVersion() int16 {
+	if d.Version >= 4 {
+		return 1
+	}
 	return 0
 }
 
 func (d *DeleteTopicsResponse) isValidVersion() bool {
-	return d.Version >= 0 && d.Version <= 3
+	return d.Version >= 0 && d.Version <= 4
 }
 
 func (d *DeleteTopicsResponse) requiredVersion() KafkaVersion {
 	switch d.Version {
+	case 4:
+		return V2_4_0_0
 	case 3:
 		return V2_1_0_0
 	case 2:
