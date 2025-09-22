@@ -249,8 +249,9 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 		return errors.New("you must specify topic details")
 	}
 
-	topicDetails := make(map[string]*TopicDetail, 1)
-	topicDetails[topic] = detail
+	topicDetails := map[string]*TopicDetail{
+		topic: detail,
+	}
 
 	request := NewCreateTopicsRequest(
 		ca.conf.Version,
@@ -479,8 +480,12 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		return ErrInvalidTopic
 	}
 
-	topicPartitions := make(map[string]*TopicPartition, 1)
-	topicPartitions[topic] = &TopicPartition{Count: count, Assignment: assignment}
+	topicPartitions := map[string]*TopicPartition{
+		topic: &TopicPartition{
+			Count:      count,
+			Assignment: assignment,
+		},
+	}
 
 	request := &CreatePartitionsRequest{
 		TopicPartitions: topicPartitions,
