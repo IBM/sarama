@@ -321,7 +321,8 @@ func (s *stickyBalanceStrategy) balance(currentAssignment map[string][]topicPart
 	// make sure we are getting a more balanced assignment; otherwise, revert to previous assignment
 	if !initializing && reassignmentPerformed && getBalanceScore(currentAssignment) >= getBalanceScore(preBalanceAssignment) {
 		currentAssignment = deepCopyAssignment(preBalanceAssignment)
-		currentPartitionConsumer = maps.Clone(preBalancePartitionConsumers)
+		clear(currentPartitionConsumer)
+		maps.Copy(currentPartitionConsumer, preBalancePartitionConsumers)
 	}
 
 	// add the fixed assignments (those that could not change) back
