@@ -330,6 +330,48 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			},
 		},
 		{
+			V2_4_0_0,
+			map[int16]int16{
+				// TODO: ProduceRequest v8 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyProduce:                     8, // up from 7
+				apiKeyMetadata:           9, // up from 8
+				apiKeyLeaderAndIsr:       4, // up from 2
+				apiKeyStopReplica:        2, // up from 1
+				apiKeyUpdateMetadata:     6, // up from 5
+				apiKeyControlledShutdown: 3, // up from 2
+				// TODO: OffsetCommitRequest v8 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyOffsetCommit:                8, // up from 7
+				apiKeyOffsetFetch: 6, // up from 5
+				// TODO: FindCoordinatorRequest v3 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyFindCoordinator:             3, // up from 2
+				// TODO: JoinGroupRequest v6 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyJoinGroup:                   6, // up from 6
+				// TODO: HeartbeatRequest v4 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyHeartbeat:                   4, // up from 3
+				// TODO: LeaveGroupRequest v4 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyLeaveGroup:                  4, // up from 2
+				// TODO: SyncGroupRequest v4 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeySyncGroup:                   4, // up from 3
+				// TODO: DescribeGroupsRequest v5 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyDescribeGroups:              5, // up from 3
+				apiKeyListGroups:  3, // up from 2
+				apiKeyApiVersions: 3, // up from 2
+				// TODO: CreateTopicsRequest v5 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyCreateTopics:                5, // up from 3
+				// TODO: DeleteTopicsRequest v4 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyDeleteTopics:                4, // up from 3
+				apiKeyInitProducerId: 2, // up from 1
+				// TODO: DeleteGroupsRequest v2 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyDeleteGroups:                2, // up from 1
+				apiKeyElectLeaders: 2, // up from 0
+				// TODO: IncrementalAlterConfigsRequest v1 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyIncrementalAlterConfigs:     1, // up from 0
+				apiKeyAlterPartitionReassignments: 0, // new in 2.4
+				apiKeyListPartitionReassignments:  0, // new in 2.4
+				apiKeyOffsetDelete:                0, // new in 2.4
+			},
+		},
+		{
 			saramaMaxVersions, // placeholder version for current maximums implemented by Sarama
 			map[int16]int16{
 				apiKeyProduce:            maxVersion(&ProduceRequest{}),
