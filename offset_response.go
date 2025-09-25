@@ -190,11 +190,13 @@ func (r *OffsetResponse) headerVersion() int16 {
 }
 
 func (r *OffsetResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 4
+	return r.Version >= 0 && r.Version <= 5
 }
 
 func (r *OffsetResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 5:
+		return V2_2_0_0
 	case 4:
 		return V2_1_0_0
 	case 3:

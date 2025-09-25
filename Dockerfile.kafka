@@ -51,9 +51,9 @@ RUN curl -sLO "https://repo1.maven.org/maven2/javax/xml/bind/jaxb-api/2.3.0/jaxb
  && for DIR in /opt/kafka-*; do cp -v jaxb-api-2.3.0.jar $DIR/libs/ ; done \
  && rm -f jaxb-api-2.3.0.jar
 
-# older kafka versions with the zookeeper 3.4.13 client aren't compatible with Java 17 so quietly bump them to 3.5.9
-RUN [ -f "/opt/kafka-${KAFKA_VERSION}/libs/zookeeper-3.4.13.jar" ] || exit 0 ; \
-    rm -f "/opt/kafka-${KAFKA_VERSION}/libs/zookeeper-3.4.13.jar" \
+# older kafka versions with the zookeeper 3.4.13/3.4.14 client aren't compatible with Java 17 so quietly bump them to 3.5.9
+RUN if ! stat /opt/kafka-${KAFKA_VERSION}/libs/zookeeper-3.4.*.jar; then exit 0; fi ; \
+    rm -f /opt/kafka-${KAFKA_VERSION}/libs/zookeeper-3.4.*.jar \
  && curl --fail -sSL -o "/opt/kafka-${KAFKA_VERSION}/libs/zookeeper-3.5.9.jar" "https://repo1.maven.org/maven2/org/apache/zookeeper/zookeeper/3.5.9/zookeeper-3.5.9.jar" \
  && curl --fail -sSL -o "/opt/kafka-${KAFKA_VERSION}/libs/zookeeper-jute-3.5.9.jar" "https://repo1.maven.org/maven2/org/apache/zookeeper/zookeeper-jute/3.5.9/zookeeper-jute-3.5.9.jar"
 

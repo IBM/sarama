@@ -306,7 +306,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V2_2_0_0,
 			map[int16]int16{
-				// apiKeyListOffsets:        5, // up from 4, TODO: not supported by Sarama yet
+				apiKeyListOffsets:        5, // up from 4
 				apiKeyLeaderAndIsr:       2, // up from 1
 				apiKeyStopReplica:        1, // up from 0
 				apiKeyUpdateMetadata:     5, // up from 4
@@ -314,6 +314,19 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyJoinGroup:          4, // up from 3
 				apiKeySASLAuth:           1, // up from 0
 				apiKeyElectLeaders:       0, // new in 2.2
+			},
+		},
+		{
+			V2_3_0_0,
+			map[int16]int16{
+				apiKeyFetch:                   11, // up from 10
+				apiKeyMetadata:                8,  // up from 7
+				apiKeyOffsetCommit:            7,  // up from 6
+				apiKeyJoinGroup:               5,  // up from 4
+				apiKeyHeartbeat:               3,  // up from 2
+				apiKeySyncGroup:               3,  // up from 2
+				apiKeyDescribeGroups:          3,  // up from 2
+				apiKeyIncrementalAlterConfigs: 0,  // new in 2.3
 			},
 		},
 		{
