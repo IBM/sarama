@@ -113,10 +113,18 @@ func (r *DescribeLogDirsResponse) isValidVersion() bool {
 }
 
 func (r *DescribeLogDirsResponse) requiredVersion() KafkaVersion {
-	if r.Version > 0 {
+	switch r.Version {
+	case 4:
+		return V3_3_0_0
+	case 3:
+		return V3_2_0_0
+	case 2:
+		return V2_6_0_0
+	case 1:
 		return V2_0_0_0
+	default:
+		return V1_0_0_0
 	}
-	return V1_0_0_0
 }
 
 func (r *DescribeLogDirsResponse) throttleTime() time.Duration {
