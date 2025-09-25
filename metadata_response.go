@@ -44,43 +44,25 @@ func (p *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) 
 		}
 	}
 
-	if p.Version < 9 {
-		p.Replicas, err = pd.getInt32Array()
-	} else {
-		p.Replicas, err = pd.getCompactInt32Array()
-	}
+	p.Replicas, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
 
-	if p.Version < 9 {
-		p.Isr, err = pd.getInt32Array()
-	} else {
-		p.Isr, err = pd.getCompactInt32Array()
-	}
+	p.Isr, err = pd.getInt32Array()
 	if err != nil {
 		return err
 	}
 
 	if p.Version >= 5 {
-		if p.Version < 9 {
-			p.OfflineReplicas, err = pd.getInt32Array()
-		} else {
-			p.OfflineReplicas, err = pd.getCompactInt32Array()
-		}
+		p.OfflineReplicas, err = pd.getInt32Array()
 		if err != nil {
 			return err
 		}
 	}
 
-	if p.Version >= 9 {
-		_, err = pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (p *PartitionMetadata) encode(pe packetEncoder, version int16) (err error) {
@@ -155,11 +137,7 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	}
 	t.Err = KError(tmp)
 
-	if t.Version < 9 {
-		t.Name, err = pd.getString()
-	} else {
-		t.Name, err = pd.getCompactString()
-	}
+	t.Name, err = pd.getString()
 	if err != nil {
 		return err
 	}
@@ -182,23 +160,17 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	var n int
-	if t.Version < 9 {
-		n, err = pd.getArrayLength()
-	} else {
-		n, err = pd.getCompactArrayLength()
-	}
+	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
-	} else {
-		t.Partitions = make([]*PartitionMetadata, n)
-		for i := 0; i < n; i++ {
-			block := &PartitionMetadata{}
-			if err := block.decode(pd, t.Version); err != nil {
-				return err
-			}
-			t.Partitions[i] = block
+	}
+	t.Partitions = make([]*PartitionMetadata, n)
+	for i := 0; i < n; i++ {
+		block := &PartitionMetadata{}
+		if err := block.decode(pd, t.Version); err != nil {
+			return err
 		}
+		t.Partitions[i] = block
 	}
 
 	if t.Version >= 8 {
@@ -208,14 +180,8 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	if t.Version >= 9 {
-		_, err = pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (t *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
@@ -295,12 +261,7 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	var brokerArrayLen int
-	if r.Version < 9 {
-		brokerArrayLen, err = pd.getArrayLength()
-	} else {
-		brokerArrayLen, err = pd.getCompactArrayLength()
-	}
+	brokerArrayLen, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -315,11 +276,7 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	if r.Version >= 2 {
-		if r.Version < 9 {
-			r.ClusterID, err = pd.getNullableString()
-		} else {
-			r.ClusterID, err = pd.getCompactNullableString()
-		}
+		r.ClusterID, err = pd.getNullableString()
 		if err != nil {
 			return err
 		}
@@ -331,12 +288,7 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	var topicArrayLen int
-	if version < 9 {
-		topicArrayLen, err = pd.getArrayLength()
-	} else {
-		topicArrayLen, err = pd.getCompactArrayLength()
-	}
+	topicArrayLen, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -357,14 +309,8 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	if r.Version >= 9 {
-		_, err := pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *MetadataResponse) encode(pe packetEncoder) (err error) {
@@ -449,6 +395,10 @@ func (r *MetadataResponse) headerVersion() int16 {
 
 func (r *MetadataResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 10
+}
+
+func (r *MetadataResponse) isFlexibleVersion(version int16) bool {
+	return version >= 9
 }
 
 func (r *MetadataResponse) requiredVersion() KafkaVersion {

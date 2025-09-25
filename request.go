@@ -83,6 +83,9 @@ func (r *request) decode(pd packetDecoder) (err error) {
 		}
 	}
 
+	if decoder, ok := pd.(*realDecoder); ok {
+		pd = prepareFlexibleDecoder(decoder, r.body, version)
+	}
 	return r.body.decode(pd, version)
 }
 

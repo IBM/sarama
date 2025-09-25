@@ -81,12 +81,7 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 
 	r.Err = KError(kerr)
 
-	var n int
-	if r.Version <= 2 {
-		n, err = pd.getArrayLength()
-	} else {
-		n, err = pd.getCompactArrayLength()
-	}
+	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -100,37 +95,26 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 		}
 
 		var groupId, protocolType string
-		if r.Version <= 2 {
-			groupId, err = pd.getString()
-			if err != nil {
-				return err
-			}
-			protocolType, err = pd.getString()
-			if err != nil {
-				return err
-			}
-		} else {
-			groupId, err = pd.getCompactString()
-			if err != nil {
-				return err
-			}
-			protocolType, err = pd.getCompactString()
-			if err != nil {
-				return err
-			}
+		groupId, err = pd.getString()
+		if err != nil {
+			return err
+		}
+		protocolType, err = pd.getString()
+		if err != nil {
+			return err
 		}
 
 		r.Groups[groupId] = protocolType
 
 		if r.Version >= 4 {
 			var groupData GroupData
-			groupState, err := pd.getCompactString()
+			groupState, err := pd.getString()
 			if err != nil {
 				return err
 			}
 			groupData.GroupState = groupState
 			if r.Version >= 5 {
-				groupType, err := pd.getCompactString()
+				groupType, err := pd.getString()
 				if err != nil {
 					return err
 				}
@@ -139,20 +123,13 @@ func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
 			r.GroupsData[groupId] = groupData
 		}
 
-		if r.Version >= 3 {
-			if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
-				return err
-			}
-		}
-	}
-
-	if r.Version >= 3 {
 		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *ListGroupsResponse) key() int16 {
@@ -172,6 +149,10 @@ func (r *ListGroupsResponse) headerVersion() int16 {
 
 func (r *ListGroupsResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 5
+}
+
+func (r *ListGroupsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 3
 }
 
 func (r *ListGroupsResponse) requiredVersion() KafkaVersion {

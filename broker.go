@@ -1111,12 +1111,7 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	var host string
-	if version < 9 {
-		host, err = pd.getString()
-	} else {
-		host, err = pd.getCompactString()
-	}
+	host, err := pd.getString()
 	if err != nil {
 		return err
 	}
@@ -1126,10 +1121,8 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	if version >= 1 && version < 9 {
+	if version >= 1 {
 		b.rack, err = pd.getNullableString()
-	} else if version >= 9 {
-		b.rack, err = pd.getCompactNullableString()
 	}
 	if err != nil {
 		return err
@@ -1140,14 +1133,8 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	if version >= 9 {
-		_, err := pd.getEmptyTaggedFieldArray()
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (b *Broker) encode(pe packetEncoder, version int16) (err error) {

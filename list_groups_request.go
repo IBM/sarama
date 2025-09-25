@@ -38,39 +38,17 @@ func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 func (r *ListGroupsRequest) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 	if r.Version >= 4 {
-		filterLen, err := pd.getCompactArrayLength()
-		if err != nil {
+		if r.StatesFilter, err = pd.getStringArray(); err != nil {
 			return err
 		}
-		if filterLen > 0 {
-			r.StatesFilter = make([]string, filterLen)
-			for i := 0; i < filterLen; i++ {
-				if r.StatesFilter[i], err = pd.getCompactString(); err != nil {
-					return err
-				}
+		if r.Version >= 5 {
+			if r.TypesFilter, err = pd.getStringArray(); err != nil {
+				return err
 			}
 		}
 	}
-	if r.Version >= 5 {
-		filterLen, err := pd.getCompactArrayLength()
-		if err != nil {
-			return err
-		}
-		if filterLen > 0 {
-			r.TypesFilter = make([]string, filterLen)
-			for i := 0; i < filterLen; i++ {
-				if r.TypesFilter[i], err = pd.getCompactString(); err != nil {
-					return err
-				}
-			}
-		}
-	}
-	if r.Version >= 3 {
-		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
-	}
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *ListGroupsRequest) key() int16 {
@@ -90,6 +68,10 @@ func (r *ListGroupsRequest) headerVersion() int16 {
 
 func (r *ListGroupsRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 5
+}
+
+func (r *ListGroupsRequest) isFlexibleVersion(version int16) bool {
+	return version >= 3
 }
 
 func (r *ListGroupsRequest) requiredVersion() KafkaVersion {

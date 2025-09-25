@@ -96,11 +96,11 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 	}
 
 	r.ErrorCode = KError(kerr)
-	if r.ErrorMessage, err = pd.getCompactNullableString(); err != nil {
+	if r.ErrorMessage, err = pd.getNullableString(); err != nil {
 		return err
 	}
 
-	numUsers, err := pd.getCompactArrayLength()
+	numUsers, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 		r.Results = make([]*DescribeUserScramCredentialsResult, numUsers)
 		for i := 0; i < numUsers; i++ {
 			r.Results[i] = &DescribeUserScramCredentialsResult{}
-			if r.Results[i].User, err = pd.getCompactString(); err != nil {
+			if r.Results[i].User, err = pd.getString(); err != nil {
 				return err
 			}
 
@@ -118,11 +118,11 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 				return err
 			}
 			r.Results[i].ErrorCode = KError(errorCode)
-			if r.Results[i].ErrorMessage, err = pd.getCompactNullableString(); err != nil {
+			if r.Results[i].ErrorMessage, err = pd.getNullableString(); err != nil {
 				return err
 			}
 
-			numCredentialInfos, err := pd.getCompactArrayLength()
+			numCredentialInfos, err := pd.getArrayLength()
 			if err != nil {
 				return err
 			}
@@ -149,10 +149,8 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 		}
 	}
 
-	if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
-		return err
-	}
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *DescribeUserScramCredentialsResponse) key() int16 {
@@ -169,6 +167,10 @@ func (r *DescribeUserScramCredentialsResponse) headerVersion() int16 {
 
 func (r *DescribeUserScramCredentialsResponse) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *DescribeUserScramCredentialsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 0
 }
 
 func (r *DescribeUserScramCredentialsResponse) requiredVersion() KafkaVersion {

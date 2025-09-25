@@ -30,14 +30,11 @@ func (b *PartitionResult) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 	b.ErrorCode = KError(kerr)
-	if version < 2 {
-		b.ErrorMessage, err = pd.getNullableString()
-	} else {
-		b.ErrorMessage, err = pd.getCompactNullableString()
+	b.ErrorMessage, err = pd.getNullableString()
+	if err != nil {
+		return err
 	}
-	if version >= 2 {
-		_, err = pd.getEmptyTaggedFieldArray()
-	}
+	_, err = pd.getEmptyTaggedFieldArray()
 	return err
 }
 
@@ -98,24 +95,19 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 		r.ErrorCode = KError(kerr)
 	}
 
-	numTopics, err := pd.getCompactArrayLength()
+	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
 	r.ReplicaElectionResults = make(map[string]map[int32]*PartitionResult, numTopics)
 	for i := 0; i < numTopics; i++ {
-		var topic string
-		if r.Version < 2 {
-			topic, err = pd.getString()
-		} else {
-			topic, err = pd.getCompactString()
-		}
+		topic, err := pd.getString()
 		if err != nil {
 			return err
 		}
 
-		numPartitions, err := pd.getCompactArrayLength()
+		numPartitions, err := pd.getArrayLength()
 		if err != nil {
 			return err
 		}
@@ -136,11 +128,8 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 		}
 	}
 
-	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-		return err
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *ElectLeadersResponse) key() int16 {
@@ -157,6 +146,10 @@ func (r *ElectLeadersResponse) headerVersion() int16 {
 
 func (r *ElectLeadersResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 2
+}
+
+func (r *ElectLeadersResponse) isFlexibleVersion(version int16) bool {
+	return version >= 2
 }
 
 func (r *ElectLeadersResponse) requiredVersion() KafkaVersion {
