@@ -49,13 +49,8 @@ func (i *InitProducerIDResponse) decode(pd packetDecoder, version int16) (err er
 		return err
 	}
 
-	if i.Version >= 2 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (i *InitProducerIDResponse) key() int16 {
@@ -75,6 +70,10 @@ func (i *InitProducerIDResponse) headerVersion() int16 {
 
 func (i *InitProducerIDResponse) isValidVersion() bool {
 	return i.Version >= 0 && i.Version <= 4
+}
+
+func (i *InitProducerIDResponse) isFlexibleVersion(version int16) bool {
+	return version >= 2
 }
 
 func (i *InitProducerIDResponse) requiredVersion() KafkaVersion {

@@ -10,8 +10,6 @@ type OffsetFetchResponseBlock struct {
 }
 
 func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
-	isFlexible := version >= 6
-
 	b.Offset, err = pd.getInt64()
 	if err != nil {
 		return err
@@ -26,11 +24,7 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 		b.LeaderEpoch = -1
 	}
 
-	if isFlexible {
-		b.Metadata, err = pd.getCompactString()
-	} else {
-		b.Metadata, err = pd.getString()
-	}
+	b.Metadata, err = pd.getString()
 	if err != nil {
 		return err
 	}
@@ -41,13 +35,8 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 	}
 	b.Err = KError(tmp)
 
-	if isFlexible {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (b *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err error) {
@@ -140,7 +129,6 @@ func (r *OffsetFetchResponse) encode(pe packetEncoder) (err error) {
 
 func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
-	isFlexible := version >= 6
 
 	if version >= 3 {
 		r.ThrottleTimeMs, err = pd.getInt32()
@@ -149,12 +137,7 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 		}
 	}
 
-	var numTopics int
-	if isFlexible {
-		numTopics, err = pd.getCompactArrayLength()
-	} else {
-		numTopics, err = pd.getArrayLength()
-	}
+	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -162,22 +145,12 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 	if numTopics > 0 {
 		r.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
 		for i := 0; i < numTopics; i++ {
-			var name string
-			if isFlexible {
-				name, err = pd.getCompactString()
-			} else {
-				name, err = pd.getString()
-			}
+			name, err := pd.getString()
 			if err != nil {
 				return err
 			}
 
-			var numBlocks int
-			if isFlexible {
-				numBlocks, err = pd.getCompactArrayLength()
-			} else {
-				numBlocks, err = pd.getArrayLength()
-			}
+			numBlocks, err := pd.getArrayLength()
 			if err != nil {
 				return err
 			}
@@ -201,10 +174,8 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 				r.Blocks[name][id] = block
 			}
 
-			if isFlexible {
-				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-					return err
-				}
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
 			}
 		}
 	}
@@ -217,13 +188,8 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 		r.Err = KError(kerr)
 	}
 
-	if isFlexible {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *OffsetFetchResponse) key() int16 {
@@ -244,6 +210,10 @@ func (r *OffsetFetchResponse) headerVersion() int16 {
 
 func (r *OffsetFetchResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 7
+}
+
+func (r *OffsetFetchResponse) isFlexibleVersion(version int16) bool {
+	return version >= 6
 }
 
 func (r *OffsetFetchResponse) requiredVersion() KafkaVersion {

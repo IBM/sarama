@@ -47,7 +47,7 @@ func (r *AlterUserScramCredentialsResponse) decode(pd packetDecoder, version int
 	}
 	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
-	numResults, err := pd.getCompactArrayLength()
+	numResults, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -56,7 +56,7 @@ func (r *AlterUserScramCredentialsResponse) decode(pd packetDecoder, version int
 		r.Results = make([]*AlterUserScramCredentialsResult, numResults)
 		for i := 0; i < numResults; i++ {
 			r.Results[i] = &AlterUserScramCredentialsResult{}
-			if r.Results[i].User, err = pd.getCompactString(); err != nil {
+			if r.Results[i].User, err = pd.getString(); err != nil {
 				return err
 			}
 
@@ -66,7 +66,7 @@ func (r *AlterUserScramCredentialsResponse) decode(pd packetDecoder, version int
 			}
 
 			r.Results[i].ErrorCode = KError(kerr)
-			if r.Results[i].ErrorMessage, err = pd.getCompactNullableString(); err != nil {
+			if r.Results[i].ErrorMessage, err = pd.getNullableString(); err != nil {
 				return err
 			}
 			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
@@ -75,10 +75,8 @@ func (r *AlterUserScramCredentialsResponse) decode(pd packetDecoder, version int
 		}
 	}
 
-	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-		return err
-	}
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *AlterUserScramCredentialsResponse) key() int16 {
@@ -95,6 +93,10 @@ func (r *AlterUserScramCredentialsResponse) headerVersion() int16 {
 
 func (r *AlterUserScramCredentialsResponse) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *AlterUserScramCredentialsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 0
 }
 
 func (r *AlterUserScramCredentialsResponse) requiredVersion() KafkaVersion {

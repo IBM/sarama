@@ -71,7 +71,7 @@ func (r *AlterUserScramCredentialsRequest) encode(pe packetEncoder) error {
 }
 
 func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int16) error {
-	numDeletions, err := pd.getCompactArrayLength()
+	numDeletions, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	r.Deletions = make([]AlterUserScramCredentialsDelete, numDeletions)
 	for i := 0; i < numDeletions; i++ {
 		r.Deletions[i] = AlterUserScramCredentialsDelete{}
-		if r.Deletions[i].Name, err = pd.getCompactString(); err != nil {
+		if r.Deletions[i].Name, err = pd.getString(); err != nil {
 			return err
 		}
 		mechanism, err := pd.getInt8()
@@ -92,7 +92,7 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 		}
 	}
 
-	numUpsertions, err := pd.getCompactArrayLength()
+	numUpsertions, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	r.Upsertions = make([]AlterUserScramCredentialsUpsert, numUpsertions)
 	for i := 0; i < numUpsertions; i++ {
 		r.Upsertions[i] = AlterUserScramCredentialsUpsert{}
-		if r.Upsertions[i].Name, err = pd.getCompactString(); err != nil {
+		if r.Upsertions[i].Name, err = pd.getString(); err != nil {
 			return err
 		}
 		mechanism, err := pd.getInt8()
@@ -112,10 +112,10 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 		if r.Upsertions[i].Iterations, err = pd.getInt32(); err != nil {
 			return err
 		}
-		if r.Upsertions[i].Salt, err = pd.getCompactBytes(); err != nil {
+		if r.Upsertions[i].Salt, err = pd.getBytes(); err != nil {
 			return err
 		}
-		if r.Upsertions[i].saltedPassword, err = pd.getCompactBytes(); err != nil {
+		if r.Upsertions[i].saltedPassword, err = pd.getBytes(); err != nil {
 			return err
 		}
 		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
@@ -123,10 +123,8 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 		}
 	}
 
-	if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
-		return err
-	}
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *AlterUserScramCredentialsRequest) key() int16 {
@@ -143,6 +141,10 @@ func (r *AlterUserScramCredentialsRequest) headerVersion() int16 {
 
 func (r *AlterUserScramCredentialsRequest) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *AlterUserScramCredentialsRequest) isFlexibleVersion(version int16) bool {
+	return version >= 0
 }
 
 func (r *AlterUserScramCredentialsRequest) requiredVersion() KafkaVersion {
