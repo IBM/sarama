@@ -9,18 +9,18 @@ on:
       kafka-version:
         required: false
         type: string
-        default: 3.6.2
+        default: "3.6.2"
       scala-version:
         required: false
         type: string
-        default: 2.13
+        default: "2.13"
 
 concurrency:
   group: ${{ github.workflow }}-kafka-${{ inputs.kafka-version}}-${{ github.ref }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 permissions:
-  contents: read  # for actions/checkout to fetch code
+  contents: read # for actions/checkout to fetch code
 
 env:
   # Use the Go toolchain installed by setup-go
@@ -68,10 +68,23 @@ jobs:
         nohup sudo tcpdump -i lo -w "fvt-kafka-${KAFKA_VERSION}.pcap" portrange 29091-29095 >/dev/null 2>&1 &
         echo $! >tcpdump.pid
         make test_functional
-        echo "## Code Coverage" >>$GITHUB_STEP_SUMMARY
-        echo "|Filename|Function|Coverage|" >>$GITHUB_STEP_SUMMARY
-        echo "|--------|--------|--------|" >>$GITHUB_STEP_SUMMARY
-        go tool cover -func=profile.out | sed -E -e 's/[[:space:]]+/|/g' -e 's/$/|/g' -e 's/^/|/g' >>$GITHUB_STEP_SUMMARY
+    - name: Report Test Results
+      if: always()
+      run: |
+        # renovate: datasource=github-releases depName=mfridman/tparse
+        go run github.com/mfridman/tparse@v0.18.0 -all -format markdown -file _test/fvt.json | tee -a $GITHUB_STEP_SUMMARY
+    - name: Report Per Func Test Coverage
+      if: always()
+      run: |
+        cat >>$GITHUB_STEP_SUMMARY <<EOF
+        <details>
+        <summary>Click for per-func code coverage</summary>
+
+        |Filename|Function|Coverage|
+        |--------|--------|--------|
+        $(go tool cover -func=profile.out | sed -E -e 's/[[:space:]]+/|/g' -e 's/$/|/g' -e 's/^/|/g')
+        </details>
+        EOF
     - name: Stop tcpdump
       if: always()
       run: |
