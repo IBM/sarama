@@ -12,35 +12,48 @@ func (r *ElectLeadersRequest) setVersion(v int16) {
 }
 
 func (r *ElectLeadersRequest) encode(pe packetEncoder) error {
+	isFlexible := r.Version >= 2
 	if r.Version > 0 {
 		pe.putInt8(int8(r.Type))
 	}
 
-	pe.putCompactArrayLength(len(r.TopicPartitions))
+	if isFlexible {
+		pe.putCompactArrayLength(len(r.TopicPartitions))
+	} else {
+		if err := pe.putArrayLength(len(r.TopicPartitions)); err != nil {
+			return err
+		}
+	}
 
 	for topic, partitions := range r.TopicPartitions {
-		if r.Version < 2 {
-			if err := pe.putString(topic); err != nil {
-				return err
-			}
-		} else {
+		if isFlexible {
 			if err := pe.putCompactString(topic); err != nil {
 				return err
 			}
+		} else {
+			if err := pe.putString(topic); err != nil {
+				return err
+			}
 		}
 
-		if err := pe.putCompactInt32Array(partitions); err != nil {
-			return err
+		if isFlexible {
+			if err := pe.putCompactInt32Array(partitions); err != nil {
+				return err
+			}
+		} else {
+			if err := pe.putInt32Array(partitions); err != nil {
+				return err
+			}
 		}
 
-		if r.Version >= 2 {
+		if isFlexible {
 			pe.putEmptyTaggedFieldArray()
 		}
 	}
 
 	pe.putInt32(r.TimeoutMs)
 
-	if r.Version >= 2 {
+	if isFlexible {
 		pe.putEmptyTaggedFieldArray()
 	}
 
@@ -48,6 +61,7 @@ func (r *ElectLeadersRequest) encode(pe packetEncoder) error {
 }
 
 func (r *ElectLeadersRequest) decode(pd packetDecoder, version int16) (err error) {
+	isFlexible := version >= 2
 	r.Version = version
 	if r.Version > 0 {
 		t, err := pd.getInt8()
@@ -56,26 +70,41 @@ func (r *ElectLeadersRequest) decode(pd packetDecoder, version int16) (err error
 		}
 		r.Type = ElectionType(t)
 	}
-
-	topicCount, err := pd.getCompactArrayLength()
-	if err != nil {
-		return err
+	var topicCount int
+	if isFlexible {
+		topicCount, err = pd.getCompactArrayLength()
+		if err != nil {
+			return err
+		}
+	} else {
+		topicCount, err = pd.getArrayLength()
+		if err != nil {
+			return err
+		}
 	}
 	if topicCount > 0 {
 		r.TopicPartitions = make(map[string][]int32)
 		for i := 0; i < topicCount; i++ {
 			var topic string
-			if r.Version < 2 {
-				topic, err = pd.getString()
-			} else {
+			if isFlexible {
 				topic, err = pd.getCompactString()
+			} else {
+				topic, err = pd.getString()
 			}
 			if err != nil {
 				return err
 			}
-			partitionCount, err := pd.getCompactArrayLength()
-			if err != nil {
-				return err
+			var partitionCount int
+			if isFlexible {
+				partitionCount, err = pd.getCompactArrayLength()
+				if err != nil {
+					return err
+				}
+			} else {
+				partitionCount, err = pd.getArrayLength()
+				if err != nil {
+					return err
+				}
 			}
 			partitions := make([]int32, partitionCount)
 			for j := 0; j < partitionCount; j++ {
@@ -86,7 +115,7 @@ func (r *ElectLeadersRequest) decode(pd packetDecoder, version int16) (err error
 				partitions[j] = partition
 			}
 			r.TopicPartitions[topic] = partitions
-			if r.Version >= 2 {
+			if isFlexible {
 				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 					return err
 				}
@@ -99,7 +128,7 @@ func (r *ElectLeadersRequest) decode(pd packetDecoder, version int16) (err error
 		return err
 	}
 
-	if r.Version >= 2 {
+	if isFlexible {
 		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
