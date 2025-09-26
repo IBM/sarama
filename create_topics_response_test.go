@@ -29,6 +29,25 @@ var (
 		0, 42,
 		0, 3, 'm', 's', 'g',
 	}
+
+	createTopicsResponseV5 = []byte{
+		0, 0, 0, 100,
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		0, 42, // invalid request error
+		4, 'm', 's', 'g', // error message
+		0, 0, 0, 1, // num partitions
+		0, 2, // replication factor
+		2,                // 1 config
+		4, 'b', 'a', 'r', // name
+		4, 'b', 'a', 'z', // value
+		0, // read only
+		5, // source default
+		0, // is sensitive
+		0, // empty tagged fields
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestCreateTopicsResponse(t *testing.T) {
@@ -52,6 +71,21 @@ func TestCreateTopicsResponse(t *testing.T) {
 	resp.ThrottleTime = 100 * time.Millisecond
 
 	testResponse(t, "version 2", resp, createTopicsResponseV2)
+
+	resp.Version = 5
+	resp.TopicResults = map[string]*CreatableTopicResult{
+		"topic": {
+			NumPartitions:     1,
+			ReplicationFactor: 2,
+			Configs: map[string]*CreatableTopicConfigs{
+				"bar": {
+					Value:        nullString("baz"),
+					ConfigSource: SourceDefault,
+				},
+			},
+		},
+	}
+	testResponse(t, "version 5", resp, createTopicsResponseV5)
 }
 
 func TestTopicError(t *testing.T) {

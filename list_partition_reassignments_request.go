@@ -11,6 +11,7 @@ func (r *ListPartitionReassignmentsRequest) setVersion(v int16) {
 }
 
 func (r *ListPartitionReassignmentsRequest) encode(pe packetEncoder) error {
+	pe.setFlexible(true)
 	pe.putInt32(r.TimeoutMs)
 
 	pe.putCompactArrayLength(len(r.blocks))
@@ -24,10 +25,10 @@ func (r *ListPartitionReassignmentsRequest) encode(pe packetEncoder) error {
 			return err
 		}
 
-		pe.putEmptyTaggedFieldArray()
+		pe.maybePutEmptyTaggedFieldArray()
 	}
 
-	pe.putEmptyTaggedFieldArray()
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }

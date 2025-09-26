@@ -17,15 +17,9 @@ type ApiVersionsResponseKey struct {
 func (a *ApiVersionsResponseKey) encode(pe packetEncoder, version int16) (err error) {
 	a.Version = version
 	pe.putInt16(a.ApiKey)
-
 	pe.putInt16(a.MinVersion)
-
 	pe.putInt16(a.MaxVersion)
-
-	if version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -43,10 +37,8 @@ func (a *ApiVersionsResponseKey) decode(pd packetDecoder, version int16) (err er
 		return err
 	}
 
-	if version >= 3 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
@@ -68,14 +60,11 @@ func (r *ApiVersionsResponse) setVersion(v int16) {
 }
 
 func (r *ApiVersionsResponse) encode(pe packetEncoder) (err error) {
+	pe.setFlexible(r.Version >= 3)
 	pe.putInt16(r.ErrorCode)
 
-	if r.Version >= 3 {
-		pe.putCompactArrayLength(len(r.ApiKeys))
-	} else {
-		if err := pe.putArrayLength(len(r.ApiKeys)); err != nil {
-			return err
-		}
+	if err := pe.putArrayLength(len(r.ApiKeys)); err != nil {
+		return err
 	}
 	for _, block := range r.ApiKeys {
 		if err := block.encode(pe, r.Version); err != nil {
@@ -87,30 +76,21 @@ func (r *ApiVersionsResponse) encode(pe packetEncoder) (err error) {
 		pe.putInt32(r.ThrottleTimeMs)
 	}
 
-	if r.Version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }
 
 func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 3)
 	r.Version = version
 	if r.ErrorCode, err = pd.getInt16(); err != nil {
 		return err
 	}
 
-	var numApiKeys int
-	if r.Version >= 3 {
-		numApiKeys, err = pd.getCompactArrayLength()
-		if err != nil {
-			return err
-		}
-	} else {
-		numApiKeys, err = pd.getArrayLength()
-		if err != nil {
-			return err
-		}
+	numApiKeys, err := pd.getArrayLength()
+	if err != nil {
+		return err
 	}
 	r.ApiKeys = make([]ApiVersionsResponseKey, numApiKeys)
 	for i := 0; i < numApiKeys; i++ {
@@ -127,10 +107,8 @@ func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) (err error
 		}
 	}
 
-	if r.Version >= 3 {
-		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err = pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

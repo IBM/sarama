@@ -19,7 +19,7 @@ func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
 		return err
 	}
 
-	pe.putEmptyTaggedFieldArray()
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -70,6 +70,7 @@ func (r *ListPartitionReassignmentsResponse) AddBlock(topic string, partition in
 }
 
 func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
+	pe.setFlexible(true)
 	pe.putInt32(r.ThrottleTimeMs)
 	pe.putInt16(int16(r.ErrorCode))
 	if err := pe.putNullableCompactString(r.ErrorMessage); err != nil {
@@ -89,10 +90,10 @@ func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
-		pe.putEmptyTaggedFieldArray()
+		pe.maybePutEmptyTaggedFieldArray()
 	}
 
-	pe.putEmptyTaggedFieldArray()
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }

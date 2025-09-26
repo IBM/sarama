@@ -440,7 +440,10 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 	}
 
 	// Versions 0, 1, 2, and 3 are the same.
-	if ca.conf.Version.IsAtLeast(V2_1_0_0) {
+	// Version 4 is first flexible version.
+	if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+		request.Version = 4
+	} else if ca.conf.Version.IsAtLeast(V2_1_0_0) {
 		request.Version = 3
 	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 		request.Version = 2
@@ -791,6 +794,10 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 		ValidateOnly: validateOnly,
 	}
 
+	if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+		request.Version = 1
+	}
+
 	var (
 		b   *Broker
 		err error
@@ -1125,7 +1132,10 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 	request := &DeleteGroupsRequest{
 		Groups: []string{group},
 	}
-	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+
+	if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 		request.Version = 1
 	}
 

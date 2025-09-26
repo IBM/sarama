@@ -9,18 +9,10 @@ type PartitionResult struct {
 
 func (b *PartitionResult) encode(pe packetEncoder, version int16) error {
 	pe.putInt16(int16(b.ErrorCode))
-	if version < 2 {
-		if err := pe.putNullableString(b.ErrorMessage); err != nil {
-			return err
-		}
-	} else {
-		if err := pe.putNullableCompactString(b.ErrorMessage); err != nil {
-			return err
-		}
+	if err := pe.putNullableString(b.ErrorMessage); err != nil {
+		return err
 	}
-	if version >= 2 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -30,14 +22,11 @@ func (b *PartitionResult) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 	b.ErrorCode = KError(kerr)
-	if version < 2 {
-		b.ErrorMessage, err = pd.getNullableString()
-	} else {
-		b.ErrorMessage, err = pd.getCompactNullableString()
+	b.ErrorMessage, err = pd.getNullableString()
+	if err != nil {
+		return err
 	}
-	if version >= 2 {
-		_, err = pd.getEmptyTaggedFieldArray()
-	}
+	_, err = pd.maybeGetEmptyTaggedFieldArray()
 	return err
 }
 
@@ -53,6 +42,7 @@ func (r *ElectLeadersResponse) setVersion(v int16) {
 }
 
 func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
+	pe.setFlexible(r.Version >= 2)
 	pe.putInt32(r.ThrottleTimeMs)
 
 	if r.Version > 0 {
@@ -61,14 +51,8 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 
 	pe.putCompactArrayLength(len(r.ReplicaElectionResults))
 	for topic, partitions := range r.ReplicaElectionResults {
-		if r.Version < 2 {
-			if err := pe.putString(topic); err != nil {
-				return err
-			}
-		} else {
-			if err := pe.putCompactString(topic); err != nil {
-				return err
-			}
+		if err := pe.putString(topic); err != nil {
+			return err
 		}
 		pe.putCompactArrayLength(len(partitions))
 		for partition, result := range partitions {
@@ -77,15 +61,16 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
-		pe.putEmptyTaggedFieldArray()
+		pe.maybePutEmptyTaggedFieldArray()
 	}
 
-	pe.putEmptyTaggedFieldArray()
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }
 
 func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 2)
 	r.Version = version
 	if r.ThrottleTimeMs, err = pd.getInt32(); err != nil {
 		return err
@@ -98,24 +83,19 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 		r.ErrorCode = KError(kerr)
 	}
 
-	numTopics, err := pd.getCompactArrayLength()
+	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
 	r.ReplicaElectionResults = make(map[string]map[int32]*PartitionResult, numTopics)
 	for i := 0; i < numTopics; i++ {
-		var topic string
-		if r.Version < 2 {
-			topic, err = pd.getString()
-		} else {
-			topic, err = pd.getCompactString()
-		}
+		topic, err := pd.getString()
 		if err != nil {
 			return err
 		}
 
-		numPartitions, err := pd.getCompactArrayLength()
+		numPartitions, err := pd.getArrayLength()
 		if err != nil {
 			return err
 		}
@@ -131,12 +111,12 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 			}
 			r.ReplicaElectionResults[topic][partition] = result
 		}
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
 	}
 
-	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
 		return err
 	}
 

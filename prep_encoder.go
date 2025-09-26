@@ -10,8 +10,9 @@ import (
 )
 
 type prepEncoder struct {
-	stack  []pushEncoder
-	length int
+	stack      []pushEncoder
+	length     int
+	isFlexible bool
 }
 
 // primitives
@@ -47,6 +48,10 @@ func (pe *prepEncoder) putFloat64(in float64) {
 }
 
 func (pe *prepEncoder) putArrayLength(in int) error {
+	if pe.isFlexible {
+		pe.putCompactArrayLength(in)
+		return nil
+	}
 	if in > math.MaxInt32 {
 		return PacketEncodingError{fmt.Sprintf("array too long (%d)", in)}
 	}
@@ -65,6 +70,9 @@ func (pe *prepEncoder) putBool(in bool) {
 // arrays
 
 func (pe *prepEncoder) putBytes(in []byte) error {
+	if pe.isFlexible {
+		return pe.putCompactBytes(in)
+	}
 	pe.length += 4
 	if in == nil {
 		return nil
@@ -109,6 +117,9 @@ func (pe *prepEncoder) putRawBytes(in []byte) error {
 }
 
 func (pe *prepEncoder) putNullableString(in *string) error {
+	if pe.isFlexible {
+		return pe.putNullableCompactString(in)
+	}
 	if in == nil {
 		pe.length += 2
 		return nil
@@ -117,6 +128,9 @@ func (pe *prepEncoder) putNullableString(in *string) error {
 }
 
 func (pe *prepEncoder) putString(in string) error {
+	if pe.isFlexible {
+		return pe.putCompactString(in)
+	}
 	pe.length += 2
 	if len(in) > math.MaxInt16 {
 		return PacketEncodingError{fmt.Sprintf("string too long (%d)", len(in))}
@@ -179,6 +193,12 @@ func (pe *prepEncoder) putInt64Array(in []int64) error {
 	return nil
 }
 
+func (pe *prepEncoder) maybePutEmptyTaggedFieldArray() {
+	if pe.isFlexible {
+		pe.putEmptyTaggedFieldArray()
+	}
+}
+
 func (pe *prepEncoder) putEmptyTaggedFieldArray() {
 	pe.putUVarint(0)
 }
@@ -208,4 +228,8 @@ func (pe *prepEncoder) pop() error {
 // we do not record metrics during the prep encoder pass
 func (pe *prepEncoder) metricRegistry() metrics.Registry {
 	return nil
+}
+
+func (pe *prepEncoder) setFlexible(v bool) {
+	pe.isFlexible = v
 }

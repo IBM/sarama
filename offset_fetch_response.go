@@ -10,8 +10,6 @@ type OffsetFetchResponseBlock struct {
 }
 
 func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
-	isFlexible := version >= 6
-
 	b.Offset, err = pd.getInt64()
 	if err != nil {
 		return err
@@ -26,11 +24,7 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 		b.LeaderEpoch = -1
 	}
 
-	if isFlexible {
-		b.Metadata, err = pd.getCompactString()
-	} else {
-		b.Metadata, err = pd.getString()
-	}
+	b.Metadata, err = pd.getString()
 	if err != nil {
 		return err
 	}
@@ -41,36 +35,27 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 	}
 	b.Err = KError(tmp)
 
-	if isFlexible {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (b *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err error) {
-	isFlexible := version >= 6
 	pe.putInt64(b.Offset)
 
 	if version >= 5 {
 		pe.putInt32(b.LeaderEpoch)
 	}
-	if isFlexible {
-		err = pe.putCompactString(b.Metadata)
-	} else {
-		err = pe.putString(b.Metadata)
-	}
+	err = pe.putString(b.Metadata)
 	if err != nil {
 		return err
 	}
 
 	pe.putInt16(int16(b.Err))
 
-	if isFlexible {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -87,35 +72,23 @@ func (r *OffsetFetchResponse) setVersion(v int16) {
 }
 
 func (r *OffsetFetchResponse) encode(pe packetEncoder) (err error) {
-	isFlexible := r.Version >= 6
+	pe.setFlexible(r.Version >= 6)
 
 	if r.Version >= 3 {
 		pe.putInt32(r.ThrottleTimeMs)
 	}
-	if isFlexible {
-		pe.putCompactArrayLength(len(r.Blocks))
-	} else {
-		err = pe.putArrayLength(len(r.Blocks))
-	}
+	err = pe.putArrayLength(len(r.Blocks))
 	if err != nil {
 		return err
 	}
 
 	for topic, partitions := range r.Blocks {
-		if isFlexible {
-			err = pe.putCompactString(topic)
-		} else {
-			err = pe.putString(topic)
-		}
+		err = pe.putString(topic)
 		if err != nil {
 			return err
 		}
 
-		if isFlexible {
-			pe.putCompactArrayLength(len(partitions))
-		} else {
-			err = pe.putArrayLength(len(partitions))
-		}
+		err = pe.putArrayLength(len(partitions))
 		if err != nil {
 			return err
 		}
@@ -125,22 +98,18 @@ func (r *OffsetFetchResponse) encode(pe packetEncoder) (err error) {
 				return err
 			}
 		}
-		if isFlexible {
-			pe.putEmptyTaggedFieldArray()
-		}
+		pe.maybePutEmptyTaggedFieldArray()
 	}
 	if r.Version >= 2 {
 		pe.putInt16(int16(r.Err))
 	}
-	if isFlexible {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
 func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 6)
 	r.Version = version
-	isFlexible := version >= 6
 
 	if version >= 3 {
 		r.ThrottleTimeMs, err = pd.getInt32()
@@ -149,12 +118,7 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 		}
 	}
 
-	var numTopics int
-	if isFlexible {
-		numTopics, err = pd.getCompactArrayLength()
-	} else {
-		numTopics, err = pd.getArrayLength()
-	}
+	numTopics, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
@@ -162,22 +126,12 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 	if numTopics > 0 {
 		r.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
 		for i := 0; i < numTopics; i++ {
-			var name string
-			if isFlexible {
-				name, err = pd.getCompactString()
-			} else {
-				name, err = pd.getString()
-			}
+			name, err := pd.getString()
 			if err != nil {
 				return err
 			}
 
-			var numBlocks int
-			if isFlexible {
-				numBlocks, err = pd.getCompactArrayLength()
-			} else {
-				numBlocks, err = pd.getArrayLength()
-			}
+			numBlocks, err := pd.getArrayLength()
 			if err != nil {
 				return err
 			}
@@ -201,10 +155,8 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 				r.Blocks[name][id] = block
 			}
 
-			if isFlexible {
-				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-					return err
-				}
+			if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+				return err
 			}
 		}
 	}
@@ -217,10 +169,8 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 		r.Err = KError(kerr)
 	}
 
-	if isFlexible {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

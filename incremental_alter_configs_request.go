@@ -32,6 +32,7 @@ type IncrementalAlterConfigsEntry struct {
 }
 
 func (a *IncrementalAlterConfigsRequest) encode(pe packetEncoder) error {
+	pe.setFlexible(a.Version >= 1)
 	if err := pe.putArrayLength(len(a.Resources)); err != nil {
 		return err
 	}
@@ -43,10 +44,13 @@ func (a *IncrementalAlterConfigsRequest) encode(pe packetEncoder) error {
 	}
 
 	pe.putBool(a.ValidateOnly)
+
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
 func (a *IncrementalAlterConfigsRequest) decode(pd packetDecoder, version int16) error {
+	pd.setFlexible(version >= 1)
 	resourceCount, err := pd.getArrayLength()
 	if err != nil {
 		return err
@@ -69,6 +73,9 @@ func (a *IncrementalAlterConfigsRequest) decode(pd packetDecoder, version int16)
 
 	a.ValidateOnly = validateOnly
 
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -93,6 +100,7 @@ func (a *IncrementalAlterConfigsResource) encode(pe packetEncoder) error {
 		}
 	}
 
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -131,6 +139,9 @@ func (a *IncrementalAlterConfigsResource) decode(pd packetDecoder, version int16
 			a.ConfigEntries[name] = v
 		}
 	}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return err
 }
 
@@ -141,6 +152,7 @@ func (a *IncrementalAlterConfigsEntry) encode(pe packetEncoder) error {
 		return err
 	}
 
+	pe.maybePutEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -158,6 +170,9 @@ func (a *IncrementalAlterConfigsEntry) decode(pd packetDecoder, version int16) e
 
 	a.Value = s
 
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -170,13 +185,21 @@ func (a *IncrementalAlterConfigsRequest) version() int16 {
 }
 
 func (a *IncrementalAlterConfigsRequest) headerVersion() int16 {
+	if a.Version >= 1 {
+		return 2
+	}
 	return 1
 }
 
 func (a *IncrementalAlterConfigsRequest) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *IncrementalAlterConfigsRequest) requiredVersion() KafkaVersion {
-	return V2_3_0_0
+	switch a.Version {
+	case 1:
+		return V2_4_0_0
+	default:
+		return V2_3_0_0
+	}
 }

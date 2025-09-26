@@ -15,37 +15,25 @@ func (i *InitProducerIDRequest) setVersion(v int16) {
 }
 
 func (i *InitProducerIDRequest) encode(pe packetEncoder) error {
-	if i.Version < 2 {
-		if err := pe.putNullableString(i.TransactionalID); err != nil {
-			return err
-		}
-	} else {
-		if err := pe.putNullableCompactString(i.TransactionalID); err != nil {
-			return err
-		}
+	pe.setFlexible(i.Version >= 2)
+	if err := pe.putNullableString(i.TransactionalID); err != nil {
+		return err
 	}
 	pe.putInt32(int32(i.TransactionTimeout / time.Millisecond))
 	if i.Version >= 3 {
 		pe.putInt64(i.ProducerID)
 		pe.putInt16(i.ProducerEpoch)
 	}
-	if i.Version >= 2 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.maybePutEmptyTaggedFieldArray()
 
 	return nil
 }
 
 func (i *InitProducerIDRequest) decode(pd packetDecoder, version int16) (err error) {
+	pd.setFlexible(version >= 2)
 	i.Version = version
-	if i.Version < 2 {
-		if i.TransactionalID, err = pd.getNullableString(); err != nil {
-			return err
-		}
-	} else {
-		if i.TransactionalID, err = pd.getCompactNullableString(); err != nil {
-			return err
-		}
+	if i.TransactionalID, err = pd.getNullableString(); err != nil {
+		return err
 	}
 
 	timeout, err := pd.getInt32()
@@ -63,10 +51,8 @@ func (i *InitProducerIDRequest) decode(pd packetDecoder, version int16) (err err
 		}
 	}
 
-	if i.Version >= 2 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.maybeGetEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

@@ -2,6 +2,9 @@ package sarama
 
 import "github.com/rcrowley/go-metrics"
 
+type taggedFieldDecoderFunc func(pd packetDecoder) error
+type taggedFieldDecoders map[uint64]taggedFieldDecoderFunc
+
 // PacketDecoder is the interface providing helpers for reading with Kafka's encoding rules.
 // Types implementing Decoder only need to worry about calling methods like GetString,
 // not about how a string is represented in Kafka.
@@ -17,7 +20,9 @@ type packetDecoder interface {
 	getArrayLength() (int, error)
 	getCompactArrayLength() (int, error)
 	getBool() (bool, error)
+	maybeGetEmptyTaggedFieldArray() (int, error)
 	getEmptyTaggedFieldArray() (int, error)
+	getTaggedFieldArray(taggedFieldDecoders) error
 
 	// Collections
 	getBytes() ([]byte, error)
@@ -45,6 +50,8 @@ type packetDecoder interface {
 
 	// To record metrics when provided
 	metricRegistry() metrics.Registry
+
+	setFlexible(bool)
 }
 
 // PushDecoder is the interface for decoding fields like CRCs and lengths where the validity

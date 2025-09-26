@@ -17,10 +17,11 @@ var (
 )
 
 type realDecoder struct {
-	raw      []byte
-	off      int
-	stack    []pushDecoder
-	registry metrics.Registry
+	raw        []byte
+	off        int
+	stack      []pushDecoder
+	registry   metrics.Registry
+	isFlexible bool
 }
 
 // primitives
@@ -106,6 +107,9 @@ func (rd *realDecoder) getFloat64() (float64, error) {
 }
 
 func (rd *realDecoder) getArrayLength() (int, error) {
+	if rd.isFlexible {
+		return rd.getCompactArrayLength()
+	}
 	if rd.remaining() < 4 {
 		rd.off = len(rd.raw)
 		return -1, ErrInsufficientData
@@ -147,6 +151,13 @@ func (rd *realDecoder) getBool() (bool, error) {
 	return true, nil
 }
 
+func (rd *realDecoder) maybeGetEmptyTaggedFieldArray() (int, error) {
+	if rd.isFlexible {
+		return rd.getEmptyTaggedFieldArray()
+	}
+	return 0, nil
+}
+
 func (rd *realDecoder) getEmptyTaggedFieldArray() (int, error) {
 	tagCount, err := rd.getUVarint()
 	if err != nil {
@@ -173,9 +184,49 @@ func (rd *realDecoder) getEmptyTaggedFieldArray() (int, error) {
 	return 0, nil
 }
 
+func (rd *realDecoder) getTaggedFieldArray(decoders taggedFieldDecoders) error {
+	// if we have no decoders just skip over the tagged fields
+	if decoders == nil {
+		_, err := rd.getEmptyTaggedFieldArray()
+		return err
+	}
+
+	tagCount, err := rd.getUVarint()
+	if err != nil {
+		return err
+	}
+
+	for i := uint64(0); i < tagCount; i++ {
+		// fetch and ignore tag identifier
+		id, err := rd.getUVarint()
+		if err != nil {
+			return err
+		}
+		length, err := rd.getUVarint()
+		if err != nil {
+			return err
+		}
+		bytes, err := rd.getRawBytes(int(length))
+		if err != nil {
+			return err
+		}
+		decoder, ok := decoders[id]
+		if !ok {
+			continue
+		}
+		if err := decoder(&realDecoder{raw: bytes, isFlexible: true}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // collections
 
 func (rd *realDecoder) getBytes() ([]byte, error) {
+	if rd.isFlexible {
+		return rd.getCompactBytes()
+	}
 	tmp, err := rd.getInt32()
 	if err != nil {
 		return nil, err
@@ -229,6 +280,9 @@ func (rd *realDecoder) getStringLength() (int, error) {
 }
 
 func (rd *realDecoder) getString() (string, error) {
+	if rd.isFlexible {
+		return rd.getCompactString()
+	}
 	n, err := rd.getStringLength()
 	if err != nil || n == -1 {
 		return "", err
@@ -240,6 +294,9 @@ func (rd *realDecoder) getString() (string, error) {
 }
 
 func (rd *realDecoder) getNullableString() (*string, error) {
+	if rd.isFlexible {
+		return rd.getCompactNullableString()
+	}
 	n, err := rd.getStringLength()
 	if err != nil || n == -1 {
 		return nil, err
@@ -446,4 +503,8 @@ func (rd *realDecoder) pop() error {
 
 func (rd *realDecoder) metricRegistry() metrics.Registry {
 	return rd.registry
+}
+
+func (rd *realDecoder) setFlexible(v bool) {
+	rd.isFlexible = v
 }

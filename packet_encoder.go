@@ -32,6 +32,7 @@ type packetEncoder interface {
 	putNullableCompactInt32Array(in []int32) error
 	putInt32Array(in []int32) error
 	putInt64Array(in []int64) error
+	maybePutEmptyTaggedFieldArray()
 	putEmptyTaggedFieldArray()
 
 	// Provide the current offset to record the batch size metric
@@ -43,6 +44,8 @@ type packetEncoder interface {
 
 	// To record metrics when provided
 	metricRegistry() metrics.Registry
+
+	setFlexible(bool)
 }
 
 // PushEncoder is the interface for encoding fields like CRCs and lengths where the value
