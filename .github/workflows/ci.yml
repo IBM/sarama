@@ -81,12 +81,14 @@ jobs:
       if: always()
       run: |
         # renovate: datasource=github-releases depName=mfridman/tparse
-        go run github.com/mfridman/tparse@v0.18.0 -all -file _test/unittests.json | tee -a $GITHUB_STEP_SUMMARY
+        go run github.com/mfridman/tparse@v0.18.0 -all -format markdown -file _test/unittests.json | tee -a $GITHUB_STEP_SUMMARY
     - name: Report Per Func Test Coverage
       if: always()
       run: |
         cat >>$GITHUB_STEP_SUMMARY <<EOF
-        <details><summary>Code Coverage Report</summary>
+        <details>
+        <summary>Click for per-func code coverage</summary>
+
         |Filename|Function|Coverage|
         |--------|--------|--------|
         $(go tool cover -func=profile.out | sed -E -e 's/[[:space:]]+/|/g' -e 's/$/|/g' -e 's/^/|/g')
