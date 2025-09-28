@@ -51,7 +51,8 @@ func (a *IncrementalAlterConfigsResponse) decode(pd packetDecoder, version int16
 		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (a *IncrementalAlterConfigsResponse) key() int16 {
@@ -63,15 +64,31 @@ func (a *IncrementalAlterConfigsResponse) version() int16 {
 }
 
 func (a *IncrementalAlterConfigsResponse) headerVersion() int16 {
+	if a.Version >= 1 {
+		return 1
+	}
 	return 0
 }
 
+func (a *IncrementalAlterConfigsResponse) isFlexible() bool {
+	return a.isFlexibleVersion(a.Version)
+}
+
+func (a *IncrementalAlterConfigsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 1
+}
+
 func (a *IncrementalAlterConfigsResponse) isValidVersion() bool {
-	return a.Version == 0
+	return a.Version >= 0 && a.Version <= 1
 }
 
 func (a *IncrementalAlterConfigsResponse) requiredVersion() KafkaVersion {
-	return V2_3_0_0
+	switch a.Version {
+	case 1:
+		return V2_4_0_0
+	default:
+		return V2_3_0_0
+	}
 }
 
 func (r *IncrementalAlterConfigsResponse) throttleTime() time.Duration {
