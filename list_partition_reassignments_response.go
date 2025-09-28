@@ -9,13 +9,13 @@ type PartitionReplicaReassignmentsStatus struct {
 }
 
 func (b *PartitionReplicaReassignmentsStatus) encode(pe packetEncoder) error {
-	if err := pe.putCompactInt32Array(b.Replicas); err != nil {
+	if err := pe.putInt32Array(b.Replicas); err != nil {
 		return err
 	}
-	if err := pe.putCompactInt32Array(b.AddingReplicas); err != nil {
+	if err := pe.putInt32Array(b.AddingReplicas); err != nil {
 		return err
 	}
-	if err := pe.putCompactInt32Array(b.RemovingReplicas); err != nil {
+	if err := pe.putInt32Array(b.RemovingReplicas); err != nil {
 		return err
 	}
 
@@ -69,16 +69,20 @@ func (r *ListPartitionReassignmentsResponse) AddBlock(topic string, partition in
 func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
 	pe.putInt16(int16(r.ErrorCode))
-	if err := pe.putNullableCompactString(r.ErrorMessage); err != nil {
+	if err := pe.putNullableString(r.ErrorMessage); err != nil {
 		return err
 	}
 
-	pe.putCompactArrayLength(len(r.TopicStatus))
+	if err := pe.putArrayLength(len(r.TopicStatus)); err != nil {
+		return err
+	}
 	for topic, partitions := range r.TopicStatus {
-		if err := pe.putCompactString(topic); err != nil {
+		if err := pe.putString(topic); err != nil {
 			return err
 		}
-		pe.putCompactArrayLength(len(partitions))
+		if err := pe.putArrayLength(len(partitions)); err != nil {
+			return err
+		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
 
@@ -167,6 +171,10 @@ func (r *ListPartitionReassignmentsResponse) headerVersion() int16 {
 
 func (r *ListPartitionReassignmentsResponse) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *ListPartitionReassignmentsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ListPartitionReassignmentsResponse) isFlexibleVersion(version int16) bool {

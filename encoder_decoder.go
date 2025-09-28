@@ -26,7 +26,7 @@ func encode(e encoder, metricRegistry metrics.Registry) ([]byte, error) {
 	var prepEnc prepEncoder
 	var realEnc realEncoder
 
-	err := e.encode(&prepEnc)
+	err := e.encode(prepareFlexibleEncoder(&prepEnc, e))
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func encode(e encoder, metricRegistry metrics.Registry) ([]byte, error) {
 
 	realEnc.raw = make([]byte, prepEnc.length)
 	realEnc.registry = metricRegistry
-	err = e.encode(&realEnc)
+	err = e.encode(prepareFlexibleEncoder(&realEnc, e))
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +57,7 @@ type versionedDecoder interface {
 
 type flexibleVersion interface {
 	isFlexibleVersion(version int16) bool
+	isFlexible() bool
 }
 
 // decode takes bytes and a decoder and fills the fields of the decoder from the bytes,
@@ -109,4 +110,18 @@ func prepareFlexibleDecoder(pd *realDecoder, in versionedDecoder, version int16)
 		return &realFlexibleDecoder{pd}
 	}
 	return pd
+}
+
+func prepareFlexibleEncoder(pe packetEncoder, req encoder) packetEncoder {
+	if flexibleEncoder, ok := req.(flexibleVersion); ok && flexibleEncoder.isFlexible() {
+		switch e := pe.(type) {
+		case *prepEncoder:
+			return &prepFlexibleEncoder{e}
+		case *realEncoder:
+			return &realFlexibleEncoder{e}
+		default:
+			return pe
+		}
+	}
+	return pe
 }

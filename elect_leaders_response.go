@@ -9,18 +9,10 @@ type PartitionResult struct {
 
 func (b *PartitionResult) encode(pe packetEncoder, version int16) error {
 	pe.putInt16(int16(b.ErrorCode))
-	if version < 2 {
-		if err := pe.putNullableString(b.ErrorMessage); err != nil {
-			return err
-		}
-	} else {
-		if err := pe.putNullableCompactString(b.ErrorMessage); err != nil {
-			return err
-		}
+	if err := pe.putNullableString(b.ErrorMessage); err != nil {
+		return err
 	}
-	if version >= 2 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -56,18 +48,16 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 		pe.putInt16(int16(r.ErrorCode))
 	}
 
-	pe.putCompactArrayLength(len(r.ReplicaElectionResults))
+	if err := pe.putArrayLength(len(r.ReplicaElectionResults)); err != nil {
+		return err
+	}
 	for topic, partitions := range r.ReplicaElectionResults {
-		if r.Version < 2 {
-			if err := pe.putString(topic); err != nil {
-				return err
-			}
-		} else {
-			if err := pe.putCompactString(topic); err != nil {
-				return err
-			}
+		if err := pe.putString(topic); err != nil {
+			return err
 		}
-		pe.putCompactArrayLength(len(partitions))
+		if err := pe.putArrayLength(len(partitions)); err != nil {
+			return err
+		}
 		for partition, result := range partitions {
 			pe.putInt32(partition)
 			if err := result.encode(pe, r.Version); err != nil {
@@ -78,7 +68,6 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 	}
 
 	pe.putEmptyTaggedFieldArray()
-
 	return nil
 }
 
@@ -146,6 +135,10 @@ func (r *ElectLeadersResponse) headerVersion() int16 {
 
 func (r *ElectLeadersResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 2
+}
+
+func (r *ElectLeadersResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ElectLeadersResponse) isFlexibleVersion(version int16) bool {

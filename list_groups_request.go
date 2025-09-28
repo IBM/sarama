@@ -12,26 +12,28 @@ func (r *ListGroupsRequest) setVersion(v int16) {
 
 func (r *ListGroupsRequest) encode(pe packetEncoder) error {
 	if r.Version >= 4 {
-		pe.putCompactArrayLength(len(r.StatesFilter))
+		if err := pe.putArrayLength(len(r.StatesFilter)); err != nil {
+			return err
+		}
 		for _, filter := range r.StatesFilter {
-			err := pe.putCompactString(filter)
+			err := pe.putString(filter)
 			if err != nil {
 				return err
 			}
 		}
-	}
-	if r.Version >= 5 {
-		pe.putCompactArrayLength(len(r.TypesFilter))
-		for _, filter := range r.TypesFilter {
-			err := pe.putCompactString(filter)
-			if err != nil {
+		if r.Version >= 5 {
+			if err := pe.putArrayLength(len(r.TypesFilter)); err != nil {
 				return err
+			}
+			for _, filter := range r.TypesFilter {
+				err := pe.putString(filter)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}
-	if r.Version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -68,6 +70,10 @@ func (r *ListGroupsRequest) headerVersion() int16 {
 
 func (r *ListGroupsRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 5
+}
+
+func (r *ListGroupsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ListGroupsRequest) isFlexibleVersion(version int16) bool {

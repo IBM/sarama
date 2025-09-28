@@ -55,21 +55,25 @@ func (r *DescribeUserScramCredentialsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
 
 	pe.putInt16(int16(r.ErrorCode))
-	if err := pe.putNullableCompactString(r.ErrorMessage); err != nil {
+	if err := pe.putNullableString(r.ErrorMessage); err != nil {
 		return err
 	}
 
-	pe.putCompactArrayLength(len(r.Results))
+	if err := pe.putArrayLength(len(r.Results)); err != nil {
+		return err
+	}
 	for _, u := range r.Results {
-		if err := pe.putCompactString(u.User); err != nil {
+		if err := pe.putString(u.User); err != nil {
 			return err
 		}
 		pe.putInt16(int16(u.ErrorCode))
-		if err := pe.putNullableCompactString(u.ErrorMessage); err != nil {
+		if err := pe.putNullableString(u.ErrorMessage); err != nil {
 			return err
 		}
 
-		pe.putCompactArrayLength(len(u.CredentialInfos))
+		if err := pe.putArrayLength(len(u.CredentialInfos)); err != nil {
+			return err
+		}
 		for _, c := range u.CredentialInfos {
 			pe.putInt8(int8(c.Mechanism))
 			pe.putInt32(c.Iterations)
@@ -167,6 +171,10 @@ func (r *DescribeUserScramCredentialsResponse) headerVersion() int16 {
 
 func (r *DescribeUserScramCredentialsResponse) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *DescribeUserScramCredentialsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *DescribeUserScramCredentialsResponse) isFlexibleVersion(version int16) bool {

@@ -9,7 +9,7 @@ type alterPartitionReassignmentsErrorBlock struct {
 
 func (b *alterPartitionReassignmentsErrorBlock) encode(pe packetEncoder) error {
 	pe.putInt16(int16(b.errorCode))
-	if err := pe.putNullableCompactString(b.errorMessage); err != nil {
+	if err := pe.putNullableString(b.errorMessage); err != nil {
 		return err
 	}
 	pe.putEmptyTaggedFieldArray()
@@ -60,16 +60,20 @@ func (r *AlterPartitionReassignmentsResponse) AddError(topic string, partition i
 func (r *AlterPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
 	pe.putInt16(int16(r.ErrorCode))
-	if err := pe.putNullableCompactString(r.ErrorMessage); err != nil {
+	if err := pe.putNullableString(r.ErrorMessage); err != nil {
 		return err
 	}
 
-	pe.putCompactArrayLength(len(r.Errors))
+	if err := pe.putArrayLength(len(r.Errors)); err != nil {
+		return err
+	}
 	for topic, partitions := range r.Errors {
-		if err := pe.putCompactString(topic); err != nil {
+		if err := pe.putString(topic); err != nil {
 			return err
 		}
-		pe.putCompactArrayLength(len(partitions))
+		if err := pe.putArrayLength(len(partitions)); err != nil {
+			return err
+		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
 
@@ -158,6 +162,10 @@ func (r *AlterPartitionReassignmentsResponse) headerVersion() int16 {
 
 func (r *AlterPartitionReassignmentsResponse) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *AlterPartitionReassignmentsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *AlterPartitionReassignmentsResponse) isFlexibleVersion(version int16) bool {

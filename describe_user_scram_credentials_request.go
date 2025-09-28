@@ -19,9 +19,11 @@ type DescribeUserScramCredentialsRequestUser struct {
 }
 
 func (r *DescribeUserScramCredentialsRequest) encode(pe packetEncoder) error {
-	pe.putCompactArrayLength(len(r.DescribeUsers))
+	if err := pe.putArrayLength(len(r.DescribeUsers)); err != nil {
+		return err
+	}
 	for _, d := range r.DescribeUsers {
-		if err := pe.putCompactString(d.Name); err != nil {
+		if err := pe.putString(d.Name); err != nil {
 			return err
 		}
 		pe.putEmptyTaggedFieldArray()
@@ -69,6 +71,10 @@ func (r *DescribeUserScramCredentialsRequest) headerVersion() int16 {
 
 func (r *DescribeUserScramCredentialsRequest) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *DescribeUserScramCredentialsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *DescribeUserScramCredentialsRequest) isFlexibleVersion(version int16) bool {

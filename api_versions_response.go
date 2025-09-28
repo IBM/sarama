@@ -65,12 +65,8 @@ func (r *ApiVersionsResponse) setVersion(v int16) {
 func (r *ApiVersionsResponse) encode(pe packetEncoder) (err error) {
 	pe.putInt16(r.ErrorCode)
 
-	if r.Version >= 3 {
-		pe.putCompactArrayLength(len(r.ApiKeys))
-	} else {
-		if err := pe.putArrayLength(len(r.ApiKeys)); err != nil {
-			return err
-		}
+	if err := pe.putArrayLength(len(r.ApiKeys)); err != nil {
+		return err
 	}
 	for _, block := range r.ApiKeys {
 		if err := block.encode(pe, r.Version); err != nil {
@@ -134,6 +130,10 @@ func (r *ApiVersionsResponse) headerVersion() int16 {
 
 func (r *ApiVersionsResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 3
+}
+
+func (r *ApiVersionsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ApiVersionsResponse) isFlexibleVersion(version int16) bool {

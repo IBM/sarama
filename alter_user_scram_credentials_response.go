@@ -23,14 +23,16 @@ type AlterUserScramCredentialsResult struct {
 
 func (r *AlterUserScramCredentialsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
-	pe.putCompactArrayLength(len(r.Results))
+	if err := pe.putArrayLength(len(r.Results)); err != nil {
+		return err
+	}
 
 	for _, u := range r.Results {
-		if err := pe.putCompactString(u.User); err != nil {
+		if err := pe.putString(u.User); err != nil {
 			return err
 		}
 		pe.putInt16(int16(u.ErrorCode))
-		if err := pe.putNullableCompactString(u.ErrorMessage); err != nil {
+		if err := pe.putNullableString(u.ErrorMessage); err != nil {
 			return err
 		}
 		pe.putEmptyTaggedFieldArray()
@@ -93,6 +95,10 @@ func (r *AlterUserScramCredentialsResponse) headerVersion() int16 {
 
 func (r *AlterUserScramCredentialsResponse) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *AlterUserScramCredentialsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *AlterUserScramCredentialsResponse) isFlexibleVersion(version int16) bool {
