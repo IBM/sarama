@@ -19,11 +19,7 @@ func (i *InitProducerIDResponse) encode(pe packetEncoder) error {
 	pe.putInt16(int16(i.Err))
 	pe.putInt64(i.ProducerID)
 	pe.putInt16(i.ProducerEpoch)
-
-	if i.Version >= 2 {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -70,6 +66,10 @@ func (i *InitProducerIDResponse) headerVersion() int16 {
 
 func (i *InitProducerIDResponse) isValidVersion() bool {
 	return i.Version >= 0 && i.Version <= 4
+}
+
+func (i *InitProducerIDResponse) isFlexible() bool {
+	return i.isFlexibleVersion(i.Version)
 }
 
 func (i *InitProducerIDResponse) isFlexibleVersion(version int16) bool {

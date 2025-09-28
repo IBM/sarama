@@ -13,14 +13,16 @@ func (r *ListPartitionReassignmentsRequest) setVersion(v int16) {
 func (r *ListPartitionReassignmentsRequest) encode(pe packetEncoder) error {
 	pe.putInt32(r.TimeoutMs)
 
-	pe.putCompactArrayLength(len(r.blocks))
+	if err := pe.putArrayLength(len(r.blocks)); err != nil {
+		return err
+	}
 
 	for topic, partitions := range r.blocks {
-		if err := pe.putCompactString(topic); err != nil {
+		if err := pe.putString(topic); err != nil {
 			return err
 		}
 
-		if err := pe.putCompactInt32Array(partitions); err != nil {
+		if err := pe.putInt32Array(partitions); err != nil {
 			return err
 		}
 
@@ -86,6 +88,10 @@ func (r *ListPartitionReassignmentsRequest) headerVersion() int16 {
 
 func (r *ListPartitionReassignmentsRequest) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *ListPartitionReassignmentsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ListPartitionReassignmentsRequest) isFlexibleVersion(version int16) bool {

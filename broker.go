@@ -1150,11 +1150,7 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 	pe.putInt32(b.id)
 
-	if version < 9 {
-		err = pe.putString(host)
-	} else {
-		err = pe.putCompactString(host)
-	}
+	err = pe.putString(host)
 	if err != nil {
 		return err
 	}
@@ -1162,20 +1158,13 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 	pe.putInt32(int32(port))
 
 	if version >= 1 {
-		if version < 9 {
-			err = pe.putNullableString(b.rack)
-		} else {
-			err = pe.putNullableCompactString(b.rack)
-		}
+		err = pe.putNullableString(b.rack)
 		if err != nil {
 			return err
 		}
 	}
 
-	if version >= 9 {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 

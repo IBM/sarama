@@ -53,57 +53,33 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 		return PacketEncodingError{"invalid or unsupported OffsetFetchRequest version field"}
 	}
 
-	isFlexible := r.Version >= 6
-
-	if isFlexible {
-		err = pe.putCompactString(r.ConsumerGroup)
-	} else {
-		err = pe.putString(r.ConsumerGroup)
-	}
+	err = pe.putString(r.ConsumerGroup)
 	if err != nil {
 		return err
 	}
 
-	if isFlexible {
-		if r.partitions == nil {
-			pe.putUVarint(0)
-		} else {
-			pe.putCompactArrayLength(len(r.partitions))
+	if r.partitions == nil && r.Version >= 2 {
+		if err := pe.putArrayLength(-1); err != nil {
+			return err
 		}
 	} else {
-		if r.partitions == nil && r.Version >= 2 {
-			pe.putInt32(-1)
-		} else {
-			if err = pe.putArrayLength(len(r.partitions)); err != nil {
-				return err
-			}
+		if err = pe.putArrayLength(len(r.partitions)); err != nil {
+			return err
 		}
 	}
 
 	for topic, partitions := range r.partitions {
-		if isFlexible {
-			err = pe.putCompactString(topic)
-		} else {
-			err = pe.putString(topic)
-		}
+		err = pe.putString(topic)
 		if err != nil {
 			return err
 		}
 
-		//
-
-		if isFlexible {
-			err = pe.putCompactInt32Array(partitions)
-		} else {
-			err = pe.putInt32Array(partitions)
-		}
+		err = pe.putInt32Array(partitions)
 		if err != nil {
 			return err
 		}
 
-		if isFlexible {
-			pe.putEmptyTaggedFieldArray()
-		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	if r.RequireStable && r.Version < 7 {
@@ -114,10 +90,7 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 		pe.putBool(r.RequireStable)
 	}
 
-	if isFlexible {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -185,6 +158,10 @@ func (r *OffsetFetchRequest) headerVersion() int16 {
 
 func (r *OffsetFetchRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 7
+}
+
+func (r *OffsetFetchRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *OffsetFetchRequest) isFlexibleVersion(version int16) bool {

@@ -24,44 +24,33 @@ func (r *ListGroupsResponse) encode(pe packetEncoder) error {
 
 	pe.putInt16(int16(r.Err))
 
-	if r.Version <= 2 {
-		if err := pe.putArrayLength(len(r.Groups)); err != nil {
+	if err := pe.putArrayLength(len(r.Groups)); err != nil {
+		return err
+	}
+	for groupId, protocolType := range r.Groups {
+		if err := pe.putString(groupId); err != nil {
 			return err
 		}
-		for groupId, protocolType := range r.Groups {
-			if err := pe.putString(groupId); err != nil {
-				return err
-			}
-			if err := pe.putString(protocolType); err != nil {
+		if err := pe.putString(protocolType); err != nil {
+			return err
+		}
+		if r.Version >= 4 {
+			groupData := r.GroupsData[groupId]
+			if err := pe.putString(groupData.GroupState); err != nil {
 				return err
 			}
 		}
-	} else {
-		pe.putCompactArrayLength(len(r.Groups))
-		for groupId, protocolType := range r.Groups {
-			if err := pe.putCompactString(groupId); err != nil {
-				return err
-			}
-			if err := pe.putCompactString(protocolType); err != nil {
-				return err
-			}
 
-			if r.Version >= 4 {
-				groupData := r.GroupsData[groupId]
-				if err := pe.putCompactString(groupData.GroupState); err != nil {
-					return err
-				}
-			}
-
-			if r.Version >= 5 {
-				groupData := r.GroupsData[groupId]
-				if err := pe.putCompactString(groupData.GroupType); err != nil {
-					return err
-				}
+		if r.Version >= 5 {
+			groupData := r.GroupsData[groupId]
+			if err := pe.putString(groupData.GroupType); err != nil {
+				return err
 			}
 		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -149,6 +138,10 @@ func (r *ListGroupsResponse) headerVersion() int16 {
 
 func (r *ListGroupsResponse) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 5
+}
+
+func (r *ListGroupsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ListGroupsResponse) isFlexibleVersion(version int16) bool {

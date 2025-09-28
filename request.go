@@ -40,6 +40,7 @@ func (r *request) encode(pe packetEncoder) error {
 		// we don't use tag headers at the moment so we just put an array length of 0
 		pe.putUVarint(0)
 	}
+	pe = prepareFlexibleEncoder(pe, r.body)
 
 	err := r.body.encode(pe)
 	if err != nil {

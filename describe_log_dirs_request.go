@@ -21,45 +21,27 @@ type DescribeLogDirsRequestTopic struct {
 }
 
 func (r *DescribeLogDirsRequest) encode(pe packetEncoder) error {
-	isFlexible := r.Version >= 2
-
 	length := len(r.DescribeTopics)
 	if length == 0 {
 		// In order to query all topics we must send null
 		length = -1
 	}
-	if isFlexible {
-		pe.putCompactArrayLength(length)
-	} else {
-		if err := pe.putArrayLength(length); err != nil {
-			return err
-		}
+	if err := pe.putArrayLength(length); err != nil {
+		return err
 	}
 
 	for _, d := range r.DescribeTopics {
-		if isFlexible {
-			if err := pe.putCompactString(d.Topic); err != nil {
-				return err
-			}
-
-			if err := pe.putCompactInt32Array(d.PartitionIDs); err != nil {
-				return err
-			}
-			pe.putEmptyTaggedFieldArray()
-		} else {
-			if err := pe.putString(d.Topic); err != nil {
-				return err
-			}
-
-			if err := pe.putInt32Array(d.PartitionIDs); err != nil {
-				return err
-			}
+		if err := pe.putString(d.Topic); err != nil {
+			return err
 		}
-	}
-	if isFlexible {
+
+		if err := pe.putInt32Array(d.PartitionIDs); err != nil {
+			return err
+		}
 		pe.putEmptyTaggedFieldArray()
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -116,6 +98,10 @@ func (r *DescribeLogDirsRequest) headerVersion() int16 {
 
 func (r *DescribeLogDirsRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 4
+}
+
+func (r *DescribeLogDirsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *DescribeLogDirsRequest) isFlexibleVersion(version int16) bool {

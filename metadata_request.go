@@ -54,45 +54,32 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 		return PacketEncodingError{"invalid or unsupported MetadataRequest version field"}
 	}
 	if r.Version == 0 || len(r.Topics) > 0 {
-		if r.Version < 9 {
-			err := pe.putArrayLength(len(r.Topics))
-			if err != nil {
-				return err
-			}
-
-			for i := range r.Topics {
-				err = pe.putString(r.Topics[i])
-				if err != nil {
-					return err
-				}
-			}
-		} else if r.Version == 9 {
-			pe.putCompactArrayLength(len(r.Topics))
+		if err := pe.putArrayLength(len(r.Topics)); err != nil {
+			return err
+		}
+		if r.Version <= 9 {
 			for _, topicName := range r.Topics {
-				if err := pe.putCompactString(topicName); err != nil {
+				if err := pe.putString(topicName); err != nil {
 					return err
 				}
 				pe.putEmptyTaggedFieldArray()
 			}
 		} else { // r.Version = 10
-			pe.putCompactArrayLength(len(r.Topics))
 			for _, topicName := range r.Topics {
 				if err := pe.putRawBytes(NullUUID); err != nil {
 					return err
 				}
 				// Avoid implicit memory aliasing in for loop
 				tn := topicName
-				if err := pe.putNullableCompactString(&tn); err != nil {
+				if err := pe.putNullableString(&tn); err != nil {
 					return err
 				}
 				pe.putEmptyTaggedFieldArray()
 			}
 		}
 	} else {
-		if r.Version < 9 {
-			pe.putInt32(-1)
-		} else {
-			pe.putCompactArrayLength(-1)
+		if err := pe.putArrayLength(-1); err != nil {
+			return err
 		}
 	}
 
@@ -103,9 +90,7 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 		pe.putBool(r.IncludeClusterAuthorizedOperations)
 		pe.putBool(r.IncludeTopicAuthorizedOperations)
 	}
-	if r.Version > 8 {
-		pe.putEmptyTaggedFieldArray()
-	}
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -188,6 +173,10 @@ func (r *MetadataRequest) headerVersion() int16 {
 
 func (r *MetadataRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 10
+}
+
+func (r *MetadataRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *MetadataRequest) isFlexibleVersion(version int16) bool {

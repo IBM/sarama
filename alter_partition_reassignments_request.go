@@ -5,7 +5,7 @@ type alterPartitionReassignmentsBlock struct {
 }
 
 func (b *alterPartitionReassignmentsBlock) encode(pe packetEncoder) error {
-	if err := pe.putNullableCompactInt32Array(b.replicas); err != nil {
+	if err := pe.putNullableInt32Array(b.replicas); err != nil {
 		return err
 	}
 
@@ -36,13 +36,17 @@ func (r *AlterPartitionReassignmentsRequest) setVersion(v int16) {
 func (r *AlterPartitionReassignmentsRequest) encode(pe packetEncoder) error {
 	pe.putInt32(r.TimeoutMs)
 
-	pe.putCompactArrayLength(len(r.blocks))
+	if err := pe.putArrayLength(len(r.blocks)); err != nil {
+		return err
+	}
 
 	for topic, partitions := range r.blocks {
-		if err := pe.putCompactString(topic); err != nil {
+		if err := pe.putString(topic); err != nil {
 			return err
 		}
-		pe.putCompactArrayLength(len(partitions))
+		if err := pe.putArrayLength(len(partitions)); err != nil {
+			return err
+		}
 		for partition, block := range partitions {
 			pe.putInt32(partition)
 			if err := block.encode(pe); err != nil {
@@ -115,6 +119,10 @@ func (r *AlterPartitionReassignmentsRequest) headerVersion() int16 {
 
 func (r *AlterPartitionReassignmentsRequest) isValidVersion() bool {
 	return r.Version == 0
+}
+
+func (r *AlterPartitionReassignmentsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *AlterPartitionReassignmentsRequest) isFlexibleVersion(version int16) bool {

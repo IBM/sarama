@@ -17,10 +17,10 @@ func (r *ApiVersionsRequest) setVersion(v int16) {
 
 func (r *ApiVersionsRequest) encode(pe packetEncoder) (err error) {
 	if r.Version >= 3 {
-		if err := pe.putCompactString(r.ClientSoftwareName); err != nil {
+		if err := pe.putString(r.ClientSoftwareName); err != nil {
 			return err
 		}
-		if err := pe.putCompactString(r.ClientSoftwareVersion); err != nil {
+		if err := pe.putString(r.ClientSoftwareVersion); err != nil {
 			return err
 		}
 		pe.putEmptyTaggedFieldArray()
@@ -61,6 +61,10 @@ func (r *ApiVersionsRequest) headerVersion() int16 {
 
 func (r *ApiVersionsRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 3
+}
+
+func (r *ApiVersionsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ApiVersionsRequest) isFlexibleVersion(version int16) bool {

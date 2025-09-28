@@ -12,51 +12,29 @@ func (r *ElectLeadersRequest) setVersion(v int16) {
 }
 
 func (r *ElectLeadersRequest) encode(pe packetEncoder) error {
-	isFlexible := r.Version >= 2
 	if r.Version > 0 {
 		pe.putInt8(int8(r.Type))
 	}
 
-	if isFlexible {
-		pe.putCompactArrayLength(len(r.TopicPartitions))
-	} else {
-		if err := pe.putArrayLength(len(r.TopicPartitions)); err != nil {
-			return err
-		}
+	if err := pe.putArrayLength(len(r.TopicPartitions)); err != nil {
+		return err
 	}
 
 	for topic, partitions := range r.TopicPartitions {
-		if isFlexible {
-			if err := pe.putCompactString(topic); err != nil {
-				return err
-			}
-		} else {
-			if err := pe.putString(topic); err != nil {
-				return err
-			}
+		if err := pe.putString(topic); err != nil {
+			return err
 		}
 
-		if isFlexible {
-			if err := pe.putCompactInt32Array(partitions); err != nil {
-				return err
-			}
-		} else {
-			if err := pe.putInt32Array(partitions); err != nil {
-				return err
-			}
+		if err := pe.putInt32Array(partitions); err != nil {
+			return err
 		}
 
-		if isFlexible {
-			pe.putEmptyTaggedFieldArray()
-		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	pe.putInt32(r.TimeoutMs)
 
-	if isFlexible {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -123,6 +101,10 @@ func (r *ElectLeadersRequest) headerVersion() int16 {
 
 func (r *ElectLeadersRequest) isValidVersion() bool {
 	return r.Version >= 0 && r.Version <= 2
+}
+
+func (r *ElectLeadersRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
 }
 
 func (r *ElectLeadersRequest) isFlexibleVersion(version int16) bool {
