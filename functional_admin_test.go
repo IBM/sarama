@@ -347,3 +347,53 @@ func TestFuncAdminDescribeLogDirs(t *testing.T) {
 		}
 	}
 }
+
+func TestFuncAdminDeleteGroup(t *testing.T) {
+	checkKafkaVersion(t, "2.4.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+	config := NewFunctionalTestConfig()
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	defer safeClose(t, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// create a consumer group
+	groupID := testFuncConsumerGroupID(t)
+	consumerGroup, err := NewConsumerGroupFromClient(groupID, client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, consumerGroup)
+
+	offsetMgr, _ := NewOffsetManagerFromClient(groupID, client)
+	defer safeClose(t, offsetMgr)
+	markOffset(t, offsetMgr, "test.1", 0, 1)
+	offsetMgr.Commit()
+
+	admin, err := NewClusterAdminFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groups, err := admin.ListConsumerGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 1 {
+		t.Fatal("Expected single group. Found ", len(groups), "groups.")
+	}
+
+	err = admin.DeleteConsumerGroup(groupID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	groups, err = admin.ListConsumerGroups()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(groups) != 0 {
+		t.Fatal("Expected no group. Found ", len(groups), "groups.")
+	}
+}

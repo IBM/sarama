@@ -25,8 +25,10 @@ func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
 			return err
 		}
 		pe.putInt16(int16(errorCode))
+		pe.putEmptyTaggedFieldArray()
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -42,7 +44,8 @@ func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 	if n == 0 {
-		return nil
+		_, err = pd.getEmptyTaggedFieldArray()
+		return err
 	}
 
 	r.GroupErrorCodes = make(map[string]KError, n)
@@ -57,9 +60,13 @@ func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 		}
 
 		r.GroupErrorCodes[groupID] = KError(errorCode)
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *DeleteGroupsResponse) key() int16 {
@@ -71,15 +78,28 @@ func (r *DeleteGroupsResponse) version() int16 {
 }
 
 func (r *DeleteGroupsResponse) headerVersion() int16 {
+	if r.Version >= 2 {
+		return 1
+	}
 	return 0
 }
 
+func (r *DeleteGroupsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *DeleteGroupsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 2
+}
+
 func (r *DeleteGroupsResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 1
+	return r.Version >= 0 && r.Version <= 2
 }
 
 func (r *DeleteGroupsResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 2:
+		return V2_4_0_0
 	case 1:
 		return V2_0_0_0
 	case 0:
