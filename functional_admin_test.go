@@ -397,3 +397,25 @@ func TestFuncAdminDeleteGroup(t *testing.T) {
 		t.Fatal("Expected no group. Found ", len(groups), "groups.")
 	}
 }
+
+func TestFuncAdminDeleteTopic(t *testing.T) {
+	checkKafkaVersion(t, "0.10.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	err = adminClient.CreateTopic("delete_topic_test", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = adminClient.DeleteTopic("delete_topic_test")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
