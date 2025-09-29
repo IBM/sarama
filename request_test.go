@@ -537,4 +537,21 @@ func testResponse(t *testing.T, name string, res protocolBody, expected []byte) 
 	}
 }
 
+func TestDecodeRequestErrorReturns(t *testing.T) {
+	_, bytesRead, err := decodeRequest(bytes.NewReader([]byte{0, 0, 0}))
+	if err == nil {
+		t.Error("Decode of short request should give error but was nil")
+	}
+	if bytesRead != 3 {
+		t.Errorf("Decode of short request should read 3 bytes but was %d", bytesRead)
+	}
+	_, bytesRead, err = decodeRequest(bytes.NewReader([]byte{0, 0, 0, 8, 0, 0, 0}))
+	if err == nil {
+		t.Error("Decode of short request should give error but was nil")
+	}
+	if bytesRead != 7 {
+		t.Errorf("Decode of short request should read 7 bytes but was %d", bytesRead)
+	}
+}
+
 func nullString(s string) *string { return &s }

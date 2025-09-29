@@ -92,8 +92,8 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 		lengthBytes = make([]byte, 4)
 	)
 
-	if _, err := io.ReadFull(r, lengthBytes); err != nil {
-		return nil, bytesRead, err
+	if n, err := io.ReadFull(r, lengthBytes); err != nil {
+		return nil, n, err
 	}
 
 	bytesRead += len(lengthBytes)
@@ -104,8 +104,8 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 	}
 
 	encodedReq := make([]byte, length)
-	if _, err := io.ReadFull(r, encodedReq); err != nil {
-		return nil, bytesRead, err
+	if n, err := io.ReadFull(r, encodedReq); err != nil {
+		return nil, bytesRead + n, err
 	}
 
 	bytesRead += len(encodedReq)
