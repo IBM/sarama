@@ -288,11 +288,9 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 
 	if r.Version >= 1 {
-		throttle, err := pd.getInt32()
-		if err != nil {
+		if r.ThrottleTime, err = pd.getDurationMs(); err != nil {
 			return err
 		}
-		r.ThrottleTime = time.Duration(throttle) * time.Millisecond
 	}
 
 	if r.Version >= 7 {
@@ -345,7 +343,7 @@ func (r *FetchResponse) decode(pd packetDecoder, version int16) (err error) {
 
 func (r *FetchResponse) encode(pe packetEncoder) (err error) {
 	if r.Version >= 1 {
-		pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+		pe.putDurationMs(r.ThrottleTime)
 	}
 
 	if r.Version >= 7 {

@@ -23,7 +23,7 @@ func (c *CreateTopicsResponse) setVersion(v int16) {
 
 func (c *CreateTopicsResponse) encode(pe packetEncoder) error {
 	if c.Version >= 2 {
-		pe.putInt32(int32(c.ThrottleTime / time.Millisecond))
+		pe.putDurationMs(c.ThrottleTime)
 	}
 
 	if err := pe.putArrayLength(len(c.TopicErrors)); err != nil {
@@ -55,11 +55,9 @@ func (c *CreateTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 	c.Version = version
 
 	if version >= 2 {
-		throttleTime, err := pd.getInt32()
-		if err != nil {
+		if c.ThrottleTime, err = pd.getDurationMs(); err != nil {
 			return err
 		}
-		c.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 	}
 
 	n, err := pd.getArrayLength()

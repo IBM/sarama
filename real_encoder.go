@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"math"
+	"time"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -69,6 +70,10 @@ func (re *realEncoder) putBool(in bool) {
 
 func (re *realEncoder) putKError(in KError) {
 	re.putInt16(int16(in))
+}
+
+func (re *realEncoder) putDurationMs(in time.Duration) {
+	re.putInt32(int32(in / time.Millisecond))
 }
 
 // collection

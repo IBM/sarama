@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -64,6 +65,10 @@ func (pe *prepEncoder) putBool(in bool) {
 
 func (pe *prepEncoder) putKError(in KError) {
 	pe.length += 2
+}
+
+func (pe *prepEncoder) putDurationMs(in time.Duration) {
+	pe.length += 4
 }
 
 // arrays

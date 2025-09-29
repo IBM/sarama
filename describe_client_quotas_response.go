@@ -41,7 +41,7 @@ type QuotaEntityComponent struct {
 
 func (d *DescribeClientQuotasResponse) encode(pe packetEncoder) error {
 	// ThrottleTime
-	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(d.ThrottleTime)
 
 	// ErrorCode
 	pe.putKError(d.ErrorCode)
@@ -64,13 +64,10 @@ func (d *DescribeClientQuotasResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (d *DescribeClientQuotasResponse) decode(pd packetDecoder, version int16) error {
-	// ThrottleTime
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+func (d *DescribeClientQuotasResponse) decode(pd packetDecoder, version int16) (err error) {
+	if d.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	d.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	// ErrorCode
 	d.ErrorCode, err = pd.getKError()

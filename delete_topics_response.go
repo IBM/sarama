@@ -16,7 +16,7 @@ func (d *DeleteTopicsResponse) setVersion(v int16) {
 
 func (d *DeleteTopicsResponse) encode(pe packetEncoder) error {
 	if d.Version >= 1 {
-		pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
+		pe.putDurationMs(d.ThrottleTime)
 	}
 
 	if err := pe.putArrayLength(len(d.TopicErrorCodes)); err != nil {
@@ -36,11 +36,9 @@ func (d *DeleteTopicsResponse) encode(pe packetEncoder) error {
 
 func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err error) {
 	if version >= 1 {
-		throttleTime, err := pd.getInt32()
-		if err != nil {
+		if d.ThrottleTime, err = pd.getDurationMs(); err != nil {
 			return err
 		}
-		d.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 		d.Version = version
 	}

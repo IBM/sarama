@@ -24,7 +24,7 @@ func (d *DeleteRecordsResponse) setVersion(v int16) {
 }
 
 func (d *DeleteRecordsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(d.ThrottleTime)
 
 	if err := pe.putArrayLength(len(d.Topics)); err != nil {
 		return err
@@ -45,14 +45,12 @@ func (d *DeleteRecordsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (d *DeleteRecordsResponse) decode(pd packetDecoder, version int16) error {
+func (d *DeleteRecordsResponse) decode(pd packetDecoder, version int16) (err error) {
 	d.Version = version
 
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+	if d.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	d.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	n, err := pd.getArrayLength()
 	if err != nil {

@@ -31,7 +31,7 @@ func (r *DeleteOffsetsResponse) AddError(topic string, partition int32, errorCod
 
 func (r *DeleteOffsetsResponse) encode(pe packetEncoder) error {
 	pe.putKError(r.ErrorCode)
-	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(r.ThrottleTime)
 
 	if err := pe.putArrayLength(len(r.Errors)); err != nil {
 		return err
@@ -57,11 +57,9 @@ func (r *DeleteOffsetsResponse) decode(pd packetDecoder, version int16) (err err
 		return err
 	}
 
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+	if r.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	numTopics, err := pd.getArrayLength()
 	if err != nil || numTopics == 0 {

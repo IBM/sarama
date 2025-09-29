@@ -19,7 +19,7 @@ func (r *DescribeLogDirsResponse) setVersion(v int16) {
 }
 
 func (r *DescribeLogDirsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(r.ThrottleTime)
 
 	if r.Version >= 3 {
 		pe.putKError(r.ErrorCode)
@@ -39,12 +39,10 @@ func (r *DescribeLogDirsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *DescribeLogDirsResponse) decode(pd packetDecoder, version int16) error {
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+func (r *DescribeLogDirsResponse) decode(pd packetDecoder, version int16) (err error) {
+	if r.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	if version >= 3 {
 		r.ErrorCode, err = pd.getKError()
