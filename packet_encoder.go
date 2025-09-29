@@ -16,6 +16,7 @@ type packetEncoder interface {
 	putFloat64(in float64)
 	putArrayLength(in int) error
 	putBool(in bool)
+	putKError(in KError)
 
 	// Collections
 	putBytes(in []byte) error

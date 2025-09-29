@@ -29,11 +29,10 @@ type ProduceResponseBlock struct {
 }
 
 func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err error) {
-	tmp, err := pd.getInt16()
+	b.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	b.Err = KError(tmp)
 
 	b.Offset, err = pd.getInt64()
 	if err != nil {
@@ -59,7 +58,7 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 }
 
 func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt16(int16(b.Err))
+	pe.putKError(b.Err)
 	pe.putInt64(b.Offset)
 
 	if version >= 2 {

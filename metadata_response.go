@@ -24,11 +24,10 @@ type PartitionMetadata struct {
 
 func (p *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) {
 	p.Version = version
-	tmp, err := pd.getInt16()
+	p.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	p.Err = KError(tmp)
 
 	if p.ID, err = pd.getInt32(); err != nil {
 		return err
@@ -67,7 +66,7 @@ func (p *PartitionMetadata) decode(pd packetDecoder, version int16) (err error) 
 
 func (p *PartitionMetadata) encode(pe packetEncoder, version int16) (err error) {
 	p.Version = version
-	pe.putInt16(int16(p.Err))
+	pe.putKError(p.Err)
 
 	pe.putInt32(p.ID)
 
@@ -116,11 +115,10 @@ type TopicMetadata struct {
 
 func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	t.Version = version
-	tmp, err := pd.getInt16()
+	t.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	t.Err = KError(tmp)
 
 	t.Name, err = pd.getString()
 	if err != nil {
@@ -171,7 +169,7 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 
 func (t *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
 	t.Version = version
-	pe.putInt16(int16(t.Err))
+	pe.putKError(t.Err)
 
 	err = pe.putString(t.Name)
 	if err != nil {

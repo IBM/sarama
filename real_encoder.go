@@ -67,6 +67,10 @@ func (re *realEncoder) putBool(in bool) {
 	re.putInt8(0)
 }
 
+func (re *realEncoder) putKError(in KError) {
+	re.putInt16(int16(in))
+}
+
 // collection
 
 func (re *realEncoder) putRawBytes(in []byte) error {

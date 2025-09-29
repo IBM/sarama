@@ -88,7 +88,7 @@ type AclCreationResponse struct {
 }
 
 func (a *AclCreationResponse) encode(pe packetEncoder) error {
-	pe.putInt16(int16(a.Err))
+	pe.putKError(a.Err)
 
 	if err := pe.putNullableString(a.ErrMsg); err != nil {
 		return err
@@ -98,11 +98,10 @@ func (a *AclCreationResponse) encode(pe packetEncoder) error {
 }
 
 func (a *AclCreationResponse) decode(pd packetDecoder, version int16) (err error) {
-	kerr, err := pd.getInt16()
+	a.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	a.Err = KError(kerr)
 
 	if a.ErrMsg, err = pd.getNullableString(); err != nil {
 		return err

@@ -162,7 +162,7 @@ func (t *TopicError) Unwrap() error {
 }
 
 func (t *TopicError) encode(pe packetEncoder, version int16) error {
-	pe.putInt16(int16(t.Err))
+	pe.putKError(t.Err)
 
 	if version >= 1 {
 		if err := pe.putNullableString(t.ErrMsg); err != nil {
@@ -174,11 +174,10 @@ func (t *TopicError) encode(pe packetEncoder, version int16) error {
 }
 
 func (t *TopicError) decode(pd packetDecoder, version int16) (err error) {
-	kErr, err := pd.getInt16()
+	t.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	t.Err = KError(kErr)
 
 	if version >= 1 {
 		if t.ErrMsg, err = pd.getNullableString(); err != nil {
@@ -228,7 +227,7 @@ func (r *CreatableTopicResult) encode(pe packetEncoder, version int16) error {
 
 	pe.putUVarint(2) // value length
 
-	pe.putInt16(int16(r.TopicConfigErrorCode)) // tag value
+	pe.putKError(r.TopicConfigErrorCode) // tag value
 
 	return nil
 }
@@ -261,11 +260,10 @@ func (r *CreatableTopicResult) decode(pd packetDecoder, version int16) (err erro
 	}
 	err = pd.getTaggedFieldArray(taggedFieldDecoders{
 		0: func(pd packetDecoder) error {
-			kErr, err := pd.getInt16()
+			r.TopicConfigErrorCode, err = pd.getKError()
 			if err != nil {
 				return err
 			}
-			r.TopicConfigErrorCode = KError(kErr)
 			return nil
 		},
 	})

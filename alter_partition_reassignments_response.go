@@ -8,7 +8,7 @@ type alterPartitionReassignmentsErrorBlock struct {
 }
 
 func (b *alterPartitionReassignmentsErrorBlock) encode(pe packetEncoder) error {
-	pe.putInt16(int16(b.errorCode))
+	pe.putKError(b.errorCode)
 	if err := pe.putNullableString(b.errorMessage); err != nil {
 		return err
 	}
@@ -18,11 +18,10 @@ func (b *alterPartitionReassignmentsErrorBlock) encode(pe packetEncoder) error {
 }
 
 func (b *alterPartitionReassignmentsErrorBlock) decode(pd packetDecoder) (err error) {
-	errorCode, err := pd.getInt16()
+	b.errorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	b.errorCode = KError(errorCode)
 	b.errorMessage, err = pd.getNullableString()
 	if err != nil {
 		return err
@@ -59,7 +58,7 @@ func (r *AlterPartitionReassignmentsResponse) AddError(topic string, partition i
 
 func (r *AlterPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
-	pe.putInt16(int16(r.ErrorCode))
+	pe.putKError(r.ErrorCode)
 	if err := pe.putNullableString(r.ErrorMessage); err != nil {
 		return err
 	}
@@ -95,12 +94,10 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 		return err
 	}
 
-	kerr, err := pd.getInt16()
+	r.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-
-	r.ErrorCode = KError(kerr)
 
 	if r.ErrorMessage, err = pd.getNullableString(); err != nil {
 		return err

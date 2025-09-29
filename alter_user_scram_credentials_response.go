@@ -31,7 +31,7 @@ func (r *AlterUserScramCredentialsResponse) encode(pe packetEncoder) error {
 		if err := pe.putString(u.User); err != nil {
 			return err
 		}
-		pe.putInt16(int16(u.ErrorCode))
+		pe.putKError(u.ErrorCode)
 		if err := pe.putNullableString(u.ErrorMessage); err != nil {
 			return err
 		}
@@ -62,12 +62,11 @@ func (r *AlterUserScramCredentialsResponse) decode(pd packetDecoder, version int
 				return err
 			}
 
-			kerr, err := pd.getInt16()
+			r.Results[i].ErrorCode, err = pd.getKError()
 			if err != nil {
 				return err
 			}
 
-			r.Results[i].ErrorCode = KError(kerr)
 			if r.Results[i].ErrorMessage, err = pd.getNullableString(); err != nil {
 				return err
 			}

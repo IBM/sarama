@@ -8,7 +8,7 @@ type PartitionResult struct {
 }
 
 func (b *PartitionResult) encode(pe packetEncoder, version int16) error {
-	pe.putInt16(int16(b.ErrorCode))
+	pe.putKError(b.ErrorCode)
 	if err := pe.putNullableString(b.ErrorMessage); err != nil {
 		return err
 	}
@@ -17,11 +17,10 @@ func (b *PartitionResult) encode(pe packetEncoder, version int16) error {
 }
 
 func (b *PartitionResult) decode(pd packetDecoder, version int16) (err error) {
-	kerr, err := pd.getInt16()
+	b.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	b.ErrorCode = KError(kerr)
 	b.ErrorMessage, err = pd.getNullableString()
 	if err != nil {
 		return err
@@ -45,7 +44,7 @@ func (r *ElectLeadersResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
 
 	if r.Version > 0 {
-		pe.putInt16(int16(r.ErrorCode))
+		pe.putKError(r.ErrorCode)
 	}
 
 	if err := pe.putArrayLength(len(r.ReplicaElectionResults)); err != nil {
@@ -77,11 +76,10 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 		return err
 	}
 	if r.Version > 0 {
-		kerr, err := pd.getInt16()
+		r.ErrorCode, err = pd.getKError()
 		if err != nil {
 			return err
 		}
-		r.ErrorCode = KError(kerr)
 	}
 
 	numTopics, err := pd.getArrayLength()

@@ -116,7 +116,7 @@ type PartitionError struct {
 
 func (p *PartitionError) encode(pe packetEncoder) error {
 	pe.putInt32(p.Partition)
-	pe.putInt16(int16(p.Err))
+	pe.putKError(p.Err)
 	return nil
 }
 
@@ -125,11 +125,10 @@ func (p *PartitionError) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	kerr, err := pd.getInt16()
+	p.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	p.Err = KError(kerr)
 
 	return nil
 }

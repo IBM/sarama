@@ -22,7 +22,7 @@ func (r *LeaveGroupResponse) encode(pe packetEncoder) error {
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTime)
 	}
-	pe.putInt16(int16(r.Err))
+	pe.putKError(r.Err)
 	if r.Version >= 3 {
 		if err := pe.putArrayLength(len(r.Members)); err != nil {
 			return err
@@ -34,7 +34,7 @@ func (r *LeaveGroupResponse) encode(pe packetEncoder) error {
 			if err := pe.putNullableString(member.GroupInstanceId); err != nil {
 				return err
 			}
-			pe.putInt16(int16(member.Err))
+			pe.putKError(member.Err)
 		}
 	}
 	return nil
@@ -47,11 +47,10 @@ func (r *LeaveGroupResponse) decode(pd packetDecoder, version int16) (err error)
 			return err
 		}
 	}
-	kerr, err := pd.getInt16()
+	r.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	r.Err = KError(kerr)
 
 	if r.Version >= 3 {
 		membersLen, err := pd.getArrayLength()
@@ -66,10 +65,8 @@ func (r *LeaveGroupResponse) decode(pd packetDecoder, version int16) (err error)
 			if r.Members[i].GroupInstanceId, err = pd.getNullableString(); err != nil {
 				return err
 			}
-			if memberErr, err := pd.getInt16(); err != nil {
+			if r.Members[i].Err, err = pd.getKError(); err != nil {
 				return err
-			} else {
-				r.Members[i].Err = KError(memberErr)
 			}
 		}
 	}

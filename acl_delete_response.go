@@ -89,7 +89,7 @@ type FilterResponse struct {
 }
 
 func (f *FilterResponse) encode(pe packetEncoder, version int16) error {
-	pe.putInt16(int16(f.Err))
+	pe.putKError(f.Err)
 	if err := pe.putNullableString(f.ErrMsg); err != nil {
 		return err
 	}
@@ -107,11 +107,10 @@ func (f *FilterResponse) encode(pe packetEncoder, version int16) error {
 }
 
 func (f *FilterResponse) decode(pd packetDecoder, version int16) (err error) {
-	kerr, err := pd.getInt16()
+	f.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	f.Err = KError(kerr)
 
 	if f.ErrMsg, err = pd.getNullableString(); err != nil {
 		return err
@@ -141,7 +140,7 @@ type MatchingAcl struct {
 }
 
 func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
-	pe.putInt16(int16(m.Err))
+	pe.putKError(m.Err)
 	if err := pe.putNullableString(m.ErrMsg); err != nil {
 		return err
 	}
@@ -158,11 +157,10 @@ func (m *MatchingAcl) encode(pe packetEncoder, version int16) error {
 }
 
 func (m *MatchingAcl) decode(pd packetDecoder, version int16) (err error) {
-	kerr, err := pd.getInt16()
+	m.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	m.Err = KError(kerr)
 
 	if m.ErrMsg, err = pd.getNullableString(); err != nil {
 		return err

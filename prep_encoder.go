@@ -62,6 +62,10 @@ func (pe *prepEncoder) putBool(in bool) {
 	pe.length++
 }
 
+func (pe *prepEncoder) putKError(in KError) {
+	pe.length += 2
+}
+
 // arrays
 
 func (pe *prepEncoder) putBytes(in []byte) error {

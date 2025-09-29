@@ -68,7 +68,7 @@ func (r *ListPartitionReassignmentsResponse) AddBlock(topic string, partition in
 
 func (r *ListPartitionReassignmentsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(r.ThrottleTimeMs)
-	pe.putInt16(int16(r.ErrorCode))
+	pe.putKError(r.ErrorCode)
 	if err := pe.putNullableString(r.ErrorMessage); err != nil {
 		return err
 	}
@@ -105,12 +105,10 @@ func (r *ListPartitionReassignmentsResponse) decode(pd packetDecoder, version in
 		return err
 	}
 
-	kerr, err := pd.getInt16()
+	r.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-
-	r.ErrorCode = KError(kerr)
 
 	if r.ErrorMessage, err = pd.getNullableString(); err != nil {
 		return err

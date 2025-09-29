@@ -29,11 +29,10 @@ func (f *FindCoordinatorResponse) decode(pd packetDecoder, version int16) (err e
 		f.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 	}
 
-	tmp, err := pd.getInt16()
+	f.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	f.Err = KError(tmp)
 
 	if version >= 1 {
 		if f.ErrMsg, err = pd.getNullableString(); err != nil {
@@ -60,7 +59,7 @@ func (f *FindCoordinatorResponse) encode(pe packetEncoder) error {
 		pe.putInt32(int32(f.ThrottleTime / time.Millisecond))
 	}
 
-	pe.putInt16(int16(f.Err))
+	pe.putKError(f.Err)
 
 	if f.Version >= 1 {
 		if err := pe.putNullableString(f.ErrMsg); err != nil {

@@ -54,7 +54,7 @@ type UserScramCredentialsResponseInfo struct {
 func (r *DescribeUserScramCredentialsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
 
-	pe.putInt16(int16(r.ErrorCode))
+	pe.putKError(r.ErrorCode)
 	if err := pe.putNullableString(r.ErrorMessage); err != nil {
 		return err
 	}
@@ -94,12 +94,11 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 	}
 	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
-	kerr, err := pd.getInt16()
+	r.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
 
-	r.ErrorCode = KError(kerr)
 	if r.ErrorMessage, err = pd.getNullableString(); err != nil {
 		return err
 	}
@@ -117,11 +116,10 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 				return err
 			}
 
-			errorCode, err := pd.getInt16()
+			r.Results[i].ErrorCode, err = pd.getKError()
 			if err != nil {
 				return err
 			}
-			r.Results[i].ErrorCode = KError(errorCode)
 			if r.Results[i].ErrorMessage, err = pd.getNullableString(); err != nil {
 				return err
 			}

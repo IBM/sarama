@@ -22,7 +22,7 @@ func (r *ListGroupsResponse) encode(pe packetEncoder) error {
 		pe.putInt32(r.ThrottleTime)
 	}
 
-	pe.putInt16(int16(r.Err))
+	pe.putKError(r.Err)
 
 	if err := pe.putArrayLength(len(r.Groups)); err != nil {
 		return err
@@ -54,21 +54,18 @@ func (r *ListGroupsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) error {
+func (r *ListGroupsResponse) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
 	if r.Version >= 1 {
-		var err error
 		if r.ThrottleTime, err = pd.getInt32(); err != nil {
 			return err
 		}
 	}
 
-	kerr, err := pd.getInt16()
+	r.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-
-	r.Err = KError(kerr)
 
 	n, err := pd.getArrayLength()
 	if err != nil {
