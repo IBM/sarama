@@ -17,6 +17,9 @@ func (b *alterPartitionReassignmentsBlock) decode(pd packetDecoder) (err error) 
 	if b.replicas, err = pd.getCompactInt32Array(); err != nil {
 		return err
 	}
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -87,10 +90,6 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 					return err
 				}
 				r.blocks[topic][partition] = block
-
-				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-					return err
-				}
 			}
 			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
