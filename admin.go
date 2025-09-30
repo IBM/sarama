@@ -985,7 +985,8 @@ func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*Group
 
 		if ca.conf.Version.IsAtLeast(V2_4_0_0) {
 			// Starting in version 4, the response will include group.instance.id info for members.
-			describeReq.Version = 4
+			// Starting in version 5, the response uses flexible encoding
+			describeReq.Version = 5
 		} else if ca.conf.Version.IsAtLeast(V2_3_0_0) {
 			// Starting in version 3, authorized operations can be requested.
 			describeReq.Version = 3
