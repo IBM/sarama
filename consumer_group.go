@@ -640,7 +640,7 @@ func (c *consumerGroup) leave() error {
 		req.Version = 2
 	}
 	if c.config.Version.IsAtLeast(V2_4_0_0) {
-		req.Version = 3
+		req.Version = 4
 		req.Members = append(req.Members, MemberIdentity{
 			MemberId: c.memberID,
 		})

@@ -348,8 +348,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyJoinGroup:                   6, // up from 6
 				// TODO: HeartbeatRequest v4 is not supported, but expected for KafkaVersion 2.4.0
 				// apiKeyHeartbeat:                   4, // up from 3
-				// TODO: LeaveGroupRequest v4 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyLeaveGroup:                  4, // up from 2
+				apiKeyLeaveGroup:                  4, // up from 2
 				apiKeySyncGroup:                   4, // up from 3
 				apiKeyDescribeGroups:              5, // up from 3
 				apiKeyListGroups:                  3, // up from 2

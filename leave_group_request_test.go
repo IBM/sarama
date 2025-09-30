@@ -20,6 +20,17 @@ var (
 		0, 4, 'm', 'i', 'd', '2', // MemberId
 		0, 3, 'g', 'i', 'd', // GroupInstanceId
 	}
+	basicLeaveGroupRequestV4 = []byte{
+		4, 'f', 'o', 'o',
+		3,                     // Two Member
+		5, 'm', 'i', 'd', '1', // MemberId
+		0,                     // GroupInstanceId  nil
+		0,                     // empty tagged fields
+		5, 'm', 'i', 'd', '2', // MemberId
+		4, 'g', 'i', 'd', // GroupInstanceId
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestLeaveGroupRequest(t *testing.T) {
@@ -46,6 +57,19 @@ func TestLeaveGroupRequest(t *testing.T) {
 			basicLeaveGroupRequestV3,
 			&LeaveGroupRequest{
 				Version: 3,
+				GroupId: "foo",
+				Members: []MemberIdentity{
+					{"mid1", nil},
+					{"mid2", &groupInstanceId},
+				},
+			},
+		},
+		{
+			"v4",
+			4,
+			basicLeaveGroupRequestV4,
+			&LeaveGroupRequest{
+				Version: 4,
 				GroupId: "foo",
 				Members: []MemberIdentity{
 					{"mid1", nil},
