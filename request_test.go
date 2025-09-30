@@ -344,8 +344,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyOffsetFetch: 6, // up from 5
 				// TODO: FindCoordinatorRequest v3 is not supported, but expected for KafkaVersion 2.4.0
 				// apiKeyFindCoordinator:             3, // up from 2
-				// TODO: JoinGroupRequest v6 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyJoinGroup:                   6, // up from 6
+				apiKeyJoinGroup:                   6, // up from 5
 				apiKeyHeartbeat:                   4, // up from 3
 				apiKeyLeaveGroup:                  4, // up from 2
 				apiKeySyncGroup:                   4, // up from 3
