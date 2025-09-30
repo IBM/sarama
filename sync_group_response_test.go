@@ -23,6 +23,13 @@ var (
 		0x00, 0x00, // No error
 		0, 0, 0, 3, 0x01, 0x02, 0x03, // Member assignment data
 	}
+
+	syncGroupResponseV4NoError = []byte{
+		0, 0, 0, 100, // ThrottleTimeMs
+		0x00, 0x00, // No error
+		4, 0x01, 0x02, 0x03, // Member assignment data
+		0, // empty tagged fields
+	}
 )
 
 func TestSyncGroupResponse(t *testing.T) {
@@ -59,6 +66,17 @@ func TestSyncGroupResponse(t *testing.T) {
 			&SyncGroupResponse{
 				ThrottleTime:     100,
 				Version:          1,
+				Err:              ErrNoError,
+				MemberAssignment: []byte{1, 2, 3},
+			},
+		},
+		{
+			"v4-noErr",
+			4,
+			syncGroupResponseV4NoError,
+			&SyncGroupResponse{
+				ThrottleTime:     100,
+				Version:          4,
 				Err:              ErrNoError,
 				MemberAssignment: []byte{1, 2, 3},
 			},

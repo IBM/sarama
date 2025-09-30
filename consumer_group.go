@@ -529,6 +529,9 @@ func (c *consumerGroup) syncGroupRequest(
 	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 3
 		req.GroupInstanceId = c.groupInstanceId
+		if c.config.Version.IsAtLeast(V2_4_0_0) {
+			req.Version = 4
+		}
 	}
 
 	for memberID, topics := range plan {
