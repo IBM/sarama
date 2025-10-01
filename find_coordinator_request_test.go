@@ -14,6 +14,12 @@ var (
 		0, 13, 't', 'r', 'a', 'n', 's', 'a', 'c', 't', 'i', 'o', 'n', 'i', 'd',
 		1,
 	}
+
+	findCoordinatorRequestTransactionV3 = []byte{
+		14, 't', 'r', 'a', 'n', 's', 'a', 'c', 't', 'i', 'o', 'n', 'i', 'd',
+		1,
+		0, // empty tagged fields
+	}
 )
 
 func TestFindCoordinatorRequest(t *testing.T) {
@@ -32,4 +38,7 @@ func TestFindCoordinatorRequest(t *testing.T) {
 	}
 
 	testRequest(t, "version 1 - transaction", req, findCoordinatorRequestTransaction)
+
+	req.Version = 3
+	testRequest(t, "version 3 - transaction", req, findCoordinatorRequestTransactionV3)
 }
