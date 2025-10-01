@@ -470,7 +470,7 @@ func (rd *realFlexibleDecoder) getString() (string, error) {
 	}
 
 	if length < 0 {
-		return "", errInvalidByteSliceLength
+		return "", errInvalidStringLength
 	}
 	tmpStr := string(rd.raw[rd.off : rd.off+length])
 	rd.off += length
