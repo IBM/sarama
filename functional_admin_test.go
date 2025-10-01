@@ -7,12 +7,17 @@ import (
 	"maps"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestFuncAdminQuotas(t *testing.T) {
+	const (
+		maxRetries = 10
+		retryDelay = 100 * time.Millisecond
+	)
 	checkKafkaVersion(t, "2.6.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -58,15 +63,23 @@ func TestFuncAdminQuotas(t *testing.T) {
 		EntityType: QuotaEntityUser,
 		MatchType:  QuotaMatchDefault,
 	}
-	quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{defaultUserFilter}, false)
-	if err != nil {
-		t.Fatal(err)
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{defaultUserFilter}, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(quotas) > 0 {
+			break
+		}
+		if attempt < maxRetries {
+			time.Sleep(retryDelay)
+		}
 	}
 	if len(quotas) == 0 {
-		t.Fatal("Expected not empty quotas")
+		t.Fatal("Expected not empty quotas for default user")
 	}
 	if len(quotas) > 1 {
-		t.Fatalf("Expected one quota entry, found: %v", quotas)
+		t.Fatalf("Expected one quota entry for default user, found: %v", quotas)
 	}
 
 	// Put a quota on specific client-id for a specific user
@@ -102,15 +115,23 @@ func TestFuncAdminQuotas(t *testing.T) {
 		MatchType:  QuotaMatchExact,
 		Match:      "sarama-consumer",
 	}
-	quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{userFilter, clientFilter}, true)
-	if err != nil {
-		t.Fatal(err)
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{userFilter, clientFilter}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(quotas) > 0 {
+			break
+		}
+		if attempt < maxRetries {
+			time.Sleep(retryDelay)
+		}
 	}
 	if len(quotas) == 0 {
-		t.Fatal("Expected not empty quotas")
+		t.Fatal("Expected not empty quotas for specific clientID")
 	}
 	if len(quotas) > 1 {
-		t.Fatalf("Expected one quota entry, found: %v", quotas)
+		t.Fatalf("Expected one quota entry for specific clientID, found: %v", quotas)
 	}
 	if quotas[0].Values[consumeOp.Key] != consumeOp.Value {
 		t.Fatalf("Expected specific quota value to be %f, found: %v", consumeOp.Value, quotas[0].Values[consumeOp.Key])
