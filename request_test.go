@@ -358,8 +358,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyApiVersions: 3, // up from 2
 				// TODO: CreateTopicsRequest v5 is not supported, but expected for KafkaVersion 2.4.0
 				// apiKeyCreateTopics:                5, // up from 3
-				// TODO: DeleteTopicsRequest v4 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyDeleteTopics:                4, // up from 3
+				apiKeyDeleteTopics:   4, // up from 3
 				apiKeyInitProducerId: 2, // up from 1
 				apiKeyDeleteGroups:   2, // up from 1
 				apiKeyElectLeaders:   2, // up from 0
