@@ -444,15 +444,33 @@ func (rd *realFlexibleDecoder) getBytes() ([]byte, error) {
 	return rd.getRawBytes(length)
 }
 
+func (rd *realFlexibleDecoder) getStringLength() (int, error) {
+	length, err := rd.getUVarint()
+	if err != nil {
+		return 0, err
+	}
+
+	n := int(length - 1)
+
+	switch {
+	case n < -1:
+		return 0, errInvalidStringLength
+	case n > rd.remaining():
+		rd.off = len(rd.raw)
+		return 0, ErrInsufficientData
+	}
+
+	return n, nil
+}
+
 func (rd *realFlexibleDecoder) getString() (string, error) {
-	n, err := rd.getUVarint()
+	length, err := rd.getStringLength()
 	if err != nil {
 		return "", err
 	}
 
-	length := int(n - 1)
 	if length < 0 {
-		return "", errInvalidByteSliceLength
+		return "", errInvalidStringLength
 	}
 	tmpStr := string(rd.raw[rd.off : rd.off+length])
 	rd.off += length
@@ -460,12 +478,10 @@ func (rd *realFlexibleDecoder) getString() (string, error) {
 }
 
 func (rd *realFlexibleDecoder) getNullableString() (*string, error) {
-	n, err := rd.getUVarint()
+	length, err := rd.getStringLength()
 	if err != nil {
 		return nil, err
 	}
-
-	length := int(n - 1)
 
 	if length < 0 {
 		return nil, err
