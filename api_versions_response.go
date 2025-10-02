@@ -91,6 +91,13 @@ func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) (err error
 		return err
 	}
 
+	// KIP-511: if broker didn't understand the ApiVersionsRequest version then
+	// it replies with a V0 ApiVersionResponse where its supported
+	// ApiVersionsRequest version is available in ApiKeys
+	if r.ErrorCode == int16(ErrUnsupportedVersion) {
+		r.Version = 0
+	}
+
 	numApiKeys, err := pd.getArrayLength()
 	if err != nil {
 		return err
