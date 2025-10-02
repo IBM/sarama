@@ -6,13 +6,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFuncConsumerGroupPartitioning(t *testing.T) {
@@ -188,19 +190,16 @@ func TestFuncConsumerGroupFuzzy(t *testing.T) {
 	}
 
 	groupID := testFuncConsumerGroupID(t)
-	sink := &testFuncConsumerGroupSink{msgs: make(chan testFuncConsumerGroupMessage, 20000)}
+	sink := &testFuncConsumerGroupSink{msgs: make(chan testFuncConsumerGroupMessage, 30000)}
 	waitForMessages := func(t *testing.T, n int) {
+		const (
+			waitFor = 60 * time.Second
+			tick    = 100 * time.Millisecond
+		)
 		t.Helper()
-
-		for i := 0; i < 600; i++ {
-			if sink.Len() >= n {
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-		if sz := sink.Len(); sz < n {
-			log.Fatalf("expected to consume %d messages, but consumed %d", n, sz)
-		}
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			require.GreaterOrEqual(t, sink.Len(), n)
+		}, waitFor, tick, "expected to consume %d messages, but consumed %d", n, sink.Len())
 	}
 
 	defer runTestFuncConsumerGroupMember(t, groupID, "M1", 1500, sink).Stop()
@@ -398,20 +397,36 @@ func defaultConfig(clientID string) *Config {
 	config.ClientID = clientID
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = OffsetOldest
-	config.Consumer.Group.Rebalance.Timeout = 10 * time.Second
+	config.Consumer.Group.Rebalance.Timeout = 30 * time.Second
+	config.Consumer.Group.Session.Timeout = 20 * time.Second
+	config.Consumer.Group.Heartbeat.Interval = 5 * time.Second
 	config.Metadata.Full = false
-	config.Metadata.RefreshFrequency = 5 * time.Second
+	config.Metadata.RefreshFrequency = 10 * time.Second
 	return config
 }
 
-func runTestFuncConsumerGroupMember(t *testing.T, groupID, clientID string, maxMessages int32, sink *testFuncConsumerGroupSink, topics ...string) *testFuncConsumerGroupMember {
+func runTestFuncConsumerGroupMember(
+	t *testing.T,
+	groupID string,
+	clientID string,
+	maxMessages int32,
+	sink *testFuncConsumerGroupSink,
+	topics ...string,
+) *testFuncConsumerGroupMember {
 	t.Helper()
 
 	config := defaultConfig(clientID)
 	return runTestFuncConsumerGroupMemberWithConfig(t, config, groupID, maxMessages, sink, topics...)
 }
 
-func runTestFuncConsumerGroupMemberWithConfig(t *testing.T, config *Config, groupID string, maxMessages int32, sink *testFuncConsumerGroupSink, topics ...string) *testFuncConsumerGroupMember {
+func runTestFuncConsumerGroupMemberWithConfig(
+	t *testing.T,
+	config *Config,
+	groupID string,
+	maxMessages int32,
+	sink *testFuncConsumerGroupSink,
+	topics ...string,
+) *testFuncConsumerGroupMember {
 	t.Helper()
 
 	group, err := NewConsumerGroup(FunctionalTestEnv.KafkaBrokerAddrs, groupID, config)
@@ -491,6 +506,8 @@ func (m *testFuncConsumerGroupMember) WaitForClaims(expected map[string]int) {
 func (m *testFuncConsumerGroupMember) Stop() { _ = m.Close() }
 
 func (m *testFuncConsumerGroupMember) Setup(s ConsumerGroupSession) error {
+	m.t.Logf("Consumer %s: new session started %s in generation %d", m.clientID, s.MemberID(), s.GenerationID())
+
 	// store claims
 	claims := make(map[string]int)
 	for topic, partitions := range s.Claims() {
@@ -509,23 +526,41 @@ func (m *testFuncConsumerGroupMember) Setup(s ConsumerGroupSession) error {
 }
 
 func (m *testFuncConsumerGroupMember) Cleanup(s ConsumerGroupSession) error {
+	m.t.Logf("Consumer %s: session ended %s in generation %d", m.clientID, s.MemberID(), s.GenerationID())
 	// enter post-cleanup state
 	atomic.StoreInt32(&m.state, 3)
 	return nil
 }
 
 func (m *testFuncConsumerGroupMember) ConsumeClaim(s ConsumerGroupSession, c ConsumerGroupClaim) error {
+	defer func() {
+		if r := recover(); r != nil {
+			m.t.Errorf("panic in ConsumeClaim: %v", r)
+		}
+	}()
 	atomic.AddInt32(&m.handlers, 1)
 	defer atomic.AddInt32(&m.handlers, -1)
 
-	for msg := range c.Messages() {
-		if n := atomic.AddInt32(&m.maxMessages, -1); m.isCapped && n < 0 {
-			break
+	consumed := 0
+	for {
+		select {
+		case msg, ok := <-c.Messages():
+			if !ok {
+				m.t.Logf("Consumer %s: message channel closed, consumed %d messages", m.clientID, consumed)
+				return nil
+			}
+			if n := atomic.AddInt32(&m.maxMessages, -1); m.isCapped && n < 0 {
+				m.t.Logf("Consumer %s: reached max messages, consumed %d messages", m.clientID, consumed)
+				return nil
+			}
+			s.MarkMessage(msg, "")
+			m.sink.Push(m.clientID, msg)
+			consumed++
+		case <-s.Context().Done():
+			m.t.Logf("Consumer %s: session context done, consumed %d messages", m.clientID, consumed)
+			return nil
 		}
-		s.MarkMessage(msg, "")
-		m.sink.Push(m.clientID, msg)
 	}
-	return nil
 }
 
 func (m *testFuncConsumerGroupMember) waitFor(kind string, expected interface{}, factory func() (interface{}, error)) {
@@ -558,10 +593,16 @@ func (m *testFuncConsumerGroupMember) waitFor(kind string, expected interface{},
 }
 
 func (m *testFuncConsumerGroupMember) loop(topics []string) {
-	defer atomic.StoreInt32(&m.state, 4)
+	defer func() {
+		if r := recover(); r != nil {
+			m.t.Errorf("panic in loop for %s: %v", m.clientID, r)
+		}
+		atomic.StoreInt32(&m.state, 4)
+	}()
 
 	go func() {
 		for err := range m.Errors() {
+			m.t.Logf("Consumer %s error: %v", m.clientID, err)
 			_ = m.Close()
 
 			m.mu.Lock()
@@ -576,16 +617,25 @@ func (m *testFuncConsumerGroupMember) loop(topics []string) {
 		atomic.StoreInt32(&m.state, 1)
 
 		if err := m.Consume(ctx, topics, m); errors.Is(err, ErrClosedConsumerGroup) {
+			m.t.Logf("Consumer %s: closed consumer group", m.clientID)
 			return
 		} else if err != nil {
+			m.t.Logf("Consumer %s: consume error: %v", m.clientID, err)
 			m.mu.Lock()
 			m.errs = append(m.errs, err)
 			m.mu.Unlock()
 			return
 		}
 
+		// check if context was canceled, signaling that the consumer should stop
+		if ctx.Err() != nil {
+			m.t.Logf("Consumer %s: context error: %v", m.clientID, ctx.Err())
+			return
+		}
+
 		// return if capped
 		if n := atomic.LoadInt32(&m.maxMessages); m.isCapped && n < 0 {
+			m.t.Logf("Consumer %s: reached max messages, returning from loop", m.clientID)
 			return
 		}
 	}
