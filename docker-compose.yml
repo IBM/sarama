@@ -13,19 +13,19 @@ x-zookeeper-base: &zookeeper-base
     ZOO_4LW_COMMANDS_WHITELIST: 'mntr,conf,ruok'
 
 x-kafka-base: &kafka-base
-  image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.6.2}'
+  image: 'sarama/fv-kafka-${KAFKA_VERSION:-3.9.1}'
   init: true
   build:
     context: .
     dockerfile: Dockerfile.kafka
     args:
-      KAFKA_VERSION: ${KAFKA_VERSION:-3.6.2}
+      KAFKA_VERSION: ${KAFKA_VERSION:-3.9.1}
       SCALA_VERSION: ${SCALA_VERSION:-2.13}
   depends_on:
     - toxiproxy
   restart: always
   environment: &kafka-base-env
-    KAFKA_VERSION: ${KAFKA_VERSION:-3.6.2}
+    KAFKA_VERSION: ${KAFKA_VERSION:-3.9.1}
     KAFKA_CFG_DEFAULT_REPLICATION_FACTOR: '2'
     KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR: '2'
     KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: '2'
@@ -72,7 +72,7 @@ services:
     <<: *kafka-base
     container_name: 'kafka-1'
     healthcheck:
-      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.6.2}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-1:9091']
+      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-1:9091']
       interval: 15s
       timeout: 15s
       retries: 10
@@ -89,7 +89,7 @@ services:
     <<: *kafka-base
     container_name: 'kafka-2'
     healthcheck:
-      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.6.2}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-2:9091']
+      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-2:9091']
       interval: 15s
       timeout: 15s
       retries: 10
@@ -106,7 +106,7 @@ services:
     <<: *kafka-base
     container_name: 'kafka-3'
     healthcheck:
-      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.6.2}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-3:9091']
+      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-3:9091']
       interval: 15s
       timeout: 15s
       retries: 10
@@ -123,7 +123,7 @@ services:
     <<: *kafka-base
     container_name: 'kafka-4'
     healthcheck:
-      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.6.2}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-4:9091']
+      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-4:9091']
       interval: 15s
       timeout: 15s
       retries: 10
@@ -140,7 +140,7 @@ services:
     <<: *kafka-base
     container_name: 'kafka-5'
     healthcheck:
-      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.6.2}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-5:9091']
+      test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-5:9091']
       interval: 15s
       timeout: 15s
       retries: 10
