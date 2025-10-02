@@ -13,12 +13,13 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFuncAdminQuotas(t *testing.T) {
 	const (
-		maxRetries = 10
-		retryDelay = 100 * time.Millisecond
+		waitFor = 10 * time.Second
+		tick    = 100 * time.Millisecond
 	)
 	checkKafkaVersion(t, "2.6.0.0")
 	setupFunctionalTest(t)
@@ -60,29 +61,20 @@ func TestFuncAdminQuotas(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check that we now have a quota entry
+	// Poll until we have the expected quota entry
 	defaultUserFilter := QuotaFilterComponent{
 		EntityType: QuotaEntityUser,
 		MatchType:  QuotaMatchDefault,
 	}
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{defaultUserFilter}, false)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(quotas) > 0 {
-			break
-		}
-		if attempt < maxRetries {
-			time.Sleep(retryDelay)
-		}
-	}
-	if len(quotas) == 0 {
-		t.Fatal("Expected not empty quotas for default user")
-	}
-	if len(quotas) > 1 {
-		t.Fatalf("Expected one quota entry for default user, found: %v", quotas)
-	}
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		quotas, err = adminClient.DescribeClientQuotas(
+			[]QuotaFilterComponent{defaultUserFilter},
+			false,
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, quotas, "Expected not empty quotas for default user")
+		require.Len(t, quotas, 1, "Expected one quota entry for default user")
+	}, waitFor, tick, "Quotas state has still not updated for default user")
 
 	// Put a quota on specific client-id for a specific user
 	// /config/users/<user>/clients/<client-id>
@@ -117,27 +109,24 @@ func TestFuncAdminQuotas(t *testing.T) {
 		MatchType:  QuotaMatchExact,
 		Match:      "sarama-consumer",
 	}
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		quotas, err = adminClient.DescribeClientQuotas([]QuotaFilterComponent{userFilter, clientFilter}, true)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(quotas) > 0 {
-			break
-		}
-		if attempt < maxRetries {
-			time.Sleep(retryDelay)
-		}
-	}
-	if len(quotas) == 0 {
-		t.Fatal("Expected not empty quotas for specific clientID")
-	}
-	if len(quotas) > 1 {
-		t.Fatalf("Expected one quota entry for specific clientID, found: %v", quotas)
-	}
-	if quotas[0].Values[consumeOp.Key] != consumeOp.Value {
-		t.Fatalf("Expected specific quota value to be %f, found: %v", consumeOp.Value, quotas[0].Values[consumeOp.Key])
-	}
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		quotas, err = adminClient.DescribeClientQuotas(
+			[]QuotaFilterComponent{userFilter, clientFilter},
+			true,
+		)
+		require.NoError(t, err)
+		require.NotEmpty(t, quotas, "Expected not empty quotas for specific clientID")
+		require.Len(t, quotas, 1, "Expected one quota entry for specific clientID")
+		require.InDelta(
+			t,
+			quotas[0].Values[consumeOp.Key],
+			consumeOp.Value,
+			0.01,
+			"Expected specific quota value to be %f, found: %v",
+			consumeOp.Value,
+			quotas[0].Values[consumeOp.Key],
+		)
+	}, waitFor, tick, "Quotas state for specific clientID has still not updated")
 
 	// Remove quota entries
 	deleteProduceOp := ClientQuotasOp{
