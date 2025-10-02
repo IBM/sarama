@@ -77,7 +77,7 @@ func (a *AlterClientQuotasResponse) decode(pd packetDecoder, version int16) erro
 
 func (a *AlterClientQuotasEntryResponse) encode(pe packetEncoder) error {
 	// ErrorCode
-	pe.putInt16(int16(a.ErrorCode))
+	pe.putKError(a.ErrorCode)
 
 	// ErrorMsg
 	if err := pe.putNullableString(a.ErrorMsg); err != nil {
@@ -97,13 +97,12 @@ func (a *AlterClientQuotasEntryResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (a *AlterClientQuotasEntryResponse) decode(pd packetDecoder, version int16) error {
+func (a *AlterClientQuotasEntryResponse) decode(pd packetDecoder, version int16) (err error) {
 	// ErrorCode
-	errCode, err := pd.getInt16()
+	a.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	a.ErrorCode = KError(errCode)
 
 	// ErrorMsg
 	errMsg, err := pd.getNullableString()

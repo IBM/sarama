@@ -29,11 +29,10 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 		return err
 	}
 
-	tmp, err := pd.getInt16()
+	b.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	b.Err = KError(tmp)
 
 	_, err = pd.getEmptyTaggedFieldArray()
 	return err
@@ -50,7 +49,7 @@ func (b *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err 
 		return err
 	}
 
-	pe.putInt16(int16(b.Err))
+	pe.putKError(b.Err)
 
 	pe.putEmptyTaggedFieldArray()
 	return nil
@@ -95,7 +94,7 @@ func (r *OffsetFetchResponse) encode(pe packetEncoder) (err error) {
 		pe.putEmptyTaggedFieldArray()
 	}
 	if r.Version >= 2 {
-		pe.putInt16(int16(r.Err))
+		pe.putKError(r.Err)
 	}
 	pe.putEmptyTaggedFieldArray()
 	return nil
@@ -155,11 +154,10 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 	}
 
 	if version >= 2 {
-		kerr, err := pd.getInt16()
+		r.Err, err = pd.getKError()
 		if err != nil {
 			return err
 		}
-		r.Err = KError(kerr)
 	}
 
 	_, err = pd.getEmptyTaggedFieldArray()

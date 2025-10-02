@@ -26,7 +26,7 @@ func (d *DeleteTopicsResponse) encode(pe packetEncoder) error {
 		if err := pe.putString(topic); err != nil {
 			return err
 		}
-		pe.putInt16(int16(errorCode))
+		pe.putKError(errorCode)
 		pe.putEmptyTaggedFieldArray()
 	}
 
@@ -57,12 +57,11 @@ func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 		if err != nil {
 			return err
 		}
-		errorCode, err := pd.getInt16()
+		d.TopicErrorCodes[topic], err = pd.getKError()
 		if err != nil {
 			return err
 		}
 
-		d.TopicErrorCodes[topic] = KError(errorCode)
 		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}

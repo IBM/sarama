@@ -159,7 +159,7 @@ type DeleteRecordsResponsePartition struct {
 
 func (t *DeleteRecordsResponsePartition) encode(pe packetEncoder) error {
 	pe.putInt64(t.LowWatermark)
-	pe.putInt16(int16(t.Err))
+	pe.putKError(t.Err)
 	return nil
 }
 
@@ -170,11 +170,10 @@ func (t *DeleteRecordsResponsePartition) decode(pd packetDecoder, version int16)
 	}
 	t.LowWatermark = lowWatermark
 
-	kErr, err := pd.getInt16()
+	t.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	t.Err = KError(kErr)
 
 	return nil
 }

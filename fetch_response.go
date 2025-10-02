@@ -74,11 +74,10 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		sizeMetric = getOrRegisterHistogram("consumer-fetch-response-size", metricRegistry)
 	}
 
-	tmp, err := pd.getInt16()
+	b.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	b.Err = KError(tmp)
 
 	b.HighWaterMarkOffset, err = pd.getInt64()
 	if err != nil {
@@ -217,7 +216,7 @@ func (b *FetchResponseBlock) isPartial() (bool, error) {
 }
 
 func (b *FetchResponseBlock) encode(pe packetEncoder, version int16) (err error) {
-	pe.putInt16(int16(b.Err))
+	pe.putKError(b.Err)
 
 	pe.putInt64(b.HighWaterMarkOffset)
 

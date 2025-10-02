@@ -44,7 +44,7 @@ func (d *DescribeClientQuotasResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(d.ThrottleTime / time.Millisecond))
 
 	// ErrorCode
-	pe.putInt16(int16(d.ErrorCode))
+	pe.putKError(d.ErrorCode)
 
 	// ErrorMsg
 	if err := pe.putNullableString(d.ErrorMsg); err != nil {
@@ -73,11 +73,10 @@ func (d *DescribeClientQuotasResponse) decode(pd packetDecoder, version int16) e
 	d.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	// ErrorCode
-	errCode, err := pd.getInt16()
+	d.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	d.ErrorCode = KError(errCode)
 
 	// ErrorMsg
 	errMsg, err := pd.getNullableString()

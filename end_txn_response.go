@@ -16,7 +16,7 @@ func (e *EndTxnResponse) setVersion(v int16) {
 
 func (e *EndTxnResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(e.ThrottleTime / time.Millisecond))
-	pe.putInt16(int16(e.Err))
+	pe.putKError(e.Err)
 	return nil
 }
 
@@ -27,11 +27,10 @@ func (e *EndTxnResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 	e.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
-	kerr, err := pd.getInt16()
+	e.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	e.Err = KError(kerr)
 
 	return nil
 }

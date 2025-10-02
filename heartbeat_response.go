@@ -16,7 +16,7 @@ func (r *HeartbeatResponse) encode(pe packetEncoder) error {
 	if r.Version >= 1 {
 		pe.putInt32(r.ThrottleTime)
 	}
-	pe.putInt16(int16(r.Err))
+	pe.putKError(r.Err)
 	return nil
 }
 
@@ -28,11 +28,10 @@ func (r *HeartbeatResponse) decode(pd packetDecoder, version int16) error {
 			return err
 		}
 	}
-	kerr, err := pd.getInt16()
+	r.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	r.Err = KError(kerr)
 
 	return nil
 }

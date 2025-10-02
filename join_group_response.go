@@ -52,7 +52,7 @@ func (r *JoinGroupResponse) encode(pe packetEncoder) error {
 	if r.Version >= 2 {
 		pe.putInt32(r.ThrottleTime)
 	}
-	pe.putInt16(int16(r.Err))
+	pe.putKError(r.Err)
 	pe.putInt32(r.GenerationId)
 
 	if err := pe.putString(r.GroupProtocol); err != nil {
@@ -95,12 +95,10 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 		}
 	}
 
-	kerr, err := pd.getInt16()
+	r.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-
-	r.Err = KError(kerr)
 
 	if r.GenerationId, err = pd.getInt32(); err != nil {
 		return

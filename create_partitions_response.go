@@ -109,7 +109,7 @@ func (t *TopicPartitionError) Unwrap() error {
 }
 
 func (t *TopicPartitionError) encode(pe packetEncoder) error {
-	pe.putInt16(int16(t.Err))
+	pe.putKError(t.Err)
 
 	if err := pe.putNullableString(t.ErrMsg); err != nil {
 		return err
@@ -119,11 +119,10 @@ func (t *TopicPartitionError) encode(pe packetEncoder) error {
 }
 
 func (t *TopicPartitionError) decode(pd packetDecoder, version int16) (err error) {
-	kerr, err := pd.getInt16()
+	t.Err, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	t.Err = KError(kerr)
 
 	if t.ErrMsg, err = pd.getNullableString(); err != nil {
 		return err

@@ -19,6 +19,7 @@ type packetDecoder interface {
 	getFloat64() (float64, error)
 	getArrayLength() (int, error)
 	getBool() (bool, error)
+	getKError() (KError, error)
 	getEmptyTaggedFieldArray() (int, error)
 	getTaggedFieldArray(taggedFieldDecoders) error
 

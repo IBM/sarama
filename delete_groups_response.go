@@ -24,7 +24,7 @@ func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
 		if err := pe.putString(groupID); err != nil {
 			return err
 		}
-		pe.putInt16(int16(errorCode))
+		pe.putKError(errorCode)
 		pe.putEmptyTaggedFieldArray()
 	}
 
@@ -54,12 +54,11 @@ func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
 		if err != nil {
 			return err
 		}
-		errorCode, err := pd.getInt16()
+		r.GroupErrorCodes[groupID], err = pd.getKError()
 		if err != nil {
 			return err
 		}
 
-		r.GroupErrorCodes[groupID] = KError(errorCode)
 		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}

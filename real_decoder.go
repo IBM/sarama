@@ -138,6 +138,11 @@ func (rd *realDecoder) getBool() (bool, error) {
 	return true, nil
 }
 
+func (rd *realDecoder) getKError() (KError, error) {
+	i, err := rd.getInt16()
+	return KError(i), err
+}
+
 func (rd *realDecoder) getTaggedFieldArray(decoders taggedFieldDecoders) error {
 	return PacketDecodingError{"tagged fields used in non-flexible context"}
 }

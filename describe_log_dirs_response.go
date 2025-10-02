@@ -22,7 +22,7 @@ func (r *DescribeLogDirsResponse) encode(pe packetEncoder) error {
 	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
 
 	if r.Version >= 3 {
-		pe.putInt16(int16(r.ErrorCode))
+		pe.putKError(r.ErrorCode)
 	}
 
 	if err := pe.putArrayLength(len(r.LogDirs)); err != nil {
@@ -47,11 +47,10 @@ func (r *DescribeLogDirsResponse) decode(pd packetDecoder, version int16) error 
 	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	if version >= 3 {
-		errCode, err := pd.getInt16()
+		r.ErrorCode, err = pd.getKError()
 		if err != nil {
 			return err
 		}
-		r.ErrorCode = KError(errCode)
 	}
 
 	// Decode array of DescribeLogDirsResponseDirMetadata
@@ -131,7 +130,7 @@ type DescribeLogDirsResponseDirMetadata struct {
 }
 
 func (r *DescribeLogDirsResponseDirMetadata) encode(pe packetEncoder, version int16) error {
-	pe.putInt16(int16(r.ErrorCode))
+	pe.putKError(r.ErrorCode)
 
 	err := pe.putString(r.Path)
 	if err != nil {
@@ -156,12 +155,11 @@ func (r *DescribeLogDirsResponseDirMetadata) encode(pe packetEncoder, version in
 	return nil
 }
 
-func (r *DescribeLogDirsResponseDirMetadata) decode(pd packetDecoder, version int16) error {
-	errCode, err := pd.getInt16()
+func (r *DescribeLogDirsResponseDirMetadata) decode(pd packetDecoder, version int16) (err error) {
+	r.ErrorCode, err = pd.getKError()
 	if err != nil {
 		return err
 	}
-	r.ErrorCode = KError(errCode)
 
 	path, err := pd.getString()
 	if err != nil {
