@@ -15,7 +15,7 @@ func (i *InitProducerIDResponse) setVersion(v int16) {
 }
 
 func (i *InitProducerIDResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(i.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(i.ThrottleTime)
 	pe.putKError(i.Err)
 	pe.putInt64(i.ProducerID)
 	pe.putInt16(i.ProducerEpoch)
@@ -25,11 +25,9 @@ func (i *InitProducerIDResponse) encode(pe packetEncoder) error {
 
 func (i *InitProducerIDResponse) decode(pd packetDecoder, version int16) (err error) {
 	i.Version = version
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+	if i.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	i.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	i.Err, err = pd.getKError()
 	if err != nil {

@@ -3,6 +3,7 @@ package sarama
 import (
 	"encoding/binary"
 	"math"
+	"time"
 
 	"github.com/rcrowley/go-metrics"
 )
@@ -141,6 +142,14 @@ func (rd *realDecoder) getBool() (bool, error) {
 func (rd *realDecoder) getKError() (KError, error) {
 	i, err := rd.getInt16()
 	return KError(i), err
+}
+
+func (rd *realDecoder) getDurationMs() (time.Duration, error) {
+	t, err := rd.getInt32()
+	if err != nil {
+		return time.Duration(0), err
+	}
+	return time.Duration(t) * time.Millisecond, nil
 }
 
 func (rd *realDecoder) getTaggedFieldArray(decoders taggedFieldDecoders) error {

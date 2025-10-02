@@ -1,6 +1,10 @@
 package sarama
 
-import "github.com/rcrowley/go-metrics"
+import (
+	"time"
+
+	"github.com/rcrowley/go-metrics"
+)
 
 type taggedFieldDecoderFunc func(pd packetDecoder) error
 type taggedFieldDecoders map[uint64]taggedFieldDecoderFunc
@@ -20,6 +24,7 @@ type packetDecoder interface {
 	getArrayLength() (int, error)
 	getBool() (bool, error)
 	getKError() (KError, error)
+	getDurationMs() (time.Duration, error)
 	getEmptyTaggedFieldArray() (int, error)
 	getTaggedFieldArray(taggedFieldDecoders) error
 

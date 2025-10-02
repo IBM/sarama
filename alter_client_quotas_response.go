@@ -30,8 +30,7 @@ type AlterClientQuotasEntryResponse struct {
 }
 
 func (a *AlterClientQuotasResponse) encode(pe packetEncoder) error {
-	// ThrottleTime
-	pe.putInt32(int32(a.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(a.ThrottleTime)
 
 	// Entries
 	if err := pe.putArrayLength(len(a.Entries)); err != nil {
@@ -46,13 +45,10 @@ func (a *AlterClientQuotasResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (a *AlterClientQuotasResponse) decode(pd packetDecoder, version int16) error {
-	// ThrottleTime
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+func (a *AlterClientQuotasResponse) decode(pd packetDecoder, version int16) (err error) {
+	if a.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	a.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	// Entries
 	entryCount, err := pd.getArrayLength()

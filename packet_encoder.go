@@ -1,6 +1,10 @@
 package sarama
 
-import "github.com/rcrowley/go-metrics"
+import (
+	"time"
+
+	"github.com/rcrowley/go-metrics"
+)
 
 // PacketEncoder is the interface providing helpers for writing with Kafka's encoding rules.
 // Types implementing Encoder only need to worry about calling methods like PutString,
@@ -17,6 +21,7 @@ type packetEncoder interface {
 	putArrayLength(in int) error
 	putBool(in bool)
 	putKError(in KError)
+	putDurationMs(in time.Duration)
 
 	// Collections
 	putBytes(in []byte) error

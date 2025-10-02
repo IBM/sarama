@@ -15,7 +15,7 @@ func (r *DeleteGroupsResponse) setVersion(v int16) {
 }
 
 func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(r.ThrottleTime)
 
 	if err := pe.putArrayLength(len(r.GroupErrorCodes)); err != nil {
 		return err
@@ -32,12 +32,10 @@ func (r *DeleteGroupsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) error {
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+func (r *DeleteGroupsResponse) decode(pd packetDecoder, version int16) (err error) {
+	if r.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	r.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	n, err := pd.getArrayLength()
 	if err != nil {

@@ -126,12 +126,9 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	if r.Version >= 1 {
-		millis, err := pd.getInt32()
-		if err != nil {
+		if r.ThrottleTime, err = pd.getDurationMs(); err != nil {
 			return err
 		}
-
-		r.ThrottleTime = time.Duration(millis) * time.Millisecond
 	}
 
 	return nil
@@ -161,7 +158,7 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 	}
 
 	if r.Version >= 1 {
-		pe.putInt32(int32(r.ThrottleTime / time.Millisecond))
+		pe.putDurationMs(r.ThrottleTime)
 	}
 	return nil
 }

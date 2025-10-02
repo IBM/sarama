@@ -14,7 +14,7 @@ func (a *IncrementalAlterConfigsResponse) setVersion(v int16) {
 }
 
 func (a *IncrementalAlterConfigsResponse) encode(pe packetEncoder) error {
-	pe.putInt32(int32(a.ThrottleTime / time.Millisecond))
+	pe.putDurationMs(a.ThrottleTime)
 
 	if err := pe.putArrayLength(len(a.Resources)); err != nil {
 		return err
@@ -29,12 +29,10 @@ func (a *IncrementalAlterConfigsResponse) encode(pe packetEncoder) error {
 	return nil
 }
 
-func (a *IncrementalAlterConfigsResponse) decode(pd packetDecoder, version int16) error {
-	throttleTime, err := pd.getInt32()
-	if err != nil {
+func (a *IncrementalAlterConfigsResponse) decode(pd packetDecoder, version int16) (err error) {
+	if a.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
-	a.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	responseCount, err := pd.getArrayLength()
 	if err != nil {
