@@ -89,6 +89,7 @@ func (a *AlterConfigsResourceResponse) encode(pe packetEncoder) error {
 	if err != nil {
 		return err
 	}
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -99,11 +100,15 @@ func (a *AlterConfigsResourceResponse) decode(pd packetDecoder, version int16) e
 	}
 	a.ErrorCode = errCode
 
-	e, err := pd.getString()
+	e, err := pd.getNullableString()
 	if err != nil {
 		return err
 	}
-	a.ErrorMsg = e
+	if e == nil {
+		a.ErrorMsg = ""
+	} else {
+		a.ErrorMsg = *e
+	}
 
 	t, err := pd.getInt8()
 	if err != nil {
@@ -117,7 +122,8 @@ func (a *AlterConfigsResourceResponse) decode(pd packetDecoder, version int16) e
 	}
 	a.Name = name
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (a *AlterConfigsResponse) key() int16 {

@@ -354,15 +354,14 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeySyncGroup:                   4, // up from 3
 				// TODO: DescribeGroupsRequest v5 is not supported, but expected for KafkaVersion 2.4.0
 				// apiKeyDescribeGroups:              5, // up from 3
-				apiKeyListGroups:     3, // up from 2
-				apiKeyApiVersions:    3, // up from 2
-				apiKeyCreateTopics:   5, // up from 3
-				apiKeyDeleteTopics:   4, // up from 3
-				apiKeyInitProducerId: 2, // up from 1
-				apiKeyDeleteGroups:   2, // up from 1
-				apiKeyElectLeaders:   2, // up from 0
-				// TODO: IncrementalAlterConfigsRequest v1 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyIncrementalAlterConfigs:     1, // up from 0
+				apiKeyListGroups:                  3, // up from 2
+				apiKeyApiVersions:                 3, // up from 2
+				apiKeyCreateTopics:                5, // up from 3
+				apiKeyDeleteTopics:                4, // up from 3
+				apiKeyInitProducerId:              2, // up from 1
+				apiKeyDeleteGroups:                2, // up from 1
+				apiKeyElectLeaders:                2, // up from 0
+				apiKeyIncrementalAlterConfigs:     1, // up from 0
 				apiKeyAlterPartitionReassignments: 0, // new in 2.4
 				apiKeyListPartitionReassignments:  0, // new in 2.4
 				apiKeyOffsetDelete:                0, // new in 2.4

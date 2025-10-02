@@ -4,8 +4,10 @@ package sarama
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -438,5 +440,60 @@ func TestFuncAdminDeleteTopic(t *testing.T) {
 	err = adminClient.DeleteTopic("delete_topic_test")
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFuncAdminIncrementalAlterConfigs(t *testing.T) {
+	checkKafkaVersion(t, "2.3.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	brokerIDs := make([]int32, len(FunctionalTestEnv.KafkaBrokerAddrs))
+	for i := range brokerIDs {
+		brokerIDs[i] = int32(i + 1)
+	}
+
+	getConfigValue := func(config string) int {
+		resource := ConfigResource{
+			Type:        BrokerResource,
+			Name:        "1",
+			ConfigNames: []string{config},
+		}
+		res, err := adminClient.DescribeConfig(resource)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res) != 1 {
+			t.Fatalf("expected 1 config in response but got %d", len(res))
+		}
+		if res[0].Name != config {
+			t.Fatalf("expected config in response name to be '%s' but got '%s'", config, res[0].Name)
+		}
+		n, err := strconv.Atoi(res[0].Value)
+		if err != nil {
+			t.Fatalf("failed to parse config in response value '%s': %v", res[0].Value, err)
+		}
+		return n
+	}
+	configName := "log.cleaner.backoff.ms"
+	n := getConfigValue(configName)
+	n++
+	value := fmt.Sprintf("%d", n)
+	err = adminClient.IncrementalAlterConfig(BrokerResource, "1",
+		map[string]IncrementalAlterConfigsEntry{
+			configName: {
+				Operation: IncrementalAlterConfigsOperationSet,
+				Value:     &value,
+			},
+		}, false)
+	if err != nil {
+		t.Fatalf("failed to alter config: %v", err)
 	}
 }
