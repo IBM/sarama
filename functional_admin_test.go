@@ -454,6 +454,7 @@ func TestFuncAdminIncrementalAlterConfigs(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer safeClose(t, adminClient)
+
 	brokerIDs := make([]int32, len(FunctionalTestEnv.KafkaBrokerAddrs))
 	for i := range brokerIDs {
 		brokerIDs[i] = int32(i + 1)
