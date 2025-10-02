@@ -223,9 +223,21 @@ func (b *Broker) Open(conf *Config) error {
 		if conf.ApiVersionsRequest {
 			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
-				Logger.Printf("Error while sending ApiVersionsRequest to broker %s: %s\n", b.addr, err)
-				// send a v0 request in case remote cluster is < 2.4.0.0
-				apiVersionsResponse, _ = b.sendAndReceiveApiVersions(0)
+				Logger.Printf("Error while sending ApiVersionsRequest V3 to broker %s: %s\n", b.addr, err)
+				// send a lower version request in case remote cluster is <= 2.4.0.0
+				maxVersion := int16(0)
+				if apiVersionsResponse != nil {
+					for _, k := range apiVersionsResponse.ApiKeys {
+						if k.ApiKey == apiKeyApiVersions {
+							maxVersion = k.MaxVersion
+							break
+						}
+					}
+				}
+				apiVersionsResponse, err = b.sendAndReceiveApiVersions(maxVersion)
+				if err != nil {
+					Logger.Printf("Error while sending ApiVersionsRequest V%d to broker %s: %s\n", maxVersion, b.addr, err)
+				}
 			}
 			if apiVersionsResponse != nil {
 				b.brokerAPIVersions = make(apiVersionMap, len(apiVersionsResponse.ApiKeys))
@@ -1252,7 +1264,7 @@ func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error
 	b.updateOutgoingCommunicationMetrics(bytes)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to send ApiVersions request to %s: %s\n", b.addr, err)
+		Logger.Printf("Failed to send ApiVersionsRequest V%d to %s: %s\n", v, b.addr, err)
 		return nil, err
 	}
 	b.correlationID++
@@ -1264,7 +1276,7 @@ func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error
 	_, err = b.readFull(header)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to read ApiVersions response header from %s: %s\n", b.addr, err)
+		Logger.Printf("Failed to read ApiVersionsResponse V%d header from %s: %s\n", v, b.addr, err)
 		return nil, err
 	}
 
@@ -1276,20 +1288,24 @@ func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error
 	n, err := b.readFull(payload)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
-		Logger.Printf("Failed to read ApiVersions response payload from %s: %s\n", b.addr, err)
+		Logger.Printf("Failed to read ApiVersionsResponse V%d payload from %s: %s\n", v, b.addr, err)
 		return nil, err
 	}
 
 	b.updateIncomingCommunicationMetrics(n+8, time.Since(requestTime))
-	res := &ApiVersionsResponse{}
-
+	res := &ApiVersionsResponse{Version: rb.version()}
 	err = versionedDecode(payload, res, rb.version(), b.metricRegistry)
 	if err != nil {
-		Logger.Printf("Failed to parse ApiVersions response from %s: %s\n", b.addr, err)
+		Logger.Printf("Failed to parse ApiVersionsResponse V%d from %s: %s\n", v, b.addr, err)
 		return nil, err
 	}
 
-	DebugLogger.Printf("Completed ApiVersions request to %s. Broker supports %d APIs\n", b.addr, len(res.ApiKeys))
+	kerr := KError(res.ErrorCode)
+	if kerr != ErrNoError {
+		return res, fmt.Errorf("Error in ApiVersionsResponse V%d from %s: %w", res.Version, b.addr, kerr)
+	}
+
+	DebugLogger.Printf("Completed ApiVersionsRequest V%d to %s. Broker supports %d APIs\n", v, b.addr, len(res.ApiKeys))
 	return res, nil
 }
 
