@@ -401,8 +401,8 @@ func TestFuncAdminDeleteGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(groups) != 1 {
-		t.Fatal("Expected single group. Found ", len(groups), "groups.")
+	if _, ok := groups[groupID]; !ok {
+		t.Fatalf("Expected test group, %s, not found.", groupID)
 	}
 
 	err = admin.DeleteConsumerGroup(groupID)
@@ -414,8 +414,8 @@ func TestFuncAdminDeleteGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(groups) != 0 {
-		t.Fatal("Expected no group. Found ", len(groups), "groups.")
+	if _, ok := groups[groupID]; ok {
+		t.Fatalf("Expected test group, %s, found after delete.", groupID)
 	}
 }
 

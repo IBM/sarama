@@ -138,6 +138,10 @@ func (rd *realDecoder) getBool() (bool, error) {
 	return true, nil
 }
 
+func (rd *realDecoder) getTaggedFieldArray(decoders taggedFieldDecoders) error {
+	return PacketDecodingError{"tagged fields used in non-flexible context"}
+}
+
 func (rd *realDecoder) getEmptyTaggedFieldArray() (int, error) {
 	return 0, nil
 }
@@ -391,6 +395,43 @@ func (rd *realFlexibleDecoder) getEmptyTaggedFieldArray() (int, error) {
 	}
 
 	return 0, nil
+}
+
+func (rd *realFlexibleDecoder) getTaggedFieldArray(decoders taggedFieldDecoders) error {
+	// if we have no decoders just skip over the tagged fields
+	if decoders == nil {
+		_, err := rd.getEmptyTaggedFieldArray()
+		return err
+	}
+
+	tagCount, err := rd.getUVarint()
+	if err != nil {
+		return err
+	}
+
+	for i := uint64(0); i < tagCount; i++ {
+		// fetch and ignore tag identifier
+		id, err := rd.getUVarint()
+		if err != nil {
+			return err
+		}
+		length, err := rd.getUVarint()
+		if err != nil {
+			return err
+		}
+		bytes, err := rd.getRawBytes(int(length))
+		if err != nil {
+			return err
+		}
+		decoder, ok := decoders[id]
+		if !ok {
+			continue
+		}
+		if err := decoder(&realFlexibleDecoder{&realDecoder{raw: bytes}}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (rd *realFlexibleDecoder) getBytes() ([]byte, error) {
