@@ -17,7 +17,7 @@ RUN cd /etc/java/java-17-openjdk/*/conf/security \
  && echo 'networkaddress.cache.negative.ttl=0' >> java.security
 
 ARG SCALA_VERSION="2.13"
-ARG KAFKA_VERSION="3.6.2"
+ARG KAFKA_VERSION="3.9.1"
 
 WORKDIR /tmp
 
