@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -160,6 +161,44 @@ var (
 		0, 0, 0, 0, // authorizedOperations 0
 
 	}
+
+	describeGroupsResponseEmptyV5 = []byte{
+		0, 0, 0, 0, // throttle time 0
+		1, // no groups
+		0, // empty tagged fields
+	}
+
+	describeGroupsResponsePopulatedV5 = []byte{
+		0, 0, 0, 0, // throttle time 0
+		3, // 1+2 groups
+
+		0, 0, // no error
+		4, 'f', 'o', 'o', // Group ID
+		4, 'b', 'a', 'r', // State
+		9, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', // ConsumerProtocol type
+		4, 'b', 'a', 'z', // Protocol name
+		2,           // 1 member
+		3, 'i', 'd', // Member ID
+		4, 'g', 'i', 'd', // Group Instance ID
+		7, 's', 'a', 'r', 'a', 'm', 'a', // Client ID
+		10, 'l', 'o', 'c', 'a', 'l', 'h', 'o', 's', 't', // Client Host
+		4, 0x01, 0x02, 0x03, // MemberMetadata
+		4, 0x04, 0x05, 0x06, // MemberAssignment
+		0,          // empty tagged fields
+		0, 0, 0, 0, // authorizedOperations 0
+		0, // empty tagged fields
+
+		0, 30, // ErrGroupAuthorizationFailed
+		1,          // empty Group ID
+		1,          // empty State
+		1,          // empty Type
+		1,          // empty Data
+		1,          // no members
+		0, 0, 0, 0, // authorizedOperations 0
+		0, // empty tagged fields
+		0, // empty tagged fields
+
+	}
 )
 
 func TestDescribeGroupsResponseV1plus(t *testing.T) {
@@ -255,10 +294,54 @@ func TestDescribeGroupsResponseV1plus(t *testing.T) {
 				},
 			},
 		},
+
+		{
+			"empty",
+			5,
+			describeGroupsResponseEmptyV5,
+			&DescribeGroupsResponse{
+				Version: 5,
+			},
+		},
+		{
+			"populated",
+			5,
+			describeGroupsResponsePopulatedV5,
+			&DescribeGroupsResponse{
+				Version:        5,
+				ThrottleTimeMs: int32(0),
+				Groups: []*GroupDescription{
+					{
+						Version:      5,
+						Err:          KError(0),
+						GroupId:      "foo",
+						State:        "bar",
+						ProtocolType: "consumer",
+						Protocol:     "baz",
+						Members: map[string]*GroupMemberDescription{
+							"id": {
+								Version:          5,
+								MemberId:         "id",
+								GroupInstanceId:  &groupInstanceId,
+								ClientId:         "sarama",
+								ClientHost:       "localhost",
+								MemberMetadata:   []byte{1, 2, 3},
+								MemberAssignment: []byte{4, 5, 6},
+							},
+						},
+					},
+					{
+						Version:   5,
+						Err:       KError(30),
+						ErrorCode: 30,
+					},
+				},
+			},
+		},
 	}
 
 	for _, c := range tests {
-		t.Run(c.Name, func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s-v%d", c.Name, c.Version), func(t *testing.T) {
 			response := new(DescribeGroupsResponse)
 			testVersionDecodable(t, c.Name, response, c.MessageBytes, c.Version)
 			if !assert.Equal(t, c.Message, response) {
