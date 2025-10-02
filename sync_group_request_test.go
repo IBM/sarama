@@ -52,6 +52,17 @@ var (
 		0, 3, 'b', 'a', 'z', // Member ID
 		0, 0, 0, 3, 'f', 'o', 'o', // Member assignment
 	}
+	populatedSyncGroupRequestV4 = []byte{
+		4, 'f', 'o', 'o', // Group ID
+		0x00, 0x01, 0x02, 0x03, // Generation ID
+		4, 'b', 'a', 'z', // Member ID
+		4, 'g', 'i', 'd', // GroupInstance ID
+		2,                // 1 + one assignment
+		4, 'b', 'a', 'z', // Member ID
+		4, 'f', 'o', 'o', // Member assignment
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestSyncGroupRequestV3AndPlus(t *testing.T) {
@@ -68,6 +79,24 @@ func TestSyncGroupRequestV3AndPlus(t *testing.T) {
 			populatedSyncGroupRequestV3,
 			&SyncGroupRequest{
 				Version:         3,
+				GroupId:         "foo",
+				GenerationId:    0x00010203,
+				MemberId:        "baz",
+				GroupInstanceId: &groupInstanceId,
+				GroupAssignments: []SyncGroupRequestAssignment{
+					{
+						MemberId:   "baz",
+						Assignment: []byte("foo"),
+					},
+				},
+			},
+		},
+		{
+			"v4",
+			4,
+			populatedSyncGroupRequestV4,
+			&SyncGroupRequest{
+				Version:         4,
 				GroupId:         "foo",
 				GenerationId:    0x00010203,
 				MemberId:        "baz",
