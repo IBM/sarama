@@ -225,8 +225,8 @@ func TestFuncTxnProduceWithBrokerFailure(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
@@ -291,8 +291,8 @@ func TestFuncTxnProduceEpochBump(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
@@ -509,8 +509,8 @@ func TestFuncTxnProduceMultiTxn(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalConfig := NewFunctionalTestConfig()
@@ -586,8 +586,8 @@ func TestFuncTxnAbortedProduce(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalConfig := NewFunctionalTestConfig()
