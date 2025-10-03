@@ -172,8 +172,8 @@ func TestFuncTxnProduce(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
