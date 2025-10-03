@@ -1,6 +1,8 @@
 package sarama
 
-import "time"
+import (
+	"time"
+)
 
 // ApiVersionsResponseKey contains the APIs supported by the broker.
 type ApiVersionsResponseKey struct {
@@ -92,10 +94,12 @@ func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) (err error
 	}
 
 	// KIP-511: if broker didn't understand the ApiVersionsRequest version then
-	// it replies with a V0 ApiVersionResponse where its supported
+	// it replies with a V0 non-flexible ApiVersionResponse where its supported
 	// ApiVersionsRequest version is available in ApiKeys
 	if r.ErrorCode == int16(ErrUnsupportedVersion) {
+		// drop version to 0 and to revert packageDecoder to non-flexible for remaining decoding
 		r.Version = 0
+		pd = downgradeFlexibleDecoder(pd)
 	}
 
 	numApiKeys, err := pd.getArrayLength()
