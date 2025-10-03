@@ -35,8 +35,10 @@ func (r *LeaveGroupResponse) encode(pe packetEncoder) error {
 				return err
 			}
 			pe.putKError(member.Err)
+			pe.putEmptyTaggedFieldArray()
 		}
 	}
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -68,10 +70,14 @@ func (r *LeaveGroupResponse) decode(pd packetDecoder, version int16) (err error)
 			if r.Members[i].Err, err = pd.getKError(); err != nil {
 				return err
 			}
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
 		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *LeaveGroupResponse) key() int16 {
@@ -83,15 +89,28 @@ func (r *LeaveGroupResponse) version() int16 {
 }
 
 func (r *LeaveGroupResponse) headerVersion() int16 {
+	if r.Version >= 4 {
+		return 1
+	}
 	return 0
 }
 
 func (r *LeaveGroupResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 3
+	return r.Version >= 0 && r.Version <= 4
+}
+
+func (r *LeaveGroupResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *LeaveGroupResponse) isFlexibleVersion(version int16) bool {
+	return version >= 4
 }
 
 func (r *LeaveGroupResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 4:
+		return V2_4_0_0
 	case 3:
 		return V2_4_0_0
 	case 2:
