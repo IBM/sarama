@@ -1135,9 +1135,9 @@ func (b *Broker) decode(pd packetDecoder, version int16) (err error) {
 
 	if version >= 1 {
 		b.rack, err = pd.getNullableString()
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
 	}
 
 	b.addr = net.JoinHostPort(host, fmt.Sprint(port))
