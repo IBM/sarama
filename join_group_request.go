@@ -80,7 +80,7 @@ func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 
 	if len(r.GroupProtocols) > 0 {
 		if len(r.OrderedGroupProtocols) > 0 {
-			return PacketDecodingError{"cannot specify both GroupProtocols and OrderedGroupProtocols on JoinGroupRequest"}
+			return PacketEncodingError{"cannot specify both GroupProtocols and OrderedGroupProtocols on JoinGroupRequest"}
 		}
 
 		if err := pe.putArrayLength(len(r.GroupProtocols)); err != nil {
