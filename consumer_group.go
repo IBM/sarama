@@ -574,6 +574,10 @@ func (c *consumerGroup) heartbeatRequest(coordinator *Broker, memberID string, g
 	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 3
 		req.GroupInstanceId = c.groupInstanceId
+		// Version 4 is the first flexible version
+		if c.config.Version.IsAtLeast(V2_4_0_0) {
+			req.Version = 4
+		}
 	}
 
 	return coordinator.Heartbeat(req)
