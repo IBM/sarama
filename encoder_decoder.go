@@ -125,3 +125,10 @@ func prepareFlexibleEncoder(pe packetEncoder, req encoder) packetEncoder {
 	}
 	return pe
 }
+
+func downgradeFlexibleDecoder(pd packetDecoder) packetDecoder {
+	if f, ok := pd.(*realFlexibleDecoder); ok {
+		return f.realDecoder
+	}
+	return pd
+}
