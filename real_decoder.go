@@ -479,7 +479,7 @@ func (rd *realFlexibleDecoder) getStringLength() (int, error) {
 
 func (rd *realFlexibleDecoder) getString() (string, error) {
 	length, err := rd.getStringLength()
-	if err != nil {
+	if err != nil || length == -1 {
 		return "", err
 	}
 
