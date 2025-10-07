@@ -2,7 +2,12 @@
 
 package sarama
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	assert "github.com/stretchr/testify/require"
+)
 
 var (
 	describeClientQuotasResponseError = []byte{
@@ -42,6 +47,24 @@ var (
 		0, 0, 0, 1, // Values
 		0, 18, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', '_', 'b', 'y', 't', 'e', '_', 'r', 'a', 't', 'e',
 		65, 46, 132, 128, 0, 0, 0, 0, // 1000000
+	}
+
+	describeClientQuotasResponseV1 = []byte{
+		0x00, 0x00, 0x00, 0x80, // ThrottleTime (128ms)
+		0x00, 0x00, // ErrorCode
+		0x01, // ErrorMsg (nil)
+		0x02, // Entries (2)
+		0x02,
+		0x05, 'u', 's', 'e', 'r', // Entity Type
+		0x00, // Entity Name (nil)
+		0x00, // Empty tagged fields
+		0x02,
+		// 0x13, 0x70, 0x72, 0x6f, 0x64, 0x75, 0x63, 0x65, 0x72, 0x5f, 0x62, 0x79, 0x74, 0x65, 0x5f, 0x72, 0x61, 0x74, 0x65,
+		0x13, 'p', 'r', 'o', 'd', 'u', 'c', 'e', 'r', '_', 'b', 'y', 't', 'e', '_', 'r', 'a', 't', 'e',
+		0x41, 0x2f, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, // 1024000
+		0x00, // Empty tagged fields
+		0x00, // Empty tagged fields
+		0x00, // Empty tagged fields
 	}
 )
 
@@ -94,4 +117,24 @@ func TestDescribeClientQuotasResponse(t *testing.T) {
 		Entries:      []DescribeClientQuotasEntry{userEntry, clientEntry},
 	}
 	testResponse(t, "Complex Quota", res, describeClientQuotasResponseComplexEntity)
+}
+
+func TestDescribeClientQuotasResponseV1(t *testing.T) {
+	res := &DescribeClientQuotasResponse{Version: 1}
+	testVersionDecodable(t, "V1", res, describeClientQuotasResponseV1, 1)
+	assert.Equal(t, res.ThrottleTime, time.Millisecond*128)
+	assert.Len(t, res.Entries, 1)
+	assert.Equal(t, []DescribeClientQuotasEntry{
+		{
+			Entity: []QuotaEntityComponent{
+				{
+					EntityType: "user",
+					MatchType:  1,
+				},
+			},
+			Values: map[string]float64{
+				"producer_byte_rate": 1024000,
+			},
+		},
+	}, res.Entries)
 }
