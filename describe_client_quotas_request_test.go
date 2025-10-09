@@ -36,6 +36,16 @@ var (
 		255, 255, // match *string
 		0, // strict
 	}
+
+	describeClientQuotasV1 = []byte{
+		0x02,                     // components len
+		0x05, 'u', 's', 'e', 'r', // entity type
+		0x01, // match type (default name)
+		0x00, // match (NULL)
+		0x00, // empty tagged fields
+		0x01, // strict (true)
+		0x00, // empty tagged fields,
+	}
 )
 
 func TestDescribeClientQuotasRequest(t *testing.T) {
@@ -83,4 +93,18 @@ func TestDescribeClientQuotasRequest(t *testing.T) {
 		Strict:     false,
 	}
 	testRequest(t, "Match default client-id of any user", req, describeClientQuotasRequestMultiComponents)
+}
+
+func TestDescribeClientQuotasRequestV1(t *testing.T) {
+	req := &DescribeClientQuotasRequest{
+		Version: 1,
+		Components: []QuotaFilterComponent{
+			{
+				EntityType: "user",
+				MatchType:  1,
+			},
+		},
+		Strict: true,
+	}
+	testRequest(t, "V1", req, describeClientQuotasV1)
 }

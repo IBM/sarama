@@ -1294,10 +1294,11 @@ func (ca *clusterAdmin) AlterUserScramCredentials(u []AlterUserScramCredentialsU
 // Contains components: strict = false
 // Contains only components: strict = true
 func (ca *clusterAdmin) DescribeClientQuotas(components []QuotaFilterComponent, strict bool) ([]DescribeClientQuotasEntry, error) {
-	request := &DescribeClientQuotasRequest{
-		Components: components,
-		Strict:     strict,
-	}
+	request := NewDescribeClientQuotasRequest(
+		ca.conf.Version,
+		components,
+		strict,
+	)
 
 	b, err := ca.Controller()
 	if err != nil {

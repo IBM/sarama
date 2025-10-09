@@ -15,6 +15,17 @@ import (
 //     values => key value
 //       key => STRING
 //       value => FLOAT64
+// DescribeClientQuotas Response (Version: 1) => throttle_time_ms error_code error_message [entries] _tagged_fields
+//   throttle_time_ms => INT32
+//   error_code => INT16
+//   error_message => COMPACT_NULLABLE_STRING
+//   entries => [entity] [values] _tagged_fields
+//     entity => entity_type entity_name _tagged_fields
+//       entity_type => COMPACT_STRING
+//       entity_name => COMPACT_NULLABLE_STRING
+//     values => key value _tagged_fields
+//       key => COMPACT_STRING
+//       value => FLOAT64
 
 type DescribeClientQuotasResponse struct {
 	Version      int16
@@ -61,6 +72,7 @@ func (d *DescribeClientQuotasResponse) encode(pe packetEncoder) error {
 		}
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -100,7 +112,8 @@ func (d *DescribeClientQuotasResponse) decode(pd packetDecoder, version int16) (
 		d.Entries = []DescribeClientQuotasEntry{}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (d *DescribeClientQuotasEntry) encode(pe packetEncoder) error {
@@ -125,8 +138,10 @@ func (d *DescribeClientQuotasEntry) encode(pe packetEncoder) error {
 		}
 		// value
 		pe.putFloat64(value)
+		pe.putEmptyTaggedFieldArray()
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -168,12 +183,17 @@ func (d *DescribeClientQuotasEntry) decode(pd packetDecoder, version int16) erro
 				return err
 			}
 			d.Values[key] = value
+			_, err = pd.getEmptyTaggedFieldArray()
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		d.Values = map[string]float64{}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (c *QuotaEntityComponent) encode(pe packetEncoder) error {
@@ -192,6 +212,7 @@ func (c *QuotaEntityComponent) encode(pe packetEncoder) error {
 		}
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -216,7 +237,8 @@ func (c *QuotaEntityComponent) decode(pd packetDecoder, version int16) error {
 		c.Name = *entityName
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (d *DescribeClientQuotasResponse) key() int16 {
@@ -228,15 +250,34 @@ func (d *DescribeClientQuotasResponse) version() int16 {
 }
 
 func (d *DescribeClientQuotasResponse) headerVersion() int16 {
+	if d.Version >= 1 {
+		return 1
+	}
+
 	return 0
 }
 
 func (d *DescribeClientQuotasResponse) isValidVersion() bool {
-	return d.Version == 0
+	return d.Version >= 0 && d.Version <= 1
+}
+
+func (d *DescribeClientQuotasResponse) isFlexible() bool {
+	return d.isFlexibleVersion(d.Version)
+}
+
+func (d *DescribeClientQuotasResponse) isFlexibleVersion(version int16) bool {
+	return version >= 1
 }
 
 func (d *DescribeClientQuotasResponse) requiredVersion() KafkaVersion {
-	return V2_6_0_0
+	switch d.Version {
+	case 1:
+		return V2_8_0_0
+	case 0:
+		return V2_6_0_0
+	default:
+		return V2_8_0_0
+	}
 }
 
 func (r *DescribeClientQuotasResponse) throttleTime() time.Duration {
