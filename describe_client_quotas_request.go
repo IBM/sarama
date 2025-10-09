@@ -171,7 +171,7 @@ func (d *DescribeClientQuotasRequest) headerVersion() int16 {
 }
 
 func (d *DescribeClientQuotasRequest) isValidVersion() bool {
-	return d.Version == 0 && d.Version <= 1
+	return d.Version >= 0 && d.Version <= 1
 }
 
 func (d *DescribeClientQuotasRequest) isFlexible() bool {
