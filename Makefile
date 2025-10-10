@@ -5,11 +5,13 @@ GOBIN    := $(shell pwd)/bin
 GOBUILD  := CGO_ENABLED=0 $(GO) build $(BUILD_FLAG)
 
 GOTESTSUM         := $(GOBIN)/gotestsum
+# renovate: datasource=github-releases depName=gotestyourself/gotestsum
 GOTESTSUM_VERSION := v1.13.0
 $(GOTESTSUM):
 	GOBIN=$(GOBIN) go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
 
 TESTSTAT         := $(GOBIN)/teststat
+# renovate: datasource=github-releases depName=vearutop/teststat
 TESTSTAT_VERSION := v0.1.26
 $(TESTSTAT):
 	GOBIN=$(GOBIN) go install github.com/vearutop/teststat@$(TESTSTAT_VERSION)
