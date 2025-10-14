@@ -25,7 +25,7 @@ env:
   # renovate: datasource=github-releases depName=golangci/golangci-lint
   GOLANGCI_LINT_VERSION: v2.5.0
   # renovate: datasource=github-releases depName=dominikh/go-tools
-  STATICCHECK_VERSION: v0.6.0
+  STATICCHECK_VERSION: 2025.1.1
   # renovate: datasource=github-releases depName=mfridman/tparse
   TPARSE_VERSION: v0.18.0
 
