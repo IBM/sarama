@@ -826,11 +826,12 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 
 	for _, rspResource := range rsp.Resources {
 		if rspResource.Name == name {
-			if rspResource.ErrorMsg != "" {
-				return errors.New(rspResource.ErrorMsg)
-			}
-			if rspResource.ErrorCode != 0 {
-				return KError(rspResource.ErrorCode)
+			if rspResource.ErrorCode != int16(ErrNoError) {
+				err = KError(rspResource.ErrorCode)
+				if rspResource.ErrorMsg != "" {
+					err = fmt.Errorf("%w: %s", err, rspResource.ErrorMsg)
+				}
+				return err
 			}
 		}
 	}
