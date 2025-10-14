@@ -12,7 +12,7 @@ $(GOTESTSUM):
 
 TESTSTAT         := $(GOBIN)/teststat
 # renovate: datasource=github-releases depName=vearutop/teststat
-TESTSTAT_VERSION := v0.1.26
+TESTSTAT_VERSION := v0.1.27
 $(TESTSTAT):
 	GOBIN=$(GOBIN) go install github.com/vearutop/teststat@$(TESTSTAT_VERSION)
 
