@@ -1064,6 +1064,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	// Will be decremented in responseReceiver (except error or request with NoResponse)
 	b.addRequestInFlightMetrics(1)
 	bytes, err := b.write(buf)
+	if b.conf.Producer.Flush.FlushCallback != nil {
+		b.conf.Producer.Flush.FlushCallback(b.conf.ClientID, bytes)
+	}
 	b.updateOutgoingCommunicationMetrics(bytes)
 	b.updateProtocolMetrics(rb)
 	if err != nil {
