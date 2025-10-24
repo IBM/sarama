@@ -1072,6 +1072,9 @@ func TestClusterAdminIncrementalAlterConfigWithErrorCode(t *testing.T) {
 	if err == nil {
 		t.Fatal(errors.New("ErrorCode present but no Error returned"))
 	}
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Fatal(errors.New("ErrorCode present but not wrapped into returned error"))
+	}
 }
 
 func TestClusterAdminIncrementalAlterBrokerConfig(t *testing.T) {

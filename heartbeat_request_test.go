@@ -26,6 +26,20 @@ var (
 		0, 3, 'b', 'a', 'z', // Member ID
 		255, 255, // Group Instance ID
 	}
+	basicHeartbeatRequestV4_GID = []byte{
+		4, 'f', 'o', 'o', // Group ID
+		0x00, 0x01, 0x02, 0x03, // Generation ID
+		4, 'b', 'a', 'z', // Member ID
+		4, 'g', 'i', 'd', // Group Instance ID
+		0, // empty tagged fields
+	}
+	basicHeartbeatRequestV4_NOGID = []byte{
+		4, 'f', 'o', 'o', // Group ID
+		0x00, 0x01, 0x02, 0x03, // Generation ID
+		4, 'b', 'a', 'z', // Member ID
+		0, // Group Instance ID
+		0, // empty tagged fields
+	}
 )
 
 func TestHeartbeatRequest(t *testing.T) {
@@ -65,6 +79,30 @@ func TestHeartbeatRequest(t *testing.T) {
 			basicHeartbeatRequestV3_NOGID,
 			&HeartbeatRequest{
 				Version:         3,
+				GroupId:         "foo",
+				GenerationId:    0x00010203,
+				MemberId:        "baz",
+				GroupInstanceId: nil,
+			},
+		},
+		{
+			"v4_basic",
+			4,
+			basicHeartbeatRequestV4_GID,
+			&HeartbeatRequest{
+				Version:         4,
+				GroupId:         "foo",
+				GenerationId:    0x00010203,
+				MemberId:        "baz",
+				GroupInstanceId: &groupInstanceId,
+			},
+		},
+		{
+			"v4_basic",
+			4,
+			basicHeartbeatRequestV4_NOGID,
+			&HeartbeatRequest{
+				Version:         4,
 				GroupId:         "foo",
 				GenerationId:    0x00010203,
 				MemberId:        "baz",

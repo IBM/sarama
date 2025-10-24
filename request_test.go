@@ -13,75 +13,75 @@ import (
 )
 
 var names = map[int16]string{
-	0:  "ProduceRequest",
-	1:  "FetchRequest",
-	2:  "ListOffsetsRequest",
-	3:  "MetadataRequest",
-	4:  "LeaderAndIsrRequest",
-	5:  "StopReplicaRequest",
-	6:  "UpdateMetadataRequest",
-	7:  "ControlledShutdownRequest",
-	8:  "OffsetCommitRequest",
-	9:  "OffsetFetchRequest",
-	10: "FindCoordinatorRequest",
-	11: "JoinGroupRequest",
-	12: "HeartbeatRequest",
-	13: "LeaveGroupRequest",
-	14: "SyncGroupRequest",
-	15: "DescribeGroupsRequest",
-	16: "ListGroupsRequest",
-	17: "SaslHandshakeRequest",
-	18: "ApiVersionsRequest",
-	19: "CreateTopicsRequest",
-	20: "DeleteTopicsRequest",
-	21: "DeleteRecordsRequest",
-	22: "InitProducerIdRequest",
-	23: "OffsetForLeaderEpochRequest",
-	24: "AddPartitionsToTxnRequest",
-	25: "AddOffsetsToTxnRequest",
-	26: "EndTxnRequest",
-	27: "WriteTxnMarkersRequest",
-	28: "TxnOffsetCommitRequest",
-	29: "DescribeAclsRequest",
-	30: "CreateAclsRequest",
-	31: "DeleteAclsRequest",
-	32: "DescribeConfigsRequest",
-	33: "AlterConfigsRequest",
-	34: "AlterReplicaLogDirsRequest",
-	35: "DescribeLogDirsRequest",
-	36: "SaslAuthenticateRequest",
-	37: "CreatePartitionsRequest",
-	38: "CreateDelegationTokenRequest",
-	39: "RenewDelegationTokenRequest",
-	40: "ExpireDelegationTokenRequest",
-	41: "DescribeDelegationTokenRequest",
-	42: "DeleteGroupsRequest",
-	43: "ElectLeadersRequest",
-	44: "IncrementalAlterConfigsRequest",
-	45: "AlterPartitionReassignmentsRequest",
-	46: "ListPartitionReassignmentsRequest",
-	47: "OffsetDeleteRequest",
-	48: "DescribeClientQuotasRequest",
-	49: "AlterClientQuotasRequest",
-	50: "DescribeUserScramCredentialsRequest",
-	51: "AlterUserScramCredentialsRequest",
-	52: "VoteRequest",
-	53: "BeginQuorumEpochRequest",
-	54: "EndQuorumEpochRequest",
-	55: "DescribeQuorumRequest",
-	56: "AlterPartitionRequest",
-	57: "UpdateFeaturesRequest",
-	58: "EnvelopeRequest",
-	59: "FetchSnapshotRequest",
-	60: "DescribeClusterRequest",
-	61: "DescribeProducersRequest",
-	62: "BrokerRegistrationRequest",
-	63: "BrokerHeartbeatRequest",
-	64: "UnregisterBrokerRequest",
-	65: "DescribeTransactionsRequest",
-	66: "ListTransactionsRequest",
-	67: "AllocateProducerIdsRequest",
-	68: "ConsumerGroupHeartbeatRequest",
+	apiKeyProduce:                      "ProduceRequest",
+	apiKeyFetch:                        "FetchRequest",
+	apiKeyListOffsets:                  "ListOffsetsRequest",
+	apiKeyMetadata:                     "MetadataRequest",
+	apiKeyLeaderAndIsr:                 "LeaderAndIsrRequest",
+	apiKeyStopReplica:                  "StopReplicaRequest",
+	apiKeyUpdateMetadata:               "UpdateMetadataRequest",
+	apiKeyControlledShutdown:           "ControlledShutdownRequest",
+	apiKeyOffsetCommit:                 "OffsetCommitRequest",
+	apiKeyOffsetFetch:                  "OffsetFetchRequest",
+	apiKeyFindCoordinator:              "FindCoordinatorRequest",
+	apiKeyJoinGroup:                    "JoinGroupRequest",
+	apiKeyHeartbeat:                    "HeartbeatRequest",
+	apiKeyLeaveGroup:                   "LeaveGroupRequest",
+	apiKeySyncGroup:                    "SyncGroupRequest",
+	apiKeyDescribeGroups:               "DescribeGroupsRequest",
+	apiKeyListGroups:                   "ListGroupsRequest",
+	apiKeySaslHandshake:                "SaslHandshakeRequest",
+	apiKeyApiVersions:                  "ApiVersionsRequest",
+	apiKeyCreateTopics:                 "CreateTopicsRequest",
+	apiKeyDeleteTopics:                 "DeleteTopicsRequest",
+	apiKeyDeleteRecords:                "DeleteRecordsRequest",
+	apiKeyInitProducerId:               "InitProducerIdRequest",
+	apiKeyOffsetForLeaderEpoch:         "OffsetForLeaderEpochRequest",
+	apiKeyAddPartitionsToTxn:           "AddPartitionsToTxnRequest",
+	apiKeyAddOffsetsToTxn:              "AddOffsetsToTxnRequest",
+	apiKeyEndTxn:                       "EndTxnRequest",
+	apiKeyWriteTxnMarkers:              "WriteTxnMarkersRequest",
+	apiKeyTxnOffsetCommit:              "TxnOffsetCommitRequest",
+	apiKeyDescribeAcls:                 "DescribeAclsRequest",
+	apiKeyCreateAcls:                   "CreateAclsRequest",
+	apiKeyDeleteAcls:                   "DeleteAclsRequest",
+	apiKeyDescribeConfigs:              "DescribeConfigsRequest",
+	apiKeyAlterConfigs:                 "AlterConfigsRequest",
+	apiKeyAlterReplicaLogDirs:          "AlterReplicaLogDirsRequest",
+	apiKeyDescribeLogDirs:              "DescribeLogDirsRequest",
+	apiKeySASLAuth:                     "SaslAuthenticateRequest",
+	apiKeyCreatePartitions:             "CreatePartitionsRequest",
+	apiKeyCreateDelegationToken:        "CreateDelegationTokenRequest",
+	apiKeyRenewDelegationToken:         "RenewDelegationTokenRequest",
+	apiKeyExpireDelegationToken:        "ExpireDelegationTokenRequest",
+	apiKeyDescribeDelegationToken:      "DescribeDelegationTokenRequest",
+	apiKeyDeleteGroups:                 "DeleteGroupsRequest",
+	apiKeyElectLeaders:                 "ElectLeadersRequest",
+	apiKeyIncrementalAlterConfigs:      "IncrementalAlterConfigsRequest",
+	apiKeyAlterPartitionReassignments:  "AlterPartitionReassignmentsRequest",
+	apiKeyListPartitionReassignments:   "ListPartitionReassignmentsRequest",
+	apiKeyOffsetDelete:                 "OffsetDeleteRequest",
+	apiKeyDescribeClientQuotas:         "DescribeClientQuotasRequest",
+	apiKeyAlterClientQuotas:            "AlterClientQuotasRequest",
+	apiKeyDescribeUserScramCredentials: "DescribeUserScramCredentialsRequest",
+	apiKeyAlterUserScramCredentials:    "AlterUserScramCredentialsRequest",
+	52:                                 "VoteRequest",
+	53:                                 "BeginQuorumEpochRequest",
+	54:                                 "EndQuorumEpochRequest",
+	55:                                 "DescribeQuorumRequest",
+	56:                                 "AlterPartitionRequest",
+	57:                                 "UpdateFeaturesRequest",
+	58:                                 "EnvelopeRequest",
+	59:                                 "FetchSnapshotRequest",
+	60:                                 "DescribeClusterRequest",
+	61:                                 "DescribeProducersRequest",
+	62:                                 "BrokerRegistrationRequest",
+	63:                                 "BrokerHeartbeatRequest",
+	64:                                 "UnregisterBrokerRequest",
+	65:                                 "DescribeTransactionsRequest",
+	66:                                 "ListTransactionsRequest",
+	67:                                 "AllocateProducerIdsRequest",
+	68:                                 "ConsumerGroupHeartbeatRequest",
 }
 
 // allocateResponseBody is a test-only clone of allocateBody. There's no
@@ -92,85 +92,87 @@ func allocateResponseBody(req protocolBody) protocolBody {
 	key := req.key()
 	version := req.version()
 	switch key {
-	case 0:
+	case apiKeyProduce:
 		return &ProduceResponse{Version: version}
-	case 1:
+	case apiKeyFetch:
 		return &FetchResponse{Version: version}
-	case 2:
+	case apiKeyListOffsets:
 		return &OffsetResponse{Version: version}
-	case 3:
+	case apiKeyMetadata:
 		return &MetadataResponse{Version: version}
-	case 8:
+	case apiKeyOffsetCommit:
 		return &OffsetCommitResponse{Version: version}
-	case 9:
+	case apiKeyOffsetFetch:
 		return &OffsetFetchResponse{Version: version}
-	case 10:
+	case apiKeyFindCoordinator:
 		return &FindCoordinatorResponse{Version: version}
-	case 11:
+	case apiKeyJoinGroup:
 		return &JoinGroupResponse{Version: version}
-	case 12:
+	case apiKeyHeartbeat:
 		return &HeartbeatResponse{Version: version}
-	case 13:
+	case apiKeyLeaveGroup:
 		return &LeaveGroupResponse{Version: version}
-	case 14:
+	case apiKeySyncGroup:
 		return &SyncGroupResponse{Version: version}
-	case 15:
+	case apiKeyDescribeGroups:
 		return &DescribeGroupsResponse{Version: version}
-	case 16:
+	case apiKeyListGroups:
 		return &ListGroupsResponse{Version: version}
-	case 17:
+	case apiKeySaslHandshake:
 		return &SaslHandshakeResponse{Version: version}
-	case 18:
+	case apiKeyApiVersions:
 		return &ApiVersionsResponse{Version: version}
-	case 19:
+	case apiKeyCreateTopics:
 		return &CreateTopicsResponse{Version: version}
-	case 20:
+	case apiKeyDeleteTopics:
 		return &DeleteTopicsResponse{Version: version}
-	case 21:
+	case apiKeyDeleteRecords:
 		return &DeleteRecordsResponse{Version: version}
-	case 22:
+	case apiKeyInitProducerId:
 		return &InitProducerIDResponse{Version: version}
-	case 24:
+	case apiKeyAddPartitionsToTxn:
 		return &AddPartitionsToTxnResponse{Version: version}
-	case 25:
+	case apiKeyAddOffsetsToTxn:
 		return &AddOffsetsToTxnResponse{Version: version}
-	case 26:
+	case apiKeyEndTxn:
 		return &EndTxnResponse{Version: version}
-	case 28:
+	case apiKeyTxnOffsetCommit:
 		return &TxnOffsetCommitResponse{Version: version}
-	case 29:
+	case apiKeyDescribeAcls:
 		return &DescribeAclsResponse{Version: version}
-	case 30:
+	case apiKeyCreateAcls:
 		return &CreateAclsResponse{Version: version}
-	case 31:
+	case apiKeyDeleteAcls:
 		return &DeleteAclsResponse{Version: version}
-	case 32:
+	case apiKeyDescribeConfigs:
 		return &DescribeConfigsResponse{Version: version}
-	case 33:
+	case apiKeyAlterConfigs:
 		return &AlterConfigsResponse{Version: version}
-	case 35:
+	case apiKeyDescribeLogDirs:
 		return &DescribeLogDirsResponse{Version: version}
-	case 36:
+	case apiKeySASLAuth:
 		return &SaslAuthenticateResponse{Version: version}
-	case 37:
+	case apiKeyCreatePartitions:
 		return &CreatePartitionsResponse{Version: version}
-	case 42:
+	case apiKeyDeleteGroups:
 		return &DeleteGroupsResponse{Version: version}
-	case 44:
+	case apiKeyElectLeaders:
+		return &ElectLeadersResponse{Version: version}
+	case apiKeyIncrementalAlterConfigs:
 		return &IncrementalAlterConfigsResponse{Version: version}
-	case 45:
+	case apiKeyAlterPartitionReassignments:
 		return &AlterPartitionReassignmentsResponse{Version: version}
-	case 46:
+	case apiKeyListPartitionReassignments:
 		return &ListPartitionReassignmentsResponse{Version: version}
-	case 47:
+	case apiKeyOffsetDelete:
 		return &DeleteOffsetsResponse{Version: version}
-	case 48:
+	case apiKeyDescribeClientQuotas:
 		return &DescribeClientQuotasResponse{Version: version}
-	case 49:
+	case apiKeyAlterClientQuotas:
 		return &AlterClientQuotasResponse{Version: version}
-	case 50:
+	case apiKeyDescribeUserScramCredentials:
 		return &DescribeUserScramCredentialsResponse{Version: version}
-	case 51:
+	case apiKeyAlterUserScramCredentials:
 		return &AlterUserScramCredentialsResponse{Version: version}
 	}
 	return nil
@@ -182,149 +184,220 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		apiVersions map[int16]int16
 	}
 
+	saramaMaxVersions := newKafkaVersion(999, 999, 999, 999)
+	maxVersion := func(pb protocolBody) int16 {
+		var (
+			i int16
+			v int16
+		)
+		for i = 0; ; i++ {
+			pb.setVersion(i)
+			if !pb.isValidVersion() {
+				return v
+			}
+			v = i
+		}
+	}
+
 	tests := []test{
 		{
 			V1_1_0_0,
 			map[int16]int16{
-				0:  5,
-				1:  7,
-				2:  2,
-				3:  5,
-				4:  1,
-				5:  0,
-				6:  4,
-				7:  1,
-				8:  3,
-				9:  3,
-				10: 1,
-				11: 2,
-				12: 1,
-				13: 1,
-				14: 1,
-				15: 1,
-				16: 1,
-				17: 1,
-				18: 1,
-				19: 2,
-				20: 1,
-				21: 0,
-				22: 0,
-				23: 0,
-				24: 0,
-				25: 0,
-				26: 0,
-				27: 0,
-				28: 0,
-				29: 0,
-				30: 0,
-				31: 0,
-				32: 1,
-				33: 0,
-				34: 0,
-				35: 0,
-				36: 0,
-				37: 0,
-				38: 0,
-				39: 0,
-				40: 0,
-				41: 0,
-				42: 0,
+				apiKeyProduce:                 5,
+				apiKeyFetch:                   7,
+				apiKeyListOffsets:             2,
+				apiKeyMetadata:                5,
+				apiKeyLeaderAndIsr:            1,
+				apiKeyStopReplica:             0,
+				apiKeyUpdateMetadata:          4,
+				apiKeyControlledShutdown:      1,
+				apiKeyOffsetCommit:            3,
+				apiKeyOffsetFetch:             3,
+				apiKeyFindCoordinator:         1,
+				apiKeyJoinGroup:               2,
+				apiKeyHeartbeat:               1,
+				apiKeyLeaveGroup:              1,
+				apiKeySyncGroup:               1,
+				apiKeyDescribeGroups:          1,
+				apiKeyListGroups:              1,
+				apiKeySaslHandshake:           1,
+				apiKeyApiVersions:             1,
+				apiKeyCreateTopics:            2,
+				apiKeyDeleteTopics:            1,
+				apiKeyDeleteRecords:           0,
+				apiKeyInitProducerId:          0,
+				apiKeyOffsetForLeaderEpoch:    0,
+				apiKeyAddPartitionsToTxn:      0,
+				apiKeyAddOffsetsToTxn:         0,
+				apiKeyEndTxn:                  0,
+				apiKeyWriteTxnMarkers:         0,
+				apiKeyTxnOffsetCommit:         0,
+				apiKeyDescribeAcls:            0,
+				apiKeyCreateAcls:              0,
+				apiKeyDeleteAcls:              0,
+				apiKeyDescribeConfigs:         1,
+				apiKeyAlterConfigs:            0,
+				apiKeyAlterReplicaLogDirs:     0,
+				apiKeyDescribeLogDirs:         0,
+				apiKeySASLAuth:                0,
+				apiKeyCreatePartitions:        0,
+				apiKeyCreateDelegationToken:   0,
+				apiKeyRenewDelegationToken:    0,
+				apiKeyExpireDelegationToken:   0,
+				apiKeyDescribeDelegationToken: 0,
+				apiKeyDeleteGroups:            0,
 			},
 		},
 		{
 			V2_0_0_0,
 			map[int16]int16{
-				0:  6,
-				1:  8,
-				2:  3,
-				3:  6,
-				4:  1,
-				5:  0,
-				6:  4,
-				7:  1,
-				8:  4,
-				9:  4,
-				10: 2,
-				11: 3,
-				12: 2,
-				13: 2,
-				14: 2,
-				15: 2,
-				16: 2,
-				17: 1,
-				18: 2,
-				19: 3,
-				20: 2,
-				21: 1,
-				22: 1,
-				23: 1,
-				24: 1,
-				25: 1,
-				26: 1,
-				27: 0,
-				28: 1,
-				29: 1,
-				30: 1,
-				31: 1,
-				32: 2,
-				33: 1,
-				34: 1,
-				35: 1,
-				36: 0,
-				37: 1,
-				38: 1,
-				39: 1,
-				40: 1,
-				41: 1,
-				42: 1,
+				apiKeyProduce:                 6, // up from 5
+				apiKeyFetch:                   8, // up from 7
+				apiKeyListOffsets:             3, // up from 2
+				apiKeyMetadata:                6, // up from 5
+				apiKeyOffsetCommit:            4, // up from 3
+				apiKeyOffsetFetch:             4, // up from 3
+				apiKeyFindCoordinator:         2, // up from 1
+				apiKeyJoinGroup:               3, // up from 2
+				apiKeyHeartbeat:               2, // up from 1
+				apiKeyLeaveGroup:              2, // up from 1
+				apiKeySyncGroup:               2, // up from 1
+				apiKeyDescribeGroups:          2, // up from 1
+				apiKeyListGroups:              2, // up from 1
+				apiKeyApiVersions:             2, // up from 1
+				apiKeyCreateTopics:            3, // up from 2
+				apiKeyDeleteTopics:            2, // up from 1
+				apiKeyDeleteRecords:           1, // up from 0
+				apiKeyInitProducerId:          1, // up from 0
+				apiKeyOffsetForLeaderEpoch:    1, // up from 0
+				apiKeyAddPartitionsToTxn:      1, // up from 0
+				apiKeyAddOffsetsToTxn:         1, // up from 0
+				apiKeyEndTxn:                  1, // up from 0
+				apiKeyTxnOffsetCommit:         1, // up from 0
+				apiKeyDescribeAcls:            1, // up from 0
+				apiKeyCreateAcls:              1, // up from 0
+				apiKeyDeleteAcls:              1, // up from 0
+				apiKeyDescribeConfigs:         2, // up from 1
+				apiKeyAlterConfigs:            1, // up from 0
+				apiKeyAlterReplicaLogDirs:     1, // up from 0
+				apiKeyDescribeLogDirs:         1, // up from 0
+				apiKeyCreatePartitions:        1, // up from 0
+				apiKeyCreateDelegationToken:   1, // up from 0
+				apiKeyRenewDelegationToken:    1, // up from 0
+				apiKeyExpireDelegationToken:   1, // up from 0
+				apiKeyDescribeDelegationToken: 1, // up from 0
+				apiKeyDeleteGroups:            1, // up from 0
 			},
 		},
 		{
 			V2_1_0_0,
 			map[int16]int16{
-				0:  7,
-				1:  10,
-				2:  4,
-				3:  7,
-				4:  1,
-				5:  0,
-				6:  4,
-				7:  1,
-				8:  6,
-				9:  5,
-				10: 2,
-				11: 3,
-				12: 2,
-				13: 2,
-				14: 2,
-				15: 2,
-				16: 2,
-				17: 1,
-				18: 2,
-				19: 3,
-				20: 3,
-				21: 1,
-				22: 1,
-				23: 2,
-				24: 1,
-				25: 1,
-				26: 1,
-				27: 0,
-				28: 2,
-				29: 1,
-				30: 1,
-				31: 1,
-				32: 2,
-				33: 1,
-				34: 1,
-				35: 1,
-				36: 0,
-				37: 1,
-				38: 1,
-				39: 1,
-				40: 1,
-				41: 1,
-				42: 1,
+				apiKeyProduce:              7,  // up from 6
+				apiKeyFetch:                10, // up from 8
+				apiKeyListOffsets:          4,  // up from 3
+				apiKeyMetadata:             7,  // up from 6
+				apiKeyOffsetCommit:         6,  // up from 4
+				apiKeyOffsetFetch:          5,  // up from 4
+				apiKeyOffsetForLeaderEpoch: 2,  // up from 1
+				apiKeyTxnOffsetCommit:      2,  // up from 1
+				apiKeyDeleteTopics:         3,  // up from 2
+			},
+		},
+		{
+			V2_2_0_0,
+			map[int16]int16{
+				apiKeyListOffsets:        5, // up from 4
+				apiKeyLeaderAndIsr:       2, // up from 1
+				apiKeyStopReplica:        1, // up from 0
+				apiKeyUpdateMetadata:     5, // up from 4
+				apiKeyControlledShutdown: 2, // up from 1
+				apiKeyJoinGroup:          4, // up from 3
+				apiKeySASLAuth:           1, // up from 0
+				apiKeyElectLeaders:       0, // new in 2.2
+			},
+		},
+		{
+			V2_3_0_0,
+			map[int16]int16{
+				apiKeyFetch:                   11, // up from 10
+				apiKeyMetadata:                8,  // up from 7
+				apiKeyOffsetCommit:            7,  // up from 6
+				apiKeyJoinGroup:               5,  // up from 4
+				apiKeyHeartbeat:               3,  // up from 2
+				apiKeySyncGroup:               3,  // up from 2
+				apiKeyDescribeGroups:          3,  // up from 2
+				apiKeyIncrementalAlterConfigs: 0,  // new in 2.3
+			},
+		},
+		{
+			V2_4_0_0,
+			map[int16]int16{
+				// TODO: ProduceRequest v8 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyProduce:                     8, // up from 7
+				apiKeyMetadata:           9, // up from 8
+				apiKeyLeaderAndIsr:       4, // up from 2
+				apiKeyStopReplica:        2, // up from 1
+				apiKeyUpdateMetadata:     6, // up from 5
+				apiKeyControlledShutdown: 3, // up from 2
+				// TODO: OffsetCommitRequest v8 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyOffsetCommit:                8, // up from 7
+				apiKeyOffsetFetch: 6, // up from 5
+				// TODO: FindCoordinatorRequest v3 is not supported, but expected for KafkaVersion 2.4.0
+				// apiKeyFindCoordinator:             3, // up from 2
+				apiKeyJoinGroup:                   6, // up from 5
+				apiKeyHeartbeat:                   4, // up from 3
+				apiKeyLeaveGroup:                  4, // up from 2
+				apiKeySyncGroup:                   4, // up from 3
+				apiKeyDescribeGroups:              5, // up from 3
+				apiKeyListGroups:                  3, // up from 2
+				apiKeyApiVersions:                 3, // up from 2
+				apiKeyCreateTopics:                5, // up from 3
+				apiKeyDeleteTopics:                4, // up from 3
+				apiKeyInitProducerId:              2, // up from 1
+				apiKeyDeleteGroups:                2, // up from 1
+				apiKeyElectLeaders:                2, // up from 0
+				apiKeyIncrementalAlterConfigs:     1, // up from 0
+				apiKeyAlterPartitionReassignments: 0, // new in 2.4
+				apiKeyListPartitionReassignments:  0, // new in 2.4
+				apiKeyOffsetDelete:                0, // new in 2.4
+			},
+		},
+		{
+			saramaMaxVersions, // placeholder version for current maximums implemented by Sarama
+			map[int16]int16{
+				apiKeyProduce:            maxVersion(&ProduceRequest{}),
+				apiKeyFetch:              maxVersion(&FetchRequest{}),
+				apiKeyListOffsets:        maxVersion(&OffsetRequest{}),
+				apiKeyMetadata:           maxVersion(&MetadataRequest{}),
+				apiKeyOffsetCommit:       maxVersion(&OffsetCommitRequest{}),
+				apiKeyOffsetFetch:        maxVersion(&OffsetFetchRequest{}),
+				apiKeyFindCoordinator:    maxVersion(&FindCoordinatorRequest{}),
+				apiKeyJoinGroup:          maxVersion(&JoinGroupRequest{}),
+				apiKeyHeartbeat:          maxVersion(&HeartbeatRequest{}),
+				apiKeyLeaveGroup:         maxVersion(&LeaveGroupRequest{}),
+				apiKeySyncGroup:          maxVersion(&SyncGroupRequest{}),
+				apiKeyDescribeGroups:     maxVersion(&DescribeGroupsRequest{}),
+				apiKeyListGroups:         maxVersion(&ListGroupsRequest{}),
+				apiKeySaslHandshake:      maxVersion(&SaslHandshakeRequest{}),
+				apiKeyApiVersions:        maxVersion(&ApiVersionsRequest{}),
+				apiKeyCreateTopics:       maxVersion(&CreateTopicsRequest{}),
+				apiKeyDeleteTopics:       maxVersion(&DeleteTopicsRequest{}),
+				apiKeyDeleteRecords:      maxVersion(&DeleteRecordsRequest{}),
+				apiKeyInitProducerId:     maxVersion(&InitProducerIDRequest{}),
+				apiKeyAddPartitionsToTxn: maxVersion(&AddPartitionsToTxnRequest{}),
+				apiKeyAddOffsetsToTxn:    maxVersion(&AddOffsetsToTxnRequest{}),
+				apiKeyEndTxn:             maxVersion(&EndTxnRequest{}),
+				apiKeyTxnOffsetCommit:    maxVersion(&TxnOffsetCommitRequest{}),
+				apiKeyDescribeAcls:       maxVersion(&DescribeAclsRequest{}),
+				apiKeyCreateAcls:         maxVersion(&CreateAclsRequest{}),
+				apiKeyDeleteAcls:         maxVersion(&DeleteAclsRequest{}),
+				apiKeyDescribeConfigs:    maxVersion(&DescribeConfigsRequest{}),
+				apiKeyAlterConfigs:       maxVersion(&AlterConfigsRequest{}),
+				apiKeyDescribeLogDirs:    maxVersion(&DescribeLogDirsRequest{}),
+				apiKeySASLAuth:           maxVersion(&SaslAuthenticateRequest{}),
+				apiKeyCreatePartitions:   maxVersion(&CreatePartitionsRequest{}),
+				apiKeyDeleteGroups:       maxVersion(&DeleteGroupsRequest{}),
+				apiKeyElectLeaders:       maxVersion(&ElectLeadersRequest{}),
 			},
 		},
 	}
@@ -336,6 +409,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				if req == nil {
 					t.Skipf("apikey %d is not implemented", key)
 				}
+				t.Logf("Testing %s V%d", reflect.TypeOf(req), version)
 				resp := allocateResponseBody(req)
 				assert.NotNil(t, resp, fmt.Sprintf("%s has no matching response type in allocateResponseBody", reflect.TypeOf(req)))
 				assert.Equal(t, req.isValidVersion(), resp.isValidVersion(), fmt.Sprintf("%s isValidVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp)))
@@ -451,6 +525,23 @@ func testResponse(t *testing.T, name string, res protocolBody, expected []byte) 
 
 	if !reflect.DeepEqual(decoded, res) {
 		t.Errorf("Decoded response does not match the encoded one\nencoded: %#v\ndecoded: %#v", res, decoded)
+	}
+}
+
+func TestDecodeRequestErrorReturns(t *testing.T) {
+	_, bytesRead, err := decodeRequest(bytes.NewReader([]byte{0, 0, 0}))
+	if err == nil {
+		t.Error("Decode of short request should give error but was nil")
+	}
+	if bytesRead != 3 {
+		t.Errorf("Decode of short request should read 3 bytes but was %d", bytesRead)
+	}
+	_, bytesRead, err = decodeRequest(bytes.NewReader([]byte{0, 0, 0, 8, 0, 0, 0}))
+	if err == nil {
+		t.Error("Decode of short request should give error but was nil")
+	}
+	if bytesRead != 7 {
+		t.Errorf("Decode of short request should read 7 bytes but was %d", bytesRead)
 	}
 }
 

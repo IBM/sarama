@@ -29,15 +29,15 @@ jobs:
     if: github.base_ref
     steps:
     - name: Setup Go
-      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+      uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
       with:
         go-version: stable
     - name: Add GOBIN to PATH
       run: echo "$(go env GOPATH)/bin" >>$GITHUB_PATH
     - name: Install apidiff cmd
-      run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20231006140011-7918f672742d
+      run: go install golang.org/x/exp/cmd/apidiff@v0.0.0-20250813145105-42675adae3e6
     - name: Checkout base code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         ref: ${{ github.base_ref }}
         path: "base"
@@ -46,7 +46,7 @@ jobs:
       run: apidiff -m -w ../baseline.bin .
       working-directory: "base"
     - name: Checkout updated code
-      uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       with:
         path: "updated"
         persist-credentials: false

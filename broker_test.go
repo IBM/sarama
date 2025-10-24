@@ -114,7 +114,6 @@ func (p produceResponsePromise) Get() (*ProduceResponse, error) {
 
 func TestSimpleBrokerCommunication(t *testing.T) {
 	for _, tt := range brokerTestTable {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			Logger.Printf("Testing broker communication for %s", tt.name)
 			mb := NewMockBroker(t, 0)
@@ -158,7 +157,6 @@ func TestSimpleBrokerCommunication(t *testing.T) {
 
 func TestBrokerFailedRequest(t *testing.T) {
 	for _, tt := range brokerFailedReqTestTable {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Logf("Testing broker communication for %s", tt.name)
 			mb := NewMockBroker(t, 0)
@@ -287,7 +285,6 @@ func TestSASLOAuthBearer(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
@@ -402,7 +399,6 @@ func TestSASLSCRAMSHAXXX(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
@@ -500,7 +496,6 @@ func TestSASLPlainAuth(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			// mockBroker mocks underlying network logic and broker responses
 			mockBroker := NewMockBroker(t, 0)
@@ -671,7 +666,7 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 		},
 		{
 			name:  "Kerberos client creation fails",
-			error: errors.New("configuration file could not be opened: krb5.conf open krb5.conf: no such file or directory"),
+			error: errors.New("configuration file could not be opened: testdata/krb5.conf open testdata/krb5.conf: no such file or directory"),
 		},
 		{
 			name:               "Bad server response, unmarshall key error",
@@ -688,7 +683,6 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 		},
 	}
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			mockBroker := NewMockBroker(t, 0)
 			// broker executes SASL requests against mockBroker
@@ -707,10 +701,11 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			broker.requestsInFlight = metrics.NilCounter{}
 
 			conf := NewTestConfig()
+			conf.Net.SASL.Version = SASLHandshakeV0
 			conf.Net.SASL.Mechanism = SASLTypeGSSAPI
 			conf.Net.SASL.Enable = true
 			conf.Net.SASL.GSSAPI.ServiceName = "kafka"
-			conf.Net.SASL.GSSAPI.KerberosConfigPath = "krb5.conf"
+			conf.Net.SASL.GSSAPI.KerberosConfigPath = "testdata/krb5.conf"
 			conf.Net.SASL.GSSAPI.Realm = "EXAMPLE.COM"
 			conf.Net.SASL.GSSAPI.Username = "kafka"
 			conf.Net.SASL.GSSAPI.Password = "kafka"
@@ -793,7 +788,6 @@ func TestBuildClientFirstMessage(t *testing.T) {
 	}
 
 	for i, test := range testTable {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			actual, err := buildClientFirstMessage(test.token)
 
@@ -1414,7 +1408,7 @@ func BenchmarkBroker_Open(b *testing.B) {
 	metrics.UseNilMetrics = false
 	conf := NewTestConfig()
 	conf.Version = V1_0_0_0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := broker.Open(conf)
 		if err != nil {
 			b.Fatal(err)
@@ -1431,7 +1425,7 @@ func BenchmarkBroker_No_Metrics_Open(b *testing.B) {
 	metrics.UseNilMetrics = true
 	conf := NewTestConfig()
 	conf.Version = V1_0_0_0
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := broker.Open(conf)
 		if err != nil {
 			b.Fatal(err)

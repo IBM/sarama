@@ -19,6 +19,16 @@ var (
 		0, 0, 0, 100,
 		0, byte(ErrFencedInstancedId),
 	}
+	heartbeatResponseNoError_V4 = []byte{
+		0, 0, 0, 100,
+		0, 0,
+		0, // empty tagged fields
+	}
+	heartbeatResponseError_V4 = []byte{
+		0, 0, 0, 100,
+		0, byte(ErrFencedInstancedId),
+		0, // empty tagged fields
+	}
 )
 
 func TestHeartbeatResponse(t *testing.T) {
@@ -53,6 +63,26 @@ func TestHeartbeatResponse(t *testing.T) {
 			heartbeatResponseError_V1,
 			&HeartbeatResponse{
 				Version:      1,
+				Err:          ErrFencedInstancedId,
+				ThrottleTime: 100,
+			},
+		},
+		{
+			"v4_noErr",
+			4,
+			heartbeatResponseNoError_V4,
+			&HeartbeatResponse{
+				Version:      4,
+				Err:          ErrNoError,
+				ThrottleTime: 100,
+			},
+		},
+		{
+			"v4_Err",
+			4,
+			heartbeatResponseError_V4,
+			&HeartbeatResponse{
+				Version:      4,
 				Err:          ErrFencedInstancedId,
 				ThrottleTime: 100,
 			},

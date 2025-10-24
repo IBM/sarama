@@ -1,0 +1,96 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  extends: [
+    "config:best-practices",
+    "customManagers:dockerfileVersions",
+    "customManagers:githubActionsVersions",
+    "customManagers:makefileVersions",
+    "security:openssf-scorecard",
+    ":gitSignOff",
+  ],
+  branchConcurrentLimit: 4,
+  prConcurrentLimit: 4,
+  prHourlyLimit: 4,
+  branchPrefix: "mend/",
+  labels: ["dependencies"],
+  timezone: "Etc/UTC",
+  major: {
+    addLabels: ["bump/major"],
+  },
+  minor: {
+    addLabels: ["bump/minor"],
+  },
+  patch: {
+    addLabels: ["bump/patch"],
+  },
+  pin: {
+    addLabels: ["bump/pin"],
+  },
+  digest: {
+    addLabels: ["bump/digest"],
+  },
+  vulnerabilityAlerts: {
+    enabled: true,
+    labels: ["security"],
+  },
+  packageRules: [
+    {
+      description: "Update Docker and Docker Compose dependencies daily at 9:00 PM UTC, grouped into a single PR",
+      matchManagers: ["dockerfile", "docker-compose"],
+      schedule: ["* 21 * * *"],
+      commitMessagePrefix: "chore(ci): ",
+      groupName: "docker dependencies",
+      addLabels: ["docker", "ignore-for-release"],
+    },
+    {
+      description: "Update GitHub Actions weekly, grouped into a single PR for actions/* packages",
+      matchManagers: ["github-actions"],
+      schedule: ["* 0 * * 0"],
+      commitMessagePrefix: "chore(ci): ",
+      groupName: "actions",
+      matchPackageNames: ["actions/*", "github/codeql-action"],
+      prConcurrentLimit: 2,
+      addLabels: ["github-actions", "ignore-for-release"],
+    },
+    {
+      description: "Update Go modules daily at 3:00 PM UTC",
+      matchManagers: ["gomod"],
+      matchFileNames: ["/**"],
+      schedule: ["* 15 * * *"],
+    },
+    {
+      description: "Group OpenTelemetry Go dependencies into a single PR",
+      matchManagers: ["gomod"],
+      groupName: "otel",
+      matchPackageNames: [
+        "go.opentelemetry.io/otel",
+        "go.opentelemetry.io/otel/*",
+      ],
+    },
+    {
+      description: "Group golang.org/x Go dependencies into a single PR",
+      matchManagers: ["gomod"],
+      groupName: "golang-x",
+      matchDepTypes: ["direct", "indirect"],
+      enabled: true,
+      matchPackageNames: ["golang.org/x/*"],
+    },
+    {
+      description: "Pin ubi-minimal docker image to major.minor tags only",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["registry.access.redhat.com/ubi9/ubi-minimal"],
+      versioning: "regex:^(?<major>\\d+)\\.(?<minor>\\d+)$",
+    },
+    {
+      description: "Pin zookeeper docker image to 3.7.x",
+      matchDatasources: ["docker"],
+      matchPackageNames: ["docker.io/library/zookeeper"],
+      allowedVersions: "< 3.8",
+    },
+    {
+      description: "Do not pin digests in docker-compose files",
+      matchManagers: ["docker-compose"],
+      pinDigests: false,
+    },
+  ],
+}

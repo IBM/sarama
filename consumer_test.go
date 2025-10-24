@@ -1973,7 +1973,6 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			child := &partitionConsumer{
 				broker: &brokerConsumer{
@@ -1994,12 +1993,12 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 }
 
 func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
-	lrbOffset := int64(5)
+	lrbOffset := int64(6)
 	block := &FetchResponseBlock{
-		HighWaterMarkOffset:    10,
-		LastStableOffset:       10,
-		LastRecordsBatchOffset: &lrbOffset,
-		LogStartOffset:         0,
+		HighWaterMarkOffset: 10,
+		LastStableOffset:    10,
+		recordsNextOffset:   &lrbOffset,
+		LogStartOffset:      0,
 	}
 	response := &FetchResponse{
 		Blocks:  map[string]map[int32]*FetchResponseBlock{"my_topic": {0: block}},
@@ -2022,7 +2021,7 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 		t.Errorf("partitionConsumer.parseResponse() should be nil, got %v", got)
 	}
 	if child.offset != 6 {
-		t.Errorf("child.offset should be LastRecordsBatchOffset + 1: %d, got %d", lrbOffset+1, child.offset)
+		t.Errorf("child.offset should be recordsNextOffset: %d, got %d", lrbOffset, child.offset)
 	}
 }
 
@@ -2131,7 +2130,6 @@ func TestConsumerInterceptors(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			testConsumerInterceptor(t, tt.interceptors, tt.expectationFn)
 		})

@@ -502,8 +502,6 @@ func produceMsgs(t *testing.T, clientVersions []KafkaVersion, codecs []Compressi
 			}
 			producers = append(producers, p)
 
-			prodVer := prodVer
-			codec := codec
 			g.Go(func() error {
 				t.Logf("*** Producing with client version %s codec %s\n", prodVer, codec)
 				var wg sync.WaitGroup
@@ -572,7 +570,6 @@ func consumeMsgs(t *testing.T, clientVersions []KafkaVersion, producedMessages [
 
 		var wg sync.WaitGroup
 		wg.Add(1)
-		consVer := consVer
 		g.Go(func() error {
 			// Consume as many messages as there have been produced and make sure that
 			// order is preserved.

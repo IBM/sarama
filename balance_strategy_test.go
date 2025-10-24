@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -271,7 +272,6 @@ func Test_deserializeTopicPartitionAssignment(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := deserializeTopicPartitionAssignment(tt.args.userDataBytes)
 			if (err != nil) != tt.wantErr {
@@ -443,7 +443,6 @@ func Test_prepopulateCurrentAssignments(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			_, gotPrevAssignments, err := prepopulateCurrentAssignments(tt.args.members)
 
@@ -574,7 +573,6 @@ func Test_areSubscriptionsIdentical(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := areSubscriptionsIdentical(tt.args.partition2AllPotentialConsumers, tt.args.consumer2AllPotentialPartitions); got != tt.want {
 				t.Errorf("areSubscriptionsIdentical() = %v, want %v", got, tt.want)
@@ -631,7 +629,6 @@ func Test_sortMemberIDsByPartitionAssignments(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sortMemberIDsByPartitionAssignments(tt.args.assignments); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sortMemberIDsByPartitionAssignments() = %v, want %v", got, tt.want)
@@ -742,7 +739,6 @@ func Test_sortPartitions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			got := sortPartitions(tt.args.currentAssignment, tt.args.partitionsWithADifferentPreviousAssignment, tt.args.isFreshAssignment, tt.args.partition2AllPotentialConsumers, tt.args.consumer2AllPotentialPartitions)
 			if tt.want != nil && !reflect.DeepEqual(got, tt.want) {
@@ -816,7 +812,6 @@ func Test_filterAssignedPartitions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := filterAssignedPartitions(tt.args.currentAssignment, tt.args.partition2AllPotentialConsumers); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("filterAssignedPartitions() = %v, want %v", got, tt.want)
@@ -918,7 +913,6 @@ func Test_canConsumerParticipateInReassignment(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := canConsumerParticipateInReassignment(tt.args.memberID, tt.args.currentAssignment, tt.args.consumer2AllPotentialPartitions, tt.args.partition2AllPotentialConsumers); got != tt.want {
 				t.Errorf("canConsumerParticipateInReassignment() = %v, want %v", got, tt.want)
@@ -992,7 +986,6 @@ func Test_removeTopicPartitionFromMemberAssignments(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := removeTopicPartitionFromMemberAssignments(tt.args.assignments, tt.args.topic); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("removeTopicPartitionFromMemberAssignments() = %v, want %v", got, tt.want)
@@ -1111,7 +1104,6 @@ func Test_assignPartition(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := assignPartition(tt.args.partition, tt.args.sortedCurrentSubscriptions, tt.args.currentAssignment, tt.args.consumer2AllPotentialPartitions, tt.args.currentPartitionConsumer); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("assignPartition() = %v, want %v", got, tt.want)
@@ -1346,7 +1338,6 @@ func Test_stickyBalanceStrategy_Plan(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			s := &stickyBalanceStrategy{}
 			plan, err := s.Plan(tt.args.members, tt.args.topics)
@@ -2133,9 +2124,8 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopics(b *testing.B) {
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions
 	}
-	b.ResetTimer()
 
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		if _, err := s.Plan(members, topics); err != nil {
 			b.Errorf("Error building plan in benchmark: %v", err)
 		}
@@ -2173,9 +2163,8 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopicsAndExistingAssig
 	for i := 0; i < 1; i++ {
 		delete(members, fmt.Sprintf("consumer%d", i))
 	}
-	b.ResetTimer()
 
-	for n := 0; n < b.N; n++ {
+	for b.Loop() {
 		if _, err := s.Plan(members, topics); err != nil {
 			b.Errorf("Error building plan in benchmark: %v", err)
 		}
@@ -2213,14 +2202,7 @@ func verifyValidityAndBalance(t *testing.T, consumers map[string]ConsumerGroupMe
 
 	for i, memberID := range members {
 		for assignedTopic := range plan[memberID] {
-			found := false
-			for _, assignableTopic := range consumers[memberID].Topics {
-				if assignableTopic == assignedTopic {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !slices.Contains(consumers[memberID].Topics, assignedTopic) {
 				t.Errorf("Consumer %s had assigned topic %q that wasn't in the list of assignable topics %v", memberID, assignedTopic, consumers[memberID].Topics)
 				t.FailNow()
 			}
@@ -2458,7 +2440,6 @@ func Test_sortPartitionsByPotentialConsumerAssignments(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			if got := sortPartitionsByPotentialConsumerAssignments(tt.args.partition2AllPotentialConsumers); !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("sortPartitionsByPotentialConsumerAssignments() = %v, want %v", got, tt.want)

@@ -172,8 +172,8 @@ func TestFuncTxnProduce(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
@@ -225,8 +225,8 @@ func TestFuncTxnProduceWithBrokerFailure(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
@@ -291,8 +291,8 @@ func TestFuncTxnProduceEpochBump(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
@@ -444,8 +444,8 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	// Ensure consumer is started
@@ -509,8 +509,8 @@ func TestFuncTxnProduceMultiTxn(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalConfig := NewFunctionalTestConfig()
@@ -586,8 +586,8 @@ func TestFuncTxnAbortedProduce(t *testing.T) {
 	defer consumer.Close()
 
 	pc, err := consumer.ConsumePartition("test.1", 0, OffsetNewest)
-	msgChannel := pc.Messages()
 	require.NoError(t, err)
+	msgChannel := pc.Messages()
 	defer pc.Close()
 
 	nonTransactionalConfig := NewFunctionalTestConfig()
@@ -841,22 +841,23 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 			checkKafkaVersion(t, version.String())
 			config.Version = version
 
-			client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+			producerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer safeClose(t, client)
+			defer safeClose(t, producerClient)
 
 			// Keep in mind the current offset
-			initialOffset, err := client.GetOffset("test.1", 0, OffsetNewest)
+			initialOffset, err := producerClient.GetOffset("test.1", 0, OffsetNewest)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			producer, err := NewAsyncProducerFromClient(client)
+			producer, err := NewAsyncProducerFromClient(producerClient)
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer safeClose(t, producer)
 
 			expectedResponses := TestBatchSize
 			for i := 1; i <= TestBatchSize; {
@@ -878,38 +879,42 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 					expectedResponses--
 				}
 			}
-			safeClose(t, producer)
 
 			// Validate producer metrics before using the consumer minus the offset request
-			validateProducerMetrics(t, client)
+			validateProducerMetrics(t, producerClient)
 
-			master, err := NewConsumerFromClient(client)
+			consumerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 			if err != nil {
 				t.Fatal(err)
 			}
-			consumer, err := master.ConsumePartition("test.1", 0, initialOffset)
+			defer safeClose(t, consumerClient)
+			consumer, err := NewConsumerFromClient(consumerClient)
 			if err != nil {
 				t.Fatal(err)
 			}
+			defer safeClose(t, consumer)
+			partitionConsumer, err := consumer.ConsumePartition("test.1", 0, initialOffset)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer safeClose(t, partitionConsumer)
 
 			for i := 1; i <= TestBatchSize; i++ {
 				select {
 				case <-time.After(10 * time.Second):
 					t.Fatal("Not received any more events in the last 10 seconds.")
 
-				case err := <-consumer.Errors():
+				case err := <-partitionConsumer.Errors():
 					t.Error(err)
 
-				case message := <-consumer.Messages():
+				case message := <-partitionConsumer.Messages():
 					if string(message.Value) != fmt.Sprintf("testing %d", i) {
 						t.Fatalf("Unexpected message with index %d: %s", i, message.Value)
 					}
 				}
 			}
 
-			validateConsumerMetrics(t, client)
-
-			safeClose(t, consumer)
+			validateConsumerMetrics(t, consumerClient)
 		})
 	}
 }

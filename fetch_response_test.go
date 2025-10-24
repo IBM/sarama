@@ -460,7 +460,7 @@ func TestEmptyRecordsFetchResponse(t *testing.T) {
 	if n != 0 {
 		t.Fatal("Decoding produced incorrect number of records.")
 	}
-	if *block.LastRecordsBatchOffset != 0 {
+	if *block.recordsNextOffset != 1 {
 		t.Fatal("Last records batch offset is incorrect.")
 	}
 }
