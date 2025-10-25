@@ -61,6 +61,49 @@ func expectResults(t *testing.T, p AsyncProducer, successCount, errorCount int) 
 	expectResultsWithTimeout(t, p, successCount, errorCount, 5*time.Minute)
 }
 
+func TestPartitionProducerFlushRetryBuffersAssignsSequence(t *testing.T) {
+	cfg := NewTestConfig()
+	cfg.Producer.Idempotent = true
+
+	txnmgr := &transactionManager{
+		producerID:      1,
+		producerEpoch:   0,
+		sequenceNumbers: map[string]int32{"topic-0": 1},
+	}
+
+	parent := &asyncProducer{
+		conf:   cfg,
+		txnmgr: txnmgr,
+	}
+
+	bp := &brokerProducer{
+		input: make(chan *ProducerMessage, 1),
+	}
+
+	pp := &partitionProducer{
+		parent:         parent,
+		topic:          "topic",
+		partition:      0,
+		brokerProducer: bp,
+		retryState:     make([]partitionRetryState, 1),
+		highWatermark:  1,
+	}
+
+	msg := &ProducerMessage{Topic: "topic", Partition: 0}
+	pp.retryState[0].buf = []*ProducerMessage{msg}
+
+	pp.flushRetryBuffers()
+
+	select {
+	case flushed := <-bp.input:
+		require.True(t, flushed.hasSequence, "message should have a sequence assigned")
+		require.Equal(t, int32(1), flushed.sequenceNumber, "sequence number should have increased")
+		require.Equal(t, txnmgr.producerEpoch, flushed.producerEpoch, "producer epoch should be the same")
+	default:
+		t.Fatal("expected buffered message to flush")
+	}
+}
+
 type testPartitioner chan *int32
 
 func (p testPartitioner) Partition(msg *ProducerMessage, numPartitions int32) (int32, error) {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 	"sync"
@@ -724,6 +725,110 @@ func TestFuncProducingIdempotentWithBrokerFailure(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestFuncIdempotentBufferedSequence(t *testing.T) {
+	checkKafkaVersion(t, "0.11.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	const (
+		topic           = "test.1"
+		partition int32 = 0
+	)
+
+	cfg := NewFunctionalTestConfig()
+	cfg.Net.MaxOpenRequests = 1
+	cfg.Producer.Idempotent = true
+	cfg.Producer.RequiredAcks = WaitForAll
+	cfg.Producer.Return.Successes = true
+	cfg.Producer.Return.Errors = true
+	cfg.Producer.Retry.Max = 64
+	cfg.Producer.Retry.Backoff = 250 * time.Millisecond
+
+	start := time.Now()
+
+	producer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, cfg)
+	require.NoError(t, err)
+	defer producer.Close()
+
+	asyncProd, ok := producer.(*asyncProducer)
+	require.True(t, ok)
+
+	waitForMessages := func(count int) {
+		timeout := time.After(2 * time.Minute)
+		for count > 0 {
+			select {
+			case <-timeout:
+				t.Fatalf("timed out waiting for %d messages", count)
+			case perr := <-producer.Errors():
+				if perr != nil {
+					t.Logf("producer error: %v", perr.Err)
+				}
+				count--
+			case <-producer.Successes():
+				count--
+			}
+		}
+	}
+
+	for i := 0; i < 5; i++ {
+		producer.Input() <- &ProducerMessage{
+			Topic:     topic,
+			Partition: partition,
+			Value:     StringEncoder(fmt.Sprintf("warmup-%d", i)),
+		}
+	}
+	waitForMessages(5)
+
+	leader, err := asyncProd.client.Leader(topic, partition)
+	require.NoError(t, err)
+
+	bp := asyncProd.getBrokerProducer(leader)
+	defer asyncProd.unrefBrokerProducer(leader, bp)
+
+	asyncProd.inFlight.Add(1)
+	pp := &partitionProducer{
+		parent:         asyncProd,
+		topic:          topic,
+		partition:      partition,
+		brokerProducer: bp,
+		leader:         leader,
+		retryState:     make([]partitionRetryState, asyncProd.conf.Producer.Retry.Max+1),
+		highWatermark:  1,
+	}
+	pp.retryState[0].buf = []*ProducerMessage{{
+		Topic:     topic,
+		Partition: partition,
+		Value:     StringEncoder("buffered"),
+	}}
+	pp.flushRetryBuffers()
+
+	waitForMessages(1)
+
+	producer.Input() <- &ProducerMessage{
+		Topic:     topic,
+		Partition: partition,
+		Value:     StringEncoder("post-buffer"),
+	}
+	waitForMessages(1)
+
+	logSince := start.UTC().Format(time.RFC3339)
+	cmd := exec.Command(
+		"docker",
+		"compose",
+		"logs",
+		"--since",
+		logSince,
+		fmt.Sprintf("kafka-%d", leader.ID()),
+	)
+	cmd.Env = os.Environ()
+	out, err := cmd.CombinedOutput()
+	require.NoErrorf(t, err, "failed to read broker logs: %s", out)
+
+	logs := string(out)
+	t.Logf("kafka-%d logs since %s:\n%s", leader.ID(), logSince, logs)
+	require.NotContains(t, logs, "OutOfOrderSequenceException", "leader logs contained out-of-order sequence errors:\n%s", logs)
 }
 
 func TestInterceptors(t *testing.T) {
