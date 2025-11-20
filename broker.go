@@ -13,8 +13,10 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
+	"github.com/IBM/sarama/internal/sockopt"
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -28,6 +30,7 @@ type Broker struct {
 	correlationID int32
 	conn          net.Conn
 	connErr       error
+	connTCP       *net.TCPConn
 	lock          sync.Mutex
 	opened        atomic.Bool
 	responses     chan *responsePromise
@@ -156,6 +159,39 @@ func NewBroker(addr string) *Broker {
 	return &Broker{id: -1, addr: addr}
 }
 
+func (b *Broker) getSockOpt(conn *net.TCPConn, opt int) (int, error) {
+	file, err := conn.File()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get file from connection: %w", err)
+	}
+	defer file.Close() // Close the duplicated file descriptor
+
+	sockErr, err := sockopt.GetSockoptInt(file.Fd(), opt)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get sockopt %d: %w", opt, err)
+	}
+
+	return sockErr, nil
+}
+
+func (b *Broker) getSockError() error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	if b.connTCP == nil {
+		return nil
+	}
+
+	sockErr, err := b.getSockOpt(b.connTCP, sockopt.SockoptError)
+	if err != nil {
+		return fmt.Errorf("failed to get socket error: %w", err)
+	}
+	if sockErr != 0 {
+		return syscall.Errno(sockErr)
+	}
+	return nil
+}
+
 // Open tries to connect to the Broker if it is not already connected or connecting, but does not block
 // waiting for the connection to complete. This means that any subsequent operations on the broker will
 // block waiting for the connection to succeed or fail. To get the effect of a fully synchronous Open call,
@@ -192,6 +228,7 @@ func (b *Broker) Open(conf *Config) error {
 			b.opened.Store(false)
 			return
 		}
+		b.connTCP = b.conn.(*net.TCPConn) // for getSockError
 		if conf.Net.TLS.Enable {
 			b.conn = tls.Client(b.conn, validServerNameTLS(b.addr, conf.Net.TLS.Config))
 		}
@@ -351,6 +388,7 @@ func (b *Broker) Close() error {
 
 	b.conn = nil
 	b.connErr = nil
+	b.connTCP = nil
 	b.done = nil
 	b.responses = nil
 
