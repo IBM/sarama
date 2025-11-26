@@ -8,7 +8,7 @@ This folder contains example applications to demonstrate the use of Sarama. For 
 
 #### Describe cluster
 
-[describe_cluster](./describe_cluster) shows how to connect to the controller, issue the DescribeCluster API (key 60), and print the cluster ID, controller ID, authorized operations, and brokers.
+[describe_cluster](./describe_cluster) creates a `ClusterAdmin`, calls `DescribeCluster`, and prints the controller ID and brokers so you can validate Sarama's DescribeCluster support (API key 60).
 
 #### Interceptors
 
