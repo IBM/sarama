@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"math/rand"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -308,6 +309,51 @@ func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetada
 }
 
 func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32, err error) {
+	if ca.conf.Version.IsAtLeast(V3_0_0_0) {
+		brokers, controllerID, err = ca.describeClusterUsingAPI()
+		if err == nil {
+			return brokers, controllerID, nil
+		}
+		if !errors.Is(err, ErrUnsupportedVersion) {
+			return nil, 0, err
+		}
+	}
+	return ca.describeClusterUsingMetadata()
+}
+
+func (ca *clusterAdmin) describeClusterUsingAPI() (brokers []*Broker, controllerID int32, err error) {
+	var response *DescribeClusterResponse
+	err = ca.retryOnError(isRetriableControllerError, func() error {
+		controller, err := ca.Controller()
+		if err != nil {
+			return err
+		}
+
+		request := NewDescribeClusterRequest(ca.conf.Version)
+		response, err = controller.DescribeCluster(request)
+		if err != nil {
+			return err
+		}
+		if !errors.Is(response.Err, ErrNoError) {
+			if isRetriableControllerError(response.Err) {
+				_, _ = ca.refreshController()
+			}
+			if response.ErrorMessage != nil && *response.ErrorMessage != "" {
+				return fmt.Errorf("%w: %s", response.Err, *response.ErrorMessage)
+			}
+			return response.Err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+
+	brokers = convertDescribeClusterBrokers(response.Brokers)
+	return brokers, response.ControllerID, nil
+}
+
+func (ca *clusterAdmin) describeClusterUsingMetadata() (brokers []*Broker, controllerID int32, err error) {
 	var response *MetadataResponse
 	err = ca.retryOnError(isRetriableControllerError, func() error {
 		controller, err := ca.Controller()
@@ -323,10 +369,25 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32
 		return err
 	})
 	if err != nil {
-		return nil, int32(0), err
+		return nil, 0, err
 	}
 
 	return response.Brokers, response.ControllerID, nil
+}
+
+func convertDescribeClusterBrokers(entries []*DescribeClusterBroker) []*Broker {
+	if len(entries) == 0 {
+		return nil
+	}
+	result := make([]*Broker, 0, len(entries))
+	for _, info := range entries {
+		addr := net.JoinHostPort(info.Host, strconv.Itoa(int(info.Port)))
+		b := NewBroker(addr)
+		b.id = info.BrokerID
+		b.rack = info.Rack
+		result = append(result, b)
+	}
+	return result
 }
 
 func (ca *clusterAdmin) findBroker(id int32) (*Broker, error) {

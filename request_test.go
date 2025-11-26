@@ -73,7 +73,7 @@ var names = map[int16]string{
 	57:                                 "UpdateFeaturesRequest",
 	58:                                 "EnvelopeRequest",
 	59:                                 "FetchSnapshotRequest",
-	60:                                 "DescribeClusterRequest",
+	apiKeyDescribeCluster:              "DescribeClusterRequest",
 	61:                                 "DescribeProducersRequest",
 	62:                                 "BrokerRegistrationRequest",
 	63:                                 "BrokerHeartbeatRequest",
@@ -174,6 +174,8 @@ func allocateResponseBody(req protocolBody) protocolBody {
 		return &DescribeUserScramCredentialsResponse{Version: version}
 	case apiKeyAlterUserScramCredentials:
 		return &AlterUserScramCredentialsResponse{Version: version}
+	case apiKeyDescribeCluster:
+		return &DescribeClusterResponse{Version: version}
 	}
 	return nil
 }
