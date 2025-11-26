@@ -34,7 +34,7 @@ func TestNewDescribeClusterRequest(t *testing.T) {
 		version     KafkaVersion
 		expectedVer int16
 	}{
-		{V3_0_0_0, 0},
+		{V2_8_0_0, 0},
 		{V3_7_0_0, 1},
 		{V4_0_0_0, 2},
 	}

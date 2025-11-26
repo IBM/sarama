@@ -128,7 +128,7 @@ func (r *DescribeClusterResponse) requiredVersion() KafkaVersion {
 	case 1:
 		return V3_7_0_0
 	default:
-		return V3_0_0_0
+		return V2_8_0_0
 	}
 }
 
