@@ -6,6 +6,10 @@ This folder contains example applications to demonstrate the use of Sarama. For 
 
 [http_server](./http_server) is a simple HTTP server uses both the sync producer to produce data as part of the request handling cycle, as well as the async producer to maintain an access log. It also uses the [mocks subpackage](https://pkg.go.dev/github.com/IBM/sarama/mocks) to test both.
 
+#### Describe cluster
+
+[describe_cluster](./describe_cluster) shows how to connect to the controller, issue the DescribeCluster API (key 60), and print the cluster ID, controller ID, authorized operations, and brokers.
+
 #### Interceptors
 
 Basic example to use a producer interceptor that produces [OpenTelemetry](https://github.com/open-telemetry/opentelemetry-go/) spans and add some headers for each intercepted message.

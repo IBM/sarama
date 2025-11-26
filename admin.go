@@ -309,7 +309,7 @@ func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetada
 }
 
 func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32, err error) {
-	if ca.conf.Version.IsAtLeast(V3_0_0_0) {
+	if ca.conf.Version.IsAtLeast(V2_8_0_0) {
 		brokers, controllerID, err = ca.describeClusterUsingAPI()
 		if err == nil {
 			return brokers, controllerID, nil
