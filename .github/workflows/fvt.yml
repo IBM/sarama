@@ -36,7 +36,7 @@ jobs:
       KAFKA_VERSION: ${{ inputs.kafka-version }}
       SCALA_VERSION: ${{ inputs.scala-version }}
     steps:
-    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5.0.1
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
       with:
         persist-credentials: false
     - name: Setup Docker
@@ -53,7 +53,7 @@ jobs:
           *.cache-from=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }}
           *.cache-to=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }},mode=max
     - name: Setup Go
-      uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
       with:
         go-version: ${{ inputs.go-version }}
     - name: Setup Docker Compose
@@ -92,7 +92,7 @@ jobs:
         if [ -f "fvt-kafka-${KAFKA_VERSION}.pcap" ]; then sudo chmod a+r "fvt-kafka-${KAFKA_VERSION}.pcap"; fi
     - name: Upload pcap file
       if: always()
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
       with:
         name: fvt-kafka-${{ inputs.kafka-version }}.pcap
         path: fvt-kafka-${{ inputs.kafka-version }}.pcap
