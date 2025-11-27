@@ -376,6 +376,10 @@ func (ca *clusterAdmin) describeClusterUsingMetadata() (brokers []*Broker, contr
 }
 
 func convertDescribeClusterBrokers(entries []*DescribeClusterBroker) []*Broker {
+	// TODO: DescribeCluster brokers currently drop DescribeCluster-specific fields
+	// such as IsFenced (KIP-1073) and ClusterAuthorizedOperations because Broker
+	// has no equivalents yet. This keeps API parity with MetadataResponse for now,
+	// but the richer fields need to be surfaced in a future change.
 	if len(entries) == 0 {
 		return nil
 	}
