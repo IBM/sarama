@@ -327,6 +327,7 @@ type Config struct {
 			}
 			Rebalance struct {
 				// Strategy for allocating topic partitions to members.
+				//
 				// Deprecated: Strategy exists for historical compatibility
 				// and should not be used. Please use GroupStrategies.
 				Strategy BalanceStrategy

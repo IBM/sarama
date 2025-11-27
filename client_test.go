@@ -595,7 +595,7 @@ func TestClientRefreshBrokers(t *testing.T) {
 	newSeedBrokers := []string{"localhost:12345"}
 	_ = client.RefreshBrokers(newSeedBrokers)
 
-	if client.seedBrokers[0].addr != newSeedBrokers[0] {
+	if len(client.seedBrokers) == 0 || client.seedBrokers[0].addr != newSeedBrokers[0] {
 		t.Error("Seed broker not updated")
 	}
 	if len(client.Brokers()) != 0 {
