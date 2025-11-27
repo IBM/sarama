@@ -122,7 +122,7 @@ func configureSASL(config *sarama.Config) error {
 	config.Net.SASL.AuthIdentity = *saslAuthzID
 
 	switch mech {
-	case "PLAIN", "PLAINtext":
+	case "PLAIN", "PLAINTEXT":
 		config.Net.SASL.Mechanism = sarama.SASLTypePlaintext
 	case "SCRAM-SHA-256":
 		config.Net.SASL.Mechanism = sarama.SASLTypeSCRAMSHA256
