@@ -14,6 +14,7 @@ import (
 
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSimpleClient(t *testing.T) {
@@ -1329,4 +1330,71 @@ func TestMetricsCleanup(t *testing.T) {
 	if len(all) != 1 || all["a"] == nil {
 		t.Errorf("excepted 1 metric, found: %v", all)
 	}
+}
+
+func TestUpdateBroker(t *testing.T) {
+	t.Run("closed client doesn't panic", func(t *testing.T) {
+		c := &client{}
+		fn := func() {
+			c.updateBroker(nil)
+			c.updateBroker([]*Broker{
+				{
+					id:   0,
+					addr: "127.0.0.1:9092",
+				},
+			})
+		}
+		require.NotPanics(t, fn)
+	})
+
+	t.Run("open client adds new broker entries", func(t *testing.T) {
+		c := &client{
+			brokers: make(map[int32]*Broker),
+		}
+		fn := func() {
+			c.updateBroker([]*Broker{
+				{
+					id:   0,
+					addr: "127.0.0.1:9092",
+				},
+			})
+		}
+		require.NotPanics(t, fn)
+		require.Len(t, c.brokers, 1)
+		assert.Equal(t, 0, int(c.brokers[0].ID()))
+		assert.Equal(t, "127.0.0.1:9092", c.brokers[0].Addr())
+	})
+
+	t.Run("open client adds, updates and removes broker entries", func(t *testing.T) {
+		c := &client{
+			brokers: map[int32]*Broker{
+				0: {
+					id:   0,
+					addr: "127.0.0.1:9092",
+				},
+				1: {
+					id:   1,
+					addr: "127.0.0.1:9093",
+				},
+			},
+		}
+		fn := func() {
+			c.updateBroker([]*Broker{
+				{
+					id:   1,
+					addr: "127.0.0.1:19093", // new addr for existing broker
+				},
+				{
+					id:   2,
+					addr: "127.0.0.1:19094",
+				},
+			})
+		}
+		require.NotPanics(t, fn)
+		require.Len(t, c.brokers, 2)
+		assert.Equal(t, 1, int(c.brokers[1].ID()))
+		assert.Equal(t, "127.0.0.1:19093", c.brokers[1].Addr())
+		assert.Equal(t, 2, int(c.brokers[2].ID()))
+		assert.Equal(t, "127.0.0.1:19094", c.brokers[2].Addr())
+	})
 }
