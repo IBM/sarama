@@ -83,6 +83,7 @@ type ClusterAdmin interface {
 	// This operation is not transactional so it may succeed or fail.
 	// If you attempt to add an ACL that duplicates an existing ACL, no error will be raised, but
 	// no changes will be made. This operation is supported by brokers with version 0.11.0.0 or higher.
+	//
 	// Deprecated: Use CreateACLs instead.
 	CreateACL(resource Resource, acl Acl) error
 
