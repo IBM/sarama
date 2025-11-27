@@ -1,0 +1,126 @@
+name: Producer Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      go-version:
+        description: go-version
+        required: false
+        type: string
+        default: stable
+      kafka-version:
+        description: kafka-version
+        required: false
+        type: string
+        default: "3.9.1"
+      scala-version:
+        description: scala-version
+        required: false
+        type: string
+        default: "2.13"
+      benchtime:
+        description: benchtime
+        required: false
+        type: string
+        default: 20s
+      count:
+        description: count
+        required: false
+        type: string
+        default: "3"
+  workflow_call:
+    inputs:
+      go-version:
+        required: false
+        type: string
+        default: stable
+      kafka-version:
+        required: false
+        type: string
+        default: "3.9.1"
+      scala-version:
+        required: false
+        type: string
+        default: "2.13"
+      benchtime:
+        required: false
+        type: string
+        default: 20s
+      count:
+        required: false
+        type: string
+        default: "3"
+
+concurrency:
+  group: ${{ github.workflow }}-kafka-${{ inputs.kafka-version || '3.9.1' }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read # for actions/checkout to fetch code
+
+env:
+  # Use the Go toolchain installed by setup-go
+  GOTOOLCHAIN: local
+
+jobs:
+  benchmark:
+    name: Benchmark on Kafka ${{ inputs.kafka-version }}
+    runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -trimpath
+      KAFKA_VERSION: ${{ inputs.kafka-version }}
+      SCALA_VERSION: ${{ inputs.scala-version }}
+      BENCH_BENCHTIME: ${{ inputs.benchtime }}
+      BENCH_COUNT: ${{ inputs.count }}
+    steps:
+    - uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+      with:
+        persist-credentials: false
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+      id: buildx
+    - name: Build FVT Docker Image
+      uses: docker/bake-action@5be5f02ff8819ecd3092ea6b2e6261c31774f2b4 # v6.10.0
+      with:
+        builder: ${{ steps.buildx.outputs.name }}
+        files: docker-compose.yml
+        load: true
+        targets: kafka-1
+        set: |
+          *.cache-from=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }}
+          *.cache-to=type=gha,scope=fvt-kafka-${{ inputs.kafka-version }},mode=max
+    - name: Setup Go
+      uses: actions/setup-go@4dc6199c7b1a012772edbd06daecab0f50c9053c # v6.1.0
+      with:
+        go-version: ${{ inputs.go-version }}
+    - name: Setup Docker Compose
+      run: |
+        curl --fail -sSL "https://github.com/docker/compose/releases/download/v2.32.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        mkdir -p $HOME/.docker/cli-plugins
+        install -m755 /tmp/docker-compose $HOME/.docker/cli-plugins
+        docker version --format 'Docker Engine version v{{.Server.Version}}'
+        docker compose version
+    - name: Run Producer Benchmarks
+      run: make bench_producer BENCH_BENCHTIME=${BENCH_BENCHTIME} BENCH_COUNT=${BENCH_COUNT}
+    - name: Upload benchmark output
+      if: always()
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+      with:
+        name: producer-benchmark-${{ inputs.kafka-version }}
+        path: |
+          _test/benchmarks/producer.txt
+          _test/benchmarks/producer_summary.txt
+        retention-days: 14
+        if-no-files-found: warn
+    - name: Publish benchmark summary
+      if: always()
+      run: |
+        {
+          echo "### Producer benchmark (Kafka ${KAFKA_VERSION})"
+          echo ""
+          if [ -f "_test/benchmarks/producer_summary.txt" ]; then
+            cat _test/benchmarks/producer_summary.txt
+          else
+            echo "No benchmark summary generated."
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"

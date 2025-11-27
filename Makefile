@@ -10,6 +10,11 @@ GOTESTSUM_VERSION := v1.13.0
 $(GOTESTSUM):
 	GOBIN=$(GOBIN) go install gotest.tools/gotestsum@$(GOTESTSUM_VERSION)
 
+BENCHSTAT         := $(GOBIN)/benchstat
+BENCHSTAT_VERSION := latest
+$(BENCHSTAT):
+	GOBIN=$(GOBIN) go install golang.org/x/perf/cmd/benchstat@$(BENCHSTAT_VERSION)
+
 TESTSTAT         := $(GOBIN)/teststat
 # renovate: datasource=github-releases depName=vearutop/teststat
 TESTSTAT_VERSION := v0.1.27
@@ -47,3 +52,12 @@ test_functional: $(GOTESTSUM) $(TESTSTAT) $(TPARSE)
 		--rerun-fails --packages="./..." \
 		-- -v -race -coverprofile=profile.out -covermode=atomic -timeout 15m -tags=functional
 	@$(TESTSTAT) _test/fvt.json
+
+.PHONY: bench_producer
+BENCH_BENCHTIME ?= 20s
+BENCH_COUNT ?= 3
+BENCH_TIMEOUT ?= 10m
+bench_producer: $(BENCHSTAT)
+	@mkdir -p _test/benchmarks
+	@bash -o pipefail -c '$(GO) test -run "^$$" -bench "^BenchmarkProducerProfiles" -benchtime=$(BENCH_BENCHTIME) -count=$(BENCH_COUNT) -tags=functional -timeout $(BENCH_TIMEOUT) ./... | tee _test/benchmarks/producer.txt'
+	@$(BENCHSTAT) _test/benchmarks/producer.txt | tee _test/benchmarks/producer_summary.txt
