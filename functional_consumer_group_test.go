@@ -378,18 +378,19 @@ func (s *testFuncConsumerGroupSink) Close() map[string][]string {
 
 type testFuncConsumerGroupMember struct {
 	ConsumerGroup
-	clientID     string
-	claims       map[string]int
+	t        *testing.T
+	clientID string
+	isCapped bool
+	sink     *testFuncConsumerGroupSink
+
 	generationId atomic.Int32
 	state        atomic.Int32
 	handlers     atomic.Int32
-	errs         []error
 	maxMessages  atomic.Int32
-	isCapped     bool
-	sink         *testFuncConsumerGroupSink
 
-	t  *testing.T
-	mu sync.RWMutex
+	mu     sync.RWMutex
+	claims map[string]int
+	errs   []error
 }
 
 func defaultConfig(clientID string) *Config {
