@@ -7,7 +7,6 @@ import (
 	"errors"
 	"math"
 	"reflect"
-	"sync/atomic"
 	"testing"
 )
 
@@ -107,7 +106,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 		t.Errorf("should have 2 members in group , got %v\n", len(res1[0].Members))
 	}
 
-	generationId1 := m1.generationId
+	generationId1 := m1.generationId.Load()
 
 	// shut down m2, membership should not change (we didn't leave group when close)
 	m2.AssertCleanShutdown()
@@ -123,7 +122,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 		t.Errorf("group description be the same before %s, after %s", res1Bytes, res2Bytes)
 	}
 
-	generationId2 := atomic.LoadInt32(&m1.generationId)
+	generationId2 := m1.generationId.Load()
 	if generationId2 != generationId1 {
 		t.Errorf("m1 generation should not increase expect %v, actual %v", generationId1, generationId2)
 	}
@@ -147,7 +146,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 		t.Errorf("should have 2 members in group , got %v\n", len(res3[0].Members))
 	}
 
-	generationId3 := atomic.LoadInt32(&m1.generationId)
+	generationId3 := m1.generationId.Load()
 	if generationId3 != generationId1 {
 		t.Errorf("m1 generation should not increase expect %v, actual %v", generationId1, generationId2)
 	}
@@ -162,7 +161,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 	}
 	m1.WaitForHandlers(4)
 
-	generationId4 := atomic.LoadInt32(&m1.generationId)
+	generationId4 := m1.generationId.Load()
 	if generationId4 == generationId1 {
 		t.Errorf("m1 generation should increase expect %v, actual %v", generationId1, generationId2)
 	}

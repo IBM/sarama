@@ -629,9 +629,14 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	config.Producer.Return.Successes = true
 	config.Producer.Retry.Max = 4
 
-	backoffCalled := make([]int32, config.Producer.Retry.Max+1)
+	// We use a pointer to atomic to prevent the possibility of a reallocation causing a copy.
+	backoffCalled := make([]*atomic.Int32, config.Producer.Retry.Max+1)
+	for i := range backoffCalled {
+		backoffCalled[i] = new(atomic.Int32)
+	}
+
 	config.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
-		atomic.AddInt32(&backoffCalled[retries-1], 1)
+		backoffCalled[retries-1].Add(1)
 		return 0
 	}
 	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
@@ -672,11 +677,11 @@ func TestAsyncProducerMultipleRetriesWithBackoffFunc(t *testing.T) {
 	closeProducer(t, producer)
 
 	for i := 0; i < config.Producer.Retry.Max; i++ {
-		if atomic.LoadInt32(&backoffCalled[i]) != 1 {
+		if backoffCalled[i].Load() != 1 {
 			t.Errorf("expected one retry attempt #%d", i)
 		}
 	}
-	if atomic.LoadInt32(&backoffCalled[config.Producer.Retry.Max]) != 0 {
+	if backoffCalled[config.Producer.Retry.Max].Load() != 0 {
 		t.Errorf("expected no retry attempt #%d", config.Producer.Retry.Max)
 	}
 }
@@ -811,21 +816,21 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	// The seed broker only handles Metadata request in bootstrap
 	seedBroker.setHandler(metadataRequestHandlerFunc)
 
-	var emptyValues int32 = 0
+	var emptyValues atomic.Int32
 
 	countRecordsWithEmptyValue := func(req *request) {
 		preq := req.body.(*ProduceRequest)
 		if batch := preq.records["my_topic"][0].RecordBatch; batch != nil {
 			for _, record := range batch.Records {
 				if len(record.Value) == 0 {
-					atomic.AddInt32(&emptyValues, 1)
+					emptyValues.Add(1)
 				}
 			}
 		}
 		if batch := preq.records["my_topic"][0].MsgSet; batch != nil {
 			for _, record := range batch.Messages {
 				if len(record.Msg.Value) == 0 {
-					atomic.AddInt32(&emptyValues, 1)
+					emptyValues.Add(1)
 				}
 			}
 		}
@@ -904,7 +909,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 
 	closeProducerWithTimeout(t, producer, 5*time.Second)
 
-	if emptyValues := atomic.LoadInt32(&emptyValues); emptyValues > 0 {
+	if emptyValues := emptyValues.Load(); emptyValues > 0 {
 		t.Fatalf("%d empty values", emptyValues)
 	}
 }

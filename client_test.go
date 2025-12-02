@@ -362,12 +362,12 @@ func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
 	metadataResponse1.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
 	seedBroker.Returns(metadataResponse1)
 
-	retryCount := int32(0)
+	var retryCount atomic.Int32
 
 	config := NewTestConfig()
 	config.Metadata.Retry.Max = 1
 	config.Metadata.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
-		atomic.AddInt32(&retryCount, 1)
+		retryCount.Add(1)
 		return 0
 	}
 	client, err := NewClient([]string{seedBroker.Addr()}, config)
@@ -388,7 +388,7 @@ func TestClientReceivingUnknownTopicWithBackoffFunc(t *testing.T) {
 	safeClose(t, client)
 	seedBroker.Close()
 
-	actualRetryCount := atomic.LoadInt32(&retryCount)
+	actualRetryCount := retryCount.Load()
 	if actualRetryCount != 1 {
 		t.Fatalf("Expected BackoffFunc to be called exactly once, but saw %d", actualRetryCount)
 	}

@@ -112,7 +112,7 @@ func TestNewOffsetManager(t *testing.T) {
 // Test that the correct sequence of offset commit messages is sent to a broker when
 // multiple goroutines for a group are committing offsets at the same time
 func TestOffsetManagerCommitSequence(t *testing.T) {
-	lastOffset := map[int32]int64{}
+	lastOffset := make(map[int32]int64)
 	var outOfOrder atomic.Pointer[string]
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -384,9 +384,9 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 
 // Test fetchInitialOffset retry on ErrOffsetsLoadInProgress
 func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
-	retryCount := int32(0)
+	var retryCount atomic.Int32
 	backoff := func(retries, maxRetries int) time.Duration {
-		atomic.AddInt32(&retryCount, 1)
+		retryCount.Add(1)
 		return 0
 	}
 	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff, NewTestConfig())
@@ -420,7 +420,7 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	safeClose(t, om)
 	safeClose(t, testClient)
 
-	if atomic.LoadInt32(&retryCount) == 0 {
+	if retryCount.Load() == 0 {
 		t.Fatal("Expected at least one retry")
 	}
 }
