@@ -400,6 +400,17 @@ func (b *Broker) GetMetadata(request *MetadataRequest) (*MetadataResponse, error
 	return response, nil
 }
 
+func (b *Broker) DescribeCluster(request *DescribeClusterRequest) (*DescribeClusterResponse, error) {
+	response := new(DescribeClusterResponse)
+	response.Version = request.Version
+
+	if err := b.sendAndReceive(request, response); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
 // GetConsumerMetadata send a consumer metadata request and returns a consumer metadata response or error
 func (b *Broker) GetConsumerMetadata(request *ConsumerMetadataRequest) (*ConsumerMetadataResponse, error) {
 	response := new(ConsumerMetadataResponse)
