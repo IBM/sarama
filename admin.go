@@ -6,9 +6,10 @@ import (
 	"io"
 	"maps"
 	"math/rand"
+	"net"
 	"strconv"
-	"syscall"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -224,7 +225,7 @@ func isRetriableGroupCoordinatorError(err error) bool {
 	return errors.Is(err, ErrNotCoordinatorForConsumer) || errors.Is(err, ErrConsumerCoordinatorNotAvailable) || errors.Is(err, io.EOF) || isNetworkError(err)
 }
 
-// isNetworkError categorises transient network failures that should trigger
+// isNetworkError categorizes transient network failures that should trigger
 // a reconnect/retry path (e.g. broken pipe, connection reset/timeout).
 func isNetworkError(err error) bool {
 	var ne net.Error
