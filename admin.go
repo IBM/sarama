@@ -1481,12 +1481,11 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 		ValidateOnly: validateOnly,
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return err
-	}
-
 	return ca.retryOnError(isRetriableControllerError, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 		_ = b.Open(ca.client.Config())
 
 		rsp, err := b.AlterClientQuotas(request)
