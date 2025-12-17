@@ -398,7 +398,8 @@ func (pc *PartitionConsumer) YieldMessage(msg *sarama.ConsumerMessage) *Partitio
 	msg.Partition = pc.partition
 
 	if pc.paused {
-		msg.Offset = atomic.AddInt64(&pc.suppressedHighWaterMarkOffset, 1) - 1
+		msg.Offset = pc.suppressedHighWaterMarkOffset
+		pc.suppressedHighWaterMarkOffset++
 		pc.suppressedMessages <- msg
 	} else {
 		msg.Offset = pc.highWaterMarkOffset.Add(1) - 1

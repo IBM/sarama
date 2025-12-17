@@ -348,20 +348,20 @@ type testFuncConsumerGroupMessage struct {
 
 type testFuncConsumerGroupSink struct {
 	msgs  chan testFuncConsumerGroupMessage
-	count int32
+	count atomic.Int32
 }
 
 func (s *testFuncConsumerGroupSink) Len() int {
 	if s == nil {
 		return -1
 	}
-	return int(atomic.LoadInt32(&s.count))
+	return int(s.count.Load())
 }
 
 func (s *testFuncConsumerGroupSink) Push(clientID string, m *ConsumerMessage) {
 	if s != nil {
 		s.msgs <- testFuncConsumerGroupMessage{ClientID: clientID, ConsumerMessage: m}
-		atomic.AddInt32(&s.count, 1)
+		s.count.Add(1)
 	}
 }
 
@@ -378,18 +378,19 @@ func (s *testFuncConsumerGroupSink) Close() map[string][]string {
 
 type testFuncConsumerGroupMember struct {
 	ConsumerGroup
-	clientID     string
-	claims       map[string]int
-	generationId int32
-	state        int32
-	handlers     int32
-	errs         []error
-	maxMessages  int32
-	isCapped     bool
-	sink         *testFuncConsumerGroupSink
+	t        *testing.T
+	clientID string
+	isCapped bool
+	sink     *testFuncConsumerGroupSink
 
-	t  *testing.T
-	mu sync.RWMutex
+	generationId atomic.Int32
+	state        atomic.Int32
+	handlers     atomic.Int32
+	maxMessages  atomic.Int32
+
+	mu     sync.RWMutex
+	claims map[string]int
+	errs   []error
 }
 
 func defaultConfig(clientID string) *Config {
@@ -443,11 +444,11 @@ func runTestFuncConsumerGroupMemberWithConfig(
 		ConsumerGroup: group,
 		clientID:      config.ClientID,
 		claims:        make(map[string]int),
-		maxMessages:   maxMessages,
 		isCapped:      maxMessages != 0,
 		sink:          sink,
 		t:             t,
 	}
+	member.maxMessages.Store(maxMessages)
 	go member.loop(topics)
 	return member
 }
@@ -480,7 +481,7 @@ func (m *testFuncConsumerGroupMember) WaitForState(expected int32) {
 	m.t.Helper()
 
 	m.waitFor("state", expected, func() (interface{}, error) {
-		return atomic.LoadInt32(&m.state), nil
+		return m.state.Load(), nil
 	})
 }
 
@@ -488,7 +489,7 @@ func (m *testFuncConsumerGroupMember) WaitForHandlers(expected int) {
 	m.t.Helper()
 
 	m.waitFor("handlers", expected, func() (interface{}, error) {
-		return int(atomic.LoadInt32(&m.handlers)), nil
+		return int(m.handlers.Load()), nil
 	})
 }
 
@@ -518,17 +519,17 @@ func (m *testFuncConsumerGroupMember) Setup(s ConsumerGroupSession) error {
 	m.mu.Unlock()
 
 	// store generationID
-	atomic.StoreInt32(&m.generationId, s.GenerationID())
+	m.generationId.Store(s.GenerationID())
 
 	// enter post-setup state
-	atomic.StoreInt32(&m.state, 2)
+	m.state.Store(2)
 	return nil
 }
 
 func (m *testFuncConsumerGroupMember) Cleanup(s ConsumerGroupSession) error {
 	m.t.Logf("Consumer %s: session ended %s in generation %d", m.clientID, s.MemberID(), s.GenerationID())
 	// enter post-cleanup state
-	atomic.StoreInt32(&m.state, 3)
+	m.state.Store(3)
 	return nil
 }
 
@@ -538,8 +539,8 @@ func (m *testFuncConsumerGroupMember) ConsumeClaim(s ConsumerGroupSession, c Con
 			m.t.Errorf("panic in ConsumeClaim: %v", r)
 		}
 	}()
-	atomic.AddInt32(&m.handlers, 1)
-	defer atomic.AddInt32(&m.handlers, -1)
+	m.handlers.Add(1)
+	defer m.handlers.Add(-1)
 
 	consumed := 0
 	for {
@@ -549,7 +550,7 @@ func (m *testFuncConsumerGroupMember) ConsumeClaim(s ConsumerGroupSession, c Con
 				m.t.Logf("Consumer %s: message channel closed, consumed %d messages", m.clientID, consumed)
 				return nil
 			}
-			if n := atomic.AddInt32(&m.maxMessages, -1); m.isCapped && n < 0 {
+			if n := m.maxMessages.Add(-1); m.isCapped && n < 0 {
 				m.t.Logf("Consumer %s: reached max messages, consumed %d messages", m.clientID, consumed)
 				return nil
 			}
@@ -597,7 +598,7 @@ func (m *testFuncConsumerGroupMember) loop(topics []string) {
 		if r := recover(); r != nil {
 			m.t.Errorf("panic in loop for %s: %v", m.clientID, r)
 		}
-		atomic.StoreInt32(&m.state, 4)
+		m.state.Store(4)
 	}()
 
 	go func() {
@@ -614,7 +615,7 @@ func (m *testFuncConsumerGroupMember) loop(topics []string) {
 	ctx := context.Background()
 	for {
 		// set state to pre-consume
-		atomic.StoreInt32(&m.state, 1)
+		m.state.Store(1)
 
 		if err := m.Consume(ctx, topics, m); errors.Is(err, ErrClosedConsumerGroup) {
 			m.t.Logf("Consumer %s: closed consumer group", m.clientID)
@@ -634,7 +635,7 @@ func (m *testFuncConsumerGroupMember) loop(topics []string) {
 		}
 
 		// return if capped
-		if n := atomic.LoadInt32(&m.maxMessages); m.isCapped && n < 0 {
+		if n := m.maxMessages.Load(); m.isCapped && n < 0 {
 			m.t.Logf("Consumer %s: reached max messages, returning from loop", m.clientID)
 			return
 		}
@@ -651,7 +652,7 @@ func newTestStatefulStrategy(t *testing.T) *testStatefulStrategy {
 type testStatefulStrategy struct {
 	BalanceStrategy
 	t       *testing.T
-	initial int32
+	initial atomic.Int32
 	state   sync.Map
 }
 
@@ -664,7 +665,7 @@ func (h *testStatefulStrategy) Plan(members map[string]ConsumerGroupMemberMetada
 	for memberID, metadata := range members {
 		if !strings.HasSuffix(string(metadata.UserData), "-stateful") {
 			metadata.UserData = []byte(string(metadata.UserData) + "-stateful")
-			atomic.AddInt32(&h.initial, 1)
+			h.initial.Add(1)
 		}
 		h.state.Store(memberID, metadata.UserData)
 	}
@@ -680,7 +681,7 @@ func (h *testStatefulStrategy) AssignmentData(memberID string, topics map[string
 
 func (h *testStatefulStrategy) AssertInitialValues(count int32) {
 	h.t.Helper()
-	actual := atomic.LoadInt32(&h.initial)
+	actual := h.initial.Load()
 	if actual != count {
 		h.t.Fatalf("unexpected count of initial values: %d, expected: %d", actual, count)
 	}
