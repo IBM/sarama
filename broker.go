@@ -230,6 +230,9 @@ func (b *Broker) Open(conf *Config) error {
 					// The underlying connection is unusable. Reset broker connection state and
 					// abort this Open() attempt; continuing initialization (SASL, response loop,
 					// etc.) on a dead connection would leave the broker in a broken state.
+					//
+					// Note: Open() is asynchronous and still returns nil; callers should use
+					// Connected() (or the next request) to observe this error.
 					b.connErr = err
 					_ = b.closeInnerLocked()
 					return
@@ -249,6 +252,8 @@ func (b *Broker) Open(conf *Config) error {
 				apiVersionsResponse, err = b.sendAndReceiveApiVersions(maxVersion)
 				if err != nil {
 					if shouldCloseBrokerConn(err) {
+						// Note: Open() is asynchronous and still returns nil; callers should use
+						// Connected() (or the next request) to observe this error.
 						b.connErr = err
 						_ = b.closeInnerLocked()
 						return
