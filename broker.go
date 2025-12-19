@@ -224,6 +224,12 @@ func (b *Broker) Open(conf *Config) error {
 		if conf.ApiVersionsRequest {
 			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
+				if shouldCloseBrokerConn(err) {
+					b.connErr = err
+					_ = b.closeInnerLocked()
+					return
+				}
+
 				Logger.Printf("Error while sending ApiVersionsRequest V3 to broker %s: %s\n", b.addr, err)
 				// send a lower version request in case remote cluster is <= 2.4.0.0
 				maxVersion := int16(0)
@@ -237,6 +243,11 @@ func (b *Broker) Open(conf *Config) error {
 				}
 				apiVersionsResponse, err = b.sendAndReceiveApiVersions(maxVersion)
 				if err != nil {
+					if shouldCloseBrokerConn(err) {
+						b.connErr = err
+						_ = b.closeInnerLocked()
+						return
+					}
 					Logger.Printf("Error while sending ApiVersionsRequest V%d to broker %s: %s\n", maxVersion, b.addr, err)
 				}
 			}
@@ -341,19 +352,28 @@ func (b *Broker) Close() error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
+	b.connErr = nil
+	return b.closeInnerLocked()
+}
+
+// closeInnerLocked is like closeInner but requires b.lock to be held by caller.
+func (b *Broker) closeInnerLocked() error {
 	if b.conn == nil {
 		return ErrNotConnected
 	}
 
-	close(b.responses)
-	<-b.done
+	if b.responses != nil {
+		close(b.responses)
+	}
+	if b.done != nil {
+		<-b.done
+	}
 
 	err := b.conn.Close()
 
 	b.conn = nil
-	b.connErr = nil
-	b.done = nil
 	b.responses = nil
+	b.done = nil
 
 	b.metricRegistry.UnregisterAll()
 
@@ -1092,6 +1112,10 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 
 	promise, err := b.send(req, res)
 	if err != nil {
+		if shouldCloseBrokerConn(err) {
+			b.connErr = err
+			_ = b.closeInnerLocked()
+		}
 		return err
 	}
 
@@ -1101,6 +1125,10 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 
 	err = handleResponsePromise(req, res, promise, b.metricRegistry)
 	if err != nil {
+		if shouldCloseBrokerConn(err) {
+			b.connErr = err
+			_ = b.closeInnerLocked()
+		}
 		return err
 	}
 	if res != nil {
