@@ -283,12 +283,14 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 }
 
 func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) error {
-	c := exec.Command("docker", "compose", "down", "--volumes")
+	// We may have started services under the "zookeeper" profile (Kafka < 4),
+	// so always include it here to avoid leaving containers/networks behind.
+	c := exec.Command("docker", "compose", "--profile", "zookeeper", "down", "--volumes")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	downErr := c.Run()
 
-	c = exec.Command("docker", "compose", "rm", "-v", "--force", "--stop")
+	c = exec.Command("docker", "compose", "--profile", "zookeeper", "rm", "-v", "--force", "--stop")
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	rmErr := c.Run()
