@@ -225,6 +225,10 @@ func (b *Broker) Open(conf *Config) error {
 			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
 				if shouldCloseBrokerConn(err) {
+					// If ApiVersions negotiation fails with a transport-level error, the underlying
+					// connection is unusable. We must reset broker connection state and abort this
+					// Open() attempt to avoid continuing initialization (SASL, response loop, etc.)
+					// on a dead connection.
 					b.connErr = err
 					_ = b.closeInnerLocked()
 					return
