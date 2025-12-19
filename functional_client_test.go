@@ -70,6 +70,9 @@ func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
 	if _, err := controller.GetMetadata(metadataReq); err == nil {
 		t.Fatal("expected metadata request to fail after injected network error")
 	}
+	// Ensure the injected reset is one-shot; otherwise the proxy will continue
+	// to reset new connections and make reconnection impossible.
+	resetProxies(t)
 
 	// Trigger a reconnect path and retry. It should succeed after the automatic reconnection.
 	_ = controller.Open(config)
