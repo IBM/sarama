@@ -13,7 +13,8 @@ func TestFuncConnectionFailure(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	FunctionalTestEnv.Proxies["kafka1"].Enabled = false
+	proxy := proxyForBrokerID(t, 1)
+	proxy.Enabled = false
 	SaveProxy(t, "kafka1")
 
 	config := NewFunctionalTestConfig()
@@ -22,6 +23,74 @@ func TestFuncConnectionFailure(t *testing.T) {
 	_, err := NewClient([]string{FunctionalTestEnv.KafkaBrokerAddrs[0]}, config)
 	if !errors.Is(err, ErrOutOfBrokers) {
 		t.Fatal("Expected returned error to be ErrOutOfBrokers, but was: ", err)
+	}
+}
+
+func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
+	checkKafkaVersion(t, "0.11.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	kafkaVersion, err := ParseKafkaVersion(FunctionalTestEnv.KafkaVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewFunctionalTestConfig()
+	config.Version = kafkaVersion
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	ca, ok := adminClient.(*clusterAdmin)
+	if !ok {
+		t.Fatalf("expected *clusterAdmin, got %T", adminClient)
+	}
+
+	controller, err := ca.Controller()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if controller.ID() < 0 {
+		_, controllerID, err := ca.DescribeCluster()
+		if err != nil {
+			t.Fatal(err)
+		}
+		controller, err = ca.findBroker(controllerID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = controller.Open(config)
+	}
+
+	// Warm up the connection so the proxy toxic applies to an established TCP session.
+	metadataReq := NewMetadataRequest(config.Version, nil)
+	if _, err := controller.GetMetadata(metadataReq); err != nil {
+		t.Fatal(err)
+	}
+
+	proxy := proxyForBrokerID(t, controller.ID())
+	addResetPeerToxic(t, proxy)
+	defer resetProxies(t)
+
+	topicName := fmt.Sprintf("net-error-topic-%d", time.Now().UnixNano())
+	topicDetails := map[string]*TopicDetail{
+		topicName: {
+			NumPartitions:     1,
+			ReplicationFactor: 1,
+		},
+	}
+	createReq := NewCreateTopicsRequest(config.Version, topicDetails, config.Admin.Timeout, false)
+	if _, err := controller.CreateTopics(createReq); err == nil {
+		_ = adminClient.DeleteTopic(topicName)
+		t.Fatal("expected create topics to fail due to injected network error")
+	}
+
+	connected, _ := controller.Connected()
+	if connected {
+		t.Fatalf("expected controller connection to be closed after network error")
 	}
 }
 
