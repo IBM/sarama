@@ -491,12 +491,12 @@ func TestConsumerLeaderRefreshError(t *testing.T) {
 }
 
 func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
-	var calls int32 = 0
+	var calls atomic.Int32
 
 	config := NewTestConfig()
 	config.Net.ReadTimeout = 100 * time.Millisecond
 	config.Consumer.Retry.BackoffFunc = func(retries int) time.Duration {
-		atomic.AddInt32(&calls, 1)
+		calls.Add(1)
 		return 200 * time.Millisecond
 	}
 	config.Consumer.Return.Errors = true
@@ -505,7 +505,7 @@ func TestConsumerLeaderRefreshErrorWithBackoffFunc(t *testing.T) {
 	runConsumerLeaderRefreshErrorTestWithConfig(t, config)
 
 	// we expect at least one call to our backoff function
-	if calls == 0 {
+	if calls.Load() == 0 {
 		t.Fail()
 	}
 }
