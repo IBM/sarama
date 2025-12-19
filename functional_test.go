@@ -474,6 +474,21 @@ func SaveProxy(t *testing.T, px string) {
 	}
 }
 
+func proxyForBrokerID(t testing.TB, brokerID int32) *toxiproxy.Proxy {
+	proxyName := fmt.Sprintf("kafka%d", brokerID)
+	proxy := FunctionalTestEnv.Proxies[proxyName]
+	if proxy == nil {
+		t.Fatalf("toxiproxy %s not found", proxyName)
+	}
+	return proxy
+}
+
+func addResetPeerToxic(t testing.TB, proxy *toxiproxy.Proxy) {
+	if _, err := proxy.AddToxic("reset-peer", "reset_peer", "downstream", 1, toxiproxy.Attributes{}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func setupFunctionalTest(t testing.TB) {
 	resetProxies(t)
 	ensureFullyReplicated(t, 60*time.Second, 5*time.Second)
