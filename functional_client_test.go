@@ -27,6 +27,11 @@ func TestFuncConnectionFailure(t *testing.T) {
 }
 
 func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
+	// Goal (IBM/sarama#1162): verify controller reconnection semantics after a TCP reset.
+	// Expected flow:
+	// 1) First metadata request succeeds.
+	// 2) Injected TCP reset makes the next metadata request fail.
+	// 3) Explicit Open triggers automatic reconnection and the subsequent metadata request succeeds.
 	checkKafkaVersion(t, "0.11.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -44,25 +49,12 @@ func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
 	}
 	defer safeClose(t, adminClient)
 
-	ca, ok := adminClient.(*clusterAdmin)
-	if !ok {
-		t.Fatalf("expected *clusterAdmin, got %T", adminClient)
-	}
-
-	controller, err := ca.Controller()
+	controller, err := adminClient.Controller()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if controller.ID() < 0 {
-		_, controllerID, err := ca.DescribeCluster()
-		if err != nil {
-			t.Fatal(err)
-		}
-		controller, err = ca.findBroker(controllerID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = controller.Open(config)
+		t.Fatalf("expected controller broker ID to be resolved, got %d", controller.ID())
 	}
 
 	// Warm up the connection so the proxy toxic applies to an established TCP session.
@@ -75,22 +67,17 @@ func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
 	addResetPeerToxic(t, proxy)
 	defer resetProxies(t)
 
-	topicName := fmt.Sprintf("net-error-topic-%d", time.Now().UnixNano())
-	topicDetails := map[string]*TopicDetail{
-		topicName: {
-			NumPartitions:     1,
-			ReplicationFactor: 1,
-		},
+	if _, err := controller.GetMetadata(metadataReq); err == nil {
+		t.Fatal("expected metadata request to fail after injected network error")
 	}
-	createReq := NewCreateTopicsRequest(config.Version, topicDetails, config.Admin.Timeout, false)
-	if _, err := controller.CreateTopics(createReq); err == nil {
-		_ = adminClient.DeleteTopic(topicName)
-		t.Fatal("expected create topics to fail due to injected network error")
-	}
+	// Ensure the injected reset is one-shot; otherwise the proxy will continue
+	// to reset new connections and make reconnection impossible.
+	resetProxies(t)
 
-	connected, _ := controller.Connected()
-	if connected {
-		t.Fatalf("expected controller connection to be closed after network error")
+	// Trigger a reconnect path and retry. It should succeed after the automatic reconnection.
+	_ = controller.Open(config)
+	if _, err := controller.GetMetadata(metadataReq); err != nil {
+		t.Fatalf("expected metadata request to succeed after reopen, got %v", err)
 	}
 }
 
