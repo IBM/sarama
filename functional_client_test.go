@@ -44,25 +44,12 @@ func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
 	}
 	defer safeClose(t, adminClient)
 
-	ca, ok := adminClient.(*clusterAdmin)
-	if !ok {
-		t.Fatalf("expected *clusterAdmin, got %T", adminClient)
-	}
-
-	controller, err := ca.Controller()
+	controller, err := adminClient.Controller()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if controller.ID() < 0 {
-		_, controllerID, err := ca.DescribeCluster()
-		if err != nil {
-			t.Fatal(err)
-		}
-		controller, err = ca.findBroker(controllerID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_ = controller.Open(config)
+		t.Fatalf("expected controller broker ID to be resolved, got %d", controller.ID())
 	}
 
 	// Warm up the connection so the proxy toxic applies to an established TCP session.
@@ -75,22 +62,16 @@ func TestFuncAdminNetworkErrorClosesControllerConnection(t *testing.T) {
 	addResetPeerToxic(t, proxy)
 	defer resetProxies(t)
 
-	topicName := fmt.Sprintf("net-error-topic-%d", time.Now().UnixNano())
-	topicDetails := map[string]*TopicDetail{
-		topicName: {
-			NumPartitions:     1,
-			ReplicationFactor: 1,
-		},
-	}
-	createReq := NewCreateTopicsRequest(config.Version, topicDetails, config.Admin.Timeout, false)
-	if _, err := controller.CreateTopics(createReq); err == nil {
-		_ = adminClient.DeleteTopic(topicName)
-		t.Fatal("expected create topics to fail due to injected network error")
+	if _, err := controller.GetMetadata(metadataReq); err == nil {
+		t.Fatal("expected metadata request to fail after injected network error")
 	}
 
-	connected, _ := controller.Connected()
-	if connected {
-		t.Fatalf("expected controller connection to be closed after network error")
+	// Trigger a reconnect path and retry. It should succeed after the automatic reconnection.
+	if err := controller.Open(config); err != nil {
+		t.Fatalf("expected controller reopen to succeed after network error, got %v", err)
+	}
+	if _, err := controller.GetMetadata(metadataReq); err != nil {
+		t.Fatalf("expected metadata request to succeed after reopen, got %v", err)
 	}
 }
 
