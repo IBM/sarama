@@ -366,7 +366,8 @@ func (b *Broker) Close() error {
 	return b.closeInnerLocked()
 }
 
-// closeInnerLocked is like closeInner but requires b.lock to be held by caller.
+// closeInnerLocked closes the broker connection and resets state.
+// NOTE: caller must hold b.lock.
 func (b *Broker) closeInnerLocked() error {
 	if b.conn == nil {
 		return ErrNotConnected
