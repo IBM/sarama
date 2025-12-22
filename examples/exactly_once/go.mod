@@ -2,7 +2,7 @@ module github.com/IBM/sarama/examples/exactly_once
 
 go 1.24.0
 
-require github.com/IBM/sarama v1.45.0
+require github.com/IBM/sarama v1.46.3
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
