@@ -224,7 +224,7 @@ func (b *Broker) Open(conf *Config) error {
 		if conf.ApiVersionsRequest {
 			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
-				if shouldCloseBrokerConn(err) {
+				if b.maybeCloseLocked(err) {
 					// ApiVersions negotiation failed with a transport-level error.
 					//
 					// The underlying connection is unusable. Reset broker connection state and
@@ -233,8 +233,6 @@ func (b *Broker) Open(conf *Config) error {
 					//
 					// Note: Open() is asynchronous and still returns nil; callers should use
 					// Connected() (or the next request) to observe this error.
-					b.connErr = err
-					_ = b.closeInnerLocked()
 					return
 				}
 
@@ -251,11 +249,9 @@ func (b *Broker) Open(conf *Config) error {
 				}
 				apiVersionsResponse, err = b.sendAndReceiveApiVersions(maxVersion)
 				if err != nil {
-					if shouldCloseBrokerConn(err) {
+					if b.maybeCloseLocked(err) {
 						// Note: Open() is asynchronous and still returns nil; callers should use
 						// Connected() (or the next request) to observe this error.
-						b.connErr = err
-						_ = b.closeInnerLocked()
 						return
 					}
 					Logger.Printf("Error while sending ApiVersionsRequest V%d to broker %s: %s\n", maxVersion, b.addr, err)
@@ -364,6 +360,19 @@ func (b *Broker) Close() error {
 
 	b.connErr = nil
 	return b.closeInnerLocked()
+}
+
+// maybeCloseLocked closes the broker connection for transport-level errors and
+// reports whether a close was performed.
+// NOTE: caller must hold b.lock.
+func (b *Broker) maybeCloseLocked(err error) bool {
+	if !shouldCloseBrokerConn(err) {
+		return false
+	}
+
+	b.connErr = err
+	_ = b.closeInnerLocked()
+	return true
 }
 
 // closeInnerLocked closes the broker connection and resets state.
@@ -1123,10 +1132,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 
 	promise, err := b.send(req, res)
 	if err != nil {
-		if shouldCloseBrokerConn(err) {
-			b.connErr = err
-			_ = b.closeInnerLocked()
-		}
+		b.maybeCloseLocked(err)
 		return err
 	}
 
@@ -1136,10 +1142,7 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 
 	err = handleResponsePromise(req, res, promise, b.metricRegistry)
 	if err != nil {
-		if shouldCloseBrokerConn(err) {
-			b.connErr = err
-			_ = b.closeInnerLocked()
-		}
+		b.maybeCloseLocked(err)
 		return err
 	}
 	if res != nil {
