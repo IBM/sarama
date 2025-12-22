@@ -227,9 +227,9 @@ func (b *Broker) Open(conf *Config) error {
 				if b.maybeCloseLocked(err) {
 					// ApiVersions negotiation failed with a transport-level error.
 					//
-					// The underlying connection is unusable. Reset broker connection state and
-					// abort this Open() attempt; continuing initialization (SASL, response loop,
-					// etc.) on a dead connection would leave the broker in a broken state.
+					// The underlying connection is unusable. Abort this Open() attempt; continuing
+					// initialization (SASL, response loop, etc.) on a dead connection would leave
+					// the broker in a broken state.
 					//
 					// Note: Open() is asynchronous and still returns nil; callers should use
 					// Connected() (or the next request) to observe this error.
@@ -250,6 +250,8 @@ func (b *Broker) Open(conf *Config) error {
 				apiVersionsResponse, err = b.sendAndReceiveApiVersions(maxVersion)
 				if err != nil {
 					if b.maybeCloseLocked(err) {
+						// ApiVersions negotiation failed with a transport-level error.
+						//
 						// Note: Open() is asynchronous and still returns nil; callers should use
 						// Connected() (or the next request) to observe this error.
 						return
