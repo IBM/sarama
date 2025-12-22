@@ -3,7 +3,7 @@ module github.com/IBM/sarama/examples/interceptors
 go 1.24.0
 
 require (
-	github.com/IBM/sarama v1.45.0
+	github.com/IBM/sarama v1.46.3
 	go.opentelemetry.io/otel v1.29.0
 	go.opentelemetry.io/otel/exporters/stdout/stdoutmetric v1.29.0
 	go.opentelemetry.io/otel/sdk v1.29.0
@@ -25,7 +25,7 @@ require (
 	github.com/jcmturner/gofork v1.7.6 // indirect
 	github.com/jcmturner/gokrb5/v8 v8.4.4 // indirect
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
-	github.com/klauspost/compress v1.18.1 // indirect
+	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	go.opentelemetry.io/otel/metric v1.29.0 // indirect
