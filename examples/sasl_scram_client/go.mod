@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/IBM/sarama v1.46.3
-	github.com/xdg-go/scram v1.1.2
+	github.com/xdg-go/scram v1.2.0
 )
 
 require (
