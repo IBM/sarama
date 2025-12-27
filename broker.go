@@ -361,7 +361,7 @@ func (b *Broker) Close() error {
 	defer b.lock.Unlock()
 
 	b.connErr = nil
-	return b.closeInnerLocked()
+	return b.closeLocked()
 }
 
 // maybeCloseLocked closes the broker connection for transport-level errors and
@@ -373,13 +373,13 @@ func (b *Broker) maybeCloseLocked(err error) bool {
 	}
 
 	b.connErr = err
-	_ = b.closeInnerLocked()
+	_ = b.closeLocked()
 	return true
 }
 
-// closeInnerLocked closes the broker connection and resets state.
+// closeLocked closes the broker connection and resets state.
 // NOTE: caller must hold b.lock.
-func (b *Broker) closeInnerLocked() error {
+func (b *Broker) closeLocked() error {
 	if b.conn == nil {
 		return ErrNotConnected
 	}
