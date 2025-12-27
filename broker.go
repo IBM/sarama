@@ -225,14 +225,7 @@ func (b *Broker) Open(conf *Config) error {
 			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
 				if b.maybeCloseLocked(err) {
-					// ApiVersions negotiation failed with a transport-level error.
-					//
-					// The underlying connection is unusable. Abort this Open() attempt; continuing
-					// initialization (SASL, response loop, etc.) on a dead connection would leave
-					// the broker in a broken state.
-					//
-					// Note: Open() is asynchronous and still returns nil; callers should use
-					// Connected() (or the next request) to observe this error.
+					// Open is async, so we can't return the error here; surface it via Connected().
 					return
 				}
 
@@ -250,10 +243,6 @@ func (b *Broker) Open(conf *Config) error {
 				apiVersionsResponse, err = b.sendAndReceiveApiVersions(maxVersion)
 				if err != nil {
 					if b.maybeCloseLocked(err) {
-						// ApiVersions negotiation failed with a transport-level error.
-						//
-						// Note: Open() is asynchronous and still returns nil; callers should use
-						// Connected() (or the next request) to observe this error.
 						return
 					}
 					Logger.Printf("Error while sending ApiVersionsRequest V%d to broker %s: %s\n", maxVersion, b.addr, err)
@@ -364,8 +353,7 @@ func (b *Broker) Close() error {
 	return b.closeLocked()
 }
 
-// maybeCloseLocked closes the broker connection for transport-level errors and
-// reports whether a close was performed.
+// maybeCloseLocked closes on transport errors and reports whether a close was performed.
 // NOTE: caller must hold b.lock.
 func (b *Broker) maybeCloseLocked(err error) bool {
 	if !shouldCloseBrokerConn(err) {
@@ -1300,51 +1288,37 @@ func getHeaderLength(headerVersion int16) int8 {
 	}
 }
 
-// shouldCloseBrokerConn returns true when the error strongly suggests the underlying
-// network connection is broken or unusable and should be closed/reset.
-//
-// Keep this conservative: only classify clear transport-level failures here.
+// shouldCloseBrokerConn reports whether a transport error should trigger closing.
 func shouldCloseBrokerConn(err error) bool {
 	if err == nil {
 		return false
 	}
 
-	// EOF is a common signal for "peer closed the connection".
 	if errors.Is(err, io.EOF) {
 		return true
 	}
 
-	// io.ReadFull returns ErrUnexpectedEOF when the connection closes mid-frame.
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return true
 	}
 
-	// Common "write on closed connection" signal.
 	if errors.Is(err, io.ErrClosedPipe) {
 		return true
 	}
 
-	// net.ErrClosed covers closed connections (including many "use of closed network connection" cases).
 	if errors.Is(err, net.ErrClosed) {
 		return true
 	}
 
-	// Common syscall-level transport errors.
 	if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNABORTED) || errors.Is(err, syscall.EPIPE) || errors.Is(err, syscall.ENOTCONN) {
 		return true
 	}
 
-	// Finally, fall back to net.Error classification: treat timeouts as
-	// retriable (don't force-close), and close for other net errors.
 	var netErr net.Error
 	if errors.As(err, &netErr) {
 		return !netErr.Timeout()
 	}
 
-	// For non-net errors, default to not closing. Callers should only invoke this
-	// for transport-level failures (read/write/response loop), but err wrapping
-	// can be inconsistent across platforms and TLS stacks; failing closed here
-	// risks tearing down connections for protocol/semantic errors.
 	return false
 }
 
