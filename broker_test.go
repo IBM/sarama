@@ -196,6 +196,58 @@ func TestBrokerFailedRequest(t *testing.T) {
 	}
 }
 
+// closeImmediatelyDialer is a test dialer that returns a net.Conn whose peer is
+// already closed. This reliably triggers a transport-level failure (e.g. EOF)
+// during ApiVersions negotiation in Broker.Open.
+type closeImmediatelyDialer struct{}
+
+func (closeImmediatelyDialer) Dial(_, _ string) (net.Conn, error) {
+	client, server := net.Pipe()
+	_ = server.Close()
+	return client, nil
+}
+
+func TestBrokerOpenApiVersionsTransportError(t *testing.T) {
+	t.Parallel()
+
+	conf := NewConfig()
+	conf.ApiVersionsRequest = true
+	conf.Net.Proxy.Enable = true
+	conf.Net.Proxy.Dialer = closeImmediatelyDialer{}
+
+	broker := NewBroker("127.0.0.1:9092")
+
+	if err := broker.Open(conf); err != nil {
+		t.Fatalf("unexpected Open error: %v", err)
+	}
+
+	connected, connErr := broker.Connected()
+	if connected {
+		t.Fatalf("expected broker to be disconnected")
+	}
+	if connErr == nil {
+		t.Fatalf("expected connection error")
+	}
+	if !shouldCloseBrokerConn(connErr) {
+		t.Fatalf("expected transport-level error, got: %v", connErr)
+	}
+
+	// Subsequent operations should surface the original connection error.
+	_, err := broker.GetMetadata(&MetadataRequest{})
+	if err == nil {
+		t.Fatalf("expected metadata request to fail")
+	}
+	if err != connErr {
+		t.Fatalf("expected original connection error, got: %v want: %v", err, connErr)
+	}
+
+	// Open() should be retryable after a fatal ApiVersions transport error.
+	if err := broker.Open(conf); errors.Is(err, ErrAlreadyConnected) {
+		t.Fatalf("expected Open retry allowed, got: %v", err)
+	}
+	_, _ = broker.Connected()
+}
+
 var ErrTokenFailure = errors.New("Failure generating token")
 
 type TokenProvider struct {
