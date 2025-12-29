@@ -356,7 +356,18 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 		for _, pom := range topicManagers {
 			pom.lock.Lock()
 			if pom.dirty {
-				r.AddBlockWithLeaderEpoch(pom.topic, pom.partition, pom.offset, pom.leaderEpoch, commitTimestamp, pom.metadata)
+				leaderEpoch := pom.leaderEpoch
+				// For protocol version 6+ (Kafka 2.1.0+), fetch the current partition leader epoch
+				// from metadata instead of using the stale committed leader epoch. This prevents
+				// "Truncation detected" errors when resetting offsets after partition leader changes.
+				if r.Version >= 6 {
+					_, currentLeaderEpoch, err := om.client.LeaderAndEpoch(pom.topic, pom.partition)
+					if err == nil && currentLeaderEpoch >= 0 {
+						leaderEpoch = currentLeaderEpoch
+						pom.leaderEpoch = currentLeaderEpoch
+					}
+				}
+				r.AddBlockWithLeaderEpoch(pom.topic, pom.partition, pom.offset, leaderEpoch, commitTimestamp, pom.metadata)
 			}
 			pom.lock.Unlock()
 		}

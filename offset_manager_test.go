@@ -738,3 +738,72 @@ func TestConstructRequestRetentionTime(t *testing.T) {
 		}
 	}
 }
+
+// TestConstructRequestUsesCurrentLeaderEpochUnit validates that constructRequest fetches the current leader epoch
+// from metadata when the protocol version is 6+ (Kafka 2.1.0+). This ensures that we don't commit
+// a stale leader epoch which could lead to "Truncation detected" errors.
+func TestConstructRequestUsesCurrentLeaderEpochUnit(t *testing.T) {
+	mc := &mockClientForLeaderEpoch{}
+	mc.conf = NewTestConfig()
+	mc.conf.Version = V2_1_0_0 // To enable protocol version 6
+
+	om := &offsetManager{
+		client: mc,
+		conf:   mc.conf,
+		group:  "group",
+		poms:   make(map[string]map[int32]*partitionOffsetManager),
+	}
+
+	pom := &partitionOffsetManager{
+		parent:      om,
+		topic:       "topic",
+		partition:   0,
+		offset:      100,
+		leaderEpoch: 44, // stale
+		metadata:    "meta",
+		dirty:       true,
+	}
+
+	om.poms["topic"] = map[int32]*partitionOffsetManager{
+		0: pom,
+	}
+
+	// Mock current leader epoch in metadata as 50
+	mc.leaderAndEpochFn = func(topic string, partitionID int32) (*Broker, int32, error) {
+		return nil, 50, nil
+	}
+
+	// constructRequest should call LeaderAndEpoch and update leaderEpoch to 50
+	req := om.constructRequest()
+
+	if req == nil {
+		t.Fatal("request is nil")
+	}
+
+	block := req.blocks["topic"][0]
+	if block.committedLeaderEpoch != 50 {
+		t.Errorf("Expected committedLeaderEpoch in request to be 50, got %d", block.committedLeaderEpoch)
+	}
+
+	if pom.leaderEpoch != 50 {
+		t.Errorf("Expected pom.leaderEpoch to be updated to 50, got %d", pom.leaderEpoch)
+	}
+}
+
+type mockClientForLeaderEpoch struct {
+	Client
+	conf             *Config
+	leaderAndEpochFn func(topic string, partitionID int32) (*Broker, int32, error)
+}
+
+func (m *mockClientForLeaderEpoch) LeaderAndEpoch(topic string, partitionID int32) (*Broker, int32, error) {
+	return m.leaderAndEpochFn(topic, partitionID)
+}
+
+func (m *mockClientForLeaderEpoch) Config() *Config {
+	return m.conf
+}
+
+func (m *mockClientForLeaderEpoch) Closed() bool {
+	return false
+}
