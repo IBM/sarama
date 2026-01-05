@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -430,7 +431,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		if info == nil {
 			t.Fatalf("missing result for %s/%d", topic, partition)
 		}
-		if info.Err != ErrNoError {
+		if !errors.Is(info.Err, ErrNoError) {
 			t.Fatalf("unexpected error for %s/%d: %v", topic, partition, info.Err)
 		}
 		if info.Offset != expectedOffsets[partition] {
@@ -468,7 +469,7 @@ func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if response.Errors[topic][partition] != ErrNoError {
+	if !errors.Is(response.Errors[topic][partition], ErrNoError) {
 		t.Fatalf("unexpected error for %s/%d: %v", topic, partition, response.Errors[topic][partition])
 	}
 
@@ -481,7 +482,7 @@ func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
 	if block == nil {
 		t.Fatalf("missing offset for %s/%d", topic, partition)
 	}
-	if block.Err != ErrNoError {
+	if !errors.Is(block.Err, ErrNoError) {
 		t.Fatalf("unexpected fetch error for %s/%d: %v", topic, partition, block.Err)
 	}
 	if block.Offset != offset {
