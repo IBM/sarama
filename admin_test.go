@@ -1644,6 +1644,91 @@ func TestListConsumerGroupOffsets(t *testing.T) {
 	}
 }
 
+func TestListOffsets(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	topic := "my-topic"
+	partition := int32(0)
+	timestamp := int64(1690000000000)
+	expectedOffset := int64(42)
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"OffsetRequest": NewMockOffsetResponse(t).SetOffset(topic, partition, timestamp, expectedOffset),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+			SetLeader(topic, partition, seedBroker.BrokerID()),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_1_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+
+	result, err := admin.ListOffsets(map[TopicPartitionID]OffsetSpec{
+		{Topic: topic, Partition: partition}: OffsetSpecForTimestamp(timestamp),
+	}, nil)
+	if err != nil {
+		t.Fatalf("ListOffsets failed with error %v", err)
+	}
+
+	info := result[TopicPartitionID{Topic: topic, Partition: partition}]
+	if info == nil {
+		t.Fatalf("Expected result for topic %v and partition %v to exist, but it doesn't", topic, partition)
+	}
+	if info.Err != ErrNoError {
+		t.Fatalf("Expected ErrNoError, got %v", info.Err)
+	}
+	if info.Offset != expectedOffset {
+		t.Fatalf("Expected offset %v, got %v", expectedOffset, info.Offset)
+	}
+}
+
+func TestAlterConsumerGroupOffsets(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	group := "my-group"
+	topic := "my-topic"
+	partition := int32(0)
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"OffsetCommitRequest": NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNoError),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_1_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+
+	response, err := admin.AlterConsumerGroupOffsets(group, map[TopicPartitionID]OffsetAndMetadata{
+		{Topic: topic, Partition: partition}: {
+			Offset:      100,
+			LeaderEpoch: -1,
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("AlterConsumerGroupOffsets failed with error %v", err)
+	}
+
+	if response.Errors[topic][partition] != ErrNoError {
+		t.Fatalf("Expected ErrNoError, got %v", response.Errors[topic][partition])
+	}
+}
+
 func TestDeleteConsumerGroup(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()

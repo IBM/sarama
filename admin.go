@@ -115,6 +115,14 @@ type ClusterAdmin interface {
 	// List the consumer group offsets available in the cluster.
 	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
 
+	// List offsets for the specified topic partitions.
+	// This operation is supported by brokers with version 0.10.1.0 or higher.
+	ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*ListOffsetsResult, error)
+
+	// Alters offsets for the specified group.
+	// This operation is not transactional so it may succeed for some partitions while fail for others.
+	AlterConsumerGroupOffsets(group string, offsets map[TopicPartitionID]OffsetAndMetadata, options *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error)
+
 	// Deletes a consumer group offset
 	DeleteConsumerGroupOffset(group string, topic string, partition int32) error
 
