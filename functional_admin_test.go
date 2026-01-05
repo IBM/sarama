@@ -389,53 +389,67 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	}
 	defer safeClose(t, producer)
 
-	t1 := time.Now().Add(-2 * time.Minute).Truncate(time.Millisecond)
-	t2 := t1.Add(1 * time.Minute)
-
-	expectedOffsets := make(map[int32]int64)
 	for partition := int32(0); partition < partitionsCount; partition++ {
 		_, _, err = producer.SendMessage(&ProducerMessage{
 			Topic:     topic,
 			Partition: partition,
-			Timestamp: t1,
-			Value:     StringEncoder(fmt.Sprintf("p%d-t1", partition)),
+			Value:     StringEncoder(fmt.Sprintf("p%d-v1", partition)),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		_, offset, err := producer.SendMessage(&ProducerMessage{
+		_, _, err = producer.SendMessage(&ProducerMessage{
 			Topic:     topic,
 			Partition: partition,
-			Timestamp: t2,
-			Value:     StringEncoder(fmt.Sprintf("p%d-t2", partition)),
+			Value:     StringEncoder(fmt.Sprintf("p%d-v2", partition)),
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		expectedOffsets[partition] = offset
 	}
 
 	partitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
 	for partition := int32(0); partition < partitionsCount; partition++ {
-		partitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecForTimestamp(t2.UnixMilli())
+		partitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecEarliest()
 	}
 
-	results, err := adminClient.ListOffsets(partitions, nil)
+	earliestResults, err := adminClient.ListOffsets(partitions, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	timestampPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
 	for partition := int32(0); partition < partitionsCount; partition++ {
-		info := results[TopicPartitionID{Topic: topic, Partition: partition}]
+		info := earliestResults[TopicPartitionID{Topic: topic, Partition: partition}]
 		if info == nil {
 			t.Fatalf("missing result for %s/%d", topic, partition)
 		}
 		if !errors.Is(info.Err, ErrNoError) {
 			t.Fatalf("unexpected error for %s/%d: %v", topic, partition, info.Err)
 		}
-		if info.Offset != expectedOffsets[partition] {
-			t.Fatalf("unexpected offset for %s/%d: want %d, got %d", topic, partition, expectedOffsets[partition], info.Offset)
+		if info.Timestamp < 0 {
+			t.Fatalf("unexpected timestamp for %s/%d: %d", topic, partition, info.Timestamp)
+		}
+		timestampPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecForTimestamp(info.Timestamp)
+	}
+
+	timestampResults, err := adminClient.ListOffsets(timestampPartitions, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		info := earliestResults[TopicPartitionID{Topic: topic, Partition: partition}]
+		timestampInfo := timestampResults[TopicPartitionID{Topic: topic, Partition: partition}]
+		if timestampInfo == nil {
+			t.Fatalf("missing timestamp result for %s/%d", topic, partition)
+		}
+		if !errors.Is(timestampInfo.Err, ErrNoError) {
+			t.Fatalf("unexpected timestamp error for %s/%d: %v", topic, partition, timestampInfo.Err)
+		}
+		if timestampInfo.Offset != info.Offset {
+			t.Fatalf("unexpected timestamp offset for %s/%d: want %d, got %d", topic, partition, info.Offset, timestampInfo.Offset)
 		}
 	}
 }
