@@ -115,11 +115,14 @@ type ClusterAdmin interface {
 	// List the consumer group offsets available in the cluster.
 	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
 
-	// List offsets for the specified topic partitions.
+	// ListOffsets lists offsets for the specified topic partitions.
+	// OffsetSpec controls whether each partition resolves to earliest, latest, or a timestamp-based offset.
+	// Results are keyed by the same topic/partition IDs and include per-partition errors.
 	// This operation is supported by brokers with version 0.10.1.0 or higher.
 	ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*ListOffsetsResult, error)
 
-	// Alters offsets for the specified group.
+	// AlterConsumerGroupOffsets alters offsets for the specified group by committing the provided offsets and metadata.
+	// The request targets the group's coordinator and returns per-partition results in the response.
 	// This operation is not transactional so it may succeed for some partitions while fail for others.
 	AlterConsumerGroupOffsets(group string, offsets map[TopicPartitionID]OffsetAndMetadata, options *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error)
 

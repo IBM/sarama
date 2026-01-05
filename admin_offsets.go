@@ -51,12 +51,16 @@ type ListOffsetsResult struct {
 
 // OffsetAndMetadata describes the offset commit for a single partition.
 type OffsetAndMetadata struct {
-	Offset      int64
-	Metadata    string
+	Offset   int64
+	Metadata string
+	// LeaderEpoch contains the leader epoch of the last consumed record.
+	// It is used by the broker to fence stale commits after leader changes.
+	// Use the epoch returned by offset fetch/list APIs, or -1 to omit.
 	LeaderEpoch int32
 }
 
 // AlterConsumerGroupOffsetsOptions configures how offsets are committed.
+// It is currently empty and reserved for future Kafka protocol options.
 type AlterConsumerGroupOffsetsOptions struct{}
 
 type brokerOffsetRequest struct {
@@ -75,9 +79,8 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 		return nil, ConfigurationError("no partitions provided")
 	}
 
-	opts := options
-	if opts == nil {
-		opts = &ListOffsetsOptions{}
+	if options == nil {
+		options = &ListOffsetsOptions{}
 	}
 
 	requests := make(map[*Broker]*brokerOffsetRequest)
@@ -93,7 +96,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 				broker:  broker,
 				request: NewOffsetRequest(ca.conf.Version),
 			}
-			req.request.IsolationLevel = opts.IsolationLevel
+			req.request.IsolationLevel = options.IsolationLevel
 			requests[broker] = req
 		}
 		req.request.AddBlock(tp.Topic, tp.Partition, spec.timestamp, 1)
