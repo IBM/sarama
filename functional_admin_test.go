@@ -318,6 +318,177 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 	t.Logf("coordinator broker %d", coordinator.id)
 }
 
+func TestFuncAdminListOffsets(t *testing.T) {
+	checkKafkaVersion(t, "2.1.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	const partitionsCount = 4
+	topic := fmt.Sprintf("list-offsets-%d", time.Now().UnixNano())
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+	config.Producer.Partitioner = NewManualPartitioner
+	config.Producer.Return.Successes = true
+
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	err = adminClient.CreateTopic(topic, &TopicDetail{
+		NumPartitions:     partitionsCount,
+		ReplicationFactor: 3,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, client)
+
+	leaders := make(map[int32]struct{})
+	var lastErr error
+	for i := 0; i < 30; i++ {
+		leaders = make(map[int32]struct{})
+		ready := true
+		for partition := int32(0); partition < partitionsCount; partition++ {
+			leader, err := client.Leader(topic, partition)
+			if err != nil {
+				lastErr = err
+				ready = false
+				break
+			}
+			if leader == nil || leader.ID() < 0 {
+				lastErr = fmt.Errorf("leader not available")
+				ready = false
+				break
+			}
+			leaders[leader.ID()] = struct{}{}
+		}
+		if ready {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if len(leaders) == 0 {
+		t.Fatalf("failed to discover topic leaders: %v", lastErr)
+	}
+	if len(leaders) < 2 {
+		t.Skipf("topic leaders not spread across brokers: %v", len(leaders))
+	}
+
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, producer)
+
+	t1 := time.Now().Add(-2 * time.Minute).Truncate(time.Millisecond)
+	t2 := t1.Add(1 * time.Minute)
+
+	expectedOffsets := make(map[int32]int64)
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		_, _, err = producer.SendMessage(&ProducerMessage{
+			Topic:     topic,
+			Partition: partition,
+			Timestamp: t1,
+			Value:     StringEncoder(fmt.Sprintf("p%d-t1", partition)),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, offset, err := producer.SendMessage(&ProducerMessage{
+			Topic:     topic,
+			Partition: partition,
+			Timestamp: t2,
+			Value:     StringEncoder(fmt.Sprintf("p%d-t2", partition)),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedOffsets[partition] = offset
+	}
+
+	partitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		partitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecForTimestamp(t2.UnixMilli())
+	}
+
+	results, err := adminClient.ListOffsets(partitions, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		info := results[TopicPartitionID{Topic: topic, Partition: partition}]
+		if info == nil {
+			t.Fatalf("missing result for %s/%d", topic, partition)
+		}
+		if info.Err != ErrNoError {
+			t.Fatalf("unexpected error for %s/%d: %v", topic, partition, info.Err)
+		}
+		if info.Offset != expectedOffsets[partition] {
+			t.Fatalf("unexpected offset for %s/%d: want %d, got %d", topic, partition, expectedOffsets[partition], info.Offset)
+		}
+	}
+}
+
+func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
+	checkKafkaVersion(t, "2.1.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	group := testFuncConsumerGroupID(t)
+	topic := "test.1"
+	partition := int32(0)
+	offset := int64(1)
+
+	response, err := adminClient.AlterConsumerGroupOffsets(group, map[TopicPartitionID]OffsetAndMetadata{
+		{Topic: topic, Partition: partition}: {
+			Offset:      offset,
+			LeaderEpoch: -1,
+		},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if response.Errors[topic][partition] != ErrNoError {
+		t.Fatalf("unexpected error for %s/%d: %v", topic, partition, response.Errors[topic][partition])
+	}
+
+	fetched, err := adminClient.ListConsumerGroupOffsets(group, map[string][]int32{topic: {partition}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block := fetched.GetBlock(topic, partition)
+	if block == nil {
+		t.Fatalf("missing offset for %s/%d", topic, partition)
+	}
+	if block.Err != ErrNoError {
+		t.Fatalf("unexpected fetch error for %s/%d: %v", topic, partition, block.Err)
+	}
+	if block.Offset != offset {
+		t.Fatalf("unexpected offset for %s/%d: want %d, got %d", topic, partition, offset, block.Offset)
+	}
+}
+
 func TestFuncAdminDescribeLogDirs(t *testing.T) {
 	checkKafkaVersion(t, "2.0.0.0")
 	setupFunctionalTest(t)
