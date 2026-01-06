@@ -417,19 +417,47 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		partitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecEarliest()
 	}
 
-	earliestResults, err := adminClient.ListOffsets(partitions, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	latestPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
 	for partition := int32(0); partition < partitionsCount; partition++ {
 		latestPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecLatest()
 	}
 
-	latestResults, err := adminClient.ListOffsets(latestPartitions, nil)
-	if err != nil {
-		t.Fatal(err)
+	var earliestResults map[TopicPartitionID]*ListOffsetsResult
+	var latestResults map[TopicPartitionID]*ListOffsetsResult
+	for attempt := 0; attempt < 20; attempt++ {
+		earliestResults, err = adminClient.ListOffsets(partitions, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		latestResults, err = adminClient.ListOffsets(latestPartitions, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ready := true
+		for partition := int32(0); partition < partitionsCount; partition++ {
+			tp := TopicPartitionID{Topic: topic, Partition: partition}
+			earliestInfo := earliestResults[tp]
+			latestInfo := latestResults[tp]
+			if earliestInfo == nil || latestInfo == nil {
+				ready = false
+				break
+			}
+			if !errors.Is(earliestInfo.Err, ErrNoError) || !errors.Is(latestInfo.Err, ErrNoError) {
+				ready = false
+				break
+			}
+			if earliestInfo.Offset < 0 || latestInfo.Offset <= earliestInfo.Offset {
+				ready = false
+				break
+			}
+		}
+
+		if ready {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
 	}
 
 	consumerConfig := NewFunctionalTestConfig()
