@@ -17,12 +17,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// createTopicWithLeaderAssignment creates a topic with explicit replica assignment and waits for leaders.
-func createTopicWithLeaderAssignment(t *testing.T, adminClient ClusterAdmin, client Client, topic string, numPartitions int32) error {
+func topicWithEventLeaders(t *testing.T, adminClient ClusterAdmin, client Client, numPartitions int32) (string, error) {
 	t.Helper()
 
 	if len(FunctionalTestEnv.KafkaBrokerAddrs) == 0 {
-		return fmt.Errorf("no brokers available for replica assignment")
+		return "", fmt.Errorf("no brokers available for replica assignment")
 	}
 
 	brokers := client.Brokers()
@@ -31,21 +30,26 @@ func createTopicWithLeaderAssignment(t *testing.T, adminClient ClusterAdmin, cli
 		brokerIDs = append(brokerIDs, broker.ID())
 	}
 	if len(brokerIDs) == 0 {
-		return fmt.Errorf("no broker IDs available for replica assignment")
+		return "", fmt.Errorf("no broker IDs available for replica assignment")
 	}
 	slices.Sort(brokerIDs)
 
+	topic := fmt.Sprintf("list-offsets-%d", time.Now().UnixNano())
 	replicaAssignment := make(map[int32][]int32, numPartitions)
 	for partition := int32(0); partition < numPartitions; partition++ {
 		brokerIndex := partition % int32(len(brokerIDs))
 		replicaAssignment[partition] = []int32{brokerIDs[brokerIndex]}
 	}
 
-	return adminClient.CreateTopic(topic, &TopicDetail{
+	err := adminClient.CreateTopic(topic, &TopicDetail{
 		NumPartitions:     -1,
 		ReplicationFactor: -1,
 		ReplicaAssignment: replicaAssignment,
 	}, false)
+	if err != nil {
+		return "", err
+	}
+	return topic, nil
 }
 
 func produceMessagesForPartitions(t *testing.T, client Client, topic string, partitionsCount int32, messagesPerPartition int, baseTimestamp int64) {
@@ -424,8 +428,6 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	defer teardownFunctionalTest(t)
 
 	partitionsCount := int32(len(FunctionalTestEnv.KafkaBrokerAddrs) * 3)
-	topic := fmt.Sprintf("list-offsets-%d", time.Now().UnixNano())
-
 	config := NewFunctionalTestConfig()
 	config.ClientID = t.Name()
 	config.Producer.Partitioner = NewManualPartitioner
@@ -442,9 +444,9 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = createTopicWithLeaderAssignment(t, adminClient, client, topic, partitionsCount)
+	topic, err := topicWithEventLeaders(t, adminClient, client, partitionsCount)
 	if err != nil {
-		t.Fatalf("failed to discover topic leaders: %v", err)
+		t.Fatalf("failed to create topic with evenly distributed leaders: %v", err)
 	}
 
 	const (
