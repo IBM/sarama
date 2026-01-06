@@ -17,6 +17,105 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// createTopicWithLeaderAssignment creates a topic with explicit replica assignment and waits for leaders.
+func createTopicWithLeaderAssignment(t *testing.T, adminClient ClusterAdmin, client Client, topic string, numPartitions int32) error {
+	t.Helper()
+
+	if len(FunctionalTestEnv.KafkaBrokerAddrs) == 0 {
+		return fmt.Errorf("no brokers available for replica assignment")
+	}
+
+	brokers := client.Brokers()
+	brokerIDs := make([]int32, 0, len(brokers))
+	for _, broker := range brokers {
+		brokerIDs = append(brokerIDs, broker.ID())
+	}
+	if len(brokerIDs) == 0 {
+		return fmt.Errorf("no broker IDs available for replica assignment")
+	}
+	slices.Sort(brokerIDs)
+
+	replicaAssignment := make(map[int32][]int32, numPartitions)
+	for partition := int32(0); partition < numPartitions; partition++ {
+		brokerIndex := partition % int32(len(brokerIDs))
+		replicaAssignment[partition] = []int32{brokerIDs[brokerIndex]}
+	}
+
+	return adminClient.CreateTopic(topic, &TopicDetail{
+		NumPartitions:     numPartitions,
+		ReplicationFactor: 1,
+		ReplicaAssignment: replicaAssignment,
+	}, false)
+}
+
+func produceMessagesForPartitions(t *testing.T, client Client, topic string, partitionsCount int32, messagesPerPartition int, baseTimestamp int64) {
+	t.Helper()
+
+	producer, err := NewSyncProducerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, producer)
+
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		for msgIndex := 0; msgIndex < messagesPerPartition; msgIndex++ {
+			ts := baseTimestamp + int64(msgIndex)*1000
+			value := fmt.Sprintf("p%d-v%d", partition, msgIndex+1)
+			message := &ProducerMessage{
+				Topic:     topic,
+				Partition: partition,
+				Timestamp: time.UnixMilli(ts),
+				Value:     StringEncoder(value),
+			}
+			if _, _, err := producer.SendMessage(message); err != nil {
+				t.Fatalf("produce message partition=%d index=%d: %v", partition, msgIndex, err)
+			}
+		}
+	}
+}
+
+func listOffsetsAndValidate(
+	t *testing.T,
+	adminClient ClusterAdmin,
+	topic string,
+	partitionsCount int32,
+	spec OffsetSpec,
+	expectedOffset int64,
+	label string,
+) {
+	t.Helper()
+
+	specs := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		specs[TopicPartitionID{Topic: topic, Partition: partition}] = spec
+	}
+
+	results, err := adminClient.ListOffsets(specs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for tp := range specs {
+		result := results[tp]
+		if result == nil {
+			t.Fatalf("missing %s result for %s/%d", label, tp.Topic, tp.Partition)
+		}
+		if !errors.Is(result.Err, ErrNoError) {
+			t.Fatalf("unexpected %s error for %s/%d: %v", label, tp.Topic, tp.Partition, result.Err)
+		}
+		if result.Offset != expectedOffset {
+			t.Fatalf(
+				"unexpected %s offset for %s/%d: want %d, got %d",
+				label,
+				tp.Topic,
+				tp.Partition,
+				expectedOffset,
+				result.Offset,
+			)
+		}
+	}
+}
+
 func TestFuncAdminQuotas(t *testing.T) {
 	const (
 		waitFor = 10 * time.Second
@@ -324,7 +423,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	const partitionsCount = 4
+	partitionsCount := int32(len(FunctionalTestEnv.KafkaBrokerAddrs) * 3)
 	topic := fmt.Sprintf("list-offsets-%d", time.Now().UnixNano())
 
 	config := NewFunctionalTestConfig()
@@ -332,243 +431,65 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	config.Producer.Partitioner = NewManualPartitioner
 	config.Producer.Return.Successes = true
 
-	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer safeClose(t, adminClient)
-
-	err = adminClient.CreateTopic(topic, &TopicDetail{
-		NumPartitions:     partitionsCount,
-		ReplicationFactor: 3,
-	}, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer safeClose(t, client)
 
-	leaders := make(map[int32]struct{})
-	var lastErr error
-	for i := 0; i < 30; i++ {
-		leaders = make(map[int32]struct{})
-		ready := true
-		for partition := int32(0); partition < partitionsCount; partition++ {
-			leader, err := client.Leader(topic, partition)
-			if err != nil {
-				lastErr = err
-				ready = false
-				break
-			}
-			if leader == nil || leader.ID() < 0 {
-				lastErr = fmt.Errorf("leader not available")
-				ready = false
-				break
-			}
-			leaders[leader.ID()] = struct{}{}
-		}
-		if ready {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-	if len(leaders) == 0 {
-		t.Fatalf("failed to discover topic leaders: %v", lastErr)
-	}
-	if len(leaders) < 2 {
-		t.Skipf("topic leaders not spread across brokers: %v", len(leaders))
-	}
-
-	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	adminClient, err := NewClusterAdminFromClient(client)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer safeClose(t, producer)
 
-	baseTimestamp := time.Now().Add(-5 * time.Minute).UnixMilli()
-	for partition := int32(0); partition < partitionsCount; partition++ {
-		_, _, err = producer.SendMessage(&ProducerMessage{
-			Topic:     topic,
-			Partition: partition,
-			Timestamp: time.UnixMilli(baseTimestamp),
-			Value:     StringEncoder(fmt.Sprintf("p%d-v1", partition)),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		_, _, err = producer.SendMessage(&ProducerMessage{
-			Topic:     topic,
-			Partition: partition,
-			Timestamp: time.UnixMilli(baseTimestamp + 1),
-			Value:     StringEncoder(fmt.Sprintf("p%d-v2", partition)),
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	partitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
-	for partition := int32(0); partition < partitionsCount; partition++ {
-		partitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecEarliest()
-	}
-
-	latestPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
-	for partition := int32(0); partition < partitionsCount; partition++ {
-		latestPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecLatest()
-	}
-
-	var earliestResults map[TopicPartitionID]*ListOffsetsResult
-	var latestResults map[TopicPartitionID]*ListOffsetsResult
-	for attempt := 0; attempt < 20; attempt++ {
-		earliestResults, err = adminClient.ListOffsets(partitions, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		latestResults, err = adminClient.ListOffsets(latestPartitions, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		ready := true
-		for partition := int32(0); partition < partitionsCount; partition++ {
-			tp := TopicPartitionID{Topic: topic, Partition: partition}
-			earliestInfo := earliestResults[tp]
-			latestInfo := latestResults[tp]
-			if earliestInfo == nil || latestInfo == nil {
-				ready = false
-				break
-			}
-			if !errors.Is(earliestInfo.Err, ErrNoError) || !errors.Is(latestInfo.Err, ErrNoError) {
-				ready = false
-				break
-			}
-			if earliestInfo.Offset < 0 || latestInfo.Offset <= earliestInfo.Offset {
-				ready = false
-				break
-			}
-		}
-
-		if ready {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	consumerConfig := NewFunctionalTestConfig()
-	consumerConfig.ClientID = t.Name() + "-consumer"
-	consumerConfig.Consumer.Return.Errors = true
-	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consumerConfig)
+	err = createTopicWithLeaderAssignment(t, adminClient, client, topic, partitionsCount)
 	if err != nil {
-		t.Fatal(err)
-	}
-	defer safeClose(t, consumer)
-
-	fetchTimestampAtOffset := func(partition int32, offset int64) int64 {
-		pc, err := consumer.ConsumePartition(topic, partition, offset)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer safeClose(t, pc)
-
-		select {
-		case msg := <-pc.Messages():
-			if msg == nil {
-				t.Fatalf("missing message for %s/%d at offset %d", topic, partition, offset)
-			}
-			return msg.Timestamp.UnixMilli()
-		case err := <-pc.Errors():
-			t.Fatalf("consumer error for %s/%d at offset %d: %v", topic, partition, offset, err)
-		case <-time.After(10 * time.Second):
-			t.Fatalf("timeout waiting for %s/%d at offset %d", topic, partition, offset)
-		}
-		return 0
+		t.Fatalf("failed to discover topic leaders: %v", err)
 	}
 
-	listOffsetsWithRetry := func(specs map[TopicPartitionID]OffsetSpec) map[TopicPartitionID]*ListOffsetsResult {
-		var results map[TopicPartitionID]*ListOffsetsResult
-		for attempt := 0; attempt < 20; attempt++ {
-			results, err = adminClient.ListOffsets(specs, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+	const (
+		baseTimestamp        = int64(1_700_000_000_000)
+		messagesPerPartition = 10
+	)
+	produceMessagesForPartitions(t, client, topic, partitionsCount, messagesPerPartition, baseTimestamp)
 
-			ready := true
-			for _, result := range results {
-				if result == nil || !errors.Is(result.Err, ErrNoError) || result.Offset < 0 {
-					ready = false
-					break
-				}
-			}
-			if ready {
-				return results
-			}
-			time.Sleep(500 * time.Millisecond)
-		}
-		return results
+	minOffset := int64(0)
+	maxOffset := int64(messagesPerPartition - 1)
+	midIndex := int64(messagesPerPartition / 2)
+	midTimestamp := baseTimestamp + midIndex*1000
+
+	if err := client.RefreshMetadata(topic); err != nil {
+		t.Fatalf("refresh metadata for %s: %v", topic, err)
 	}
 
-	earliestTimestampPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
-	latestTimestampPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
-	latestOffsets := make(map[TopicPartitionID]int64, partitionsCount)
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		OffsetSpecEarliest(),
+		minOffset,
+		"earliest",
+	)
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		OffsetSpecLatest(),
+		maxOffset+1,
+		"latest",
+	)
 
-	for partition := int32(0); partition < partitionsCount; partition++ {
-		tp := TopicPartitionID{Topic: topic, Partition: partition}
-		earliestInfo := earliestResults[tp]
-		if earliestInfo == nil {
-			t.Fatalf("missing earliest result for %s/%d", topic, partition)
-		}
-		if !errors.Is(earliestInfo.Err, ErrNoError) {
-			t.Fatalf("unexpected earliest error for %s/%d: %v", topic, partition, earliestInfo.Err)
-		}
-
-		latestInfo := latestResults[tp]
-		if latestInfo == nil {
-			t.Fatalf("missing latest result for %s/%d", topic, partition)
-		}
-		if !errors.Is(latestInfo.Err, ErrNoError) {
-			t.Fatalf("unexpected latest error for %s/%d: %v", topic, partition, latestInfo.Err)
-		}
-		if latestInfo.Offset <= earliestInfo.Offset {
-			t.Fatalf("unexpected offsets for %s/%d: earliest=%d latest=%d", topic, partition, earliestInfo.Offset, latestInfo.Offset)
-		}
-
-		earliestTimestamp := fetchTimestampAtOffset(partition, earliestInfo.Offset)
-		latestOffset := latestInfo.Offset - 1
-		latestTimestamp := fetchTimestampAtOffset(partition, latestOffset)
-
-		earliestTimestampPartitions[tp] = OffsetSpecForTimestamp(earliestTimestamp)
-		latestTimestampPartitions[tp] = OffsetSpecForTimestamp(latestTimestamp)
-		latestOffsets[tp] = latestOffset
-	}
-
-	earliestTimestampResults := listOffsetsWithRetry(earliestTimestampPartitions)
-	latestTimestampResults := listOffsetsWithRetry(latestTimestampPartitions)
-
-	for partition := int32(0); partition < partitionsCount; partition++ {
-		tp := TopicPartitionID{Topic: topic, Partition: partition}
-		earliestInfo := earliestResults[tp]
-		earliestTimestampInfo := earliestTimestampResults[tp]
-		if earliestTimestampInfo == nil || !errors.Is(earliestTimestampInfo.Err, ErrNoError) || earliestTimestampInfo.Offset < 0 {
-			t.Fatalf("unexpected earliest timestamp result for %s/%d: %v", topic, partition, earliestTimestampInfo)
-		}
-		if earliestTimestampInfo.Offset != earliestInfo.Offset {
-			t.Fatalf("unexpected earliest timestamp offset for %s/%d: want %d, got %d", topic, partition, earliestInfo.Offset, earliestTimestampInfo.Offset)
-		}
-
-		latestTimestampInfo := latestTimestampResults[tp]
-		if latestTimestampInfo == nil || !errors.Is(latestTimestampInfo.Err, ErrNoError) || latestTimestampInfo.Offset < 0 {
-			t.Fatalf("unexpected latest timestamp result for %s/%d: %v", topic, partition, latestTimestampInfo)
-		}
-		if latestTimestampInfo.Offset != latestOffsets[tp] {
-			t.Fatalf("unexpected latest timestamp offset for %s/%d: want %d, got %d", topic, partition, latestOffsets[tp], latestTimestampInfo.Offset)
-		}
-	}
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		OffsetSpecForTimestamp(midTimestamp),
+		midIndex,
+		"mid timestamp",
+	)
 }
 
 func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
