@@ -389,7 +389,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	}
 	defer safeClose(t, producer)
 
-	baseTimestamp := time.Now().Add(-2 * time.Second).UnixMilli()
+	baseTimestamp := time.Now().Add(-5 * time.Minute).UnixMilli()
 	for partition := int32(0); partition < partitionsCount; partition++ {
 		_, _, err = producer.SendMessage(&ProducerMessage{
 			Topic:     topic,
