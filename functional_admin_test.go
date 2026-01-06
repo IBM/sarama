@@ -42,8 +42,6 @@ func createTopicWithLeaderAssignment(t *testing.T, adminClient ClusterAdmin, cli
 	}
 
 	return adminClient.CreateTopic(topic, &TopicDetail{
-		NumPartitions:     numPartitions,
-		ReplicationFactor: 1,
 		ReplicaAssignment: replicaAssignment,
 	}, false)
 }
