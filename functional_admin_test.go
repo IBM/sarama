@@ -422,34 +422,123 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	timestampPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
+	latestPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
 	for partition := int32(0); partition < partitionsCount; partition++ {
-		info := earliestResults[TopicPartitionID{Topic: topic, Partition: partition}]
-		if info == nil {
-			t.Fatalf("missing result for %s/%d", topic, partition)
-		}
-		if !errors.Is(info.Err, ErrNoError) {
-			t.Fatalf("unexpected error for %s/%d: %v", topic, partition, info.Err)
-		}
-		timestampPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecForTimestamp(baseTimestamp)
+		latestPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecLatest()
 	}
 
-	timestampResults, err := adminClient.ListOffsets(timestampPartitions, nil)
+	latestResults, err := adminClient.ListOffsets(latestPartitions, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	consumerConfig := NewFunctionalTestConfig()
+	consumerConfig.ClientID = t.Name() + "-consumer"
+	consumerConfig.Consumer.Return.Errors = true
+	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, consumerConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, consumer)
+
+	fetchTimestampAtOffset := func(partition int32, offset int64) int64 {
+		pc, err := consumer.ConsumePartition(topic, partition, offset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, pc)
+
+		select {
+		case msg := <-pc.Messages():
+			if msg == nil {
+				t.Fatalf("missing message for %s/%d at offset %d", topic, partition, offset)
+			}
+			return msg.Timestamp.UnixMilli()
+		case err := <-pc.Errors():
+			t.Fatalf("consumer error for %s/%d at offset %d: %v", topic, partition, offset, err)
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timeout waiting for %s/%d at offset %d", topic, partition, offset)
+		}
+		return 0
+	}
+
+	listOffsetsWithRetry := func(specs map[TopicPartitionID]OffsetSpec) map[TopicPartitionID]*ListOffsetsResult {
+		var results map[TopicPartitionID]*ListOffsetsResult
+		for attempt := 0; attempt < 20; attempt++ {
+			results, err = adminClient.ListOffsets(specs, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			ready := true
+			for _, result := range results {
+				if result == nil || !errors.Is(result.Err, ErrNoError) || result.Offset < 0 {
+					ready = false
+					break
+				}
+			}
+			if ready {
+				return results
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+		return results
+	}
+
+	earliestTimestampPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
+	latestTimestampPartitions := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
+	latestOffsets := make(map[TopicPartitionID]int64, partitionsCount)
+
 	for partition := int32(0); partition < partitionsCount; partition++ {
-		info := earliestResults[TopicPartitionID{Topic: topic, Partition: partition}]
-		timestampInfo := timestampResults[TopicPartitionID{Topic: topic, Partition: partition}]
-		if timestampInfo == nil {
-			t.Fatalf("missing timestamp result for %s/%d", topic, partition)
+		tp := TopicPartitionID{Topic: topic, Partition: partition}
+		earliestInfo := earliestResults[tp]
+		if earliestInfo == nil {
+			t.Fatalf("missing earliest result for %s/%d", topic, partition)
 		}
-		if !errors.Is(timestampInfo.Err, ErrNoError) {
-			t.Fatalf("unexpected timestamp error for %s/%d: %v", topic, partition, timestampInfo.Err)
+		if !errors.Is(earliestInfo.Err, ErrNoError) {
+			t.Fatalf("unexpected earliest error for %s/%d: %v", topic, partition, earliestInfo.Err)
 		}
-		if timestampInfo.Offset != info.Offset {
-			t.Fatalf("unexpected timestamp offset for %s/%d: want %d, got %d", topic, partition, info.Offset, timestampInfo.Offset)
+
+		latestInfo := latestResults[tp]
+		if latestInfo == nil {
+			t.Fatalf("missing latest result for %s/%d", topic, partition)
+		}
+		if !errors.Is(latestInfo.Err, ErrNoError) {
+			t.Fatalf("unexpected latest error for %s/%d: %v", topic, partition, latestInfo.Err)
+		}
+		if latestInfo.Offset <= earliestInfo.Offset {
+			t.Fatalf("unexpected offsets for %s/%d: earliest=%d latest=%d", topic, partition, earliestInfo.Offset, latestInfo.Offset)
+		}
+
+		earliestTimestamp := fetchTimestampAtOffset(partition, earliestInfo.Offset)
+		latestOffset := latestInfo.Offset - 1
+		latestTimestamp := fetchTimestampAtOffset(partition, latestOffset)
+
+		earliestTimestampPartitions[tp] = OffsetSpecForTimestamp(earliestTimestamp)
+		latestTimestampPartitions[tp] = OffsetSpecForTimestamp(latestTimestamp)
+		latestOffsets[tp] = latestOffset
+	}
+
+	earliestTimestampResults := listOffsetsWithRetry(earliestTimestampPartitions)
+	latestTimestampResults := listOffsetsWithRetry(latestTimestampPartitions)
+
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		tp := TopicPartitionID{Topic: topic, Partition: partition}
+		earliestInfo := earliestResults[tp]
+		earliestTimestampInfo := earliestTimestampResults[tp]
+		if earliestTimestampInfo == nil || !errors.Is(earliestTimestampInfo.Err, ErrNoError) || earliestTimestampInfo.Offset < 0 {
+			t.Fatalf("unexpected earliest timestamp result for %s/%d: %v", topic, partition, earliestTimestampInfo)
+		}
+		if earliestTimestampInfo.Offset != earliestInfo.Offset {
+			t.Fatalf("unexpected earliest timestamp offset for %s/%d: want %d, got %d", topic, partition, earliestInfo.Offset, earliestTimestampInfo.Offset)
+		}
+
+		latestTimestampInfo := latestTimestampResults[tp]
+		if latestTimestampInfo == nil || !errors.Is(latestTimestampInfo.Err, ErrNoError) || latestTimestampInfo.Offset < 0 {
+			t.Fatalf("unexpected latest timestamp result for %s/%d: %v", topic, partition, latestTimestampInfo)
+		}
+		if latestTimestampInfo.Offset != latestOffsets[tp] {
+			t.Fatalf("unexpected latest timestamp offset for %s/%d: want %d, got %d", topic, partition, latestOffsets[tp], latestTimestampInfo.Offset)
 		}
 	}
 }
