@@ -389,10 +389,12 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	}
 	defer safeClose(t, producer)
 
+	baseTimestamp := time.Now().Add(-2 * time.Second).UnixMilli()
 	for partition := int32(0); partition < partitionsCount; partition++ {
 		_, _, err = producer.SendMessage(&ProducerMessage{
 			Topic:     topic,
 			Partition: partition,
+			Timestamp: time.UnixMilli(baseTimestamp),
 			Value:     StringEncoder(fmt.Sprintf("p%d-v1", partition)),
 		})
 		if err != nil {
@@ -402,6 +404,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		_, _, err = producer.SendMessage(&ProducerMessage{
 			Topic:     topic,
 			Partition: partition,
+			Timestamp: time.UnixMilli(baseTimestamp + 1),
 			Value:     StringEncoder(fmt.Sprintf("p%d-v2", partition)),
 		})
 		if err != nil {
@@ -428,10 +431,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		if !errors.Is(info.Err, ErrNoError) {
 			t.Fatalf("unexpected error for %s/%d: %v", topic, partition, info.Err)
 		}
-		if info.Timestamp < 0 {
-			t.Fatalf("unexpected timestamp for %s/%d: %d", topic, partition, info.Timestamp)
-		}
-		timestampPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecForTimestamp(info.Timestamp)
+		timestampPartitions[TopicPartitionID{Topic: topic, Partition: partition}] = OffsetSpecForTimestamp(baseTimestamp)
 	}
 
 	timestampResults, err := adminClient.ListOffsets(timestampPartitions, nil)
