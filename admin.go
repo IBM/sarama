@@ -118,6 +118,9 @@ type ClusterAdmin interface {
 	// ListOffsets lists offsets for the specified topic partitions.
 	// OffsetSpec controls whether each partition resolves to earliest, latest, or a timestamp-based offset.
 	// Results are keyed by the same topic/partition IDs and include per-partition errors.
+	//
+	// For oldest/newest requests, Kafka may return a valid offset while timestamp is -1.
+	// To get the exact message timestamp, fetch the record at that offset.
 	// This operation is supported by brokers with version 0.10.1.0 or higher.
 	ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*ListOffsetsResult, error)
 
