@@ -283,12 +283,22 @@ func existingEnvironment(ctx context.Context, env *testEnvironment) (bool, error
 }
 
 func tearDownDockerTestEnvironment(ctx context.Context, env *testEnvironment) error {
-	c := exec.Command("docker", "compose", "down", "--volumes")
+	args := []string{"compose", "down", "--volumes"}
+	v, _ := ParseKafkaVersion(env.KafkaVersion)
+	// use zookeeper profile for kafka < 4 to ensure zookeeper containers are stopped
+	if !v.IsAtLeast(V4_0_0_0) {
+		args = append([]string{"compose", "--profile", "zookeeper"}, args[1:]...)
+	}
+	c := exec.Command("docker", args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	downErr := c.Run()
 
-	c = exec.Command("docker", "compose", "rm", "-v", "--force", "--stop")
+	args = []string{"compose", "rm", "-v", "--force", "--stop"}
+	if !v.IsAtLeast(V4_0_0_0) {
+		args = append([]string{"compose", "--profile", "zookeeper"}, args[1:]...)
+	}
+	c = exec.Command("docker", args...)
 	c.Stdout = os.Stdout
 	c.Stderr = os.Stderr
 	rmErr := c.Run()
@@ -460,6 +470,21 @@ func resetProxies(t testing.TB) {
 
 func SaveProxy(t *testing.T, px string) {
 	if _, err := FunctionalTestEnv.Proxies[px].Save(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func proxyForBrokerID(t testing.TB, brokerID int32) *toxiproxy.Proxy {
+	proxyName := fmt.Sprintf("kafka%d", brokerID)
+	proxy := FunctionalTestEnv.Proxies[proxyName]
+	if proxy == nil {
+		t.Fatalf("toxiproxy %s not found", proxyName)
+	}
+	return proxy
+}
+
+func addResetPeerToxic(t testing.TB, proxy *toxiproxy.Proxy) {
+	if _, err := proxy.AddToxic("reset-peer", "reset_peer", "downstream", 1, toxiproxy.Attributes{}); err != nil {
 		t.Fatal(err)
 	}
 }
