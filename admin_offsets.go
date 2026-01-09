@@ -63,18 +63,18 @@ type OffsetAndMetadata struct {
 // It is currently empty and reserved for future Kafka protocol options.
 type AlterConsumerGroupOffsetsOptions struct{}
 
-type brokerOffsetRequest struct {
-	broker     *Broker
-	request    *OffsetRequest
-	partitions []TopicPartitionID
-}
-
-type brokerOffsetResult struct {
-	result map[TopicPartitionID]*ListOffsetsResult
-	err    error
-}
-
 func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*ListOffsetsResult, error) {
+	type brokerOffsetRequest struct {
+		broker     *Broker
+		request    *OffsetRequest
+		partitions []TopicPartitionID
+	}
+
+	type brokerOffsetResult struct {
+		result map[TopicPartitionID]*ListOffsetsResult
+		err    error
+	}
+
 	if len(partitions) == 0 {
 		return nil, ConfigurationError("no partitions provided")
 	}
