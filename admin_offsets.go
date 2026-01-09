@@ -5,12 +5,6 @@ import (
 	"sync"
 )
 
-// TopicPartitionID identifies a specific partition in a topic.
-type TopicPartitionID struct {
-	Topic     string
-	Partition int32
-}
-
 // ListOffsetsOptions configures how offsets are fetched.
 type ListOffsetsOptions struct {
 	IsolationLevel IsolationLevel
@@ -38,14 +32,19 @@ type OffsetAndMetadata struct {
 // It is currently empty and reserved for future Kafka protocol options.
 type AlterConsumerGroupOffsetsOptions struct{}
 
-func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]int64, options *ListOffsetsOptions) (map[TopicPartitionID]*OffsetResult, error) {
+func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, options *ListOffsetsOptions) (map[string]map[int32]*OffsetResult, error) {
+	type topicPartition struct {
+		topic     string
+		partition int32
+	}
+
 	type brokerOffsetRequest struct {
 		request    *OffsetRequest
-		partitions []TopicPartitionID
+		partitions []topicPartition
 	}
 
 	type brokerOffsetResult struct {
-		result map[TopicPartitionID]*OffsetResult
+		result map[string]map[int32]*OffsetResult
 		err    error
 	}
 
@@ -58,22 +57,24 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]int64, optio
 	}
 
 	requests := make(map[*Broker]*brokerOffsetRequest)
-	for tp, offsetQuery := range partitions {
-		broker, _, err := ca.client.LeaderAndEpoch(tp.Topic, tp.Partition)
-		if err != nil {
-			return nil, err
-		}
+	for topic, topicOffsets := range partitions {
+		for partition, offsetQuery := range topicOffsets {
+			broker, _, err := ca.client.LeaderAndEpoch(topic, partition)
+			if err != nil {
+				return nil, err
+			}
 
-		req := requests[broker]
-		if req == nil {
+			req := requests[broker]
+			if req == nil {
 			req = &brokerOffsetRequest{
 				request: NewOffsetRequest(ca.conf.Version),
 			}
 			req.request.IsolationLevel = options.IsolationLevel
 			requests[broker] = req
 		}
-		req.request.AddBlock(tp.Topic, tp.Partition, offsetQuery, 1)
-		req.partitions = append(req.partitions, tp)
+		req.request.AddBlock(topic, partition, offsetQuery, 1)
+		req.partitions = append(req.partitions, topicPartition{topic: topic, partition: partition})
+	}
 	}
 
 	results := make(chan brokerOffsetResult)
@@ -91,14 +92,17 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]int64, optio
 			}
 			broker.handleThrottledResponse(resp)
 
-			partitionResults := make(map[TopicPartitionID]*OffsetResult, len(req.partitions))
+			partitionResults := make(map[string]map[int32]*OffsetResult)
 			for _, tp := range req.partitions {
-				block := resp.GetBlock(tp.Topic, tp.Partition)
+				block := resp.GetBlock(tp.topic, tp.partition)
+				if partitionResults[tp.topic] == nil {
+					partitionResults[tp.topic] = make(map[int32]*OffsetResult)
+				}
 				if block == nil {
-					partitionResults[tp] = &OffsetResult{Err: ErrIncompleteResponse}
+					partitionResults[tp.topic][tp.partition] = &OffsetResult{Err: ErrIncompleteResponse}
 					continue
 				}
-				partitionResults[tp] = &OffsetResult{
+				partitionResults[tp.topic][tp.partition] = &OffsetResult{
 					Offset:      block.Offset,
 					Timestamp:   block.Timestamp,
 					LeaderEpoch: block.LeaderEpoch,
@@ -115,21 +119,26 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]int64, optio
 		close(results)
 	}()
 
-	allResults := make(map[TopicPartitionID]*OffsetResult, len(partitions))
+	allResults := make(map[string]map[int32]*OffsetResult, len(partitions))
 	var errs []error
 	for res := range results {
 		if res.err != nil {
 			errs = append(errs, res.err)
 		}
-		for tp, info := range res.result {
-			allResults[tp] = info
+		for topic, partitionResults := range res.result {
+			if allResults[topic] == nil {
+				allResults[topic] = make(map[int32]*OffsetResult, len(partitionResults))
+			}
+			for partition, info := range partitionResults {
+				allResults[topic][partition] = info
+			}
 		}
 	}
 
 	return allResults, errors.Join(errs...)
 }
 
-func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[TopicPartitionID]OffsetAndMetadata, _ *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error) {
+func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[string]map[int32]OffsetAndMetadata, _ *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error) {
 	if len(offsets) == 0 {
 		return nil, ConfigurationError("no offsets provided")
 	}
@@ -142,8 +151,10 @@ func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[Topi
 		commitTimestamp = ReceiveTime
 	}
 
-	for tp, offset := range offsets {
-		request.AddBlockWithLeaderEpoch(tp.Topic, tp.Partition, offset.Offset, offset.LeaderEpoch, commitTimestamp, offset.Metadata)
+	for topic, topicOffsets := range offsets {
+		for partition, offset := range topicOffsets {
+			request.AddBlockWithLeaderEpoch(topic, partition, offset.Offset, offset.LeaderEpoch, commitTimestamp, offset.Metadata)
+		}
 	}
 
 	err := ca.retryOnError(isRetriableGroupCoordinatorError, func() (err error) {

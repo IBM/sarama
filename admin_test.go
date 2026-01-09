@@ -1670,14 +1670,14 @@ func TestListOffsets(t *testing.T) {
 	}
 	defer admin.Close()
 
-	result, err := admin.ListOffsets(map[TopicPartitionID]int64{
-		{Topic: topic, Partition: partition}: timestamp,
+	result, err := admin.ListOffsets(map[string]map[int32]int64{
+		topic: map[int32]int64{partition: timestamp},
 	}, nil)
 	if err != nil {
 		t.Fatalf("ListOffsets failed with error %v", err)
 	}
 
-	info := result[TopicPartitionID{Topic: topic, Partition: partition}]
+	info := result[topic][partition]
 	if info == nil {
 		t.Fatalf("Expected result for topic %v and partition %v to exist, but it doesn't", topic, partition)
 	}
@@ -1714,11 +1714,11 @@ func TestAlterConsumerGroupOffsets(t *testing.T) {
 	}
 	defer admin.Close()
 
-	response, err := admin.AlterConsumerGroupOffsets(group, map[TopicPartitionID]OffsetAndMetadata{
-		{Topic: topic, Partition: partition}: {
+	response, err := admin.AlterConsumerGroupOffsets(group, map[string]map[int32]OffsetAndMetadata{
+		topic: {partition: {
 			Offset:      100,
 			LeaderEpoch: -1,
-		},
+		}},
 	}, nil)
 	if err != nil {
 		t.Fatalf("AlterConsumerGroupOffsets failed with error %v", err)

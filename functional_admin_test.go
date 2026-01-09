@@ -89,9 +89,10 @@ func listOffsetsAndValidate(
 ) {
 	t.Helper()
 
-	offsetQueries := make(map[TopicPartitionID]int64, partitionsCount)
+	offsetQueries := make(map[string]map[int32]int64, 1)
+	offsetQueries[topic] = make(map[int32]int64, partitionsCount)
 	for partition := int32(0); partition < partitionsCount; partition++ {
-		offsetQueries[TopicPartitionID{Topic: topic, Partition: partition}] = offsetQuery
+		offsetQueries[topic][partition] = offsetQuery
 	}
 
 	results, err := adminClient.ListOffsets(offsetQueries, nil)
@@ -99,20 +100,20 @@ func listOffsetsAndValidate(
 		t.Fatal(err)
 	}
 
-	for tp := range offsetQueries {
-		result := results[tp]
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		result := results[topic][partition]
 		if result == nil {
-			t.Fatalf("missing %s result for %s/%d", label, tp.Topic, tp.Partition)
+			t.Fatalf("missing %s result for %s/%d", label, topic, partition)
 		}
 		if !errors.Is(result.Err, ErrNoError) {
-			t.Fatalf("unexpected %s error for %s/%d: %v", label, tp.Topic, tp.Partition, result.Err)
+			t.Fatalf("unexpected %s error for %s/%d: %v", label, topic, partition, result.Err)
 		}
 		if result.Offset != expectedOffset {
 			t.Fatalf(
 				"unexpected %s offset for %s/%d: want %d, got %d",
 				label,
-				tp.Topic,
-				tp.Partition,
+				topic,
+				partition,
 				expectedOffset,
 				result.Offset,
 			)
@@ -513,11 +514,11 @@ func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
 	partition := int32(0)
 	offset := int64(1)
 
-	response, err := adminClient.AlterConsumerGroupOffsets(group, map[TopicPartitionID]OffsetAndMetadata{
-		{Topic: topic, Partition: partition}: {
+	response, err := adminClient.AlterConsumerGroupOffsets(group, map[string]map[int32]OffsetAndMetadata{
+		topic: {partition: {
 			Offset:      offset,
 			LeaderEpoch: -1,
-		},
+		}},
 	}, nil)
 	if err != nil {
 		t.Fatal(err)
