@@ -104,7 +104,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 	}
 
 	results := make(chan brokerOffsetResult, len(requests))
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 
 	for _, req := range requests {
 		wg.Add(1)
