@@ -221,7 +221,7 @@ func newOffsetCommitRequestForAdmin(conf *Config, group string) *OffsetCommitReq
 	if request.Version >= 2 && request.Version < 5 {
 		request.RetentionTime = -1
 		if conf.Consumer.Offsets.Retention > 0 {
-			request.RetentionTime = int64(conf.Consumer.Offsets.Retention / time.Millisecond)
+			request.RetentionTime = conf.Consumer.Offsets.Retention.Milliseconds()
 		}
 	}
 
