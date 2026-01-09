@@ -66,15 +66,15 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 
 			req := requests[broker]
 			if req == nil {
-			req = &brokerOffsetRequest{
-				request: NewOffsetRequest(ca.conf.Version),
+				req = &brokerOffsetRequest{
+					request: NewOffsetRequest(ca.conf.Version),
+				}
+				req.request.IsolationLevel = options.IsolationLevel
+				requests[broker] = req
 			}
-			req.request.IsolationLevel = options.IsolationLevel
-			requests[broker] = req
+			req.request.AddBlock(topic, partition, offsetQuery, 1)
+			req.partitions = append(req.partitions, topicPartition{topic: topic, partition: partition})
 		}
-		req.request.AddBlock(topic, partition, offsetQuery, 1)
-		req.partitions = append(req.partitions, topicPartition{topic: topic, partition: partition})
-	}
 	}
 
 	results := make(chan brokerOffsetResult)
