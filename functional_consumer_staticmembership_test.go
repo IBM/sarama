@@ -136,9 +136,6 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err != nil {
-		t.Fatal(err)
-	}
 	if len(res3) != 1 {
 		t.Errorf("group description should be only 1, got %v\n", len(res3))
 	}
@@ -148,7 +145,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	generationId3 := m1.generationId.Load()
 	if generationId3 != generationId1 {
-		t.Errorf("m1 generation should not increase expect %v, actual %v", generationId1, generationId2)
+		t.Errorf("m1 generation should not increase expect %v, actual %v", generationId1, generationId3)
 	}
 
 	m2.AssertCleanShutdown()
@@ -163,7 +160,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 
 	generationId4 := m1.generationId.Load()
 	if generationId4 == generationId1 {
-		t.Errorf("m1 generation should increase expect %v, actual %v", generationId1, generationId2)
+		t.Errorf("m1 generation should increase expect %v, actual %v", generationId1, generationId4)
 	}
 }
 
