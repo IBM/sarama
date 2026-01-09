@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"errors"
 	"sync"
 )
 
@@ -142,17 +143,17 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 	}()
 
 	allResults := make(map[TopicPartitionID]*ListOffsetsResult, len(partitions))
-	var firstErr error
+	var errs []error
 	for res := range results {
-		if res.err != nil && firstErr == nil {
-			firstErr = res.err
+		if res.err != nil {
+			errs = append(errs, res.err)
 		}
 		for tp, info := range res.result {
 			allResults[tp] = info
 		}
 	}
 
-	return allResults, firstErr
+	return allResults, errors.Join(errs...)
 }
 
 func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[TopicPartitionID]OffsetAndMetadata, _ *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error) {
