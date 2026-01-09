@@ -116,13 +116,13 @@ type ClusterAdmin interface {
 	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
 
 	// ListOffsets lists offsets for the specified topic partitions.
-	// OffsetSpec controls whether each partition resolves to earliest, latest, or a timestamp-based offset.
+	// Each value is OffsetNewest, OffsetOldest, or a timestamp in milliseconds.
 	// Results are keyed by the same topic/partition IDs and include per-partition errors.
 	//
 	// For oldest/newest requests, Kafka may return a valid offset while timestamp is -1.
 	// To get the exact message timestamp, fetch the record at that offset.
 	// This operation is supported by brokers with version 0.10.1.0 or higher.
-	ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*OffsetResult, error)
+	ListOffsets(partitions map[TopicPartitionID]int64, options *ListOffsetsOptions) (map[TopicPartitionID]*OffsetResult, error)
 
 	// AlterConsumerGroupOffsets alters offsets for the specified group by committing the provided offsets and metadata.
 	// The request targets the group's coordinator and returns per-partition results in the response.

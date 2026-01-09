@@ -11,31 +11,6 @@ type TopicPartitionID struct {
 	Partition int32
 }
 
-// OffsetSpec specifies which offset to look up for a partition.
-type OffsetSpec struct {
-	timestamp int64
-}
-
-// OffsetSpecLatest requests the log end offset.
-func OffsetSpecLatest() OffsetSpec {
-	return OffsetSpec{timestamp: OffsetNewest}
-}
-
-// OffsetSpecEarliest requests the log start offset.
-func OffsetSpecEarliest() OffsetSpec {
-	return OffsetSpec{timestamp: OffsetOldest}
-}
-
-// OffsetSpecForTimestamp requests the offset for the given timestamp in milliseconds.
-func OffsetSpecForTimestamp(timestamp int64) OffsetSpec {
-	return OffsetSpec{timestamp: timestamp}
-}
-
-// Timestamp returns the underlying timestamp value for this spec.
-func (s OffsetSpec) Timestamp() int64 {
-	return s.timestamp
-}
-
 // ListOffsetsOptions configures how offsets are fetched.
 type ListOffsetsOptions struct {
 	IsolationLevel IsolationLevel
@@ -63,7 +38,7 @@ type OffsetAndMetadata struct {
 // It is currently empty and reserved for future Kafka protocol options.
 type AlterConsumerGroupOffsetsOptions struct{}
 
-func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*OffsetResult, error) {
+func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]int64, options *ListOffsetsOptions) (map[TopicPartitionID]*OffsetResult, error) {
 	type brokerOffsetRequest struct {
 		request    *OffsetRequest
 		partitions []TopicPartitionID
@@ -83,7 +58,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 	}
 
 	requests := make(map[*Broker]*brokerOffsetRequest)
-	for tp, spec := range partitions {
+	for tp, offsetQuery := range partitions {
 		broker, _, err := ca.client.LeaderAndEpoch(tp.Topic, tp.Partition)
 		if err != nil {
 			return nil, err
@@ -97,7 +72,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 			req.request.IsolationLevel = options.IsolationLevel
 			requests[broker] = req
 		}
-		req.request.AddBlock(tp.Topic, tp.Partition, spec.timestamp, 1)
+		req.request.AddBlock(tp.Topic, tp.Partition, offsetQuery, 1)
 		req.partitions = append(req.partitions, tp)
 	}
 

@@ -83,23 +83,23 @@ func listOffsetsAndValidate(
 	adminClient ClusterAdmin,
 	topic string,
 	partitionsCount int32,
-	spec OffsetSpec,
+	offsetQuery int64,
 	expectedOffset int64,
 	label string,
 ) {
 	t.Helper()
 
-	specs := make(map[TopicPartitionID]OffsetSpec, partitionsCount)
+	offsetQueries := make(map[TopicPartitionID]int64, partitionsCount)
 	for partition := int32(0); partition < partitionsCount; partition++ {
-		specs[TopicPartitionID{Topic: topic, Partition: partition}] = spec
+		offsetQueries[TopicPartitionID{Topic: topic, Partition: partition}] = offsetQuery
 	}
 
-	results, err := adminClient.ListOffsets(specs, nil)
+	results, err := adminClient.ListOffsets(offsetQueries, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for tp := range specs {
+	for tp := range offsetQueries {
 		result := results[tp]
 		if result == nil {
 			t.Fatalf("missing %s result for %s/%d", label, tp.Topic, tp.Partition)
@@ -469,7 +469,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		adminClient,
 		topic,
 		partitionsCount,
-		OffsetSpecEarliest(),
+		OffsetOldest,
 		minOffset,
 		"earliest",
 	)
@@ -478,7 +478,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		adminClient,
 		topic,
 		partitionsCount,
-		OffsetSpecLatest(),
+		OffsetNewest,
 		maxOffset+1,
 		"latest",
 	)
@@ -488,7 +488,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		adminClient,
 		topic,
 		partitionsCount,
-		OffsetSpecForTimestamp(midTimestamp),
+		midTimestamp,
 		midIndex,
 		"mid timestamp",
 	)

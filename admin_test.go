@@ -1670,8 +1670,8 @@ func TestListOffsets(t *testing.T) {
 	}
 	defer admin.Close()
 
-	result, err := admin.ListOffsets(map[TopicPartitionID]OffsetSpec{
-		{Topic: topic, Partition: partition}: OffsetSpecForTimestamp(timestamp),
+	result, err := admin.ListOffsets(map[TopicPartitionID]int64{
+		{Topic: topic, Partition: partition}: timestamp,
 	}, nil)
 	if err != nil {
 		t.Fatalf("ListOffsets failed with error %v", err)
