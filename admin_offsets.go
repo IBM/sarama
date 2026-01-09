@@ -41,8 +41,8 @@ type ListOffsetsOptions struct {
 	IsolationLevel IsolationLevel
 }
 
-// ListOffsetsResult contains the response for a single topic partition.
-type ListOffsetsResult struct {
+// OffsetResult contains the response for a single topic partition.
+type OffsetResult struct {
 	Offset      int64
 	Timestamp   int64
 	LeaderEpoch int32
@@ -63,14 +63,14 @@ type OffsetAndMetadata struct {
 // It is currently empty and reserved for future Kafka protocol options.
 type AlterConsumerGroupOffsetsOptions struct{}
 
-func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*ListOffsetsResult, error) {
+func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*OffsetResult, error) {
 	type brokerOffsetRequest struct {
 		request    *OffsetRequest
 		partitions []TopicPartitionID
 	}
 
 	type brokerOffsetResult struct {
-		result map[TopicPartitionID]*ListOffsetsResult
+		result map[TopicPartitionID]*OffsetResult
 		err    error
 	}
 
@@ -116,14 +116,14 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 			}
 			broker.handleThrottledResponse(resp)
 
-			partitionResults := make(map[TopicPartitionID]*ListOffsetsResult, len(req.partitions))
+			partitionResults := make(map[TopicPartitionID]*OffsetResult, len(req.partitions))
 			for _, tp := range req.partitions {
 				block := resp.GetBlock(tp.Topic, tp.Partition)
 				if block == nil {
-					partitionResults[tp] = &ListOffsetsResult{Err: ErrIncompleteResponse}
+					partitionResults[tp] = &OffsetResult{Err: ErrIncompleteResponse}
 					continue
 				}
-				partitionResults[tp] = &ListOffsetsResult{
+				partitionResults[tp] = &OffsetResult{
 					Offset:      block.Offset,
 					Timestamp:   block.Timestamp,
 					LeaderEpoch: block.LeaderEpoch,
@@ -140,7 +140,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 		close(results)
 	}()
 
-	allResults := make(map[TopicPartitionID]*ListOffsetsResult, len(partitions))
+	allResults := make(map[TopicPartitionID]*OffsetResult, len(partitions))
 	var errs []error
 	for res := range results {
 		if res.err != nil {
