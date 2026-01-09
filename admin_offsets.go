@@ -137,8 +137,10 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 		}(req)
 	}
 
-	wg.Wait()
-	close(results)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	allResults := make(map[TopicPartitionID]*ListOffsetsResult, len(partitions))
 	var firstErr error
