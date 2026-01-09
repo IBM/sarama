@@ -179,10 +179,10 @@ func recordBatchTestCases() []struct {
 			},
 			encoded: []byte{
 				0, 0, 0, 0, 0, 0, 0, 0, // First Offset
-				0, 0, 0, 72, // Length
+				0, 0, 0, 92, // Length
 				0, 0, 0, 0, // Partition Leader Epoch
-				2,              // Version
-				21, 0, 159, 97, // CRC
+				2,                 // Version
+				133, 100, 178, 36, // CRC
 				0, 2, // Attributes
 				0, 0, 0, 0, // Last Offset Delta
 				0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
@@ -191,7 +191,12 @@ func recordBatchTestCases() []struct {
 				0, 0, // Producer Epoch
 				0, 0, 0, 0, // First Sequence
 				0, 0, 0, 1, // Number of Records
-				21, 80, 40, 0, 10, 0, 8, 1, 2, 3, 4, 6, 5, 6, 7, 2, 6, 8, 9, 10, 4, 11, 12,
+				// Xerial framing header + compressed data
+				130, 83, 78, 65, 80, 80, 89, 0, // SNAPPY magic
+				0, 0, 0, 1, // min version
+				0, 0, 0, 1, // default version
+				0, 0, 0, 23, // compressed length
+				21, 80, 40, 0, 10, 0, 8, 1, 2, 3, 4, 6, 5, 6, 7, 2, 6, 8, 9, 10, 4, 11, 12, // compressed data
 			},
 		},
 		{
