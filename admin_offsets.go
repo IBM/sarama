@@ -2,7 +2,6 @@ package sarama
 
 import (
 	"sync"
-	"time"
 )
 
 // TopicPartitionID identifies a specific partition in a topic.
@@ -103,7 +102,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 		req.partitions = append(req.partitions, tp)
 	}
 
-	results := make(chan brokerOffsetResult, len(requests))
+	results := make(chan brokerOffsetResult)
 	var wg sync.WaitGroup
 
 	for _, req := range requests {
