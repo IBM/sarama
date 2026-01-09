@@ -65,7 +65,6 @@ type AlterConsumerGroupOffsetsOptions struct{}
 
 func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, options *ListOffsetsOptions) (map[TopicPartitionID]*ListOffsetsResult, error) {
 	type brokerOffsetRequest struct {
-		broker     *Broker
 		request    *OffsetRequest
 		partitions []TopicPartitionID
 	}
@@ -93,7 +92,6 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 		req := requests[broker]
 		if req == nil {
 			req = &brokerOffsetRequest{
-				broker:  broker,
 				request: NewOffsetRequest(ca.conf.Version),
 			}
 			req.request.IsolationLevel = options.IsolationLevel
@@ -106,17 +104,17 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 	results := make(chan brokerOffsetResult)
 	var wg sync.WaitGroup
 
-	for _, req := range requests {
+	for broker, req := range requests {
 		wg.Add(1)
-		go func(req *brokerOffsetRequest) {
+		go func(broker *Broker, req *brokerOffsetRequest) {
 			defer wg.Done()
 
-			resp, err := req.broker.GetAvailableOffsets(req.request)
+			resp, err := broker.GetAvailableOffsets(req.request)
 			if err != nil {
 				results <- brokerOffsetResult{err: err}
 				return
 			}
-			req.broker.handleThrottledResponse(resp)
+			broker.handleThrottledResponse(resp)
 
 			partitionResults := make(map[TopicPartitionID]*ListOffsetsResult, len(req.partitions))
 			for _, tp := range req.partitions {
@@ -134,7 +132,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[TopicPartitionID]OffsetSpec, 
 			}
 
 			results <- brokerOffsetResult{result: partitionResults}
-		}(req)
+		}(broker, req)
 	}
 
 	go func() {
