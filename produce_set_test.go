@@ -13,6 +13,7 @@ func makeProduceSet() (*asyncProducer, *produceSet) {
 	txnmgr, _ := newTransactionManager(conf, nil)
 	parent := &asyncProducer{
 		conf:   conf,
+		muter:  newPartitionMuter(),
 		txnmgr: txnmgr,
 	}
 	return parent, newProduceSet(parent)
