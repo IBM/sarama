@@ -952,10 +952,21 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 			}
 			defer safeClose(t, producerClient)
 
-			// Keep in mind the current offset
-			initialOffset, err := producerClient.GetOffset("test.1", 0, OffsetNewest)
-			if err != nil {
+			// Keep in mind the current offset (retry on transient leader election errors)
+			var initialOffset int64
+			for i := 0; i < 10; i++ {
+				initialOffset, err = producerClient.GetOffset("test.1", 0, OffsetNewest)
+				if err == nil {
+					break
+				}
+				if errors.Is(err, ErrLeaderNotAvailable) || errors.Is(err, ErrOffsetNotAvailable) {
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
 				t.Fatal(err)
+			}
+			if err != nil {
+				t.Fatalf("GetOffset failed after retries: %v", err)
 			}
 
 			producer, err := NewAsyncProducerFromClient(producerClient)
