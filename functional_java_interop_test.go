@@ -59,14 +59,14 @@ func produceWithJava(t *testing.T, topic string, codec CompressionCodec, message
 	require.NoError(t, cmd.Wait(), "Java producer failed")
 }
 
-func consumeWithSarama(t *testing.T, topic string, count int) []string {
+func consumeWithSarama(t *testing.T, topic string, startOffset int64, count int) []string {
 	t.Helper()
 	config := NewFunctionalTestConfig()
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
 	require.NoError(t, err)
 	defer consumer.Close()
 
-	partitionConsumer, err := consumer.ConsumePartition(topic, 0, OffsetOldest)
+	partitionConsumer, err := consumer.ConsumePartition(topic, 0, startOffset)
 	require.NoError(t, err)
 	defer partitionConsumer.Close()
 
@@ -108,12 +108,12 @@ func produceWithSarama(t *testing.T, topic string, codec CompressionCodec, messa
 	}
 }
 
-func consumeWithJava(t *testing.T, topic string, count int) []string {
+func consumeWithJava(t *testing.T, topic string, startOffset int64, count int) []string {
 	t.Helper()
 	consumerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-consumer.sh", FunctionalTestEnv.KafkaVersion)
 	args := append(
 		[]string{"compose", "exec", "-T", brokerContainer, consumerPath},
-		javaConsumerArgs(topic, count)...,
+		javaConsumerArgs(topic, startOffset, count)...,
 	)
 	cmd := exec.Command("docker", args...)
 
@@ -164,6 +164,18 @@ func consumeWithJava(t *testing.T, topic string, count int) []string {
 	return messages
 }
 
+func endOffsetForPartition(t *testing.T, topic string, partition int32) int64 {
+	t.Helper()
+	config := NewFunctionalTestConfig()
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	offset, err := client.GetOffset(topic, partition, OffsetNewest)
+	require.NoError(t, err)
+	return offset
+}
+
 // TestJavaProducerCompressionRoundTrip tests that messages produced by Kafka's Java
 // console producer with various compression codecs can be correctly consumed and
 // decompressed by Sarama.
@@ -181,8 +193,9 @@ func TestJavaProducerCompressionRoundTrip(t *testing.T) {
 				"Message 3",
 			}
 
+			initialOffset := endOffsetForPartition(t, "test.1", 0)
 			produceWithJava(t, "test.1", tc.codec, expected)
-			actual := consumeWithSarama(t, "test.1", len(expected))
+			actual := consumeWithSarama(t, "test.1", initialOffset, len(expected))
 
 			require.Equal(t, expected, actual)
 		})
@@ -206,8 +219,9 @@ func TestJavaConsumerCompressionRoundTrip(t *testing.T) {
 				"Message 3",
 			}
 
+			initialOffset := endOffsetForPartition(t, "test.1", 0)
 			produceWithSarama(t, "test.1", tc.codec, expected)
-			actual := consumeWithJava(t, "test.1", len(expected))
+			actual := consumeWithJava(t, "test.1", initialOffset, len(expected))
 
 			require.Equal(t, expected, actual)
 		})
@@ -240,8 +254,8 @@ func javaProducerCompressionArgs(codec CompressionCodec) []string {
 	return []string{"--compression-codec", codec.String()}
 }
 
-func javaConsumerArgs(topic string, count int) []string {
-	args := make([]string, 0, 10)
+func javaConsumerArgs(topic string, startOffset int64, count int) []string {
+	args := make([]string, 0, 12)
 	if kafkaVersionAtLeast("0.10.0") {
 		args = append(args, "--bootstrap-server", brokerAddr)
 	} else {
@@ -249,7 +263,8 @@ func javaConsumerArgs(topic string, count int) []string {
 	}
 	return append(args,
 		"--topic", topic,
-		"--from-beginning",
+		"--partition", "0",
+		"--offset", fmt.Sprintf("%d", startOffset),
 		"--max-messages", fmt.Sprintf("%d", count),
 	)
 }
