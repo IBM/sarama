@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -130,8 +131,13 @@ func consumeWithJava(t *testing.T, topic string, startOffset int64, count int) [
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	done := make(chan bool)
+	done := make(chan struct{})
+	stdoutErrCh := make(chan error, 1)
+	stderrErrCh := make(chan error, 1)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		for scanner.Scan() {
 			if line := strings.TrimSpace(scanner.Text()); line != "" {
 				messages = append(messages, line)
@@ -140,27 +146,34 @@ func consumeWithJava(t *testing.T, topic string, startOffset int64, count int) [
 				break
 			}
 		}
-		done <- true
+		stdoutErrCh <- scanner.Err()
+		close(done)
 	}()
 
 	var stderrOutput strings.Builder
 	go func() {
+		defer wg.Done()
 		s := bufio.NewScanner(stderr)
 		for s.Scan() {
 			stderrOutput.WriteString(s.Text() + "\n")
 		}
+		stderrErrCh <- s.Err()
 	}()
 
 	select {
 	case <-done:
 	case <-ctx.Done():
 		require.Fail(t, "timeout waiting for Java consumer")
+		_ = cmd.Process.Kill()
 	}
 
 	if err := cmd.Wait(); err != nil && len(messages) < count {
 		t.Logf("stderr: %s", stderrOutput.String())
 		require.NoError(t, err, "Java consumer failed")
 	}
+	wg.Wait()
+	require.NoError(t, <-stdoutErrCh)
+	require.NoError(t, <-stderrErrCh)
 	return messages
 }
 
@@ -264,7 +277,7 @@ func javaConsumerArgs(topic string, startOffset int64, count int) []string {
 	return append(args,
 		"--topic", topic,
 		"--partition", "0",
-		"--offset", fmt.Sprintf("%d", startOffset),
-		"--max-messages", fmt.Sprintf("%d", count),
+		"--offset", fmt.Sprint(startOffset),
+		"--max-messages", fmt.Sprint(count),
 	)
 }
