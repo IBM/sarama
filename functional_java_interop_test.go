@@ -17,6 +17,7 @@ import (
 const (
 	brokerContainer = "kafka-1"
 	brokerAddr      = "kafka-1:9091"
+	zookeeperAddr   = "zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181"
 )
 
 var compressionTests = []struct {
@@ -33,12 +34,11 @@ var compressionTests = []struct {
 func produceWithJava(t *testing.T, topic string, codec CompressionCodec, messages []string) {
 	t.Helper()
 	producerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-producer.sh", FunctionalTestEnv.KafkaVersion)
-	cmd := exec.Command("docker", "compose", "exec", "-T", brokerContainer,
-		producerPath,
-		"--bootstrap-server", brokerAddr,
-		"--topic", topic,
-		"--compression-codec", codec.String(),
+	args := append(
+		[]string{"compose", "exec", "-T", brokerContainer, producerPath},
+		javaProducerArgs(topic, codec)...,
 	)
+	cmd := exec.Command("docker", args...)
 
 	stdin, err := cmd.StdinPipe()
 	require.NoError(t, err)
@@ -111,13 +111,11 @@ func produceWithSarama(t *testing.T, topic string, codec CompressionCodec, messa
 func consumeWithJava(t *testing.T, topic string, count int) []string {
 	t.Helper()
 	consumerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-consumer.sh", FunctionalTestEnv.KafkaVersion)
-	cmd := exec.Command("docker", "compose", "exec", "-T", brokerContainer,
-		consumerPath,
-		"--bootstrap-server", brokerAddr,
-		"--topic", topic,
-		"--from-beginning",
-		"--max-messages", fmt.Sprintf("%d", count),
+	args := append(
+		[]string{"compose", "exec", "-T", brokerContainer, consumerPath},
+		javaConsumerArgs(topic, count)...,
 	)
+	cmd := exec.Command("docker", args...)
 
 	stdout, err := cmd.StdoutPipe()
 	require.NoError(t, err)
@@ -214,4 +212,44 @@ func TestJavaConsumerCompressionRoundTrip(t *testing.T) {
 			require.Equal(t, expected, actual)
 		})
 	}
+}
+
+func kafkaVersionAtLeast(requiredVersion string) bool {
+	kafkaVersion := FunctionalTestEnv.KafkaVersion
+	if kafkaVersion == "" {
+		return false
+	}
+	return parseKafkaVersion(kafkaVersion).satisfies(parseKafkaVersion(requiredVersion))
+}
+
+func javaProducerArgs(topic string, codec CompressionCodec) []string {
+	args := make([]string, 0, 8)
+	if kafkaVersionAtLeast("2.0.0") {
+		args = append(args, "--bootstrap-server", brokerAddr)
+	} else {
+		args = append(args, "--broker-list", brokerAddr)
+	}
+	args = append(args, "--topic", topic)
+	return append(args, javaProducerCompressionArgs(codec)...)
+}
+
+func javaProducerCompressionArgs(codec CompressionCodec) []string {
+	if kafkaVersionAtLeast("0.10.0") {
+		return []string{"--producer-property", fmt.Sprintf("compression.type=%s", codec.String())}
+	}
+	return []string{"--compression-codec", codec.String()}
+}
+
+func javaConsumerArgs(topic string, count int) []string {
+	args := make([]string, 0, 10)
+	if kafkaVersionAtLeast("0.10.0") {
+		args = append(args, "--bootstrap-server", brokerAddr)
+	} else {
+		args = append(args, "--zookeeper", zookeeperAddr)
+	}
+	return append(args,
+		"--topic", topic,
+		"--from-beginning",
+		"--max-messages", fmt.Sprintf("%d", count),
+	)
 }
