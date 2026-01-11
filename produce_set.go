@@ -161,7 +161,7 @@ func (ps *produceSet) takePartitions(predicate func(topic string, partition int3
 	return out
 }
 
-func (ps *produceSet) filteredCopy(predicate func(topic string, partition int32) bool) *produceSet {
+func (ps *produceSet) copyFunc(predicate func(topic string, partition int32) bool) *produceSet {
 	out := newProduceSetWithMeta(ps.parent, ps.producerID, ps.producerEpoch)
 	for topic, partitions := range ps.msgs {
 		for partition, set := range partitions {
@@ -277,6 +277,17 @@ func (ps *produceSet) eachPartition(cb func(topic string, partition int32, pSet 
 			cb(topic, partition, set)
 		}
 	}
+}
+
+func (ps *produceSet) anyPartition(predicate func(topic string, partition int32, pSet *partitionSet) bool) bool {
+	for topic, partitionSet := range ps.msgs {
+		for partition, set := range partitionSet {
+			if predicate(topic, partition, set) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (ps *produceSet) dropPartition(topic string, partition int32) []*ProducerMessage {

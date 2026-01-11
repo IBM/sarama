@@ -127,23 +127,15 @@ func newPartitionMuter() *partitionMuter {
 // isMuted reports whether the partition has an in-flight batch.
 // Requires: m.mu held.
 func (m *partitionMuter) isMuted(topic string, partition int32) bool {
-	if partitions := m.inFlightCounts[topic]; partitions != nil {
-		return partitions[partition] > 0
-	}
-	return false
+	return m.inFlightCounts[topic][partition] > 0
 }
 
 // isAnyMuted reports whether any partition in the set has an in-flight batch.
 // Requires: m.mu held.
 func (m *partitionMuter) isAnyMuted(set *produceSet) bool {
-	muted := false
-	set.eachPartition(func(topic string, partition int32, _ *partitionSet) {
-		if muted {
-			return
-		}
-		muted = m.isMuted(topic, partition)
+	return set.anyPartition(func(topic string, partition int32, _ *partitionSet) bool {
+		return m.isMuted(topic, partition)
 	})
-	return muted
 }
 
 // mutePartition increments the in-flight count for a single partition.
@@ -1322,12 +1314,7 @@ func (bp *brokerProducer) waitForSpace(msg *ProducerMessage, forceRollover bool)
 
 func (bp *brokerProducer) rollOver() {
 	if bp.timer != nil {
-		if !bp.timer.Stop() {
-			select {
-			case <-bp.timer.C:
-			default:
-			}
-		}
+		bp.timer.Stop()
 	}
 	bp.timer = nil
 	bp.timerFired = false
@@ -1438,7 +1425,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		})
 	}
 
-	unmuteSet := sent.filteredCopy(func(topic string, partition int32) bool {
+	unmuteSet := sent.copyFunc(func(topic string, partition int32) bool {
 		if partitions := keepMuted[topic]; partitions != nil {
 			_, kept := partitions[partition]
 			return !kept
@@ -1540,7 +1527,7 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		})
 		bp.rollOver()
 
-		unmuteSet := sent.filteredCopy(func(topic string, partition int32) bool {
+		unmuteSet := sent.copyFunc(func(topic string, partition int32) bool {
 			if partitions := keepMuted[topic]; partitions != nil {
 				_, kept := partitions[partition]
 				return !kept
