@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -19,56 +18,6 @@ const (
 	brokerContainer = "kafka-1"
 	brokerAddr      = "kafka-1:9091"
 )
-
-// setupTestTopic creates a topic for testing, deleting it first if it exists.
-func setupTestTopic(t *testing.T, topic string) (Client, *Broker) {
-	config := NewFunctionalTestConfig()
-	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
-	require.NoError(t, err, "Failed to create client")
-
-	controller, err := client.Controller()
-	require.NoError(t, err, "Failed to get controller")
-
-	deleteReq := NewDeleteTopicsRequest(config.Version, []string{topic}, time.Minute)
-	deleteRes, _ := controller.DeleteTopics(deleteReq)
-	_ = deleteRes // ignore errors
-
-	time.Sleep(2 * time.Second)
-
-	createReq := NewCreateTopicsRequest(config.Version, map[string]*TopicDetail{
-		topic: {
-			NumPartitions:     1,
-			ReplicationFactor: 1,
-		},
-	}, time.Minute, false)
-	createRes, err := controller.CreateTopics(createReq)
-	require.NoError(t, err, "Failed to create topic")
-	if err := createRes.TopicErrors[topic]; err != nil && err.Err != ErrTopicAlreadyExists && err.Err != ErrNoError {
-		require.NoError(t, err, "Failed to create topic %s", topic)
-	}
-
-	// Wait for topic to be ready
-	time.Sleep(2 * time.Second)
-
-	return client, controller
-}
-
-// getKafkaVersion returns the Kafka version, skipping the test for Kafka 1.0.2.
-func getKafkaVersion(t *testing.T) string {
-	kafkaVersion := FunctionalTestEnv.KafkaVersion
-	if kafkaVersion == "" {
-		kafkaVersion = os.Getenv("KAFKA_VERSION")
-		if kafkaVersion == "" {
-			kafkaVersion = "3.9.1" // default from docker-compose.yml
-		}
-	}
-
-	if kafkaVersion == "1.0.2" {
-		t.Skipf("Skipping test for Kafka version %s", kafkaVersion)
-	}
-
-	return kafkaVersion
-}
 
 // verifyMessages verifies that consumed messages match expected messages.
 func verifyMessages(t *testing.T, expectedMessages, consumedMessages []string) {
@@ -92,15 +41,11 @@ func verifyMessages(t *testing.T, expectedMessages, consumedMessages []string) {
 // by Sarama. This verifies compatibility between Java's snappy implementation and
 // klauspost/compress/snappy/xerial.
 func TestJavaProducerSnappyRoundTrip(t *testing.T) {
+	checkKafkaVersion(t, "2.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	topic := "test-snappy-java-roundtrip"
-	client, controller := setupTestTopic(t, topic)
-	defer controller.Close()
-	defer client.Close()
-
-	kafkaVersion := getKafkaVersion(t)
+	topic := "test.1"
 
 	expectedMessages := []string{
 		"Hello from Java producer with snappy compression!",
@@ -110,7 +55,7 @@ func TestJavaProducerSnappyRoundTrip(t *testing.T) {
 		"Final message: Java producer -> Sarama consumer.",
 	}
 
-	producerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-producer.sh", kafkaVersion)
+	producerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-producer.sh", FunctionalTestEnv.KafkaVersion)
 	cmd := exec.Command("docker", "compose", "exec", "-T", brokerContainer,
 		producerPath,
 		"--bootstrap-server", brokerAddr,
@@ -128,7 +73,7 @@ func TestJavaProducerSnappyRoundTrip(t *testing.T) {
 		_, err := fmt.Fprintln(stdin, msg)
 		if err != nil {
 			stdin.Close()
-			_ = cmd.Wait() // ignore error since we're already handling the write error
+			_ = cmd.Wait()
 			require.NoError(t, err, "Failed to write message")
 		}
 	}
@@ -138,8 +83,6 @@ func TestJavaProducerSnappyRoundTrip(t *testing.T) {
 	require.NoError(t, err, "Producer command failed")
 
 	t.Logf("Produced %d messages via Java console producer with snappy compression", len(expectedMessages))
-
-	time.Sleep(2 * time.Second)
 
 	config := NewFunctionalTestConfig()
 	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
@@ -180,15 +123,11 @@ func TestJavaProducerSnappyRoundTrip(t *testing.T) {
 // console consumer. This verifies compatibility between klauspost/compress/snappy/xerial
 // and Java's snappy implementation.
 func TestJavaConsumerSnappyRoundTrip(t *testing.T) {
+	checkKafkaVersion(t, "2.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	topic := "test-snappy-sarama-to-java"
-	client, controller := setupTestTopic(t, topic)
-	defer controller.Close()
-	defer client.Close()
-
-	kafkaVersion := getKafkaVersion(t)
+	topic := "test.1"
 
 	expectedMessages := []string{
 		"Hello from Sarama producer with snappy compression!",
@@ -221,9 +160,7 @@ func TestJavaConsumerSnappyRoundTrip(t *testing.T) {
 
 	t.Logf("Produced %d messages via Sarama with snappy compression", len(expectedMessages))
 
-	time.Sleep(2 * time.Second)
-
-	consumerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-consumer.sh", kafkaVersion)
+	consumerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-consumer.sh", FunctionalTestEnv.KafkaVersion)
 	cmd := exec.Command("docker", "compose", "exec", "-T", brokerContainer,
 		consumerPath,
 		"--bootstrap-server", brokerAddr,
