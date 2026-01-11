@@ -44,6 +44,20 @@ func produceWithJava(t *testing.T, topic string, codec CompressionCodec, message
 	stdin, err := cmd.StdinPipe()
 	require.NoError(t, err)
 
+	stderr, err := cmd.StderrPipe()
+	require.NoError(t, err)
+
+	var stderrOutput strings.Builder
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s := bufio.NewScanner(stderr)
+		for s.Scan() {
+			stderrOutput.WriteString(s.Text() + "\n")
+		}
+	}()
+
 	require.NoError(t, cmd.Start())
 
 	for _, msg := range messages {
@@ -51,15 +65,21 @@ func produceWithJava(t *testing.T, topic string, codec CompressionCodec, message
 		if err != nil {
 			stdin.Close()
 			waitErr := cmd.Wait()
+			wg.Wait()
 			if waitErr != nil {
-				err = fmt.Errorf("failed to write message: %w; Java producer failed: %w", err, waitErr)
+				err = fmt.Errorf("failed to write message: %w; Java producer failed: %w; stderr: %s", err, waitErr, stderrOutput.String())
 			}
 		}
 		require.NoError(t, err)
 	}
 	stdin.Close()
 
-	require.NoError(t, cmd.Wait(), "Java producer failed")
+	err = cmd.Wait()
+	wg.Wait()
+	if err != nil {
+		t.Logf("Java producer stderr: %s", stderrOutput.String())
+		require.NoError(t, err, "Java producer failed")
+	}
 }
 
 func consumeWithSarama(t *testing.T, topic string, startOffset int64, count int) []string {
@@ -253,7 +273,7 @@ func kafkaVersionAtLeast(requiredVersion string) bool {
 
 func javaProducerArgs(topic string, codec CompressionCodec) []string {
 	args := make([]string, 0, 8)
-	if kafkaVersionAtLeast("2.0.0") {
+	if kafkaVersionAtLeast("2.5.0") {
 		args = append(args, "--bootstrap-server", brokerAddr)
 	} else {
 		args = append(args, "--broker-list", brokerAddr)
