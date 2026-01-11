@@ -51,7 +51,9 @@ func produceWithJava(t *testing.T, topic string, codec CompressionCodec, message
 		if err != nil {
 			stdin.Close()
 			waitErr := cmd.Wait()
-			require.NoError(t, waitErr, "Java producer failed")
+			if waitErr != nil {
+				err = fmt.Errorf("failed to write message: %w; Java producer failed: %w", err, waitErr)
+			}
 		}
 		require.NoError(t, err)
 	}
