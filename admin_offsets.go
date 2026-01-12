@@ -44,7 +44,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 	}
 
 	type brokerOffsetResult struct {
-		result map[string]map[int32]*OffsetResult
+		result map[topicPartition]*OffsetResult
 		err    error
 	}
 
@@ -92,17 +92,14 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 			}
 			broker.handleThrottledResponse(resp)
 
-			partitionResults := make(map[string]map[int32]*OffsetResult)
+			partitionResults := make(map[topicPartition]*OffsetResult, len(req.partitions))
 			for _, tp := range req.partitions {
 				block := resp.GetBlock(tp.topic, tp.partition)
-				if partitionResults[tp.topic] == nil {
-					partitionResults[tp.topic] = make(map[int32]*OffsetResult)
-				}
 				if block == nil {
-					partitionResults[tp.topic][tp.partition] = &OffsetResult{Err: ErrIncompleteResponse}
+					partitionResults[tp] = &OffsetResult{Err: ErrIncompleteResponse}
 					continue
 				}
-				partitionResults[tp.topic][tp.partition] = &OffsetResult{
+				partitionResults[tp] = &OffsetResult{
 					Offset:      block.Offset,
 					Timestamp:   block.Timestamp,
 					LeaderEpoch: block.LeaderEpoch,
@@ -125,13 +122,11 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 		if res.err != nil {
 			errs = append(errs, res.err)
 		}
-		for topic, partitionResults := range res.result {
-			if allResults[topic] == nil {
-				allResults[topic] = make(map[int32]*OffsetResult, len(partitionResults))
+		for tp, info := range res.result {
+			if allResults[tp.topic] == nil {
+				allResults[tp.topic] = make(map[int32]*OffsetResult)
 			}
-			for partition, info := range partitionResults {
-				allResults[topic][partition] = info
-			}
+			allResults[tp.topic][tp.partition] = info
 		}
 	}
 
