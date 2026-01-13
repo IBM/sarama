@@ -82,7 +82,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 
 	for broker, req := range requests {
 		wg.Add(1)
-		go func(broker *Broker, req *brokerOffsetRequest) {
+		go func() {
 			defer wg.Done()
 
 			resp, err := broker.GetAvailableOffsets(req.request)
@@ -108,7 +108,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 			}
 
 			results <- brokerOffsetResult{result: partitionResults}
-		}(broker, req)
+		}()
 	}
 
 	go func() {
