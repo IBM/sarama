@@ -139,7 +139,7 @@ func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[stri
 	}
 
 	var response *OffsetCommitResponse
-	request := newOffsetCommitRequestForAdmin(ca.conf, group)
+	request := NewOffsetCommitRequest(ca.conf, group)
 
 	var commitTimestamp int64
 	if request.Version == 1 {
@@ -173,38 +173,4 @@ func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[stri
 	})
 
 	return response, err
-}
-
-func newOffsetCommitRequestForAdmin(conf *Config, group string) *OffsetCommitRequest {
-	request := &OffsetCommitRequest{
-		ConsumerGroup:           group,
-		ConsumerGroupGeneration: GroupGenerationUndefined,
-	}
-
-	if conf.Version.IsAtLeast(V0_9_0_0) {
-		request.Version = 2
-	} else {
-		request.Version = 1
-	}
-	if conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 3
-	}
-	if conf.Version.IsAtLeast(V2_0_0_0) {
-		request.Version = 4
-	}
-	if conf.Version.IsAtLeast(V2_1_0_0) {
-		request.Version = 6
-	}
-	if conf.Version.IsAtLeast(V2_3_0_0) {
-		request.Version = 7
-	}
-
-	if request.Version >= 2 && request.Version < 5 {
-		request.RetentionTime = -1
-		if conf.Consumer.Offsets.Retention > 0 {
-			request.RetentionTime = conf.Consumer.Offsets.Retention.Milliseconds()
-		}
-	}
-
-	return request
 }
