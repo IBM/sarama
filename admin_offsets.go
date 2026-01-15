@@ -85,7 +85,13 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 		go func() {
 			defer wg.Done()
 
-			resp, err := broker.GetAvailableOffsets(req.request)
+			var resp *OffsetResponse
+			err := ca.retryOnError(isRetriableBrokerError, func() error {
+				var err error
+				_ = broker.Open(ca.client.Config())
+				resp, err = broker.GetAvailableOffsets(req.request)
+				return err
+			})
 			if err != nil {
 				results <- brokerOffsetResult{err: err}
 				return

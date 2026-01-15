@@ -238,6 +238,17 @@ func isRetriableGroupCoordinatorError(err error) bool {
 	return errors.Is(err, ErrNotCoordinatorForConsumer) || errors.Is(err, ErrConsumerCoordinatorNotAvailable) || errors.Is(err, io.EOF)
 }
 
+// isRetriableBrokerError returns `true` if the given error is a retryable
+// transport error or a timeout.
+func isRetriableBrokerError(err error) bool {
+	return errors.Is(err, ErrNotConnected) || shouldCloseBrokerConn(err) || isTimeoutError(err)
+}
+
+func isTimeoutError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
 // retryOnError will repeatedly call the given (error-returning) func in the
 // case that its response is non-nil and retryable (as determined by the
 // provided retryable func) up to the maximum number of tries permitted by
