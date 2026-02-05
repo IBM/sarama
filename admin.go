@@ -115,6 +115,20 @@ type ClusterAdmin interface {
 	// List the consumer group offsets available in the cluster.
 	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
 
+	// ListOffsets lists offsets for the specified topic partitions.
+	// Each value is OffsetNewest, OffsetOldest, or a timestamp in milliseconds.
+	// Results are keyed by topic/partition and include per-partition errors.
+	//
+	// For oldest/newest requests, Kafka may return a valid offset while timestamp is -1.
+	// To get the exact message timestamp, fetch the record at that offset.
+	// This operation is supported by brokers with version 0.10.1.0 or higher.
+	ListOffsets(partitions map[string]map[int32]int64, options *ListOffsetsOptions) (map[string]map[int32]*OffsetResult, error)
+
+	// AlterConsumerGroupOffsets alters offsets for the specified group by committing the provided offsets and metadata.
+	// The request targets the group's coordinator and returns per-partition results in the response.
+	// This operation is not transactional so it may succeed for some partitions while fail for others.
+	AlterConsumerGroupOffsets(group string, offsets map[string]map[int32]OffsetAndMetadata, options *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error)
+
 	// Deletes a consumer group offset
 	DeleteConsumerGroupOffset(group string, topic string, partition int32) error
 
@@ -222,6 +236,17 @@ func isRetriableControllerError(err error) bool {
 // `ErrConsumerCoordinatorNotAvailable` or `EOF` response from Kafka
 func isRetriableGroupCoordinatorError(err error) bool {
 	return errors.Is(err, ErrNotCoordinatorForConsumer) || errors.Is(err, ErrConsumerCoordinatorNotAvailable) || errors.Is(err, io.EOF)
+}
+
+// isRetriableBrokerError returns `true` if the given error is a retryable
+// transport error or a timeout.
+func isRetriableBrokerError(err error) bool {
+	return errors.Is(err, ErrNotConnected) || shouldCloseBrokerConn(err) || isTimeoutError(err)
+}
+
+func isTimeoutError(err error) bool {
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }
 
 // retryOnError will repeatedly call the given (error-returning) func in the
