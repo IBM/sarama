@@ -10,10 +10,10 @@ require (
 	github.com/jcmturner/gofork v1.7.6
 	github.com/jcmturner/gokrb5/v8 v8.4.4
 	github.com/klauspost/compress v1.18.2
-	github.com/pierrec/lz4/v4 v4.1.23
+	github.com/pierrec/lz4/v4 v4.1.25
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/net v0.48.0
+	golang.org/x/net v0.49.0
 	golang.org/x/sync v0.19.0
 )
 
@@ -24,7 +24,7 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/kr/pretty v0.3.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	golang.org/x/crypto v0.46.0 // indirect
+	golang.org/x/crypto v0.47.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
