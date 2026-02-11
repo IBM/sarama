@@ -80,35 +80,39 @@ func TestMetadataOffsetFetchResponse(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		response := &OffsetFetchResponse{Version: 1}
-		response.AddBlock("t", 0, &OffsetFetchResponseBlock{
-			Offset:   1,
-			Metadata: tc.metadata,
-			Err:      ErrNoError,
+		t.Run(tc.name, func(t *testing.T) {
+			response := &OffsetFetchResponse{Version: 1}
+			response.AddBlock("t", 0, &OffsetFetchResponseBlock{
+				Offset:   1,
+				Metadata: tc.metadata,
+				Err:      ErrNoError,
+			})
+
+			encoded, err := encode(response, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			decoded := &OffsetFetchResponse{Version: 1}
+			if err := versionedDecode(encoded, decoded, 1, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			block := decoded.GetBlock("t", 0)
+			if block == nil {
+				t.Fatal(err)
+			}
+
+			switch {
+			case tc.metadata == nil:
+				if block.Metadata != nil {
+					t.Errorf("block metadata = %q, expected it to be nil", *block.Metadata)
+				}
+			case block.Metadata == nil:
+				t.Errorf("block metdata is unexpectedly nil")
+			case *tc.metadata != *block.Metadata:
+				t.Errorf("block metadata = %q, expected %q", *block.Metadata, *tc.metadata)
+			}
 		})
-
-		encoded, err := encode(response, nil)
-		if err != nil {
-			t.Errorf("Failed to encode %s: %v", tc.name, err)
-			continue
-		}
-
-		decoded := &OffsetFetchResponse{Version: 1}
-		if err := versionedDecode(encoded, decoded, 1, nil); err != nil {
-			t.Errorf("Failed to decode %s: %v", tc.name, err)
-			continue
-		}
-
-		block := decoded.GetBlock("t", 0)
-		if block == nil {
-			t.Errorf("Missing block for %s", tc.name)
-			continue
-		}
-
-		if (tc.metadata == nil) != (block.Metadata == nil) {
-			t.Errorf("%s: metadata nullness mismatch", tc.name)
-		} else if tc.metadata != nil && *tc.metadata != *block.Metadata {
-			t.Errorf("%s: metadata value mismatch", tc.name)
-		}
 	}
 }
