@@ -5,7 +5,7 @@ import "time"
 type OffsetFetchResponseBlock struct {
 	Offset      int64
 	LeaderEpoch int32
-	Metadata    string
+	Metadata    *string
 	Err         KError
 }
 
@@ -24,7 +24,7 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 		b.LeaderEpoch = -1
 	}
 
-	b.Metadata, err = pd.getString()
+	b.Metadata, err = pd.getNullableString()
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (b *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err 
 	if version >= 5 {
 		pe.putInt32(b.LeaderEpoch)
 	}
-	err = pe.putString(b.Metadata)
+	err = pe.putNullableString(b.Metadata)
 	if err != nil {
 		return err
 	}

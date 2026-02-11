@@ -144,11 +144,11 @@ func (om *offsetManager) computeBackoff(retries int) time.Duration {
 	}
 }
 
-func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retries int) (int64, int32, string, error) {
+func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retries int) (int64, int32, *string, error) {
 	broker, err := om.coordinator()
 	if err != nil {
 		if retries <= 0 {
-			return 0, 0, "", err
+			return 0, 0, nil, err
 		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	}
@@ -158,7 +158,7 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 	resp, err := broker.FetchOffset(req)
 	if err != nil {
 		if retries <= 0 {
-			return 0, 0, "", err
+			return 0, 0, nil, err
 		}
 		om.releaseCoordinator(broker)
 		return om.fetchInitialOffset(topic, partition, retries-1)
@@ -166,7 +166,7 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 
 	block := resp.GetBlock(topic, partition)
 	if block == nil {
-		return 0, 0, "", ErrIncompleteResponse
+		return 0, 0, nil, ErrIncompleteResponse
 	}
 
 	switch block.Err {
@@ -174,23 +174,23 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 		return block.Offset, block.LeaderEpoch, block.Metadata, nil
 	case ErrNotCoordinatorForConsumer:
 		if retries <= 0 {
-			return 0, 0, "", block.Err
+			return 0, 0, nil, block.Err
 		}
 		om.releaseCoordinator(broker)
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	case ErrOffsetsLoadInProgress:
 		if retries <= 0 {
-			return 0, 0, "", block.Err
+			return 0, 0, nil, block.Err
 		}
 		backoff := om.computeBackoff(retries)
 		select {
 		case <-om.closing:
-			return 0, 0, "", block.Err
+			return 0, 0, nil, block.Err
 		case <-time.After(backoff):
 		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	default:
-		return 0, 0, "", block.Err
+		return 0, 0, nil, block.Err
 	}
 }
 
@@ -565,6 +565,11 @@ func (om *offsetManager) newPartitionOffsetManager(topic string, partition int32
 		return nil, err
 	}
 
+	var metadataValue string
+	if metadata != nil {
+		metadataValue = *metadata
+	}
+
 	return &partitionOffsetManager{
 		parent:      om,
 		topic:       topic,
@@ -572,7 +577,7 @@ func (om *offsetManager) newPartitionOffsetManager(topic string, partition int32
 		leaderEpoch: leaderEpoch,
 		errors:      make(chan *ConsumerError, om.conf.ChannelBufferSize),
 		offset:      offset,
-		metadata:    metadata,
+		metadata:    metadataValue,
 	}, nil
 }
 
