@@ -556,18 +556,20 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 
 // Fetch returns a FetchResponse or error
 func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
-	defer func() {
-		if b.fetchRate != nil {
-			b.fetchRate.Mark(1)
-		}
-		if b.brokerFetchRate != nil {
-			b.brokerFetchRate.Mark(1)
-		}
-	}()
-
 	response := new(FetchResponse)
 
 	err := b.sendAndReceive(request, response)
+
+	// Mark fetch rate metrics after sendAndReceive returns.
+	// sendAndReceive acquires b.lock, which synchronizes with Open() that
+	// writes these metric fields under the same lock, avoiding a data race.
+	if b.fetchRate != nil {
+		b.fetchRate.Mark(1)
+	}
+	if b.brokerFetchRate != nil {
+		b.brokerFetchRate.Mark(1)
+	}
+
 	if err != nil {
 		return nil, err
 	}
