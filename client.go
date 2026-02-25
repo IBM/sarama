@@ -684,6 +684,38 @@ func (client *client) randomizeSeedBrokers(addrs []string) {
 	}
 }
 
+func (client *client) checkSeedBrokersHealth(brokers []*Broker) []*Broker {
+	if len(brokers) == 0 {
+		return nil
+	}
+
+	healthyBrokers := make([]*Broker, 0, len(brokers))
+	for _, broker := range brokers {
+		if err := broker.getSockError(); err != nil {
+			Logger.Printf("client/seedbrokers close seed broker #%d at %s due to socket error: %v", broker.ID(), broker.Addr(), err)
+			safeAsyncClose(broker)
+			continue
+		}
+
+		healthyBrokers = append(healthyBrokers, broker)
+	}
+
+	return healthyBrokers
+}
+
+func (client *client) checkBrokersHealth() {
+	for id, broker := range client.brokers {
+		if err := broker.getSockError(); err != nil {
+			Logger.Printf("client/brokers close broker #%d at %s due to socket error: %v", broker.ID(), broker.Addr(), err)
+			safeAsyncClose(broker)
+			delete(client.brokers, id)
+		}
+	}
+
+	client.seedBrokers = client.checkSeedBrokersHealth(client.seedBrokers)
+	client.deadSeeds = client.checkSeedBrokersHealth(client.deadSeeds)
+}
+
 func (client *client) updateBroker(brokers []*Broker) {
 	if client.brokers == nil {
 		return
@@ -1052,6 +1084,14 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 
 	client.lock.Lock()
 	defer client.lock.Unlock()
+
+	// Check health of existing brokers, including seed brokers, dead
+	// seed brokers, and registered brokers.
+	// - if error occurred on broker's tcp socket, close the tcp
+	//   connection.
+	// - if it's seed broker or dead seed broker, remove it from
+	//   the list.
+	client.checkBrokersHealth()
 
 	// For all the brokers we received:
 	// - if it is a new ID, save it
