@@ -44,7 +44,7 @@ func (p *Proxy) AddToxic(
 		return nil, fmt.Errorf("failed to make post toxic request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) // #nosec G704 -- toxiproxy endpoint is controlled test infrastructure.
 	if err != nil {
 		return nil, fmt.Errorf("failed to http post toxic: %w", err)
 	}
@@ -83,7 +83,7 @@ func (p *Proxy) Save() (*Proxy, error) {
 		return nil, fmt.Errorf("failed to make post proxy request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) // #nosec G704 -- toxiproxy endpoint is controlled test infrastructure.
 	if err != nil {
 		return nil, fmt.Errorf("failed to http post proxy: %w", err)
 	}
@@ -98,7 +98,7 @@ func (p *Proxy) Save() (*Proxy, error) {
 			return nil, fmt.Errorf("failed to make post proxy request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
-		resp, err = c.httpClient.Do(req)
+		resp, err = c.httpClient.Do(req) // #nosec G704 -- toxiproxy endpoint is controlled test infrastructure.
 		if err != nil {
 			return nil, fmt.Errorf("failed to http post proxy: %w", err)
 		}
