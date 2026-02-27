@@ -46,25 +46,73 @@ func TestNormalOffsetFetchResponse(t *testing.T) {
 
 	for version := 0; version <= 1; version++ {
 		response := OffsetFetchResponse{Version: int16(version)}
-		response.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, "md", ErrRequestTimedOut})
+		response.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, nullString("md"), ErrRequestTimedOut})
 		response.Blocks["m"] = nil
 		testResponse(t, fmt.Sprintf("Normal v%d", version), &response, nil)
 	}
 
 	responseV2 := OffsetFetchResponse{Version: 2, Err: ErrInvalidRequest}
-	responseV2.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, "md", ErrRequestTimedOut})
+	responseV2.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, nullString("md"), ErrRequestTimedOut})
 	responseV2.Blocks["m"] = nil
 	testResponse(t, "normal V2", &responseV2, nil)
 
 	for version := 3; version <= 4; version++ {
 		responseV3 := OffsetFetchResponse{Version: int16(version), Err: ErrInvalidRequest, ThrottleTimeMs: 9}
-		responseV3.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, "md", ErrRequestTimedOut})
+		responseV3.AddBlock("t", 0, &OffsetFetchResponseBlock{0, -1, nullString("md"), ErrRequestTimedOut})
 		responseV3.Blocks["m"] = nil
 		testResponse(t, fmt.Sprintf("Normal v%d", version), &responseV3, nil)
 	}
 
 	responseV5 := OffsetFetchResponse{Version: 5, Err: ErrInvalidRequest, ThrottleTimeMs: 9}
-	responseV5.AddBlock("t", 0, &OffsetFetchResponseBlock{Offset: 10, LeaderEpoch: 100, Metadata: "md", Err: ErrRequestTimedOut})
+	responseV5.AddBlock("t", 0, &OffsetFetchResponseBlock{Offset: 10, LeaderEpoch: 100, Metadata: nullString("md"), Err: ErrRequestTimedOut})
 	responseV5.Blocks["m"] = nil
 	testResponse(t, "normal V5", &responseV5, nil)
+}
+
+func TestMetadataOffsetFetchResponse(t *testing.T) {
+	testCases := []struct {
+		name     string
+		metadata *string
+	}{
+		{"non-null metadata", nullString("md")},
+		{"null metadata", nil},
+		{"empty metadata", nullString("")},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			response := &OffsetFetchResponse{Version: 1}
+			response.AddBlock("t", 0, &OffsetFetchResponseBlock{
+				Offset:   1,
+				Metadata: tc.metadata,
+				Err:      ErrNoError,
+			})
+
+			encoded, err := encode(response, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			decoded := &OffsetFetchResponse{Version: 1}
+			if err := versionedDecode(encoded, decoded, 1, nil); err != nil {
+				t.Fatal(err)
+			}
+
+			block := decoded.GetBlock("t", 0)
+			if block == nil {
+				t.Fatal(err)
+			}
+
+			switch {
+			case tc.metadata == nil:
+				if block.Metadata != nil {
+					t.Errorf("block metadata = %q, expected it to be nil", *block.Metadata)
+				}
+			case block.Metadata == nil:
+				t.Errorf("block metdata is unexpectedly nil")
+			case *tc.metadata != *block.Metadata:
+				t.Errorf("block metadata = %q, expected %q", *block.Metadata, *tc.metadata)
+			}
+		})
+	}
 }
