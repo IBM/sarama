@@ -23,9 +23,9 @@ env:
   # Use the Go toolchain installed by setup-go
   GOTOOLCHAIN: local
   # renovate: datasource=github-releases depName=golangci/golangci-lint
-  GOLANGCI_LINT_VERSION: v2.8.0
+  GOLANGCI_LINT_VERSION: v2.10.1
   # renovate: datasource=github-releases depName=dominikh/go-tools
-  STATICCHECK_VERSION: 2025.1.1
+  STATICCHECK_VERSION: 2026.1
   # renovate: datasource=github-releases depName=mfridman/tparse
   TPARSE_VERSION: v0.18.0
 

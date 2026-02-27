@@ -55,7 +55,7 @@ func (c *Client) Proxy(name string) (*Proxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to make proxy request: %w", err)
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) // #nosec G704 -- toxiproxy endpoint is controlled test infrastructure.
 	if err != nil {
 		return nil, fmt.Errorf("failed to http get proxy: %w", err)
 	}
@@ -80,7 +80,7 @@ func (c *Client) ResetState() error {
 	if err != nil {
 		return fmt.Errorf("failed to make reset request: %w", err)
 	}
-	resp, err := c.httpClient.Do(req)
+	resp, err := c.httpClient.Do(req) // #nosec G704 -- toxiproxy endpoint is controlled test infrastructure.
 	if err != nil {
 		return fmt.Errorf("failed to http post reset: %w", err)
 	}
