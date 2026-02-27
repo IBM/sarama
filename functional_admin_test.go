@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -15,6 +16,110 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func topicWithEvenLeaders(t *testing.T, adminClient ClusterAdmin, client Client, numPartitions int32) (string, error) {
+	t.Helper()
+
+	if len(FunctionalTestEnv.KafkaBrokerAddrs) == 0 {
+		return "", fmt.Errorf("no brokers available for replica assignment")
+	}
+
+	brokers := client.Brokers()
+	brokerIDs := make([]int32, 0, len(brokers))
+	for _, broker := range brokers {
+		brokerIDs = append(brokerIDs, broker.ID())
+	}
+	if len(brokerIDs) == 0 {
+		return "", fmt.Errorf("no broker IDs available for replica assignment")
+	}
+	slices.Sort(brokerIDs)
+
+	topic := fmt.Sprintf("list-offsets-%d", time.Now().UnixNano())
+	replicaAssignment := make(map[int32][]int32, numPartitions)
+	for partition := int32(0); partition < numPartitions; partition++ {
+		brokerIndex := partition % int32(len(brokerIDs))
+		replicaAssignment[partition] = []int32{brokerIDs[brokerIndex]}
+	}
+
+	err := adminClient.CreateTopic(topic, &TopicDetail{
+		NumPartitions:     -1,
+		ReplicationFactor: -1,
+		ReplicaAssignment: replicaAssignment,
+	}, false)
+	if err != nil {
+		return "", err
+	}
+	return topic, nil
+}
+
+func produceMessagesForPartitions(t *testing.T, client Client, topic string, partitionsCount int32, messagesPerPartition int, baseTimestamp int64) {
+	t.Helper()
+
+	producer, err := NewSyncProducerFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, producer)
+
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		for msgIndex := 0; msgIndex < messagesPerPartition; msgIndex++ {
+			ts := baseTimestamp + int64(msgIndex)*1000
+			value := fmt.Sprintf("p%d-v%d", partition, msgIndex+1)
+			message := &ProducerMessage{
+				Topic:     topic,
+				Partition: partition,
+				Timestamp: time.UnixMilli(ts),
+				Value:     StringEncoder(value),
+			}
+			if _, _, err := producer.SendMessage(message); err != nil {
+				t.Fatalf("produce message partition=%d index=%d: %v", partition, msgIndex, err)
+			}
+		}
+	}
+}
+
+func listOffsetsAndValidate(
+	t *testing.T,
+	adminClient ClusterAdmin,
+	topic string,
+	partitionsCount int32,
+	offsetQuery int64,
+	expectedOffset int64,
+	label string,
+) {
+	t.Helper()
+
+	offsetQueries := make(map[string]map[int32]int64, 1)
+	offsetQueries[topic] = make(map[int32]int64, partitionsCount)
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		offsetQueries[topic][partition] = offsetQuery
+	}
+
+	results, err := adminClient.ListOffsets(offsetQueries, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for partition := int32(0); partition < partitionsCount; partition++ {
+		result := results[topic][partition]
+		if result == nil {
+			t.Fatalf("missing %s result for %s/%d", label, topic, partition)
+		}
+		if !errors.Is(result.Err, ErrNoError) {
+			t.Fatalf("unexpected %s error for %s/%d: %v", label, topic, partition, result.Err)
+		}
+		if result.Offset != expectedOffset {
+			t.Fatalf(
+				"unexpected %s offset for %s/%d: want %d, got %d",
+				label,
+				topic,
+				partition,
+				expectedOffset,
+				result.Offset,
+			)
+		}
+	}
+}
 
 func TestFuncAdminQuotas(t *testing.T) {
 	const (
@@ -316,6 +421,128 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 	}
 
 	t.Logf("coordinator broker %d", coordinator.id)
+}
+
+func TestFuncAdminListOffsets(t *testing.T) {
+	checkKafkaVersion(t, "2.1.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	partitionsCount := int32(len(FunctionalTestEnv.KafkaBrokerAddrs) * 3)
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+	config.Producer.Partitioner = NewManualPartitioner
+	config.Producer.Return.Successes = true
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, client)
+
+	adminClient, err := NewClusterAdminFromClient(client)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topic, err := topicWithEvenLeaders(t, adminClient, client, partitionsCount)
+	if err != nil {
+		t.Fatalf("failed to create topic with evenly distributed leaders: %v", err)
+	}
+
+	const (
+		baseTimestamp        = int64(1_700_000_000_000)
+		messagesPerPartition = 10
+	)
+	produceMessagesForPartitions(t, client, topic, partitionsCount, messagesPerPartition, baseTimestamp)
+
+	minOffset := int64(0)
+	maxOffset := int64(messagesPerPartition - 1)
+	midIndex := int64(messagesPerPartition / 2)
+	midTimestamp := baseTimestamp + midIndex*1000
+
+	if err := client.RefreshMetadata(topic); err != nil {
+		t.Fatalf("refresh metadata for %s: %v", topic, err)
+	}
+
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		OffsetOldest,
+		minOffset,
+		"earliest",
+	)
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		OffsetNewest,
+		maxOffset+1,
+		"latest",
+	)
+
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		midTimestamp,
+		midIndex,
+		"mid timestamp",
+	)
+}
+
+func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
+	checkKafkaVersion(t, "2.1.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	group := testFuncConsumerGroupID(t)
+	topic := "test.1"
+	partition := int32(0)
+	offset := int64(1)
+
+	response, err := adminClient.AlterConsumerGroupOffsets(group, map[string]map[int32]OffsetAndMetadata{
+		topic: {partition: {
+			Offset:      offset,
+			LeaderEpoch: -1,
+		}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !errors.Is(response.Errors[topic][partition], ErrNoError) {
+		t.Fatalf("unexpected error for %s/%d: %v", topic, partition, response.Errors[topic][partition])
+	}
+
+	fetched, err := adminClient.ListConsumerGroupOffsets(group, map[string][]int32{topic: {partition}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	block := fetched.GetBlock(topic, partition)
+	if block == nil {
+		t.Fatalf("missing offset for %s/%d", topic, partition)
+	}
+	if !errors.Is(block.Err, ErrNoError) {
+		t.Fatalf("unexpected fetch error for %s/%d: %v", topic, partition, block.Err)
+	}
+	if block.Offset != offset {
+		t.Fatalf("unexpected offset for %s/%d: want %d, got %d", topic, partition, offset, block.Offset)
+	}
 }
 
 func TestFuncAdminDescribeLogDirs(t *testing.T) {
