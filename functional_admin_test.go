@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func topicWithEventLeaders(t *testing.T, adminClient ClusterAdmin, client Client, numPartitions int32) (string, error) {
+func topicWithEvenLeaders(t *testing.T, adminClient ClusterAdmin, client Client, numPartitions int32) (string, error) {
 	t.Helper()
 
 	if len(FunctionalTestEnv.KafkaBrokerAddrs) == 0 {
@@ -445,7 +445,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	topic, err := topicWithEventLeaders(t, adminClient, client, partitionsCount)
+	topic, err := topicWithEvenLeaders(t, adminClient, client, partitionsCount)
 	if err != nil {
 		t.Fatalf("failed to create topic with evenly distributed leaders: %v", err)
 	}
