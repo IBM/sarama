@@ -205,7 +205,8 @@ type Config struct {
 		// setting for the JVM producer.
 		Partitioner PartitionerConstructor
 		// If enabled, the producer will ensure that exactly one copy of each message is
-		// written.
+		// written, and it will enforce stricter ordering by requiring MaxOpenRequests=1
+		// and WaitForAll acks, which can reduce throughput.
 		Idempotent bool
 		// Transaction specify
 		Transaction struct {
