@@ -14,7 +14,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/net v0.51.0
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 )
 
 require (
