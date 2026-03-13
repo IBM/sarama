@@ -63,7 +63,7 @@ func initOffsetManager(t *testing.T, retention time.Duration) (om OffsetManager,
 }
 
 func initPartitionOffsetManager(t *testing.T, om OffsetManager,
-	coordinator *MockBroker, initialOffset int64, metadata string,
+	coordinator *MockBroker, initialOffset int64, metadata *string,
 ) PartitionOffsetManager {
 	fetchResponse := new(OffsetFetchResponse)
 	fetchResponse.AddBlock("my_topic", 0, &OffsetFetchResponseBlock{
@@ -241,7 +241,7 @@ func TestNewOffsetManagerOffsetsAutoCommit(t *testing.T) {
 			om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
 			defer broker.Close()
 			defer coordinator.Close()
-			pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+			pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("original_meta"))
 
 			// Wait long enough for the test not to fail..
 			timeout := 50 * config.Consumer.Offsets.AutoCommit.Interval
@@ -290,7 +290,7 @@ func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, nil, config)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("original_meta"))
 
 	// Wait long enough for the test not to fail..
 	timeout := 50 * config.Consumer.Offsets.AutoCommit.Interval
@@ -349,7 +349,7 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	responseBlock := OffsetFetchResponseBlock{
 		Err:      ErrNotCoordinatorForConsumer,
 		Offset:   5,
-		Metadata: "test_meta",
+		Metadata: nullString("test_meta"),
 	}
 
 	fetchResponse := new(OffsetFetchResponse)
@@ -397,7 +397,7 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	responseBlock := OffsetFetchResponseBlock{
 		Err:      ErrOffsetsLoadInProgress,
 		Offset:   5,
-		Metadata: "test_meta",
+		Metadata: nullString("test_meta"),
 	}
 
 	fetchResponse := new(OffsetFetchResponse)
@@ -432,7 +432,7 @@ func TestPartitionOffsetManagerInitialOffset(t *testing.T) {
 	testClient.Config().Consumer.Offsets.Initial = OffsetOldest
 
 	// Kafka returns -1 if no offset has been stored for this partition yet.
-	pom := initPartitionOffsetManager(t, om, coordinator, -1, "")
+	pom := initPartitionOffsetManager(t, om, coordinator, -1, nullString(""))
 
 	offset, meta := pom.NextOffset()
 	if offset != OffsetOldest {
@@ -451,7 +451,7 @@ func TestPartitionOffsetManagerNextOffset(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "test_meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("test_meta"))
 
 	offset, meta := pom.NextOffset()
 	if offset != 5 {
@@ -470,7 +470,7 @@ func TestPartitionOffsetManagerResetOffset(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("original_meta"))
 
 	ocResponse := new(OffsetCommitResponse)
 	ocResponse.AddError("my_topic", 0, ErrNoError)
@@ -496,7 +496,7 @@ func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, time.Hour)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("original_meta"))
 
 	ocResponse := new(OffsetCommitResponse)
 	ocResponse.AddError("my_topic", 0, ErrNoError)
@@ -532,7 +532,7 @@ func TestPartitionOffsetManagerMarkOffset(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("original_meta"))
 
 	ocResponse := new(OffsetCommitResponse)
 	ocResponse.AddError("my_topic", 0, ErrNoError)
@@ -557,7 +557,7 @@ func TestPartitionOffsetManagerMarkOffsetWithRetention(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, time.Hour)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("original_meta"))
 
 	ocResponse := new(OffsetCommitResponse)
 	ocResponse.AddError("my_topic", 0, ErrNoError)
@@ -592,7 +592,7 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
 	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("meta"))
 
 	// Error on one partition
 	ocResponse := new(OffsetCommitResponse)
@@ -653,7 +653,7 @@ func TestPartitionOffsetManagerCommitErr(t *testing.T) {
 func TestAbortPartitionOffsetManager(t *testing.T) {
 	om, testClient, broker, coordinator := initOffsetManager(t, 0)
 	defer broker.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "meta")
+	pom := initPartitionOffsetManager(t, om, coordinator, 5, nullString("meta"))
 
 	// this triggers an error in the CommitOffset request,
 	// which leads to the abort call
