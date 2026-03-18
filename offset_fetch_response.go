@@ -24,9 +24,12 @@ func (b *OffsetFetchResponseBlock) decode(pd packetDecoder, version int16) (err 
 		b.LeaderEpoch = -1
 	}
 
-	b.Metadata, err = pd.getString()
+	metadata, err := pd.getNullableString()
 	if err != nil {
 		return err
+	}
+	if metadata != nil {
+		b.Metadata = *metadata
 	}
 
 	b.Err, err = pd.getKError()
@@ -44,7 +47,7 @@ func (b *OffsetFetchResponseBlock) encode(pe packetEncoder, version int16) (err 
 	if version >= 5 {
 		pe.putInt32(b.LeaderEpoch)
 	}
-	err = pe.putString(b.Metadata)
+	err = pe.putNullableString(&b.Metadata)
 	if err != nil {
 		return err
 	}
