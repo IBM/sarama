@@ -941,12 +941,16 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 	for version := range kafkaVersions {
 		name := t.Name() + "-v" + version.String()
 		t.Run(name, func(t *testing.T) {
-			config.ClientID = name
-			config.MetricRegistry = metrics.NewRegistry()
+			// Clone the config to avoid data races between subtests
+			// when background goroutines from a closing client still
+			// reference the shared config object.
+			cfg := *config
+			cfg.ClientID = name
+			cfg.MetricRegistry = metrics.NewRegistry()
 			checkKafkaVersion(t, version.String())
-			config.Version = version
+			cfg.Version = version
 
-			producerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+			producerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, &cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -999,7 +1003,7 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 			// Validate producer metrics before using the consumer minus the offset request
 			validateProducerMetrics(t, producerClient)
 
-			consumerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+			consumerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, &cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
