@@ -15,10 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/fortytw2/leaktest"
-	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 func expectResultsWithTimeout(t *testing.T, p AsyncProducer, successCount, errorCount int, timeout time.Duration) {
@@ -1647,11 +1646,10 @@ func TestAsyncProducerIdempotentEpochExhaustion(t *testing.T) {
 //
 //nolint:paralleltest
 func TestBrokerProducerShutdown(t *testing.T) {
-	defer leaktest.Check(t)()
-	metrics.UseNilMetrics = true // disable Sarama's go-metrics library
-	defer func() {
-		metrics.UseNilMetrics = false
-	}()
+	defer goleak.VerifyNone(t,
+		goleak.IgnoreCurrent(),
+		goleak.IgnoreTopFunction("github.com/rcrowley/go-metrics.(*meterArbiter).tick"),
+	)
 
 	mockBroker := NewMockBroker(t, 1)
 	metadataResponse := &MetadataResponse{}
@@ -1909,7 +1907,7 @@ func TestPartitionMuterCloseWakesWaitUntilMuted(t *testing.T) {
 // TestBrokerProducerRollOverClearsTimer ensures timer events from a previous batch
 // do not cause a flush of a fresh empty batch after rollOver.
 func TestBrokerProducerRollOverClearsTimer(t *testing.T) {
-	defer leaktest.Check(t)()
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
 
 	config := NewTestConfig()
 	config.Producer.Flush.Frequency = 10 * time.Millisecond
