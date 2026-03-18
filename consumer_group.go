@@ -956,13 +956,6 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 		return
 	}
 
-	// handle errors
-	go func() {
-		for err := range claim.Errors() {
-			s.parent.handleError(err, topic, partition)
-		}
-	}()
-
 	// trigger close when session is done
 	go func() {
 		select {
