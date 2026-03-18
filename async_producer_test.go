@@ -2053,6 +2053,86 @@ func (c *stubLeaderClient) PartitionNotReadable(string, int32) bool          { r
 func (c *stubLeaderClient) Close() error                                     { return nil }
 func (c *stubLeaderClient) Closed() bool                                     { return false }
 
+// exercises the async producer hot path against mock brokers to catch
+// throughput regressions without needing a live Kafka cluster
+func BenchmarkAsyncProducerThroughput(b *testing.B) {
+	const messageSize = 128
+
+	for _, bc := range []struct {
+		name       string
+		partitions int
+		maxOpen    int
+	}{
+		{"single_partition/MaxOpen=1", 1, 1},
+		{"single_partition/MaxOpen=5", 1, 5},
+		{"16_partitions/MaxOpen=1", 16, 1},
+		{"16_partitions/MaxOpen=5", 16, 5},
+	} {
+		b.Run(bc.name, func(b *testing.B) {
+			seedBroker := NewMockBroker(b, 1)
+			leader := NewMockBroker(b, 2)
+			defer seedBroker.Close()
+			defer leader.Close()
+
+			metadataResponse := new(MetadataResponse)
+			metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+			for i := 0; i < bc.partitions; i++ {
+				metadataResponse.AddTopicPartition("bench", int32(i), leader.BrokerID(), nil, nil, nil, ErrNoError)
+			}
+			seedBroker.Returns(metadataResponse)
+
+			mockMeta := NewMockMetadataResponse(b).
+				SetBroker(leader.Addr(), leader.BrokerID())
+			for i := 0; i < bc.partitions; i++ {
+				mockMeta = mockMeta.SetLeader("bench", int32(i), leader.BrokerID())
+			}
+			leader.SetHandlerByMap(map[string]MockResponse{
+				"MetadataRequest": mockMeta,
+				"ProduceRequest":  NewMockProduceResponse(b),
+			})
+
+			config := NewTestConfig()
+			config.Producer.Return.Successes = true
+			config.Producer.Flush.Messages = 100
+			config.Producer.Flush.Frequency = 5 * time.Millisecond
+			config.Producer.Partitioner = NewManualPartitioner
+			config.Net.MaxOpenRequests = bc.maxOpen
+
+			producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+			if err != nil {
+				b.Fatal(err)
+			}
+
+			value := make([]byte, messageSize)
+			b.SetBytes(messageSize)
+			b.ResetTimer()
+
+			doneCh := make(chan struct{})
+			go func() {
+				defer close(doneCh)
+				for range producer.Successes() {
+				}
+			}()
+			go func() {
+				for err := range producer.Errors() {
+					b.Error(err.Err)
+				}
+			}()
+
+			for i := 0; i < b.N; i++ {
+				producer.Input() <- &ProducerMessage{
+					Topic:     "bench",
+					Partition: int32(i % bc.partitions),
+					Value:     ByteEncoder(value),
+				}
+			}
+
+			safeClose(b, producer)
+			<-doneCh
+		})
+	}
+}
+
 func testProducerInterceptor(
 	t *testing.T,
 	interceptors []ProducerInterceptor,
