@@ -941,21 +941,36 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 	for version := range kafkaVersions {
 		name := t.Name() + "-v" + version.String()
 		t.Run(name, func(t *testing.T) {
-			config.ClientID = name
-			config.MetricRegistry = metrics.NewRegistry()
+			// Clone the config to avoid data races between subtests
+			// when background goroutines from a closing client still
+			// reference the shared config object.
+			cfg := *config
+			cfg.ClientID = name
+			cfg.MetricRegistry = metrics.NewRegistry()
 			checkKafkaVersion(t, version.String())
-			config.Version = version
+			cfg.Version = version
 
-			producerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+			producerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, &cfg)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer safeClose(t, producerClient)
 
-			// Keep in mind the current offset
-			initialOffset, err := producerClient.GetOffset("test.1", 0, OffsetNewest)
-			if err != nil {
+			// Keep in mind the current offset (retry on transient leader election errors)
+			var initialOffset int64
+			for i := 0; i < 10; i++ {
+				initialOffset, err = producerClient.GetOffset("test.1", 0, OffsetNewest)
+				if err == nil {
+					break
+				}
+				if errors.Is(err, ErrLeaderNotAvailable) || errors.Is(err, ErrOffsetNotAvailable) {
+					time.Sleep(100 * time.Millisecond)
+					continue
+				}
 				t.Fatal(err)
+			}
+			if err != nil {
+				t.Fatalf("GetOffset failed after retries: %v", err)
 			}
 
 			producer, err := NewAsyncProducerFromClient(producerClient)
@@ -988,7 +1003,7 @@ func testProducingMessages(t *testing.T, config *Config, minVersion KafkaVersion
 			// Validate producer metrics before using the consumer minus the offset request
 			validateProducerMetrics(t, producerClient)
 
-			consumerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+			consumerClient, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, &cfg)
 			if err != nil {
 				t.Fatal(err)
 			}

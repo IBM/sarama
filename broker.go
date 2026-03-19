@@ -289,6 +289,8 @@ func (b *Broker) Open(conf *Config) error {
 			if b.connErr != nil {
 				close(b.responses)
 				<-b.done
+				b.responses = nil
+				b.done = nil
 				err = b.conn.Close()
 				if err == nil {
 					DebugLogger.Printf("Closed connection to broker %s due to SASL v1 auth error: %s\n", b.addr, b.connErr)

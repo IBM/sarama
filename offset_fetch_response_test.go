@@ -5,9 +5,24 @@ package sarama
 import (
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
+	// version 0 response with one topic "t", one partition 0, offset 0,
+	// null metadata (length -1), and error code 7 (ErrRequestTimedOut)
+	offsetFetchResponseV0NullMetadata = []byte{
+		0x00, 0x00, 0x00, 0x01, // num topics = 1
+		0x00, 0x01, 't', // topic name = "t"
+		0x00, 0x00, 0x00, 0x01, // num partitions = 1
+		0x00, 0x00, 0x00, 0x00, // partition = 0
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // offset = 0
+		0xFF, 0xFF, // metadata = null (length -1)
+		0x00, 0x07, // error code = 7
+	}
+
 	emptyOffsetFetchResponse = []byte{
 		0x00, 0x00, 0x00, 0x00,
 	}
@@ -37,6 +52,17 @@ func TestEmptyOffsetFetchResponse(t *testing.T) {
 		responseV3 := OffsetFetchResponse{Version: int16(version), Err: ErrInvalidRequest, ThrottleTimeMs: 9}
 		testResponse(t, fmt.Sprintf("empty v%d", version), &responseV3, emptyOffsetFetchResponseV3)
 	}
+}
+
+func TestOffsetFetchResponseNullMetadata(t *testing.T) {
+	response := &OffsetFetchResponse{}
+	err := versionedDecode(offsetFetchResponseV0NullMetadata, response, 0, nil)
+	require.NoError(t, err)
+
+	block := response.GetBlock("t", 0)
+	require.NotNil(t, block)
+	assert.Empty(t, block.Metadata)
+	assert.Equal(t, ErrRequestTimedOut, block.Err)
 }
 
 func TestNormalOffsetFetchResponse(t *testing.T) {
