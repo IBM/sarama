@@ -128,7 +128,10 @@ func (r *ElectLeadersResponse) version() int16 {
 }
 
 func (r *ElectLeadersResponse) headerVersion() int16 {
-	return 1
+	if r.isFlexible() {
+		return 1
+	}
+	return 0
 }
 
 func (r *ElectLeadersResponse) isValidVersion() bool {
