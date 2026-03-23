@@ -158,7 +158,10 @@ func NewBroker(addr string) *Broker {
 }
 
 func (b *Broker) getSockError() error {
-	b.lock.Lock()
+	// skip socket health checks while another operation owns broker state
+	if !b.lock.TryLock() {
+		return nil
+	}
 	defer b.lock.Unlock()
 
 	if b.conn == nil {
@@ -308,18 +311,12 @@ func (b *Broker) Open(conf *Config) error {
 		if conf.Net.SASL.Enable && !useSaslV0 {
 			b.connErr = b.authenticateViaSASLv1()
 			if b.connErr != nil {
-				close(b.responses)
-				<-b.done
-				b.responses = nil
-				b.done = nil
-				err = b.conn.Close()
+				err = b.closeLocked()
 				if err == nil {
 					DebugLogger.Printf("Closed connection to broker %s due to SASL v1 auth error: %s\n", b.addr, b.connErr)
 				} else {
 					Logger.Printf("Error while closing connection to broker %s (due to SASL v1 auth error: %s): %s\n", b.addr, b.connErr, err)
 				}
-				b.conn = nil
-				b.opened.Store(false)
 				return
 			}
 		}
@@ -398,11 +395,11 @@ func (b *Broker) closeLocked() error {
 	if b.responses != nil {
 		close(b.responses)
 	}
+	// close the socket before waiting so in-flight reads can exit
+	err := b.conn.Close()
 	if b.done != nil {
 		<-b.done
 	}
-
-	err := b.conn.Close()
 
 	b.conn = nil
 	b.responses = nil
