@@ -689,18 +689,14 @@ func (client *client) checkSeedBrokersHealth(brokers []*Broker) []*Broker {
 		return nil
 	}
 
-	healthyBrokers := make([]*Broker, 0, len(brokers))
 	for _, broker := range brokers {
 		if err := broker.getSockError(); err != nil {
 			Logger.Printf("client/seedbrokers close seed broker #%d at %s due to socket error: %v", broker.ID(), broker.Addr(), err)
 			safeAsyncClose(broker)
-			continue
 		}
-
-		healthyBrokers = append(healthyBrokers, broker)
 	}
 
-	return healthyBrokers
+	return brokers
 }
 
 func (client *client) checkBrokersHealth() {
