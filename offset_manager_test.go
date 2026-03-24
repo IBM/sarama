@@ -208,6 +208,142 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 	}
 }
 
+// Test that concurrent Commit() calls do not deadlock when the coordinator
+// returns errors that trigger releaseCoordinator while other goroutines are
+// in constructRequest or coordinator(). This reproduces the lock ordering
+// issue from https://github.com/IBM/sarama/issues/3191 where four goroutines
+// form a cycle: broker.lock -> pomsLock -> brokerLock -> broker.lock.
+func TestOffsetManagerCommitConcurrentDeadlock(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	coordinatorBroker := NewMockBroker(t, 2)
+	defer coordinatorBroker.Close()
+
+	findCoordDelay := 500 * time.Microsecond
+	seedBroker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			resp := new(MetadataResponse)
+			resp.AddBroker(coordinatorBroker.Addr(), coordinatorBroker.BrokerID())
+			return resp
+		},
+		"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+			// slow coordinator lookup increases the window where brokerLock
+			// is held in coordinator(), while LeastLoadedBroker calls
+			// ResponseSize (which needs broker.lock), widening the
+			// deadlock window
+			time.Sleep(findCoordDelay)
+			resp := new(FindCoordinatorResponse)
+			resp.Coordinator = &Broker{id: coordinatorBroker.brokerID, addr: coordinatorBroker.Addr()}
+			return resp
+		},
+	})
+
+	var commitCount atomic.Int64
+	coordinatorBroker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"ConsumerMetadataRequest": func(req *request) encoderWithHeader {
+			return &ConsumerMetadataResponse{
+				CoordinatorID:   coordinatorBroker.BrokerID(),
+				CoordinatorHost: "127.0.0.1",
+				CoordinatorPort: coordinatorBroker.Port(),
+			}
+		},
+		"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+			time.Sleep(findCoordDelay)
+			resp := new(FindCoordinatorResponse)
+			resp.Coordinator = &Broker{id: coordinatorBroker.brokerID, addr: coordinatorBroker.Addr()}
+			return resp
+		},
+		"OffsetFetchRequest": func(r *request) encoderWithHeader {
+			req := r.body.(*OffsetFetchRequest)
+			resp := new(OffsetFetchResponse)
+			resp.Blocks = map[string]map[int32]*OffsetFetchResponseBlock{}
+			for topic, partitions := range req.partitions {
+				for _, partition := range partitions {
+					if _, ok := resp.Blocks[topic]; !ok {
+						resp.Blocks[topic] = map[int32]*OffsetFetchResponseBlock{}
+					}
+					resp.Blocks[topic][partition] = &OffsetFetchResponseBlock{
+						Offset: 0,
+						Err:    ErrNoError,
+					}
+				}
+			}
+			return resp
+		},
+		"OffsetCommitRequest": func(r *request) encoderWithHeader {
+			req := r.body.(*OffsetCommitRequest)
+			runtime.Gosched()
+			resp := new(OffsetCommitResponse)
+			resp.Errors = map[string]map[int32]KError{}
+
+			// always return ErrNotCoordinatorForConsumer to trigger
+			// releaseCoordinator in handleResponse, which acquires
+			// brokerLock while holding pomsLock, creating the conditions
+			// for the four-goroutine deadlock cycle
+			commitCount.Add(1)
+			for topic, partitions := range req.blocks {
+				resp.Errors[topic] = map[int32]KError{}
+				for partition := range partitions {
+					resp.Errors[topic][partition] = ErrNotCoordinatorForConsumer
+				}
+			}
+			return resp
+		},
+	})
+
+	config := NewTestConfig()
+	config.Consumer.Offsets.AutoCommit.Enable = false
+	config.Version = V0_9_0_0
+
+	testClient, err := NewClient([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, testClient)
+
+	om, err := NewOffsetManagerFromClient("group", testClient)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, om)
+
+	const numPartitions = 4
+	const commitsPerGoroutine = 200
+	poms := make([]PartitionOffsetManager, numPartitions)
+	for p := 0; p < numPartitions; p++ {
+		pom, err := om.ManagePartition("topic", int32(p))
+		if err != nil {
+			t.Fatal(err)
+		}
+		poms[p] = pom
+	}
+
+	done := make(chan struct{})
+	go func() {
+		var wg sync.WaitGroup
+		for p := 0; p < numPartitions; p++ {
+			pom := poms[p]
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for c := 0; c < commitsPerGoroutine; c++ {
+					pom.MarkOffset(int64(c+1), "")
+					om.Commit()
+				}
+			}()
+		}
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("deadlock detected: concurrent Commit() calls did not complete within timeout")
+	}
+}
+
 var offsetsautocommitTestTable = []struct {
 	name   string
 	set    bool // if given will override default configuration for Consumer.Offsets.AutoCommit.Enable

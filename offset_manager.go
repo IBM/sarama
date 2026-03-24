@@ -370,9 +370,10 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 }
 
 func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest, resp *OffsetCommitResponse) {
-	om.pomsLock.RLock()
-	defer om.pomsLock.RUnlock()
+	// release coordinator after dropping pomsLock to avoid lock inversion (#3191)
+	shouldRelease := false
 
+	om.pomsLock.RLock()
 	for _, topicManagers := range om.poms {
 		for _, pom := range topicManagers {
 			if req.blocks[pom.topic] == nil || req.blocks[pom.topic][pom.partition] == nil {
@@ -398,7 +399,7 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 			case ErrNotLeaderForPartition, ErrLeaderNotAvailable,
 				ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer:
 				// not a critical error, we just need to redispatch
-				om.releaseCoordinator(broker)
+				shouldRelease = true
 			case ErrOffsetMetadataTooLarge, ErrInvalidCommitOffsetSize:
 				// nothing we can do about this, just tell the user and carry on
 				pom.handleError(err)
@@ -417,9 +418,14 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 			default:
 				// dunno, tell the user and try redispatching
 				pom.handleError(err)
-				om.releaseCoordinator(broker)
+				shouldRelease = true
 			}
 		}
+	}
+	om.pomsLock.RUnlock()
+
+	if shouldRelease {
+		om.releaseCoordinator(broker)
 	}
 }
 

@@ -659,6 +659,51 @@ func TestFuncAdminDeleteTopic(t *testing.T) {
 	}
 }
 
+// TestFuncAdminElectLeadersV1 covers low-version client compatibility against a
+// newer broker for the ElectLeaders V1 non-flexible path. See
+// https://github.com/IBM/sarama/pull/3312.
+func TestFuncAdminElectLeadersV1(t *testing.T) {
+	checkKafkaVersion(t, "2.3.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	// Force ElectLeaders onto request/response version 1 so the broker emits
+	// the non-flexible wire format that previously regressed.
+	config.Version = V2_3_0_0
+
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	results, err := adminClient.ElectLeaders(PreferredElection, map[string][]int32{"test.1": {0}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	topicResults, ok := results["test.1"]
+	if !ok {
+		t.Fatalf("topic test.1 missing in response: %#v", results)
+	}
+
+	partitionResult, ok := topicResults[0]
+	if !ok {
+		t.Fatalf("partition 0 missing in response: %#v", topicResults)
+	}
+
+	if partitionResult == nil {
+		t.Fatal("partition 0 returned nil result")
+	}
+
+	switch partitionResult.ErrorCode {
+	case ErrNoError, ErrElectionNotNeeded:
+	default:
+		t.Fatalf("expected partition 0 to return a decodable ElectLeaders result, got %v (%v)", partitionResult.ErrorCode, partitionResult.ErrorMessage)
+	}
+}
+
 func TestFuncAdminIncrementalAlterConfigs(t *testing.T) {
 	checkKafkaVersion(t, "2.3.0.0")
 	setupFunctionalTest(t)

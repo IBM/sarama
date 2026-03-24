@@ -13,6 +13,10 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 var (
@@ -1978,7 +1982,8 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 				broker: &brokerConsumer{
 					broker: &Broker{},
 				},
-				conf: &Config{},
+				conf:           &Config{},
+				dispatcherStop: make(chan none),
 			}
 			got, err := child.parseResponse(tt.args.response)
 			if (err != nil) != tt.wantErr {
@@ -2008,9 +2013,10 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 		broker: &brokerConsumer{
 			broker: &Broker{},
 		},
-		conf:      NewTestConfig(),
-		topic:     "my_topic",
-		partition: 0,
+		conf:           NewTestConfig(),
+		topic:          "my_topic",
+		partition:      0,
+		dispatcherStop: make(chan none),
 	}
 	got, err := child.parseResponse(response)
 	if err != nil {
@@ -2142,4 +2148,191 @@ func TestConsumerError(t *testing.T) {
 	if !errors.Is(err, ErrOutOfBrokers) {
 		t.Error("unexpected errors.Is")
 	}
+}
+
+// TestConsumerAbortNoGoroutineLeak verifies that brokerConsumer.abort() does
+// not leak the subscriptionManager goroutine when children are already
+// shutting down or already queued for redispatch.
+func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
+	metrics.UseNilMetrics = true
+	defer func() { metrics.UseNilMetrics = false }()
+
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+	config := NewTestConfig()
+	config.Consumer.Return.Errors = true
+
+	broker0 := NewMockBroker(t, 0)
+	defer broker0.Close()
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my_topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my_topic", 0, OffsetOldest, 0).
+			SetOffset("my_topic", 0, OffsetNewest, 1000),
+	})
+
+	client, err := NewClient([]string{broker0.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	realBroker := client.Brokers()[0]
+
+	newChild := func(errorsBuffer int) *partitionConsumer {
+		return &partitionConsumer{
+			conf:           config,
+			topic:          "my_topic",
+			partition:      0,
+			trigger:        make(chan none, 1),
+			dying:          make(chan none),
+			dispatcherStop: make(chan none),
+			messages:       make(chan *ConsumerMessage, config.ChannelBufferSize),
+			errors:         make(chan *ConsumerError, errorsBuffer),
+			feeder:         make(chan *FetchResponse, 1),
+		}
+	}
+
+	newBrokerConsumer := func(child *partitionConsumer) *brokerConsumer {
+		c := &consumer{
+			client:          client,
+			conf:            config,
+			children:        make(map[string]map[int32]*partitionConsumer),
+			brokerConsumers: make(map[*Broker]*brokerConsumer),
+			metricRegistry:  newCleanupRegistry(config.MetricRegistry),
+		}
+		child.consumer = c
+
+		bc := &brokerConsumer{
+			consumer:         c,
+			broker:           realBroker,
+			input:            make(chan *partitionConsumer),
+			newSubscriptions: make(chan []*partitionConsumer),
+			subscriptions:    map[*partitionConsumer]none{child: {}},
+			refs:             1,
+			stop:             make(chan none),
+		}
+		c.brokerConsumers[realBroker] = bc
+		return bc
+	}
+
+	startAbort := func(t *testing.T, bc *brokerConsumer) chan struct{} {
+		t.Helper()
+
+		go withRecover(bc.subscriptionManager)
+
+		done := make(chan struct{})
+		go func() {
+			withRecover(func() {
+				bc.abort(errors.New("broker disconnected"))
+			})
+			close(done)
+		}()
+		return done
+	}
+
+	runAbort := func(t *testing.T, bc *brokerConsumer) {
+		t.Helper()
+
+		done := startAbort(t, bc)
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "abort() did not return; subscriptionManager likely leaked")
+		}
+	}
+
+	t.Run("returns when child is already shutting down", func(t *testing.T) {
+		child := newChild(config.ChannelBufferSize)
+		close(child.dying)
+		close(child.messages)
+		close(child.errors)
+
+		runAbort(t, newBrokerConsumer(child))
+	})
+
+	t.Run("returns when redispatch is already pending", func(t *testing.T) {
+		child := newChild(config.ChannelBufferSize)
+		child.trigger <- none{}
+
+		runAbort(t, newBrokerConsumer(child))
+
+		select {
+		case err := <-child.errors:
+			require.EqualError(t, err.Err, "broker disconnected")
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "abort() did not publish the broker error")
+		}
+	})
+
+	t.Run("preserves abort errors when the errors channel is full", func(t *testing.T) {
+		child := newChild(1)
+		child.errors <- &ConsumerError{
+			Topic:     child.topic,
+			Partition: child.partition,
+			Err:       errors.New("existing error"),
+		}
+
+		bc := newBrokerConsumer(child)
+		done := startAbort(t, bc)
+
+		<-bc.stop
+
+		select {
+		case <-done:
+			require.FailNow(t, "abort() returned before the broker error could be delivered")
+		default:
+		}
+
+		err := <-child.errors
+		require.EqualError(t, err.Err, "existing error")
+
+		select {
+		case err = <-child.errors:
+			require.EqualError(t, err.Err, "broker disconnected")
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "abort() did not publish the broker error")
+		}
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "abort() did not return after the broker error was consumed")
+		}
+	})
+
+	t.Run("rejects new subscriptions after abort starts", func(t *testing.T) {
+		child := newChild(config.ChannelBufferSize)
+		bc := newBrokerConsumer(child)
+		done := startAbort(t, bc)
+
+		<-bc.stop
+
+		queued := make(chan bool, 1)
+		go func() {
+			queued <- bc.queueSubscription(newChild(config.ChannelBufferSize))
+		}()
+
+		select {
+		case ok := <-queued:
+			require.False(t, ok)
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "queueSubscription() blocked after abort")
+		}
+
+		select {
+		case err := <-child.errors:
+			require.EqualError(t, err.Err, "broker disconnected")
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "abort() did not publish the broker error")
+		}
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "abort() did not return")
+		}
+	})
 }
