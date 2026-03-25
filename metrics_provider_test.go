@@ -68,6 +68,10 @@ func TestGoMetricsProviderUnregisterAll(t *testing.T) {
 
 	p.NewCounter("c1")
 	p.NewMeter("m1")
+
+	// Register a metric directly on the registry (not via provider)
+	metrics.GetOrRegisterCounter("external", r)
+
 	p.UnregisterAll()
 
 	if r.Get("c1") != nil {
@@ -75,6 +79,10 @@ func TestGoMetricsProviderUnregisterAll(t *testing.T) {
 	}
 	if r.Get("m1") != nil {
 		t.Error("expected m1 to be unregistered")
+	}
+	// Metrics registered outside the provider should be preserved
+	if r.Get("external") == nil {
+		t.Error("expected external metric to survive UnregisterAll")
 	}
 }
 

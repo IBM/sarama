@@ -1,6 +1,8 @@
 package sarama
 
 import (
+	"sync"
+
 	"github.com/rcrowley/go-metrics"
 )
 
@@ -53,33 +55,55 @@ type MetricsMeter interface {
 
 // GoMetricsProvider wraps a rcrowley/go-metrics Registry to implement MetricsProvider.
 // This is the default implementation used when Config.MetricsProvider is nil.
+// It tracks which metrics it registers so UnregisterAll only removes its own,
+// matching the cleanupRegistry pattern used elsewhere in sarama.
 type GoMetricsProvider struct {
 	registry metrics.Registry
+	names    map[string]struct{}
+	mu       sync.Mutex
 }
 
 // NewGoMetricsProvider returns a MetricsProvider backed by the given go-metrics Registry.
 func NewGoMetricsProvider(registry metrics.Registry) *GoMetricsProvider {
-	return &GoMetricsProvider{registry: registry}
+	return &GoMetricsProvider{
+		registry: registry,
+		names:    make(map[string]struct{}),
+	}
+}
+
+func (p *GoMetricsProvider) track(name string) {
+	p.mu.Lock()
+	p.names[name] = struct{}{}
+	p.mu.Unlock()
 }
 
 func (p *GoMetricsProvider) NewCounter(name string) MetricsCounter {
+	p.track(name)
 	return metrics.GetOrRegisterCounter(name, p.registry)
 }
 
 func (p *GoMetricsProvider) NewGauge(name string) MetricsGauge {
+	p.track(name)
 	return metrics.GetOrRegisterGauge(name, p.registry)
 }
 
 func (p *GoMetricsProvider) NewHistogram(name string) MetricsHistogram {
+	p.track(name)
 	return p.registry.GetOrRegister(name, func() metrics.Histogram {
 		return metrics.NewHistogram(metrics.NewExpDecaySample(metricsReservoirSize, metricsAlphaFactor))
 	}).(metrics.Histogram)
 }
 
 func (p *GoMetricsProvider) NewMeter(name string) MetricsMeter {
+	p.track(name)
 	return metrics.GetOrRegisterMeter(name, p.registry)
 }
 
 func (p *GoMetricsProvider) UnregisterAll() {
-	p.registry.UnregisterAll()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for name := range p.names {
+		p.registry.Unregister(name)
+	}
+	p.names = make(map[string]struct{})
 }
