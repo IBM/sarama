@@ -814,6 +814,10 @@ func TestClientCheckBrokersHealth(t *testing.T) {
 	})
 
 	t.Run("keeps unhealthy live seed brokers available for reopening", func(t *testing.T) {
+		if !socketErrorProbeAvailable() {
+			t.Skip("socket error probing is unavailable on this platform")
+		}
+
 		broker, serverConn, cleanup := newConnectedBroker(t)
 		defer cleanup()
 
@@ -838,6 +842,10 @@ func TestClientCheckBrokersHealth(t *testing.T) {
 	})
 
 	t.Run("keeps unhealthy dead seed brokers available for reopening", func(t *testing.T) {
+		if !socketErrorProbeAvailable() {
+			t.Skip("socket error probing is unavailable on this platform")
+		}
+
 		broker, serverConn, cleanup := newConnectedBroker(t)
 		defer cleanup()
 
