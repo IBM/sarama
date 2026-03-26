@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -17,6 +18,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func socketErrorProbeAvailable() bool {
+	switch runtime.GOOS {
+	case "aix", "darwin", "dragonfly", "freebsd", "linux", "netbsd", "openbsd", "solaris":
+		return true
+	default:
+		return false
+	}
+}
 
 func TestSimpleClient(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
@@ -814,6 +824,10 @@ func TestClientCheckBrokersHealth(t *testing.T) {
 	})
 
 	t.Run("keeps unhealthy live seed brokers available for reopening", func(t *testing.T) {
+		if !socketErrorProbeAvailable() {
+			t.Skip("socket error probing is unavailable on this platform")
+		}
+
 		broker, serverConn, cleanup := newConnectedBroker(t)
 		defer cleanup()
 
@@ -838,6 +852,10 @@ func TestClientCheckBrokersHealth(t *testing.T) {
 	})
 
 	t.Run("keeps unhealthy dead seed brokers available for reopening", func(t *testing.T) {
+		if !socketErrorProbeAvailable() {
+			t.Skip("socket error probing is unavailable on this platform")
+		}
+
 		broker, serverConn, cleanup := newConnectedBroker(t)
 		defer cleanup()
 
