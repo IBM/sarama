@@ -157,6 +157,30 @@ func NewBroker(addr string) *Broker {
 	return &Broker{id: -1, addr: addr}
 }
 
+func (b *Broker) getSockError() error {
+	// skip socket health checks while another operation owns broker state
+	if !b.lock.TryLock() {
+		return nil
+	}
+	defer b.lock.Unlock()
+
+	if b.conn == nil {
+		return nil
+	}
+
+	conn := b.conn
+	if c, ok := conn.(*bufConn); ok {
+		conn = c.Conn
+	}
+	if c, ok := conn.(*tls.Conn); ok {
+		conn = c.NetConn()
+	}
+	if c, ok := conn.(*net.TCPConn); ok {
+		return getTCPConnSockError(c)
+	}
+	return nil
+}
+
 // Open tries to connect to the Broker if it is not already connected or connecting, but does not block
 // waiting for the connection to complete. This means that any subsequent operations on the broker will
 // block waiting for the connection to succeed or fail. To get the effect of a fully synchronous Open call,
@@ -287,18 +311,12 @@ func (b *Broker) Open(conf *Config) error {
 		if conf.Net.SASL.Enable && !useSaslV0 {
 			b.connErr = b.authenticateViaSASLv1()
 			if b.connErr != nil {
-				close(b.responses)
-				<-b.done
-				b.responses = nil
-				b.done = nil
-				err = b.conn.Close()
+				err = b.closeLocked()
 				if err == nil {
 					DebugLogger.Printf("Closed connection to broker %s due to SASL v1 auth error: %s\n", b.addr, b.connErr)
 				} else {
 					Logger.Printf("Error while closing connection to broker %s (due to SASL v1 auth error: %s): %s\n", b.addr, b.connErr, err)
 				}
-				b.conn = nil
-				b.opened.Store(false)
 				return
 			}
 		}
@@ -377,11 +395,11 @@ func (b *Broker) closeLocked() error {
 	if b.responses != nil {
 		close(b.responses)
 	}
+	// close the socket before waiting so in-flight reads can exit
+	err := b.conn.Close()
 	if b.done != nil {
 		<-b.done
 	}
-
-	err := b.conn.Close()
 
 	b.conn = nil
 	b.responses = nil
