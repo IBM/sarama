@@ -220,7 +220,7 @@ func (b *Broker) Open(conf *Config) error {
 		// Send an ApiVersionsRequest to identify the client (KIP-511).
 		// Store the response in the brokerAPIVersions map.
 		// It will be used to determine the supported API versions for each request.
-		// This should happen before SASL authentication: https://kafka.apache.org/26/protocol.html#api_versions
+		// This should happen before SASL authentication: https://kafka.apache.org/42/design/protocol/#retrieving-supported-api-versions
 		if conf.ApiVersionsRequest {
 			apiVersionsResponse, err := b.sendAndReceiveApiVersions(3)
 			if err != nil {
