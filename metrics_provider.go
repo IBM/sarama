@@ -12,18 +12,17 @@ import (
 // When Config.MetricsProvider is non-nil it takes precedence over Config.MetricRegistry.
 // The default value is nil, which preserves the existing rcrowley/go-metrics behavior.
 type MetricsProvider interface {
-	// NewCounter returns a named counter. Calling NewCounter with the same
-	// name should return the same instance.
-	NewCounter(name string) MetricsCounter
+	// GetCounter returns a named counter, creating it if it does not exist.
+	GetCounter(name string) MetricsCounter
 
-	// NewGauge returns a named gauge.
-	NewGauge(name string) MetricsGauge
+	// GetGauge returns a named gauge, creating it if it does not exist.
+	GetGauge(name string) MetricsGauge
 
-	// NewHistogram returns a named histogram.
-	NewHistogram(name string) MetricsHistogram
+	// GetHistogram returns a named histogram, creating it if it does not exist.
+	GetHistogram(name string) MetricsHistogram
 
-	// NewMeter returns a named meter.
-	NewMeter(name string) MetricsMeter
+	// GetMeter returns a named meter, creating it if it does not exist.
+	GetMeter(name string) MetricsMeter
 
 	// UnregisterAll removes all metrics that have been registered.
 	UnregisterAll()
@@ -59,8 +58,9 @@ type MetricsMeter interface {
 // matching the cleanupRegistry pattern used elsewhere in sarama.
 type GoMetricsProvider struct {
 	registry metrics.Registry
-	names    map[string]struct{}
-	mu       sync.Mutex
+
+	mu    sync.Mutex
+	names map[string]struct{}
 }
 
 // NewGoMetricsProvider returns a MetricsProvider backed by the given go-metrics Registry.
@@ -73,28 +73,33 @@ func NewGoMetricsProvider(registry metrics.Registry) *GoMetricsProvider {
 
 func (p *GoMetricsProvider) track(name string) {
 	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.names == nil {
+		p.names = make(map[string]struct{})
+	}
+
 	p.names[name] = struct{}{}
-	p.mu.Unlock()
 }
 
-func (p *GoMetricsProvider) NewCounter(name string) MetricsCounter {
+func (p *GoMetricsProvider) GetCounter(name string) MetricsCounter {
 	p.track(name)
 	return metrics.GetOrRegisterCounter(name, p.registry)
 }
 
-func (p *GoMetricsProvider) NewGauge(name string) MetricsGauge {
+func (p *GoMetricsProvider) GetGauge(name string) MetricsGauge {
 	p.track(name)
 	return metrics.GetOrRegisterGauge(name, p.registry)
 }
 
-func (p *GoMetricsProvider) NewHistogram(name string) MetricsHistogram {
+func (p *GoMetricsProvider) GetHistogram(name string) MetricsHistogram {
 	p.track(name)
 	return p.registry.GetOrRegister(name, func() metrics.Histogram {
 		return metrics.NewHistogram(metrics.NewExpDecaySample(metricsReservoirSize, metricsAlphaFactor))
 	}).(metrics.Histogram)
 }
 
-func (p *GoMetricsProvider) NewMeter(name string) MetricsMeter {
+func (p *GoMetricsProvider) GetMeter(name string) MetricsMeter {
 	p.track(name)
 	return metrics.GetOrRegisterMeter(name, p.registry)
 }
@@ -104,6 +109,6 @@ func (p *GoMetricsProvider) UnregisterAll() {
 	defer p.mu.Unlock()
 	for name := range p.names {
 		p.registry.Unregister(name)
+		delete(p.names, name)
 	}
-	p.names = make(map[string]struct{})
 }

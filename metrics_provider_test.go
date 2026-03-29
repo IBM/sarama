@@ -13,7 +13,7 @@ func TestGoMetricsProviderCounter(t *testing.T) {
 	r := metrics.NewRegistry()
 	p := NewGoMetricsProvider(r)
 
-	c := p.NewCounter("test-counter")
+	c := p.GetCounter("test-counter")
 	c.Inc(1)
 	c.Inc(2)
 	if c.Count() != 3 {
@@ -21,7 +21,7 @@ func TestGoMetricsProviderCounter(t *testing.T) {
 	}
 
 	// same name returns same instance
-	c2 := p.NewCounter("test-counter")
+	c2 := p.GetCounter("test-counter")
 	if c2.Count() != 3 {
 		t.Errorf("expected same counter instance, got count=%d", c2.Count())
 	}
@@ -31,7 +31,7 @@ func TestGoMetricsProviderGauge(t *testing.T) {
 	r := metrics.NewRegistry()
 	p := NewGoMetricsProvider(r)
 
-	g := p.NewGauge("test-gauge")
+	g := p.GetGauge("test-gauge")
 	g.Update(42)
 	if g.Value() != 42 {
 		t.Errorf("expected gauge=42, got %d", g.Value())
@@ -42,7 +42,7 @@ func TestGoMetricsProviderHistogram(t *testing.T) {
 	r := metrics.NewRegistry()
 	p := NewGoMetricsProvider(r)
 
-	h := p.NewHistogram("test-histogram")
+	h := p.GetHistogram("test-histogram")
 	h.Update(100)
 	h.Update(200)
 	if h.Count() != 2 {
@@ -54,7 +54,7 @@ func TestGoMetricsProviderMeter(t *testing.T) {
 	r := metrics.NewRegistry()
 	p := NewGoMetricsProvider(r)
 
-	m := p.NewMeter("test-meter")
+	m := p.GetMeter("test-meter")
 	m.Mark(5)
 	m.Mark(3)
 	if m.Count() != 8 {
@@ -66,8 +66,8 @@ func TestGoMetricsProviderUnregisterAll(t *testing.T) {
 	r := metrics.NewRegistry()
 	p := NewGoMetricsProvider(r)
 
-	p.NewCounter("c1")
-	p.NewMeter("m1")
+	p.GetCounter("c1")
+	p.GetMeter("m1")
 
 	// Register a metric directly on the registry (not via provider)
 	metrics.GetOrRegisterCounter("external", r)
@@ -124,7 +124,7 @@ func newStubProvider() *stubProvider {
 	}
 }
 
-func (p *stubProvider) NewCounter(name string) MetricsCounter {
+func (p *stubProvider) GetCounter(name string) MetricsCounter {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if c, ok := p.counters[name]; ok {
@@ -135,7 +135,7 @@ func (p *stubProvider) NewCounter(name string) MetricsCounter {
 	return c
 }
 
-func (p *stubProvider) NewGauge(name string) MetricsGauge {
+func (p *stubProvider) GetGauge(name string) MetricsGauge {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if g, ok := p.gauges[name]; ok {
@@ -146,7 +146,7 @@ func (p *stubProvider) NewGauge(name string) MetricsGauge {
 	return g
 }
 
-func (p *stubProvider) NewHistogram(name string) MetricsHistogram {
+func (p *stubProvider) GetHistogram(name string) MetricsHistogram {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if h, ok := p.histograms[name]; ok {
@@ -157,7 +157,7 @@ func (p *stubProvider) NewHistogram(name string) MetricsHistogram {
 	return h
 }
 
-func (p *stubProvider) NewMeter(name string) MetricsMeter {
+func (p *stubProvider) GetMeter(name string) MetricsMeter {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if m, ok := p.meters[name]; ok {
@@ -183,27 +183,27 @@ func TestCustomMetricsProvider(t *testing.T) {
 	// Verify stub implements the interface
 	var _ MetricsProvider = sp
 
-	c := sp.NewCounter("requests")
+	c := sp.GetCounter("requests")
 	c.Inc(1)
 	c.Inc(1)
 	if c.Count() != 2 {
 		t.Errorf("expected stub counter=2, got %d", c.Count())
 	}
 
-	m := sp.NewMeter("bytes")
+	m := sp.GetMeter("bytes")
 	m.Mark(1024)
 	if m.Count() != 1024 {
 		t.Errorf("expected stub meter=1024, got %d", m.Count())
 	}
 
-	h := sp.NewHistogram("latency")
+	h := sp.GetHistogram("latency")
 	h.Update(50)
 	h.Update(100)
 	if h.Count() != 2 {
 		t.Errorf("expected stub histogram count=2, got %d", h.Count())
 	}
 
-	g := sp.NewGauge("connections")
+	g := sp.GetGauge("connections")
 	g.Update(10)
 	if g.Value() != 10 {
 		t.Errorf("expected stub gauge=10, got %d", g.Value())
@@ -239,17 +239,17 @@ func TestGoMetricsProviderConcurrentAccess(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			c := p.NewCounter("concurrent-counter")
+			c := p.GetCounter("concurrent-counter")
 			c.Inc(1)
-			m := p.NewMeter("concurrent-meter")
+			m := p.GetMeter("concurrent-meter")
 			m.Mark(1)
-			h := p.NewHistogram("concurrent-histogram")
+			h := p.GetHistogram("concurrent-histogram")
 			h.Update(1)
 		}()
 	}
 	wg.Wait()
 
-	c := p.NewCounter("concurrent-counter")
+	c := p.GetCounter("concurrent-counter")
 	if c.Count() != 100 {
 		t.Errorf("expected counter=100, got %d", c.Count())
 	}

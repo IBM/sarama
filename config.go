@@ -530,6 +530,7 @@ type Config struct {
 	// like OpenTelemetry or Prometheus without depending on rcrowley/go-metrics.
 	//
 	// Defaults to nil, which preserves the existing MetricRegistry behavior.
+	// Call sites must nil-check before use: if conf.MetricsProvider != nil { ... }.
 	MetricsProvider MetricsProvider
 }
 
