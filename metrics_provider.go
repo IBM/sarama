@@ -67,7 +67,6 @@ type GoMetricsProvider struct {
 func NewGoMetricsProvider(registry metrics.Registry) *GoMetricsProvider {
 	return &GoMetricsProvider{
 		registry: registry,
-		names:    make(map[string]struct{}),
 	}
 }
 
