@@ -1728,7 +1728,7 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 		broker:         broker,
 		messages:       make(chan *ConsumerMessage, 1),
 		errors:         make(chan *ConsumerError, 1),
-		feeder:         make(chan *FetchResponse, 1),
+		feeder:         make(chan *partitionConsumerResponse, 1),
 		trigger:        make(chan none, 1),
 		dying:          make(chan none),
 		dispatcherStop: make(chan none),
@@ -1769,7 +1769,10 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 
 	for range iterations {
 		broker.acks.Add(1)
-		child.feeder <- response
+		child.feeder <- &partitionConsumerResponse{
+			broker:   broker,
+			response: response,
+		}
 	}
 
 	close(done)
@@ -2262,7 +2265,7 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 			dispatcherStop: make(chan none),
 			messages:       make(chan *ConsumerMessage, config.ChannelBufferSize),
 			errors:         make(chan *ConsumerError, errorsBuffer),
-			feeder:         make(chan *FetchResponse, 1),
+			feeder:         make(chan *partitionConsumerResponse, 1),
 		}
 	}
 
