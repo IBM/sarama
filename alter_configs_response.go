@@ -29,6 +29,10 @@ func (c *AlterConfigError) Error() string {
 	return text
 }
 
+func (c *AlterConfigError) Unwrap() error {
+	return c.Err
+}
+
 // AlterConfigsResourceResponse is a response type for alter config resource
 type AlterConfigsResourceResponse struct {
 	ErrorCode int16
