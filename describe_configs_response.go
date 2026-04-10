@@ -47,6 +47,10 @@ func (c *DescribeConfigError) Error() string {
 	return text
 }
 
+func (c *DescribeConfigError) Unwrap() error {
+	return c.Err
+}
+
 type DescribeConfigsResponse struct {
 	Version      int16
 	ThrottleTime time.Duration
