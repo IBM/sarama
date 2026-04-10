@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -1707,6 +1708,80 @@ func TestConsumerExpiryTicker(t *testing.T) {
 	broker0.Close()
 }
 
+func TestPartitionConsumerBrokerRace(t *testing.T) {
+	oldMaxProcs := runtime.GOMAXPROCS(2)
+	defer runtime.GOMAXPROCS(oldMaxProcs)
+
+	const iterations = 2048
+
+	config := NewTestConfig()
+	config.ChannelBufferSize = 0
+	config.Consumer.MaxProcessingTime = time.Hour
+
+	broker := &brokerConsumer{
+		input: make(chan *partitionConsumer, 1),
+		stop:  make(chan none),
+	}
+
+	child := &partitionConsumer{
+		conf:           config,
+		broker:         broker,
+		messages:       make(chan *ConsumerMessage, 1),
+		errors:         make(chan *ConsumerError, 1),
+		feeder:         make(chan *partitionConsumerResponse, 1),
+		trigger:        make(chan none, 1),
+		dying:          make(chan none),
+		dispatcherStop: make(chan none),
+		topic:          "my_topic",
+		partition:      0,
+		fetchSize:      config.Consumer.Fetch.Default,
+	}
+
+	response := &FetchResponse{}
+	response.AddMessage("my_topic", 0, nil, testMsg, 0)
+
+	done := make(chan none)
+	feederDone := make(chan none)
+	messagesDone := make(chan none)
+
+	go func() {
+		defer close(feederDone)
+		child.responseFeeder()
+	}()
+
+	go func() {
+		defer close(messagesDone)
+		for range child.messages {
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case <-done:
+				return
+			default:
+				child.broker = broker
+				runtime.Gosched()
+			}
+		}
+	}()
+
+	for range iterations {
+		broker.acks.Add(1)
+		child.feeder <- &partitionConsumerResponse{
+			broker:   broker,
+			response: response,
+		}
+	}
+
+	close(done)
+	close(child.feeder)
+
+	<-feederDone
+	<-messagesDone
+}
+
 func TestConsumerTimestamps(t *testing.T) {
 	now := time.Now().Truncate(time.Millisecond)
 	type testMessage struct {
@@ -2190,7 +2265,7 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 			dispatcherStop: make(chan none),
 			messages:       make(chan *ConsumerMessage, config.ChannelBufferSize),
 			errors:         make(chan *ConsumerError, errorsBuffer),
-			feeder:         make(chan *FetchResponse, 1),
+			feeder:         make(chan *partitionConsumerResponse, 1),
 		}
 	}
 
