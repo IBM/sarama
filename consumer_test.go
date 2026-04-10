@@ -2328,6 +2328,34 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		runAbort(t, newBrokerConsumer(child))
 	})
 
+	t.Run("stops dispatcher for dying child", func(t *testing.T) {
+		child := newChild(config.ChannelBufferSize)
+		child.consumer = &consumer{
+			client:          client,
+			conf:            config,
+			children:        make(map[string]map[int32]*partitionConsumer),
+			brokerConsumers: make(map[*Broker]*brokerConsumer),
+			metricRegistry:  newCleanupRegistry(config.MetricRegistry),
+		}
+
+		// Start the dispatcher goroutine (it will block on <-child.trigger).
+		go child.dispatcher()
+
+		// Mark the child as dying (simulates AsyncClose during rebalance).
+		close(child.dying)
+
+		bc := newBrokerConsumer(child)
+		runAbort(t, bc)
+
+		// The dispatcher should have exited via stopDispatcher, closing feeder.
+		select {
+		case _, ok := <-child.feeder:
+			require.False(t, ok, "feeder channel should be closed after dispatcher exits")
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "dispatcher did not exit after abort() on dying child")
+		}
+	})
+
 	t.Run("returns when redispatch is already pending", func(t *testing.T) {
 		child := newChild(config.ChannelBufferSize)
 		child.trigger <- none{}
