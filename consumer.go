@@ -1171,12 +1171,22 @@ func (bc *brokerConsumer) abort(err error) {
 	_ = bc.broker.Close() // we don't care about the error this might return, we already have one
 
 	for child := range bc.subscriptions {
-		child.notifyError(err)
+		select {
+		case <-child.dying:
+			child.stopDispatcher()
+		default:
+			child.notifyError(err)
+		}
 	}
 
 	for newSubscriptions := range bc.newSubscriptions {
 		for _, child := range newSubscriptions {
-			child.notifyError(err)
+			select {
+			case <-child.dying:
+				child.stopDispatcher()
+			default:
+				child.notifyError(err)
+			}
 		}
 	}
 }
