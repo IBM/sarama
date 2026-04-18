@@ -164,7 +164,7 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 		partition:            partition,
 		messages:             make(chan *ConsumerMessage, c.conf.ChannelBufferSize),
 		errors:               make(chan *ConsumerError, c.conf.ChannelBufferSize),
-		feeder:               make(chan *FetchResponse, 1),
+		feeder:               make(chan *partitionConsumerResponse, 1),
 		leaderEpoch:          invalidLeaderEpoch,
 		preferredReadReplica: invalidPreferredReplicaID,
 		trigger:              make(chan none, 1),
@@ -398,6 +398,11 @@ type PartitionConsumer interface {
 	IsPaused() bool
 }
 
+type partitionConsumerResponse struct {
+	broker   *brokerConsumer
+	response *FetchResponse
+}
+
 type partitionConsumer struct {
 	highWaterMarkOffset atomic.Int64 // must be at the top of the struct because https://golang.org/pkg/sync/atomic/#pkg-note-BUG
 
@@ -406,7 +411,7 @@ type partitionConsumer struct {
 	broker   *brokerConsumer
 	messages chan *ConsumerMessage
 	errors   chan *ConsumerError
-	feeder   chan *FetchResponse
+	feeder   chan *partitionConsumerResponse
 
 	leaderEpoch          int32
 	preferredReadReplica int32
@@ -654,12 +659,10 @@ func (child *partitionConsumer) responseFeeder() {
 	firstAttempt := true
 
 feederLoop:
-	for response := range child.feeder {
-		// capture broker before it can be nilled by the dispatcher
-		// during an abort/redispatch cycle
-		broker := child.broker
+	for feederResponse := range child.feeder {
+		broker := feederResponse.broker
 
-		msgs, child.responseResult = child.parseResponse(response)
+		msgs, child.responseResult = child.parseResponse(feederResponse.response)
 
 		if child.responseResult == nil {
 			child.retries.Store(0)
@@ -1075,7 +1078,10 @@ func (bc *brokerConsumer) subscriptionConsumer() {
 				continue
 			}
 
-			child.feeder <- response
+			child.feeder <- &partitionConsumerResponse{
+				broker:   bc,
+				response: response,
+			}
 		}
 		bc.acks.Wait()
 		bc.handleResponses()
@@ -1171,12 +1177,22 @@ func (bc *brokerConsumer) abort(err error) {
 	_ = bc.broker.Close() // we don't care about the error this might return, we already have one
 
 	for child := range bc.subscriptions {
-		child.notifyError(err)
+		select {
+		case <-child.dying:
+			child.stopDispatcher()
+		default:
+			child.notifyError(err)
+		}
 	}
 
 	for newSubscriptions := range bc.newSubscriptions {
 		for _, child := range newSubscriptions {
-			child.notifyError(err)
+			select {
+			case <-child.dying:
+				child.stopDispatcher()
+			default:
+				child.notifyError(err)
+			}
 		}
 	}
 }
