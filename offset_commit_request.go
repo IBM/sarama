@@ -75,6 +75,43 @@ func (r *OffsetCommitRequest) setVersion(v int16) {
 	r.Version = v
 }
 
+// NewOffsetCommitRequest creates an OffsetCommitRequest initialized for admin use.
+func NewOffsetCommitRequest(conf *Config, group string) *OffsetCommitRequest {
+	request := &OffsetCommitRequest{
+		ConsumerGroup:           group,
+		ConsumerGroupGeneration: GroupGenerationUndefined,
+	}
+
+	if conf.Version.IsAtLeast(V2_3_0_0) {
+		// Version 7 adds GroupInstanceId.
+		request.Version = 7
+	} else if conf.Version.IsAtLeast(V2_1_0_0) {
+		// Version 6 adds committed leader epoch (version 5 removes retention time).
+		request.Version = 6
+	} else if conf.Version.IsAtLeast(V2_0_0_0) {
+		// Version 4 is the same as version 2.
+		request.Version = 4
+	} else if conf.Version.IsAtLeast(V0_11_0_0) {
+		// Version 3 is the same as version 2.
+		request.Version = 3
+	} else if conf.Version.IsAtLeast(V0_9_0_0) {
+		// Version 2 adds retention time and removes the commit timestamp from version 1.
+		request.Version = 2
+	} else {
+		// Version 1 adds commit timestamp and group membership.
+		request.Version = 1
+	}
+
+	if request.Version >= 2 && request.Version < 5 {
+		request.RetentionTime = -1
+		if conf.Consumer.Offsets.Retention > 0 {
+			request.RetentionTime = conf.Consumer.Offsets.Retention.Milliseconds()
+		}
+	}
+
+	return request
+}
+
 func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 	if r.Version < 0 || r.Version > 7 {
 		return PacketEncodingError{"invalid or unsupported OffsetCommitRequest version field"}
