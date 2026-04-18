@@ -193,7 +193,6 @@ func (c *consumer) ConsumePartition(topic string, partition int32, offset int64)
 	for {
 		bc := c.refBrokerConsumer(leader)
 		if bc.queueSubscription(child) {
-			child.setBrokerConsumer(bc)
 			break
 		}
 
@@ -503,12 +502,6 @@ func (child *partitionConsumer) currentBrokerConsumer() *brokerConsumer {
 	return child.broker
 }
 
-func (child *partitionConsumer) setBrokerConsumer(bc *brokerConsumer) {
-	child.brokerMu.Lock()
-	child.broker = bc
-	child.brokerMu.Unlock()
-}
-
 func (child *partitionConsumer) releaseBrokerConsumer(expected *brokerConsumer) {
 	child.brokerMu.Lock()
 	current := child.broker
@@ -603,7 +596,6 @@ func (child *partitionConsumer) dispatch() error {
 	for {
 		bc := child.consumer.refBrokerConsumer(broker)
 		if bc.queueSubscription(child) {
-			child.setBrokerConsumer(bc)
 			return nil
 		}
 
@@ -1318,10 +1310,14 @@ func (bc *brokerConsumer) stopConsuming() {
 }
 
 func (bc *brokerConsumer) queueSubscription(child *partitionConsumer) bool {
+	child.brokerMu.Lock()
+	defer child.brokerMu.Unlock()
+
 	select {
 	case <-bc.stop:
 		return false
 	case bc.input <- child:
+		child.broker = bc
 		return true
 	}
 }

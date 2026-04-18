@@ -2515,3 +2515,62 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		}
 	})
 }
+
+func TestQueueSubscriptionPublishesBrokerOwnership(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Return.Errors = true
+
+	c := &consumer{
+		conf:            config,
+		children:        make(map[string]map[int32]*partitionConsumer),
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		metricRegistry:  newCleanupRegistry(config.MetricRegistry),
+	}
+
+	child := &partitionConsumer{
+		consumer:       c,
+		conf:           config,
+		topic:          "my_topic",
+		partition:      0,
+		trigger:        make(chan none, 1),
+		dying:          make(chan none),
+		dispatcherStop: make(chan none),
+		messages:       make(chan *ConsumerMessage, config.ChannelBufferSize),
+		errors:         make(chan *ConsumerError, 1),
+		feeder:         make(chan *partitionConsumerResponse, 1),
+	}
+
+	realBroker := &Broker{}
+	bc := &brokerConsumer{
+		consumer:         c,
+		broker:           realBroker,
+		input:            make(chan *partitionConsumer),
+		newSubscriptions: make(chan []*partitionConsumer),
+		subscriptions:    make(map[*partitionConsumer]none),
+		refs:             1,
+		stop:             make(chan none),
+	}
+	c.brokerConsumers[realBroker] = bc
+
+	go withRecover(bc.subscriptionManager)
+
+	t.Cleanup(func() {
+		bc.stopConsuming()
+
+		done := make(chan struct{})
+		go func() {
+			for range bc.newSubscriptions {
+			}
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "subscriptionManager did not exit during cleanup")
+		}
+	})
+
+	require.True(t, bc.queueSubscription(child))
+	require.Same(t, bc, child.currentBrokerConsumer(), "queueSubscription must publish broker ownership before returning")
+}
