@@ -224,6 +224,17 @@ func isRetriableGroupCoordinatorError(err error) bool {
 	return errors.Is(err, ErrNotCoordinatorForConsumer) || errors.Is(err, ErrConsumerCoordinatorNotAvailable) || errors.Is(err, io.EOF)
 }
 
+// isRetriableListTopicsError returns true for controller errors and transient
+// transport failures where reconnecting and retrying can succeed.
+func isRetriableListTopicsError(err error) bool {
+	if isRetriableControllerError(err) || shouldCloseBrokerConn(err) {
+		return true
+	}
+
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
 // retryOnError will repeatedly call the given (error-returning) func in the
 // case that its response is non-nil and retryable (as determined by the
 // provided retryable func) up to the maximum number of tries permitted by
@@ -420,76 +431,83 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 	// DescribeConfigsRequest request. To avoid sending many requests to the
 	// broker, we use a single DescribeConfigsRequest.
 
-	// Send the all-topic MetadataRequest
-	b, err := ca.findAnyBroker()
-	if err != nil {
-		return nil, err
-	}
-	_ = b.Open(ca.client.Config())
+	var topicsDetailsMap map[string]TopicDetail
 
-	metadataReq := NewMetadataRequest(ca.conf.Version, nil)
-	metadataResp, err := b.GetMetadata(metadataReq)
-	if err != nil {
-		return nil, err
-	}
-
-	topicsDetailsMap := make(map[string]TopicDetail, len(metadataResp.Topics))
-
-	var describeConfigsResources []*ConfigResource
-
-	for _, topic := range metadataResp.Topics {
-		topicDetails := TopicDetail{
-			NumPartitions: int32(len(topic.Partitions)),
+	if err := ca.retryOnError(isRetriableListTopicsError, func() error {
+		// Send the all-topic MetadataRequest
+		b, err := ca.findAnyBroker()
+		if err != nil {
+			return err
 		}
-		if len(topic.Partitions) > 0 {
-			topicDetails.ReplicaAssignment = make(map[int32][]int32, len(topic.Partitions))
-			for _, partition := range topic.Partitions {
-				topicDetails.ReplicaAssignment[partition.ID] = partition.Replicas
+		_ = b.Open(ca.client.Config())
+
+		metadataReq := NewMetadataRequest(ca.conf.Version, nil)
+		metadataResp, err := b.GetMetadata(metadataReq)
+		if err != nil {
+			return err
+		}
+
+		currentTopicsDetailsMap := make(map[string]TopicDetail, len(metadataResp.Topics))
+		describeConfigsResources := make([]*ConfigResource, 0, len(metadataResp.Topics))
+
+		for _, topic := range metadataResp.Topics {
+			topicDetails := TopicDetail{
+				NumPartitions: int32(len(topic.Partitions)),
 			}
-			topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas))
-		}
-		topicsDetailsMap[topic.Name] = topicDetails
-
-		// we populate the resources we want to describe from the MetadataResponse
-		topicResource := ConfigResource{
-			Type: TopicResource,
-			Name: topic.Name,
-		}
-		describeConfigsResources = append(describeConfigsResources, &topicResource)
-	}
-
-	// Send the DescribeConfigsRequest
-	describeConfigsReq := &DescribeConfigsRequest{
-		Resources: describeConfigsResources,
-	}
-
-	if ca.conf.Version.IsAtLeast(V1_1_0_0) {
-		describeConfigsReq.Version = 1
-	}
-
-	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
-		describeConfigsReq.Version = 2
-	}
-
-	describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, resource := range describeConfigsResp.Resources {
-		topicDetails := topicsDetailsMap[resource.Name]
-		topicDetails.ConfigEntries = make(map[string]*string)
-
-		for _, entry := range resource.Configs {
-			// only include non-default non-sensitive config
-			// (don't actually think topic config will ever be sensitive)
-			if entry.Default || entry.Sensitive {
-				continue
+			if len(topic.Partitions) > 0 {
+				topicDetails.ReplicaAssignment = make(map[int32][]int32, len(topic.Partitions))
+				for _, partition := range topic.Partitions {
+					topicDetails.ReplicaAssignment[partition.ID] = partition.Replicas
+				}
+				topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas))
 			}
-			topicDetails.ConfigEntries[entry.Name] = &entry.Value
+			currentTopicsDetailsMap[topic.Name] = topicDetails
+
+			// we populate the resources we want to describe from the MetadataResponse
+			describeConfigsResources = append(describeConfigsResources, &ConfigResource{
+				Type: TopicResource,
+				Name: topic.Name,
+			})
 		}
 
-		topicsDetailsMap[resource.Name] = topicDetails
+		// Send the DescribeConfigsRequest
+		describeConfigsReq := &DescribeConfigsRequest{
+			Resources: describeConfigsResources,
+		}
+
+		if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+			describeConfigsReq.Version = 1
+		}
+
+		if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+			describeConfigsReq.Version = 2
+		}
+
+		describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
+		if err != nil {
+			return err
+		}
+
+		for _, resource := range describeConfigsResp.Resources {
+			topicDetails := currentTopicsDetailsMap[resource.Name]
+			topicDetails.ConfigEntries = make(map[string]*string)
+
+			for _, entry := range resource.Configs {
+				// only include non-default non-sensitive config
+				// (don't actually think topic config will ever be sensitive)
+				if entry.Default || entry.Sensitive {
+					continue
+				}
+				topicDetails.ConfigEntries[entry.Name] = &entry.Value
+			}
+
+			currentTopicsDetailsMap[resource.Name] = topicDetails
+		}
+
+		topicsDetailsMap = currentTopicsDetailsMap
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return topicsDetailsMap, nil
