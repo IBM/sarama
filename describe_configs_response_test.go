@@ -3,6 +3,7 @@
 package sarama
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -274,4 +275,35 @@ func TestDescribeConfigsResponseWithDefaultv1(t *testing.T) {
 		},
 	}
 	testResponse(t, "response with error", response, describeConfigsResponseWithDefaultv1)
+}
+
+func TestDescribeConfigError(t *testing.T) {
+	// Assert that DescribeConfigError satisfies error interface
+	var err error = &DescribeConfigError{
+		Err: ErrInvalidConfig,
+	}
+
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("expected errors.Is to match ErrInvalidConfig")
+	}
+
+	got := err.Error()
+	want := ErrInvalidConfig.Error()
+	if got != want {
+		t.Errorf("DescribeConfigError.Error() = %v; want %v", got, want)
+	}
+
+	err = &DescribeConfigError{
+		Err:    ErrInvalidConfig,
+		ErrMsg: "invalid config value",
+	}
+	got = err.Error()
+	want = ErrInvalidConfig.Error() + " - invalid config value"
+	if got != want {
+		t.Errorf("DescribeConfigError.Error() = %v; want %v", got, want)
+	}
+
+	if !errors.Is(err, ErrInvalidConfig) {
+		t.Errorf("expected errors.Is to match ErrInvalidConfig with ErrMsg set")
+	}
 }
