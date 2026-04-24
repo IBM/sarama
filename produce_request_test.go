@@ -109,3 +109,46 @@ func TestProduceRequest(t *testing.T) {
 	batch.compressedRecords = nil
 	testRequestDecode(t, "one record", request, packet)
 }
+
+func benchmarkProduceRequestEncodeMetrics(b *testing.B, partitions int) {
+	b.Helper()
+
+	produceReq := &ProduceRequest{
+		RequiredAcks: WaitForLocal,
+		Timeout:      1_000,
+	}
+	for partition := 0; partition < partitions; partition++ {
+		produceReq.AddMessage("bench.topic", int32(partition), &Message{
+			Codec: CompressionNone,
+			Value: []byte("payload"),
+		})
+	}
+
+	req := &request{
+		correlationID: 1,
+		clientID:      "bench",
+		body:          produceReq,
+	}
+	metricRegistry := NewConfig().MetricRegistry
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for b.Loop() {
+		if _, err := encode(req, metricRegistry); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+func BenchmarkProduceRequestEncodeMetrics1Partition(b *testing.B) {
+	benchmarkProduceRequestEncodeMetrics(b, 1)
+}
+
+func BenchmarkProduceRequestEncodeMetrics32Partitions(b *testing.B) {
+	benchmarkProduceRequestEncodeMetrics(b, 32)
+}
+
+func BenchmarkProduceRequestEncodeMetrics128Partitions(b *testing.B) {
+	benchmarkProduceRequestEncodeMetrics(b, 128)
+}

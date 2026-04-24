@@ -102,8 +102,10 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		}
 		topicRecordCount := int64(0)
 		var topicCompressionRatioMetric metrics.Histogram
+		var topicBatchSizeMetric metrics.Histogram
 		if metricRegistry != nil {
 			topicCompressionRatioMetric = getOrRegisterTopicHistogram("compression-ratio", topic, metricRegistry)
+			topicBatchSizeMetric = getOrRegisterTopicHistogram("batch-size", topic, metricRegistry)
 		}
 		for id, records := range partitions {
 			startOffset := pe.offset()
@@ -125,7 +127,7 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 				}
 				batchSize := int64(pe.offset() - startOffset)
 				batchSizeMetric.Update(batchSize)
-				getOrRegisterTopicHistogram("batch-size", topic, metricRegistry).Update(batchSize)
+				topicBatchSizeMetric.Update(batchSize)
 			}
 		}
 		if topicRecordCount > 0 {
