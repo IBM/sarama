@@ -524,6 +524,14 @@ type Config struct {
 	// prior to starting Sarama.
 	// See Examples on how to use the metrics registry
 	MetricRegistry metrics.Registry
+
+	// MetricsProvider is an optional pluggable metrics backend. When non-nil it
+	// takes precedence over MetricRegistry, allowing integration with systems
+	// like OpenTelemetry or Prometheus without depending on rcrowley/go-metrics.
+	//
+	// Defaults to nil, which preserves the existing MetricRegistry behavior.
+	// Call sites must nil-check before use: if conf.MetricsProvider != nil { ... }.
+	MetricsProvider MetricsProvider
 }
 
 // NewConfig returns a new configuration instance with sane defaults.
