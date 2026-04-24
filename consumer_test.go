@@ -1782,6 +1782,82 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 	<-messagesDone
 }
 
+func TestPartitionConsumerAsyncCloseAfterRedispatchExitsDispatcher(t *testing.T) {
+	config := NewTestConfig()
+	dispatchStarted := make(chan none, 1)
+	config.Consumer.Retry.BackoffFunc = func(retries int) time.Duration {
+		select {
+		case dispatchStarted <- none{}:
+		default:
+		}
+		return time.Hour
+	}
+
+	c := &consumer{
+		conf:            config,
+		children:        make(map[string]map[int32]*partitionConsumer),
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		metricRegistry:  newCleanupRegistry(config.MetricRegistry),
+	}
+
+	realBroker := &Broker{}
+	bc := &brokerConsumer{
+		consumer:         c,
+		broker:           realBroker,
+		input:            make(chan *partitionConsumer),
+		newSubscriptions: make(chan []*partitionConsumer),
+		subscriptions:    make(map[*partitionConsumer]none),
+		refs:             1,
+		stop:             make(chan none),
+	}
+	c.brokerConsumers[realBroker] = bc
+
+	child := &partitionConsumer{
+		consumer:       c,
+		conf:           config,
+		broker:         bc,
+		messages:       make(chan *ConsumerMessage),
+		errors:         make(chan *ConsumerError),
+		feeder:         make(chan *partitionConsumerResponse),
+		trigger:        make(chan none, 1),
+		dying:          make(chan none),
+		dispatcherStop: make(chan none),
+		topic:          "my_topic",
+		partition:      0,
+	}
+	c.children[child.topic] = map[int32]*partitionConsumer{child.partition: child}
+
+	// This matches the flaky shutdown window from TestFuncTxnProduceAndCommitOffset:
+	// the broker abandons the current subscription for redispatch, the dispatcher
+	// consumes that signal, and shutdown begins while it is waiting to redispatch.
+	bc.subscriptions[child] = none{}
+	child.responseResult = ErrFencedLeaderEpoch
+
+	done := make(chan none)
+	go func() {
+		child.dispatcher()
+		close(done)
+	}()
+
+	bc.handleResponses()
+
+	select {
+	case <-dispatchStarted:
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("dispatcher did not begin waiting to redispatch")
+	}
+
+	child.AsyncClose()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+		child.stopDispatcher()
+		<-done
+		t.Fatal("dispatcher did not exit after AsyncClose during redispatch backoff")
+	}
+}
+
 func TestConsumerTimestamps(t *testing.T) {
 	now := time.Now().Truncate(time.Millisecond)
 	type testMessage struct {
@@ -2060,7 +2136,7 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 				conf:           &Config{},
 				dispatcherStop: make(chan none),
 			}
-			got, err := child.parseResponse(tt.args.response)
+			got, err := child.parseResponse(child.broker, tt.args.response)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("partitionConsumer.parseResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2093,7 +2169,7 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 		partition:      0,
 		dispatcherStop: make(chan none),
 	}
-	got, err := child.parseResponse(response)
+	got, err := child.parseResponse(child.broker, response)
 	if err != nil {
 		t.Errorf("partitionConsumer.parseResponse() error = %v", err)
 		return
@@ -2438,4 +2514,63 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 			require.FailNow(t, "abort() did not return")
 		}
 	})
+}
+
+func TestQueueSubscriptionPublishesBrokerOwnership(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Return.Errors = true
+
+	c := &consumer{
+		conf:            config,
+		children:        make(map[string]map[int32]*partitionConsumer),
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		metricRegistry:  newCleanupRegistry(config.MetricRegistry),
+	}
+
+	child := &partitionConsumer{
+		consumer:       c,
+		conf:           config,
+		topic:          "my_topic",
+		partition:      0,
+		trigger:        make(chan none, 1),
+		dying:          make(chan none),
+		dispatcherStop: make(chan none),
+		messages:       make(chan *ConsumerMessage, config.ChannelBufferSize),
+		errors:         make(chan *ConsumerError, 1),
+		feeder:         make(chan *partitionConsumerResponse, 1),
+	}
+
+	realBroker := &Broker{}
+	bc := &brokerConsumer{
+		consumer:         c,
+		broker:           realBroker,
+		input:            make(chan *partitionConsumer),
+		newSubscriptions: make(chan []*partitionConsumer),
+		subscriptions:    make(map[*partitionConsumer]none),
+		refs:             1,
+		stop:             make(chan none),
+	}
+	c.brokerConsumers[realBroker] = bc
+
+	go withRecover(bc.subscriptionManager)
+
+	t.Cleanup(func() {
+		bc.stopConsuming()
+
+		done := make(chan struct{})
+		go func() {
+			for range bc.newSubscriptions {
+			}
+			close(done)
+		}()
+
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			require.FailNow(t, "subscriptionManager did not exit during cleanup")
+		}
+	})
+
+	require.True(t, bc.queueSubscription(child))
+	require.Same(t, bc, child.currentBrokerConsumer(), "queueSubscription must publish broker ownership before returning")
 }
