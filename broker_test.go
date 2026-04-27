@@ -197,6 +197,52 @@ func TestBrokerFailedRequest(t *testing.T) {
 	}
 }
 
+func TestBrokerClose(t *testing.T) {
+	t.Run("interrupts active async response reads", func(t *testing.T) {
+		mockBroker := NewMockBroker(t, 0)
+		defer mockBroker.Close()
+
+		broker := NewBroker(mockBroker.Addr())
+		conf := NewTestConfig()
+		conf.ApiVersionsRequest = false
+		conf.Net.ReadTimeout = 30 * time.Second
+
+		require.NoError(t, broker.Open(conf))
+
+		request := ProduceRequest{}
+		request.RequiredAcks = WaitForLocal
+
+		responseErrs := make(chan error, 1)
+		err := broker.AsyncProduce(&request, func(_ *ProduceResponse, err error) {
+			responseErrs <- err
+		})
+		require.NoError(t, err)
+
+		closeErrs := make(chan error, 1)
+		go func() {
+			closeErrs <- broker.Close()
+		}()
+
+		select {
+		case err := <-closeErrs:
+			require.NoError(t, err)
+		case <-time.After(250 * time.Millisecond):
+			require.FailNow(t, "Close blocked with an active async response read")
+		}
+
+		select {
+		case err := <-responseErrs:
+			require.Error(t, err)
+		case <-time.After(time.Second):
+			require.FailNow(t, "timed out waiting for the async produce callback")
+		}
+
+		connected, err := broker.Connected()
+		require.NoError(t, err)
+		require.False(t, connected)
+	})
+}
+
 // closeImmediatelyDialer is a test dialer that returns a net.Conn whose peer is
 // already closed. This reliably triggers a transport-level failure (e.g. EOF)
 // during ApiVersions negotiation in Broker.Open.
