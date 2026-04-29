@@ -5,6 +5,7 @@ package sarama
 import (
 	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -167,20 +168,20 @@ func TestClusterAdminListTopics(t *testing.T) {
 	}
 
 	if len(entries) == 0 {
-		t.Fatal(errors.New("no resource present"))
+		t.Fatal("no resource present")
 	}
 
 	topic, found := entries["my_topic"]
 	if !found {
-		t.Fatal(errors.New("topic not found in response"))
+		t.Fatal("topic not found in response")
 	}
 	_, found = topic.ConfigEntries["max.message.bytes"]
 	if found {
-		t.Fatal(errors.New("default topic config entry incorrectly found in response"))
+		t.Fatal("default topic config entry incorrectly found in response")
 	}
 	value := topic.ConfigEntries["retention.ms"]
 	if value == nil || *value != "5000" {
-		t.Fatal(errors.New("non-default topic config entry not found in response"))
+		t.Fatal("non-default topic config entry not found in response")
 	}
 
 	err = admin.Close()
@@ -188,8 +189,80 @@ func TestClusterAdminListTopics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if topic.ReplicaAssignment == nil || topic.ReplicaAssignment[0][0] != 1 {
-		t.Fatal(errors.New("replica assignment not found in response"))
+	assignment, found := topic.ReplicaAssignment[0]
+	if !found {
+		t.Fatal("replica assignment for partition 0 not found in response")
+	}
+	if len(assignment) == 0 {
+		t.Fatal("replica assignment for partition 0 was empty")
+	}
+	if assignment[0] != 1 {
+		t.Fatal("replica assignment not found in response")
+	}
+}
+
+func TestClusterAdminListTopicsRetriesOnTransientConnectionError(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	metadataResponse := NewMockMetadataResponse(t).
+		SetController(seedBroker.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+		SetLeader("my_topic", 0, seedBroker.BrokerID())
+
+	var metadataAttempts atomic.Int32
+	seedBroker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			// Simulate one transient network timeout by not responding to the
+			// first request. The second attempt should succeed.
+			if metadataAttempts.Add(1) == 1 {
+				return nil
+			}
+			return metadataResponse.For(req.body)
+		},
+		"DescribeConfigsRequest": func(req *request) encoderWithHeader {
+			return NewMockDescribeConfigsResponse(t).For(req.body)
+		},
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_1_0_0
+	config.Net.ReadTimeout = 100 * time.Millisecond
+	config.Admin.Retry.Max = 3
+	config.Admin.Retry.Backoff = 10 * time.Millisecond
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, admin)
+
+	entries, err := admin.ListTopics()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if metadataAttempts.Load() < 2 {
+		t.Fatal("expected ListTopics to retry after transient error")
+	}
+
+	if len(entries) == 0 {
+		t.Fatal("no resource present")
+	}
+
+	topic, found := entries["my_topic"]
+	if !found {
+		t.Fatal("topic not found in response")
+	}
+	assignment, found := topic.ReplicaAssignment[0]
+	if !found {
+		t.Fatal("replica assignment for partition 0 not found in response")
+	}
+	if len(assignment) == 0 {
+		t.Fatal("replica assignment for partition 0 was empty")
+	}
+	if assignment[0] != 1 {
+		t.Fatal("replica assignment not found in response")
 	}
 }
 
