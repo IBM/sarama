@@ -6,10 +6,6 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
-// zstdMaxBufferedEncoders maximum number of not-in-use zstd encoders
-// If the pool of encoders is exhausted then new encoders will be created on the fly
-const zstdMaxBufferedEncoders = 1
-
 type ZstdEncoderParams struct {
 	Level int
 }
@@ -20,35 +16,35 @@ var zstdDecMap sync.Map
 
 var zstdAvailableEncoders sync.Map
 
-func getZstdEncoderChannel(params ZstdEncoderParams) chan *zstd.Encoder {
+func getZstdEncoderPool(params ZstdEncoderParams) *sync.Pool {
 	if c, ok := zstdAvailableEncoders.Load(params); ok {
-		return c.(chan *zstd.Encoder)
+		return c.(*sync.Pool)
 	}
-	c, _ := zstdAvailableEncoders.LoadOrStore(params, make(chan *zstd.Encoder, zstdMaxBufferedEncoders))
-	return c.(chan *zstd.Encoder)
+
+	encoderLevel := zstd.SpeedDefault
+	if params.Level != CompressionLevelDefault {
+		encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
+	}
+
+	pool := &sync.Pool{
+		New: func() any {
+			enc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
+				zstd.WithEncoderLevel(encoderLevel),
+				zstd.WithEncoderConcurrency(1))
+			return enc
+		},
+	}
+
+	c, _ := zstdAvailableEncoders.LoadOrStore(params, pool)
+	return c.(*sync.Pool)
 }
 
 func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
-	select {
-	case enc := <-getZstdEncoderChannel(params):
-		return enc
-	default:
-		encoderLevel := zstd.SpeedDefault
-		if params.Level != CompressionLevelDefault {
-			encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
-		}
-		zstdEnc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
-			zstd.WithEncoderLevel(encoderLevel),
-			zstd.WithEncoderConcurrency(1))
-		return zstdEnc
-	}
+	return getZstdEncoderPool(params).Get().(*zstd.Encoder)
 }
 
 func releaseEncoder(params ZstdEncoderParams, enc *zstd.Encoder) {
-	select {
-	case getZstdEncoderChannel(params) <- enc:
-	default:
-	}
+	getZstdEncoderPool(params).Put(enc)
 }
 
 func getDecoder(params ZstdDecoderParams) *zstd.Decoder {
