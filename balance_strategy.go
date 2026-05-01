@@ -57,6 +57,29 @@ type BalanceStrategy interface {
 	AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error)
 }
 
+// SubscriptionUserDataProvider is an optional interface that a BalanceStrategy
+// may implement to inject per-cycle metadata into the ConsumerGroupMemberMetadata
+// UserData field on each JoinGroup. When a strategy implements this interface,
+// Sarama invokes SubscriptionUserData immediately before each JoinGroup, passing
+// the member's currently subscribed topics. The returned bytes replace the
+// statically configured Consumer.Group.Member.UserData for the metadata of that
+// strategy only.
+//
+// Returning a nil byte slice or a non-nil error causes Sarama to fall back to
+// the statically configured UserData; an error is logged but does not fail the
+// JoinGroup.
+//
+// This mirrors Java's ConsumerPartitionAssignor.subscriptionUserData and enables
+// load-aware assignors that report fresh observations (e.g., CPU, lag, latency)
+// to the group leader on every rebalance cycle.
+//
+// The interface is treated as V1; future revisions should be introduced as
+// separate interfaces (e.g., SubscriptionUserDataProviderV2) to preserve
+// backward compatibility with existing implementations.
+type SubscriptionUserDataProvider interface {
+	SubscriptionUserData(topics []string) ([]byte, error)
+}
+
 // --------------------------------------------------------------------
 
 // NewBalanceStrategyRange returns a range balance strategy,

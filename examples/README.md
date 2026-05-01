@@ -17,3 +17,7 @@ Basic example to use a producer interceptor that produces [OpenTelemetry](https:
 #### Exacly-once transactional paradigm
 
 [exactly_once](./exactly_once) Basic example to use a transactional producer that produce consumed message from some topics within a Kafka transaction. To ensure transactional-id uniqueness it implement some **_ProducerProvider_** that build a producer using current message topic-partition.
+
+#### Load-aware sticky consumer
+
+[consumer_load_aware](./consumer_load_aware) demonstrates the `SubscriptionUserDataProvider` interface: a `LoadAwareSticky` strategy wraps the built-in sticky assignor and injects a fresh load sample (CPU%, in-flight count) into each JoinGroup's subscription metadata.
