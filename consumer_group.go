@@ -477,24 +477,48 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		}
 	}
 
-	meta := &ConsumerGroupMemberMetadata{
-		Topics:   topics,
-		UserData: c.userData,
+	addProtocol := func(strategy BalanceStrategy) error {
+		return req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics))
 	}
-	var strategy BalanceStrategy
-	if strategy = c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
-		if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
+
+	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
+		if err := addProtocol(strategy); err != nil {
 			return nil, err
 		}
 	} else {
-		for _, strategy = range c.config.Consumer.Group.Rebalance.GroupStrategies {
-			if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
+		for _, strategy := range c.config.Consumer.Group.Rebalance.GroupStrategies {
+			if err := addProtocol(strategy); err != nil {
 				return nil, err
 			}
 		}
 	}
 
 	return coordinator.JoinGroup(req)
+}
+
+// subscriptionMetadata builds the ConsumerGroupMemberMetadata for a single
+// strategy in a JoinGroup request. If the strategy implements
+// SubscriptionUserDataProvider, its SubscriptionUserData hook is invoked to
+// obtain per-cycle UserData; otherwise (or on error/nil result) the statically
+// configured Consumer.Group.Member.UserData is used.
+func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []string) *ConsumerGroupMemberMetadata {
+	userData := c.userData
+	if p, ok := strategy.(SubscriptionUserDataProvider); ok {
+		data, err := p.SubscriptionUserData(topics)
+		switch {
+		case err != nil:
+			Logger.Printf(
+				"consumergroup/%s strategy %q SubscriptionUserData failed: %v; falling back to static UserData\n",
+				c.groupID, strategy.Name(), err,
+			)
+		case data != nil:
+			userData = data
+		}
+	}
+	return &ConsumerGroupMemberMetadata{
+		Topics:   topics,
+		UserData: userData,
+	}
 }
 
 // findStrategy returns the BalanceStrategy with the specified protocolName
