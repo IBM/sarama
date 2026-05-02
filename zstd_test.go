@@ -16,16 +16,39 @@ func BenchmarkZstdMemoryConsumption(b *testing.B) {
 
 	cpus := 96
 
-	gomaxprocsBackup := runtime.GOMAXPROCS(cpus)
-	b.ReportAllocs()
-	for b.Loop() {
-		for j := 0; j < 2*cpus; j++ {
+	b.Run("no_drain", func(b *testing.B) {
+		b.ReportAllocs()
+
+		gomaxprocsBackup := runtime.GOMAXPROCS(cpus)
+		for b.Loop() {
 			_, _ = zstdCompress(params, nil, buf)
 		}
-		// drain the buffered encoder
-		getZstdEncoder(params)
-		// previously this would be achieved with
-		// zstdEncMap.Delete(params)
-	}
-	runtime.GOMAXPROCS(gomaxprocsBackup)
+		runtime.GOMAXPROCS(gomaxprocsBackup)
+	})
+
+	// Drops the buffered encoder so we can measure cold-start allocation
+	b.Run("with_drain", func(b *testing.B) {
+		b.ReportAllocs()
+
+		gomaxprocsBackup := runtime.GOMAXPROCS(cpus)
+		for b.Loop() {
+			_, _ = zstdCompress(params, nil, buf)
+			_ = getZstdEncoder(params)
+		}
+		runtime.GOMAXPROCS(gomaxprocsBackup)
+
+	})
+
+	// Concurrent encodes, which historically would allocate excessively
+	b.Run("concurrent", func(b *testing.B) {
+		b.ReportAllocs()
+
+		gomaxprocsBackup := runtime.GOMAXPROCS(cpus)
+		b.RunParallel(func(pb *testing.PB) {
+			for pb.Next() {
+				_, _ = zstdCompress(params, nil, buf)
+			}
+		})
+		runtime.GOMAXPROCS(gomaxprocsBackup)
+	})
 }
