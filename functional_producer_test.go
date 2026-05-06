@@ -364,14 +364,16 @@ func TestFuncInitProducerId3(t *testing.T) {
 
 type messageHandler struct {
 	*testing.T
-	h       func(*ConsumerMessage)
-	started sync.WaitGroup
+	h         func(*ConsumerMessage)
+	started   chan struct{}
+	startOnce sync.Once
 }
 
 func (h *messageHandler) Setup(s ConsumerGroupSession) error   { return nil }
 func (h *messageHandler) Cleanup(s ConsumerGroupSession) error { return nil }
 func (h *messageHandler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
-	h.started.Done()
+	// signal once on the first claim received
+	h.startOnce.Do(func() { close(h.started) })
 
 	for msg := range claim.Messages() {
 		h.Logf("consumed msg %v", msg)
@@ -416,7 +418,7 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	handler := &messageHandler{}
+	handler := &messageHandler{started: make(chan struct{})}
 	handler.T = t
 	handler.h = func(msg *ConsumerMessage) {
 		err := producer.BeginTxn()
@@ -428,13 +430,12 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	handler.started.Add(4)
 	go func() {
 		err = cg.Consume(ctx, []string{"test.4"}, handler)
 		require.NoError(t, err)
 	}()
 
-	handler.started.Wait()
+	<-handler.started
 
 	nonTransactionalProducer, err := NewAsyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
 	require.NoError(t, err)
