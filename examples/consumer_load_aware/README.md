@@ -1,6 +1,6 @@
 # Load-aware sticky consumer example
 
-This example demonstrates the `sarama.SubscriptionUserDataProvider` interface
+This example demonstrates the `sarama.SubscriptionUserDataBalanceStrategy` interface
 (see issue [#3505](https://github.com/IBM/sarama/issues/3505)). A
 `LoadAwareSticky` strategy wraps the built-in sticky assignor and injects a
 fresh `LoadSample` (CPU percent, in-flight count, lag) into the member's
@@ -21,6 +21,6 @@ $ go run . -brokers="127.0.0.1:9092" -topics="sarama" -group="example"
 ## Files
 
 - `load_aware_sticky.go` — the wrapper strategy that implements
-  `SubscriptionUserDataProvider`.
+  `SubscriptionUserDataBalanceStrategy`.
 - `main.go` — minimal consumer group runner that wires the strategy in via
   `Config.Consumer.Group.Rebalance.GroupStrategies`.

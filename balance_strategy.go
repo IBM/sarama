@@ -57,26 +57,25 @@ type BalanceStrategy interface {
 	AssignmentData(memberID string, topics map[string][]int32, generationID int32) ([]byte, error)
 }
 
-// SubscriptionUserDataProvider is an optional interface that a BalanceStrategy
-// may implement to inject per-cycle metadata into the ConsumerGroupMemberMetadata
-// UserData field on each JoinGroup. When a strategy implements this interface,
-// Sarama invokes SubscriptionUserData immediately before each JoinGroup, passing
-// the member's currently subscribed topics. The returned bytes replace the
-// statically configured Consumer.Group.Member.UserData for the metadata of that
-// strategy only.
+// SubscriptionUserDataBalanceStrategy is an optional extension of
+// BalanceStrategy that lets a strategy inject per-cycle metadata into the
+// ConsumerGroupMemberMetadata UserData field on each JoinGroup. When a
+// strategy implements this interface, Sarama invokes SubscriptionUserData
+// immediately before each JoinGroup, passing the member's currently subscribed
+// topics, and uses the returned bytes as the UserData for that strategy's
+// subscription metadata in place of the statically configured
+// Consumer.Group.Member.UserData.
 //
-// Returning a nil byte slice or a non-nil error causes Sarama to fall back to
-// the statically configured UserData; an error is logged but does not fail the
-// JoinGroup.
+// On a non-nil error Sarama logs the error and falls back to the statically
+// configured UserData; the JoinGroup is not failed. On a nil error the
+// returned slice is used verbatim, including empty and nil slices.
 //
-// This mirrors Java's ConsumerPartitionAssignor.subscriptionUserData and enables
-// load-aware assignors that report fresh observations (e.g., CPU, lag, latency)
-// to the group leader on every rebalance cycle.
-//
-// The interface is treated as V1; future revisions should be introduced as
-// separate interfaces (e.g., SubscriptionUserDataProviderV2) to preserve
-// backward compatibility with existing implementations.
-type SubscriptionUserDataProvider interface {
+// This mirrors Java's ConsumerPartitionAssignor.subscriptionUserData and
+// enables load-aware assignors that report fresh observations (e.g., CPU,
+// lag, latency) to the group leader on every rebalance cycle.
+type SubscriptionUserDataBalanceStrategy interface {
+	BalanceStrategy
+
 	SubscriptionUserData(topics []string) ([]byte, error)
 }
 

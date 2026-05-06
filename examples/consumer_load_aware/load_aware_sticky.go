@@ -22,7 +22,7 @@ type LoadObserver func() LoadSample
 
 // LoadAwareSticky wraps the built-in sticky balance strategy and reports a
 // fresh LoadSample to the group leader on every JoinGroup. It implements
-// sarama.SubscriptionUserDataProvider; assignment logic is delegated unchanged
+// sarama.SubscriptionUserDataBalanceStrategy; assignment logic is delegated unchanged
 // to NewBalanceStrategySticky, which keeps this example focused on the
 // per-cycle metadata hook rather than on a custom assignor.
 //
@@ -44,7 +44,7 @@ func NewLoadAwareSticky(observe LoadObserver) *LoadAwareSticky {
 	}
 }
 
-// SubscriptionUserData satisfies sarama.SubscriptionUserDataProvider. The
+// SubscriptionUserData satisfies sarama.SubscriptionUserDataBalanceStrategy. The
 // topics argument is the member's currently subscribed topic set, supplied by
 // sarama immediately before the JoinGroup is sent.
 func (s *LoadAwareSticky) SubscriptionUserData(_ []string) ([]byte, error) {

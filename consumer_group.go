@@ -477,17 +477,13 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		}
 	}
 
-	addProtocol := func(strategy BalanceStrategy) error {
-		return req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics))
-	}
-
 	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
-		if err := addProtocol(strategy); err != nil {
+		if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
 			return nil, err
 		}
 	} else {
 		for _, strategy := range c.config.Consumer.Group.Rebalance.GroupStrategies {
-			if err := addProtocol(strategy); err != nil {
+			if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
 				return nil, err
 			}
 		}
@@ -498,26 +494,26 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 
 // subscriptionMetadata builds the ConsumerGroupMemberMetadata for a single
 // strategy in a JoinGroup request. If the strategy implements
-// SubscriptionUserDataProvider, its SubscriptionUserData hook is invoked to
-// obtain per-cycle UserData; otherwise (or on error/nil result) the statically
-// configured Consumer.Group.Member.UserData is used.
+// SubscriptionUserDataBalanceStrategy, its SubscriptionUserData hook is invoked
+// to obtain per-cycle UserData; on error the statically configured
+// Consumer.Group.Member.UserData is used and the error is logged.
 func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []string) *ConsumerGroupMemberMetadata {
-	userData := c.userData
-	if p, ok := strategy.(SubscriptionUserDataProvider); ok {
-		data, err := p.SubscriptionUserData(topics)
-		switch {
-		case err != nil:
-			Logger.Printf(
-				"consumergroup/%s strategy %q SubscriptionUserData failed: %v; falling back to static UserData\n",
-				c.groupID, strategy.Name(), err,
-			)
-		case data != nil:
-			userData = data
+	if p, ok := strategy.(SubscriptionUserDataBalanceStrategy); ok {
+		userData, err := p.SubscriptionUserData(topics)
+		if err == nil {
+			return &ConsumerGroupMemberMetadata{
+				Topics:   topics,
+				UserData: userData,
+			}
 		}
+		Logger.Printf(
+			"falling back to static user data for strategy %q consumergroup/%s: %v\n",
+			strategy.Name(), c.groupID, err,
+		)
 	}
 	return &ConsumerGroupMemberMetadata{
 		Topics:   topics,
-		UserData: userData,
+		UserData: c.userData,
 	}
 }
 

@@ -20,4 +20,4 @@ Basic example to use a producer interceptor that produces [OpenTelemetry](https:
 
 #### Load-aware sticky consumer
 
-[consumer_load_aware](./consumer_load_aware) demonstrates the `SubscriptionUserDataProvider` interface: a `LoadAwareSticky` strategy wraps the built-in sticky assignor and injects a fresh load sample (CPU%, in-flight count) into each JoinGroup's subscription metadata.
+[consumer_load_aware](./consumer_load_aware) demonstrates the `SubscriptionUserDataBalanceStrategy` interface: a `LoadAwareSticky` strategy wraps the built-in sticky assignor and injects a fresh load sample (CPU%, in-flight count) into each JoinGroup's subscription metadata.

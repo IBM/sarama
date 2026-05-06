@@ -5,7 +5,7 @@ package sarama
 import (
 	"context"
 	"errors"
-	"fmt"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -255,9 +255,9 @@ func TestConsumerShouldNotRetrySessionIfContextCancelled(t *testing.T) {
 }
 
 // strategyWithSubscriptionUserData wraps a BalanceStrategy and adds a
-// SubscriptionUserDataProvider implementation that returns the configured
-// data/error. It also records the topics it was invoked with so tests can
-// assert per-cycle invocation.
+// SubscriptionUserDataBalanceStrategy implementation that returns the
+// configured data/error. It also records the topics it was invoked with so
+// tests can assert per-cycle invocation.
 type strategyWithSubscriptionUserData struct {
 	BalanceStrategy
 	data   []byte
@@ -266,7 +266,7 @@ type strategyWithSubscriptionUserData struct {
 }
 
 func (s *strategyWithSubscriptionUserData) SubscriptionUserData(topics []string) ([]byte, error) {
-	s.called = append(s.called, append([]string(nil), topics...))
+	s.called = append(s.called, slices.Clone(topics))
 	return s.data, s.err
 }
 
@@ -292,14 +292,24 @@ func TestSubscriptionMetadata(t *testing.T) {
 		assert.Equal(t, [][]string{topics}, strategy.called)
 	})
 
-	t.Run("provider returning nil falls back to static user data", func(t *testing.T) {
+	t.Run("provider returning nil clears static user data", func(t *testing.T) {
 		c := &consumerGroup{userData: staticUserData}
 		strategy := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            nil,
 		}
 		meta := c.subscriptionMetadata(strategy, topics)
-		assert.Equal(t, staticUserData, meta.UserData)
+		assert.Nil(t, meta.UserData)
+	})
+
+	t.Run("provider returning empty slice clears static user data", func(t *testing.T) {
+		c := &consumerGroup{userData: staticUserData}
+		strategy := &strategyWithSubscriptionUserData{
+			BalanceStrategy: NewBalanceStrategyRange(),
+			data:            []byte{},
+		}
+		meta := c.subscriptionMetadata(strategy, topics)
+		assert.Equal(t, []byte{}, meta.UserData)
 	})
 
 	t.Run("provider returning error falls back to static user data", func(t *testing.T) {
@@ -307,7 +317,7 @@ func TestSubscriptionMetadata(t *testing.T) {
 		strategy := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            []byte("ignored"),
-			err:             fmt.Errorf("boom"),
+			err:             errors.New("boom"),
 		}
 		meta := c.subscriptionMetadata(strategy, topics)
 		assert.Equal(t, staticUserData, meta.UserData)

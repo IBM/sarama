@@ -2,7 +2,7 @@ package main
 
 // Worked example: a load-aware sticky consumer that reports a fresh load
 // sample (CPU%, in-flight count, lag) to the group leader on every JoinGroup
-// cycle via sarama.SubscriptionUserDataProvider. See load_aware_sticky.go for
+// cycle via sarama.SubscriptionUserDataBalanceStrategy. See load_aware_sticky.go for
 // the strategy wrapper.
 
 import (
