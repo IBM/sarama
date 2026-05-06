@@ -380,6 +380,10 @@ type PartitionConsumer interface {
 	// Consumer.Return.Errors setting to true, and read from this channel.
 	Errors() <-chan *ConsumerError
 
+	// InitialOffset returns the initial offset that was used as a starting
+	// point for this partition.
+	InitialOffset() int64
+
 	// HighWaterMarkOffset returns the high water mark offset of the partition,
 	// i.e. the offset that will be used for the next message that will be produced.
 	// You can use this to determine how far behind the processing is.
@@ -448,6 +452,7 @@ type partitionConsumer struct {
 	responseResult     error
 	fetchSize          int32
 	offset             int64
+	initialOffset	   int64
 	retries            atomic.Int32
 
 	paused atomic.Bool // accessed atomically, 0 = not paused, 1 = paused
@@ -648,6 +653,8 @@ func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
 		return ErrOffsetOutOfRange
 	}
 
+	child.initialOffset = child.offset
+
 	return nil
 }
 
@@ -679,6 +686,10 @@ func (child *partitionConsumer) Close() error {
 		return consumerErrors
 	}
 	return nil
+}
+
+func (child *partitionConsumer) InitialOffset() int64 {
+	return child.initialOffset
 }
 
 func (child *partitionConsumer) HighWaterMarkOffset() int64 {

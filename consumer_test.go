@@ -68,6 +68,9 @@ func TestConsumerOffsetManual(t *testing.T) {
 	}
 
 	// Then
+	if io := consumer.InitialOffset(); io != manualOffset {
+		t.Errorf("Expected initial offset %d, found %d", manualOffset, io)
+	}
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
 	}
@@ -241,6 +244,7 @@ func TestPauseResumeConsumption(t *testing.T) {
 func TestConsumerOffsetNewest(t *testing.T) {
 	// Given
 	offsetNewest := int64(10)
+	offsetOldest := int64(7)
 	offsetNewestAfterFetchRequest := int64(50)
 	broker0 := NewMockBroker(t, 0)
 	broker0.SetHandlerByMap(map[string]MockResponse{
@@ -249,7 +253,7 @@ func TestConsumerOffsetNewest(t *testing.T) {
 			SetLeader("my_topic", 0, broker0.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
 			SetOffset("my_topic", 0, OffsetNewest, offsetNewest).
-			SetOffset("my_topic", 0, OffsetOldest, 7),
+			SetOffset("my_topic", 0, OffsetOldest, offsetOldest),
 		"FetchRequest": NewMockFetchResponse(t, 1).
 			SetMessage("my_topic", 0, 9, testMsg). // skipped because parseRecords(): offset < child.offset
 			SetMessage("my_topic", 0, 10, testMsg).
@@ -269,6 +273,9 @@ func TestConsumerOffsetNewest(t *testing.T) {
 	}
 
 	// Then
+	if io := consumer.InitialOffset(); io != offsetNewest {
+		t.Errorf("Expected initial offset %d, found %d", offsetNewest, io)
+	}
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
 	}
@@ -287,6 +294,7 @@ func TestConsumerOffsetNewest(t *testing.T) {
 func TestConsumerOffsetOldest(t *testing.T) {
 	// Given
 	offsetNewest := int64(10)
+	offsetOldest := int64(7)
 	broker0 := NewMockBroker(t, 0)
 	broker0.SetHandlerByMap(map[string]MockResponse{
 		"MetadataRequest": NewMockMetadataResponse(t).
@@ -294,7 +302,7 @@ func TestConsumerOffsetOldest(t *testing.T) {
 			SetLeader("my_topic", 0, broker0.BrokerID()),
 		"OffsetRequest": NewMockOffsetResponse(t).
 			SetOffset("my_topic", 0, OffsetNewest, offsetNewest).
-			SetOffset("my_topic", 0, OffsetOldest, 7),
+			SetOffset("my_topic", 0, OffsetOldest, offsetOldest),
 		"FetchRequest": NewMockFetchResponse(t, 1).
 			// skipped because parseRecords(): offset < child.offset
 			SetMessage("my_topic", 0, 6, testMsg).
@@ -317,6 +325,9 @@ func TestConsumerOffsetOldest(t *testing.T) {
 	}
 
 	// Then
+	if io := consumer.InitialOffset(); io != offsetOldest {
+		t.Errorf("Expected initial offset %d, found %d", offsetOldest, io)
+	}
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
 	}
