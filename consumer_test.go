@@ -68,8 +68,8 @@ func TestConsumerOffsetManual(t *testing.T) {
 	}
 
 	// Then
-	if io := consumer.InitialOffset(); io != manualOffset {
-		t.Errorf("Expected initial offset %d, found %d", manualOffset, io)
+	if initialOffset := consumer.InitialOffset(); initialOffset != manualOffset {
+		t.Errorf("Expected initial offset %d, found %d", manualOffset, initialOffset)
 	}
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
@@ -273,8 +273,8 @@ func TestConsumerOffsetNewest(t *testing.T) {
 	}
 
 	// Then
-	if io := consumer.InitialOffset(); io != offsetNewest {
-		t.Errorf("Expected initial offset %d, found %d", offsetNewest, io)
+	if initialOffset := consumer.InitialOffset(); initialOffset != offsetNewest {
+		t.Errorf("Expected initial offset %d, found %d", offsetNewest, initialOffset)
 	}
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
@@ -325,8 +325,8 @@ func TestConsumerOffsetOldest(t *testing.T) {
 	}
 
 	// Then
-	if io := consumer.InitialOffset(); io != offsetOldest {
-		t.Errorf("Expected initial offset %d, found %d", offsetOldest, io)
+	if initialOffset := consumer.InitialOffset(); initialOffset != offsetOldest {
+		t.Errorf("Expected initial offset %d, found %d", offsetOldest, initialOffset)
 	}
 	if hwmo := consumer.HighWaterMarkOffset(); hwmo != offsetNewest {
 		t.Errorf("Expected high water mark offset %d, found %d", offsetNewest, hwmo)
