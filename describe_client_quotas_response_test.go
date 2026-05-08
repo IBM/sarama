@@ -122,7 +122,7 @@ func TestDescribeClientQuotasResponse(t *testing.T) {
 func TestDescribeClientQuotasResponseV1(t *testing.T) {
 	res := &DescribeClientQuotasResponse{Version: 1}
 	testVersionDecodable(t, "V1", res, describeClientQuotasResponseV1, 1)
-	assert.Equal(t, res.ThrottleTime, time.Millisecond*128)
+	assert.Equal(t, time.Millisecond*128, res.ThrottleTime)
 	assert.Len(t, res.Entries, 1)
 	assert.Equal(t, []DescribeClientQuotasEntry{
 		{

@@ -360,7 +360,7 @@ func TestFuncInitProducerId3(t *testing.T) {
 	require.NoError(t, err)
 	defer producer.Close()
 
-	require.Equal(t, true, producer.(*asyncProducer).txnmgr.coordinatorSupportsBumpingEpoch)
+	require.True(t, producer.(*asyncProducer).txnmgr.coordinatorSupportsBumpingEpoch)
 }
 
 type messageHandler struct {

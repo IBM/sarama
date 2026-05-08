@@ -365,6 +365,7 @@ func TestConsumerGroupDeadlock(t *testing.T) {
 	assert.NoError(t, err)
 
 	ch := make(chan string, msgQty)
+	consumeErrCh := make(chan error, partitionsQty)
 	for i := 0; i < partitionsQty; i++ {
 		time.Sleep(250 * time.Millisecond) // ensure delays between the "claims"
 		wg.Add(1)
@@ -372,7 +373,10 @@ func TestConsumerGroupDeadlock(t *testing.T) {
 			defer wg.Done()
 
 			pConsumer, err := consumer.ConsumePartition(topic, int32(i), OffsetOldest)
-			assert.NoError(t, err)
+			if err != nil {
+				consumeErrCh <- err
+				return
+			}
 			defer pConsumer.Close()
 
 			for {
@@ -417,7 +421,7 @@ func TestConsumerGroupDeadlock(t *testing.T) {
 
 	cancel()
 
-	assert.Equal(t, msgQty, len(received))
+	assert.Len(t, received, msgQty)
 
 	err = producer.Close()
 	assert.NoError(t, err)
@@ -429,6 +433,10 @@ func TestConsumerGroupDeadlock(t *testing.T) {
 	assert.NoError(t, err)
 
 	wg.Wait()
+	close(consumeErrCh)
+	for err := range consumeErrCh {
+		assert.NoError(t, err)
+	}
 }
 
 func prodMsg2Str(prodMsg *ProducerMessage) string {

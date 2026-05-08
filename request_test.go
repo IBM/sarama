@@ -12,6 +12,7 @@ import (
 	assert "github.com/stretchr/testify/require"
 )
 
+//nolint:gosec // G101: false positive — values are Kafka API request type names, not credentials
 var names = map[int16]string{
 	apiKeyProduce:                      "ProduceRequest",
 	apiKeyFetch:                        "FetchRequest",
@@ -413,14 +414,14 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				}
 				t.Logf("Testing %s V%d", reflect.TypeOf(req), version)
 				resp := allocateResponseBody(req)
-				assert.NotNil(t, resp, fmt.Sprintf("%s has no matching response type in allocateResponseBody", reflect.TypeOf(req)))
-				assert.Equal(t, req.isValidVersion(), resp.isValidVersion(), fmt.Sprintf("%s isValidVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp)))
-				assert.Equal(t, req.requiredVersion(), resp.requiredVersion(), fmt.Sprintf("%s requiredVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp)))
+				assert.NotNil(t, resp, "%s has no matching response type in allocateResponseBody", reflect.TypeOf(req))
+				assert.Equal(t, req.isValidVersion(), resp.isValidVersion(), "%s isValidVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp))
+				assert.Equal(t, req.requiredVersion(), resp.requiredVersion(), "%s requiredVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp))
 				for _, body := range []protocolBody{req, resp} {
 					assert.Equal(t, key, body.key())
 					assert.Equal(t, version, body.version())
-					assert.True(t, body.isValidVersion(), fmt.Sprintf("%s v%d is not supported, but expected for KafkaVersion %s", reflect.TypeOf(body), version, tt.version))
-					assert.True(t, tt.version.IsAtLeast(body.requiredVersion()), fmt.Sprintf("KafkaVersion %s should be enough for %s v%d", tt.version, reflect.TypeOf(body), version))
+					assert.True(t, body.isValidVersion(), "%s v%d is not supported, but expected for KafkaVersion %s", reflect.TypeOf(body), version, tt.version)
+					assert.True(t, tt.version.IsAtLeast(body.requiredVersion()), "KafkaVersion %s should be enough for %s v%d", tt.version, reflect.TypeOf(body), version)
 				}
 			})
 		}

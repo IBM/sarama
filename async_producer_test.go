@@ -1864,7 +1864,7 @@ func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
 
 	assertNotDone(t, done, 50*time.Millisecond)
 	parent.muter.unmute(blockedSet)
-	assertDoneWithin(t, done, 2*time.Second)
+	require.NoError(t, assertDoneWithin(t, done, 2*time.Second))
 }
 
 // TestPartitionMuterCloseWakesWaitUntilMuted verifies that closing the muter wakes
@@ -2422,7 +2422,7 @@ func TestTxnProduceBatchAddPartition(t *testing.T) {
 
 	go func() {
 		for err := range producer.Errors() {
-			require.NoError(t, err)
+			assert.NoError(t, err)
 		}
 	}()
 
@@ -2473,11 +2473,11 @@ func TestTxnProduceBatchAddPartition(t *testing.T) {
 
 	produceExchange := broker.History()[len(broker.History())-2]
 	produceRequest := produceExchange.Request.(*ProduceRequest)
-	require.Equal(t, 3, len(produceRequest.records["test-topic"]))
+	require.Len(t, produceRequest.records["test-topic"], 3)
 
 	addPartitionExchange := broker.History()[len(broker.History())-3]
 	addpartitionRequest := addPartitionExchange.Request.(*AddPartitionsToTxnRequest)
-	require.Equal(t, 3, len(addpartitionRequest.TopicPartitions["test-topic"]))
+	require.Len(t, addpartitionRequest.TopicPartitions["test-topic"], 3)
 	require.Contains(t, addpartitionRequest.TopicPartitions["test-topic"], int32(0))
 	require.Contains(t, addpartitionRequest.TopicPartitions["test-topic"], int32(1))
 	require.Contains(t, addpartitionRequest.TopicPartitions["test-topic"], int32(2))
@@ -2662,7 +2662,7 @@ func TestTxnCanAbort(t *testing.T) {
 
 	err = producer.CommitTxn()
 	require.Error(t, err)
-	require.NotEqual(t, producer.txnmgr.status&ProducerTxnFlagAbortableError, 0)
+	require.NotEqual(t, 0, producer.txnmgr.status&ProducerTxnFlagAbortableError)
 
 	err = producer.AbortTxn()
 	require.NoError(t, err)

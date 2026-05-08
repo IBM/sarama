@@ -350,7 +350,7 @@ func TestFuncAdminDescribeLogDirs(t *testing.T) {
 
 	for _, resp := range res {
 		for _, logDir := range resp {
-			assert.Equal(t, logDir.ErrorCode, ErrNoError)
+			assert.Equal(t, ErrNoError, logDir.ErrorCode)
 			// assert that total bytes and usable bytes were returned for kafka 3.3 and newer
 			if kafkaVersion.IsAtLeast(V3_3_0_0) {
 				assert.NotZero(t, logDir.TotalBytes)
