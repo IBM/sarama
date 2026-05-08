@@ -57,10 +57,13 @@ jobs:
         echo "::add-matcher::./.github/actions/staticcheck-matchers.json"
         $(go env GOPATH)/bin/staticcheck -tags "${BUILDTAGS}" ./...
     - name: golangci-lint
-      env:
-        GOFLAGS: -tags=functional
       uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
       with:
+        version: ${{ env.GOLANGCI_LINT_VERSION }}
+    - name: golangci-lint functional
+      uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
+      with:
+        args: --build-tags functional
         version: ${{ env.GOLANGCI_LINT_VERSION }}
   test:
     name: Unit Testing with Go ${{ matrix.go-version }}

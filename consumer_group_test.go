@@ -190,7 +190,7 @@ outerFor:
 		t.Errorf("clientRetries = %v; want > 1", clientRetries)
 	}
 
-	if err != nil && !errors.Is(err, context.DeadlineExceeded) {
+	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatal(err)
 	}
 
@@ -231,14 +231,15 @@ func TestConsumerGroupSessionDoesNotRetryForever(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	var consumeErr error
 	go func() {
+		defer wg.Done()
 		topics := []string{"my-topic"}
-		err := group.Consume(ctx, topics, h)
-		assert.Error(t, err)
-		wg.Done()
+		consumeErr = group.Consume(ctx, topics, h)
 	}()
 
 	wg.Wait()
+	assert.Error(t, consumeErr)
 }
 
 func TestConsumerShouldNotRetrySessionIfContextCancelled(t *testing.T) {

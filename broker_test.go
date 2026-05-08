@@ -284,7 +284,7 @@ func TestBrokerOpenApiVersionsTransportError(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected metadata request to fail")
 	}
-	if err != connErr {
+	if !errors.Is(err, connErr) {
 		t.Fatalf("expected original connection error, got: %v want: %v", err, connErr)
 	}
 

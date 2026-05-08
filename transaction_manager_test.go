@@ -489,7 +489,7 @@ func TestAddOffsetsToTxn(t *testing.T) {
 				require.Equal(t, tc.expectedError, err)
 			}
 			require.Equal(t, tc.newOffsets, newOffsets)
-			require.True(t, tc.expectedFlags&txmng.status != 0)
+			require.NotEqual(t, 0, tc.expectedFlags&txmng.status)
 		}()
 	}
 }
@@ -726,7 +726,7 @@ func TestTxnOffsetsCommit(t *testing.T) {
 				require.Equal(t, tc.expectedError, err)
 			}
 			require.Equal(t, tc.expectedOffsets, newOffsets)
-			require.True(t, tc.expectedFlags&txmng.status != 0)
+			require.NotEqual(t, 0, tc.expectedFlags&txmng.status)
 		}()
 	}
 }
@@ -848,7 +848,7 @@ func TestEndTxn(t *testing.T) {
 
 			err = txmng.endTxn(tc.commit)
 			require.Equal(t, tc.expectedError, err)
-			require.True(t, txmng.currentTxnStatus()&tc.expectedFlags != 0)
+			require.NotEqual(t, 0, txmng.currentTxnStatus()&tc.expectedFlags)
 		}()
 	}
 }
@@ -1026,7 +1026,7 @@ func TestPublishPartitionToTxn(t *testing.T) {
 				require.Equal(t, tc.expectedError, err, tc)
 			}
 
-			require.True(t, txmng.status&tc.expectedFlags != 0, tc)
+			require.NotEqual(t, 0, txmng.status&tc.expectedFlags, tc)
 			require.Equal(t, tc.expectedPartitionsInTxn, txmng.partitionsInCurrentTxn, tc)
 			require.Equal(t, tc.expectedPendingPartitions, txmng.pendingPartitionsInCurrentTxn, tc)
 		}()
