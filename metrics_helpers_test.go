@@ -26,11 +26,6 @@ func (m *metricValidators) registerForBroker(broker *Broker, validator *metricVa
 	m.register(&metricValidator{getMetricNameForBroker(validator.name, broker), validator.validator})
 }
 
-func (m *metricValidators) registerForGlobalAndTopic(topic string, validator *metricValidator) {
-	m.register(&metricValidator{validator.name, validator.validator})
-	m.register(&metricValidator{getMetricNameForTopic(validator.name, topic), validator.validator})
-}
-
 func (m *metricValidators) registerForAllBrokers(broker *Broker, validator *metricValidator) {
 	m.register(validator)
 	m.registerForBroker(broker, validator)
@@ -72,16 +67,6 @@ func countMeterValidator(name string, expectedCount int) *metricValidator {
 	})
 }
 
-func minCountMeterValidator(name string, minCount int) *metricValidator {
-	return meterValidator(name, func(t *testing.T, meter metrics.Meter) {
-		t.Helper()
-		count := meter.Count()
-		if count < int64(minCount) {
-			t.Errorf("Expected meter metric '%s' count >= %d, got %d", name, minCount, count)
-		}
-	})
-}
-
 func histogramValidator(name string, extraValidator func(*testing.T, metrics.Histogram)) *metricValidator {
 	return &metricValidator{
 		name: name,
@@ -106,16 +91,6 @@ func countHistogramValidator(name string, expectedCount int) *metricValidator {
 	})
 }
 
-func minCountHistogramValidator(name string, minCount int) *metricValidator {
-	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
-		t.Helper()
-		count := histogram.Count()
-		if count < int64(minCount) {
-			t.Errorf("Expected histogram metric '%s' count >= %d, got %d", name, minCount, count)
-		}
-	})
-}
-
 //lint:ignore U1000 // this is used but only in unittests which are excluded by the integration build tag
 func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *metricValidator {
 	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
@@ -127,26 +102,6 @@ func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *me
 		max := int(histogram.Max())
 		if max != expectedMax {
 			t.Errorf("Expected histogram metric '%s' max = %d, got %d", name, expectedMax, max)
-		}
-	})
-}
-
-func minValHistogramValidator(name string, minMin int) *metricValidator {
-	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
-		t.Helper()
-		min := int(histogram.Min())
-		if min < minMin {
-			t.Errorf("Expected histogram metric '%s' min >= %d, got %d", name, minMin, min)
-		}
-	})
-}
-
-func maxValHistogramValidator(name string, maxMax int) *metricValidator {
-	return histogramValidator(name, func(t *testing.T, histogram metrics.Histogram) {
-		t.Helper()
-		max := int(histogram.Max())
-		if max > maxMax {
-			t.Errorf("Expected histogram metric '%s' max <= %d, got %d", name, maxMax, max)
 		}
 	})
 }
