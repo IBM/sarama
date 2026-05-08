@@ -946,9 +946,9 @@ func (s *consumerGroupSession) newClaimWithRetry(topic string, partition int32, 
 		if retries <= 0 || !isRetriableClaimError(err) {
 			return nil, err
 		}
-		backoff := computeMetadataBackoff(s.parent.config, retries)
 		retries--
 
+		backoff := computeMetadataBackoff(s.parent.config, retries)
 		Logger.Printf(
 			"consumer-group/claim %s/%d retrying after %dms... (%d attempts remaining): %v\n",
 			topic, partition, backoff/time.Millisecond, retries, err)

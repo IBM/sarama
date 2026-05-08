@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/IBM/sarama/internal/toxiproxy"
@@ -432,7 +433,7 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 
 	go func() {
 		err = cg.Consume(ctx, []string{"test.4"}, handler)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 	}()
 
 	<-handler.started
