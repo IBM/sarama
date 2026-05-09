@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/signal"
 	"reflect"
-	"runtime"
 	"strconv"
 	"sync/atomic"
 	"testing"
@@ -1708,24 +1707,18 @@ func TestConsumerExpiryTicker(t *testing.T) {
 	broker0.Close()
 }
 
-func TestPartitionConsumerBrokerRace(t *testing.T) {
-	oldMaxProcs := runtime.GOMAXPROCS(2)
-	defer runtime.GOMAXPROCS(oldMaxProcs)
-
-	const iterations = 2048
-
+func TestPartitionConsumerResponseUsesFeederSubscription(t *testing.T) {
 	config := NewTestConfig()
 	config.ChannelBufferSize = 0
 	config.Consumer.MaxProcessingTime = time.Hour
 
 	broker := &brokerConsumer{
-		input: make(chan *partitionConsumer, 1),
+		input: make(chan *brokerSubscription, 1),
 		stop:  make(chan none),
 	}
 
 	child := &partitionConsumer{
 		conf:           config,
-		broker:         broker,
 		messages:       make(chan *ConsumerMessage, 1),
 		errors:         make(chan *ConsumerError, 1),
 		feeder:         make(chan *partitionConsumerResponse, 1),
@@ -1736,11 +1729,15 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 		partition:      0,
 		fetchSize:      config.Consumer.Fetch.Default,
 	}
+	subscription := &brokerSubscription{
+		broker: broker,
+		child:  child,
+		done:   make(chan none),
+	}
 
 	response := &FetchResponse{}
 	response.AddMessage("my_topic", 0, nil, testMsg, 0)
 
-	done := make(chan none)
 	feederDone := make(chan none)
 	messagesDone := make(chan none)
 
@@ -1755,27 +1752,23 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 		}
 	}()
 
+	ackDone := make(chan none)
+	broker.acks.Add(1)
+	child.feeder <- &partitionConsumerResponse{
+		subscription: subscription,
+		response:     response,
+	}
 	go func() {
-		for {
-			select {
-			case <-done:
-				return
-			default:
-				child.broker = broker
-				runtime.Gosched()
-			}
-		}
+		broker.acks.Wait()
+		close(ackDone)
 	}()
 
-	for range iterations {
-		broker.acks.Add(1)
-		child.feeder <- &partitionConsumerResponse{
-			broker:   broker,
-			response: response,
-		}
+	select {
+	case <-ackDone:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "responseFeeder did not acknowledge the feeder subscription")
 	}
 
-	close(done)
 	close(child.feeder)
 
 	<-feederDone
@@ -1804,9 +1797,9 @@ func TestPartitionConsumerAsyncCloseAfterRedispatchExitsDispatcher(t *testing.T)
 	bc := &brokerConsumer{
 		consumer:         c,
 		broker:           realBroker,
-		input:            make(chan *partitionConsumer),
-		newSubscriptions: make(chan []*partitionConsumer),
-		subscriptions:    make(map[*partitionConsumer]none),
+		input:            make(chan *brokerSubscription),
+		newSubscriptions: make(chan []*brokerSubscription),
+		subscriptions:    make(map[*brokerSubscription]none),
 		refs:             1,
 		stop:             make(chan none),
 	}
@@ -1815,7 +1808,6 @@ func TestPartitionConsumerAsyncCloseAfterRedispatchExitsDispatcher(t *testing.T)
 	child := &partitionConsumer{
 		consumer:       c,
 		conf:           config,
-		broker:         bc,
 		messages:       make(chan *ConsumerMessage),
 		errors:         make(chan *ConsumerError),
 		feeder:         make(chan *partitionConsumerResponse),
@@ -1826,11 +1818,17 @@ func TestPartitionConsumerAsyncCloseAfterRedispatchExitsDispatcher(t *testing.T)
 		partition:      0,
 	}
 	c.children[child.topic] = map[int32]*partitionConsumer{child.partition: child}
+	subscription := &brokerSubscription{
+		broker: bc,
+		child:  child,
+		done:   make(chan none),
+	}
+	child.subscription.Store(subscription)
 
 	// This matches the flaky shutdown window from TestFuncTxnProduceAndCommitOffset:
 	// the broker abandons the current subscription for redispatch, the dispatcher
 	// consumes that signal, and shutdown begins while it is waiting to redispatch.
-	bc.subscriptions[child] = none{}
+	bc.subscriptions[subscription] = none{}
 	child.responseResult = ErrFencedLeaderEpoch
 
 	done := make(chan none)
@@ -2129,14 +2127,14 @@ func Test_partitionConsumer_parseResponse(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			broker := &brokerConsumer{
+				broker: &Broker{},
+			}
 			child := &partitionConsumer{
-				broker: &brokerConsumer{
-					broker: &Broker{},
-				},
 				conf:           &Config{},
 				dispatcherStop: make(chan none),
 			}
-			got, err := child.parseResponse(child.broker, tt.args.response)
+			got, err := child.parseResponse(broker, tt.args.response)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("partitionConsumer.parseResponse() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -2160,16 +2158,16 @@ func Test_partitionConsumer_parseResponseEmptyBatch(t *testing.T) {
 		Blocks:  map[string]map[int32]*FetchResponseBlock{"my_topic": {0: block}},
 		Version: 2,
 	}
+	broker := &brokerConsumer{
+		broker: &Broker{},
+	}
 	child := &partitionConsumer{
-		broker: &brokerConsumer{
-			broker: &Broker{},
-		},
 		conf:           NewTestConfig(),
 		topic:          "my_topic",
 		partition:      0,
 		dispatcherStop: make(chan none),
 	}
-	got, err := child.parseResponse(child.broker, response)
+	got, err := child.parseResponse(broker, response)
 	if err != nil {
 		t.Errorf("partitionConsumer.parseResponse() error = %v", err)
 		return
@@ -2358,12 +2356,19 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		bc := &brokerConsumer{
 			consumer:         c,
 			broker:           realBroker,
-			input:            make(chan *partitionConsumer),
-			newSubscriptions: make(chan []*partitionConsumer),
-			subscriptions:    map[*partitionConsumer]none{child: {}},
+			input:            make(chan *brokerSubscription),
+			newSubscriptions: make(chan []*brokerSubscription),
+			subscriptions:    make(map[*brokerSubscription]none),
 			refs:             1,
 			stop:             make(chan none),
 		}
+		subscription := &brokerSubscription{
+			broker: bc,
+			child:  child,
+			done:   make(chan none),
+		}
+		child.subscription.Store(subscription)
+		bc.subscriptions[subscription] = none{}
 		c.brokerConsumers[realBroker] = bc
 		return bc
 	}
@@ -2491,7 +2496,12 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 
 		queued := make(chan bool, 1)
 		go func() {
-			queued <- bc.queueSubscription(newChild(config.ChannelBufferSize))
+			child := newChild(config.ChannelBufferSize)
+			queued <- bc.queueSubscription(&brokerSubscription{
+				broker: bc,
+				child:  child,
+				done:   make(chan none),
+			})
 		}()
 
 		select {
@@ -2516,9 +2526,8 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 	})
 }
 
-func TestQueueSubscriptionPublishesBrokerOwnership(t *testing.T) {
+func TestBrokerSubscriptionReleaseIsIdempotent(t *testing.T) {
 	config := NewTestConfig()
-	config.Consumer.Return.Errors = true
 
 	c := &consumer{
 		conf:            config,
@@ -2544,33 +2553,27 @@ func TestQueueSubscriptionPublishesBrokerOwnership(t *testing.T) {
 	bc := &brokerConsumer{
 		consumer:         c,
 		broker:           realBroker,
-		input:            make(chan *partitionConsumer),
-		newSubscriptions: make(chan []*partitionConsumer),
-		subscriptions:    make(map[*partitionConsumer]none),
+		input:            make(chan *brokerSubscription),
+		newSubscriptions: make(chan []*brokerSubscription),
+		subscriptions:    make(map[*brokerSubscription]none),
 		refs:             1,
 		stop:             make(chan none),
 	}
 	c.brokerConsumers[realBroker] = bc
 
-	go withRecover(bc.subscriptionManager)
+	subscription := &brokerSubscription{
+		broker: bc,
+		child:  child,
+		done:   make(chan none),
+	}
 
-	t.Cleanup(func() {
-		bc.stopConsuming()
+	subscription.release()
+	subscription.release()
 
-		done := make(chan struct{})
-		go func() {
-			for range bc.newSubscriptions {
-			}
-			close(done)
-		}()
-
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			require.FailNow(t, "subscriptionManager did not exit during cleanup")
-		}
-	})
-
-	require.True(t, bc.queueSubscription(child))
-	require.Same(t, bc, child.currentBrokerConsumer(), "queueSubscription must publish broker ownership before returning")
+	select {
+	case <-subscription.done:
+	case <-time.After(5 * time.Second):
+		require.FailNow(t, "release did not close the subscription")
+	}
+	require.Zero(t, bc.refs)
 }
