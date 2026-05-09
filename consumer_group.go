@@ -933,6 +933,50 @@ func (s *consumerGroupSession) Context() context.Context {
 	return s.ctx
 }
 
+// newClaimWithRetry calls newConsumerGroupClaim, retrying transient errors so
+// that brief leader/metadata desync around a rebalance doesn't leave a
+// partition permanently unclaimed for the lifetime of this session
+func (s *consumerGroupSession) newClaimWithRetry(topic string, partition int32, offset int64) (*consumerGroupClaim, error) {
+	retries := s.parent.config.Metadata.Retry.Max
+	for {
+		claim, err := newConsumerGroupClaim(s, topic, partition, offset)
+		if err == nil {
+			return claim, nil
+		}
+		if retries <= 0 || !isRetriableClaimError(err) {
+			return nil, err
+		}
+		retries--
+
+		backoff := computeMetadataBackoff(s.parent.config, retries)
+		Logger.Printf(
+			"consumer-group/claim %s/%d retrying after %dms... (%d attempts remaining): %v\n",
+			topic, partition, backoff/time.Millisecond, retries, err)
+
+		select {
+		case <-s.ctx.Done():
+			return nil, err
+		case <-s.parent.closed:
+			return nil, err
+		case <-time.After(backoff):
+		}
+
+		// refresh leader/broker info before retrying
+		_ = s.parent.client.RefreshMetadata(topic)
+	}
+}
+
+// isRetriableClaimError reports whether err from newConsumerGroupClaim is
+// a transient condition worth retrying after a metadata refresh
+func isRetriableClaimError(err error) bool {
+	return errors.Is(err, ErrNotConnected) ||
+		errors.Is(err, ErrLeaderNotAvailable) ||
+		errors.Is(err, ErrNotLeaderForPartition) ||
+		errors.Is(err, ErrFencedLeaderEpoch) ||
+		errors.Is(err, ErrUnknownLeaderEpoch) ||
+		errors.Is(err, ErrReplicaNotAvailable)
+}
+
 func (s *consumerGroupSession) consume(topic string, partition int32) {
 	// quick exit if rebalance is due
 	select {
@@ -950,7 +994,7 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 	}
 
 	// create new claim
-	claim, err := newConsumerGroupClaim(s, topic, partition, offset)
+	claim, err := s.newClaimWithRetry(topic, partition, offset)
 	if err != nil {
 		s.parent.handleError(err, topic, partition)
 		return
