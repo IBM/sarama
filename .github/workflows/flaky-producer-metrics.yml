@@ -1,0 +1,84 @@
+name: Flaky Producer Metrics Repro
+on:
+  pull_request:
+    branches:
+    - "**"
+    paths-ignore:
+    - '**/*.md'
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Number of test runs
+        required: false
+        type: string
+        default: "100"
+      kafka-version:
+        description: Kafka version
+        required: false
+        type: string
+        default: "2.8.2"
+      scala-version:
+        description: Scala version
+        required: false
+        type: string
+        default: "2.12"
+
+permissions:
+  contents: read # for actions/checkout to fetch code
+
+env:
+  # Use the Go toolchain installed by setup-go
+  GOTOOLCHAIN: local
+
+jobs:
+  repro:
+    name: Kafka ${{ github.event.inputs['kafka-version'] || '2.8.2' }}
+    runs-on: ubuntu-latest
+    env:
+      DEBUG: true
+      GOFLAGS: -trimpath
+      KAFKA_VERSION: ${{ github.event.inputs['kafka-version'] || '2.8.2' }}
+      RUNS: ${{ github.event.inputs.runs || '100' }}
+      SCALA_VERSION: ${{ github.event.inputs['scala-version'] || '2.12' }}
+    steps:
+    - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      with:
+        persist-credentials: false
+    - name: Setup Docker
+      uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+      id: buildx
+    - name: Build FVT Docker Image
+      uses: docker/bake-action@a66e1c87e2eca0503c343edf1d208c716d54b8a8 # v7.1.0
+      with:
+        builder: ${{ steps.buildx.outputs.name }}
+        files: docker-compose.yml
+        load: true
+        targets: kafka-1
+        set: |
+          *.cache-from=type=gha,scope=fvt-kafka-${{ env.KAFKA_VERSION }}
+          *.cache-to=type=gha,scope=fvt-kafka-${{ env.KAFKA_VERSION }},mode=max
+    - name: Setup Go
+      uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+      with:
+        go-version: stable
+    - name: Setup Docker Compose
+      run: |
+        curl --fail -sSL --retry 6 --retry-delay 10 --retry-all-errors "https://github.com/docker/compose/releases/download/v2.32.1/docker-compose-$(uname -s)-$(uname -m)" -o /tmp/docker-compose
+        mkdir -p $HOME/.docker/cli-plugins
+        install -m755 /tmp/docker-compose $HOME/.docker/cli-plugins
+        docker version --format 'Docker Engine version v{{.Server.Version}}'
+        docker compose version
+    - name: Start FVT environment
+      run: |
+        docker compose --profile zookeeper up -d --quiet-pull --timestamps --wait --wait-timeout 600
+    - name: Reproduce TestFuncProducingFlushing flake
+      run: |
+        TOXIPROXY_ADDR=http://localhost:8474 go test -tags=functional -race -run '^TestFuncProducingFlushing$' -count=1 -timeout 15m .
+    - name: Stress TestFuncProducingFlushing
+      run: |
+        TOXIPROXY_ADDR=http://localhost:8474 go test -tags=functional -race -run '^TestFuncProducingFlushing$' -count="${RUNS}" -timeout 30m .
+    - name: Stop FVT environment
+      if: always()
+      run: |
+        docker compose --profile zookeeper down --volumes
+        docker compose --profile zookeeper rm -v --force --stop
