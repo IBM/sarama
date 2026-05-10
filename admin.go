@@ -245,12 +245,7 @@ func isRetriableListTopicsError(err error) bool {
 		return true
 	}
 
-	return isRetriableListTopicsTimeoutError(err)
-}
-
-func isRetriableListTopicsTimeoutError(err error) bool {
-	var netErr net.Error
-	return errors.As(err, &netErr) && netErr.Timeout()
+	return isTimeoutError(err)
 }
 
 // isRetriableBrokerError returns `true` if the given error is a retryable
@@ -473,7 +468,7 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 		metadataReq := NewMetadataRequest(ca.conf.Version, nil)
 		metadataResp, err := b.GetMetadata(metadataReq)
 		if err != nil {
-			if isRetriableListTopicsTimeoutError(err) {
+			if isTimeoutError(err) {
 				_ = b.Close()
 			}
 			return err
@@ -517,7 +512,7 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 
 		describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
 		if err != nil {
-			if isRetriableListTopicsTimeoutError(err) {
+			if isTimeoutError(err) {
 				_ = b.Close()
 			}
 			return err
