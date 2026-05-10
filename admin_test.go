@@ -5,6 +5,7 @@ package sarama
 import (
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -167,20 +168,20 @@ func TestClusterAdminListTopics(t *testing.T) {
 	}
 
 	if len(entries) == 0 {
-		t.Fatal(errors.New("no resource present"))
+		t.Fatal("no resource present")
 	}
 
 	topic, found := entries["my_topic"]
 	if !found {
-		t.Fatal(errors.New("topic not found in response"))
+		t.Fatal("topic not found in response")
 	}
 	_, found = topic.ConfigEntries["max.message.bytes"]
 	if found {
-		t.Fatal(errors.New("default topic config entry incorrectly found in response"))
+		t.Fatal("default topic config entry incorrectly found in response")
 	}
 	value := topic.ConfigEntries["retention.ms"]
 	if value == nil || *value != "5000" {
-		t.Fatal(errors.New("non-default topic config entry not found in response"))
+		t.Fatal("non-default topic config entry not found in response")
 	}
 
 	err = admin.Close()
@@ -188,8 +189,154 @@ func TestClusterAdminListTopics(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if topic.ReplicaAssignment == nil || topic.ReplicaAssignment[0][0] != 1 {
-		t.Fatal(errors.New("replica assignment not found in response"))
+	assignment, found := topic.ReplicaAssignment[0]
+	if !found {
+		t.Fatal("replica assignment for partition 0 not found in response")
+	}
+	if len(assignment) == 0 {
+		t.Fatal("replica assignment for partition 0 was empty")
+	}
+	if assignment[0] != 1 {
+		t.Fatal("replica assignment not found in response")
+	}
+}
+
+func TestClusterAdminListTopicsRetriesOnTransientConnectionError(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	metadataResponse := NewMockMetadataResponse(t).
+		SetController(seedBroker.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+		SetLeader("my_topic", 0, seedBroker.BrokerID())
+
+	var stateMu sync.Mutex
+	var injectTimeout, injected bool
+	var metadataAttempts int
+
+	seedBroker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			stateMu.Lock()
+			metadataAttempts++
+			shouldInject := injectTimeout && !injected
+			if shouldInject {
+				injected = true
+			}
+			stateMu.Unlock()
+			if shouldInject {
+				return nil
+			}
+			return metadataResponse.For(req.body)
+		},
+		"DescribeConfigsRequest": func(req *request) encoderWithHeader {
+			return NewMockDescribeConfigsResponse(t).For(req.body)
+		},
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_1_0_0
+	config.Net.ReadTimeout = 100 * time.Millisecond
+	config.Admin.Retry.Max = 3
+	config.Admin.Retry.Backoff = 10 * time.Millisecond
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, admin)
+
+	stateMu.Lock()
+	injectTimeout = true
+	metadataAttemptsBeforeList := metadataAttempts
+	stateMu.Unlock()
+
+	entries, err := admin.ListTopics()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateMu.Lock()
+	gotInjected := injected
+	gotMetadataAttempts := metadataAttempts
+	stateMu.Unlock()
+	if !gotInjected {
+		t.Fatal("expected metadata timeout to be injected during ListTopics")
+	}
+	if gotMetadataAttempts < metadataAttemptsBeforeList+2 {
+		t.Fatal("expected ListTopics to retry metadata after transient timeout")
+	}
+	if len(entries) == 0 {
+		t.Fatal("no resource present")
+	}
+}
+
+func TestClusterAdminListTopicsRetriesOnDescribeConfigsTimeout(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	metadataResponse := NewMockMetadataResponse(t).
+		SetController(seedBroker.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+		SetLeader("my_topic", 0, seedBroker.BrokerID())
+
+	var stateMu sync.Mutex
+	var injectTimeout, injected bool
+	var describeConfigsAttempts int
+	describeConfigsResponse := NewMockDescribeConfigsResponse(t)
+
+	seedBroker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			return metadataResponse.For(req.body)
+		},
+		"DescribeConfigsRequest": func(req *request) encoderWithHeader {
+			stateMu.Lock()
+			describeConfigsAttempts++
+			shouldInject := injectTimeout && !injected
+			if shouldInject {
+				injected = true
+			}
+			stateMu.Unlock()
+			if shouldInject {
+				return nil
+			}
+			return describeConfigsResponse.For(req.body)
+		},
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_1_0_0
+	config.Net.ReadTimeout = 100 * time.Millisecond
+	config.Admin.Retry.Max = 3
+	config.Admin.Retry.Backoff = 10 * time.Millisecond
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, admin)
+
+	stateMu.Lock()
+	injectTimeout = true
+	describeConfigsAttemptsBeforeList := describeConfigsAttempts
+	stateMu.Unlock()
+
+	entries, err := admin.ListTopics()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	stateMu.Lock()
+	gotInjected := injected
+	gotDescribeConfigsAttempts := describeConfigsAttempts
+	stateMu.Unlock()
+	if !gotInjected {
+		t.Fatal("expected DescribeConfigs timeout to be injected during ListTopics")
+	}
+	if gotDescribeConfigsAttempts < describeConfigsAttemptsBeforeList+2 {
+		t.Fatal("expected ListTopics to retry DescribeConfigs after transient timeout")
+	}
+	if len(entries) == 0 {
+		t.Fatal("no resource present")
 	}
 }
 
