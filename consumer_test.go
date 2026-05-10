@@ -1719,7 +1719,7 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 	config.Consumer.MaxProcessingTime = time.Hour
 
 	broker := &brokerConsumer{
-		input: make(chan *partitionConsumer, 1),
+		input: make(chan *brokerSubscription, 1),
 		stop:  make(chan none),
 	}
 
@@ -1736,6 +1736,7 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 		partition:      0,
 		fetchSize:      config.Consumer.Fetch.Default,
 	}
+	child.brokerSubscription = newBrokerSubscription(child)
 
 	response := &FetchResponse{}
 	response.AddMessage("my_topic", 0, nil, testMsg, 0)
@@ -1770,8 +1771,9 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 	for range iterations {
 		broker.acks.Add(1)
 		child.feeder <- &partitionConsumerResponse{
-			broker:   broker,
-			response: response,
+			broker:       broker,
+			subscription: child.brokerSubscription,
+			response:     response,
 		}
 	}
 
@@ -1780,6 +1782,73 @@ func TestPartitionConsumerBrokerRace(t *testing.T) {
 
 	<-feederDone
 	<-messagesDone
+}
+
+// TestPartitionConsumerDispatcherOrphanedClose verifies the dispatcher exits
+// after AsyncClose when the brokerConsumer has detached this child from its
+// subscriptions and there is a pending redispatch on the trigger channel.
+func TestPartitionConsumerDispatcherOrphanedClose(t *testing.T) {
+	newOrphan := func() *partitionConsumer {
+		config := NewTestConfig()
+		config.Consumer.Retry.Backoff = time.Hour
+		config.Consumer.MaxWaitTime = 50 * time.Millisecond
+
+		c := &consumer{
+			conf:            config,
+			children:        make(map[string]map[int32]*partitionConsumer),
+			brokerConsumers: make(map[*Broker]*brokerConsumer),
+		}
+		bc := &brokerConsumer{consumer: c, input: make(chan *brokerSubscription), refs: 1}
+		child := &partitionConsumer{
+			consumer:       c,
+			conf:           config,
+			broker:         bc,
+			feeder:         make(chan *partitionConsumerResponse, 1),
+			trigger:        make(chan none, 1),
+			dying:          make(chan none),
+			dispatcherStop: make(chan none),
+		}
+		child.brokerSubscription = newBrokerSubscription(child)
+		return child
+	}
+
+	runDispatcher := func(t *testing.T, child *partitionConsumer) {
+		t.Helper()
+		done := make(chan none)
+		go func() {
+			defer close(done)
+			child.dispatcher()
+		}()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			require.FailNow(t, "dispatcher hung after AsyncClose on orphaned child")
+		}
+	}
+
+	t.Run("subscription released before dying", func(t *testing.T) {
+		child := newOrphan()
+		child.brokerSubscription.release()
+		child.triggerRedispatch()
+		close(child.dying)
+		runDispatcher(t, child)
+	})
+
+	t.Run("subscription released after dying", func(t *testing.T) {
+		child := newOrphan()
+		child.triggerRedispatch()
+		close(child.dying)
+		child.brokerSubscription.release()
+		runDispatcher(t, child)
+	})
+
+	t.Run("stopDispatcher unblocks waitForBrokerHandover", func(t *testing.T) {
+		child := newOrphan()
+		child.triggerRedispatch()
+		close(child.dying)
+		child.stopDispatcher()
+		runDispatcher(t, child)
+	})
 }
 
 func TestConsumerTimestamps(t *testing.T) {
@@ -2278,16 +2347,19 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 			metricRegistry:  newCleanupRegistry(config.MetricRegistry),
 		}
 		child.consumer = c
+		subscription := newBrokerSubscription(child)
 
 		bc := &brokerConsumer{
 			consumer:         c,
 			broker:           realBroker,
-			input:            make(chan *partitionConsumer),
-			newSubscriptions: make(chan []*partitionConsumer),
-			subscriptions:    map[*partitionConsumer]none{child: {}},
+			input:            make(chan *brokerSubscription),
+			newSubscriptions: make(chan []*brokerSubscription),
+			subscriptions:    map[*partitionConsumer]*brokerSubscription{child: subscription},
 			refs:             1,
 			stop:             make(chan none),
 		}
+		child.broker = bc
+		child.brokerSubscription = subscription
 		c.brokerConsumers[realBroker] = bc
 		return bc
 	}
@@ -2330,24 +2402,17 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 
 	t.Run("stops dispatcher for dying child", func(t *testing.T) {
 		child := newChild(config.ChannelBufferSize)
-		child.consumer = &consumer{
-			client:          client,
-			conf:            config,
-			children:        make(map[string]map[int32]*partitionConsumer),
-			brokerConsumers: make(map[*Broker]*brokerConsumer),
-			metricRegistry:  newCleanupRegistry(config.MetricRegistry),
-		}
-
-		// Start the dispatcher goroutine (it will block on <-child.trigger).
-		go child.dispatcher()
-
-		// Mark the child as dying (simulates AsyncClose during rebalance).
-		close(child.dying)
 
 		bc := newBrokerConsumer(child)
+
+		// simulate AsyncClose during rebalance
+		close(child.dying)
+
+		go child.dispatcher()
+
 		runAbort(t, bc)
 
-		// The dispatcher should have exited via stopDispatcher, closing feeder.
+		// the dispatcher should have exited, closing feeder.
 		select {
 		case _, ok := <-child.feeder:
 			require.False(t, ok, "feeder channel should be closed after dispatcher exits")
@@ -2415,7 +2480,7 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 
 		queued := make(chan bool, 1)
 		go func() {
-			queued <- bc.queueSubscription(newChild(config.ChannelBufferSize))
+			queued <- bc.queueSubscription(newBrokerSubscription(newChild(config.ChannelBufferSize)))
 		}()
 
 		select {
