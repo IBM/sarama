@@ -76,6 +76,9 @@ func (r *OffsetCommitRequest) setVersion(v int16) {
 }
 
 // NewOffsetCommitRequest creates an OffsetCommitRequest initialized for admin use.
+//
+// The version-mapping logic mirrors offsetManager.constructRequest in
+// offset_manager.go; protocol bumps must be applied to both call sites.
 func NewOffsetCommitRequest(conf *Config, group string) *OffsetCommitRequest {
 	request := &OffsetCommitRequest{
 		ConsumerGroup:           group,

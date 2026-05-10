@@ -7,6 +7,8 @@ import (
 
 // ListOffsetsOptions configures how offsets are fetched.
 type ListOffsetsOptions struct {
+	// IsolationLevel selects between ReadUncommitted (default) and ReadCommitted
+	// when fetching the latest offset. Only honored by brokers running v0.11+.
 	IsolationLevel IsolationLevel
 }
 
@@ -29,9 +31,14 @@ type OffsetAndMetadata struct {
 }
 
 // AlterConsumerGroupOffsetsOptions configures how offsets are committed.
-// It is currently empty and reserved for future Kafka protocol options.
+// It is currently empty and reserved for future Kafka protocol options
 type AlterConsumerGroupOffsetsOptions struct{}
 
+// ListOffsets fans out across the partition leaders to fetch offsets in parallel.
+// Per-partition results may carry their own Err (e.g. NotLeaderForPartition,
+// UnknownTopicOrPartition) when metadata is stale; the caller can refresh
+// metadata via the underlying client and retry those partitions if needed. The
+// retry loop here only covers transport-level failures.
 func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, options *ListOffsetsOptions) (map[string]map[int32]*OffsetResult, error) {
 	type topicPartition struct {
 		topic     string
@@ -56,12 +63,21 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 		options = &ListOffsetsOptions{}
 	}
 
+	allResults := make(map[string]map[int32]*OffsetResult, len(partitions))
+	setResult := func(topic string, partition int32, result *OffsetResult) {
+		if allResults[topic] == nil {
+			allResults[topic] = make(map[int32]*OffsetResult)
+		}
+		allResults[topic][partition] = result
+	}
+
 	requests := make(map[*Broker]*brokerOffsetRequest)
 	for topic, topicOffsets := range partitions {
 		for partition, offsetQuery := range topicOffsets {
 			broker, _, err := ca.client.LeaderAndEpoch(topic, partition)
 			if err != nil {
-				return nil, err
+				setResult(topic, partition, &OffsetResult{Err: err})
+				continue
 			}
 
 			req := requests[broker]
@@ -77,7 +93,11 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 		}
 	}
 
-	results := make(chan brokerOffsetResult)
+	if len(requests) == 0 {
+		return allResults, nil
+	}
+
+	results := make(chan brokerOffsetResult, len(requests))
 	var wg sync.WaitGroup
 
 	for broker, req := range requests {
@@ -122,23 +142,24 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 		close(results)
 	}()
 
-	allResults := make(map[string]map[int32]*OffsetResult, len(partitions))
 	var errs []error
 	for res := range results {
 		if res.err != nil {
 			errs = append(errs, res.err)
 		}
 		for tp, info := range res.result {
-			if allResults[tp.topic] == nil {
-				allResults[tp.topic] = make(map[int32]*OffsetResult)
-			}
-			allResults[tp.topic][tp.partition] = info
+			setResult(tp.topic, tp.partition, info)
 		}
 	}
 
 	return allResults, errors.Join(errs...)
 }
 
+// AlterConsumerGroupOffsets retries on transport-level errors and on
+// per-partition coordinator errors (NOT_COORDINATOR,
+// COORDINATOR_NOT_AVAILABLE, EOF). Other per-partition errors
+// (e.g. UNKNOWN_TOPIC_OR_PARTITION) are returned to the caller in
+// OffsetCommitResponse.Errors without retry.
 func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[string]map[int32]OffsetAndMetadata, _ *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error) {
 	if len(offsets) == 0 {
 		return nil, ConfigurationError("no offsets provided")
@@ -173,6 +194,14 @@ func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[stri
 		response, err = coordinator.CommitOffset(request)
 		if err != nil {
 			return err
+		}
+
+		for _, topicErrors := range response.Errors {
+			for _, partErr := range topicErrors {
+				if isRetriableGroupCoordinatorError(partErr) {
+					return partErr
+				}
+			}
 		}
 
 		return nil
