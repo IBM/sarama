@@ -1011,7 +1011,6 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 
 		req := NewMetadataRequest(client.conf.Version, topics)
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
-		client.updateMetadataMs.Store(time.Now().UnixMilli())
 
 		response, err := broker.GetMetadata(req)
 		var kerror KError
@@ -1029,8 +1028,11 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			shouldRetry, err := client.updateMetadata(response, allKnownMetaData)
 			if shouldRetry {
 				Logger.Println("client/metadata found some partitions to be leaderless")
-				return retry(err) // note: err can be nil
+				return retry(err)
 			}
+			// only update on success; if we updated on every attempt then
+			// concurrent refreshes would short-circuit each other's retries
+			client.updateMetadataMs.Store(time.Now().UnixMilli())
 			return err
 		} else if errors.As(err, &packetEncodingError) {
 			// didn't even send, return the error
@@ -1122,6 +1124,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 			retry = true
 			continue
 		case ErrLeaderNotAvailable: // retry, but store partial partition results
+			err = topic.Err
 			retry = true
 		default: // don't retry, don't store partial results
 			Logger.Printf("Unexpected topic-level metadata error: %s", topic.Err)
@@ -1133,6 +1136,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
 			if errors.Is(partition.Err, ErrLeaderNotAvailable) {
+				err = partition.Err
 				retry = true
 			}
 		}

@@ -467,8 +467,10 @@ func TestClientReceivingPartialMetadata(t *testing.T) {
 	metadataPartial.AddTopicPartition("new_topic", 1, -1, replicas, []int32{}, []int32{}, ErrLeaderNotAvailable)
 	leader.Returns(metadataPartial)
 
-	if err := client.RefreshMetadata("new_topic"); err != nil {
-		t.Error("ErrLeaderNotAvailable should not make RefreshMetadata respond with an error")
+	// the leaderless error is now propagated so callers can back off (#3514);
+	// partial partition data is still cached for the lookups below
+	if err := client.RefreshMetadata("new_topic"); !errors.Is(err, ErrLeaderNotAvailable) {
+		t.Error("Expected ErrLeaderNotAvailable, got", err)
 	}
 
 	// Even though the metadata was incomplete, we should be able to get the leader of a partition
@@ -1013,6 +1015,46 @@ func TestClientMetadataTimeout(t *testing.T) {
 			})
 		}
 	}
+}
+
+// covers #3514: when every partition is leaderless (e.g. all brokers
+// rebooting), the metadata refresh path used to swallow the leaderless
+// condition and return nil, leaving the async producer dispatcher to spin.
+func TestClientRefreshMetadataLeaderless(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	initial := new(MetadataResponse)
+	initial.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(initial)
+
+	config := NewTestConfig()
+	config.Metadata.Retry.Max = 2
+	config.Metadata.Retry.Backoff = 1 * time.Millisecond
+	c, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer safeClose(t, c)
+
+	client := c.(*client)
+	client.updateMetadataMs.Store(0)
+
+	leaderless := new(MetadataResponse)
+	leaderless.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	leaderless.AddTopicPartition("ll_topic", 0, -1, []int32{1}, []int32{}, []int32{}, ErrLeaderNotAvailable)
+	// initial attempt + Retry.Max retries
+	seedBroker.Returns(leaderless)
+	seedBroker.Returns(leaderless)
+	seedBroker.Returns(leaderless)
+
+	err = c.RefreshMetadata("ll_topic")
+
+	require.ErrorIs(t, err, ErrLeaderNotAvailable,
+		"RefreshMetadata should return ErrLeaderNotAvailable when all partitions are leaderless")
+
+	// updating the timestamp on a failed refresh lets concurrent
+	// refreshes short-circuit each other's retries
+	assert.Zero(t, client.updateMetadataMs.Load(),
+		"updateMetadataMs should only advance after a successful refresh")
 }
 
 func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
