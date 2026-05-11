@@ -113,6 +113,11 @@ func TestMetadataRefreshFiltersSharedTopicErrors(t *testing.T) {
 		require.ErrorIs(t, err, ErrInvalidTopic)
 		require.NotErrorIs(t, err, ErrUnknownTopicOrPartition)
 		require.ErrorIs(t, err, ErrLeaderNotAvailable)
+
+		// each wrapped error names the topic it came from
+		require.ErrorContains(t, err, "topic1")
+		require.NotContains(t, err.Error(), "topic2")
+		require.ErrorContains(t, err, "topic3")
 	})
 
 	t.Run("piggy-backed callers only see errors for their topics", func(t *testing.T) {

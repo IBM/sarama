@@ -2,6 +2,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"sync"
@@ -30,14 +31,22 @@ func (e refreshError) forTopics(topics []string) error {
 	errs := make([]error, 0, len(topics))
 	for _, topic := range topics {
 		if err, ok := e[topic]; ok {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("%s: %w", topic, err))
 		}
 	}
 	return errors.Join(errs...)
 }
 
+// errors returns the per-topic errors in deterministic (sorted by topic) order,
+// each wrapped so its string carries the topic name. The wrap preserves the
+// underlying error for errors.Is/As.
 func (e refreshError) errors() []error {
-	return slices.Collect(maps.Values(e))
+	topics := slices.Sorted(maps.Keys(e))
+	errs := make([]error, len(topics))
+	for i, topic := range topics {
+		errs[i] = fmt.Errorf("%s: %w", topic, e[topic])
+	}
+	return errs
 }
 
 func errorForTopics(topics []string, err error) error {
