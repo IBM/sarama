@@ -73,9 +73,9 @@ services:
     container_name: 'kafka-1'
     healthcheck:
       test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-1:9091']
-      interval: 15s
+      interval: 5s
       timeout: 15s
-      retries: 10
+      retries: 30
       start_period: 360s
     environment:
       <<: *kafka-base-env
@@ -90,9 +90,9 @@ services:
     container_name: 'kafka-2'
     healthcheck:
       test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-2:9091']
-      interval: 15s
+      interval: 5s
       timeout: 15s
-      retries: 10
+      retries: 30
       start_period: 360s
     environment:
       <<: *kafka-base-env
@@ -107,9 +107,9 @@ services:
     container_name: 'kafka-3'
     healthcheck:
       test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-3:9091']
-      interval: 15s
+      interval: 5s
       timeout: 15s
-      retries: 10
+      retries: 30
       start_period: 360s
     environment:
       <<: *kafka-base-env
@@ -124,9 +124,9 @@ services:
     container_name: 'kafka-4'
     healthcheck:
       test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-4:9091']
-      interval: 15s
+      interval: 5s
       timeout: 15s
-      retries: 10
+      retries: 30
       start_period: 360s
     environment:
       <<: *kafka-base-env
@@ -141,9 +141,9 @@ services:
     container_name: 'kafka-5'
     healthcheck:
       test: ['CMD', '/opt/kafka-${KAFKA_VERSION:-3.9.1}/bin/kafka-broker-api-versions.sh', '--bootstrap-server', 'kafka-5:9091']
-      interval: 15s
+      interval: 5s
       timeout: 15s
-      retries: 10
+      retries: 30
       start_period: 360s
     environment:
       <<: *kafka-base-env
