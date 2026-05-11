@@ -1073,9 +1073,9 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 }
 
 // if no fatal error, records per-topic errors and whether any topic needs retrying.
-func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bool) (retry bool, err error) {
+func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bool) (bool, error) {
 	if client.Closed() {
-		return
+		return false, nil
 	}
 
 	client.lock.Lock()
@@ -1103,6 +1103,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		client.metadataTopics = make(map[string]none)
 		client.cachedPartitionsResults = make(map[string][maxPartitionIndex][]int32)
 	}
+	retry := false
 	topicErrors := &topicErrorSet{}
 	for _, topic := range data.Topics {
 		// topics must be added firstly to `metadataTopics` to guarantee that all
@@ -1147,9 +1148,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		partitionCache[writablePartitions] = client.setPartitionCache(topic.Name, writablePartitions)
 		client.cachedPartitionsResults[topic.Name] = partitionCache
 	}
-	err = topicErrors.errOrNil()
-
-	return
+	return retry, topicErrors.Err()
 }
 
 func (client *client) cachedCoordinator(consumerGroup string) *Broker {

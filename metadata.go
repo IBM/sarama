@@ -28,7 +28,7 @@ func (e *topicErrorSet) setTopicError(topic string, err KError) {
 	e.topicErrors[topic] = err
 }
 
-func (e *topicErrorSet) errOrNil() error {
+func (e *topicErrorSet) Err() error {
 	if len(e.topicErrors) == 0 {
 		return nil
 	}
