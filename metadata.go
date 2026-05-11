@@ -15,7 +15,7 @@ func (e *topicErrorSet) Error() string {
 	if err := e.firstVisibleErrorFor(nil); err != nil {
 		return err.Error()
 	}
-	return ""
+	return "unexpected empty metadata topic error set"
 }
 
 func (e *topicErrorSet) setTopicError(topic string, err KError) {
