@@ -193,14 +193,13 @@ func prepareDockerTestEnvironment(ctx context.Context, env *testEnvironment) err
 	allBrokersUp := false
 
 	Logger.Printf("waiting for kafka %s brokers to come up...\n", env.KafkaVersion)
-	time.Sleep(10 * time.Second)
 
 mainLoop:
-	for i := 0; i < 30 && !allBrokersUp; i++ {
+	for i := 0; i < 90 && !allBrokersUp; i++ {
 		if i > 0 {
 			Logger.Printf("still waiting for kafka %s brokers to come up...\n", env.KafkaVersion)
+			time.Sleep(time.Second)
 		}
-		time.Sleep(3 * time.Second)
 		brokersOk := make([]bool, len(env.KafkaBrokerAddrs))
 
 		// first check that all bootstrap brokers are TCP accessible
@@ -377,8 +376,8 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	{
 		var topicsOk bool
 		request := NewMetadataRequest(config.Version, testTopicNames)
-		for i := 0; i < 60 && !topicsOk; i++ {
-			time.Sleep(1 * time.Second)
+		for i := 0; i < 600 && !topicsOk; i++ {
+			time.Sleep(100 * time.Millisecond)
 			md, err := controller.GetMetadata(request)
 			if err != nil {
 				return fmt.Errorf("failed to get metadata for test topics: %w", err)
@@ -417,8 +416,8 @@ func prepareTestTopics(ctx context.Context, env *testEnvironment) error {
 	{
 		var topicsOk bool
 		request := NewMetadataRequest(config.Version, testTopicNames)
-		for i := 0; i < 60 && !topicsOk; i++ {
-			time.Sleep(1 * time.Second)
+		for i := 0; i < 600 && !topicsOk; i++ {
+			time.Sleep(100 * time.Millisecond)
 			md, err := controller.GetMetadata(request)
 			if err != nil {
 				return fmt.Errorf("failed to get metadata for test topics: %w", err)
