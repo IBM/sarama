@@ -18,6 +18,7 @@ import (
 )
 
 func TestFuncConsumerGroupPartitioning(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "0.10.2")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -52,6 +53,7 @@ func TestFuncConsumerGroupPartitioning(t *testing.T) {
 }
 
 func TestFuncConsumerGroupPartitioningStateful(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "0.10.2")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -97,6 +99,7 @@ func TestFuncConsumerGroupPartitioningStateful(t *testing.T) {
 }
 
 func TestFuncConsumerGroupExcessConsumers(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "0.10.2")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -181,6 +184,7 @@ func TestFuncConsumerGroupRebalanceAfterAddingPartitions(t *testing.T) {
 }
 
 func TestFuncConsumerGroupFuzzy(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "0.10.2")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -237,6 +241,7 @@ func TestFuncConsumerGroupFuzzy(t *testing.T) {
 }
 
 func TestFuncConsumerGroupOffsetDeletion(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.4.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)

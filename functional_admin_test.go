@@ -122,6 +122,7 @@ func listOffsetsAndValidate(
 }
 
 func TestFuncAdminQuotas(t *testing.T) {
+	t.Parallel()
 	const (
 		waitFor = 10 * time.Second
 		tick    = 100 * time.Millisecond
@@ -252,6 +253,7 @@ func TestFuncAdminQuotas(t *testing.T) {
 }
 
 func TestFuncAdminDescribeGroups(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.3.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -309,6 +311,7 @@ func TestFuncAdminDescribeGroups(t *testing.T) {
 }
 
 func TestFuncAdminListConsumerGroups(t *testing.T) {
+	t.Parallel()
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -424,6 +427,7 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 }
 
 func TestFuncAdminListOffsets(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.1.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -496,6 +500,7 @@ func TestFuncAdminListOffsets(t *testing.T) {
 }
 
 func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.1.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -546,6 +551,7 @@ func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
 }
 
 func TestFuncAdminDescribeLogDirs(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.0.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -588,6 +594,7 @@ func TestFuncAdminDescribeLogDirs(t *testing.T) {
 }
 
 func TestFuncAdminDeleteGroup(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.4.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -638,6 +645,7 @@ func TestFuncAdminDeleteGroup(t *testing.T) {
 }
 
 func TestFuncAdminDeleteTopic(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "0.10.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -663,6 +671,7 @@ func TestFuncAdminDeleteTopic(t *testing.T) {
 // newer broker for the ElectLeaders V1 non-flexible path. See
 // https://github.com/IBM/sarama/pull/3312.
 func TestFuncAdminElectLeadersV1(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.3.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -705,6 +714,7 @@ func TestFuncAdminElectLeadersV1(t *testing.T) {
 }
 
 func TestFuncAdminIncrementalAlterConfigs(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.3.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
