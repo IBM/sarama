@@ -306,10 +306,10 @@ func testFuncConsumerGroupID(t *testing.T) string {
 
 func markOffset(t *testing.T, offsetMgr OffsetManager, topic string, partition int32, offset int64) {
 	partitionOffsetManager, err := offsetMgr.ManagePartition(topic, partition)
-	defer safeClose(t, partitionOffsetManager)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer safeClose(t, partitionOffsetManager)
 	partitionOffsetManager.MarkOffset(offset, "")
 }
 
