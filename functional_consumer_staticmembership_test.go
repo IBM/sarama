@@ -11,6 +11,7 @@ import (
 )
 
 func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.3.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -65,6 +66,7 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 }
 
 func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.4.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
@@ -165,6 +167,7 @@ func TestFuncConsumerGroupStaticMembership_RejoinAndLeave(t *testing.T) {
 }
 
 func TestFuncConsumerGroupStaticMembership_Fenced(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "2.3.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)

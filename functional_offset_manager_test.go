@@ -7,6 +7,7 @@ import (
 )
 
 func TestFuncOffsetManager(t *testing.T) {
+	t.Parallel()
 	checkKafkaVersion(t, "0.8.2")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
