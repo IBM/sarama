@@ -1,10 +1,68 @@
 package sarama
 
 import (
+	"errors"
 	"sync"
 )
 
 type metadataRefresh func(topics []string) error
+
+type topicErrorSet struct {
+	topicErrors map[string]error
+}
+
+func (e *topicErrorSet) Error() string {
+	if err := e.firstVisibleErrorFor(nil); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+func (e *topicErrorSet) setTopicError(topic string, err KError) {
+	if err == ErrNoError {
+		return
+	}
+	if e.topicErrors == nil {
+		e.topicErrors = make(map[string]error)
+	}
+	e.topicErrors[topic] = err
+}
+
+func (e *topicErrorSet) errOrNil() error {
+	if len(e.topicErrors) == 0 {
+		return nil
+	}
+	return e
+}
+
+// firstVisibleErrorFor returns a topic error visible to a caller that requested topics.
+// Empty topics means all topics, so any topic-specific error may be returned.
+func (e *topicErrorSet) firstVisibleErrorFor(topics []string) error {
+	if len(e.topicErrors) == 0 {
+		return nil
+	}
+	if len(topics) == 0 {
+		for _, err := range e.topicErrors {
+			return err
+		}
+	}
+	for _, topic := range topics {
+		if err := e.topicErrors[topic]; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// firstVisibleMetadataErrorFor leaves non-topic refresh errors unchanged.
+// Topic errors from a shared refresh are filtered to this caller's topics.
+func firstVisibleMetadataErrorFor(err error, topics []string) error {
+	var topicErrors *topicErrorSet
+	if errors.As(err, &topicErrors) {
+		return topicErrors.firstVisibleErrorFor(topics)
+	}
+	return err
+}
 
 // currentRefresh makes sure sarama does not issue metadata requests
 // in parallel. If we need to refresh the metadata for a list of topics,
