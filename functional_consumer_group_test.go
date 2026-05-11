@@ -398,9 +398,9 @@ func defaultConfig(clientID string) *Config {
 	config.ClientID = clientID
 	config.Consumer.Return.Errors = true
 	config.Consumer.Offsets.Initial = OffsetOldest
-	config.Consumer.Group.Rebalance.Timeout = 30 * time.Second
-	config.Consumer.Group.Session.Timeout = 20 * time.Second
-	config.Consumer.Group.Heartbeat.Interval = 5 * time.Second
+	config.Consumer.Group.Rebalance.Timeout = 6 * time.Second
+	config.Consumer.Group.Session.Timeout = 6 * time.Second
+	config.Consumer.Group.Heartbeat.Interval = 2 * time.Second
 	config.Metadata.Full = false
 	config.Metadata.RefreshFrequency = 10 * time.Second
 	return config
