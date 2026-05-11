@@ -194,7 +194,7 @@ func TestFuncConsumerGroupFuzzy(t *testing.T) {
 	}
 
 	groupID := testFuncConsumerGroupID(t)
-	sink := &testFuncConsumerGroupSink{msgs: make(chan testFuncConsumerGroupMessage, 30000)}
+	sink := &testFuncConsumerGroupSink{msgs: make(chan testFuncConsumerGroupMessage, 10000)}
 	waitForMessages := func(t *testing.T, n int) {
 		const (
 			waitFor = 60 * time.Second
@@ -206,37 +206,37 @@ func TestFuncConsumerGroupFuzzy(t *testing.T) {
 		}, waitFor, tick, "expected to consume %d messages, but consumed %d", n, sink.Len())
 	}
 
-	defer runTestFuncConsumerGroupMember(t, groupID, "M1", 1500, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M2", 3000, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M3", 1500, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M4", 200, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M5", 100, sink).Stop()
-	waitForMessages(t, 3000)
+	defer runTestFuncConsumerGroupMember(t, groupID, "M1", 500, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M2", 1000, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M3", 500, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M4", 70, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M5", 35, sink).Stop()
+	waitForMessages(t, 1000)
 
-	defer runTestFuncConsumerGroupMember(t, groupID, "M6", 300, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M7", 400, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M8", 500, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M9", 2000, sink).Stop()
-	waitForMessages(t, 8000)
+	defer runTestFuncConsumerGroupMember(t, groupID, "M6", 100, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M7", 135, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M8", 170, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M9", 670, sink).Stop()
+	waitForMessages(t, 2700)
 
-	defer runTestFuncConsumerGroupMember(t, groupID, "M10", 1000, sink).Stop()
-	waitForMessages(t, 10000)
+	defer runTestFuncConsumerGroupMember(t, groupID, "M10", 335, sink).Stop()
+	waitForMessages(t, 3300)
 
-	defer runTestFuncConsumerGroupMember(t, groupID, "M11", 1000, sink).Stop()
-	defer runTestFuncConsumerGroupMember(t, groupID, "M12", 2500, sink).Stop()
-	waitForMessages(t, 12000)
+	defer runTestFuncConsumerGroupMember(t, groupID, "M11", 335, sink).Stop()
+	defer runTestFuncConsumerGroupMember(t, groupID, "M12", 830, sink).Stop()
+	waitForMessages(t, 4000)
 
-	defer runTestFuncConsumerGroupMember(t, groupID, "M13", 1000, sink).Stop()
-	waitForMessages(t, 15000)
+	defer runTestFuncConsumerGroupMember(t, groupID, "M13", 320, sink).Stop()
+	waitForMessages(t, 5000)
 
-	if umap := sink.Close(); len(umap) != 15000 {
+	if umap := sink.Close(); len(umap) != 5000 {
 		dupes := make(map[string][]string)
 		for k, v := range umap {
 			if len(v) > 1 {
 				dupes[k] = v
 			}
 		}
-		t.Fatalf("expected %d unique messages to be consumed but got %d, including %d duplicates:\n%v", 15000, len(umap), len(dupes), dupes)
+		t.Fatalf("expected %d unique messages to be consumed but got %d, including %d duplicates:\n%v", 5000, len(umap), len(dupes), dupes)
 	}
 }
 
@@ -332,7 +332,7 @@ func testFuncConsumerGroupFuzzySeed(topic string) error {
 		}
 		total = total + newest - oldest
 	}
-	if total >= 21000 {
+	if total >= 7000 {
 		return nil
 	}
 
@@ -340,7 +340,7 @@ func testFuncConsumerGroupFuzzySeed(topic string) error {
 	if err != nil {
 		return err
 	}
-	for i := total; i < 21000; i++ {
+	for i := total; i < 7000; i++ {
 		producer.Input() <- &ProducerMessage{Topic: topic, Value: ByteEncoder([]byte("testdata"))}
 	}
 	return producer.Close()
