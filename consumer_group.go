@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -499,7 +500,9 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 // Consumer.Group.Member.UserData is used and the error is logged.
 func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []string) *ConsumerGroupMemberMetadata {
 	if p, ok := strategy.(SubscriptionUserDataBalanceStrategy); ok {
-		userData, err := p.SubscriptionUserData(topics)
+		// Hand the provider a throwaway copy so it cannot mutate the slice
+		// we later attach to the JoinGroup request.
+		userData, err := p.SubscriptionUserData(slices.Clone(topics))
 		if err == nil {
 			return &ConsumerGroupMemberMetadata{
 				Topics:   topics,
@@ -507,8 +510,8 @@ func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []
 			}
 		}
 		Logger.Printf(
-			"falling back to static user data for strategy %q consumergroup/%s: %v\n",
-			strategy.Name(), c.groupID, err,
+			"consumergroup/%s: falling back to static user data for strategy %q due to %v\n",
+			c.groupID, strategy.Name(), err,
 		)
 	}
 	return &ConsumerGroupMemberMetadata{
