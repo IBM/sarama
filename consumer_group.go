@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -477,24 +478,46 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		}
 	}
 
-	meta := &ConsumerGroupMemberMetadata{
-		Topics:   topics,
-		UserData: c.userData,
-	}
-	var strategy BalanceStrategy
-	if strategy = c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
-		if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
+	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
+		if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
 			return nil, err
 		}
 	} else {
-		for _, strategy = range c.config.Consumer.Group.Rebalance.GroupStrategies {
-			if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
+		for _, strategy := range c.config.Consumer.Group.Rebalance.GroupStrategies {
+			if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
 				return nil, err
 			}
 		}
 	}
 
 	return coordinator.JoinGroup(req)
+}
+
+// subscriptionMetadata builds the ConsumerGroupMemberMetadata for a single
+// strategy in a JoinGroup request. If the strategy implements
+// SubscriptionUserDataBalanceStrategy, its SubscriptionUserData hook is invoked
+// to obtain per-cycle UserData; on error the statically configured
+// Consumer.Group.Member.UserData is used and the error is logged.
+func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []string) *ConsumerGroupMemberMetadata {
+	if p, ok := strategy.(SubscriptionUserDataBalanceStrategy); ok {
+		// Hand the provider a throwaway copy so it cannot mutate the slice
+		// we later attach to the JoinGroup request.
+		userData, err := p.SubscriptionUserData(slices.Clone(topics))
+		if err == nil {
+			return &ConsumerGroupMemberMetadata{
+				Topics:   topics,
+				UserData: userData,
+			}
+		}
+		Logger.Printf(
+			"consumergroup/%s: falling back to static user data for strategy %q due to %v\n",
+			c.groupID, strategy.Name(), err,
+		)
+	}
+	return &ConsumerGroupMemberMetadata{
+		Topics:   topics,
+		UserData: c.userData,
+	}
 }
 
 // findStrategy returns the BalanceStrategy with the specified protocolName
