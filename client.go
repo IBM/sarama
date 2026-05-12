@@ -1119,18 +1119,18 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		case ErrNoError:
 			// no-op
 		case ErrInvalidTopic, ErrTopicAuthorizationFailed: // don't retry, don't store partial results
-			topicErrs[topic.Name] = topic.Err
+			topicErrs.addError(topic.Name, topic.Err)
 			continue
 		case ErrUnknownTopicOrPartition: // retry, do not store partial partition results
-			topicErrs[topic.Name] = topic.Err
+			topicErrs.addError(topic.Name, topic.Err)
 			retry = true
 			continue
 		case ErrLeaderNotAvailable: // retry, but store partial partition results
-			topicErrs[topic.Name] = topic.Err
+			topicErrs.addError(topic.Name, topic.Err)
 			retry = true
 		default: // don't retry, don't store partial results
 			Logger.Printf("Unexpected topic-level metadata error: %s", topic.Err)
-			topicErrs[topic.Name] = topic.Err
+			topicErrs.addError(topic.Name, topic.Err)
 			continue
 		}
 
@@ -1138,7 +1138,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		for _, partition := range topic.Partitions {
 			client.metadata[topic.Name][partition.ID] = partition
 			if errors.Is(partition.Err, ErrLeaderNotAvailable) {
-				topicErrs[topic.Name] = partition.Err
+				topicErrs.addError(topic.Name, partition.Err)
 				retry = true
 			}
 		}

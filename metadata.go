@@ -12,6 +12,12 @@ type metadataRefresh func(topics []string) error
 
 type refreshError map[string]error
 
+// addError adds an error for a topic to the set. The wrap preserves
+// the underlying error for errors.Is/As.
+func (e refreshError) addError(topic string, err error) {
+	e[topic] = fmt.Errorf("%s: %w", topic, err)
+}
+
 func (e refreshError) Error() string {
 	err := errors.Join(e.errors()...)
 	if err == nil {
@@ -31,20 +37,18 @@ func (e refreshError) forTopics(topics []string) error {
 	errs := make([]error, 0, len(topics))
 	for _, topic := range topics {
 		if err, ok := e[topic]; ok {
-			errs = append(errs, fmt.Errorf("%s: %w", topic, err))
+			errs = append(errs, err)
 		}
 	}
 	return errors.Join(errs...)
 }
 
-// errors returns the per-topic errors in deterministic (sorted by topic) order,
-// each wrapped so its string carries the topic name. The wrap preserves the
-// underlying error for errors.Is/As.
+// errors returns the per-topic errors in deterministic (sorted by topic) order.
 func (e refreshError) errors() []error {
 	topics := slices.Sorted(maps.Keys(e))
 	errs := make([]error, len(topics))
 	for i, topic := range topics {
-		errs[i] = fmt.Errorf("%s: %w", topic, e[topic])
+		errs[i] = e[topic]
 	}
 	return errs
 }

@@ -104,11 +104,11 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 
 func TestMetadataRefreshFiltersSharedTopicErrors(t *testing.T) {
 	t.Run("returns only the errors for the requested topics", func(t *testing.T) {
-		err := refreshError{
-			"topic1": ErrInvalidTopic,
-			"topic2": ErrUnknownTopicOrPartition,
-			"topic3": ErrLeaderNotAvailable,
-		}.forTopics([]string{"topic1", "topic3"})
+		re := make(refreshError)
+		re.addError("topic1", ErrInvalidTopic)
+		re.addError("topic2", ErrUnknownTopicOrPartition)
+		re.addError("topic3", ErrLeaderNotAvailable)
+		err := re.forTopics([]string{"topic1", "topic3"})
 
 		require.ErrorIs(t, err, ErrInvalidTopic)
 		require.NotErrorIs(t, err, ErrUnknownTopicOrPartition)
@@ -124,7 +124,9 @@ func TestMetadataRefreshFiltersSharedTopicErrors(t *testing.T) {
 		block := make(chan struct{})
 		refresh := newMetadataRefresh(func(topics []string) error {
 			<-block
-			return refreshError{"topic3": ErrUnknownTopicOrPartition}
+			re := make(refreshError)
+			re.addError("topic3", ErrUnknownTopicOrPartition)
+			return re
 		})
 
 		// the first call starts an in-flight refresh covering all three
