@@ -101,3 +101,43 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 	require.NoError(t, <-ch)
 	require.NoError(t, <-ch2)
 }
+
+func TestMetadataRefreshFiltersSharedTopicErrors(t *testing.T) {
+	t.Run("returns only the errors for the requested topics", func(t *testing.T) {
+		re := make(refreshError)
+		re.addError("topic1", ErrInvalidTopic)
+		re.addError("topic2", ErrUnknownTopicOrPartition)
+		re.addError("topic3", ErrLeaderNotAvailable)
+		err := re.forTopics([]string{"topic1", "topic3"})
+
+		require.ErrorIs(t, err, ErrInvalidTopic)
+		require.NotErrorIs(t, err, ErrUnknownTopicOrPartition)
+		require.ErrorIs(t, err, ErrLeaderNotAvailable)
+
+		// each wrapped error names the topic it came from
+		require.ErrorContains(t, err, "topic1")
+		require.NotContains(t, err.Error(), "topic2")
+		require.ErrorContains(t, err, "topic3")
+	})
+
+	t.Run("piggy-backed callers only see errors for their topics", func(t *testing.T) {
+		block := make(chan struct{})
+		refresh := newMetadataRefresh(func(topics []string) error {
+			<-block
+			re := make(refreshError)
+			re.addError("topic3", ErrUnknownTopicOrPartition)
+			return re
+		})
+
+		// the first call starts an in-flight refresh covering all three
+		// topics; the next two piggy-back on it for subsets of those topics
+		batched, _ := refresh.refreshOrQueue([]string{"topic1", "topic2", "topic3"})
+		topic1, _ := refresh.refreshOrQueue([]string{"topic1"})
+		topic2, _ := refresh.refreshOrQueue([]string{"topic2"})
+		close(block)
+
+		require.ErrorIs(t, errorForTopics([]string{"topic1", "topic2", "topic3"}, <-batched), ErrUnknownTopicOrPartition)
+		require.NoError(t, errorForTopics([]string{"topic1"}, <-topic1))
+		require.NoError(t, errorForTopics([]string{"topic2"}, <-topic2))
+	})
+}
