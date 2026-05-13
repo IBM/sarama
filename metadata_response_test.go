@@ -534,3 +534,28 @@ func TestMetadataResponseV10(t *testing.T) {
 		t.Error("Decoding produced", response.Topics[0].Partitions[0].LeaderEpoch, "should have been 123!")
 	}
 }
+
+func TestFlexibleMetadataResponseInvalidInt32ArrayLength(t *testing.T) {
+	packet := []byte{
+		0x00, 0x00, 0x00, 0x00, // throttle ms
+		0x01,                   // length of brokers (0)
+		0x00,                   // null cluster id
+		0x00, 0x00, 0x00, 0x00, // controller id
+		0x02,       // length of topics (1)
+		0x00, 0x00, // topic error
+		0x02, 't', // topic name
+		0x00,       // is internal
+		0x02,       // length of partitions (1)
+		0x00, 0x00, // partition error
+		0x00, 0x00, 0x00, 0x00, // partition id
+		0x00, 0x00, 0x00, 0x00, // leader id
+		0x00, 0x00, 0x00, 0x00, // leader epoch
+		0x2, // length of compact array (1) should trigger ErrInsufficientData
+	}
+
+	response := MetadataResponse{}
+	err := versionedDecode(packet, &response, 9, nil)
+	if err == nil {
+		t.Error("expected an error decoding a truncated flexible int32 array, got nil")
+	}
+}
