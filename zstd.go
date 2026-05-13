@@ -1,14 +1,11 @@
 package sarama
 
 import (
+	"runtime"
 	"sync"
 
 	"github.com/klauspost/compress/zstd"
 )
-
-// zstdMaxBufferedEncoders maximum number of not-in-use zstd encoders
-// If the pool of encoders is exhausted then new encoders will be created on the fly
-const zstdMaxBufferedEncoders = 1
 
 type ZstdEncoderParams struct {
 	Level int
@@ -18,14 +15,45 @@ type ZstdDecoderParams struct {
 
 var zstdDecMap sync.Map
 
-var zstdAvailableEncoders sync.Map
+var (
+	zstdAvailableEncoders sync.Map
+	zstdEncoderInitMu     sync.Mutex
+)
 
+// getZstdEncoderChannel returns the buffered channel that retains idle zstd
+// encoders for the given params. The slow path holds a single global mutex
+// and re-checks the sync.Map under the lock so that a stampede of goroutines
+// arriving for the same not-yet-seen ZstdEncoderParams cannot create
+// multiple competing channels. The channel is sized to GOMAXPROCS so that
+// the previous size-1 cap can no longer force concurrent callers to
+// allocate a fresh encoder per batch.
 func getZstdEncoderChannel(params ZstdEncoderParams) chan *zstd.Encoder {
 	if c, ok := zstdAvailableEncoders.Load(params); ok {
 		return c.(chan *zstd.Encoder)
 	}
-	c, _ := zstdAvailableEncoders.LoadOrStore(params, make(chan *zstd.Encoder, zstdMaxBufferedEncoders))
-	return c.(chan *zstd.Encoder)
+
+	zstdEncoderInitMu.Lock()
+	defer zstdEncoderInitMu.Unlock()
+
+	if c, ok := zstdAvailableEncoders.Load(params); ok {
+		return c.(chan *zstd.Encoder)
+	}
+
+	ch := make(chan *zstd.Encoder, max(runtime.GOMAXPROCS(0), 1))
+	zstdAvailableEncoders.Store(params, ch)
+	return ch
+}
+
+func newZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
+	encoderLevel := zstd.SpeedDefault
+	if params.Level != CompressionLevelDefault {
+		encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
+	}
+	enc, _ := zstd.NewWriter(nil,
+		zstd.WithZeroFrames(true),
+		zstd.WithEncoderLevel(encoderLevel),
+		zstd.WithEncoderConcurrency(1))
+	return enc
 }
 
 func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
@@ -33,14 +61,7 @@ func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
 	case enc := <-getZstdEncoderChannel(params):
 		return enc
 	default:
-		encoderLevel := zstd.SpeedDefault
-		if params.Level != CompressionLevelDefault {
-			encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
-		}
-		zstdEnc, _ := zstd.NewWriter(nil, zstd.WithZeroFrames(true),
-			zstd.WithEncoderLevel(encoderLevel),
-			zstd.WithEncoderConcurrency(1))
-		return zstdEnc
+		return newZstdEncoder(params)
 	}
 }
 
@@ -48,6 +69,7 @@ func releaseEncoder(params ZstdEncoderParams, enc *zstd.Encoder) {
 	select {
 	case getZstdEncoderChannel(params) <- enc:
 	default:
+		// pool is at capacity; let the encoder be garbage collected.
 	}
 }
 
