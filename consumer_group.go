@@ -81,7 +81,7 @@ type consumerGroup struct {
 	client Client
 
 	config          *Config
-	consumer        Consumer
+	consumer        *consumer
 	groupID         string
 	groupInstanceId *string
 	memberID        string
@@ -1197,18 +1197,17 @@ type ConsumerGroupClaim interface {
 }
 
 type consumerGroupClaim struct {
+	*partitionConsumer
 	topic     string
 	partition int32
-	offset    int64
-	PartitionConsumer
 }
 
 func newConsumerGroupClaim(sess *consumerGroupSession, topic string, partition int32, offset int64) (*consumerGroupClaim, error) {
-	pcm, err := sess.parent.consumer.ConsumePartition(topic, partition, offset)
+	pcm, err := sess.parent.consumer.consumePartition(topic, partition, offset)
 
 	if errors.Is(err, ErrOffsetOutOfRange) && sess.parent.config.Consumer.Group.ResetInvalidOffsets {
 		offset = sess.parent.config.Consumer.Offsets.Initial
-		pcm, err = sess.parent.consumer.ConsumePartition(topic, partition, offset)
+		pcm, err = sess.parent.consumer.consumePartition(topic, partition, offset)
 	}
 	if err != nil {
 		return nil, err
@@ -1221,16 +1220,14 @@ func newConsumerGroupClaim(sess *consumerGroupSession, topic string, partition i
 	}()
 
 	return &consumerGroupClaim{
+		partitionConsumer: pcm,
 		topic:             topic,
 		partition:         partition,
-		offset:            offset,
-		PartitionConsumer: pcm,
 	}, nil
 }
 
-func (c *consumerGroupClaim) Topic() string        { return c.topic }
-func (c *consumerGroupClaim) Partition() int32     { return c.partition }
-func (c *consumerGroupClaim) InitialOffset() int64 { return c.offset }
+func (c *consumerGroupClaim) Topic() string    { return c.topic }
+func (c *consumerGroupClaim) Partition() int32 { return c.partition }
 
 // Drains messages and errors, ensures the claim is fully closed.
 func (c *consumerGroupClaim) waitClosed() (errs ConsumerErrors) {
