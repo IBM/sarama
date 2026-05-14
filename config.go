@@ -405,6 +405,14 @@ type Config struct {
 			// (no limit). Similar to the JVM's `fetch.message.max.bytes`. The
 			// global `sarama.MaxResponseSize` still applies.
 			Max int32
+			// MaxBytes is the maximum number of bytes the broker should return for
+			// a fetch request across all partitions. Defaults to 50 MiB, matching
+			// the JVM client's `fetch.max.bytes`. This is the value sent as
+			// FetchRequest.MaxBytes for v3+ (KIP-74); the broker may return up to
+			// one extra RecordBatch beyond it to guarantee progress when a single
+			// record exceeds the limit, so keep this comfortably below the global
+			// `sarama.MaxResponseSize` safety net. Only used for Kafka >= 0.10.1.
+			MaxBytes int32
 		}
 		// The maximum amount of time the broker will wait for Consumer.Fetch.Min
 		// bytes to become available before it returns fewer than that anyways. The
@@ -563,6 +571,7 @@ func NewConfig() *Config {
 
 	c.Consumer.Fetch.Min = 1
 	c.Consumer.Fetch.Default = 1024 * 1024
+	c.Consumer.Fetch.MaxBytes = 50 * 1024 * 1024
 	c.Consumer.Retry.Backoff = 2 * time.Second
 	c.Consumer.MaxWaitTime = 500 * time.Millisecond
 	c.Consumer.MaxProcessingTime = 100 * time.Millisecond
@@ -808,6 +817,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.Fetch.Default must be > 0")
 	case c.Consumer.Fetch.Max < 0:
 		return ConfigurationError("Consumer.Fetch.Max must be >= 0")
+	case c.Consumer.Fetch.MaxBytes <= 0:
+		return ConfigurationError("Consumer.Fetch.MaxBytes must be > 0")
 	case c.Consumer.MaxWaitTime < 1*time.Millisecond:
 		return ConfigurationError("Consumer.MaxWaitTime must be >= 1ms")
 	case c.Consumer.MaxProcessingTime <= 0:

@@ -1269,7 +1269,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	// they appear in the request.
 	if bc.consumer.conf.Version.IsAtLeast(V0_10_1_0) {
 		request.Version = 3
-		request.MaxBytes = MaxResponseSize
+		request.MaxBytes = bc.consumer.conf.Consumer.Fetch.MaxBytes
 	}
 	// Version 4 adds IsolationLevel.  Starting in version 4, the reqestor must be
 	// able to handle Kafka log message format version 2.
