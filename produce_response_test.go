@@ -65,6 +65,24 @@ var (
 
 			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
 		},
+		8: { // version 8 adds RecordErrors and ErrorMessage (KIP-467)
+			0x00, 0x00, 0x00, 0x01,
+
+			0x00, 0x03, 'f', 'o', 'o',
+			0x00, 0x00, 0x00, 0x01,
+
+			0x00, 0x00, 0x00, 0x01, // Partition 1
+			0x00, 0x02, // ErrInvalidMessage
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8, // Timestamp January 1st 0001 at 00:00:01,000 UTC (LogAppendTime was used)
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, // StartOffset 50
+			0x00, 0x00, 0x00, 0x01, // 1 record error
+			0x00, 0x00, 0x00, 0x03, // BatchIndex 3
+			0x00, 0x07, 'b', 'a', 'd', ' ', 'r', 'e', 'c', // BatchIndexErrorMessage "bad rec"
+			0x00, 0x09, 'b', 'a', 'd', ' ', 'b', 'a', 't', 'c', 'h', // ErrorMessage "bad batch"
+
+			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
+		},
 	}
 )
 
@@ -105,6 +123,21 @@ func TestProduceResponseDecode(t *testing.T) {
 					t.Error("Decoding failed for foo/1/StartOffset, got:", block.StartOffset)
 				}
 			}
+			if v >= 8 {
+				if len(block.RecordErrors) != 1 {
+					t.Error("Decoding failed for foo/1/RecordErrors, expected 1 entry, got:", len(block.RecordErrors))
+				} else {
+					if block.RecordErrors[0].BatchIndex != 3 {
+						t.Error("Decoding failed for foo/1/RecordErrors[0].BatchIndex, got:", block.RecordErrors[0].BatchIndex)
+					}
+					if block.RecordErrors[0].BatchIndexErrorMessage == nil || *block.RecordErrors[0].BatchIndexErrorMessage != "bad rec" {
+						t.Error("Decoding failed for foo/1/RecordErrors[0].BatchIndexErrorMessage, got:", block.RecordErrors[0].BatchIndexErrorMessage)
+					}
+				}
+				if block.ErrorMessage == nil || *block.ErrorMessage != "bad batch" {
+					t.Error("Decoding failed for foo/1/ErrorMessage, got:", block.ErrorMessage)
+				}
+			}
 		}
 		if v >= 1 {
 			if expected := 100 * time.Millisecond; response.ThrottleTime != expected {
@@ -119,12 +152,19 @@ func TestProduceResponseEncode(t *testing.T) {
 	response.Blocks = make(map[string]map[int32]*ProduceResponseBlock)
 	testEncodable(t, "empty", &response, produceResponseNoBlocksV0)
 
+	batchIndexErrMsg := "bad rec"
+	errMsg := "bad batch"
 	response.Blocks["foo"] = make(map[int32]*ProduceResponseBlock)
 	response.Blocks["foo"][1] = &ProduceResponseBlock{
 		Err:         ErrInvalidMessage,
 		Offset:      255,
 		Timestamp:   time.Unix(1, 0),
 		StartOffset: 50,
+		RecordErrors: []ProduceResponseRecordError{{
+			BatchIndex:             3,
+			BatchIndexErrorMessage: &batchIndexErrMsg,
+		}},
+		ErrorMessage: &errMsg,
 	}
 	response.ThrottleTime = 100 * time.Millisecond
 	for v, produceResponseManyBlocks := range produceResponseManyBlocksVersions {

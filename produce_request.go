@@ -219,11 +219,13 @@ func (r *ProduceRequest) headerVersion() int16 {
 }
 
 func (r *ProduceRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 7
+	return r.Version >= 0 && r.Version <= 8
 }
 
 func (r *ProduceRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 8:
+		return V2_4_0_0
 	case 7:
 		return V2_1_0_0
 	case 6:

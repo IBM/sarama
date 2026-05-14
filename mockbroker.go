@@ -368,6 +368,10 @@ func (b *MockBroker) defaultRequestHandler(req *request) (res encoderWithHeader)
 		if !ok {
 			return nil
 		}
+		// always match the response version to the request version
+		if pb, ok := res.(protocolBody); ok {
+			pb.setVersion(req.body.version())
+		}
 		return res
 	case <-time.After(expectationTimeout):
 		return nil
