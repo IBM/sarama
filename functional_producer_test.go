@@ -248,16 +248,15 @@ func TestFuncTxnProduceWithBrokerFailure(t *testing.T) {
 	err = producer.BeginTxn()
 	require.NoError(t, err)
 
-	if err := stopDockerTestBroker(context.Background(), txCoordinator.id); err != nil {
-		t.Fatal(err)
-	}
-
 	defer func() {
 		if err := startDockerTestBroker(context.Background(), txCoordinator.id); err != nil {
 			t.Fatal(err)
 		}
 		t.Logf("\n")
 	}()
+	if err := stopDockerTestBroker(context.Background(), txCoordinator.id); err != nil {
+		t.Fatal(err)
+	}
 
 	for i := 0; i < 1; i++ {
 		producer.Input() <- &ProducerMessage{Topic: "test.1", Key: nil, Value: StringEncoder("test")}

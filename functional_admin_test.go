@@ -398,10 +398,6 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 	}
 
 	brokerID := coordinator.id
-	if err := stopDockerTestBroker(context.Background(), brokerID); err != nil {
-		t.Fatal(err)
-	}
-
 	t.Cleanup(
 		func() {
 			if err := startDockerTestBroker(context.Background(), brokerID); err != nil {
@@ -409,6 +405,9 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 			}
 		},
 	)
+	if err := stopDockerTestBroker(context.Background(), brokerID); err != nil {
+		t.Fatal(err)
+	}
 
 	{
 		resp, err := adminClient.ListConsumerGroupOffsets(group, map[string][]int32{"test.4": {0, 1, 2, 3}})
