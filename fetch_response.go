@@ -65,6 +65,11 @@ type FetchResponseBlock struct {
 	// recordsNextOffset contains the next consecutive offset following this response block.
 	// This field is computed locally and is not part of the server's binary response.
 	recordsNextOffset *int64
+
+	// partialBatchSize is the total on-wire size needed to fetch the trailing
+	// partial batch fully, when one is present. Zero if no partial trailing
+	// batch was detected or the size is unknown (e.g. legacy MessageSet).
+	partialBatchSize int32
 }
 
 func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error) {
@@ -181,6 +186,13 @@ func (b *FetchResponseBlock) decode(pd packetDecoder, version int16) (err error)
 		}
 
 		if partial || overflow {
+			if partial {
+				size, err := records.partialSize()
+				if err != nil {
+					return err
+				}
+				b.partialBatchSize = size
+			}
 			break
 		}
 	}

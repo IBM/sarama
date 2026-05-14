@@ -866,7 +866,13 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 				child.sendError(ErrMessageTooLarge)
 				child.offset++ // skip this one so we can keep processing future messages
 			} else {
-				child.fetchSize *= 2
+				// if the broker told us the exact size of the partial batch, request that
+				// directly; otherwise fall back to doubling the fetch size
+				if block.partialBatchSize > child.fetchSize {
+					child.fetchSize = block.partialBatchSize
+				} else {
+					child.fetchSize *= 2
+				}
 				// check int32 overflow
 				if child.fetchSize < 0 {
 					child.fetchSize = math.MaxInt32

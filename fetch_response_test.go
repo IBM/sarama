@@ -418,6 +418,12 @@ func TestPartailFetchResponse(t *testing.T) {
 	if n != 0 {
 		t.Fatal("Decoding produced incorrect number of records.")
 	}
+
+	// batchLen (70) plus 12 bytes of FirstOffset and length-field overhead;
+	// see partialFetchResponse fixture above
+	if block.partialBatchSize != 70+12 {
+		t.Errorf("expected partialBatchSize %d, got %d", 70+12, block.partialBatchSize)
+	}
 }
 
 func TestEmptyRecordsFetchResponse(t *testing.T) {
