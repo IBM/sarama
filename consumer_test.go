@@ -1851,6 +1851,57 @@ func TestPartitionConsumerDispatcherOrphanedClose(t *testing.T) {
 	})
 }
 
+func TestPartitionConsumerComputeBackoff(t *testing.T) {
+	newChild := func() *partitionConsumer {
+		return &partitionConsumer{
+			conf:      NewTestConfig(),
+			topic:     "my_topic",
+			partition: 7,
+		}
+	}
+
+	t.Run("returns configured backoff", func(t *testing.T) {
+		child := newChild()
+		child.conf.Consumer.Retry.Backoff = 7 * time.Millisecond
+		require.Equal(t, 7*time.Millisecond, child.computeBackoff())
+	})
+
+	t.Run("BackoffFunc receives consecutive retry counts", func(t *testing.T) {
+		child := newChild()
+		var seen []int
+		child.conf.Consumer.Retry.BackoffFunc = func(retries int) time.Duration {
+			seen = append(seen, retries)
+			return 0
+		}
+		for i := 0; i < 3; i++ {
+			child.computeBackoff()
+		}
+		require.Equal(t, []int{1, 2, 3}, seen)
+	})
+
+	t.Run("emits stuck warning at threshold and each multiple", func(t *testing.T) {
+		child := newChild()
+		var buf bytes.Buffer
+		orig := Logger
+		Logger = log.New(&buf, "", 0)
+		t.Cleanup(func() { Logger = orig })
+
+		expectStuckWarning := func(want string) {
+			t.Helper()
+			buf.Reset()
+			for i := 1; i < stuckRetryThreshold; i++ {
+				child.computeBackoff()
+			}
+			require.NotContains(t, buf.String(), "still retrying")
+			child.computeBackoff()
+			require.Contains(t, buf.String(), want)
+		}
+
+		expectStuckWarning("consumer/my_topic/7 still retrying after 10")
+		expectStuckWarning("consumer/my_topic/7 still retrying after 20")
+	})
+}
+
 func TestConsumerTimestamps(t *testing.T) {
 	now := time.Now().Truncate(time.Millisecond)
 	type testMessage struct {

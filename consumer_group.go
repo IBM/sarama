@@ -1166,7 +1166,9 @@ type ConsumerGroupHandler interface {
 
 	// ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
 	// Once the Messages() channel is closed, the Handler must finish its processing
-	// loop and exit.
+	// loop and exit. Handlers should also return when ConsumerGroupSession.Context()
+	// is done; Messages() alone can block while the partition consumer is retrying
+	// (e.g. after a broker disconnect). See examples/consumergroup.
 	ConsumeClaim(ConsumerGroupSession, ConsumerGroupClaim) error
 }
 
