@@ -518,6 +518,11 @@ func (rd *realFlexibleDecoder) getInt32Array() ([]int32, error) {
 
 	arrayLength := int(n) - 1
 
+	if rd.remaining() < 4*arrayLength {
+		rd.off = len(rd.raw)
+		return nil, ErrInsufficientData
+	}
+
 	ret := make([]int32, arrayLength)
 
 	for i := range ret {
