@@ -335,8 +335,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V2_4_0_0,
 			map[int16]int16{
-				// TODO: ProduceRequest v8 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyProduce:                     8, // up from 7
+				apiKeyProduce:            8, // up from 7
 				apiKeyMetadata:           9, // up from 8
 				apiKeyLeaderAndIsr:       4, // up from 2
 				apiKeyStopReplica:        2, // up from 1
