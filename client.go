@@ -1217,6 +1217,10 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 		if client.conf.Version.IsAtLeast(V2_0_0_0) {
 			request.Version = 2
 		}
+		// Version 3 is the first flexible version
+		if client.conf.Version.IsAtLeast(V2_4_0_0) {
+			request.Version = 3
+		}
 
 		response, err := broker.FindCoordinator(request)
 		if err != nil {

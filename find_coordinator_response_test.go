@@ -79,6 +79,24 @@ func TestFindCoordinatorResponse(t *testing.T) {
 			0, 0, // Coordinator.Host: ""
 			255, 255, 255, 255, // Coordinator.Port: -1
 		},
+	}, {
+		desc: "version 3 - error",
+		response: &FindCoordinatorResponse{
+			Version:      3,
+			ThrottleTime: 100 * time.Millisecond,
+			Err:          ErrConsumerCoordinatorNotAvailable,
+			ErrMsg:       &errMsg,
+			Coordinator:  NoNode,
+		},
+		encoded: []byte{
+			0, 0, 0, 100, // ThrottleTime
+			0, 15, // Err
+			7, 'k', 'a', 'b', 'o', 'o', 'm', // ErrMsg
+			255, 255, 255, 255, // Coordinator.ID: -1
+			1,                  // Coordinator.Host: ""
+			255, 255, 255, 255, // Coordinator.Port: -1
+			0, // empty tagged fields
+		},
 	}} {
 		testResponse(t, tc.desc, tc.response, tc.encoded)
 	}

@@ -343,9 +343,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyControlledShutdown: 3, // up from 2
 				// TODO: OffsetCommitRequest v8 is not supported, but expected for KafkaVersion 2.4.0
 				// apiKeyOffsetCommit:                8, // up from 7
-				apiKeyOffsetFetch: 6, // up from 5
-				// TODO: FindCoordinatorRequest v3 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyFindCoordinator:             3, // up from 2
+				apiKeyOffsetFetch:                 6, // up from 5
+				apiKeyFindCoordinator:             3, // up from 2
 				apiKeyJoinGroup:                   6, // up from 5
 				apiKeyHeartbeat:                   4, // up from 3
 				apiKeyLeaveGroup:                  4, // up from 2
