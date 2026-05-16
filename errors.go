@@ -45,6 +45,12 @@ var ErrMessageTooLarge = errors.New("kafka: message is larger than Consumer.Fetc
 // a RecordBatch.
 var ErrConsumerOffsetNotAdvanced = errors.New("kafka: consumer offset was not advanced after a RecordBatch")
 
+// ErrConsumerRetriesExhausted is sent on a partition consumer's Errors channel
+// when Consumer.Retry.Max consecutive dispatch attempts have failed. The
+// partition consumer self-closes immediately after; in a consumer group this
+// ends the session and triggers a fresh rejoin.
+var ErrConsumerRetriesExhausted = errors.New("kafka: partition consumer giving up after consecutive failures")
+
 // ErrControllerNotAvailable is returned when server didn't give correct controller id. May be kafka server's version
 // is lower than 0.10.0.0.
 var ErrControllerNotAvailable = errors.New("kafka: controller is not available")

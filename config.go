@@ -382,6 +382,12 @@ type Config struct {
 			// more sophisticated backoff strategies. This takes precedence over
 			// `Backoff` if set.
 			BackoffFunc func(retries int) time.Duration
+			// The maximum number of consecutive failed dispatch attempts before a
+			// partition consumer gives up, sends ErrConsumerRetriesExhausted on
+			// its Errors channel and closes itself. In a consumer group this
+			// ends the session and triggers a fresh rejoin. The counter resets
+			// on the next successful fetch. Defaults to 0 (unlimited).
+			Max int
 		}
 
 		// Fetch is the namespace for controlling how many bytes are retrieved by any
@@ -825,6 +831,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Consumer.MaxProcessingTime must be > 0")
 	case c.Consumer.Retry.Backoff < 0:
 		return ConfigurationError("Consumer.Retry.Backoff must be >= 0")
+	case c.Consumer.Retry.Max < 0:
+		return ConfigurationError("Consumer.Retry.Max must be >= 0")
 	case c.Consumer.Offsets.AutoCommit.Interval <= 0:
 		return ConfigurationError("Consumer.Offsets.AutoCommit.Interval must be > 0")
 	case c.Consumer.Offsets.Initial != OffsetOldest && c.Consumer.Offsets.Initial != OffsetNewest:

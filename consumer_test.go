@@ -1851,6 +1851,46 @@ func TestPartitionConsumerDispatcherOrphanedClose(t *testing.T) {
 	})
 }
 
+func TestPartitionConsumerRetryMax(t *testing.T) {
+	config := NewTestConfig()
+	config.Consumer.Return.Errors = true
+	config.Consumer.Retry.Max = 3
+
+	child := &partitionConsumer{
+		consumer:       &consumer{},
+		conf:           config,
+		topic:          "my_topic",
+		partition:      7,
+		errors:         make(chan *ConsumerError, 1),
+		feeder:         make(chan *partitionConsumerResponse, 1),
+		trigger:        make(chan none, 1),
+		dying:          make(chan none),
+		dispatcherStop: make(chan none),
+	}
+	child.retries.Store(int32(config.Consumer.Retry.Max))
+
+	done := make(chan none)
+	go func() {
+		defer close(done)
+		child.dispatcher()
+	}()
+
+	child.trigger <- none{}
+
+	select {
+	case err := <-child.errors:
+		require.ErrorIs(t, err.Err, ErrConsumerRetriesExhausted)
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "expected ErrConsumerRetriesExhausted on errors channel")
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		require.FailNow(t, "dispatcher did not exit after Retry.Max")
+	}
+}
+
 func TestPartitionConsumerComputeBackoff(t *testing.T) {
 	newChild := func() *partitionConsumer {
 		return &partitionConsumer{
