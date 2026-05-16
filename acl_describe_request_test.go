@@ -24,6 +24,16 @@ var (
 		5, // acl operation
 		3, // acl permission type
 	}
+	aclDescribeRequestV2 = []byte{
+		2, // resource type
+		6, 't', 'o', 'p', 'i', 'c',
+		1, // any Type
+		10, 'p', 'r', 'i', 'n', 'c', 'i', 'p', 'a', 'l',
+		5, 'h', 'o', 's', 't',
+		5, // acl operation
+		3, // acl permission type
+		0, // empty tagged fields
+	}
 )
 
 func TestAclDescribeRequestV0(t *testing.T) {
@@ -64,4 +74,25 @@ func TestAclDescribeRequestV1(t *testing.T) {
 	}
 
 	testRequest(t, "", req, aclDescribeRequestV1)
+}
+
+func TestAclDescribeRequestV2(t *testing.T) {
+	resourcename := "topic"
+	principal := "principal"
+	host := "host"
+
+	req := &DescribeAclsRequest{
+		Version: 2,
+		AclFilter: AclFilter{
+			ResourceType:              AclResourceTopic,
+			ResourceName:              &resourcename,
+			ResourcePatternTypeFilter: AclPatternAny,
+			Principal:                 &principal,
+			Host:                      &host,
+			Operation:                 AclOperationCreate,
+			PermissionType:            AclPermissionAllow,
+		},
+	}
+
+	testRequest(t, "", req, aclDescribeRequestV2)
 }
