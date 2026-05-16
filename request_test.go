@@ -335,14 +335,13 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V2_4_0_0,
 			map[int16]int16{
-				apiKeyProduce:            8, // up from 7
-				apiKeyMetadata:           9, // up from 8
-				apiKeyLeaderAndIsr:       4, // up from 2
-				apiKeyStopReplica:        2, // up from 1
-				apiKeyUpdateMetadata:     6, // up from 5
-				apiKeyControlledShutdown: 3, // up from 2
-				// TODO: OffsetCommitRequest v8 is not supported, but expected for KafkaVersion 2.4.0
-				// apiKeyOffsetCommit:                8, // up from 7
+				apiKeyProduce:                     8, // up from 7
+				apiKeyMetadata:                    9, // up from 8
+				apiKeyLeaderAndIsr:                4, // up from 2
+				apiKeyStopReplica:                 2, // up from 1
+				apiKeyUpdateMetadata:              6, // up from 5
+				apiKeyControlledShutdown:          3, // up from 2
+				apiKeyOffsetCommit:                8, // up from 7
 				apiKeyOffsetFetch:                 6, // up from 5
 				apiKeyFindCoordinator:             3, // up from 2
 				apiKeyJoinGroup:                   6, // up from 5
