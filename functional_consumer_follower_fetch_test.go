@@ -100,6 +100,11 @@ func TestConsumerFetchFollowerFailover(t *testing.T) {
 		}
 	}
 
+	t.Cleanup(func() {
+		if err := startDockerTestBroker(context.Background(), follower); err != nil {
+			t.Fatal(err)
+		}
+	})
 	if err := stopDockerTestBroker(context.Background(), follower); err != nil {
 		t.Fatal(err)
 	}
