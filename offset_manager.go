@@ -329,6 +329,10 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 		r.Version = 7
 		r.GroupInstanceId = om.groupInstanceId
 	}
+	// Version 8 is the first flexible version.
+	if om.conf.Version.IsAtLeast(V2_4_0_0) {
+		r.Version = 8
+	}
 
 	// commit timestamp was only briefly supported in V1 where we set it to
 	// ReceiveTime (-1) to tell the broker to set it to the time when the commit

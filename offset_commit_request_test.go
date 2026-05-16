@@ -140,6 +140,22 @@ var (
 		0, 0, 0, 3, // CommittedEpoch
 		0, 4, 'm', 'e', 't', 'a', // CommittedMetadata
 	}
+	offsetCommitRequestOneBlockV8 = []byte{
+		0x04, 'f', 'o', 'o', // GroupId (compact string)
+		0x00, 0x00, 0x00, 0x01, // GenerationId
+		0x04, 'm', 'i', 'd', // MemberId (compact string)
+		0x04, 'g', 'i', 'd', // GroupInstanceId (compact nullable string)
+		0x02,                          // One Topic (compact array length)
+		0x06, 't', 'o', 'p', 'i', 'c', // Name (compact string)
+		0x02,                   // One Partition (compact array length)
+		0x00, 0x00, 0x00, 0x01, // PartitionIndex
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, // CommittedOffset
+		0x00, 0x00, 0x00, 0x03, // CommittedEpoch
+		0x05, 'm', 'e', 't', 'a', // CommittedMetadata (compact string)
+		0x00, // partition tagged fields
+		0x00, // topic tagged fields
+		0x00, // request tagged fields
+	}
 )
 
 func TestOffsetCommitRequestV5AndPlus(t *testing.T) {
@@ -188,6 +204,23 @@ func TestOffsetCommitRequestV5AndPlus(t *testing.T) {
 			offsetCommitRequestOneBlockV7,
 			&OffsetCommitRequest{
 				Version:                 7,
+				ConsumerGroup:           "foo",
+				ConsumerGroupGeneration: 1,
+				ConsumerID:              "mid",
+				GroupInstanceId:         &groupInstanceId,
+				blocks: map[string]map[int32]*offsetCommitRequestBlock{
+					"topic": {
+						1: &offsetCommitRequestBlock{offset: 2, metadata: "meta", committedLeaderEpoch: 3},
+					},
+				},
+			},
+		},
+		{
+			"v8",
+			8,
+			offsetCommitRequestOneBlockV8,
+			&OffsetCommitRequest{
+				Version:                 8,
 				ConsumerGroup:           "foo",
 				ConsumerGroupGeneration: 1,
 				ConsumerID:              "mid",

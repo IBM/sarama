@@ -27,6 +27,17 @@ var (
 		0, 0, 0, 3, // PartitionIndex
 		0, 0, // ErrorCode
 	}
+	noEmptyOffsetCommitResponseV8 = []byte{
+		0x00, 0x00, 0x00, 0x64, // ThrottleTimeMs = 100
+		0x02,                          // Topic Len (compact array length)
+		0x06, 't', 'o', 'p', 'i', 'c', // Name (compact string)
+		0x02,                   // Partition Len (compact array length)
+		0x00, 0x00, 0x00, 0x03, // PartitionIndex
+		0x00, 0x00, // ErrorCode
+		0x00, // partition tagged fields
+		0x00, // topic tagged fields
+		0x00, // response tagged fields
+	}
 )
 
 func TestEmptyOffsetCommitResponse(t *testing.T) {
@@ -65,6 +76,20 @@ func TestEmptyOffsetCommitResponse(t *testing.T) {
 			&OffsetCommitResponse{
 				ThrottleTimeMs: 100,
 				Version:        3,
+				Errors: map[string]map[int32]KError{
+					"topic": {
+						3: ErrNoError,
+					},
+				},
+			},
+		},
+		{
+			"v8",
+			8,
+			noEmptyOffsetCommitResponseV8,
+			&OffsetCommitResponse{
+				ThrottleTimeMs: 100,
+				Version:        8,
 				Errors: map[string]map[int32]KError{
 					"topic": {
 						3: ErrNoError,
