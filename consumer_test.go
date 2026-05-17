@@ -843,270 +843,207 @@ func TestConsumeMessageWithSessionIDs(t *testing.T) {
 }
 
 func TestConsumeMessagesFromReadReplica(t *testing.T) {
-	// Given
-	fetchResponse1 := &FetchResponse{Version: 11}
-	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
-	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 2)
-	block1 := fetchResponse1.GetBlock("my_topic", 0)
-	block1.PreferredReadReplica = -1
-
-	fetchResponse2 := &FetchResponse{Version: 11}
-	// Create a block with no records.
-	block2 := fetchResponse1.getOrCreateBlock("my_topic", 0)
-	block2.PreferredReadReplica = 1
-
-	fetchResponse3 := &FetchResponse{Version: 11}
-	fetchResponse3.AddMessage("my_topic", 0, nil, testMsg, 3)
-	fetchResponse3.AddMessage("my_topic", 0, nil, testMsg, 4)
-	block3 := fetchResponse3.GetBlock("my_topic", 0)
-	block3.PreferredReadReplica = -1
-
-	fetchResponse4 := &FetchResponse{Version: 11}
-	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 5)
-	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 6)
-	block4 := fetchResponse4.GetBlock("my_topic", 0)
-	block4.PreferredReadReplica = -1
-
-	cfg := NewTestConfig()
-	cfg.Version = V2_3_0_0
-	cfg.RackID = "consumer_rack"
-
-	leader := NewMockBroker(t, 0)
-	broker0 := NewMockBroker(t, 1)
-
-	leader.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
-	})
-
-	broker0.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse3, fetchResponse4),
-	})
-
-	master, err := NewConsumer([]string{broker0.Addr()}, cfg)
-	if err != nil {
-		t.Fatal(err)
+	withRefreshFrequency := func(frequency time.Duration) func(*Config) {
+		return func(cfg *Config) {
+			cfg.Metadata.RefreshFrequency = frequency
+		}
+	}
+	preferredReplica := func(replicaID int32) preferredReadReplica {
+		return preferredReadReplica{id: replicaID, ok: true}
+	}
+	assertOffsets := func(t *testing.T, c PartitionConsumer, offsets ...int64) {
+		t.Helper()
+		for _, want := range offsets {
+			select {
+			case msg := <-c.Messages():
+				assertMessageOffset(t, msg, want)
+			case <-time.After(5 * time.Second):
+				require.Failf(t, "timed out waiting for message", "offset %d", want)
+			}
+		}
 	}
 
-	// When
-	consumer, err := master.ConsumePartition("my_topic", 0, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("switches to preferred follower", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(1)},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{3, 4}},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
 
-	assertMessageOffset(t, <-consumer.Messages(), 1)
-	assertMessageOffset(t, <-consumer.Messages(), 2)
-	assertMessageOffset(t, <-consumer.Messages(), 3)
-	assertMessageOffset(t, <-consumer.Messages(), 4)
+	t.Run("falls back to leader when preferred replica is unknown", func(t *testing.T) {
+		const notInMetadata = 5
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(notInMetadata)},
+				{records: []int64{3, 4}},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
 
-	safeClose(t, consumer)
-	safeClose(t, master)
-	broker0.Close()
-	leader.Close()
+	t.Run("falls back to leader on ErrReplicaNotAvailable", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			leaderFetches: []readReplicaFetch{
+				{preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{1, 2}},
+				{err: ErrReplicaNotAvailable},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("falls back to leader on unknown error", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			leaderFetches: []readReplicaFetch{
+				{preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{1, 2}},
+				{err: ErrUnknown},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("expires after Metadata.RefreshFrequency and falls back to leader", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: withRefreshFrequency(50 * time.Millisecond),
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(1)},
+				{records: []int64{4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{3}},
+				{},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("uses preferred follower when metadata refresh is disabled", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: withRefreshFrequency(0),
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(1)},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{3, 4}},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
 }
 
-func TestConsumeMessagesFromReadReplicaLeaderFallback(t *testing.T) {
-	// Given
-	fetchResponse1 := &FetchResponse{Version: 11}
-	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 1)
-	fetchResponse1.AddMessage("my_topic", 0, nil, testMsg, 2)
-	block1 := fetchResponse1.GetBlock("my_topic", 0)
-	block1.PreferredReadReplica = 5 // Does not exist.
+type readReplicaTestConfig struct {
+	configure       func(*Config)
+	leaderFetches   []readReplicaFetch
+	followerFetches []readReplicaFetch
+}
 
-	fetchResponse2 := &FetchResponse{Version: 11}
-	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 3)
-	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 4)
-	block2 := fetchResponse2.GetBlock("my_topic", 0)
-	block2.PreferredReadReplica = -1
+type readReplicaFetch struct {
+	records              []int64
+	preferredReadReplica preferredReadReplica
+	err                  KError
+}
+
+type preferredReadReplica struct {
+	id int32
+	ok bool
+}
+
+func (fetch readReplicaFetch) For(reqBody versionedDecoder) encoderWithHeader {
+	fetchRequest := reqBody.(*FetchRequest)
+	response := &FetchResponse{Version: fetchRequest.Version}
+	for _, offset := range fetch.records {
+		response.AddMessage("my_topic", 0, nil, testMsg, offset)
+	}
+	if !errors.Is(fetch.err, ErrNoError) {
+		response.AddError("my_topic", 0, fetch.err)
+	}
+	preferredReadReplica := int32(invalidPreferredReplicaID)
+	if fetch.preferredReadReplica.ok {
+		preferredReadReplica = fetch.preferredReadReplica.id
+	}
+	response.getOrCreateBlock("my_topic", 0).PreferredReadReplica = preferredReadReplica
+	return response
+}
+
+func newReadReplicaTest(t *testing.T, testConfig readReplicaTestConfig) (PartitionConsumer, func()) {
+	t.Helper()
 
 	cfg := NewTestConfig()
 	cfg.Version = V2_3_0_0
 	cfg.RackID = "consumer_rack"
+	if testConfig.configure != nil {
+		testConfig.configure(cfg)
+	}
 
 	leader := NewMockBroker(t, 0)
+	var follower *MockBroker
+
+	meta := NewMockMetadataResponse(t).
+		SetBroker(leader.Addr(), leader.BrokerID()).
+		SetLeader("my_topic", 0, leader.BrokerID())
+
+	if testConfig.followerFetches != nil {
+		follower = NewMockBroker(t, 1)
+		meta.SetBroker(follower.Addr(), follower.BrokerID())
+	}
+
+	offsets := NewMockOffsetResponse(t).
+		SetOffset("my_topic", 0, OffsetNewest, 1234).
+		SetOffset("my_topic", 0, OffsetOldest, 0)
+
+	toSequence := func(fetches []readReplicaFetch) MockResponse {
+		responses := make([]interface{}, len(fetches))
+		for i, fetch := range fetches {
+			responses[i] = fetch
+		}
+		return NewMockSequence(responses...)
+	}
 
 	leader.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse2),
+		"MetadataRequest": meta,
+		"OffsetRequest":   offsets,
+		"FetchRequest":    toSequence(testConfig.leaderFetches),
 	})
+	if follower != nil {
+		follower.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": meta,
+			"OffsetRequest":   offsets,
+			"FetchRequest":    toSequence(testConfig.followerFetches),
+		})
+	}
 
 	master, err := NewConsumer([]string{leader.Addr()}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// When
 	consumer, err := master.ConsumePartition("my_topic", 0, 1)
-	if err != nil {
-		t.Fatal(err)
+	require.NoError(t, err)
+
+	return consumer, func() {
+		safeClose(t, consumer)
+		safeClose(t, master)
+		if follower != nil {
+			follower.Close()
+		}
+		leader.Close()
 	}
-
-	assertMessageOffset(t, <-consumer.Messages(), 1)
-	assertMessageOffset(t, <-consumer.Messages(), 2)
-	assertMessageOffset(t, <-consumer.Messages(), 3)
-	assertMessageOffset(t, <-consumer.Messages(), 4)
-
-	safeClose(t, consumer)
-	safeClose(t, master)
-	leader.Close()
-}
-
-func TestConsumeMessagesFromReadReplicaErrorReplicaNotAvailable(t *testing.T) {
-	// Given
-	fetchResponse1 := &FetchResponse{Version: 11}
-	block1 := fetchResponse1.getOrCreateBlock("my_topic", 0)
-	block1.PreferredReadReplica = 1
-
-	fetchResponse2 := &FetchResponse{Version: 11}
-	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 1)
-	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 2)
-	block2 := fetchResponse2.GetBlock("my_topic", 0)
-	block2.PreferredReadReplica = -1
-
-	fetchResponse3 := &FetchResponse{Version: 11}
-	fetchResponse3.AddError("my_topic", 0, ErrReplicaNotAvailable)
-
-	fetchResponse4 := &FetchResponse{Version: 11}
-	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 3)
-	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 4)
-
-	cfg := NewTestConfig()
-	cfg.Version = V2_3_0_0
-	cfg.RackID = "consumer_rack"
-
-	leader := NewMockBroker(t, 0)
-	broker0 := NewMockBroker(t, 1)
-
-	leader.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse4),
-	})
-
-	broker0.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse2, fetchResponse3),
-	})
-
-	master, err := NewConsumer([]string{broker0.Addr()}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// When
-	consumer, err := master.ConsumePartition("my_topic", 0, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertMessageOffset(t, <-consumer.Messages(), 1)
-	assertMessageOffset(t, <-consumer.Messages(), 2)
-	assertMessageOffset(t, <-consumer.Messages(), 3)
-	assertMessageOffset(t, <-consumer.Messages(), 4)
-
-	safeClose(t, consumer)
-	safeClose(t, master)
-	broker0.Close()
-	leader.Close()
-}
-
-func TestConsumeMessagesFromReadReplicaErrorUnknown(t *testing.T) {
-	// Given
-	fetchResponse1 := &FetchResponse{Version: 11}
-	block1 := fetchResponse1.getOrCreateBlock("my_topic", 0)
-	block1.PreferredReadReplica = 1
-
-	fetchResponse2 := &FetchResponse{Version: 11}
-	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 1)
-	fetchResponse2.AddMessage("my_topic", 0, nil, testMsg, 2)
-	block2 := fetchResponse2.GetBlock("my_topic", 0)
-	block2.PreferredReadReplica = -1
-
-	fetchResponse3 := &FetchResponse{Version: 11}
-	fetchResponse3.AddError("my_topic", 0, ErrUnknown)
-
-	fetchResponse4 := &FetchResponse{Version: 11}
-	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 3)
-	fetchResponse4.AddMessage("my_topic", 0, nil, testMsg, 4)
-
-	cfg := NewTestConfig()
-	cfg.Version = V2_3_0_0
-	cfg.RackID = "consumer_rack"
-
-	leader := NewMockBroker(t, 0)
-	broker0 := NewMockBroker(t, 1)
-
-	leader.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse1, fetchResponse4),
-	})
-
-	broker0.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetBroker(broker0.Addr(), broker0.BrokerID()).
-			SetBroker(leader.Addr(), leader.BrokerID()).
-			SetLeader("my_topic", 0, leader.BrokerID()),
-		"OffsetRequest": NewMockOffsetResponse(t).
-			SetOffset("my_topic", 0, OffsetNewest, 1234).
-			SetOffset("my_topic", 0, OffsetOldest, 0),
-		"FetchRequest": NewMockSequence(fetchResponse2, fetchResponse3),
-	})
-
-	master, err := NewConsumer([]string{broker0.Addr()}, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// When
-	consumer, err := master.ConsumePartition("my_topic", 0, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	assertMessageOffset(t, <-consumer.Messages(), 1)
-	assertMessageOffset(t, <-consumer.Messages(), 2)
-	assertMessageOffset(t, <-consumer.Messages(), 3)
-	assertMessageOffset(t, <-consumer.Messages(), 4)
-
-	safeClose(t, consumer)
-	safeClose(t, master)
-	broker0.Close()
-	leader.Close()
 }
 
 // TestConsumeMessagesTrackLeader ensures that in the event that leadership of
