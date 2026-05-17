@@ -995,7 +995,9 @@ func (ca *clusterAdmin) CreateACLs(resourceACLs []*ResourceAcls) error {
 func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 	request := &DescribeAclsRequest{AclFilter: filter}
 
-	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+	if ca.conf.Version.IsAtLeast(V2_5_0_0) {
+		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 		request.Version = 1
 	}
 
