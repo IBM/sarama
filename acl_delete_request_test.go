@@ -27,6 +27,19 @@ var (
 		3, // allow
 	}
 
+	aclDeleteRequestv2 = []byte{
+		2,
+		1, // any
+		7, 'f', 'i', 'l', 't', 'e', 'r',
+		1, // Any Filter
+		10, 'p', 'r', 'i', 'n', 'c', 'i', 'p', 'a', 'l',
+		5, 'h', 'o', 's', 't',
+		4, // write
+		3, // allow
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
+
 	aclDeleteRequestNulls = []byte{
 		0, 0, 0, 1,
 		1,
@@ -111,4 +124,21 @@ func TestDeleteAclsRequestV1(t *testing.T) {
 	req.Filters[0].Operation = AclOperationWrite
 
 	testRequest(t, "delete request", req, aclDeleteRequestv1)
+}
+
+func TestDeleteAclsRequestV2(t *testing.T) {
+	req := &DeleteAclsRequest{
+		Version: 2,
+		Filters: []*AclFilter{{
+			ResourceName:              nullString("filter"),
+			Principal:                 nullString("principal"),
+			Host:                      nullString("host"),
+			ResourceType:              AclResourceAny,
+			Operation:                 AclOperationWrite,
+			PermissionType:            AclPermissionAllow,
+			ResourcePatternTypeFilter: AclPatternAny,
+		}},
+	}
+
+	testRequest(t, "delete request", req, aclDeleteRequestv2)
 }
