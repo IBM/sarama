@@ -534,6 +534,7 @@ func testRequestDecode(t *testing.T, name string, rb protocolBody, packet []byte
 }
 
 func testResponse(t *testing.T, name string, res protocolBody, expected []byte) {
+	t.Helper()
 	encoded, err := encode(res, nil)
 	if err != nil {
 		t.Error(err)
