@@ -77,6 +77,15 @@ func TestAclDescribeResponse(t *testing.T) {
 	}
 
 	testResponse(t, "describe", resp, aclDescribeResponseError)
+
+	errmsg = ""
+	resp = &DescribeAclsResponse{
+		ThrottleTime: 100 * time.Millisecond,
+		Err:          ErrBrokerNotAvailable,
+		ErrMsg:       &errmsg,
+		ResourceAcls: []*ResourceAcls{},
+	}
+	testResponse(t, "describe with empty error message", resp, nil)
 }
 
 func TestAclDescribeResponseV1(t *testing.T) {
@@ -104,6 +113,16 @@ func TestAclDescribeResponseV1(t *testing.T) {
 	}
 
 	testResponse(t, "describe", resp, aclDescribeResponseErrorV1)
+
+	errmsg = ""
+	resp = &DescribeAclsResponse{
+		Version:      1,
+		ThrottleTime: 100 * time.Millisecond,
+		Err:          ErrBrokerNotAvailable,
+		ErrMsg:       &errmsg,
+		ResourceAcls: []*ResourceAcls{},
+	}
+	testResponse(t, "describe with empty error message", resp, nil)
 }
 
 func TestAclDescribeResponseV2(t *testing.T) {
@@ -131,4 +150,14 @@ func TestAclDescribeResponseV2(t *testing.T) {
 	}
 
 	testResponse(t, "describe", resp, aclDescribeResponseErrorV2)
+
+	errmsg = ""
+	resp = &DescribeAclsResponse{
+		Version:      2,
+		ThrottleTime: 100 * time.Millisecond,
+		Err:          ErrBrokerNotAvailable,
+		ErrMsg:       &errmsg,
+		ResourceAcls: []*ResourceAcls{},
+	}
+	testResponse(t, "describe with empty error message", resp, nil)
 }
