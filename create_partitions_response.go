@@ -30,10 +30,12 @@ func (c *CreatePartitionsResponse) encode(pe packetEncoder) error {
 		}
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
 func (c *CreatePartitionsResponse) decode(pd packetDecoder, version int16) (err error) {
+	c.Version = version
 	if c.ThrottleTime, err = pd.getDurationMs(); err != nil {
 		return err
 	}
@@ -55,7 +57,8 @@ func (c *CreatePartitionsResponse) decode(pd packetDecoder, version int16) (err 
 		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *CreatePartitionsResponse) key() int16 {
@@ -67,15 +70,28 @@ func (r *CreatePartitionsResponse) version() int16 {
 }
 
 func (r *CreatePartitionsResponse) headerVersion() int16 {
+	if r.Version >= 2 {
+		return 1
+	}
 	return 0
 }
 
 func (r *CreatePartitionsResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 1
+	return r.Version >= 0 && r.Version <= 2
+}
+
+func (r *CreatePartitionsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *CreatePartitionsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 2
 }
 
 func (r *CreatePartitionsResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 2:
+		return V2_5_0_0
 	case 1:
 		return V2_0_0_0
 	case 0:
@@ -113,6 +129,7 @@ func (t *TopicPartitionError) encode(pe packetEncoder) error {
 		return err
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -126,5 +143,6 @@ func (t *TopicPartitionError) decode(pd packetDecoder, version int16) (err error
 		return err
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
