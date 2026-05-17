@@ -363,6 +363,29 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			},
 		},
 		{
+			V2_5_0_0,
+			map[int16]int16{
+				apiKeyOffsetFetch:    7, // up from 6
+				apiKeyInitProducerId: 3, // up from 2
+				// TODO: JoinGroupRequest v7 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeyJoinGroup:               7, // up from 6
+				// TODO: SyncGroupRequest v5 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeySyncGroup:               5, // up from 4
+				// TODO: TxnOffsetCommitRequest v3 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeyTxnOffsetCommit:         3, // up from 2
+				// TODO: DescribeAclsRequest v2 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeyDescribeAcls:            2, // up from 1
+				// TODO: CreateAclsRequest v2 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeyCreateAcls:              2, // up from 1
+				// TODO: DeleteAclsRequest v2 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeyDeleteAcls:              2, // up from 1
+				// TODO: SaslAuthenticateRequest v2 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeySASLAuth:                2, // up from 1
+				// TODO: CreatePartitionsRequest v2 is not supported, but expected for KafkaVersion 2.5.0
+				// apiKeyCreatePartitions:        2, // up from 1
+			},
+		},
+		{
 			saramaMaxVersions, // placeholder version for current maximums implemented by Sarama
 			map[int16]int16{
 				apiKeyProduce:            maxVersion(&ProduceRequest{}),
