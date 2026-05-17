@@ -473,7 +473,9 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 	if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 5
 		req.GroupInstanceId = c.groupInstanceId
-		if c.config.Version.IsAtLeast(V2_4_0_0) {
+		if c.config.Version.IsAtLeast(V2_5_0_0) {
+			req.Version = 7
+		} else if c.config.Version.IsAtLeast(V2_4_0_0) {
 			req.Version = 6
 		}
 	}

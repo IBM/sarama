@@ -366,14 +366,13 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			V2_5_0_0,
 			map[int16]int16{
 				apiKeyOffsetFetch:      7, // up from 6
+				apiKeyJoinGroup:        7, // up from 6
 				apiKeyInitProducerId:   3, // up from 2
 				apiKeyDescribeAcls:     2, // up from 1
 				apiKeyCreateAcls:       2, // up from 1
 				apiKeyDeleteAcls:       2, // up from 1
 				apiKeySASLAuth:         2, // up from 1
 				apiKeyCreatePartitions: 2, // up from 1
-				// TODO: JoinGroupRequest v7 is not supported, but expected for KafkaVersion 2.5.0
-				// apiKeyJoinGroup:               7, // up from 6
 				// TODO: SyncGroupRequest v5 is not supported, but expected for KafkaVersion 2.5.0
 				// apiKeySyncGroup:               5, // up from 4
 				// TODO: TxnOffsetCommitRequest v3 is not supported, but expected for KafkaVersion 2.5.0
