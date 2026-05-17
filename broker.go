@@ -1737,7 +1737,9 @@ func (b *Broker) sendAndReceiveSASLSCRAMv1(authSendReceiver func(authBytes []byt
 
 func (b *Broker) createSaslAuthenticateRequest(msg []byte) *SaslAuthenticateRequest {
 	authenticateRequest := SaslAuthenticateRequest{SaslAuthBytes: msg}
-	if b.conf.Version.IsAtLeast(V2_2_0_0) {
+	if b.conf.Version.IsAtLeast(V2_5_0_0) {
+		authenticateRequest.Version = 2
+	} else if b.conf.Version.IsAtLeast(V2_2_0_0) {
 		authenticateRequest.Version = 1
 	}
 

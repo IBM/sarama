@@ -16,6 +16,13 @@ var (
 		0, 0, 0, 3, 'm', 's', 'g',
 		0, 0, 0, 0, 0, 0, 0, 1,
 	}
+	saslAuthenticateResponseErrV2 = []byte{
+		0, 58,
+		4, 'e', 'r', 'r',
+		4, 'm', 's', 'g',
+		0, 0, 0, 0, 0, 0, 0, 1,
+		0, // empty tagged fields
+	}
 )
 
 func TestSaslAuthenticateResponse(t *testing.T) {
@@ -37,5 +44,18 @@ func TestSaslAuthenticateResponseV1(t *testing.T) {
 	response.SaslAuthBytes = []byte(`msg`)
 	response.SessionLifetimeMs = 1
 
-	testResponse(t, "authenticate response", response, saslAuthenticateResponseErrV1)
+	testResponse(t, "authenticate response v1", response, saslAuthenticateResponseErrV1)
+}
+
+func TestSaslAuthenticateResponseV2(t *testing.T) {
+	msg := "err"
+	response := &SaslAuthenticateResponse{
+		Version:           2,
+		Err:               ErrSASLAuthenticationFailed,
+		ErrorMessage:      &msg,
+		SaslAuthBytes:     []byte(`msg`),
+		SessionLifetimeMs: 1,
+	}
+
+	testResponse(t, "authenticate response v2", response, saslAuthenticateResponseErrV2)
 }
