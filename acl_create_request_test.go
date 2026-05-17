@@ -24,6 +24,18 @@ var (
 		2, // all
 		2, // deny
 	}
+	aclCreateRequestv2 = []byte{
+		2,
+		3, // resource type = group
+		6, 'g', 'r', 'o', 'u', 'p',
+		3, // resource pattern type = literal
+		10, 'p', 'r', 'i', 'n', 'c', 'i', 'p', 'a', 'l',
+		5, 'h', 'o', 's', 't',
+		2, // all
+		2, // deny
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestCreateAclsRequestv0(t *testing.T) {
@@ -69,4 +81,27 @@ func TestCreateAclsRequestv1(t *testing.T) {
 	}
 
 	testRequest(t, "create request v1", req, aclCreateRequestv1)
+}
+
+func TestCreateAclsRequestv2(t *testing.T) {
+	req := &CreateAclsRequest{
+		Version: 2,
+		AclCreations: []*AclCreation{
+			{
+				Resource: Resource{
+					ResourceType:        AclResourceGroup,
+					ResourceName:        "group",
+					ResourcePatternType: AclPatternLiteral,
+				},
+				Acl: Acl{
+					Principal:      "principal",
+					Host:           "host",
+					Operation:      AclOperationAll,
+					PermissionType: AclPermissionDeny,
+				},
+			},
+		},
+	}
+
+	testRequest(t, "create request v2", req, aclCreateRequestv2)
 }
