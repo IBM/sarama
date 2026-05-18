@@ -5,7 +5,6 @@ go 1.25.0
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/eapache/go-resiliency v1.7.0
-	github.com/eapache/queue v1.1.0
 	github.com/jcmturner/gofork v1.7.6
 	github.com/jcmturner/gokrb5/v8 v8.4.4
 	github.com/klauspost/compress v1.18.6
