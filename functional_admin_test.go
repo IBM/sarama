@@ -712,6 +712,83 @@ func TestFuncAdminElectLeadersV1(t *testing.T) {
 	}
 }
 
+func TestFuncAdminAlterPartitionReassignments(t *testing.T) {
+	t.Parallel()
+	const (
+		waitFor = 60 * time.Second
+		tick    = 500 * time.Millisecond
+	)
+	checkKafkaVersion(t, "2.4.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	adminClient, err := NewClusterAdminFromClient(client)
+	require.NoError(t, err)
+
+	brokers := client.Brokers()
+	require.GreaterOrEqual(t, len(brokers), 2, "need at least two brokers to grow replication factor")
+	brokerIDs := make([]int32, 0, len(brokers))
+	for _, b := range brokers {
+		brokerIDs = append(brokerIDs, b.ID())
+	}
+	slices.Sort(brokerIDs)
+
+	const numPartitions = int32(2)
+	topic := fmt.Sprintf("alter-reassignments-%d", time.Now().UnixNano())
+	initial := map[int32][]int32{
+		0: {brokerIDs[0]},
+		1: {brokerIDs[1]},
+	}
+	require.NoError(t, adminClient.CreateTopic(topic, &TopicDetail{
+		NumPartitions:     -1,
+		ReplicationFactor: -1,
+		ReplicaAssignment: initial,
+	}, false))
+	defer func() {
+		if err := adminClient.DeleteTopic(topic); err != nil {
+			t.Logf("delete topic %q: %v", topic, err)
+		}
+	}()
+
+	target := [][]int32{
+		{brokerIDs[0], brokerIDs[1]},
+		{brokerIDs[1], brokerIDs[0]},
+	}
+	require.NoError(t, adminClient.AlterPartitionReassignments(topic, target))
+
+	partitions := []int32{0, 1}
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		status, err := adminClient.ListPartitionReassignments(topic, partitions)
+		require.NoError(t, err)
+		// ListPartitionReassignments only returns partitions that are
+		// still being reassigned; an empty TopicStatus entry means the
+		// move has finished.
+		require.Empty(t, status[topic], "reassignment still in progress")
+	}, waitFor, tick, "topic %q reassignment did not complete in time", topic)
+
+	require.NoError(t, client.RefreshMetadata(topic))
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		meta, err := adminClient.DescribeTopics([]string{topic})
+		require.NoError(t, err)
+		require.Len(t, meta, 1)
+		require.Equal(t, ErrNoError, meta[0].Err)
+		require.Len(t, meta[0].Partitions, int(numPartitions))
+		for _, p := range meta[0].Partitions {
+			want := target[p.ID]
+			require.Equal(t, want, p.Replicas, "partition %d replicas", p.ID)
+			require.ElementsMatch(t, want, p.Isr, "partition %d ISR did not catch up", p.ID)
+		}
+	}, waitFor, tick, "topic %q never reported the expected final replica set", topic)
+}
+
 func TestFuncAdminIncrementalAlterConfigs(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "2.3.0.0")
