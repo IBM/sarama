@@ -48,12 +48,8 @@ func (d *DescribeAclsResponse) decode(pd packetDecoder, version int16) (err erro
 		return err
 	}
 
-	errmsg, err := pd.getString()
-	if err != nil {
+	if d.ErrMsg, err = pd.getNullableString(); err != nil {
 		return err
-	}
-	if errmsg != "" {
-		d.ErrMsg = &errmsg
 	}
 
 	n, err := pd.getArrayLength()
