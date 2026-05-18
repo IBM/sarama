@@ -781,12 +781,16 @@ func (p *asyncProducer) newPartitionProducer(topic string, partition int32) chan
 }
 
 func (pp *partitionProducer) backoff(retries int) {
+	pp.parent.backoff(retries)
+}
+
+func (p *asyncProducer) backoff(retries int) {
 	var backoff time.Duration
-	if pp.parent.conf.Producer.Retry.BackoffFunc != nil {
-		maxRetries := pp.parent.conf.Producer.Retry.Max
-		backoff = pp.parent.conf.Producer.Retry.BackoffFunc(retries, maxRetries)
+	if p.conf.Producer.Retry.BackoffFunc != nil {
+		maxRetries := p.conf.Producer.Retry.Max
+		backoff = p.conf.Producer.Retry.BackoffFunc(retries, maxRetries)
 	} else {
-		backoff = pp.parent.conf.Producer.Retry.Backoff
+		backoff = p.conf.Producer.Retry.Backoff
 	}
 	if backoff > 0 {
 		time.Sleep(backoff)
@@ -1451,6 +1455,13 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 			return
 		}
 		msg.retries++
+	}
+
+	// honor Producer.Retry.Backoff between retry attempts (#2469); the
+	// non-idempotent path gets this from partitionProducer.dispatch, but
+	// retryBatch dispatches the produceSet directly to the broker
+	if len(pSet.msgs) > 0 {
+		p.backoff(pSet.msgs[0].retries)
 	}
 
 	// it's expected that a metadata refresh has been requested prior to calling retryBatch
