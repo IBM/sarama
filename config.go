@@ -13,7 +13,10 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-const defaultClientID = "sarama"
+const (
+	defaultClientID                 = "sarama"
+	defaultMetadataRefreshFrequency = 10 * time.Minute
+)
 
 // validClientID specifies the permitted characters for a client.id when
 // connecting to Kafka versions before 1.0.0 (KIP-190)
@@ -557,7 +560,7 @@ func NewConfig() *Config {
 
 	c.Metadata.Retry.Max = 3
 	c.Metadata.Retry.Backoff = 250 * time.Millisecond
-	c.Metadata.RefreshFrequency = 10 * time.Minute
+	c.Metadata.RefreshFrequency = defaultMetadataRefreshFrequency
 	c.Metadata.Full = true
 	c.Metadata.AllowAutoTopicCreation = true
 	c.Metadata.SingleFlight = true

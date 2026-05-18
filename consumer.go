@@ -436,8 +436,9 @@ type partitionConsumer struct {
 	errors             chan *ConsumerError
 	feeder             chan *partitionConsumerResponse
 
-	leaderEpoch          int32
-	preferredReadReplica int32
+	leaderEpoch                int32
+	preferredReadReplica       int32
+	preferredReadReplicaExpiry time.Time
 
 	trigger, dying     chan none
 	dispatcherStop     chan none
@@ -599,22 +600,41 @@ func (child *partitionConsumer) waitForBrokerHandover() {
 
 func (child *partitionConsumer) preferredBroker() (*Broker, int32, error) {
 	if child.preferredReadReplica >= 0 {
-		broker, err := child.consumer.client.Broker(child.preferredReadReplica)
-		if err == nil {
-			return broker, child.leaderEpoch, nil
-		}
-		Logger.Printf(
-			"consumer/%s/%d failed to find active broker for preferred read replica %d - will fallback to leader",
-			child.topic, child.partition, child.preferredReadReplica)
+		// expire the preference periodically so the consumer returns to the
+		// leader to re-evaluate, otherwise a follower that has dropped out of
+		// the ISR (KAFKA-14372) would keep serving stale data forever (#2464)
+		if !child.preferredReadReplicaExpiry.IsZero() && time.Now().After(child.preferredReadReplicaExpiry) {
+			Logger.Printf(
+				"consumer/%s/%d preferred read replica %d expired - will fallback to leader",
+				child.topic, child.partition, child.preferredReadReplica)
+			child.preferredReadReplica = invalidPreferredReplicaID
+			child.preferredReadReplicaExpiry = time.Time{}
+		} else {
+			broker, err := child.consumer.client.Broker(child.preferredReadReplica)
+			if err == nil {
+				return broker, child.leaderEpoch, nil
+			}
+			Logger.Printf(
+				"consumer/%s/%d failed to find active broker for preferred read replica %d - will fallback to leader",
+				child.topic, child.partition, child.preferredReadReplica)
 
-		// if we couldn't find it, discard the replica preference and trigger a
-		// metadata refresh whilst falling back to consuming from the leader again
-		child.preferredReadReplica = invalidPreferredReplicaID
-		_ = child.consumer.client.RefreshMetadata(child.topic)
+			// if we couldn't find it, discard the replica preference and trigger a
+			// metadata refresh whilst falling back to consuming from the leader again
+			child.preferredReadReplica = invalidPreferredReplicaID
+			child.preferredReadReplicaExpiry = time.Time{}
+			_ = child.consumer.client.RefreshMetadata(child.topic)
+		}
 	}
 
 	// if preferred replica cannot be found fallback to leader
 	return child.consumer.client.LeaderAndEpoch(child.topic, child.partition)
+}
+
+func (child *partitionConsumer) preferredReadReplicaLease() time.Duration {
+	if child.conf.Metadata.RefreshFrequency > 0 {
+		return child.conf.Metadata.RefreshFrequency
+	}
+	return defaultMetadataRefreshFrequency
 }
 
 func (child *partitionConsumer) dispatch() error {
@@ -859,6 +879,7 @@ func (child *partitionConsumer) parseResponse(response *FetchResponse) ([]*Consu
 
 	if block.PreferredReadReplica != invalidPreferredReplicaID {
 		child.preferredReadReplica = block.PreferredReadReplica
+		child.preferredReadReplicaExpiry = time.Now().Add(child.preferredReadReplicaLease())
 	}
 
 	if nRecs == 0 {
@@ -1195,6 +1216,7 @@ func (bc *brokerConsumer) handleResponses() {
 
 		// Discard any replica preference.
 		child.preferredReadReplica = invalidPreferredReplicaID
+		child.preferredReadReplicaExpiry = time.Time{}
 
 		if errors.Is(result, errTimedOut) {
 			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because consuming was taking too long\n",
