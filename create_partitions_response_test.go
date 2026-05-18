@@ -25,6 +25,16 @@ var (
 		0, 37, // partition error
 		0, 5, 'e', 'r', 'r', 'o', 'r',
 	}
+
+	createPartitionResponseSuccessV2 = []byte{
+		0, 0, 0, 100, // throttleTimeMs
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		0, 0, // no error
+		0, // no error message
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestCreatePartitionsResponse(t *testing.T) {
@@ -80,4 +90,15 @@ func TestTopicPartitionError(t *testing.T) {
 	if got != want {
 		t.Errorf("TopicPartitionError.Error() = %v; want %v", got, want)
 	}
+}
+
+func TestCreatePartitionsResponseV2(t *testing.T) {
+	resp := &CreatePartitionsResponse{
+		Version:      2,
+		ThrottleTime: 100 * time.Millisecond,
+		TopicPartitionErrors: map[string]*TopicPartitionError{
+			"topic": {},
+		},
+	}
+	testResponse(t, "success", resp, createPartitionResponseSuccessV2)
 }

@@ -29,6 +29,23 @@ var (
 		0, 0, 0, 100,
 		1, // validate only = true
 	}
+
+	createPartitionRequestAssignmentV2 = []byte{
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		0, 0, 0, 3, // 3 partitions
+		3,
+		3,
+		0, 0, 0, 2, 0, 0, 0, 3,
+		0, // empty tagged fields
+		3,
+		0, 0, 0, 3, 0, 0, 0, 1,
+		0, // empty tagged fields
+		0, // empty tagged fields
+		0, 0, 0, 100,
+		1, // validate only = true
+		0, // empty tagged fields
+	}
 )
 
 func TestCreatePartitionsRequest(t *testing.T) {
@@ -49,4 +66,8 @@ func TestCreatePartitionsRequest(t *testing.T) {
 
 	buf = testRequestEncode(t, "assignment", req, createPartitionRequestAssignment)
 	testRequestDecode(t, "assignment", req, buf)
+
+	req.Version = 2
+	buf = testRequestEncode(t, "assignment v2", req, createPartitionRequestAssignmentV2)
+	testRequestDecode(t, "assignment v2", req, buf)
 }
