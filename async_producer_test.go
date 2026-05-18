@@ -1446,6 +1446,73 @@ func TestAsyncProducerIdempotentRetryCheckBatch_2378(t *testing.T) {
 	closeProducer(t, producer)
 }
 
+// test case for https://github.com/IBM/sarama/issues/2469: idempotent producer
+// retries via retryBatch must honor Retry.Backoff / Retry.BackoffFunc when the
+// broker repeatedly returns a retriable error.
+func TestAsyncProducerIdempotentRetryBatchBackoff(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+
+	metadataResponse := &MetadataResponse{
+		Version:      4,
+		ControllerID: 1,
+	}
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+
+	initProducerIDResponse := &InitProducerIDResponse{
+		ThrottleTime:  0,
+		ProducerID:    1000,
+		ProducerEpoch: 1,
+	}
+
+	prodNotLeaderResponse := &ProduceResponse{
+		Version:      3,
+		ThrottleTime: 0,
+	}
+	prodNotLeaderResponse.AddTopicPartition("my_topic", 0, ErrNotEnoughReplicas)
+
+	handler := func(req *request) (res encoderWithHeader) {
+		switch req.body.key() {
+		case 3:
+			return metadataResponse
+		case 22:
+			return initProducerIDResponse
+		case 0:
+			return prodNotLeaderResponse
+		}
+		return nil
+	}
+
+	config := NewTestConfig()
+	config.Version = V0_11_0_0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Retry.Max = 3
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Return.Successes = true
+	config.Producer.Flush.Frequency = 50 * time.Millisecond
+
+	backoffCalls := new(atomic.Int32)
+	config.Producer.Retry.BackoffFunc = func(retries, maxRetries int) time.Duration {
+		backoffCalls.Add(1)
+		return 0
+	}
+
+	broker.setHandler(handler)
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
+
+	expectResults(t, producer, 0, 1)
+
+	broker.Close()
+	closeProducer(t, producer)
+
+	assert.GreaterOrEqual(t, int(backoffCalls.Load()), config.Producer.Retry.Max,
+		"BackoffFunc should be called at least Retry.Max times during idempotent retryBatch")
+}
+
 func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
