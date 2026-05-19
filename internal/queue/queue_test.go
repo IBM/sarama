@@ -8,13 +8,13 @@ import (
 )
 
 func TestQueue(t *testing.T) {
-	t.Run("new queue reports zero length", func(t *testing.T) {
-		q := New[int]()
+	t.Run("zero value reports zero length", func(t *testing.T) {
+		var q Queue[int]
 		assert.Equal(t, 0, q.Length())
 	})
 
 	t.Run("add then peek then remove preserves FIFO order", func(t *testing.T) {
-		q := New[int]()
+		var q Queue[int]
 		for i := 0; i < 5; i++ {
 			q.Add(i)
 		}
@@ -27,7 +27,7 @@ func TestQueue(t *testing.T) {
 	})
 
 	t.Run("grows beyond initial capacity", func(t *testing.T) {
-		q := New[int]()
+		var q Queue[int]
 		const n = 1024
 		for i := 0; i < n; i++ {
 			q.Add(i)
@@ -40,7 +40,7 @@ func TestQueue(t *testing.T) {
 	})
 
 	t.Run("interleaved add and remove wraps around buffer", func(t *testing.T) {
-		q := New[int]()
+		var q Queue[int]
 		var want []int
 		for i := 0; i < 100; i++ {
 			q.Add(i)
@@ -63,7 +63,7 @@ func TestQueue(t *testing.T) {
 
 	t.Run("works with pointer types and clears slot on remove", func(t *testing.T) {
 		type box struct{ v int }
-		q := New[*box]()
+		var q Queue[*box]
 		a, b := &box{v: 1}, &box{v: 2}
 		q.Add(a)
 		q.Add(b)
@@ -79,17 +79,17 @@ func TestQueue(t *testing.T) {
 	})
 
 	t.Run("peek on empty queue panics", func(t *testing.T) {
-		q := New[int]()
+		var q Queue[int]
 		assert.Panics(t, func() { q.Peek() })
 	})
 
 	t.Run("remove on empty queue panics", func(t *testing.T) {
-		q := New[int]()
+		var q Queue[int]
 		assert.Panics(t, func() { q.Remove() })
 	})
 
 	t.Run("shrinks when sparsely populated", func(t *testing.T) {
-		q := New[int]()
+		var q Queue[int]
 		// grow well beyond minLen
 		for i := 0; i < 1024; i++ {
 			q.Add(i)

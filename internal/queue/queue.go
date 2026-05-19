@@ -3,17 +3,13 @@
 package queue
 
 // power of two so wrap-around can use bitwise AND
-const minLen = 16
+const minLen = 1 << 4
 
-// Queue is a generic FIFO ring buffer.
+// Queue is a generic FIFO ring buffer. The zero value is an empty queue ready
+// for use.
 type Queue[T any] struct {
 	buf               []T
 	head, tail, count int
-}
-
-// New returns an empty Queue.
-func New[T any]() *Queue[T] {
-	return &Queue[T]{buf: make([]T, minLen)}
 }
 
 // Length returns the number of elements in the queue.
@@ -21,9 +17,10 @@ func (q *Queue[T]) Length() int {
 	return q.count
 }
 
-// resize rebuilds buf at 2*count with head back at index 0.
+// resize rebuilds buf with head back at index 0, sized to 2*count but never
+// below minLen so the zero value of Queue grows on first Add.
 func (q *Queue[T]) resize() {
-	newBuf := make([]T, q.count<<1)
+	newBuf := make([]T, max(minLen, q.count<<1))
 	if q.tail > q.head {
 		copy(newBuf, q.buf[q.head:q.tail])
 	} else {
