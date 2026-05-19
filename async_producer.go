@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/eapache/go-resiliency/breaker"
-	"github.com/eapache/queue"
 	"github.com/rcrowley/go-metrics"
+
+	"github.com/IBM/sarama/internal/queue"
 )
 
 // ErrProducerRetryBufferOverflow is returned when the bridging retry buffer is full and OOM prevention needs to be applied.
@@ -1034,7 +1035,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 	// This is because the AsyncProduce callback inside the bridge is invoked from the broker
 	// responseReceiver goroutine and closing the broker requires such goroutine to be finished
 	go withRecover(func() {
-		buf := queue.New()
+		var buf queue.Queue[*brokerProducerResponse]
 		for {
 			if buf.Length() == 0 {
 				res, ok := <-pending
@@ -1047,7 +1048,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			}
 			// Send the head pending response or buffer another one
 			// so that we never block the callback
-			headRes := buf.Peek().(*brokerProducerResponse)
+			headRes := buf.Peek()
 			select {
 			case res, ok := <-pending:
 				if !ok {
@@ -1570,7 +1571,7 @@ func (p *asyncProducer) retryHandler() {
 
 	var currentByteSize int64
 	var msg *ProducerMessage
-	buf := queue.New()
+	var buf queue.Queue[*ProducerMessage]
 
 	for {
 		if buf.Length() == 0 {
@@ -1578,8 +1579,8 @@ func (p *asyncProducer) retryHandler() {
 		} else {
 			select {
 			case msg = <-p.retries:
-			case p.input <- buf.Peek().(*ProducerMessage):
-				msgToRemove := buf.Remove().(*ProducerMessage)
+			case p.input <- buf.Peek():
+				msgToRemove := buf.Remove()
 				currentByteSize -= int64(msgToRemove.ByteSize(version))
 				continue
 			}
@@ -1596,7 +1597,7 @@ func (p *asyncProducer) retryHandler() {
 			continue
 		}
 
-		msgToHandle := buf.Peek().(*ProducerMessage)
+		msgToHandle := buf.Peek()
 		if msgToHandle.flags == 0 {
 			select {
 			case p.input <- msgToHandle:
