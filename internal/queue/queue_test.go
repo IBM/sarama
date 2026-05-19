@@ -61,21 +61,16 @@ func TestQueue(t *testing.T) {
 		assert.Equal(t, want, got)
 	})
 
-	t.Run("works with pointer types and clears slot on remove", func(t *testing.T) {
+	t.Run("clears slot on remove so the popped element can be GC'd", func(t *testing.T) {
 		type box struct{ v int }
 		var q Queue[*box]
-		a, b := &box{v: 1}, &box{v: 2}
-		q.Add(a)
-		q.Add(b)
+		q.Add(&box{v: 1})
+		q.Add(&box{v: 2})
+		head := q.head
 		got := q.Remove()
 		require.NotNil(t, got)
 		assert.Equal(t, 1, got.v)
-		// the just-vacated slot must hold the zero value so the referent can
-		// be garbage collected. We can't inspect head directly, but Remove
-		// followed by Add at the same slot must not return the old element.
-		q.Add(&box{v: 3})
-		assert.Equal(t, 2, q.Remove().v)
-		assert.Equal(t, 3, q.Remove().v)
+		assert.Nil(t, q.buf[head])
 	})
 
 	t.Run("peek on empty queue panics", func(t *testing.T) {
