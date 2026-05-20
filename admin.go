@@ -115,6 +115,17 @@ type ClusterAdmin interface {
 	// List the consumer group offsets available in the cluster.
 	ListConsumerGroupOffsets(group string, topicPartitions map[string][]int32) (*OffsetFetchResponse, error)
 
+	// ListConsumerGroupOffsetsBatch fetches committed offsets for multiple consumer groups
+	// in a single round trip per coordinator using OffsetFetch v8+ (KIP-709). A nil
+	// partitions map fetches offsets for all topics in that group.
+	//
+	// Returns ErrUnsupportedVersion if any coordinator advertises < v8. Requires
+	// Config.ApiVersionsRequest to be enabled for the version check to take effect.
+	//
+	// On a retriable per-group error all coordinators are re-resolved and every group
+	// is re-batched. Non-retriable per-group errors are returned in the per-group Err.
+	ListConsumerGroupOffsetsBatch(groupTopics map[string]map[string][]int32) (map[string]*OffsetFetchResponseGroup, error)
+
 	// ListOffsets lists offsets for the specified topic partitions.
 	// Each value is OffsetNewest, OffsetOldest, or a timestamp in milliseconds.
 	// Results are keyed by topic/partition and include per-partition errors.
@@ -1205,14 +1216,75 @@ func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions m
 		if err != nil {
 			return err
 		}
-		if !errors.Is(response.Err, ErrNoError) {
-			return response.Err
+		if groupErr := response.GroupError(); !errors.Is(groupErr, ErrNoError) {
+			return groupErr
 		}
 
 		return nil
 	})
 
 	return response, err
+}
+
+func (ca *clusterAdmin) ListConsumerGroupOffsetsBatch(groupTopics map[string]map[string][]int32) (map[string]*OffsetFetchResponseGroup, error) {
+	type brokerBatch struct {
+		broker *Broker
+		groups []OffsetFetchRequestGroup
+	}
+
+	result := make(map[string]*OffsetFetchResponseGroup, len(groupTopics))
+	err := ca.retryOnError(isRetriableGroupCoordinatorError, func() (err error) {
+		defer func() {
+			if err != nil && isRetriableGroupCoordinatorError(err) {
+				for group := range groupTopics {
+					_ = ca.client.RefreshCoordinator(group)
+				}
+			}
+		}()
+
+		// re-resolve coordinators each attempt; key by broker id to coalesce groups
+		// sharing a coordinator
+		batches := make(map[int32]*brokerBatch)
+		for group, partitions := range groupTopics {
+			coordinator, cerr := ca.client.Coordinator(group)
+			if cerr != nil {
+				return cerr
+			}
+			batch, ok := batches[coordinator.ID()]
+			if !ok {
+				batch = &brokerBatch{broker: coordinator}
+				batches[coordinator.ID()] = batch
+			}
+			batch.groups = append(batch.groups,
+				OffsetFetchRequestGroup{GroupId: group, Partitions: partitions})
+		}
+
+		clear(result)
+		for _, batch := range batches {
+			version, ok := batch.broker.negotiateApiVersion(apiKeyOffsetFetch, 8)
+			if !ok {
+				return ErrUnsupportedVersion
+			}
+			resp, ferr := batch.broker.FetchOffset(&OffsetFetchRequest{Version: version, Groups: batch.groups})
+			if ferr != nil {
+				return ferr
+			}
+			for i := range resp.Groups {
+				g := &resp.Groups[i]
+				// retriable per-group error re-batches every group on retry; non-retriable
+				// errors are left on g.Err for the caller
+				if g.Err != ErrNoError && isRetriableGroupCoordinatorError(g.Err) {
+					return g.Err
+				}
+				result[g.GroupId] = g
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (ca *clusterAdmin) DeleteConsumerGroupOffset(group string, topic string, partition int32) error {
