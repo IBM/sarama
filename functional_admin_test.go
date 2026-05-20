@@ -425,6 +425,59 @@ func TestFuncAdminListConsumerGroupOffsets(t *testing.T) {
 	t.Logf("coordinator broker %d", coordinator.id)
 }
 
+func TestFuncAdminListConsumerGroupOffsetsBatch(t *testing.T) {
+	checkKafkaVersion(t, "3.0.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	groupA := testFuncConsumerGroupID(t)
+	groupB := testFuncConsumerGroupID(t)
+	const (
+		topic      = "test.4"
+		partition  = int32(0)
+		offsetGrpA = int64(2)
+		offsetGrpB = int64(3)
+	)
+
+	for _, c := range []struct {
+		group  string
+		offset int64
+	}{{groupA, offsetGrpA}, {groupB, offsetGrpB}} {
+		offsetMgr, err := NewOffsetManagerFromClient(c.group, client)
+		require.NoError(t, err)
+		markOffset(t, offsetMgr, topic, partition, c.offset)
+		offsetMgr.Commit()
+		safeClose(t, offsetMgr)
+	}
+
+	adminClient, err := NewClusterAdminFromClient(client)
+	require.NoError(t, err)
+
+	result, err := adminClient.ListConsumerGroupOffsetsBatch(map[string]map[string][]int32{
+		groupA: {topic: {partition}},
+		groupB: {topic: {partition}},
+	})
+	require.NoError(t, err)
+
+	for _, c := range []struct {
+		group  string
+		offset int64
+	}{{groupA, offsetGrpA}, {groupB, offsetGrpB}} {
+		require.Contains(t, result, c.group)
+		require.Equal(t, ErrNoError, result[c.group].Err)
+		block := result[c.group].GetBlock(topic, partition)
+		require.NotNil(t, block, "missing block for %s/%s/%d", c.group, topic, partition)
+		require.Equal(t, ErrNoError, block.Err)
+		require.Equal(t, c.offset, block.Offset)
+	}
+}
+
 func TestFuncAdminListOffsets(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "2.1.0.0")
