@@ -1172,21 +1172,23 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 	return nil
 }
 
-// negotiateApiVersion returns the broker's advertised maximum version for apiKey,
-// or minVersion when no ApiVersions info is available (optimistic fallback).
-// Returns (0, false) if the broker advertises a maximum below minVersion.
-func (b *Broker) negotiateApiVersion(apiKey, minVersion int16) (int16, bool) {
+// negotiateApiVersion returns the highest API version supported by both the
+// broker and the caller's requested range, or maxVersion when no ApiVersions
+// info is available (optimistic fallback).
+// Returns (0, false) if the broker advertises no overlap with the requested
+// version range.
+func (b *Broker) negotiateApiVersion(apiKey, minVersion, maxVersion int16) (int16, bool) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
 	r := b.brokerAPIVersions[apiKey]
 	if r == nil {
-		return minVersion, true
+		return maxVersion, true
 	}
-	if r.maxVersion < minVersion {
+	if r.maxVersion < minVersion || r.minVersion > maxVersion {
 		return 0, false
 	}
-	return r.maxVersion, true
+	return min(maxVersion, r.maxVersion), true
 }
 
 func handleResponsePromise(req protocolBody, res protocolBody, promise *responsePromise, metricRegistry metrics.Registry) error {

@@ -1227,6 +1227,8 @@ func (ca *clusterAdmin) ListConsumerGroupOffsets(group string, topicPartitions m
 }
 
 func (ca *clusterAdmin) ListConsumerGroupOffsetsBatch(groupTopics map[string]map[string][]int32) (map[string]*OffsetFetchResponseGroup, error) {
+	const maxOffsetFetchBatchVersion = 8
+
 	type brokerBatch struct {
 		broker *Broker
 		groups []OffsetFetchRequestGroup
@@ -1261,7 +1263,7 @@ func (ca *clusterAdmin) ListConsumerGroupOffsetsBatch(groupTopics map[string]map
 
 		clear(result)
 		for _, batch := range batches {
-			version, ok := batch.broker.negotiateApiVersion(apiKeyOffsetFetch, 8)
+			version, ok := batch.broker.negotiateApiVersion(apiKeyOffsetFetch, 8, maxOffsetFetchBatchVersion)
 			if !ok {
 				return ErrUnsupportedVersion
 			}
