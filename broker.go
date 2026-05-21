@@ -576,12 +576,12 @@ func (b *Broker) Produce(request *ProduceRequest) (*ProduceResponse, error) {
 
 // Fetch returns a FetchResponse or error
 func (b *Broker) Fetch(request *FetchRequest) (*FetchResponse, error) {
-	// snapshot meters under the lock; Open may reassign them on reconnect
-	b.lock.Lock()
-	fetchRate, brokerFetchRate := b.fetchRate, b.brokerFetchRate
-	b.lock.Unlock()
-
 	defer func() {
+		// snapshot meters under the lock; Open may reassign them on reconnect
+		b.lock.Lock()
+		fetchRate, brokerFetchRate := b.fetchRate, b.brokerFetchRate
+		b.lock.Unlock()
+
 		if fetchRate != nil {
 			fetchRate.Mark(1)
 		}

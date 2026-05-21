@@ -352,20 +352,17 @@ func TestBrokerFetch(t *testing.T) {
 		req := &FetchRequest{MaxWaitTime: 100, MinBytes: 1, Version: 4}
 
 		var wg sync.WaitGroup
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 500 {
 				_, _ = broker.Fetch(req)
 			}
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			for range 50 {
 				_ = broker.Close()
 				_ = broker.Open(conf)
 			}
-		}()
+		})
 		wg.Wait()
 	})
 }
