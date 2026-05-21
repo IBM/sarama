@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -332,6 +333,38 @@ func TestBrokerOpenSASLv1FailThenReopenTransportError(t *testing.T) {
 
 	require.NotErrorIs(t, broker.Open(conf2), ErrAlreadyConnected)
 	_, _ = broker.Connected()
+}
+
+func TestBrokerFetch(t *testing.T) {
+	t.Run("metric mark does not race with concurrent reopen", func(t *testing.T) {
+		mb := NewMockBroker(t, 1)
+		defer mb.Close()
+		mb.SetHandlerByMap(map[string]MockResponse{
+			"FetchRequest": NewMockFetchResponse(t, 1),
+		})
+
+		broker := NewBroker(mb.Addr())
+		conf := NewTestConfig()
+		conf.Version = V0_11_0_0
+		require.NoError(t, broker.Open(conf))
+		t.Cleanup(func() { _ = broker.Close() })
+
+		req := &FetchRequest{MaxWaitTime: 100, MinBytes: 1, Version: 4}
+
+		var wg sync.WaitGroup
+		wg.Go(func() {
+			for range 500 {
+				_, _ = broker.Fetch(req)
+			}
+		})
+		wg.Go(func() {
+			for range 50 {
+				_ = broker.Close()
+				_ = broker.Open(conf)
+			}
+		})
+		wg.Wait()
+	})
 }
 
 var ErrTokenFailure = errors.New("Failure generating token")
