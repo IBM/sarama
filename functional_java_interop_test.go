@@ -303,3 +303,175 @@ func javaConsumerArgs(topic string, startOffset int64, count int) []string {
 		"--max-messages", fmt.Sprint(count),
 	)
 }
+
+// produceKeyedWithJava produces key:value messages via the Java console producer,
+// which uses the DefaultPartitioner (murmur2) when a key is present.
+func produceKeyedWithJava(t *testing.T, topic string, messages []struct{ key, value string }) {
+	t.Helper()
+	producerPath := fmt.Sprintf("/opt/kafka-%s/bin/kafka-console-producer.sh", FunctionalTestEnv.KafkaVersion)
+	args := []string{"compose", "exec", "-T", brokerContainer, producerPath}
+	if kafkaVersionAtLeast("2.5.0") {
+		args = append(args, "--bootstrap-server", brokerAddr)
+	} else {
+		args = append(args, "--broker-list", brokerAddr)
+	}
+	args = append(args,
+		"--topic", topic,
+		"--property", "parse.key=true",
+		"--property", "key.separator=:",
+	)
+	cmd := exec.Command("docker", args...)
+
+	stdin, err := cmd.StdinPipe()
+	require.NoError(t, err)
+
+	stderr, err := cmd.StderrPipe()
+	require.NoError(t, err)
+
+	var stderrOutput strings.Builder
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		s := bufio.NewScanner(stderr)
+		for s.Scan() {
+			stderrOutput.WriteString(s.Text() + "\n")
+		}
+	}()
+
+	require.NoError(t, cmd.Start())
+
+	for _, msg := range messages {
+		_, err := fmt.Fprintf(stdin, "%s:%s\n", msg.key, msg.value)
+		if err != nil {
+			stdin.Close()
+			waitErr := cmd.Wait()
+			wg.Wait()
+			if waitErr != nil {
+				err = fmt.Errorf("failed to write message: %w; Java producer failed: %w; stderr: %s", err, waitErr, stderrOutput.String())
+			}
+			require.NoError(t, err)
+		}
+	}
+	stdin.Close()
+
+	err = cmd.Wait()
+	wg.Wait()
+	if err != nil {
+		t.Logf("Java producer stderr: %s", stderrOutput.String())
+		require.NoError(t, err, "Java producer failed")
+	}
+}
+
+// consumeKeyedFromPartition consumes up to count messages from a specific partition,
+// returning them as key+value pairs.
+func consumeKeyedFromPartition(t *testing.T, topic string, partition int32, startOffset int64, count int) map[string]string {
+	t.Helper()
+	config := NewFunctionalTestConfig()
+	consumer, err := NewConsumer(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer consumer.Close()
+
+	pc, err := consumer.ConsumePartition(topic, partition, startOffset)
+	require.NoError(t, err)
+	defer pc.Close()
+
+	result := make(map[string]string, count)
+	ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+	defer cancel()
+
+	for len(result) < count {
+		select {
+		case msg := <-pc.Messages():
+			require.NotNil(t, msg)
+			result[string(msg.Key)] = string(msg.Value)
+		case err := <-pc.Errors():
+			require.NoError(t, err)
+		case <-ctx.Done():
+			return result
+		}
+	}
+	return result
+}
+
+// TestJavaMurmur2PartitionerInterop verifies that Sarama's NewMurmur2Partitioner
+// routes keyed messages to the same partitions as the Apache Kafka Java client's
+// DefaultPartitioner (which uses murmur2 internally).
+func TestJavaMurmur2PartitionerInterop(t *testing.T) {
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	checkKafkaVersion(t, "0.10.0")
+
+	const topic = "test.64"
+	const numPartitions = int32(64)
+
+	keyedMessages := []struct{ key, value string }{
+		{"foo", "value-foo"},
+		{"bar", "value-bar"},
+		{"baz", "value-baz"},
+		{"kafka", "value-kafka"},
+		{"sarama", "value-sarama"},
+		{"hello", "value-hello"},
+		{"world", "value-world"},
+	}
+
+	// record the end offsets per partition before we produce anything
+	startOffsets := make([]int64, numPartitions)
+	for p := int32(0); p < numPartitions; p++ {
+		startOffsets[p] = endOffsetForPartition(t, topic, p)
+	}
+
+	// produce with Java's DefaultPartitioner (murmur2)
+	produceKeyedWithJava(t, topic, keyedMessages)
+
+	// determine which partition each key landed on via Java
+	javaPartition := make(map[string]int32, len(keyedMessages))
+	for p := int32(0); p < numPartitions; p++ {
+		endOff := endOffsetForPartition(t, topic, p)
+		if endOff <= startOffsets[p] {
+			continue
+		}
+		msgs := consumeKeyedFromPartition(t, topic, p, startOffsets[p], int(endOff-startOffsets[p]))
+		for key := range msgs {
+			javaPartition[key] = p
+		}
+	}
+	require.Len(t, javaPartition, len(keyedMessages), "Java producer did not produce all messages")
+
+	// record new end offsets before Sarama production
+	for p := int32(0); p < numPartitions; p++ {
+		startOffsets[p] = endOffsetForPartition(t, topic, p)
+	}
+
+	// produce the same keyed messages with Sarama's murmur2 partitioner
+	config := NewFunctionalTestConfig()
+	config.Producer.Partitioner = NewMurmur2Partitioner
+	config.Producer.Return.Successes = true
+	config.Producer.RequiredAcks = WaitForAll
+
+	producer, err := NewSyncProducer(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer producer.Close()
+
+	saramaPartition := make(map[string]int32, len(keyedMessages))
+	for _, msg := range keyedMessages {
+		partition, _, err := producer.SendMessage(&ProducerMessage{
+			Topic: topic,
+			Key:   StringEncoder(msg.key),
+			Value: StringEncoder(msg.value),
+		})
+		require.NoError(t, err)
+		saramaPartition[msg.key] = partition
+	}
+
+	// assert every key landed on the same partition for both producers
+	for _, msg := range keyedMessages {
+		require.Equal(t,
+			javaPartition[msg.key],
+			saramaPartition[msg.key],
+			"key %q: Java partition %d != Sarama murmur2 partition %d",
+			msg.key, javaPartition[msg.key], saramaPartition[msg.key],
+		)
+	}
+}
