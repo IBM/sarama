@@ -549,6 +549,74 @@ func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
 	}
 }
 
+func TestFuncAdminListConsumerGroupOffsetsBatchWithNewerBrokerApiVersion(t *testing.T) {
+	t.Parallel()
+	checkKafkaVersion(t, "4.0.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	topic := "test.1"
+	partition := int32(0)
+	groupA := testFuncConsumerGroupID(t) + ".a"
+	groupB := testFuncConsumerGroupID(t) + ".b"
+	offsets := map[string]int64{
+		groupA: 1,
+		groupB: 2,
+	}
+
+	for group, offset := range offsets {
+		response, err := adminClient.AlterConsumerGroupOffsets(group, map[string]map[int32]OffsetAndMetadata{
+			topic: {partition: {
+				Offset:      offset,
+				LeaderEpoch: -1,
+			}},
+		}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !errors.Is(response.Errors[topic][partition], ErrNoError) {
+			t.Fatalf("unexpected alter error for %s/%d in group %s: %v", topic, partition, group, response.Errors[topic][partition])
+		}
+	}
+
+	result, err := adminClient.ListConsumerGroupOffsetsBatch(map[string]map[string][]int32{
+		groupA: {topic: {partition}},
+		groupB: {topic: {partition}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for group, offset := range offsets {
+		groupResult := result[group]
+		if groupResult == nil {
+			t.Fatalf("missing result for group %s", group)
+		}
+		if !errors.Is(groupResult.Err, ErrNoError) {
+			t.Fatalf("unexpected group error for %s: %v", group, groupResult.Err)
+		}
+		block := groupResult.GetBlock(topic, partition)
+		if block == nil {
+			t.Fatalf("missing offset for %s/%d in group %s", topic, partition, group)
+		}
+		if !errors.Is(block.Err, ErrNoError) {
+			t.Fatalf("unexpected fetch error for %s/%d in group %s: %v", topic, partition, group, block.Err)
+		}
+		if block.Offset != offset {
+			t.Fatalf("unexpected offset for %s/%d in group %s: want %d, got %d", topic, partition, group, offset, block.Offset)
+		}
+	}
+}
+
 func TestFuncAdminDescribeLogDirs(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "2.0.0.0")
