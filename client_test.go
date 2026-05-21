@@ -3,11 +3,14 @@
 package sarama
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"runtime"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
@@ -1358,6 +1361,28 @@ func TestClientCoordinatorWithoutConsumerOffsetsTopic(t *testing.T) {
 	coordinator.Close()
 	seedBroker.Close()
 	safeClose(t, client)
+}
+
+func TestClientBackgroundMetadataUpdaterIgnoresNoTopics(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	var buf bytes.Buffer
+	orig := Logger
+	Logger = log.New(&buf, "", 0)
+	t.Cleanup(func() { Logger = orig })
+
+	conf := NewTestConfig()
+	conf.Metadata.Full = false
+	conf.Metadata.RefreshFrequency = 10 * time.Millisecond
+	client, err := NewClient([]string{seedBroker.Addr()}, conf)
+	require.NoError(t, err)
+	t.Cleanup(func() { safeClose(t, client) })
+
+	require.Never(t, func() bool {
+		return strings.Contains(buf.String(), "no specific topics to update metadata")
+	}, 200*time.Millisecond, 10*time.Millisecond,
+		"background updater should not log when no topics are registered")
 }
 
 func TestClientAutorefreshShutdownRace(t *testing.T) {

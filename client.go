@@ -939,6 +939,10 @@ func (client *client) backgroundMetadataUpdater() {
 		select {
 		case <-ticker.C:
 			if err := client.refreshMetadata(); err != nil {
+				// expected no-op, not worth logging every tick
+				if errors.Is(err, ErrNoTopicsToUpdateMetadata) {
+					continue
+				}
 				Logger.Println("Client background metadata update:", err)
 			}
 		case <-client.closer:
