@@ -1,5 +1,7 @@
 package sarama
 
+import "encoding/binary"
+
 // murmur2 implements the same hashing algorithm used by the Apache Kafka Java
 // client's DefaultPartitioner (org.apache.kafka.common.utils.Utils.murmur2).
 // It is a variant of MurmurHash2 with a fixed seed of 0x9747b28c and
@@ -16,7 +18,7 @@ func murmur2(b []byte) uint32 {
 	)
 	h := seed ^ uint32(len(b))
 	for len(b) >= 4 {
-		k := uint32(b[3])<<24 + uint32(b[2])<<16 + uint32(b[1])<<8 + uint32(b[0])
+		k := binary.LittleEndian.Uint32(b)
 		b = b[4:]
 		k *= m
 		k ^= k >> r

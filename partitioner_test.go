@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"crypto/rand"
+	"fmt"
 	"hash/crc32"
 	"hash/fnv"
 	"log"
@@ -333,7 +334,7 @@ func TestMurmur2(t *testing.T) {
 		{"sarama", 770765511},
 	}
 	for _, tc := range testCases {
-		t.Run(tc.input, func(t *testing.T) {
+		t.Run(fmt.Sprintf("input=%q", tc.input), func(t *testing.T) {
 			got := murmur2([]byte(tc.input))
 			if got != tc.expected {
 				t.Errorf("murmur2(%q) = %d, want %d", tc.input, got, tc.expected)
