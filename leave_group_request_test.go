@@ -31,10 +31,24 @@ var (
 		0, // empty tagged fields
 		0, // empty tagged fields
 	}
+	basicLeaveGroupRequestV5 = []byte{
+		4, 'f', 'o', 'o',
+		3,                     // Two Member
+		5, 'm', 'i', 'd', '1', // MemberId
+		0,                     // GroupInstanceId  nil
+		0,                     // Reason nil
+		0,                     // empty tagged fields
+		5, 'm', 'i', 'd', '2', // MemberId
+		4, 'g', 'i', 'd', // GroupInstanceId
+		5, 'l', 'e', 'f', 't', // Reason
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestLeaveGroupRequest(t *testing.T) {
 	groupInstanceId := "gid"
+	reason := "left"
 	tests := []struct {
 		CaseName     string
 		Version      int16
@@ -59,8 +73,8 @@ func TestLeaveGroupRequest(t *testing.T) {
 				Version: 3,
 				GroupId: "foo",
 				Members: []MemberIdentity{
-					{"mid1", nil},
-					{"mid2", &groupInstanceId},
+					{"mid1", nil, nil},
+					{"mid2", &groupInstanceId, nil},
 				},
 			},
 		},
@@ -72,8 +86,21 @@ func TestLeaveGroupRequest(t *testing.T) {
 				Version: 4,
 				GroupId: "foo",
 				Members: []MemberIdentity{
-					{"mid1", nil},
-					{"mid2", &groupInstanceId},
+					{"mid1", nil, nil},
+					{"mid2", &groupInstanceId, nil},
+				},
+			},
+		},
+		{
+			"v5",
+			5,
+			basicLeaveGroupRequestV5,
+			&LeaveGroupRequest{
+				Version: 5,
+				GroupId: "foo",
+				Members: []MemberIdentity{
+					{"mid1", nil, nil},
+					{"mid2", &groupInstanceId, &reason},
 				},
 			},
 		},

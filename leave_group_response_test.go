@@ -39,6 +39,20 @@ var (
 		0, // empty tagged fields
 		0, // empty tagged fields
 	}
+	leaveGroupResponseV5NoError = []byte{
+		0, 0, 0, 100, // ThrottleTime
+		0x00, 0x00, // Err
+		3,                     // Two Members
+		5, 'm', 'i', 'd', '1', // MemberId
+		0,    // GroupInstanceId
+		0, 0, // Err
+		0,                     // empty tagged fields
+		5, 'm', 'i', 'd', '2', // MemberId
+		4, 'g', 'i', 'd', // GroupInstanceId
+		0, 25, // Err
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestLeaveGroupResponse(t *testing.T) {
@@ -97,6 +111,20 @@ func TestLeaveGroupResponse(t *testing.T) {
 			leaveGroupResponseV4NoError,
 			&LeaveGroupResponse{
 				Version:      4,
+				ThrottleTime: 100,
+				Err:          ErrNoError,
+				Members: []MemberResponse{
+					{"mid1", nil, ErrNoError},
+					{"mid2", &groupInstanceId, ErrUnknownMemberId},
+				},
+			},
+		},
+		{
+			"v5",
+			5,
+			leaveGroupResponseV5NoError,
+			&LeaveGroupResponse{
+				Version:      5,
 				ThrottleTime: 100,
 				Err:          ErrNoError,
 				Members: []MemberResponse{

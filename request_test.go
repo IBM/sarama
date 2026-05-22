@@ -380,6 +380,12 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			},
 		},
 		{
+			V3_2_0_0,
+			map[int16]int16{
+				apiKeyLeaveGroup: 5, // up from 4
+			},
+		},
+		{
 			saramaMaxVersions, // placeholder version for current maximums implemented by Sarama
 			map[int16]int16{
 				apiKeyProduce:            maxVersion(&ProduceRequest{}),
