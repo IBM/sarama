@@ -665,14 +665,16 @@ func (c *consumerGroup) leave() error {
 		GroupId:  c.groupID,
 		MemberId: c.memberID,
 	}
-	if c.config.Version.IsAtLeast(V0_11_0_0) {
+	if c.config.Version.IsAtLeast(V3_2_0_0) {
+		req.Version = 5
+	} else if c.config.Version.IsAtLeast(V2_4_0_0) {
+		req.Version = 4
+	} else if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 2
+	} else if c.config.Version.IsAtLeast(V0_11_0_0) {
 		req.Version = 1
 	}
-	if c.config.Version.IsAtLeast(V2_0_0_0) {
-		req.Version = 2
-	}
-	if c.config.Version.IsAtLeast(V2_4_0_0) {
-		req.Version = 4
+	if req.Version >= 3 {
 		req.Members = append(req.Members, MemberIdentity{
 			MemberId: c.memberID,
 		})
