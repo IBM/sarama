@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"crypto/rand"
+	"fmt"
 	"hash/crc32"
 	"hash/fnv"
 	"log"
@@ -315,6 +316,113 @@ func TestWithCustomFallbackPartitioner(t *testing.T) {
 			t.Error(err)
 		}
 		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: ByteEncoder(buf)}, 50)
+	}
+}
+
+func TestMurmur2(t *testing.T) {
+	// expected values verified against the Apache Kafka Java client's
+	// org.apache.kafka.common.utils.Utils.murmur2() implementation
+	testCases := []struct {
+		input    string
+		expected uint32
+	}{
+		{"foo", 597841616},
+		{"bar", 988958145},
+		{"baz", 1973573280},
+		{"", 275646681},
+		{"kafka", 3496464228},
+		{"sarama", 770765511},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("input=%q", tc.input), func(t *testing.T) {
+			got := murmur2([]byte(tc.input))
+			if got != tc.expected {
+				t.Errorf("murmur2(%q) = %d, want %d", tc.input, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestMurmur2Partitioner(t *testing.T) {
+	partitioner := NewMurmur2Partitioner("mytopic")
+
+	t.Run("single partition always returns 0", func(t *testing.T) {
+		choice, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder("foo")}, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if choice != 0 {
+			t.Errorf("expected partition 0, got %d", choice)
+		}
+	})
+
+	t.Run("nil key returns random partition in range", func(t *testing.T) {
+		for i := 0; i < 50; i++ {
+			choice, err := partitioner.Partition(&ProducerMessage{}, 50)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if choice < 0 || choice >= 50 {
+				t.Errorf("partition %d out of range [0, 50)", choice)
+			}
+		}
+	})
+
+	t.Run("consistent for same key", func(t *testing.T) {
+		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: StringEncoder("foo")}, 100)
+		assertPartitioningConsistent(t, partitioner, &ProducerMessage{Key: StringEncoder("bar")}, 100)
+	})
+
+	t.Run("partition in range for various keys", func(t *testing.T) {
+		keys := []string{"foo", "bar", "baz", "kafka", "sarama", "1468509572224"}
+		for _, key := range keys {
+			choice, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(key)}, 100)
+			if err != nil {
+				t.Fatalf("key %q: %v", key, err)
+			}
+			if choice < 0 || choice >= 100 {
+				t.Errorf("key %q: partition %d out of range [0, 100)", key, choice)
+			}
+		}
+	})
+
+	t.Run("known Java-compatible partition assignments", func(t *testing.T) {
+		// these expected partitions were verified against the Apache Kafka Java
+		// client's DefaultPartitioner with 100 partitions
+		testCases := []struct {
+			key       string
+			partition int32
+		}{
+			{"foo", 16},
+			{"bar", 45},
+			{"baz", 80},
+			{"kafka", 80},
+			{"sarama", 11},
+		}
+		for _, tc := range testCases {
+			choice, err := partitioner.Partition(&ProducerMessage{Key: StringEncoder(tc.key)}, 100)
+			if err != nil {
+				t.Fatalf("key %q: %v", tc.key, err)
+			}
+			if choice != tc.partition {
+				t.Errorf("key %q: got partition %d, want %d", tc.key, choice, tc.partition)
+			}
+		}
+	})
+}
+
+func TestMurmur2PartitionerConsistency(t *testing.T) {
+	partitioner := NewMurmur2Partitioner("mytopic")
+	ep, ok := partitioner.(DynamicConsistencyPartitioner)
+	if !ok {
+		t.Fatal("murmur2 partitioner does not implement DynamicConsistencyPartitioner")
+	}
+
+	if !ep.MessageRequiresConsistency(&ProducerMessage{Key: StringEncoder("hi")}) {
+		t.Error("messages with keys should require consistency")
+	}
+	if ep.MessageRequiresConsistency(&ProducerMessage{}) {
+		t.Error("messages without keys should not require consistency")
 	}
 }
 
