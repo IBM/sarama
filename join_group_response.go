@@ -196,7 +196,7 @@ func (r *JoinGroupResponse) headerVersion() int16 {
 }
 
 func (r *JoinGroupResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 7
+	return r.Version >= 0 && r.Version <= 8
 }
 
 func (r *JoinGroupResponse) isFlexible() bool {
@@ -209,6 +209,8 @@ func (r *JoinGroupResponse) isFlexibleVersion(version int16) bool {
 
 func (r *JoinGroupResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 8:
+		return V3_1_0_0
 	case 7:
 		return V2_5_0_0
 	case 6:

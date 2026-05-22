@@ -450,34 +450,32 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		SessionTimeout: int32(c.config.Consumer.Group.Session.Timeout / time.Millisecond),
 		ProtocolType:   "consumer",
 	}
-	if c.config.Version.IsAtLeast(V0_10_1_0) {
-		req.Version = 1
-		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond)
-	}
-	if c.config.Version.IsAtLeast(V0_11_0_0) {
-		req.Version = 2
-	}
-	if c.config.Version.IsAtLeast(V0_11_0_0) {
-		req.Version = 2
-	}
-	if c.config.Version.IsAtLeast(V2_0_0_0) {
-		req.Version = 3
-	}
 	// from JoinGroupRequest v4 onwards (due to KIP-394) the client will actually
 	// send two JoinGroupRequests, once with the empty member id, and then again
 	// with the assigned id from the first response. This is handled via the
 	// ErrMemberIdRequired case.
-	if c.config.Version.IsAtLeast(V2_2_0_0) {
-		req.Version = 4
-	}
-	if c.config.Version.IsAtLeast(V2_3_0_0) {
+	if c.config.Version.IsAtLeast(V3_1_0_0) {
+		req.Version = 8
+	} else if c.config.Version.IsAtLeast(V2_5_0_0) {
+		req.Version = 7
+	} else if c.config.Version.IsAtLeast(V2_4_0_0) {
+		req.Version = 6
+	} else if c.config.Version.IsAtLeast(V2_3_0_0) {
 		req.Version = 5
+	} else if c.config.Version.IsAtLeast(V2_2_0_0) {
+		req.Version = 4
+	} else if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 3
+	} else if c.config.Version.IsAtLeast(V0_11_0_0) {
+		req.Version = 2
+	} else if c.config.Version.IsAtLeast(V0_10_1_0) {
+		req.Version = 1
+	}
+	if req.Version >= 1 {
+		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond)
+	}
+	if req.Version >= 5 {
 		req.GroupInstanceId = c.groupInstanceId
-		if c.config.Version.IsAtLeast(V2_5_0_0) {
-			req.Version = 7
-		} else if c.config.Version.IsAtLeast(V2_4_0_0) {
-			req.Version = 6
-		}
 	}
 
 	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {

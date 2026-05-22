@@ -113,10 +113,26 @@ var (
 		0, // empty tagged fields
 		0, // empty tagged fields
 	}
+
+	joinGroupRequestV8 = []byte{
+		10, 'T', 'e', 's', 't', 'G', 'r', 'o', 'u', 'p', // Group ID
+		0, 0, 0, 100, // Session timeout
+		0, 0, 0, 200, // Rebalance timeout
+		12, 'O', 'n', 'e', 'P', 'r', 'o', 't', 'o', 'c', 'o', 'l', // Member ID
+		4, 'g', 'i', 'd', // GroupInstanceId
+		9, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', // Protocol Type
+		2,                // 1 group protocol
+		4, 'o', 'n', 'e', // Protocol name
+		4, 0x01, 0x02, 0x03, // protocol metadata
+		0,                               // empty tagged fields
+		7, 'r', 'e', 'j', 'o', 'i', 'n', // Reason
+		0, // empty tagged fields
+	}
 )
 
 func TestJoinGroupRequestV3plus(t *testing.T) {
 	groupInstanceId := "gid"
+	reason := "rejoin"
 	tests := []struct {
 		CaseName     string
 		Version      int16
@@ -161,6 +177,27 @@ func TestJoinGroupRequestV3plus(t *testing.T) {
 				OrderedGroupProtocols: []*GroupProtocol{
 					{Name: "one", Metadata: []byte{1, 2, 3}},
 				},
+			},
+		},
+		{
+			"v8",
+			8,
+			joinGroupRequestV8,
+			&JoinGroupRequest{
+				Version:          8,
+				GroupId:          "TestGroup",
+				SessionTimeout:   100,
+				RebalanceTimeout: 200,
+				MemberId:         "OneProtocol",
+				GroupInstanceId:  &groupInstanceId,
+				ProtocolType:     "consumer",
+				GroupProtocols: map[string][]byte{
+					"one": {1, 2, 3},
+				},
+				OrderedGroupProtocols: []*GroupProtocol{
+					{Name: "one", Metadata: []byte{1, 2, 3}},
+				},
+				Reason: &reason,
 			},
 		},
 	}
