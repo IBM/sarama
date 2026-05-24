@@ -516,9 +516,9 @@ func (rd *realFlexibleDecoder) getInt32Array() ([]int32, error) {
 		return nil, nil
 	}
 
-	arrayLength := int(n) - 1
+	arrayLength := int64(n) - 1
 
-	if rd.remaining()/4 < arrayLength {
+	if int64(rd.remaining())/4 < arrayLength {
 		rd.off = len(rd.raw)
 		return nil, ErrInsufficientData
 	}
