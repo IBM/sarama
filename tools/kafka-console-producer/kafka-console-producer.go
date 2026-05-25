@@ -83,7 +83,7 @@ func main() {
 		printUsageErrorAndExit(fmt.Sprintf("Partitioner %s not supported.", *partitioner))
 	}
 
-	message := &sarama.ProducerMessage{Topic: *topic, Partition: int32(*partition)}
+	message := &sarama.ProducerMessage{Topic: *topic, Partition: int32(*partition)} //nolint:gosec // G115 - partition number from CLI flag fits int32
 
 	if *key != "" {
 		message.Key = sarama.StringEncoder(*key)

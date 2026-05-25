@@ -35,7 +35,7 @@ func (rd *realDecoder) getInt8() (int8, error) {
 		rd.off = len(rd.raw)
 		return -1, ErrInsufficientData
 	}
-	tmp := int8(rd.raw[rd.off])
+	tmp := int8(rd.raw[rd.off]) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	rd.off++
 	return tmp, nil
 }
@@ -45,7 +45,7 @@ func (rd *realDecoder) getInt16() (int16, error) {
 		rd.off = len(rd.raw)
 		return -1, ErrInsufficientData
 	}
-	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:]))
+	tmp := int16(binary.BigEndian.Uint16(rd.raw[rd.off:])) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	rd.off += 2
 	return tmp, nil
 }
@@ -55,7 +55,7 @@ func (rd *realDecoder) getInt32() (int32, error) {
 		rd.off = len(rd.raw)
 		return -1, ErrInsufficientData
 	}
-	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+	tmp := int32(binary.BigEndian.Uint32(rd.raw[rd.off:])) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	rd.off += 4
 	return tmp, nil
 }
@@ -65,7 +65,7 @@ func (rd *realDecoder) getInt64() (int64, error) {
 		rd.off = len(rd.raw)
 		return -1, ErrInsufficientData
 	}
-	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
+	tmp := int64(binary.BigEndian.Uint64(rd.raw[rd.off:])) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	rd.off += 8
 	return tmp, nil
 }
@@ -117,7 +117,7 @@ func (rd *realDecoder) getArrayLength() (int, error) {
 	}
 	// cast to int32 first to get correct signedness for length before then
 	// casting to int for ease of interop
-	tmp := int(int32(binary.BigEndian.Uint32(rd.raw[rd.off:])))
+	tmp := int(int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	rd.off += 4
 	if tmp < -1 {
 		return -1, errInvalidArrayLength
@@ -249,7 +249,7 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 
 	ret := make([]int32, n)
 	for i := range ret {
-		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:])) //nolint:gosec // G115 - same-width signed/unsigned conversion
 		rd.off += 4
 	}
 	return ret, nil
@@ -271,7 +271,7 @@ func (rd *realDecoder) getInt64Array() ([]int64, error) {
 
 	ret := make([]int64, n)
 	for i := range ret {
-		ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
+		ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:])) //nolint:gosec // G115 - same-width signed/unsigned conversion
 		rd.off += 8
 	}
 	return ret, nil
@@ -338,7 +338,7 @@ func (rd *realDecoder) peekInt8(offset int) (int8, error) {
 	if rd.remaining() < offset+byteLen {
 		return -1, ErrInsufficientData
 	}
-	return int8(rd.raw[rd.off+offset]), nil
+	return int8(rd.raw[rd.off+offset]), nil //nolint:gosec // G115 - same-width signed/unsigned conversion
 }
 
 // stacks
@@ -388,12 +388,12 @@ func (rd *realFlexibleDecoder) getArrayLength() (int, error) {
 		return 0, nil
 	}
 
-	if n-1 > uint64(rd.remaining()) {
+	if n-1 > uint64(rd.remaining()) { //nolint:gosec // G115 - remaining() is non-negative
 		rd.off = len(rd.raw)
 		return 0, ErrInsufficientData
 	}
 
-	return int(n - 1), nil
+	return int(n - 1), nil //nolint:gosec // G115 - value bounded by remaining() above
 }
 
 func (rd *realFlexibleDecoder) getEmptyTaggedFieldArray() (int, error) {
@@ -414,11 +414,11 @@ func (rd *realFlexibleDecoder) getEmptyTaggedFieldArray() (int, error) {
 		if err != nil {
 			return 0, err
 		}
-		if length > uint64(rd.remaining()) {
+		if length > uint64(rd.remaining()) { //nolint:gosec // G115 - remaining() is non-negative
 			rd.off = len(rd.raw)
 			return 0, ErrInsufficientData
 		}
-		if _, err := rd.getRawBytes(int(length)); err != nil {
+		if _, err := rd.getRawBytes(int(length)); err != nil { //nolint:gosec // G115 - value bounded by remaining() above
 			return 0, err
 		}
 	}
@@ -448,11 +448,11 @@ func (rd *realFlexibleDecoder) getTaggedFieldArray(decoders taggedFieldDecoders)
 		if err != nil {
 			return err
 		}
-		if length > uint64(rd.remaining()) {
+		if length > uint64(rd.remaining()) { //nolint:gosec // G115 - remaining() is non-negative
 			rd.off = len(rd.raw)
 			return ErrInsufficientData
 		}
-		bytes, err := rd.getRawBytes(int(length))
+		bytes, err := rd.getRawBytes(int(length)) //nolint:gosec // G115 - value bounded by remaining() above
 		if err != nil {
 			return err
 		}
@@ -472,12 +472,12 @@ func (rd *realFlexibleDecoder) getBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if n > 0 && n-1 > uint64(rd.remaining()) {
+	if n > 0 && n-1 > uint64(rd.remaining()) { //nolint:gosec // G115 - remaining() is non-negative
 		rd.off = len(rd.raw)
 		return nil, ErrInsufficientData
 	}
 
-	length := int(n) - 1
+	length := int(n) - 1 //nolint:gosec // G115 - value bounded by remaining() above
 	return rd.getRawBytes(length)
 }
 
@@ -486,12 +486,12 @@ func (rd *realFlexibleDecoder) getStringLength() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	if length > 0 && length-1 > uint64(rd.remaining()) {
+	if length > 0 && length-1 > uint64(rd.remaining()) { //nolint:gosec // G115 - remaining() is non-negative
 		rd.off = len(rd.raw)
 		return 0, ErrInsufficientData
 	}
 
-	n := int(length) - 1
+	n := int(length) - 1 //nolint:gosec // G115 - value bounded by remaining() above
 
 	if n < -1 {
 		return 0, errInvalidStringLength
@@ -549,7 +549,7 @@ func (rd *realFlexibleDecoder) getInt32Array() ([]int32, error) {
 	ret := make([]int32, int(arrayLength)) //nolint:gosec // G115 - value bounded by remaining() above
 
 	for i := range ret {
-		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:]))
+		ret[i] = int32(binary.BigEndian.Uint32(rd.raw[rd.off:])) //nolint:gosec // G115 - same-width signed/unsigned conversion
 		rd.off += 4
 	}
 	return ret, nil

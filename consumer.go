@@ -1289,7 +1289,7 @@ func (bc *brokerConsumer) abort(err error) {
 func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	request := &FetchRequest{
 		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
-		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
+		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond), //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 	}
 	// Version 1 is the same as version 0.
 	if bc.consumer.conf.Version.IsAtLeast(V0_9_0_0) {

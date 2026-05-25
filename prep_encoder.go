@@ -192,7 +192,7 @@ func (pe *prepEncoder) metricRegistry() metrics.Registry {
 }
 
 func (pe *prepFlexibleEncoder) putArrayLength(in int) error {
-	pe.putUVarint(uint64(in + 1))
+	pe.putUVarint(uint64(in + 1)) //nolint:gosec // G115 - array length is non-negative
 	return nil
 }
 

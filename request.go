@@ -101,7 +101,7 @@ func decodeRequest(r io.Reader) (*request, int, error) {
 	}
 
 	bytesRead += len(lengthBytes)
-	length := int32(binary.BigEndian.Uint32(lengthBytes))
+	length := int32(binary.BigEndian.Uint32(lengthBytes)) //nolint:gosec // G115 - same-width signed/unsigned conversion
 
 	if length <= 4 || length > MaxRequestSize {
 		return nil, bytesRead, PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", length)}

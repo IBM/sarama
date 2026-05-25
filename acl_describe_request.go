@@ -26,7 +26,7 @@ func (d *DescribeAclsRequest) key() int16 {
 }
 
 func (d *DescribeAclsRequest) version() int16 {
-	return int16(d.Version)
+	return int16(d.Version) //nolint:gosec // G115 - version validated by isValidVersion
 }
 
 func (d *DescribeAclsRequest) headerVersion() int16 {
@@ -41,7 +41,7 @@ func (d *DescribeAclsRequest) isValidVersion() bool {
 }
 
 func (d *DescribeAclsRequest) isFlexible() bool {
-	return d.isFlexibleVersion(int16(d.Version))
+	return d.isFlexibleVersion(int16(d.Version)) //nolint:gosec // G115 - version validated by isValidVersion
 }
 
 func (d *DescribeAclsRequest) isFlexibleVersion(version int16) bool {

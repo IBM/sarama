@@ -209,7 +209,7 @@ func generateMessages(topic string, partition, messageLoad, messageSize int) []*
 		}
 		messages[i] = &sarama.ProducerMessage{
 			Topic:     topic,
-			Partition: int32(partition),
+			Partition: int32(partition), //nolint:gosec // G115 - partition number from CLI flag fits int32
 			Value:     sarama.ByteEncoder(payload),
 		}
 	}
@@ -245,7 +245,7 @@ func main() {
 
 	config.Net.MaxOpenRequests = *maxOpenRequests
 	config.Producer.MaxMessageBytes = *maxMessageBytes
-	config.Producer.RequiredAcks = sarama.RequiredAcks(*requiredAcks)
+	config.Producer.RequiredAcks = sarama.RequiredAcks(*requiredAcks) //nolint:gosec // G115 - RequiredAcks enum fits int16
 	config.Producer.Timeout = *timeout
 	config.Producer.Partitioner = parsePartitioner(*partitioner, *partition)
 	config.Producer.Compression = parseCompression(*compression)

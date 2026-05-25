@@ -23,22 +23,22 @@ type realFlexibleEncoder struct {
 // primitives
 
 func (re *realEncoder) putInt8(in int8) {
-	re.raw[re.off] = byte(in)
+	re.raw[re.off] = byte(in) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	re.off++
 }
 
 func (re *realEncoder) putInt16(in int16) {
-	binary.BigEndian.PutUint16(re.raw[re.off:], uint16(in))
+	binary.BigEndian.PutUint16(re.raw[re.off:], uint16(in)) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	re.off += 2
 }
 
 func (re *realEncoder) putInt32(in int32) {
-	binary.BigEndian.PutUint32(re.raw[re.off:], uint32(in))
+	binary.BigEndian.PutUint32(re.raw[re.off:], uint32(in)) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	re.off += 4
 }
 
 func (re *realEncoder) putInt64(in int64) {
-	binary.BigEndian.PutUint64(re.raw[re.off:], uint64(in))
+	binary.BigEndian.PutUint64(re.raw[re.off:], uint64(in)) //nolint:gosec // G115 - same-width signed/unsigned conversion
 	re.off += 8
 }
 
@@ -56,7 +56,7 @@ func (re *realEncoder) putFloat64(in float64) {
 }
 
 func (re *realEncoder) putArrayLength(in int) error {
-	re.putInt32(int32(in))
+	re.putInt32(int32(in)) //nolint:gosec // G115 - array length fits in int32
 	return nil
 }
 
@@ -69,11 +69,11 @@ func (re *realEncoder) putBool(in bool) {
 }
 
 func (re *realEncoder) putKError(in KError) {
-	re.putInt16(int16(in))
+	re.putInt16(int16(in)) //nolint:gosec // G115 - error code fits in int16
 }
 
 func (re *realEncoder) putDurationMs(in time.Duration) {
-	re.putInt32(int32(in / time.Millisecond))
+	re.putInt32(int32(in / time.Millisecond)) //nolint:gosec // G115 - duration in ms fits in int32
 }
 
 // collection
@@ -89,7 +89,7 @@ func (re *realEncoder) putBytes(in []byte) error {
 		re.putInt32(-1)
 		return nil
 	}
-	re.putInt32(int32(len(in)))
+	re.putInt32(int32(len(in))) //nolint:gosec // G115 - byte slice length fits in int32
 	return re.putRawBytes(in)
 }
 
@@ -103,7 +103,7 @@ func (re *realEncoder) putVarintBytes(in []byte) error {
 }
 
 func (re *realEncoder) putString(in string) error {
-	re.putInt16(int16(len(in)))
+	re.putInt16(int16(len(in))) //nolint:gosec // G115 - string length fits in int16
 	copy(re.raw[re.off:], in)
 	re.off += len(in)
 	return nil
@@ -199,7 +199,7 @@ func (re *realEncoder) metricRegistry() metrics.Registry {
 
 func (re *realFlexibleEncoder) putArrayLength(in int) error {
 	// 0 represents a null array, so +1 has to be added
-	re.putUVarint(uint64(in + 1))
+	re.putUVarint(uint64(in + 1)) //nolint:gosec // G115 - array length is non-negative
 	return nil
 }
 

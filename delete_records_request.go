@@ -40,7 +40,7 @@ func (d *DeleteRecordsRequest) encode(pe packetEncoder) error {
 			return err
 		}
 	}
-	pe.putInt32(int32(d.Timeout / time.Millisecond))
+	pe.putInt32(int32(d.Timeout / time.Millisecond)) //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 
 	return nil
 }

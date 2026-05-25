@@ -64,7 +64,7 @@ func main() {
 		printErrorAndExit(69, "Failed to start consumer: %s", err)
 	}
 
-	pc, err := c.ConsumePartition(*topic, int32(*partition), initialOffset)
+	pc, err := c.ConsumePartition(*topic, int32(*partition), initialOffset) //nolint:gosec // G115 - partition number from CLI flag fits int32
 	if err != nil {
 		printErrorAndExit(69, "Failed to start partition consumer: %s", err)
 	}

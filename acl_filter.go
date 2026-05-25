@@ -12,13 +12,13 @@ type AclFilter struct {
 }
 
 func (a *AclFilter) encode(pe packetEncoder) error {
-	pe.putInt8(int8(a.ResourceType))
+	pe.putInt8(int8(a.ResourceType)) //nolint:gosec // G115 - enum fits int8 by protocol definition
 	if err := pe.putNullableString(a.ResourceName); err != nil {
 		return err
 	}
 
 	if a.Version >= 1 {
-		pe.putInt8(int8(a.ResourcePatternTypeFilter))
+		pe.putInt8(int8(a.ResourcePatternTypeFilter)) //nolint:gosec // G115 - enum fits int8 by protocol definition
 	}
 
 	if err := pe.putNullableString(a.Principal); err != nil {
@@ -27,8 +27,8 @@ func (a *AclFilter) encode(pe packetEncoder) error {
 	if err := pe.putNullableString(a.Host); err != nil {
 		return err
 	}
-	pe.putInt8(int8(a.Operation))
-	pe.putInt8(int8(a.PermissionType))
+	pe.putInt8(int8(a.Operation))      //nolint:gosec // G115 - enum fits int8 by protocol definition
+	pe.putInt8(int8(a.PermissionType)) //nolint:gosec // G115 - enum fits int8 by protocol definition
 
 	pe.putEmptyTaggedFieldArray()
 	return nil

@@ -447,7 +447,7 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 	req := &JoinGroupRequest{
 		GroupId:        c.groupID,
 		MemberId:       c.memberID,
-		SessionTimeout: int32(c.config.Consumer.Group.Session.Timeout / time.Millisecond),
+		SessionTimeout: int32(c.config.Consumer.Group.Session.Timeout / time.Millisecond), //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 		ProtocolType:   "consumer",
 	}
 	// from JoinGroupRequest v4 onwards (due to KIP-394) the client will actually
@@ -472,7 +472,7 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		req.Version = 1
 	}
 	if req.Version >= 1 {
-		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond)
+		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond) //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 	}
 	if req.Version >= 5 {
 		req.GroupInstanceId = c.groupInstanceId

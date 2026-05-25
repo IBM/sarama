@@ -180,7 +180,7 @@ func (ps *produceSet) copyFunc(predicate func(topic string, partition int32) boo
 func (ps *produceSet) buildRequest() *ProduceRequest {
 	req := &ProduceRequest{
 		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
-		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
+		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond), //nolint:gosec // G115 - timeout in ms fits in int32
 	}
 	if ps.parent.conf.Version.IsAtLeast(V0_10_0_0) {
 		req.Version = 2
@@ -216,7 +216,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 				//  under the RecordBatch section for details.)
 				rb := set.recordsToSend.RecordBatch
 				if len(rb.Records) > 0 {
-					rb.LastOffsetDelta = int32(len(rb.Records) - 1)
+					rb.LastOffsetDelta = int32(len(rb.Records) - 1) //nolint:gosec // G115 - record count fits in int32
 					var maxTimestampDelta time.Duration
 					for i, record := range rb.Records {
 						record.OffsetDelta = int64(i)

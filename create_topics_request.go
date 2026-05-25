@@ -62,7 +62,7 @@ func (c *CreateTopicsRequest) encode(pe packetEncoder) error {
 		}
 	}
 
-	pe.putInt32(int32(c.Timeout / time.Millisecond))
+	pe.putInt32(int32(c.Timeout / time.Millisecond)) //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 
 	if c.Version >= 1 {
 		pe.putBool(c.ValidateOnly)

@@ -8,7 +8,7 @@ type Resource struct {
 }
 
 func (r *Resource) encode(pe packetEncoder, version int16) error {
-	pe.putInt8(int8(r.ResourceType))
+	pe.putInt8(int8(r.ResourceType)) //nolint:gosec // G115 - enum fits int8 by protocol definition
 
 	if err := pe.putString(r.ResourceName); err != nil {
 		return err
@@ -19,7 +19,7 @@ func (r *Resource) encode(pe packetEncoder, version int16) error {
 			Logger.Print("Cannot encode an unknown resource pattern type, using Literal instead")
 			r.ResourcePatternType = AclPatternLiteral
 		}
-		pe.putInt8(int8(r.ResourcePatternType))
+		pe.putInt8(int8(r.ResourcePatternType)) //nolint:gosec // G115 - enum fits int8 by protocol definition
 	}
 
 	return nil
@@ -63,8 +63,8 @@ func (a *Acl) encode(pe packetEncoder) error {
 		return err
 	}
 
-	pe.putInt8(int8(a.Operation))
-	pe.putInt8(int8(a.PermissionType))
+	pe.putInt8(int8(a.Operation))      //nolint:gosec // G115 - enum fits int8 by protocol definition
+	pe.putInt8(int8(a.PermissionType)) //nolint:gosec // G115 - enum fits int8 by protocol definition
 
 	pe.putEmptyTaggedFieldArray()
 	return nil

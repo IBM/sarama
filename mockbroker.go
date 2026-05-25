@@ -208,7 +208,7 @@ func (b *MockBroker) readToBytes(r io.Reader) ([]byte, error) {
 	}
 
 	bytesRead += len(lengthBytes)
-	length := int32(binary.BigEndian.Uint32(lengthBytes))
+	length := int32(binary.BigEndian.Uint32(lengthBytes)) //nolint:gosec // G115 - same-width signed/unsigned conversion
 
 	if length <= 4 || length > MaxRequestSize {
 		return nil, PacketDecodingError{fmt.Sprintf("message of length %d too large or too small", length)}
@@ -308,7 +308,7 @@ func (b *MockBroker) handleRequests(conn io.ReadWriteCloser, idx int, wg *sync.W
 				continue
 			}
 
-			resHeader := b.encodeHeader(res.headerVersion(), req.correlationID, uint32(len(encodedRes)))
+			resHeader := b.encodeHeader(res.headerVersion(), req.correlationID, uint32(len(encodedRes))) //nolint:gosec // G115 - encoded response length is non-negative
 			if _, err = conn.Write(resHeader); err != nil {
 				b.serverError(err)
 				break
@@ -353,7 +353,7 @@ func (b *MockBroker) encodeHeader(headerVersion int16, correlationId int32, payl
 
 	resHeader := make([]byte, headerLength)
 	binary.BigEndian.PutUint32(resHeader, payloadLength+headerLength-4)
-	binary.BigEndian.PutUint32(resHeader[4:], uint32(correlationId))
+	binary.BigEndian.PutUint32(resHeader[4:], uint32(correlationId)) //nolint:gosec // G115 - same-width signed/unsigned conversion
 
 	if headerVersion >= 1 {
 		binary.PutUvarint(resHeader[8:], 0)

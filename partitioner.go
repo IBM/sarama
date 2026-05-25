@@ -103,7 +103,7 @@ func NewRandomPartitioner(topic string) Partitioner {
 }
 
 func (p *randomPartitioner) Partition(message *ProducerMessage, numPartitions int32) (int32, error) {
-	return int32(p.generator.Intn(int(numPartitions))), nil
+	return int32(p.generator.Intn(int(numPartitions))), nil //nolint:gosec // G115 - Intn result is in [0, numPartitions)
 }
 
 func (p *randomPartitioner) RequiresConsistency() bool {
@@ -225,13 +225,13 @@ func (p *hashPartitioner) Partition(message *ProducerMessage, numPartitions int3
 	// the old version; if referenceAbs is set we are compatible with the reference java client
 	// but not past Sarama versions
 	if p.referenceAbs {
-		partition = (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions
+		partition = (int32(p.hasher.Sum32()) & 0x7fffffff) % numPartitions //nolint:gosec // G115 - high bit cleared by mask
 	} else if p.hashUnsigned {
 		// librdkafka treats the hashed value as unsigned.  If `hashUnsigned` is set we are compatible
 		// with librdkafka's `consistent` partitioning but not past Sarama versions
-		partition = int32(p.hasher.Sum32() % uint32(numPartitions))
+		partition = int32(p.hasher.Sum32() % uint32(numPartitions)) //nolint:gosec // G115 - modulo result fits in int32
 	} else {
-		partition = int32(p.hasher.Sum32()) % numPartitions
+		partition = int32(p.hasher.Sum32()) % numPartitions //nolint:gosec // G115 - same-width signed/unsigned conversion
 		if partition < 0 {
 			partition = -partition
 		}

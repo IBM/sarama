@@ -16,7 +16,7 @@ func murmur2(b []byte) uint32 {
 		m    uint32 = 0x5bd1e995
 		r           = 24
 	)
-	h := seed ^ uint32(len(b))
+	h := seed ^ uint32(len(b)) //nolint:gosec // G115 - length is non-negative
 	for len(b) >= 4 {
 		k := binary.LittleEndian.Uint32(b)
 		b = b[4:]

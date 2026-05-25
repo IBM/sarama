@@ -132,7 +132,7 @@ func (b *RecordBatch) decode(pd packetDecoder) (err error) {
 	if err != nil {
 		return err
 	}
-	b.Codec = CompressionCodec(int8(attributes) & compressionCodecMask)
+	b.Codec = CompressionCodec(int8(attributes) & compressionCodecMask) //nolint:gosec // G115 - codec stored in low bits of attributes
 	b.Control = attributes&controlMask == controlMask
 	b.LogAppendTime = attributes&timestampTypeMask == timestampTypeMask
 	b.IsTransactional = attributes&isTransactionalMask == isTransactionalMask

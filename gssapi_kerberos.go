@@ -70,7 +70,7 @@ func (krbAuth *GSSAPIKerberosAuth) writePackage(broker *Broker, payload []byte) 
 	}
 	finalPackage := make([]byte, size)
 	copy(finalPackage[4:], payload)
-	binary.BigEndian.PutUint32(finalPackage, uint32(length))
+	binary.BigEndian.PutUint32(finalPackage, uint32(length)) //nolint:gosec // G115 - length checked against MaxInt32 above
 	bytes, err := broker.conn.Write(finalPackage)
 	if err != nil {
 		return bytes, err
@@ -103,7 +103,7 @@ func (krbAuth *GSSAPIKerberosAuth) newAuthenticatorChecksum() []byte {
 	binary.LittleEndian.PutUint32(a[:4], 16)
 	for _, i := range flags {
 		f := binary.LittleEndian.Uint32(a[20:24])
-		f |= uint32(i)
+		f |= uint32(i) //nolint:gosec // G115 - gssapi flag constants fit uint32
 		binary.LittleEndian.PutUint32(a[20:24], f)
 	}
 	return a

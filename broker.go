@@ -1587,8 +1587,8 @@ func (b *Broker) sendAndReceiveSASLPlainAuthV0() error {
 	}
 
 	length := len(b.conf.Net.SASL.AuthIdentity) + 1 + len(b.conf.Net.SASL.User) + 1 + len(b.conf.Net.SASL.Password)
-	authBytes := make([]byte, length+4) // 4 byte length header + auth data
-	binary.BigEndian.PutUint32(authBytes, uint32(length))
+	authBytes := make([]byte, length+4)                   // 4 byte length header + auth data
+	binary.BigEndian.PutUint32(authBytes, uint32(length)) //nolint:gosec // G115 - SASL credentials bounded well within uint32
 	copy(authBytes[4:], b.conf.Net.SASL.AuthIdentity+"\x00"+b.conf.Net.SASL.User+"\x00"+b.conf.Net.SASL.Password)
 
 	requestTime := time.Now()
@@ -1675,8 +1675,8 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 		// Will be decremented in updateIncomingCommunicationMetrics (except error)
 		b.addRequestInFlightMetrics(1)
 		length := len(msg)
-		authBytes := make([]byte, length+4) // 4 byte length header + auth data
-		binary.BigEndian.PutUint32(authBytes, uint32(length))
+		authBytes := make([]byte, length+4)                   // 4 byte length header + auth data
+		binary.BigEndian.PutUint32(authBytes, uint32(length)) //nolint:gosec // G115 - SASL message bounded well within uint32
 		copy(authBytes[4:], msg)
 		_, err := b.write(authBytes)
 		b.updateOutgoingCommunicationMetrics(length + 4)
@@ -1697,7 +1697,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 		if int64(payloadLength) > int64(MaxResponseSize) {
 			return PacketDecodingError{fmt.Sprintf("SASL response of length %d too large", payloadLength)}
 		}
-		payload := make([]byte, int(payloadLength))
+		payload := make([]byte, int(payloadLength)) //nolint:gosec // G115 - value bounded by MaxResponseSize above
 		n, err := b.readFull(payload)
 		if err != nil {
 			b.addRequestInFlightMetrics(-1)

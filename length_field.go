@@ -31,7 +31,7 @@ func (l *lengthField) decode(pd packetDecoder) error {
 	if err != nil {
 		return err
 	}
-	if l.length > int32(pd.remaining()) {
+	if l.length > int32(pd.remaining()) { //nolint:gosec // G115 - remaining() is non-negative and fits in int32
 		return ErrInsufficientData
 	}
 	return nil
@@ -46,12 +46,12 @@ func (l *lengthField) reserveLength() int {
 }
 
 func (l *lengthField) run(curOffset int, buf []byte) error {
-	binary.BigEndian.PutUint32(buf[l.startOffset:], uint32(curOffset-l.startOffset-4))
+	binary.BigEndian.PutUint32(buf[l.startOffset:], uint32(curOffset-l.startOffset-4)) //nolint:gosec // G115 - offset difference is non-negative
 	return nil
 }
 
 func (l *lengthField) check(curOffset int, buf []byte) error {
-	if int32(curOffset-l.startOffset-4) != l.length {
+	if int32(curOffset-l.startOffset-4) != l.length { //nolint:gosec // G115 - offset difference fits in int32
 		return PacketDecodingError{"length field invalid"}
 	}
 

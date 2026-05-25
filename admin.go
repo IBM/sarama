@@ -479,14 +479,14 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 
 		for _, topic := range metadataResp.Topics {
 			topicDetails := TopicDetail{
-				NumPartitions: int32(len(topic.Partitions)),
+				NumPartitions: int32(len(topic.Partitions)), //nolint:gosec // G115 - partition count fits int32 by Kafka protocol
 			}
 			if len(topic.Partitions) > 0 {
 				topicDetails.ReplicaAssignment = make(map[int32][]int32, len(topic.Partitions))
 				for _, partition := range topic.Partitions {
 					topicDetails.ReplicaAssignment[partition.ID] = partition.Replicas
 				}
-				topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas))
+				topicDetails.ReplicationFactor = int16(len(topic.Partitions[0].Replicas)) //nolint:gosec // G115 - replica count fits int16 by Kafka protocol
 			}
 			currentTopicsDetailsMap[topic.Name] = topicDetails
 

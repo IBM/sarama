@@ -18,7 +18,7 @@ func (i *InitProducerIDRequest) encode(pe packetEncoder) error {
 	if err := pe.putNullableString(i.TransactionalID); err != nil {
 		return err
 	}
-	pe.putInt32(int32(i.TransactionTimeout / time.Millisecond))
+	pe.putInt32(int32(i.TransactionTimeout / time.Millisecond)) //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 	if i.Version >= 3 {
 		pe.putInt64(i.ProducerID)
 		pe.putInt16(i.ProducerEpoch)

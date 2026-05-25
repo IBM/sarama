@@ -104,7 +104,7 @@ func (d *QuotaFilterComponent) encode(pe packetEncoder) error {
 	}
 
 	// MatchType
-	pe.putInt8(int8(d.MatchType))
+	pe.putInt8(int8(d.MatchType)) //nolint:gosec // G115 - match type enum fits int8 by protocol definition
 
 	// Match
 	if d.MatchType == QuotaMatchAny {

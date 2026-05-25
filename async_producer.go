@@ -721,7 +721,7 @@ func (tp *topicProducer) partitionMessage(msg *ProducerMessage) error {
 		return err
 	}
 
-	numPartitions := int32(len(partitions))
+	numPartitions := int32(len(partitions)) //nolint:gosec // G115 - partition count fits int32 by Kafka protocol
 
 	if numPartitions == 0 {
 		return ErrLeaderNotAvailable

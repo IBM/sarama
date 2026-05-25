@@ -1108,7 +1108,7 @@ func (mr *MockListAclsResponse) For(reqBody versionedDecoder) encoderWithHeader 
 
 	acl.Acls = append(acl.Acls, &Acl{Operation: req.Operation, PermissionType: permissionType, Host: host, Principal: principal})
 	res.ResourceAcls = append(res.ResourceAcls, acl)
-	res.Version = int16(req.Version)
+	res.Version = int16(req.Version) //nolint:gosec // G115 - API version fits in int16
 	return res
 }
 
@@ -1194,7 +1194,7 @@ func (mr *MockDeleteAclsResponse) For(reqBody versionedDecoder) encoderWithHeade
 		response.MatchingAcls = append(response.MatchingAcls, &MatchingAcl{Err: ErrNoError})
 		res.FilterResponses = append(res.FilterResponses, response)
 	}
-	res.Version = int16(req.Version)
+	res.Version = int16(req.Version) //nolint:gosec // G115 - API version fits in int16
 	return res
 }
 
@@ -1510,7 +1510,7 @@ func (m *MockInitProducerIDResponse) SetProducerID(id int) *MockInitProducerIDRe
 }
 
 func (m *MockInitProducerIDResponse) SetProducerEpoch(epoch int) *MockInitProducerIDResponse {
-	m.producerEpoch = int16(epoch)
+	m.producerEpoch = int16(epoch) //nolint:gosec // G115 - producer epoch fits in int16
 	return m
 }
 

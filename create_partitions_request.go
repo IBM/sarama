@@ -27,7 +27,7 @@ func (c *CreatePartitionsRequest) encode(pe packetEncoder) error {
 		}
 	}
 
-	pe.putInt32(int32(c.Timeout / time.Millisecond))
+	pe.putInt32(int32(c.Timeout / time.Millisecond)) //nolint:gosec // G115 - protocol field is int32; config values fit at ms resolution
 
 	pe.putBool(c.ValidateOnly)
 

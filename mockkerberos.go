@@ -51,7 +51,7 @@ func (h *KafkaGSSAPIHandler) MockKafkaGSSAPI(buffer []byte) []byte {
 	lenBytes := len(packBytes)
 	response := make([]byte, lenBytes+4)
 	copy(response[4:], packBytes)
-	binary.BigEndian.PutUint32(response, uint32(lenBytes))
+	binary.BigEndian.PutUint32(response, uint32(lenBytes)) //nolint:gosec // G115 - byte slice length is non-negative
 	return response
 }
 
