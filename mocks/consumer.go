@@ -227,6 +227,7 @@ func (c *Consumer) ExpectConsumePartition(topic string, partition int32, offset 
 			topic:              topic,
 			partition:          partition,
 			offset:             offset,
+			initialOffset:      highWatermarkOffset,
 			messages:           make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
 			suppressedMessages: make(chan *sarama.ConsumerMessage, c.config.ChannelBufferSize),
 			errors:             make(chan *sarama.ConsumerError, c.config.ChannelBufferSize),
@@ -255,6 +256,7 @@ type PartitionConsumer struct {
 	topic                         string
 	partition                     int32
 	offset                        int64
+	initialOffset                 int64
 	messages                      chan *sarama.ConsumerMessage
 	suppressedMessages            chan *sarama.ConsumerMessage
 	errors                        chan *sarama.ConsumerError
@@ -343,6 +345,10 @@ func (pc *PartitionConsumer) Errors() <-chan *sarama.ConsumerError {
 // Messages implements the Messages method from the sarama.PartitionConsumer interface.
 func (pc *PartitionConsumer) Messages() <-chan *sarama.ConsumerMessage {
 	return pc.messages
+}
+
+func (pc *PartitionConsumer) InitialOffset() int64 {
+	return pc.initialOffset
 }
 
 func (pc *PartitionConsumer) HighWaterMarkOffset() int64 {
