@@ -78,7 +78,7 @@ linters:
     - linters:
       - paralleltest
       path: functional.*_test\.go
-    - path: (.+)\.go$
+    - path: _test\.go$
       text: 'G115: integer overflow conversion'
     - path: (.+)\.go$
       text: 'G404: Use of weak random number generator'
