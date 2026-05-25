@@ -9,16 +9,9 @@ import (
 // v1
 // v2 = v3 = v4
 // v5 = v6 = v7
-// Produce Response (Version: 7) => [responses] throttle_time_ms
-//   responses => topic [partition_responses]
-//     topic => STRING
-//     partition_responses => partition error_code base_offset log_append_time log_start_offset
-//       partition => INT32
-//       error_code => INT16
-//       base_offset => INT64
-//       log_append_time => INT64
-//       log_start_offset => INT64
-//   throttle_time_ms => INT32
+// v9+ is flexible (KIP-482)
+// v10+ adds CurrentLeader / NodeEndpoints tagged fields (KIP-951)
+// v12 is the KIP-890 transactions v2 marker
 
 // partition_responses in protocol
 type ProduceResponseBlock struct {
@@ -78,9 +71,20 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 				if b.RecordErrors[i].BatchIndexErrorMessage, err = pd.getNullableString(); err != nil {
 					return err
 				}
+				if version >= 9 {
+					if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+						return err
+					}
+				}
 			}
 		}
 		if b.ErrorMessage, err = pd.getNullableString(); err != nil {
+			return err
+		}
+	}
+
+	if version >= 9 {
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
 	}
@@ -115,10 +119,17 @@ func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err erro
 			if err = pe.putNullableString(re.BatchIndexErrorMessage); err != nil {
 				return err
 			}
+			if version >= 9 {
+				pe.putEmptyTaggedFieldArray()
+			}
 		}
 		if err = pe.putNullableString(b.ErrorMessage); err != nil {
 			return err
 		}
+	}
+
+	if version >= 9 {
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	return nil
@@ -169,10 +180,21 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 			}
 			r.Blocks[name][id] = block
 		}
+		if r.isFlexible() {
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
+		}
 	}
 
 	if r.Version >= 1 {
 		if r.ThrottleTime, err = pd.getDurationMs(); err != nil {
+			return err
+		}
+	}
+
+	if r.isFlexible() {
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
 	}
@@ -201,10 +223,17 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
+		if r.isFlexible() {
+			pe.putEmptyTaggedFieldArray()
+		}
 	}
 
 	if r.Version >= 1 {
 		pe.putDurationMs(r.ThrottleTime)
+	}
+
+	if r.isFlexible() {
+		pe.putEmptyTaggedFieldArray()
 	}
 	return nil
 }
@@ -218,15 +247,34 @@ func (r *ProduceResponse) version() int16 {
 }
 
 func (r *ProduceResponse) headerVersion() int16 {
+	if r.isFlexible() {
+		return 1
+	}
 	return 0
 }
 
 func (r *ProduceResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 8
+	return r.Version >= 0 && r.Version <= 12
+}
+
+func (r *ProduceResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *ProduceResponse) isFlexibleVersion(version int16) bool {
+	return version >= 9
 }
 
 func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 12:
+		return V4_0_0_0
+	case 11:
+		return V3_0_0_0
+	case 10:
+		return V2_8_0_0
+	case 9:
+		return V2_5_0_0
 	case 8:
 		return V2_4_0_0
 	case 7:

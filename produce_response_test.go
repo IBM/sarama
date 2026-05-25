@@ -173,6 +173,58 @@ func TestProduceResponseEncode(t *testing.T) {
 	}
 }
 
+func TestProduceResponseV9FlexibleRoundTrip(t *testing.T) {
+	for _, v := range []int16{9, 10, 11, 12} {
+		batchIndexErrMsg := "bad rec"
+		errMsg := "bad batch"
+		response := ProduceResponse{
+			Version:      v,
+			ThrottleTime: 100 * time.Millisecond,
+			Blocks: map[string]map[int32]*ProduceResponseBlock{
+				"foo": {
+					1: {
+						Err:         ErrInvalidMessage,
+						Offset:      255,
+						Timestamp:   time.Unix(1, 0),
+						StartOffset: 50,
+						RecordErrors: []ProduceResponseRecordError{{
+							BatchIndex:             3,
+							BatchIndexErrorMessage: &batchIndexErrMsg,
+						}},
+						ErrorMessage: &errMsg,
+					},
+				},
+			},
+		}
+
+		buf, err := encode(&response, nil)
+		if err != nil {
+			t.Fatalf("v%d encode failed: %v", v, err)
+		}
+		decoded := ProduceResponse{}
+		decoded.Version = v
+		if err := versionedDecode(buf, &decoded, v, nil); err != nil {
+			t.Fatalf("v%d decode failed: %v", v, err)
+		}
+		if decoded.ThrottleTime != 100*time.Millisecond {
+			t.Errorf("v%d throttle time: want 100ms, got %v", v, decoded.ThrottleTime)
+		}
+		block := decoded.GetBlock("foo", 1)
+		if block == nil {
+			t.Fatalf("v%d: missing block for foo/1", v)
+		}
+		if !errors.Is(block.Err, ErrInvalidMessage) {
+			t.Errorf("v%d: err mismatch: got %v", v, block.Err)
+		}
+		if block.Offset != 255 {
+			t.Errorf("v%d: offset mismatch: got %d", v, block.Offset)
+		}
+		if len(block.RecordErrors) != 1 || block.RecordErrors[0].BatchIndex != 3 {
+			t.Errorf("v%d: record errors mismatch: %+v", v, block.RecordErrors)
+		}
+	}
+}
+
 func TestProduceResponseEncodeInvalidTimestamp(t *testing.T) {
 	response := ProduceResponse{}
 	response.Version = 2

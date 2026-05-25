@@ -110,6 +110,39 @@ func TestProduceRequest(t *testing.T) {
 	testRequestDecode(t, "one record", request, packet)
 }
 
+func TestProduceRequestV9Flexible(t *testing.T) {
+	for _, v := range []int16{9, 10, 11, 12} {
+		t.Run("v"+string(rune('0'+v/10))+string(rune('0'+v%10)), func(t *testing.T) {
+			request := &ProduceRequest{
+				Version:      v,
+				RequiredAcks: WaitForAll,
+				Timeout:      30000,
+			}
+			transactionalID := "tv2-producer"
+			request.TransactionalID = &transactionalID
+			batch := &RecordBatch{
+				LastOffsetDelta: 0,
+				Version:         2,
+				FirstTimestamp:  time.Unix(1479847795, 0),
+				MaxTimestamp:    time.Unix(1479847795, 0),
+				IsTransactional: true,
+				ProducerID:      8000,
+				ProducerEpoch:   3,
+				Records: []*Record{{
+					Key:     []byte("k"),
+					Value:   []byte("v"),
+					Headers: []*RecordHeader{{Key: []byte("h"), Value: []byte("1")}},
+				}},
+			}
+			request.AddBatch("topic", 7, batch)
+
+			packet := testRequestEncode(t, "flex", request, nil)
+			batch.compressedRecords = nil
+			testRequestDecode(t, "flex", request, packet)
+		})
+	}
+}
+
 func benchmarkProduceRequestEncodeMetrics(b *testing.B, partitions int) {
 	b.Helper()
 

@@ -110,14 +110,27 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		for id, records := range partitions {
 			startOffset := pe.offset()
 			pe.putInt32(id)
-			pe.push(&lengthField{})
-			err = records.encode(pe)
-			if err != nil {
-				return err
+			if r.isFlexible() {
+				buf, err := encodeRecords(records, metricRegistry)
+				if err != nil {
+					return err
+				}
+				if err := pe.putBytes(buf); err != nil {
+					return err
+				}
+			} else {
+				pe.push(&lengthField{})
+				err = records.encode(pe)
+				if err != nil {
+					return err
+				}
+				err = pe.pop()
+				if err != nil {
+					return err
+				}
 			}
-			err = pe.pop()
-			if err != nil {
-				return err
+			if r.isFlexible() {
+				pe.putEmptyTaggedFieldArray()
 			}
 			if metricRegistry != nil {
 				if r.Version >= 3 {
@@ -130,6 +143,9 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 				topicBatchSizeMetric.Update(batchSize)
 			}
 		}
+		if r.isFlexible() {
+			pe.putEmptyTaggedFieldArray()
+		}
 		if topicRecordCount > 0 {
 			getOrRegisterTopicMeter("record-send-rate", topic, metricRegistry).Mark(topicRecordCount)
 			getOrRegisterTopicHistogram("records-per-request", topic, metricRegistry).Update(topicRecordCount)
@@ -141,7 +157,23 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		getOrRegisterHistogram("records-per-request", metricRegistry).Update(totalRecordCount)
 	}
 
+	if r.isFlexible() {
+		pe.putEmptyTaggedFieldArray()
+	}
+
 	return nil
+}
+
+func encodeRecords(r Records, metricRegistry metrics.Registry) ([]byte, error) {
+	var prepEnc prepEncoder
+	if err := r.encode(&prepEnc); err != nil {
+		return nil, err
+	}
+	realEnc := realEncoder{raw: make([]byte, prepEnc.length), registry: metricRegistry}
+	if err := r.encode(&realEnc); err != nil {
+		return nil, err
+	}
+	return realEnc.raw, nil
 }
 
 func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
@@ -167,6 +199,11 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 	if topicCount == 0 {
+		if r.isFlexible() {
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
+		}
 		return nil
 	}
 
@@ -187,19 +224,44 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 			if err != nil {
 				return err
 			}
-			size, err := pd.getInt32()
-			if err != nil {
-				return err
-			}
-			recordsDecoder, err := pd.getSubset(int(size))
-			if err != nil {
-				return err
+			var recordsDecoder packetDecoder
+			if r.isFlexible() {
+				bytes, err := pd.getBytes()
+				if err != nil {
+					return err
+				}
+				recordsDecoder = &realDecoder{raw: bytes}
+			} else {
+				size, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				recordsDecoder, err = pd.getSubset(int(size))
+				if err != nil {
+					return err
+				}
 			}
 			var records Records
 			if err := records.decode(recordsDecoder); err != nil {
 				return err
 			}
 			r.records[topic][partition] = records
+			if r.isFlexible() {
+				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+					return err
+				}
+			}
+		}
+		if r.isFlexible() {
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
+		}
+	}
+
+	if r.isFlexible() {
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
 		}
 	}
 
@@ -215,15 +277,34 @@ func (r *ProduceRequest) version() int16 {
 }
 
 func (r *ProduceRequest) headerVersion() int16 {
+	if r.isFlexible() {
+		return 2
+	}
 	return 1
 }
 
 func (r *ProduceRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 8
+	return r.Version >= 0 && r.Version <= 12
+}
+
+func (r *ProduceRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *ProduceRequest) isFlexibleVersion(version int16) bool {
+	return version >= 9
 }
 
 func (r *ProduceRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 12:
+		return V4_0_0_0
+	case 11:
+		return V3_0_0_0
+	case 10:
+		return V2_8_0_0
+	case 9:
+		return V2_5_0_0
 	case 8:
 		return V2_4_0_0
 	case 7:
