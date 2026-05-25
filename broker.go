@@ -1693,7 +1693,11 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 			Logger.Printf("Failed to read response header while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
 			return err
 		}
-		payload := make([]byte, int32(binary.BigEndian.Uint32(header)))
+		payloadLength := binary.BigEndian.Uint32(header)
+		if int64(payloadLength) > int64(MaxResponseSize) {
+			return PacketDecodingError{fmt.Sprintf("SASL response of length %d too large", payloadLength)}
+		}
+		payload := make([]byte, int(payloadLength))
 		n, err := b.readFull(payload)
 		if err != nil {
 			b.addRequestInFlightMetrics(-1)
