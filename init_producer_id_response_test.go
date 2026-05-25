@@ -47,4 +47,9 @@ func TestInitProducerIDResponse(t *testing.T) {
 
 	resp.Version = 2
 	testResponse(t, "with tagged fields", resp, initProducerIdResponseWithTaggedFields)
+
+	for _, v := range []int16{3, 4, 5} {
+		resp.Version = v
+		testResponse(t, "tagged fields at bumped version", resp, initProducerIdResponseWithTaggedFields)
+	}
 }

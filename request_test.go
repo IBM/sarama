@@ -406,7 +406,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V4_0_0_0,
 			map[int16]int16{
-				apiKeyEndTxn: 5, // up from 4 (KIP-890 transactions v2)
+				apiKeyEndTxn:         5, // up from 4 (KIP-890 transactions v2)
+				apiKeyInitProducerId: 5, // up from 4 (KIP-890 transactions v2)
 			},
 		},
 		{

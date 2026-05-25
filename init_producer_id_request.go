@@ -70,7 +70,7 @@ func (i *InitProducerIDRequest) headerVersion() int16 {
 }
 
 func (i *InitProducerIDRequest) isValidVersion() bool {
-	return i.Version >= 0 && i.Version <= 4
+	return i.Version >= 0 && i.Version <= 5
 }
 
 func (i *InitProducerIDRequest) isFlexible() bool {
@@ -83,6 +83,8 @@ func (i *InitProducerIDRequest) isFlexibleVersion(version int16) bool {
 
 func (i *InitProducerIDRequest) requiredVersion() KafkaVersion {
 	switch i.Version {
+	case 5:
+		return V4_0_0_0
 	case 4:
 		return V2_7_0_0
 	case 3:
