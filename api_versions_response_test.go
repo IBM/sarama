@@ -122,6 +122,38 @@ func TestApiVersionsResponseV3(t *testing.T) {
 		{v, 5, 0, 2},  // API Version StopReplica (v0-2)
 	}, response.ApiKeys)
 	assert.Equal(t, int32(128), response.ThrottleTimeMs)
+	// When the broker advertises no tagged features, the epoch defaults to -1 and
+	// the feature slices stay nil.
+	assert.Equal(t, int64(-1), response.FinalizedFeaturesEpoch)
+	assert.Nil(t, response.SupportedFeatures)
+	assert.Nil(t, response.FinalizedFeatures)
+}
+
+func TestApiVersionsResponseV3WithFeaturesRoundTrip(t *testing.T) {
+	const v = 3
+	original := &ApiVersionsResponse{
+		Version:        v,
+		ErrorCode:      0,
+		ThrottleTimeMs: 64,
+		ApiKeys: []ApiVersionsResponseKey{
+			{Version: v, ApiKey: 0, MinVersion: 0, MaxVersion: 8},
+		},
+		SupportedFeatures: []ApiVersionsSupportedFeatureKey{
+			{Name: "transaction.version", MinVersion: 0, MaxVersion: 2},
+		},
+		FinalizedFeaturesEpoch: 42,
+		FinalizedFeatures: []ApiVersionsFinalizedFeatureKey{
+			{Name: "transaction.version", MaxVersionLevel: 2, MinVersionLevel: 1},
+		},
+	}
+	buf, err := encode(original, nil)
+	assert.NoError(t, err)
+	decoded := new(ApiVersionsResponse)
+	decoded.Version = v
+	assert.NoError(t, versionedDecode(buf, decoded, v, nil))
+	assert.Equal(t, original.SupportedFeatures, decoded.SupportedFeatures)
+	assert.Equal(t, original.FinalizedFeaturesEpoch, decoded.FinalizedFeaturesEpoch)
+	assert.Equal(t, original.FinalizedFeatures, decoded.FinalizedFeatures)
 }
 
 func TestApiVersionsResponseUnsupportedVersion(t *testing.T) {

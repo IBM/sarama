@@ -164,6 +164,10 @@ func (pe *prepEncoder) putInt64Array(in []int64) error {
 func (pe *prepEncoder) putEmptyTaggedFieldArray() {
 }
 
+func (pe *prepEncoder) putTaggedFieldArray(_ taggedFieldEncoders) error {
+	return PacketEncodingError{"tagged fields used in non-flexible context"}
+}
+
 func (pe *prepEncoder) offset() int {
 	return pe.length
 }
@@ -255,4 +259,23 @@ func (pe *prepFlexibleEncoder) putNullableInt32Array(in []int32) error {
 
 func (pe *prepFlexibleEncoder) putEmptyTaggedFieldArray() {
 	pe.putUVarint(0)
+}
+
+func (pe *prepFlexibleEncoder) putTaggedFieldArray(encoders taggedFieldEncoders) error {
+	if len(encoders) == 0 {
+		pe.putUVarint(0)
+		return nil
+	}
+	pe.putUVarint(uint64(len(encoders)))
+	for id, enc := range encoders {
+		// Compute payload size by running through a fresh prepFlexibleEncoder.
+		inner := &prepFlexibleEncoder{prepEncoder: &prepEncoder{}}
+		if err := enc(inner); err != nil {
+			return err
+		}
+		pe.putUVarint(id)
+		pe.putUVarint(uint64(inner.length))
+		pe.length += inner.length
+	}
+	return nil
 }

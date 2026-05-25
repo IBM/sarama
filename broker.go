@@ -57,6 +57,7 @@ type Broker struct {
 	brokerThrottleTime         metrics.Histogram
 	brokerProtocolRequestsRate map[int16]metrics.Meter
 	brokerAPIVersions          apiVersionMap
+	brokerFinalizedFeatures    map[string]ApiVersionsFinalizedFeatureKey
 
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
@@ -280,6 +281,12 @@ func (b *Broker) Open(conf *Config) error {
 						maxVersion: key.MaxVersion,
 					}
 				}
+				if len(apiVersionsResponse.FinalizedFeatures) > 0 {
+					b.brokerFinalizedFeatures = make(map[string]ApiVersionsFinalizedFeatureKey, len(apiVersionsResponse.FinalizedFeatures))
+					for _, f := range apiVersionsResponse.FinalizedFeatures {
+						b.brokerFinalizedFeatures[f.Name] = f
+					}
+				}
 			}
 		}
 
@@ -436,6 +443,21 @@ func (b *Broker) Rack() string {
 		return ""
 	}
 	return *b.rack
+}
+
+func (b *Broker) finalizedFeatureLevel(name string) int16 {
+	if b == nil {
+		return 0
+	}
+	b.lock.Lock()
+	defer b.lock.Unlock()
+	if b.brokerFinalizedFeatures == nil {
+		return 0
+	}
+	if f, ok := b.brokerFinalizedFeatures[name]; ok {
+		return f.MaxVersionLevel
+	}
+	return 0
 }
 
 // GetMetadata send a metadata request and returns a metadata response or error

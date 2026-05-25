@@ -172,6 +172,10 @@ func (re *realEncoder) putInt64Array(in []int64) error {
 func (re *realEncoder) putEmptyTaggedFieldArray() {
 }
 
+func (re *realEncoder) putTaggedFieldArray(_ taggedFieldEncoders) error {
+	return PacketEncodingError{"tagged fields used in non-flexible context"}
+}
+
 func (re *realEncoder) offset() int {
 	return re.off
 }
@@ -265,4 +269,38 @@ func (re *realFlexibleEncoder) putNullableInt32Array(in []int32) error {
 
 func (re *realFlexibleEncoder) putEmptyTaggedFieldArray() {
 	re.putUVarint(0)
+}
+
+func (re *realFlexibleEncoder) putTaggedFieldArray(encoders taggedFieldEncoders) error {
+	if len(encoders) == 0 {
+		re.putUVarint(0)
+		return nil
+	}
+	tagIDs := make([]uint64, 0, len(encoders))
+	for id := range encoders {
+		tagIDs = append(tagIDs, id)
+	}
+	sortUint64Slice(tagIDs)
+
+	re.putUVarint(uint64(len(tagIDs)))
+	for _, id := range tagIDs {
+		prep := &prepFlexibleEncoder{prepEncoder: &prepEncoder{}}
+		if err := encoders[id](prep); err != nil {
+			return err
+		}
+		re.putUVarint(id)
+		re.putUVarint(uint64(prep.length))
+		if err := encoders[id](re); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func sortUint64Slice(s []uint64) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j-1] > s[j]; j-- {
+			s[j-1], s[j] = s[j], s[j-1]
+		}
+	}
 }
