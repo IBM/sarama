@@ -1032,3 +1032,218 @@ func TestPublishPartitionToTxn(t *testing.T) {
 		}()
 	}
 }
+
+// TestTxnmgrTV2MaybeAddPartitionSkipsPendingSet verifies that TV2 records partitions directly in partitionsInCurrentTxn instead of queueing them for AddPartitionsToTxn.
+func TestTxnmgrTV2MaybeAddPartitionSkipsPendingSet(t *testing.T) {
+	txmng := &transactionManager{
+		transactionalID:               "tv2",
+		status:                        ProducerTxnFlagInTransaction,
+		txnVersion:                    2,
+		pendingPartitionsInCurrentTxn: topicPartitionSet{},
+		partitionsInCurrentTxn:        topicPartitionSet{},
+	}
+
+	txmng.maybeAddPartitionToCurrentTxn("topic-a", 0)
+	txmng.maybeAddPartitionToCurrentTxn("topic-a", 1)
+	txmng.maybeAddPartitionToCurrentTxn("topic-a", 0)
+
+	require.Equal(t, topicPartitionSet{}, txmng.pendingPartitionsInCurrentTxn)
+	require.Equal(t, topicPartitionSet{
+		{topic: "topic-a", partition: 0}: struct{}{},
+		{topic: "topic-a", partition: 1}: struct{}{},
+	}, txmng.partitionsInCurrentTxn)
+}
+
+// TestTxnmgrTV2PublishTxnPartitionsIsNoop verifies publishTxnPartitions does nothing under TV2.
+func TestTxnmgrTV2PublishTxnPartitionsIsNoop(t *testing.T) {
+	txmng := &transactionManager{
+		transactionalID: "tv2",
+		status:          ProducerTxnFlagInTransaction,
+		txnVersion:      2,
+		pendingPartitionsInCurrentTxn: topicPartitionSet{
+			{topic: "topic-a", partition: 0}: struct{}{},
+		},
+		partitionsInCurrentTxn: topicPartitionSet{},
+	}
+
+	require.NoError(t, txmng.publishTxnPartitions())
+	require.Equal(t, topicPartitionSet{}, txmng.pendingPartitionsInCurrentTxn)
+}
+
+// TestTxnmgrTV2EndTxnAdoptsBumpedEpoch verifies the manager adopts the
+// ProducerID/ProducerEpoch returned by EndTxnResponse v5. It drives the commit
+// through finishTransaction (the production path, which holds t.mutex) rather
+// than calling endTxn directly, so a re-entrant lock would deadlock here.
+func TestTxnmgrTV2EndTxnAdoptsBumpedEpoch(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 4
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "tv2"
+	config.Version = V4_0_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Transaction.Retry.Max = 0
+	config.Producer.Transaction.Retry.Backoff = 0
+
+	broker.Returns(metadataLeader)
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	broker.Returns(&FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	})
+	broker.Returns(&InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    42,
+		ProducerEpoch: 3,
+	})
+
+	txmng, err := newTransactionManager(config, client)
+	require.NoError(t, err)
+
+	txmng.txnVersion = 2
+	txmng.status = ProducerTxnFlagEndTransaction | ProducerTxnFlagCommittingTransaction
+	txmng.partitionsInCurrentTxn = topicPartitionSet{
+		{topic: "topic-a", partition: 0}: struct{}{},
+	}
+
+	broker.Returns(&EndTxnResponse{
+		Version:       5,
+		Err:           ErrNoError,
+		ProducerID:    42,
+		ProducerEpoch: 4,
+	})
+
+	require.NoError(t, txmng.finishTransaction(true))
+	require.Equal(t, int64(42), txmng.producerID)
+	require.Equal(t, int16(4), txmng.producerEpoch)
+	require.Empty(t, txmng.sequenceNumbers)
+	require.Equal(t, ProducerTxnFlagReady, txmng.currentTxnStatus())
+}
+
+// TestTxnmgrTV2FinishTransactionAfterAbortableError verifies that committing a
+// TV2 transaction after an abortable error (which set epochBumpRequired) does
+// not run the TV1 re-init path: the epoch is bumped server-side via EndTxn v5,
+// and finishTransaction should return cleanly in Ready state.
+func TestTxnmgrTV2FinishTransactionAfterAbortableError(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 4
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "tv2"
+	config.Version = V4_0_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Transaction.Retry.Max = 0
+	config.Producer.Transaction.Retry.Backoff = 0
+
+	broker.Returns(metadataLeader)
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	broker.Returns(&FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	})
+	broker.Returns(&InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    42,
+		ProducerEpoch: 3,
+	})
+
+	txmng, err := newTransactionManager(config, client)
+	require.NoError(t, err)
+
+	txmng.txnVersion = 2
+	txmng.status = ProducerTxnFlagEndTransaction | ProducerTxnFlagAbortingTransaction
+	txmng.epochBumpRequired = true
+	txmng.lastError = ErrInvalidTxnState
+	txmng.partitionsInCurrentTxn = topicPartitionSet{
+		{topic: "topic-a", partition: 0}: struct{}{},
+	}
+
+	broker.Returns(&EndTxnResponse{
+		Version:       5,
+		Err:           ErrNoError,
+		ProducerID:    42,
+		ProducerEpoch: 4,
+	})
+
+	require.NoError(t, txmng.finishTransaction(false))
+	require.Equal(t, int16(4), txmng.producerEpoch)
+	require.False(t, txmng.epochBumpRequired)
+	require.Equal(t, ProducerTxnFlagReady, txmng.currentTxnStatus())
+}
+
+// TestTxnmgrTV1EndTxnDoesNotTouchEpoch verifies the TV2 adoption path doesn't fire for TV1.
+func TestTxnmgrTV1EndTxnDoesNotTouchEpoch(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.Version = 4
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "tv1"
+	config.Version = V0_11_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Transaction.Retry.Max = 0
+	config.Producer.Transaction.Retry.Backoff = 0
+
+	broker.Returns(metadataLeader)
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	broker.Returns(&FindCoordinatorResponse{
+		Coordinator: client.Brokers()[0],
+		Err:         ErrNoError,
+		Version:     1,
+	})
+	broker.Returns(&InitProducerIDResponse{
+		Err:           ErrNoError,
+		ProducerID:    99,
+		ProducerEpoch: 7,
+	})
+
+	txmng, err := newTransactionManager(config, client)
+	require.NoError(t, err)
+	require.Equal(t, int16(1), txmng.txnVersion)
+
+	txmng.status = ProducerTxnFlagEndTransaction
+	txmng.partitionsInCurrentTxn = topicPartitionSet{
+		{topic: "topic-a", partition: 0}: struct{}{},
+	}
+
+	broker.Returns(&EndTxnResponse{
+		Err:           ErrNoError,
+		ProducerID:    -1,
+		ProducerEpoch: -1,
+	})
+
+	require.NoError(t, txmng.endTxn(true))
+	require.Equal(t, int64(99), txmng.producerID)
+	require.Equal(t, int16(7), txmng.producerEpoch)
+}

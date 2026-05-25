@@ -85,6 +85,9 @@ type transactionManager struct {
 	// used to recover when producer failed.
 	coordinatorSupportsBumpingEpoch bool
 
+	// negotiated transaction.version finalized feature level (1 or 2).
+	txnVersion int16
+
 	// When producer need to bump it's epoch.
 	epochBumpRequired bool
 	// Record last seen error.
@@ -109,6 +112,8 @@ const (
 
 	// see publishTxnPartitions comment.
 	addPartitionsRetryBackoff = 20 * time.Millisecond
+
+	kafkaFeatureTransactionVersion = "transaction.version"
 )
 
 // txnmngr allowed transitions.
@@ -267,6 +272,24 @@ func (t *transactionManager) isTransactional() bool {
 	return t.transactionalID != ""
 }
 
+func (t *transactionManager) isTransactionV2Enabled() bool {
+	return t.txnVersion >= 2
+}
+
+func (t *transactionManager) negotiateTransactionVersion(coordinator *Broker) {
+	if coordinator == nil {
+		return
+	}
+	level := coordinator.finalizedFeatureLevel(kafkaFeatureTransactionVersion)
+	if level > 2 {
+		level = 2
+	}
+	if level < 1 {
+		level = 1
+	}
+	t.txnVersion = level
+}
+
 // add specified offsets to current transaction.
 func (t *transactionManager) addOffsetsToTxn(offsetsToAdd map[string][]*PartitionOffsetMetadata, groupId string) error {
 	t.mutex.Lock()
@@ -295,6 +318,10 @@ func (t *transactionManager) addOffsetsToTxn(offsetsToAdd map[string][]*Partitio
 
 // send txnmgnr save offsets to transaction coordinator.
 func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, groupId string) (topicPartitionOffsets, error) {
+	if t.isTransactionV2Enabled() {
+		return t.commitTxnOffsets(offsets, groupId)
+	}
+
 	// First AddOffsetsToTxn
 	attemptsRemaining := t.client.Config().Producer.Transaction.Retry.Max
 	exec := func(run func() (bool, error), err error) error {
@@ -375,11 +402,13 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		return offsets, lastError
 	}
 
+	return t.commitTxnOffsets(offsets, groupId)
+}
+
+func (t *transactionManager) commitTxnOffsets(offsets topicPartitionOffsets, groupId string) (topicPartitionOffsets, error) {
 	resultOffsets := offsets
-	// Then TxnOffsetCommit
-	// note the result is not completed until the TxnOffsetCommit returns
-	attemptsRemaining = t.client.Config().Producer.Transaction.Retry.Max
-	execTxnOffsetCommit := func(run func() (topicPartitionOffsets, bool, error), err error) (topicPartitionOffsets, error) {
+	attemptsRemaining := t.client.Config().Producer.Transaction.Retry.Max
+	runWithRetry := func(run func() (topicPartitionOffsets, bool, error), err error) (topicPartitionOffsets, error) {
 		var r topicPartitionOffsets
 		for attemptsRemaining >= 0 {
 			var retry bool
@@ -395,7 +424,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		}
 		return r, err
 	}
-	return execTxnOffsetCommit(func() (topicPartitionOffsets, bool, error) {
+	return runWithRetry(func() (topicPartitionOffsets, bool, error) {
 		consumerGroupCoordinator, err := t.client.Coordinator(groupId)
 		if err != nil {
 			return resultOffsets, true, err
@@ -405,9 +434,13 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 			ProducerEpoch:   t.producerEpoch,
 			ProducerID:      t.producerID,
 			GroupID:         groupId,
+			GenerationID:    -1,
 			Topics:          offsets.mapToRequest(),
 		}
-		if t.client.Config().Version.IsAtLeast(V2_1_0_0) {
+		if t.isTransactionV2Enabled() && t.client.Config().Version.IsAtLeast(V4_0_0_0) {
+			// Version 5 (KIP-890 transactions v2).
+			request.Version = 5
+		} else if t.client.Config().Version.IsAtLeast(V2_1_0_0) {
 			// Version 2 adds the committed leader epoch.
 			request.Version = 2
 		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
@@ -453,6 +486,8 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 					fallthrough
 				case ErrGroupAuthorizationFailed:
 					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, partitionError.Err)
+				case ErrTransactionAbortable:
+					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, partitionError.Err)
 				default:
 					// Others are fatal
 					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, partitionError.Err)
@@ -484,7 +519,10 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 	}
 
 	if t.client.Config().Version.IsAtLeast(V2_5_0_0) {
-		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+		if t.client.Config().Version.IsAtLeast(V4_0_0_0) {
+			// Version 5 is the KIP-890 transactions v2 marker.
+			req.Version = 5
+		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
 			// Version 4 adds the support for new error code PRODUCER_FENCED.
 			req.Version = 4
 		} else {
@@ -560,12 +598,15 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 			if isEpochBump {
 				t.sequenceNumbers = make(map[string]int32)
 			}
+			if t.isTransactional() {
+				t.negotiateTransactionVersion(coordinator)
+			}
 			err := t.transitionTo(ProducerTxnFlagReady, nil)
 			if err != nil {
 				return -1, -1, true, err
 			}
-			DebugLogger.Printf("txnmgr/init-producer-id [%s] successful init producer id %+v\n",
-				t.transactionalID, response)
+			DebugLogger.Printf("txnmgr/init-producer-id [%s] successful init producer id %+v (txn version %d)\n",
+				t.transactionalID, response, t.txnVersion)
 			return response.ProducerID, response.ProducerEpoch, false, nil
 		}
 		switch response.Err {
@@ -644,7 +685,10 @@ func (t *transactionManager) endTxn(commit bool) error {
 			ProducerID:        t.producerID,
 			TransactionResult: commit,
 		}
-		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+		if t.isTransactionV2Enabled() && t.client.Config().Version.IsAtLeast(V4_0_0_0) {
+			// Version 5 (KIP-890 transactions v2).
+			request.Version = 5
+		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
 			// Version 2 adds the support for new error code PRODUCER_FENCED.
 			request.Version = 2
 		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
@@ -664,6 +708,14 @@ func (t *transactionManager) endTxn(commit bool) error {
 		if response.Err == ErrNoError {
 			DebugLogger.Printf("txnmgr/endtxn [%s] successful to end txn %+v\n",
 				t.transactionalID, response)
+			// endTxn is always called with t.mutex held (via finishTransaction),
+			// so mutate directly without re-locking the non-reentrant mutex.
+			if request.Version >= 5 && response.ProducerID >= 0 && response.ProducerEpoch >= 0 {
+				t.producerID = response.ProducerID
+				t.producerEpoch = response.ProducerEpoch
+				t.sequenceNumbers = make(map[string]int32)
+				t.epochBumpRequired = false
+			}
 			return false, t.completeTransaction()
 		}
 		switch response.Err {
@@ -682,6 +734,8 @@ func (t *transactionManager) endTxn(commit bool) error {
 			fallthrough
 		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrTransactionAbortable:
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		// Fatal errors
 		default:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
@@ -730,7 +784,9 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 		if err != nil {
 			return err
 		}
-		if !epochBump {
+		// Under transactions v2 the broker bumps the epoch and EndTxn adopts
+		// the new identity from its response, so the TV1 re-init is never needed.
+		if !epochBump || t.isTransactionV2Enabled() {
 			return nil
 		}
 	}
@@ -754,6 +810,11 @@ func (t *transactionManager) maybeAddPartitionToCurrentTxn(topic string, partiti
 		return
 	}
 
+	if t.isTransactionV2Enabled() {
+		t.partitionsInCurrentTxn[tp] = struct{}{}
+		return
+	}
+
 	t.pendingPartitionsInCurrentTxn[tp] = struct{}{}
 }
 
@@ -764,6 +825,11 @@ func (t *transactionManager) publishTxnPartitions() error {
 
 	if t.currentTxnStatus()&ProducerTxnFlagInError != 0 {
 		return t.lastError
+	}
+
+	if t.isTransactionV2Enabled() {
+		t.pendingPartitionsInCurrentTxn = topicPartitionSet{}
+		return nil
 	}
 
 	if len(t.pendingPartitionsInCurrentTxn) == 0 {
