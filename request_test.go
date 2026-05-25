@@ -380,6 +380,12 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			},
 		},
 		{
+			V3_0_0_0,
+			map[int16]int16{
+				apiKeyEndTxn: 3, // up from 2 (flexible)
+			},
+		},
+		{
 			V3_1_0_0,
 			map[int16]int16{
 				apiKeyJoinGroup: 8, // up from 7
@@ -389,6 +395,18 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			V3_2_0_0,
 			map[int16]int16{
 				apiKeyLeaveGroup: 5, // up from 4
+			},
+		},
+		{
+			V3_5_0_0,
+			map[int16]int16{
+				apiKeyEndTxn: 4, // up from 3
+			},
+		},
+		{
+			V4_0_0_0,
+			map[int16]int16{
+				apiKeyEndTxn: 5, // up from 4 (KIP-890 transactions v2)
 			},
 		},
 		{

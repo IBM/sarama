@@ -23,10 +23,15 @@ func (a *EndTxnRequest) encode(pe packetEncoder) error {
 
 	pe.putBool(a.TransactionResult)
 
+	if a.isFlexible() {
+		pe.putEmptyTaggedFieldArray()
+	}
+
 	return nil
 }
 
 func (a *EndTxnRequest) decode(pd packetDecoder, version int16) (err error) {
+	a.Version = version
 	if a.TransactionalID, err = pd.getString(); err != nil {
 		return err
 	}
@@ -38,6 +43,11 @@ func (a *EndTxnRequest) decode(pd packetDecoder, version int16) (err error) {
 	}
 	if a.TransactionResult, err = pd.getBool(); err != nil {
 		return err
+	}
+	if a.isFlexible() {
+		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -51,15 +61,32 @@ func (a *EndTxnRequest) version() int16 {
 }
 
 func (r *EndTxnRequest) headerVersion() int16 {
+	if r.isFlexible() {
+		return 2
+	}
 	return 1
 }
 
 func (a *EndTxnRequest) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 2
+	return a.Version >= 0 && a.Version <= 5
+}
+
+func (a *EndTxnRequest) isFlexible() bool {
+	return a.isFlexibleVersion(a.Version)
+}
+
+func (a *EndTxnRequest) isFlexibleVersion(version int16) bool {
+	return version >= 3
 }
 
 func (a *EndTxnRequest) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 5:
+		return V4_0_0_0
+	case 4:
+		return V3_5_0_0
+	case 3:
+		return V3_0_0_0
 	case 2:
 		return V2_7_0_0
 	case 1:
