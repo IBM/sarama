@@ -29,3 +29,33 @@ func TestTxnOffsetCommitResponse(t *testing.T) {
 
 	testResponse(t, "", resp, txnOffsetCommitResponse)
 }
+
+func TestTxnOffsetCommitResponseV3(t *testing.T) {
+	resp := &TxnOffsetCommitResponse{
+		Version:      3,
+		ThrottleTime: 100 * time.Millisecond,
+		Topics: map[string][]*PartitionError{
+			"topic": {{
+				Partition: 2,
+				Err:       ErrInvalidProducerEpoch,
+			}},
+		},
+	}
+
+	testResponseWithoutByteComparison(t, "v3", resp)
+}
+
+func TestTxnOffsetCommitResponseV5(t *testing.T) {
+	resp := &TxnOffsetCommitResponse{
+		Version:      5,
+		ThrottleTime: 100 * time.Millisecond,
+		Topics: map[string][]*PartitionError{
+			"topic": {{
+				Partition: 2,
+				Err:       ErrNoError,
+			}},
+		},
+	}
+
+	testResponseWithoutByteComparison(t, "v5", resp)
+}

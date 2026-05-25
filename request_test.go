@@ -384,6 +384,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			map[int16]int16{
 				apiKeyEndTxn:             3, // up from 2 (flexible)
 				apiKeyAddPartitionsToTxn: 3, // up from 2 (flexible)
+				apiKeyTxnOffsetCommit:    3, // up from 2 (flexible + group fields)
 			},
 		},
 		{
@@ -401,7 +402,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V3_5_0_0,
 			map[int16]int16{
-				apiKeyEndTxn: 4, // up from 3
+				apiKeyEndTxn:          4, // up from 3
+				apiKeyTxnOffsetCommit: 4, // up from 3
 			},
 		},
 		{
@@ -416,6 +418,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyEndTxn:             5, // up from 4 (KIP-890 transactions v2)
 				apiKeyInitProducerId:     5, // up from 4 (KIP-890 transactions v2)
 				apiKeyAddPartitionsToTxn: 5, // up from 4 (KIP-890 transactions v2)
+				apiKeyTxnOffsetCommit:    5, // up from 4 (KIP-890 transactions v2)
 			},
 		},
 		{

@@ -68,3 +68,46 @@ func TestTxnOffsetCommitRequestV2(t *testing.T) {
 
 	testRequest(t, "V2", req, txnOffsetCommitRequestV2)
 }
+
+func TestTxnOffsetCommitRequestV3FlexibleAndGroupFields(t *testing.T) {
+	instance := "static-instance-1"
+	req := &TxnOffsetCommitRequest{
+		Version:         3,
+		TransactionalID: "txn",
+		GroupID:         "groupid",
+		ProducerID:      8000,
+		ProducerEpoch:   1,
+		GenerationID:    7,
+		MemberID:        "member-a",
+		GroupInstanceID: &instance,
+		Topics: map[string][]*PartitionOffsetMetadata{
+			"topic": {{
+				Offset:      123,
+				Partition:   2,
+				LeaderEpoch: 9,
+			}},
+		},
+	}
+
+	testRequestWithoutByteComparison(t, "v3 with group fields", req)
+}
+
+func TestTxnOffsetCommitRequestV5DefaultsAcceptableForBareProducer(t *testing.T) {
+	req := &TxnOffsetCommitRequest{
+		Version:         5,
+		TransactionalID: "txn",
+		GroupID:         "groupid",
+		ProducerID:      8000,
+		ProducerEpoch:   1,
+		GenerationID:    -1,
+		Topics: map[string][]*PartitionOffsetMetadata{
+			"topic": {{
+				Offset:      123,
+				Partition:   2,
+				LeaderEpoch: 9,
+			}},
+		},
+	}
+
+	testRequestWithoutByteComparison(t, "v5 bare producer", req)
+}
