@@ -1112,6 +1112,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		if err != nil {
 			if retries <= 0 {
 				s.parent.handleError(err, "", -1)
+				s.cancel(err)
 				return
 			}
 			retryBackoff.Reset(s.parent.config.Metadata.Retry.Backoff)
@@ -1130,6 +1131,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 
 			if retries <= 0 {
 				s.parent.handleError(err, "", -1)
+				s.cancel(err)
 				return
 			}
 
@@ -1155,6 +1157,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 			return
 		default:
 			s.parent.handleError(err, "", -1)
+			s.cancel(err)
 			return
 		}
 
