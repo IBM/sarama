@@ -94,12 +94,13 @@ type ConsumerGroup interface {
 type consumerGroup struct {
 	client Client
 
-	config          *Config
-	consumer        Consumer
-	groupID         string
-	groupInstanceId *string
-	memberID        string
-	errors          chan error
+	config           *Config
+	consumer         Consumer
+	groupID          string
+	groupInstanceId  *string
+	memberID         string
+	lastSessionCause error
+	errors           chan error
 
 	lock       sync.Mutex
 	errorsLock sync.RWMutex
@@ -235,7 +236,17 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	}
 
 	// Gracefully release session claims
-	return sess.release(true)
+	err = sess.release(true)
+
+	// store the session cancellation cause so it can be sent as the reason
+	// on the next JoinGroup or LeaveGroup request
+	if cause := context.Cause(sess.ctx); !errors.Is(cause, context.Canceled) {
+		c.lastSessionCause = cause
+	} else {
+		c.lastSessionCause = nil
+	}
+
+	return err
 }
 
 // Pause implements ConsumerGroup.
@@ -491,6 +502,11 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 	if req.Version >= 5 {
 		req.GroupInstanceId = c.groupInstanceId
 	}
+	if req.Version >= 8 && c.lastSessionCause != nil {
+		reason := sessionCauseToReason(c.lastSessionCause)
+		req.Reason = &reason
+		c.lastSessionCause = nil
+	}
 
 	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
 		if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
@@ -687,9 +703,14 @@ func (c *consumerGroup) leave() error {
 		req.Version = 1
 	}
 	if req.Version >= 3 {
-		req.Members = append(req.Members, MemberIdentity{
+		member := MemberIdentity{
 			MemberId: c.memberID,
-		})
+		}
+		if req.Version >= 5 {
+			reason := "the consumer is being closed"
+			member.Reason = &reason
+		}
+		req.Members = append(req.Members, member)
 	}
 
 	resp, err := coordinator.LeaveGroup(req)
@@ -1166,6 +1187,27 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		case <-s.hbDying:
 			return
 		}
+	}
+}
+
+func sessionCauseToReason(cause error) string {
+	switch {
+	case errors.Is(cause, ErrRebalanceInProgress):
+		return "group is rebalancing"
+	case errors.Is(cause, ErrUnknownMemberId):
+		return "member id is not known by the group coordinator"
+	case errors.Is(cause, ErrIllegalGeneration):
+		return "generation id is not current"
+	case errors.Is(cause, ErrFencedInstancedId):
+		return "group instance id has been fenced"
+	case errors.Is(cause, ErrSessionPartitionCountChanged):
+		return "partitions were added to a subscribed topic"
+	case errors.Is(cause, ErrSessionConsumeClaimExited):
+		return "a ConsumeClaim handler has exited"
+	case errors.Is(cause, ErrSessionHeartbeatFailed):
+		return "the heartbeat goroutine has stopped"
+	default:
+		return cause.Error()
 	}
 }
 
