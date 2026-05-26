@@ -1400,6 +1400,7 @@ func (m *MockHeartbeatResponse) For(reqBody versionedDecoder) encoderWithHeader 
 	req := reqBody.(*HeartbeatRequest)
 	resp := &HeartbeatResponse{
 		Version: req.version(),
+		Err:     m.Err,
 	}
 	return resp
 }

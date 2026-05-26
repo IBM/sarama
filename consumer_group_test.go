@@ -338,3 +338,101 @@ func TestSubscriptionMetadata(t *testing.T) {
 		assert.Equal(t, []byte("from-s2"), c.subscriptionMetadata(s2, topics).UserData)
 	})
 }
+
+// causeHandler is a ConsumerGroupHandler that captures the context.Cause when
+// the session context is canceled.
+type causeHandler struct {
+	causeCh chan error
+}
+
+func (h *causeHandler) Setup(_ ConsumerGroupSession) error { return nil }
+func (h *causeHandler) Cleanup(_ ConsumerGroupSession) error {
+	close(h.causeCh)
+	return nil
+}
+func (h *causeHandler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
+	<-sess.Context().Done()
+	h.causeCh <- context.Cause(sess.Context())
+	return nil
+}
+
+// mockHeartbeatRebalanceResponse returns ErrNoError for the first N heartbeats,
+// then ErrRebalanceInProgress for all subsequent heartbeats.
+type mockHeartbeatRebalanceResponse struct {
+	t           TestReporter
+	mu          sync.Mutex
+	successLeft int
+}
+
+func (m *mockHeartbeatRebalanceResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*HeartbeatRequest)
+	resp := &HeartbeatResponse{Version: req.version()}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.successLeft > 0 {
+		m.successLeft--
+	} else {
+		resp.Err = ErrRebalanceInProgress
+	}
+	return resp
+}
+
+func TestConsumerGroupSessionCancelCause_Rebalance(t *testing.T) {
+	config := NewTestConfig()
+	config.ClientID = t.Name()
+	config.Version = V2_0_0_0
+	config.Consumer.Return.Errors = true
+	config.Consumer.Group.Rebalance.Retry.Max = 2
+	config.Consumer.Group.Rebalance.Retry.Backoff = 0
+	config.Consumer.Offsets.AutoCommit.Enable = false
+	config.Consumer.Group.Heartbeat.Interval = 50 * time.Millisecond
+
+	broker0 := NewMockBroker(t, 0)
+	defer broker0.Close()
+
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()).
+			SetLeader("my-topic", 0, broker0.BrokerID()),
+		"OffsetRequest": NewMockOffsetResponse(t).
+			SetOffset("my-topic", 0, OffsetOldest, 0).
+			SetOffset("my-topic", 0, OffsetNewest, 1),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorGroup, "my-group", broker0),
+		"HeartbeatRequest": &mockHeartbeatRebalanceResponse{t: t, successLeft: 1},
+		"JoinGroupRequest": NewMockJoinGroupResponse(t).SetGroupProtocol(RangeBalanceStrategyName),
+		"SyncGroupRequest": NewMockSyncGroupResponse(t).SetMemberAssignment(
+			&ConsumerGroupMemberAssignment{
+				Version: 0,
+				Topics: map[string][]int32{
+					"my-topic": {0},
+				},
+			}),
+		"OffsetFetchRequest": NewMockOffsetFetchResponse(t).SetOffset(
+			"my-group", "my-topic", 0, 0, "", ErrNoError,
+		).SetError(ErrNoError),
+		"FetchRequest": NewMockFetchResponse(t, 1).
+			SetMessage("my-topic", 0, 0, StringEncoder("foo")),
+	})
+
+	group, err := NewConsumerGroup([]string{broker0.Addr()}, "my-group", config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	h := &causeHandler{causeCh: make(chan error, 1)}
+	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+	defer cancel()
+	defer func() { _ = group.Close() }()
+
+	go func() {
+		_ = group.Consume(ctx, []string{"my-topic"}, h)
+	}()
+
+	var causes []error
+	for cause := range h.causeCh {
+		causes = append(causes, cause)
+	}
+	assert.Len(t, causes, 1, "expected exactly one cancellation cause")
+	assert.ErrorIs(t, causes[0], ErrRebalanceInProgress)
+}
