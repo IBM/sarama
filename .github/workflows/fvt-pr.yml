@@ -20,7 +20,13 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [stable]
-        kafka-version: [1.0.2, 2.6.3, 3.6.2, 3.9.2, 4.1.1, 4.2.0]
+        kafka-version:
+        - 1.0.2   # oldest baseline, lowest protocol versions
+        - 2.6.3   # accumulates many 2.x protocol bumps (KIP-227, KIP-320, KIP-345, KIP-429)
+        - 3.6.2   # mid-3.x representative
+        - 3.9.2   # last ZooKeeper-capable release
+        - 4.1.1   # stable KRaft-only (post-4.0 transition)
+        - 4.2.0   # latest
         include:
         - kafka-version: 1.0.2
           scala-version: 2.11
