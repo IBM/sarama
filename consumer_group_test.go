@@ -339,6 +339,17 @@ func TestSubscriptionMetadata(t *testing.T) {
 	})
 }
 
+// drainHandler is a ConsumerGroupHandler that drains messages without blocking.
+type drainHandler struct{}
+
+func (*drainHandler) Setup(_ ConsumerGroupSession) error   { return nil }
+func (*drainHandler) Cleanup(_ ConsumerGroupSession) error { return nil }
+func (*drainHandler) ConsumeClaim(_ ConsumerGroupSession, claim ConsumerGroupClaim) error {
+	for range claim.Messages() {
+	}
+	return nil
+}
+
 // causeHandler is a ConsumerGroupHandler that captures the context.Cause when
 // the session context is canceled.
 type causeHandler struct {
@@ -354,6 +365,55 @@ func (h *causeHandler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGro
 	<-sess.Context().Done()
 	h.causeCh <- context.Cause(sess.Context())
 	return nil
+}
+
+// mockJoinGroupCapture wraps a MockJoinGroupResponse and records the Reason
+// from each incoming JoinGroupRequest.
+type mockJoinGroupCapture struct {
+	inner    MockResponse
+	mu       sync.Mutex
+	reasons  []*string
+	captured chan struct{} // closed when len(reasons) >= want
+	want     int
+}
+
+func (m *mockJoinGroupCapture) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*JoinGroupRequest)
+	m.mu.Lock()
+	m.reasons = append(m.reasons, req.Reason)
+	if len(m.reasons) >= m.want {
+		select {
+		case <-m.captured:
+		default:
+			close(m.captured)
+		}
+	}
+	m.mu.Unlock()
+	return m.inner.For(reqBody)
+}
+
+// mockLeaveGroupCapture wraps a MockLeaveGroupResponse and records the Reason
+// from each incoming LeaveGroupRequest member.
+type mockLeaveGroupCapture struct {
+	inner    MockResponse
+	mu       sync.Mutex
+	reasons  []*string
+	captured chan struct{} // closed after first LeaveGroup
+}
+
+func (m *mockLeaveGroupCapture) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*LeaveGroupRequest)
+	m.mu.Lock()
+	for _, member := range req.Members {
+		m.reasons = append(m.reasons, member.Reason)
+	}
+	select {
+	case <-m.captured:
+	default:
+		close(m.captured)
+	}
+	m.mu.Unlock()
+	return m.inner.For(reqBody)
 }
 
 // mockHeartbeatRebalanceResponse returns ErrNoError for the first N heartbeats,
@@ -435,4 +495,114 @@ func TestConsumerGroupSessionCancelCause_Rebalance(t *testing.T) {
 	}
 	assert.Len(t, causes, 1, "expected exactly one cancellation cause")
 	assert.ErrorIs(t, causes[0], ErrRebalanceInProgress)
+}
+
+func TestConsumerGroupReason(t *testing.T) {
+	setup := func(t *testing.T, overrides map[string]MockResponse) (*MockBroker, ConsumerGroup) {
+		t.Helper()
+		config := NewTestConfig()
+		config.ClientID = t.Name()
+		config.Version = V3_2_0_0
+		config.Consumer.Return.Errors = true
+		config.Consumer.Group.Rebalance.Retry.Max = 0
+		config.Consumer.Group.Rebalance.Retry.Backoff = 0
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		config.Consumer.Group.Heartbeat.Interval = 50 * time.Millisecond
+
+		broker0 := NewMockBroker(t, 0)
+		handlers := map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetBroker(broker0.Addr(), broker0.BrokerID()).
+				SetLeader("my-topic", 0, broker0.BrokerID()),
+			"OffsetRequest": NewMockOffsetResponse(t).
+				SetOffset("my-topic", 0, OffsetOldest, 0).
+				SetOffset("my-topic", 0, OffsetNewest, 1),
+			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+				SetCoordinator(CoordinatorGroup, "my-group", broker0),
+			"HeartbeatRequest": &mockHeartbeatRebalanceResponse{t: t, successLeft: 1},
+			"JoinGroupRequest": NewMockJoinGroupResponse(t).
+				SetGroupProtocol(RangeBalanceStrategyName).
+				SetMemberId("test-member"),
+			"SyncGroupRequest": NewMockSyncGroupResponse(t).SetMemberAssignment(
+				&ConsumerGroupMemberAssignment{
+					Version: 0,
+					Topics:  map[string][]int32{"my-topic": {0}},
+				}),
+			"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
+			"OffsetFetchRequest": NewMockOffsetFetchResponse(t).SetOffset(
+				"my-group", "my-topic", 0, 0, "", ErrNoError,
+			).SetError(ErrNoError),
+			"FetchRequest": NewMockFetchResponse(t, 1).
+				SetMessage("my-topic", 0, 0, StringEncoder("foo")),
+		}
+		for k, v := range overrides {
+			handlers[k] = v
+		}
+		broker0.SetHandlerByMap(handlers)
+
+		group, err := NewConsumerGroup([]string{broker0.Addr()}, "my-group", config)
+		assert.NoError(t, err)
+		return broker0, group
+	}
+
+	t.Run("JoinGroup carries reason from previous session", func(t *testing.T) {
+		joinCapture := &mockJoinGroupCapture{
+			inner: NewMockJoinGroupResponse(t).
+				SetGroupProtocol(RangeBalanceStrategyName).
+				SetMemberId("test-member"),
+			captured: make(chan struct{}),
+			want:     2,
+		}
+		broker0, group := setup(t, map[string]MockResponse{
+			"JoinGroupRequest": joinCapture,
+		})
+		defer broker0.Close()
+
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for i := 0; i < 2; i++ {
+				_ = group.Consume(ctx, []string{"my-topic"}, &drainHandler{})
+			}
+		}()
+
+		select {
+		case <-joinCapture.captured:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for second JoinGroup")
+		}
+		cancel()
+		<-done
+		_ = group.Close()
+
+		joinCapture.mu.Lock()
+		defer joinCapture.mu.Unlock()
+		assert.Len(t, joinCapture.reasons, 2)
+		assert.Nil(t, joinCapture.reasons[0], "first JoinGroup should have no reason")
+		assert.NotNil(t, joinCapture.reasons[1], "second JoinGroup should carry reason")
+		assert.Equal(t, "group is rebalancing", *joinCapture.reasons[1])
+	})
+
+	t.Run("LeaveGroup sends closing reason", func(t *testing.T) {
+		leaveCapture := &mockLeaveGroupCapture{
+			inner:    NewMockLeaveGroupResponse(t),
+			captured: make(chan struct{}),
+		}
+		broker0, group := setup(t, map[string]MockResponse{
+			"LeaveGroupRequest": leaveCapture,
+		})
+		defer broker0.Close()
+
+		_ = group.Consume(t.Context(), []string{"my-topic"}, &drainHandler{})
+		_ = group.Close()
+
+		leaveCapture.mu.Lock()
+		defer leaveCapture.mu.Unlock()
+		assert.Len(t, leaveCapture.reasons, 1)
+		assert.NotNil(t, leaveCapture.reasons[0], "LeaveGroup should carry reason")
+		assert.Equal(t, "the consumer is being closed", *leaveCapture.reasons[0])
+	})
 }
