@@ -1246,12 +1246,12 @@ func (ca *clusterAdmin) ListConsumerGroupOffsetsBatch(groupTopics map[string]map
 		// sharing a coordinator
 		batches := make(map[int32]*brokerBatch)
 		for group, partitions := range groupTopics {
-			coordinator, cerr := ca.client.Coordinator(group)
-			if cerr != nil {
-				return cerr
+			coordinator, err := ca.client.Coordinator(group)
+			if err != nil {
+				return err
 			}
-			batch, ok := batches[coordinator.ID()]
-			if !ok {
+			batch := batches[coordinator.ID()]
+			if batch == nil {
 				batch = &brokerBatch{broker: coordinator}
 				batches[coordinator.ID()] = batch
 			}
@@ -1266,9 +1266,9 @@ func (ca *clusterAdmin) ListConsumerGroupOffsetsBatch(groupTopics map[string]map
 			if _, ok := batch.broker.negotiateApiVersion(req, 8); !ok {
 				return ErrUnsupportedVersion
 			}
-			resp, ferr := batch.broker.FetchOffset(req)
-			if ferr != nil {
-				return ferr
+			resp, err := batch.broker.FetchOffset(req)
+			if err != nil {
+				return err
 			}
 			for i := range resp.Groups {
 				g := &resp.Groups[i]

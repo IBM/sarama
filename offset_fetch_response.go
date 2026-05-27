@@ -78,12 +78,6 @@ func (g *OffsetFetchResponseGroup) AddBlock(topic string, partition int32, block
 }
 
 func (g *OffsetFetchResponseGroup) GetBlock(topic string, partition int32) *OffsetFetchResponseBlock {
-	if g.Blocks == nil {
-		return nil
-	}
-	if g.Blocks[topic] == nil {
-		return nil
-	}
 	return g.Blocks[topic][partition]
 }
 
