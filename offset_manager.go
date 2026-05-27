@@ -167,13 +167,17 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 
 	block := resp.GetBlock(topic, partition)
 	if block == nil {
-		return 0, 0, "", ErrIncompleteResponse
+		// v2+ surfaces some coordinator errors at the top level with no per-partition blocks
+		if resp.Err == ErrNoError {
+			return 0, 0, "", ErrIncompleteResponse
+		}
+		block = &OffsetFetchResponseBlock{Err: resp.Err}
 	}
 
 	switch block.Err {
 	case ErrNoError:
 		return block.Offset, block.LeaderEpoch, block.Metadata, nil
-	case ErrNotCoordinatorForConsumer:
+	case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable:
 		if retries <= 0 {
 			return 0, 0, "", block.Err
 		}
