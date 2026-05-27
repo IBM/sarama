@@ -181,6 +181,12 @@ func allocateResponseBody(req protocolBody) protocolBody {
 	return nil
 }
 
+// TestAllocateBodyProtocolVersions tests two related version expectations:
+//  1. uncommented entries are protocol versions Sarama currently supports with
+//     parity to a given Kafka release version
+//  2. commented TODO entries are the max versions supported by the given Kafka
+//     release that Sarama still needs to implement for parity, this is for dev
+//     tracking.
 func TestAllocateBodyProtocolVersions(t *testing.T) {
 	type test struct {
 		version     KafkaVersion
@@ -422,7 +428,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// TODO: ListOffsetsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyListOffsets:          6, // up from 5
 				// TODO: MetadataRequest v11 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyMetadata:             11, // up from 10
+				// apiKeyMetadata:             11, // up from 9
 				// TODO: AddPartitionsToTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyAddPartitionsToTxn:   3, // up from 2
 				// TODO: AddOffsetsToTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0
@@ -438,7 +444,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// TODO: DeleteTopicsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyDeleteTopics:         6, // up from 5
 				// TODO: DescribeProducersRequest v0 is not supported, but expected for KafkaVersion 2.8.0
-				// 61:                         0, // new in 2.8
+				// apiKeyDescribeProducers /* (61) */: 0, // new in 2.8
 			},
 		},
 		{
@@ -467,7 +473,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyLeaveGroup:      5, // up from 4
 				apiKeyDescribeLogDirs: 3, // up from 2
 				// TODO: JoinGroupRequest v9 is not supported, but expected for KafkaVersion 3.2.0
-				// apiKeyJoinGroup:    9, // up from 8
+				// apiKeyJoinGroup:    9, // up from 7
 			},
 		},
 		{
