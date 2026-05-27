@@ -574,20 +574,26 @@ func (c *consumerGroup) syncGroupRequest(
 		GenerationId: generationID,
 	}
 
-	// Versions 1 and 2 are the same as version 0.
-	if c.config.Version.IsAtLeast(V0_11_0_0) {
+	if c.config.Version.IsAtLeast(V2_5_0_0) {
+		req.Version = 5
+	} else if c.config.Version.IsAtLeast(V2_4_0_0) {
+		req.Version = 4
+	} else if c.config.Version.IsAtLeast(V2_3_0_0) {
+		req.Version = 3
+	} else if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 2
+	} else if c.config.Version.IsAtLeast(V0_11_0_0) {
 		req.Version = 1
 	}
-	if c.config.Version.IsAtLeast(V2_0_0_0) {
-		req.Version = 2
-	}
 	// Starting from version 3, we add a new field called groupInstanceId to indicate member identity across restarts.
-	if c.config.Version.IsAtLeast(V2_3_0_0) {
-		req.Version = 3
+	if req.Version >= 3 {
 		req.GroupInstanceId = c.groupInstanceId
-		if c.config.Version.IsAtLeast(V2_4_0_0) {
-			req.Version = 4
-		}
+	}
+	if req.Version >= 5 {
+		protocolType := "consumer"
+		protocolName := strategy.Name()
+		req.ProtocolType = &protocolType
+		req.ProtocolName = &protocolName
 	}
 
 	for memberID, topics := range plan {
