@@ -211,7 +211,7 @@ func (r *JoinGroupRequest) isFlexibleVersion(version int16) bool {
 func (r *JoinGroupRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
 	case 8:
-		return V3_1_0_0
+		return V3_2_0_0
 	case 7:
 		return V2_5_0_0
 	case 6:
