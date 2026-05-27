@@ -205,6 +205,26 @@ func TestOffsetFetchRequest(t *testing.T) {
 	}
 }
 
+func TestOffsetFetchRequestValidation(t *testing.T) {
+	t.Run("v8 with empty groups", func(t *testing.T) {
+		request := &OffsetFetchRequest{Version: 8}
+		_, err := encode(request, nil)
+		require.ErrorContains(t, err, "version 8 or later requires Groups to be populated")
+	})
+
+	t.Run("pre-v8 with multiple groups", func(t *testing.T) {
+		request := &OffsetFetchRequest{
+			Version: 7,
+			Groups: []OffsetFetchRequestGroup{
+				{GroupId: "a"},
+				{GroupId: "b"},
+			},
+		}
+		_, err := encode(request, nil)
+		require.ErrorContains(t, err, "multiple groups require version 8 or later")
+	})
+}
+
 func TestOffsetFetchRequestAddGroupPartition(t *testing.T) {
 	t.Run("creates a new group entry", func(t *testing.T) {
 		request := &OffsetFetchRequest{Version: 8}

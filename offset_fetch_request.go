@@ -79,6 +79,9 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 	}
 
 	if r.Version >= 8 {
+		if len(r.Groups) == 0 {
+			return PacketEncodingError{"version 8 or later requires Groups to be populated"}
+		}
 		if err := pe.putArrayLength(len(r.Groups)); err != nil {
 			return err
 		}
@@ -111,6 +114,10 @@ func (r *OffsetFetchRequest) encode(pe packetEncoder) (err error) {
 		pe.putBool(r.RequireStable)
 		pe.putEmptyTaggedFieldArray()
 		return nil
+	}
+
+	if len(r.Groups) > 1 {
+		return PacketEncodingError{"multiple groups require version 8 or later"}
 	}
 
 	consumerGroup := r.ConsumerGroup
