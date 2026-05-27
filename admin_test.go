@@ -1749,50 +1749,220 @@ func TestListConsumerGroupsMultiBroker(t *testing.T) {
 }
 
 func TestListConsumerGroupOffsets(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	defer seedBroker.Close()
+	const (
+		group          = "my-group"
+		topic          = "my-topic"
+		partition      = int32(0)
+		expectedOffset = int64(0)
+	)
 
-	group := "my-group"
-	topic := "my-topic"
-	partition := int32(0)
-	expectedOffset := int64(0)
+	fetch := func(t *testing.T, version KafkaVersion) *OffsetFetchResponse {
+		t.Helper()
+		broker := newMockBroker(t, 1)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"OffsetFetchRequest": NewMockOffsetFetchResponse(t).
+				SetOffset(group, topic, partition, expectedOffset, "", ErrNoError).
+				SetError(ErrNoError),
+			"MetadataRequest":        mockMetadataFor(t, broker),
+			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, group),
+		})
+		response, err := newTestAdminAt(t, version, broker).
+			ListConsumerGroupOffsets(group, map[string][]int32{topic: {0}})
+		require.NoError(t, err)
+		return response
+	}
 
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"OffsetFetchRequest": NewMockOffsetFetchResponse(t).SetOffset(group, "my-topic", partition, expectedOffset, "", ErrNoError).SetError(ErrNoError),
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
-		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, seedBroker),
+	t.Run("returns legacy blocks for older versions", func(t *testing.T) {
+		response := fetch(t, V1_0_0_0)
+		block := response.GetBlock(topic, partition)
+		require.NotNil(t, block)
+		assert.Equal(t, expectedOffset, block.Offset)
+		assert.Equal(t, expectedOffset, response.Blocks[topic][partition].Offset)
 	})
 
-	config := NewTestConfig()
-	config.Version = V1_0_0_0
-
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	response, err := admin.ListConsumerGroupOffsets(group, map[string][]int32{
-		topic: {0},
+	t.Run("mirrors v8 group response into legacy blocks", func(t *testing.T) {
+		response := fetch(t, V3_0_0_0)
+		block := response.GetBlock(topic, partition)
+		require.NotNil(t, block)
+		require.Contains(t, response.Blocks, topic)
+		assert.Equal(t, expectedOffset, response.Blocks[topic][partition].Offset)
+		assert.Equal(t, ErrNoError, response.Err)
 	})
-	if err != nil {
-		t.Fatalf("ListConsumerGroupOffsets failed with error %v", err)
+}
+
+func TestListConsumerGroupOffsetsBatch(t *testing.T) {
+	const (
+		topic           = "my-topic"
+		groupA          = "group-a"
+		groupB          = "group-b"
+		expectedOffsetA = int64(7)
+		expectedOffsetB = int64(13)
+	)
+	bothGroups := map[string]map[string][]int32{
+		groupA: {topic: {0}},
+		groupB: {topic: {0}},
 	}
 
-	block := response.GetBlock(topic, partition)
-	if block == nil {
-		t.Fatalf("Expected block for topic %v and partition %v to exist, but it doesn't", topic, partition)
+	// setup wires a single mock broker as the coordinator for every named group
+	// and serves the given OffsetFetchRequest handler. Returns a v3.0 admin.
+	setup := func(t *testing.T, offsetFetch MockResponse, groups ...string) ClusterAdmin {
+		t.Helper()
+		broker := newMockBroker(t, 1)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"OffsetFetchRequest":     offsetFetch,
+			"MetadataRequest":        mockMetadataFor(t, broker),
+			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groups...),
+		})
+		return newTestAdminAt(t, V3_0_0_0, broker)
 	}
 
-	if block.Offset != expectedOffset {
-		t.Fatalf("Expected offset %v, got %v", expectedOffset, block.Offset)
+	// groupBlock builds a v8 response group entry with a single block.
+	groupBlock := func(group string, offset int64) OffsetFetchResponseGroup {
+		return OffsetFetchResponseGroup{
+			GroupId: group,
+			Blocks:  map[string]map[int32]*OffsetFetchResponseBlock{topic: {0: {Offset: offset}}},
+		}
 	}
 
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("fetches offsets for multiple groups", func(t *testing.T) {
+		admin := setup(t, NewMockOffsetFetchResponse(t).
+			SetOffset(groupA, topic, 0, expectedOffsetA, "", ErrNoError).
+			SetOffset(groupB, topic, 0, expectedOffsetB, "", ErrNoError).
+			SetError(ErrNoError), groupA, groupB)
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
+
+	t.Run("nil partitions fetches all topics for the group", func(t *testing.T) {
+		const otherTopic = "other-topic"
+		admin := setup(t, NewMockOffsetFetchResponse(t).
+			SetOffset(groupA, topic, 0, expectedOffsetA, "", ErrNoError).
+			SetOffset(groupA, otherTopic, 0, expectedOffsetB, "", ErrNoError).
+			SetError(ErrNoError), groupA)
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(map[string]map[string][]int32{groupA: nil})
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupA, otherTopic, 0, expectedOffsetB)
+	})
+
+	t.Run("rejects broker downgrade below v8", func(t *testing.T) {
+		broker := newMockBroker(t, 1)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
+				{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 7},
+			}),
+			"MetadataRequest":        mockMetadataFor(t, broker),
+			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groupA, groupB),
+		})
+		config := NewTestConfig()
+		config.ApiVersionsRequest = true
+		config.Version = V3_0_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { admin.Close() })
+
+		_, err = admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.ErrorIs(t, err, ErrUnsupportedVersion)
+	})
+
+	t.Run("limits broker's advertised max to client's supported max", func(t *testing.T) {
+		// Kafka 4.x brokers advertise OffsetFetch versions above the highest the
+		// client knows how to encode. The client must limit to its own max.
+		// 9999 keeps this test honest as we add more protocol versions later.
+		broker := newMockBroker(t, 1)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
+				{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 9999},
+			}),
+			"MetadataRequest":        mockMetadataFor(t, broker),
+			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groupA, groupB),
+			"OffsetFetchRequest": NewMockOffsetFetchResponse(t).
+				SetOffset(groupA, topic, 0, expectedOffsetA, "", ErrNoError).
+				SetOffset(groupB, topic, 0, expectedOffsetB, "", ErrNoError).
+				SetError(ErrNoError),
+		})
+		config := NewTestConfig()
+		config.ApiVersionsRequest = true
+		config.Version = V3_0_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { admin.Close() })
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
+
+	t.Run("retries on retriable per-group error", func(t *testing.T) {
+		first := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			{GroupId: groupA, Err: ErrNotCoordinatorForConsumer},
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		second := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			groupBlock(groupA, expectedOffsetA),
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		admin := setup(t, NewMockSequence(first, second), groupA, groupB)
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
+
+	t.Run("returns non-retriable per-group error without retry", func(t *testing.T) {
+		resp := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			{GroupId: groupA, Err: ErrGroupAuthorizationFailed},
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		admin := setup(t, NewMockWrapper(resp), groupA, groupB)
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		require.Contains(t, result, groupA)
+		assert.Equal(t, ErrGroupAuthorizationFailed, result[groupA].Err)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
+
+	t.Run("splits groups across coordinators", func(t *testing.T) {
+		seed := newMockBroker(t, 1)
+		coordA := newMockBroker(t, 2)
+		coordB := newMockBroker(t, 3)
+		metadata := mockMetadataFor(t, seed, coordA, coordB)
+		findCoord := NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorGroup, groupA, coordA).
+			SetCoordinator(CoordinatorGroup, groupB, coordB)
+		seed.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest":        metadata,
+			"FindCoordinatorRequest": findCoord,
+		})
+		for _, c := range []struct {
+			broker *MockBroker
+			group  string
+			offset int64
+		}{
+			{coordA, groupA, expectedOffsetA},
+			{coordB, groupB, expectedOffsetB},
+		} {
+			c.broker.SetHandlerByMap(map[string]MockResponse{
+				"MetadataRequest":        metadata,
+				"FindCoordinatorRequest": findCoord,
+				"OffsetFetchRequest": NewMockOffsetFetchResponse(t).
+					SetOffset(c.group, topic, 0, c.offset, "", ErrNoError).
+					SetError(ErrNoError),
+			})
+		}
+
+		result, err := newTestAdminAt(t, V3_0_0_0, seed).ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
 }
 
 // newMockBroker spins up a MockBroker with auto-cleanup.
@@ -1807,13 +1977,39 @@ func newMockBroker(t *testing.T, id int32) *MockBroker {
 // retry backoff disabled and auto-cleanup.
 func newTestAdmin(t *testing.T, seed *MockBroker) ClusterAdmin {
 	t.Helper()
+	return newTestAdminAt(t, V2_1_0_0, seed)
+}
+
+// newTestAdminAt is like newTestAdmin but with a caller-chosen KafkaVersion.
+func newTestAdminAt(t *testing.T, version KafkaVersion, seed *MockBroker) ClusterAdmin {
+	t.Helper()
 	config := NewTestConfig()
-	config.Version = V2_1_0_0
+	config.Version = version
 	config.Admin.Retry.Backoff = 0
 	admin, err := NewClusterAdmin([]string{seed.Addr()}, config)
 	require.NoError(t, err)
 	t.Cleanup(func() { admin.Close() })
 	return admin
+}
+
+// mockGroupCoordinators builds a FindCoordinator handler placing every named
+// group on coordinator.
+func mockGroupCoordinators(t *testing.T, coordinator *MockBroker, groups ...string) *MockFindCoordinatorResponse {
+	t.Helper()
+	r := NewMockFindCoordinatorResponse(t)
+	for _, g := range groups {
+		r.SetCoordinator(CoordinatorGroup, g, coordinator)
+	}
+	return r
+}
+
+// assertGroupOffset asserts result has groupID with the expected offset at topic/partition.
+func assertGroupOffset(t *testing.T, result map[string]*OffsetFetchResponseGroup, groupID, topic string, partition int32, expected int64) {
+	t.Helper()
+	require.Contains(t, result, groupID)
+	block := result[groupID].GetBlock(topic, partition)
+	require.NotNil(t, block)
+	assert.Equal(t, expected, block.Offset)
 }
 
 // mockMetadataFor builds a MockMetadataResponse with controller and brokers

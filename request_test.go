@@ -380,6 +380,12 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			},
 		},
 		{
+			V3_0_0_0,
+			map[int16]int16{
+				apiKeyOffsetFetch: 8, // up from 7
+			},
+		},
+		{
 			V3_1_0_0,
 			map[int16]int16{
 				apiKeyJoinGroup: 8, // up from 7
