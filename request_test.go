@@ -411,6 +411,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyDeleteTopics:     5, // up from 4
 				// TODO: CreatePartitionsRequest v3 is not supported, but expected for KafkaVersion 2.7.0
 				// apiKeyCreatePartitions: 3, // up from 2
+				// TODO: UpdateFeaturesRequest v0 is not supported, but expected for KafkaVersion 2.7.0
+				// apiKeyUpdateFeatures /* (57) */: 0, // new in 2.7
 			},
 		},
 		{
@@ -483,24 +485,95 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyCreateAcls:   3, // up from 2
 				// TODO: DeleteAclsRequest v3 is not supported, but expected for KafkaVersion 3.3.0
 				// apiKeyDeleteAcls:   3, // up from 2
+				// TODO: UpdateFeaturesRequest v1 is not supported, but expected for KafkaVersion 3.3.0
+				// apiKeyUpdateFeatures /* (57) */: 1, // up from 0
+			},
+		},
+		{
+			V3_5_0_0,
+			map[int16]int16{
+				// TODO: FetchRequest v15 is not supported, but expected for KafkaVersion 3.5.0
+				// apiKeyFetch:              15, // up from 13
+				// TODO: ListOffsetsRequest v8 is not supported, but expected for KafkaVersion 3.5.0
+				// apiKeyListOffsets:        8,  // up from 7
+				// TODO: AddPartitionsToTxnRequest v4 is not supported, but expected for KafkaVersion 3.5.0
+				// apiKeyAddPartitionsToTxn: 4,  // up from 3
+				// TODO: ConsumerGroupHeartbeatRequest v0 is not supported, but expected for KafkaVersion 3.5.0
+				// apiKeyConsumerGroupHeartbeat /* (68) */: 0, // new in 3.5
+			},
+		},
+		{
+			V3_6_0_0,
+			map[int16]int16{
+				// TODO: OffsetCommitRequest v9 is not supported, but expected for KafkaVersion 3.6.0
+				// apiKeyOffsetCommit: 9, // up from 8
 			},
 		},
 		{
 			V3_7_0_0,
 			map[int16]int16{
 				apiKeyDescribeCluster: 1, // up from 0
+				// TODO: ProduceRequest v10 is not supported, but expected for KafkaVersion 3.7.0
+				// apiKeyProduce:         10, // up from 9
+				// TODO: FetchRequest v16 is not supported, but expected for KafkaVersion 3.7.0
+				// apiKeyFetch:           16, // up from 15
+				// TODO: OffsetFetchRequest v9 is not supported, but expected for KafkaVersion 3.7.0
+				// apiKeyOffsetFetch:     9,  // up from 8
 			},
 		},
 		{
 			V3_8_0_0,
 			map[int16]int16{
 				apiKeyListGroups: 5, // up from 4
+				// TODO: ProduceRequest v11 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyProduce:            11, // up from 10
+				// TODO: FindCoordinatorRequest v5 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyFindCoordinator:    5,  // up from 4
+				// TODO: InitProducerIdRequest v5 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyInitProducerId:     5,  // up from 4
+				// TODO: AddPartitionsToTxnRequest v5 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyAddPartitionsToTxn: 5,  // up from 4
+				// TODO: AddOffsetsToTxnRequest v4 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyAddOffsetsToTxn:    4,  // up from 3
+				// TODO: EndTxnRequest v4 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyEndTxn:             4,  // up from 3
+				// TODO: TxnOffsetCommitRequest v4 is not supported, but expected for KafkaVersion 3.8.0
+				// apiKeyTxnOffsetCommit:    4,  // up from 3
+			},
+		},
+		{
+			V3_9_0_0,
+			map[int16]int16{
+				// TODO: FetchRequest v17 is not supported, but expected for KafkaVersion 3.9.0
+				// apiKeyFetch:               17, // up from 16
+				// TODO: ListOffsetsRequest v9 is not supported, but expected for KafkaVersion 3.9.0
+				// apiKeyListOffsets:         9, // up from 8
+				// TODO: FindCoordinatorRequest v6 is not supported, but expected for KafkaVersion 3.9.0
+				// apiKeyFindCoordinator:     6,  // up from 5
+				// TODO: ApiVersionsRequest v4 is not supported, but expected for KafkaVersion 3.9.0
+				// apiKeyApiVersions:         4,  // up from 3
 			},
 		},
 		{
 			V4_0_0_0,
 			map[int16]int16{
 				apiKeyDescribeCluster: 2, // up from 1
+				// TODO: ProduceRequest v12 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyProduce:             12, // up from 11
+				// TODO: ListOffsetsRequest v10 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyListOffsets:         10, // up from 9
+				// TODO: MetadataRequest v13 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyMetadata:            13, // up from 12
+				// TODO: DescribeGroupsRequest v6 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyDescribeGroups:      6,  // up from 5
+				// TODO: EndTxnRequest v5 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyEndTxn:              5,  // up from 4
+				// TODO: TxnOffsetCommitRequest v5 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyTxnOffsetCommit:     5,  // up from 4
+				// TODO: UpdateFeaturesRequest v2 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyUpdateFeatures /* (57) */: 2, // up from 1
+				// TODO: ConsumerGroupHeartbeatRequest v1 is not supported, but expected for KafkaVersion 4.0.0
+				// apiKeyConsumerGroupHeartbeat /* (68) */: 1, // up from 0
 			},
 		},
 		{
