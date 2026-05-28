@@ -31,9 +31,12 @@ func (t *TxnOffsetCommitResponse) encode(pe packetEncoder) error {
 			if err := partitionError.encode(pe); err != nil {
 				return err
 			}
+			pe.putEmptyTaggedFieldArray()
 		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -70,7 +73,18 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 			if err := t.Topics[topic][j].decode(pd, version); err != nil {
 				return err
 			}
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
 		}
+
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
+		}
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
@@ -85,15 +99,28 @@ func (a *TxnOffsetCommitResponse) version() int16 {
 }
 
 func (a *TxnOffsetCommitResponse) headerVersion() int16 {
+	if a.Version >= 3 {
+		return 1
+	}
 	return 0
 }
 
 func (a *TxnOffsetCommitResponse) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 2
+	return a.Version >= 0 && a.Version <= 3
+}
+
+func (a *TxnOffsetCommitResponse) isFlexible() bool {
+	return a.isFlexibleVersion(a.Version)
+}
+
+func (a *TxnOffsetCommitResponse) isFlexibleVersion(version int16) bool {
+	return version >= 3
 }
 
 func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 3:
+		return V2_5_0_0
 	case 2:
 		return V2_1_0_0
 	case 1:
@@ -101,7 +128,7 @@ func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	case 0:
 		return V0_11_0_0
 	default:
-		return V2_1_0_0
+		return V2_5_0_0
 	}
 }
 

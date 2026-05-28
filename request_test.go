@@ -380,8 +380,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeySASLAuth:         2, // up from 1
 				apiKeyCreatePartitions: 2, // up from 1
 				apiKeySyncGroup:        5, // up from 4
-				// TODO: TxnOffsetCommitRequest v3 is not supported, but expected for KafkaVersion 2.5.0
-				// apiKeyTxnOffsetCommit:         3, // up from 2
+				apiKeyTxnOffsetCommit:  3, // up from 2
 			},
 		},
 		{
