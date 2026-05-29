@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -265,13 +266,6 @@ func TestMaybeAddPartitionToCurrentTxn(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
-	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 4
-	metadataLeader.ControllerID = broker.brokerID
-	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataLeader.AddTopic("test-topic", ErrNoError)
-	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
-
 	config := NewTestConfig()
 	config.Producer.Idempotent = true
 	config.Producer.Transaction.ID = "test"
@@ -283,28 +277,8 @@ func TestMaybeAddPartitionToCurrentTxn(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			broker.Returns(metadataLeader)
-
-			client, err := NewClient([]string{broker.Addr()}, config)
-			require.NoError(t, err)
+			client, txmng := newMockTxnManager(t, broker, config)
 			defer client.Close()
-
-			findCoordinatorResponse := FindCoordinatorResponse{
-				Coordinator: client.Brokers()[0],
-				Err:         ErrNoError,
-				Version:     1,
-			}
-			broker.Returns(&findCoordinatorResponse)
-
-			producerIdResponse := &InitProducerIDResponse{
-				Err:           ErrNoError,
-				ProducerID:    1,
-				ProducerEpoch: 0,
-			}
-			broker.Returns(producerIdResponse)
-
-			txmng, err := newTransactionManager(config, client)
-			require.NoError(t, err)
 
 			txmng.partitionsInCurrentTxn = tc.initialPartitionsInCurrentTxn
 			txmng.pendingPartitionsInCurrentTxn = tc.initialPendingPartitionsInCurrentTxn
@@ -399,13 +373,6 @@ func TestAddOffsetsToTxn(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
-	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 4
-	metadataLeader.ControllerID = broker.brokerID
-	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataLeader.AddTopic("test-topic", ErrNoError)
-	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
-
 	config := NewTestConfig()
 	config.Producer.Idempotent = true
 	config.Producer.Transaction.ID = "test"
@@ -424,29 +391,8 @@ func TestAddOffsetsToTxn(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			broker.Returns(metadataLeader)
-
-			client, err := NewClient([]string{broker.Addr()}, config)
-			require.NoError(t, err)
-
+			client, txmng := newMockTxnManager(t, broker, config)
 			defer client.Close()
-
-			findCoordinatorResponse := FindCoordinatorResponse{
-				Coordinator: client.Brokers()[0],
-				Err:         ErrNoError,
-				Version:     1,
-			}
-			broker.Returns(&findCoordinatorResponse)
-
-			producerIdResponse := &InitProducerIDResponse{
-				Err:           ErrNoError,
-				ProducerID:    1,
-				ProducerEpoch: 0,
-			}
-			broker.Returns(producerIdResponse)
-
-			txmng, err := newTransactionManager(config, client)
-			require.NoError(t, err)
 
 			txmng.status = tc.initialFlags
 
@@ -482,7 +428,7 @@ func TestAddOffsetsToTxn(t *testing.T) {
 				})
 			}
 
-			newOffsets, err := txmng.publishOffsetsToTxn(offsets, "test-group")
+			newOffsets, err := txmng.publishOffsetsToTxn(offsets, NewConsumerGroupMetadata("test-group"))
 			if tc.expectedError != nil {
 				require.Equal(t, tc.expectedError.Error(), err.Error())
 			} else {
@@ -492,6 +438,82 @@ func TestAddOffsetsToTxn(t *testing.T) {
 			require.NotEqual(t, 0, tc.expectedFlags&txmng.status)
 		}()
 	}
+}
+
+// newMockTxnManager wires a transaction manager to broker using the standard
+// metadata, find-coordinator and init-producer-id handshake. The caller owns
+// closing the returned client.
+func newMockTxnManager(t *testing.T, broker *MockBroker, config *Config) (Client, *transactionManager) {
+	// the mock broker matches each response version to the request version, so
+	// MetadataResponse.Version is left at its zero value here
+	metadataLeader := new(MetadataResponse)
+	metadataLeader.ControllerID = broker.brokerID
+	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataLeader.AddTopic("test-topic", ErrNoError)
+	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	broker.Returns(metadataLeader)
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+
+	broker.Returns(&FindCoordinatorResponse{Coordinator: client.Brokers()[0], Err: ErrNoError})
+	broker.Returns(&InitProducerIDResponse{Err: ErrNoError, ProducerID: 1, ProducerEpoch: 0})
+
+	txmng, err := newTransactionManager(config, client)
+	require.NoError(t, err)
+	return client, txmng
+}
+
+func TestTxnOffsetCommitGroupMetadata(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V2_5_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+
+	client, txmng := newMockTxnManager(t, broker, config)
+	defer client.Close()
+	txmng.status = ProducerTxnFlagInTransaction
+
+	broker.Returns(&AddOffsetsToTxnResponse{Err: ErrNoError})
+	broker.Returns(&FindCoordinatorResponse{Coordinator: client.Brokers()[0], Err: ErrNoError})
+	broker.Returns(&TxnOffsetCommitResponse{
+		Topics: map[string][]*PartitionError{
+			"test-topic": {{Partition: 0, Err: ErrNoError}},
+		},
+	})
+
+	instanceID := "instance-1"
+	groupMetadata := &ConsumerGroupMetadata{
+		GroupID:         "test-group",
+		GenerationID:    42,
+		MemberID:        "member-1",
+		GroupInstanceID: &instanceID,
+	}
+	offsets := topicPartitionOffsets{
+		topicPartition{topic: "test-topic", partition: 0}: {Partition: 0, Offset: 0},
+	}
+
+	_, err := txmng.publishOffsetsToTxn(offsets, groupMetadata)
+	require.NoError(t, err)
+
+	var committed *TxnOffsetCommitRequest
+	for _, rr := range broker.History() {
+		if req, ok := rr.Request.(*TxnOffsetCommitRequest); ok {
+			committed = req
+		}
+	}
+	require.NotNil(t, committed, "expected a TxnOffsetCommitRequest to reach the broker")
+	assert.EqualValues(t, 3, committed.Version)
+	assert.Equal(t, "test-group", committed.GroupID)
+	assert.EqualValues(t, 42, committed.GenerationID)
+	assert.Equal(t, "member-1", committed.MemberID)
+	require.NotNil(t, committed.GroupInstanceID)
+	assert.Equal(t, instanceID, *committed.GroupInstanceID)
 }
 
 func TestTxnOffsetsCommit(t *testing.T) {
@@ -656,37 +678,10 @@ func TestTxnOffsetsCommit(t *testing.T) {
 	config.Producer.Transaction.Retry.Max = 0
 	config.Producer.Transaction.Retry.Backoff = 0
 
-	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 4
-	metadataLeader.ControllerID = broker.brokerID
-	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataLeader.AddTopic("test-topic", ErrNoError)
-	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
-
 	for _, tc := range testCases {
 		func() {
-			broker.Returns(metadataLeader)
-
-			client, err := NewClient([]string{broker.Addr()}, config)
-			require.NoError(t, err)
+			client, txmng := newMockTxnManager(t, broker, config)
 			defer client.Close()
-
-			findCoordinatorResponse := FindCoordinatorResponse{
-				Coordinator: client.Brokers()[0],
-				Err:         ErrNoError,
-				Version:     1,
-			}
-			broker.Returns(&findCoordinatorResponse)
-
-			producerIdResponse := &InitProducerIDResponse{
-				Err:           ErrNoError,
-				ProducerID:    1,
-				ProducerEpoch: 0,
-			}
-			broker.Returns(producerIdResponse)
-
-			txmng, err := newTransactionManager(config, client)
-			require.NoError(t, err)
 
 			txmng.status = tc.initialFlags
 
@@ -719,7 +714,7 @@ func TestTxnOffsetsCommit(t *testing.T) {
 				})
 			}
 
-			newOffsets, err := txmng.publishOffsetsToTxn(tc.initialOffsets, "test-group")
+			newOffsets, err := txmng.publishOffsetsToTxn(tc.initialOffsets, NewConsumerGroupMetadata("test-group"))
 			if tc.expectedError != nil {
 				require.Equal(t, tc.expectedError.Error(), err.Error())
 			} else {
@@ -787,13 +782,6 @@ func TestEndTxn(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
-	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 4
-	metadataLeader.ControllerID = broker.brokerID
-	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataLeader.AddTopic("test-topic", ErrNoError)
-	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
-
 	config := NewTestConfig()
 	config.Producer.Idempotent = true
 	config.Producer.Transaction.ID = "test"
@@ -805,28 +793,8 @@ func TestEndTxn(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			broker.Returns(metadataLeader)
-
-			client, err := NewClient([]string{broker.Addr()}, config)
-			require.NoError(t, err)
+			client, txmng := newMockTxnManager(t, broker, config)
 			defer client.Close()
-
-			findCoordinatorResponse := FindCoordinatorResponse{
-				Coordinator: client.Brokers()[0],
-				Err:         ErrNoError,
-				Version:     1,
-			}
-			broker.Returns(&findCoordinatorResponse)
-
-			producerIdResponse := &InitProducerIDResponse{
-				Err:           ErrNoError,
-				ProducerID:    1,
-				ProducerEpoch: 0,
-			}
-			broker.Returns(producerIdResponse)
-
-			txmng, err := newTransactionManager(config, client)
-			require.NoError(t, err)
 
 			txmng.status = ProducerTxnFlagEndTransaction
 
@@ -846,7 +814,7 @@ func TestEndTxn(t *testing.T) {
 				})
 			}
 
-			err = txmng.endTxn(tc.commit)
+			err := txmng.endTxn(tc.commit)
 			require.Equal(t, tc.expectedError, err)
 			require.NotEqual(t, 0, txmng.currentTxnStatus()&tc.expectedFlags)
 		}()
@@ -952,13 +920,6 @@ func TestPublishPartitionToTxn(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
 
-	metadataLeader := new(MetadataResponse)
-	metadataLeader.Version = 4
-	metadataLeader.ControllerID = broker.brokerID
-	metadataLeader.AddBroker(broker.Addr(), broker.BrokerID())
-	metadataLeader.AddTopic("test-topic", ErrNoError)
-	metadataLeader.AddTopicPartition("test-topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
-
 	config := NewTestConfig()
 	config.Producer.Idempotent = true
 	config.Producer.Transaction.ID = "test"
@@ -970,28 +931,8 @@ func TestPublishPartitionToTxn(t *testing.T) {
 
 	for _, tc := range testCases {
 		func() {
-			broker.Returns(metadataLeader)
-
-			client, err := NewClient([]string{broker.Addr()}, config)
-			require.NoError(t, err)
+			client, txmng := newMockTxnManager(t, broker, config)
 			defer client.Close()
-
-			findCoordinatorResponse := FindCoordinatorResponse{
-				Coordinator: client.Brokers()[0],
-				Err:         ErrNoError,
-				Version:     1,
-			}
-			broker.Returns(&findCoordinatorResponse)
-
-			producerIdResponse := &InitProducerIDResponse{
-				Err:           ErrNoError,
-				ProducerID:    1,
-				ProducerEpoch: 0,
-			}
-			broker.Returns(producerIdResponse)
-
-			txmng, err := newTransactionManager(config, client)
-			require.NoError(t, err)
 
 			txmng.status = ProducerTxnFlagInTransaction
 			txmng.pendingPartitionsInCurrentTxn = topicPartitionSet{
@@ -1019,7 +960,7 @@ func TestPublishPartitionToTxn(t *testing.T) {
 					Version:     1,
 				})
 			}
-			err = txmng.publishTxnPartitions()
+			err := txmng.publishTxnPartitions()
 			if tc.expectedError != nil {
 				require.Equal(t, tc.expectedError.Error(), err.Error(), tc)
 			} else {

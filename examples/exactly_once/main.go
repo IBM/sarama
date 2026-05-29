@@ -216,6 +216,11 @@ func (consumer *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 	// Do not move the code below to a goroutine.
 	// The `ConsumeClaim` itself is called within a goroutine, see:
 	// https://github.com/IBM/sarama/blob/main/consumer_group.go#L27-L2
+
+	// Carry the member ID and generation ID from this session so the broker can
+	// fence stale members when committing offsets within the transaction. Pass a
+	// non-nil group instance ID here when using static membership.
+	groupMetadata := sarama.NewConsumerGroupMetadataFromSession(session, consumer.groupId, nil)
 	for {
 		select {
 		case message, ok := <-claim.Messages():
@@ -243,11 +248,11 @@ func (consumer *Consumer) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 				}
 
 				// You can add current message to this transaction
-				err = producer.AddMessageToTxn(message, consumer.groupId, nil)
+				err = producer.AddMessageToTxnWithGroupMetadata(message, groupMetadata, nil)
 				if err != nil {
 					log.Println("error on AddMessageToTxn")
 					consumer.handleTxnError(producer, message, session, err, func() error {
-						return producer.AddMessageToTxn(message, consumer.groupId, nil)
+						return producer.AddMessageToTxnWithGroupMetadata(message, groupMetadata, nil)
 					})
 					return
 				}

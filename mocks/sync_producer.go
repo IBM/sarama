@@ -260,6 +260,14 @@ func (sp *SyncProducer) AddOffsetsToTxn(offsets map[string][]*sarama.PartitionOf
 	return nil
 }
 
+func (sp *SyncProducer) AddOffsetsToTxnWithGroupMetadata(offsets map[string][]*sarama.PartitionOffsetMetadata, groupMetadata *sarama.ConsumerGroupMetadata) error {
+	return nil
+}
+
 func (sp *SyncProducer) AddMessageToTxn(msg *sarama.ConsumerMessage, groupId string, metadata *string) error {
+	return nil
+}
+
+func (sp *SyncProducer) AddMessageToTxnWithGroupMetadata(msg *sarama.ConsumerMessage, groupMetadata *sarama.ConsumerGroupMetadata, metadata *string) error {
 	return nil
 }
