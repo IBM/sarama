@@ -224,11 +224,11 @@ func (a *AddPartitionsToTxnRequest) isFlexibleVersion(version int16) bool {
 func (a *AddPartitionsToTxnRequest) requiredVersion() KafkaVersion {
 	switch a.Version {
 	case 5:
-		return V4_0_0_0
+		return V3_8_0_0
 	case 4:
 		return V3_6_0_0
 	case 3:
-		return V3_0_0_0
+		return V2_8_0_0
 	case 2:
 		return V2_7_0_0
 	case 1:

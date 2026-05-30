@@ -30,9 +30,20 @@ var (
 		4, 0x01, 0x02, 0x03, // Member assignment data
 		0, // empty tagged fields
 	}
+
+	syncGroupResponseV5NoError = []byte{
+		0, 0, 0, 100, // ThrottleTimeMs
+		0x00, 0x00, // No error
+		9, 'c', 'o', 'n', 's', 'u', 'm', 'e', 'r', // ProtocolType
+		6, 'r', 'a', 'n', 'g', 'e', // ProtocolName
+		4, 0x01, 0x02, 0x03, // Member assignment data
+		0, // empty tagged fields
+	}
 )
 
 func TestSyncGroupResponse(t *testing.T) {
+	protocolType := "consumer"
+	protocolName := "range"
 	tests := []struct {
 		CaseName     string
 		Version      int16
@@ -78,6 +89,19 @@ func TestSyncGroupResponse(t *testing.T) {
 				ThrottleTime:     100,
 				Version:          4,
 				Err:              ErrNoError,
+				MemberAssignment: []byte{1, 2, 3},
+			},
+		},
+		{
+			"v5-noErr",
+			5,
+			syncGroupResponseV5NoError,
+			&SyncGroupResponse{
+				ThrottleTime:     100,
+				Version:          5,
+				Err:              ErrNoError,
+				ProtocolType:     &protocolType,
+				ProtocolName:     &protocolName,
 				MemberAssignment: []byte{1, 2, 3},
 			},
 		},

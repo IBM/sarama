@@ -28,35 +28,32 @@ func (t *TxnOffsetCommitResponse) encode(pe packetEncoder) error {
 			return err
 		}
 		for _, partitionError := range e {
-			pe.putInt32(partitionError.Partition)
-			pe.putKError(partitionError.Err)
-			if t.isFlexible() {
-				pe.putEmptyTaggedFieldArray()
+			if err := partitionError.encode(pe); err != nil {
+				return err
 			}
-		}
-		if t.isFlexible() {
 			pe.putEmptyTaggedFieldArray()
 		}
-	}
-
-	if t.isFlexible() {
 		pe.putEmptyTaggedFieldArray()
 	}
+
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
 func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err error) {
 	t.Version = version
-	if t.ThrottleTime, err = pd.getDurationMs(); err != nil {
+	throttleTime, err := pd.getInt32()
+	if err != nil {
 		return err
 	}
+	t.ThrottleTime = time.Duration(throttleTime) * time.Millisecond
 
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
 
-	t.Topics = make(map[string][]*PartitionError, n)
+	t.Topics = make(map[string][]*PartitionError)
 
 	for i := 0; i < n; i++ {
 		topic, err := pd.getString()
@@ -72,31 +69,22 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 		t.Topics[topic] = make([]*PartitionError, m)
 
 		for j := 0; j < m; j++ {
-			pe := new(PartitionError)
-			if pe.Partition, err = pd.getInt32(); err != nil {
+			t.Topics[topic][j] = new(PartitionError)
+			if err := t.Topics[topic][j].decode(pd, version); err != nil {
 				return err
 			}
-			if pe.Err, err = pd.getKError(); err != nil {
-				return err
-			}
-			if t.isFlexible() {
-				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-					return err
-				}
-			}
-			t.Topics[topic][j] = pe
-		}
-		if t.isFlexible() {
 			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
 			}
 		}
-	}
 
-	if t.isFlexible() {
 		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
@@ -111,7 +99,7 @@ func (a *TxnOffsetCommitResponse) version() int16 {
 }
 
 func (a *TxnOffsetCommitResponse) headerVersion() int16 {
-	if a.isFlexible() {
+	if a.Version >= 3 {
 		return 1
 	}
 	return 0
@@ -134,9 +122,9 @@ func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	case 5:
 		return V4_0_0_0
 	case 4:
-		return V3_5_0_0
+		return V3_8_0_0
 	case 3:
-		return V3_0_0_0
+		return V2_5_0_0
 	case 2:
 		return V2_1_0_0
 	case 1:
@@ -144,7 +132,7 @@ func (a *TxnOffsetCommitResponse) requiredVersion() KafkaVersion {
 	case 0:
 		return V0_11_0_0
 	default:
-		return V2_1_0_0
+		return V2_5_0_0
 	}
 }
 

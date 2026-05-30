@@ -6,9 +6,9 @@ type TxnOffsetCommitRequest struct {
 	GroupID         string
 	ProducerID      int64
 	ProducerEpoch   int16
-	GenerationID    int32   // v3
-	MemberID        string  // v3
-	GroupInstanceID *string // v3, nullable
+	GenerationID    int32   // v3+, generation of the group or member epoch
+	MemberID        string  // v3+, member ID assigned by the group coordinator
+	GroupInstanceID *string // v3+, unique identifier of the consumer instance
 	Topics          map[string][]*PartitionOffsetMetadata
 }
 
@@ -51,20 +51,15 @@ func (t *TxnOffsetCommitRequest) encode(pe packetEncoder) error {
 				return err
 			}
 		}
-		if t.isFlexible() {
-			pe.putEmptyTaggedFieldArray()
-		}
-	}
-
-	if t.isFlexible() {
 		pe.putEmptyTaggedFieldArray()
 	}
+
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
 func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err error) {
 	t.Version = version
-
 	if t.TransactionalID, err = pd.getString(); err != nil {
 		return err
 	}
@@ -95,7 +90,7 @@ func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err er
 		return err
 	}
 
-	t.Topics = make(map[string][]*PartitionOffsetMetadata, n)
+	t.Topics = make(map[string][]*PartitionOffsetMetadata)
 	for i := 0; i < n; i++ {
 		topic, err := pd.getString()
 		if err != nil {
@@ -116,17 +111,14 @@ func (t *TxnOffsetCommitRequest) decode(pd packetDecoder, version int16) (err er
 			}
 			t.Topics[topic][j] = partitionOffsetMetadata
 		}
-		if t.isFlexible() {
-			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-				return err
-			}
-		}
-	}
 
-	if t.isFlexible() {
 		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 			return err
 		}
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
@@ -141,7 +133,7 @@ func (a *TxnOffsetCommitRequest) version() int16 {
 }
 
 func (a *TxnOffsetCommitRequest) headerVersion() int16 {
-	if a.isFlexible() {
+	if a.Version >= 3 {
 		return 2
 	}
 	return 1
@@ -164,9 +156,9 @@ func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
 	case 5:
 		return V4_0_0_0
 	case 4:
-		return V3_5_0_0
+		return V3_8_0_0
 	case 3:
-		return V3_0_0_0
+		return V2_5_0_0
 	case 2:
 		return V2_1_0_0
 	case 1:
@@ -174,7 +166,7 @@ func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
 	case 0:
 		return V0_11_0_0
 	default:
-		return V2_1_0_0
+		return V2_5_0_0
 	}
 }
 
@@ -201,10 +193,7 @@ func (p *PartitionOffsetMetadata) encode(pe packetEncoder, version int16) error 
 		return err
 	}
 
-	if version >= 3 {
-		pe.putEmptyTaggedFieldArray()
-	}
-
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -226,10 +215,8 @@ func (p *PartitionOffsetMetadata) decode(pd packetDecoder, version int16) (err e
 		return err
 	}
 
-	if version >= 3 {
-		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
-			return err
-		}
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil

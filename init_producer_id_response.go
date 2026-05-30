@@ -76,7 +76,7 @@ func (i *InitProducerIDResponse) isFlexibleVersion(version int16) bool {
 func (i *InitProducerIDResponse) requiredVersion() KafkaVersion {
 	switch i.Version {
 	case 5:
-		return V4_0_0_0
+		return V3_8_0_0
 	case 4:
 		return V2_7_0_0
 	case 3:

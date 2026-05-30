@@ -270,11 +270,11 @@ func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	case 12:
 		return V4_0_0_0
 	case 11:
-		return V3_0_0_0
+		return V3_8_0_0
 	case 10:
-		return V2_8_0_0
+		return V3_7_0_0
 	case 9:
-		return V2_5_0_0
+		return V2_8_0_0
 	case 8:
 		return V2_4_0_0
 	case 7:

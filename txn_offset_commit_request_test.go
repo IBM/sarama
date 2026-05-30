@@ -31,6 +31,26 @@ var (
 		0, 0, 0, 9, // leader epoch
 		255, 255, // no meta data
 	}
+
+	txnOffsetCommitRequestV3 = []byte{
+		4, 't', 'x', 'n', // transactional ID (compact string)
+		8, 'g', 'r', 'o', 'u', 'p', 'i', 'd', // group ID (compact string)
+		0, 0, 0, 0, 0, 0, 31, 64, // producer ID
+		0, 1, // producer epoch
+		0, 0, 0, 5, // generation ID
+		4, 'm', 'i', 'd', // member ID (compact string)
+		4, 'g', 'i', 'd', // group instance ID (compact nullable string)
+		2,                          // 1 topic (compact array)
+		6, 't', 'o', 'p', 'i', 'c', // topic name (compact string)
+		2,          // 1 partition (compact array)
+		0, 0, 0, 2, // partition no 2
+		0, 0, 0, 0, 0, 0, 0, 123, // committed offset
+		0, 0, 0, 9, // leader epoch
+		0, // no meta data (compact nullable string, null)
+		0, // partition tagged fields
+		0, // topic tagged fields
+		0, // request tagged fields
+	}
 )
 
 func TestTxnOffsetCommitRequest(t *testing.T) {
@@ -69,17 +89,17 @@ func TestTxnOffsetCommitRequestV2(t *testing.T) {
 	testRequest(t, "V2", req, txnOffsetCommitRequestV2)
 }
 
-func TestTxnOffsetCommitRequestV3FlexibleAndGroupFields(t *testing.T) {
-	instance := "static-instance-1"
+func TestTxnOffsetCommitRequestV3(t *testing.T) {
+	groupInstanceID := "gid"
 	req := &TxnOffsetCommitRequest{
 		Version:         3,
 		TransactionalID: "txn",
 		GroupID:         "groupid",
 		ProducerID:      8000,
 		ProducerEpoch:   1,
-		GenerationID:    7,
-		MemberID:        "member-a",
-		GroupInstanceID: &instance,
+		GenerationID:    5,
+		MemberID:        "mid",
+		GroupInstanceID: &groupInstanceID,
 		Topics: map[string][]*PartitionOffsetMetadata{
 			"topic": {{
 				Offset:      123,
@@ -89,7 +109,7 @@ func TestTxnOffsetCommitRequestV3FlexibleAndGroupFields(t *testing.T) {
 		},
 	}
 
-	testRequestWithoutByteComparison(t, "v3 with group fields", req)
+	testRequest(t, "V3", req, txnOffsetCommitRequestV3)
 }
 
 func TestTxnOffsetCommitRequestV5DefaultsAcceptableForBareProducer(t *testing.T) {

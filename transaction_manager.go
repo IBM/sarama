@@ -434,12 +434,18 @@ func (t *transactionManager) commitTxnOffsets(offsets topicPartitionOffsets, gro
 			ProducerEpoch:   t.producerEpoch,
 			ProducerID:      t.producerID,
 			GroupID:         groupId,
-			GenerationID:    -1,
-			Topics:          offsets.mapToRequest(),
+			// We don't track the consumer group member metadata here, so send the
+			// protocol defaults (generation -1, empty member ID, null instance ID)
+			// which tell the broker to skip zombie fencing, matching v2 behavior.
+			GenerationID: GroupGenerationUndefined,
+			Topics:       offsets.mapToRequest(),
 		}
 		if t.isTransactionV2Enabled() && t.client.Config().Version.IsAtLeast(V4_0_0_0) {
 			// Version 5 (KIP-890 transactions v2).
 			request.Version = 5
+		} else if t.client.Config().Version.IsAtLeast(V2_5_0_0) {
+			// Version 3 adds the member ID, group instance ID and generation ID.
+			request.Version = 3
 		} else if t.client.Config().Version.IsAtLeast(V2_1_0_0) {
 			// Version 2 adds the committed leader epoch.
 			request.Version = 2
