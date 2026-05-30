@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -30,7 +31,7 @@ type offsetManager struct {
 	conf            *Config
 	group           string
 	ticker          *time.Ticker
-	sessionCanceler func()
+	sessionCanceler context.CancelCauseFunc
 
 	memberID        string
 	groupInstanceId *string
@@ -53,7 +54,7 @@ func NewOffsetManagerFromClient(group string, client Client) (OffsetManager, err
 	return newOffsetManagerFromClient(group, "", GroupGenerationUndefined, client, nil)
 }
 
-func newOffsetManagerFromClient(group, memberID string, generation int32, client Client, sessionCanceler func()) (*offsetManager, error) {
+func newOffsetManagerFromClient(group, memberID string, generation int32, client Client, sessionCanceler context.CancelCauseFunc) (*offsetManager, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -166,13 +167,17 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 
 	block := resp.GetBlock(topic, partition)
 	if block == nil {
-		return 0, 0, "", ErrIncompleteResponse
+		// v2+ surfaces some coordinator errors at the top level with no per-partition blocks
+		if resp.Err == ErrNoError {
+			return 0, 0, "", ErrIncompleteResponse
+		}
+		block = &OffsetFetchResponseBlock{Err: resp.Err}
 	}
 
 	switch block.Err {
 	case ErrNoError:
 		return block.Offset, block.LeaderEpoch, block.Metadata, nil
-	case ErrNotCoordinatorForConsumer:
+	case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable:
 		if retries <= 0 {
 			return 0, 0, "", block.Err
 		}
@@ -494,7 +499,7 @@ func (om *offsetManager) findPOM(topic string, partition int32) *partitionOffset
 
 func (om *offsetManager) tryCancelSession() {
 	if om.sessionCanceler != nil {
-		om.sessionCanceler()
+		om.sessionCanceler(ErrFencedInstancedId)
 	}
 }
 

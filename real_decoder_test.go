@@ -4,6 +4,9 @@ import (
 	"encoding/binary"
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRealDecoder_getArrayLength(t *testing.T) {
@@ -49,6 +52,12 @@ func TestRealDecoder_getArrayLength(t *testing.T) {
 			wantLen: -1,
 			wantErr: errInvalidArrayLength,
 		},
+		{
+			name:    "negative length other than null array",
+			input:   []byte{0x80, 0x00, 0x00, 0x00},
+			wantLen: -1,
+			wantErr: errInvalidArrayLength,
+		},
 	}
 
 	for _, tt := range tests {
@@ -71,4 +80,17 @@ func makeInput(length int) []byte {
 	input := make([]byte, 4+length)
 	binary.BigEndian.PutUint32(input, uint32(length)) // #nosec G115 - not going to exceed uint32
 	return input
+}
+
+func TestRealFlexibleDecoderGetInt32Array(t *testing.T) {
+	t.Run("returns insufficient data for compact length exceeding int64", func(t *testing.T) {
+		var input [binary.MaxVarintLen64]byte
+		n := binary.PutUvarint(input[:], 1<<63)
+
+		rd := &realFlexibleDecoder{&realDecoder{raw: input[:n]}}
+		array, err := rd.getInt32Array()
+
+		require.ErrorIs(t, err, ErrInsufficientData)
+		assert.Nil(t, array)
+	})
 }

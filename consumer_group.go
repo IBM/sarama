@@ -15,6 +15,20 @@ import (
 // ErrClosedConsumerGroup is the error returned when a method is called on a consumer group that has been closed.
 var ErrClosedConsumerGroup = errors.New("kafka: tried to use a consumer group that was closed")
 
+// ErrSessionPartitionCountChanged is set as the cancellation cause of a consumer group
+// session context when the leader detects that the partition count for a subscribed topic
+// has changed, requiring a new session.
+var ErrSessionPartitionCountChanged = errors.New("kafka: partition count changed for subscribed topic")
+
+// ErrSessionConsumeClaimExited is set as the cancellation cause of a consumer group session
+// context when a ConsumeClaim goroutine exits, triggering the end of the session.
+var ErrSessionConsumeClaimExited = errors.New("kafka: ConsumeClaim goroutine exited")
+
+// ErrSessionHeartbeatFailed is set as the cancellation cause of a consumer group session
+// context when the heartbeat loop exits due to an unrecoverable error (e.g. coordinator
+// unreachable after retries).
+var ErrSessionHeartbeatFailed = errors.New("kafka: heartbeat loop failed")
+
 // ConsumerGroup is responsible for dividing up processing of topics and partitions
 // over a collection of processes (the members of the consumer group).
 type ConsumerGroup interface {
@@ -80,12 +94,13 @@ type ConsumerGroup interface {
 type consumerGroup struct {
 	client Client
 
-	config          *Config
-	consumer        Consumer
-	groupID         string
-	groupInstanceId *string
-	memberID        string
-	errors          chan error
+	config           *Config
+	consumer         Consumer
+	groupID          string
+	groupInstanceId  *string
+	memberID         string
+	lastSessionCause error
+	errors           chan error
 
 	lock       sync.Mutex
 	errorsLock sync.RWMutex
@@ -221,7 +236,17 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	}
 
 	// Gracefully release session claims
-	return sess.release(true)
+	err = sess.release(true)
+
+	// store the session cancellation cause so it can be sent as the reason
+	// on the next JoinGroup or LeaveGroup request
+	if cause := context.Cause(sess.ctx); !errors.Is(cause, context.Canceled) {
+		c.lastSessionCause = cause
+	} else {
+		c.lastSessionCause = nil
+	}
+
+	return err
 }
 
 // Pause implements ConsumerGroup.
@@ -477,6 +502,11 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 	if req.Version >= 5 {
 		req.GroupInstanceId = c.groupInstanceId
 	}
+	if req.Version >= 8 && c.lastSessionCause != nil {
+		reason := sessionCauseToReason(c.lastSessionCause)
+		req.Reason = &reason
+		c.lastSessionCause = nil
+	}
 
 	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
 		if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
@@ -544,20 +574,26 @@ func (c *consumerGroup) syncGroupRequest(
 		GenerationId: generationID,
 	}
 
-	// Versions 1 and 2 are the same as version 0.
-	if c.config.Version.IsAtLeast(V0_11_0_0) {
+	if c.config.Version.IsAtLeast(V2_5_0_0) {
+		req.Version = 5
+	} else if c.config.Version.IsAtLeast(V2_4_0_0) {
+		req.Version = 4
+	} else if c.config.Version.IsAtLeast(V2_3_0_0) {
+		req.Version = 3
+	} else if c.config.Version.IsAtLeast(V2_0_0_0) {
+		req.Version = 2
+	} else if c.config.Version.IsAtLeast(V0_11_0_0) {
 		req.Version = 1
 	}
-	if c.config.Version.IsAtLeast(V2_0_0_0) {
-		req.Version = 2
-	}
 	// Starting from version 3, we add a new field called groupInstanceId to indicate member identity across restarts.
-	if c.config.Version.IsAtLeast(V2_3_0_0) {
-		req.Version = 3
+	if req.Version >= 3 {
 		req.GroupInstanceId = c.groupInstanceId
-		if c.config.Version.IsAtLeast(V2_4_0_0) {
-			req.Version = 4
-		}
+	}
+	if req.Version >= 5 {
+		protocolType := "consumer"
+		protocolName := strategy.Name()
+		req.ProtocolType = &protocolType
+		req.ProtocolName = &protocolName
 	}
 
 	for memberID, topics := range plan {
@@ -673,9 +709,14 @@ func (c *consumerGroup) leave() error {
 		req.Version = 1
 	}
 	if req.Version >= 3 {
-		req.Members = append(req.Members, MemberIdentity{
+		member := MemberIdentity{
 			MemberId: c.memberID,
-		})
+		}
+		if req.Version >= 5 {
+			reason := "the consumer is being closed"
+			member.Reason = &reason
+		}
+		req.Members = append(req.Members, member)
 	}
 
 	resp, err := coordinator.LeaveGroup(req)
@@ -731,7 +772,7 @@ func (c *consumerGroup) loopCheckPartitionNumbers(allSubscribedTopicPartitions m
 		return
 	}
 
-	defer session.cancel()
+	defer session.cancel(ErrSessionPartitionCountChanged)
 
 	oldTopicToPartitionNum := make(map[string]int, len(allSubscribedTopicPartitions))
 	for topic, partitions := range allSubscribedTopicPartitions {
@@ -838,7 +879,7 @@ type consumerGroupSession struct {
 	claims  map[string][]int32
 	offsets *offsetManager
 	ctx     context.Context
-	cancel  func()
+	cancel  context.CancelCauseFunc
 
 	waitGroup       sync.WaitGroup
 	releaseOnce     sync.Once
@@ -847,7 +888,7 @@ type consumerGroupSession struct {
 
 func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims map[string][]int32, memberID string, generationID int32, handler ConsumerGroupHandler) (*consumerGroupSession, error) {
 	// init context
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancelCause(ctx)
 
 	// init offset manager
 	offsets, err := newOffsetManagerFromClient(parent.groupID, memberID, generationID, parent.client, cancel)
@@ -903,7 +944,7 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 			go func(topic string, partition int32) {
 				defer sess.waitGroup.Done()
 				// cancel the group session as soon as any of the consume calls return
-				defer sess.cancel()
+				defer sess.cancel(ErrSessionConsumeClaimExited)
 
 				// if partition not currently readable, wait for it to become readable
 				if sess.parent.client.PartitionNotReadable(topic, partition) {
@@ -1048,7 +1089,7 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 
 func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 	// signal release, stop heartbeat
-	s.cancel()
+	s.cancel(nil)
 
 	// wait for consumers to exit
 	s.waitGroup.Wait()
@@ -1079,7 +1120,7 @@ func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 
 func (s *consumerGroupSession) heartbeatLoop() {
 	defer close(s.hbDead)
-	defer s.cancel() // trigger the end of the session on exit
+	defer s.cancel(ErrSessionHeartbeatFailed) // trigger the end of the session on exit
 	defer func() {
 		Logger.Printf(
 			"consumergroup/session/%s/%d heartbeat loop stopped\n",
@@ -1098,6 +1139,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		if err != nil {
 			if retries <= 0 {
 				s.parent.handleError(err, "", -1)
+				s.cancel(err)
 				return
 			}
 			retryBackoff.Reset(s.parent.config.Metadata.Retry.Backoff)
@@ -1116,6 +1158,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 
 			if retries <= 0 {
 				s.parent.handleError(err, "", -1)
+				s.cancel(err)
 				return
 			}
 
@@ -1123,22 +1166,25 @@ func (s *consumerGroupSession) heartbeatLoop() {
 			continue
 		}
 
-		switch resp.Err {
+		switch err := resp.Err; err {
 		case ErrNoError:
 			retries = s.parent.config.Metadata.Retry.Max
 		case ErrRebalanceInProgress:
 			retries = s.parent.config.Metadata.Retry.Max
-			s.cancel()
+			s.cancel(err)
 		case ErrUnknownMemberId, ErrIllegalGeneration:
+			s.cancel(err)
 			return
 		case ErrFencedInstancedId:
 			if s.parent.groupInstanceId != nil {
 				Logger.Printf("JoinGroup failed: group instance id %s has been fenced\n", *s.parent.groupInstanceId)
 			}
-			s.parent.handleError(resp.Err, "", -1)
+			s.parent.handleError(err, "", -1)
+			s.cancel(err)
 			return
 		default:
-			s.parent.handleError(resp.Err, "", -1)
+			s.parent.handleError(err, "", -1)
+			s.cancel(err)
 			return
 		}
 
@@ -1147,6 +1193,27 @@ func (s *consumerGroupSession) heartbeatLoop() {
 		case <-s.hbDying:
 			return
 		}
+	}
+}
+
+func sessionCauseToReason(cause error) string {
+	switch {
+	case errors.Is(cause, ErrRebalanceInProgress):
+		return "group is rebalancing"
+	case errors.Is(cause, ErrUnknownMemberId):
+		return "member id is not known by the group coordinator"
+	case errors.Is(cause, ErrIllegalGeneration):
+		return "generation id is not current"
+	case errors.Is(cause, ErrFencedInstancedId):
+		return "group instance id has been fenced"
+	case errors.Is(cause, ErrSessionPartitionCountChanged):
+		return "partitions were added to a subscribed topic"
+	case errors.Is(cause, ErrSessionConsumeClaimExited):
+		return "a ConsumeClaim handler has exited"
+	case errors.Is(cause, ErrSessionHeartbeatFailed):
+		return "the heartbeat goroutine has stopped"
+	default:
+		return cause.Error()
 	}
 }
 
