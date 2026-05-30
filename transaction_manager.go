@@ -407,7 +407,14 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 			GroupID:         groupId,
 			Topics:          offsets.mapToRequest(),
 		}
-		if t.client.Config().Version.IsAtLeast(V2_1_0_0) {
+		if t.client.Config().Version.IsAtLeast(V2_5_0_0) {
+			// Version 3 adds the member ID, group instance ID and generation ID.
+			// We don't track the consumer group member metadata here, so send the
+			// protocol defaults (generation -1, empty member ID, null instance ID)
+			// which tell the broker to skip zombie fencing, matching v2 behavior.
+			request.Version = 3
+			request.GenerationID = GroupGenerationUndefined
+		} else if t.client.Config().Version.IsAtLeast(V2_1_0_0) {
 			// Version 2 adds the committed leader epoch.
 			request.Version = 2
 		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
