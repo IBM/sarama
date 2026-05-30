@@ -390,8 +390,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeLogDirs:      2, // up from 1
 				apiKeyDescribeClientQuotas: 0, // new in 2.6
 				apiKeyAlterClientQuotas:    0, // new in 2.6
-				// TODO: DeleteRecordsRequest v2 is not supported, but expected for KafkaVersion 2.6.0
-				// apiKeyDeleteRecords:     2, // up from 1
+				apiKeyDeleteRecords:        2, // up from 1
 				// TODO: DescribeConfigsRequest v3 is not supported, but expected for KafkaVersion 2.6.0
 				// apiKeyDescribeConfigs:   3, // up from 2
 			},

@@ -763,7 +763,9 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 			Topics:  topics,
 			Timeout: ca.conf.Admin.Timeout,
 		}
-		if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		if ca.conf.Version.IsAtLeast(V2_6_0_0) {
+			request.Version = 2
+		} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 			request.Version = 1
 		}
 		rsp, err := broker.DeleteRecords(request)
