@@ -391,8 +391,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeClientQuotas: 0, // new in 2.6
 				apiKeyAlterClientQuotas:    0, // new in 2.6
 				apiKeyDeleteRecords:        2, // up from 1
-				// TODO: DescribeConfigsRequest v3 is not supported, but expected for KafkaVersion 2.6.0
-				// apiKeyDescribeConfigs:   3, // up from 2
+				apiKeyDescribeConfigs:      3, // up from 2
 			},
 		},
 		{
@@ -420,6 +419,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyMetadata:             10, // up from 9
 				apiKeyDescribeClientQuotas: 1,  // up from 0
 				apiKeyDescribeCluster:      0,  // new in 2.8
+				apiKeyDescribeConfigs:      4,  // up from 3
 				// TODO: ProduceRequest v9 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyProduce:              9, // up from 8
 				// TODO: ListOffsetsRequest v6 is not supported, but expected for KafkaVersion 2.8.0

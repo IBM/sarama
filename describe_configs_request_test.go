@@ -48,6 +48,30 @@ var (
 		255, 255, 255, 255, // no configs
 		1, // synonyms
 	}
+
+	singleDescribeConfigsRequestv3 = []byte{
+		0, 0, 0, 1, // 1 config
+		2,                   // a topic
+		0, 3, 'f', 'o', 'o', // topic name: foo
+		0, 0, 0, 1, // 1 config name
+		0, 10, // 10 chars
+		's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
+		1, // synonyms
+		1, // documentation
+	}
+
+	singleDescribeConfigsRequestv4 = []byte{
+		2,                // 1 config (compact array)
+		2,                // a topic
+		4, 'f', 'o', 'o', // topic name: foo (compact string)
+		2,  // 1 config name (compact array)
+		11, // 10 chars (compact string)
+		's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's',
+		0, // resource tagged fields
+		1, // synonyms
+		1, // documentation
+		0, // request tagged fields
+	}
 )
 
 func TestDescribeConfigsRequestv0(t *testing.T) {
@@ -116,4 +140,38 @@ func TestDescribeConfigsRequestv1(t *testing.T) {
 	}
 
 	testRequest(t, "one topic, all configs", request, singleDescribeConfigsRequestAllConfigsv1)
+}
+
+func TestDescribeConfigsRequestv3(t *testing.T) {
+	request := &DescribeConfigsRequest{
+		Version: 3,
+		Resources: []*ConfigResource{
+			{
+				Type:        TopicResource,
+				Name:        "foo",
+				ConfigNames: []string{"segment.ms"},
+			},
+		},
+		IncludeSynonyms:      true,
+		IncludeDocumentation: true,
+	}
+
+	testRequest(t, "include synonyms and documentation", request, singleDescribeConfigsRequestv3)
+}
+
+func TestDescribeConfigsRequestv4(t *testing.T) {
+	request := &DescribeConfigsRequest{
+		Version: 4,
+		Resources: []*ConfigResource{
+			{
+				Type:        TopicResource,
+				Name:        "foo",
+				ConfigNames: []string{"segment.ms"},
+			},
+		},
+		IncludeSynonyms:      true,
+		IncludeDocumentation: true,
+	}
+
+	testRequest(t, "include synonyms and documentation", request, singleDescribeConfigsRequestv4)
 }
