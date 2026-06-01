@@ -288,6 +288,19 @@ func (ca *clusterAdmin) retryOnError(retryable func(error) bool, fn func() error
 	}
 }
 
+func (ca *clusterAdmin) controllerError(code KError, msg *string) error {
+	if errors.Is(code, ErrNoError) {
+		return nil
+	}
+	if isRetriableControllerError(code) {
+		_, _ = ca.refreshController()
+	}
+	if msg != nil && *msg != "" {
+		return fmt.Errorf("%w: %s", code, *msg)
+	}
+	return code
+}
+
 func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateOnly bool) error {
 	if topic == "" {
 		return ErrInvalidTopic
@@ -976,13 +989,18 @@ func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
 		request.Version = 1
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return err
-	}
+	return ca.retryOnError(isRetriableControllerError, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	_, err = b.CreateAcls(request)
-	return err
+		_, err = b.CreateAcls(request)
+		if isRetriableControllerError(err) {
+			_, _ = ca.refreshController()
+		}
+		return err
+	})
 }
 
 func (ca *clusterAdmin) CreateACLs(resourceACLs []*ResourceAcls) error {
@@ -998,13 +1016,18 @@ func (ca *clusterAdmin) CreateACLs(resourceACLs []*ResourceAcls) error {
 		request.Version = 1
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return err
-	}
+	return ca.retryOnError(isRetriableControllerError, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	_, err = b.CreateAcls(request)
-	return err
+		_, err = b.CreateAcls(request)
+		if isRetriableControllerError(err) {
+			_, _ = ca.refreshController()
+		}
+		return err
+	})
 }
 
 func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
@@ -1016,21 +1039,31 @@ func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 		request.Version = 1
 	}
 
-	b, err := ca.Controller()
+	var acls []ResourceAcls
+	err := ca.retryOnError(isRetriableControllerError, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
+
+		rsp, err := b.DescribeAcls(request)
+		if err != nil {
+			return err
+		}
+		if err := ca.controllerError(rsp.Err, rsp.ErrMsg); err != nil {
+			return err
+		}
+
+		acls = nil
+		for _, rAcl := range rsp.ResourceAcls {
+			acls = append(acls, *rAcl)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	rsp, err := b.DescribeAcls(request)
-	if err != nil {
-		return nil, err
-	}
-
-	var lAcls []ResourceAcls
-	for _, rAcl := range rsp.ResourceAcls {
-		lAcls = append(lAcls, *rAcl)
-	}
-	return lAcls, nil
+	return acls, nil
 }
 
 func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]MatchingAcl, error) {
@@ -1044,23 +1077,33 @@ func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]Matchi
 		request.Version = 1
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return nil, err
-	}
-
-	rsp, err := b.DeleteAcls(request)
-	if err != nil {
-		return nil, err
-	}
-
-	var mAcls []MatchingAcl
-	for _, fr := range rsp.FilterResponses {
-		for _, mACL := range fr.MatchingAcls {
-			mAcls = append(mAcls, *mACL)
+	var matchingAcls []MatchingAcl
+	err := ca.retryOnError(isRetriableControllerError, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
 		}
+
+		rsp, err := b.DeleteAcls(request)
+		if err != nil {
+			return err
+		}
+
+		matchingAcls = nil
+		for _, fr := range rsp.FilterResponses {
+			if err := ca.controllerError(fr.Err, fr.ErrMsg); err != nil {
+				return err
+			}
+			for _, mACL := range fr.MatchingAcls {
+				matchingAcls = append(matchingAcls, *mACL)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return mAcls, nil
+	return matchingAcls, nil
 }
 
 func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[string][]int32) (map[string]map[int32]*PartitionResult, error) {
@@ -1432,12 +1475,19 @@ func (ca *clusterAdmin) DescribeUserScramCredentials(users []string) ([]*Describ
 		})
 	}
 
-	b, err := ca.Controller()
-	if err != nil {
-		return nil, err
-	}
+	var rsp *DescribeUserScramCredentialsResponse
+	err := ca.retryOnError(isRetriableControllerError, func() error {
+		b, err := ca.Controller()
+		if err != nil {
+			return err
+		}
 
-	rsp, err := b.DescribeUserScramCredentials(req)
+		rsp, err = b.DescribeUserScramCredentials(req)
+		if err != nil {
+			return err
+		}
+		return ca.controllerError(rsp.ErrorCode, rsp.ErrorMessage)
+	})
 	if err != nil {
 		return nil, err
 	}

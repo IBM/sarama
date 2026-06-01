@@ -1355,130 +1355,245 @@ func TestClusterAdminCreateAclErrorHandling(t *testing.T) {
 }
 
 func TestClusterAdminCreateAcls(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	defer seedBroker.Close()
+	resource := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
+	acl := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
+	createOK := func(req *request) encoderWithHeader { return NewMockCreateAclsResponse(t).For(req.body) }
+	notController := func(req *request) encoderWithHeader {
+		r := req.body.(*CreateAclsRequest)
+		rsp := &CreateAclsResponse{Version: r.version()}
+		for range r.AclCreations {
+			rsp.AclCreationResponses = append(rsp.AclCreationResponses, &AclCreationResponse{Err: ErrNotController})
+		}
+		return rsp
+	}
 
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
-		"CreateAclsRequest": NewMockCreateAclsResponse(t),
+	t.Run("creates acls", func(t *testing.T) {
+		admin := singleBrokerAdmin(t, V1_0_0_0, map[string]requestHandlerFunc{
+			"CreateAclsRequest": createOK,
+		})
+
+		rACLs := []*ResourceAcls{
+			{
+				Resource: resource,
+				Acls:     []*Acl{&acl},
+			},
+			{
+				Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "your_topic"},
+				Acls:     []*Acl{&acl},
+			},
+		}
+
+		err := admin.CreateACLs(rACLs)
+		require.NoError(t, err)
+	})
+
+	t.Run("retries on stale controller", func(t *testing.T) {
+		admin, retriedOnNewController := staleControllerAdmin(t, V1_0_0_0, "CreateAclsRequest", notController, createOK)
+
+		err := admin.CreateACL(resource, acl)
+		require.NoError(t, err)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
+
+	t.Run("returns error when retries exhausted", func(t *testing.T) {
+		admin, retriedOnNewController := staleControllerAdmin(t, V1_0_0_0, "CreateAclsRequest", notController, notController)
+
+		err := admin.CreateACL(resource, acl)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrNotController)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
+}
+
+// singleBrokerAdmin wires a single mock broker that names itself controller,
+// installs the given per-request handlers, and returns a ready admin client.
+func singleBrokerAdmin(t *testing.T, version KafkaVersion, handlers map[string]requestHandlerFunc) ClusterAdmin {
+	b := NewMockBroker(t, 1)
+	t.Cleanup(func() { b.Close() })
+
+	hm := map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			return NewMockMetadataResponse(t).
+				SetController(b.BrokerID()).
+				SetBroker(b.Addr(), b.BrokerID()).For(req.body)
+		},
+	}
+	for reqType, handler := range handlers {
+		hm[reqType] = handler
+	}
+	b.SetHandlerFuncByMap(hm)
+
+	config := NewTestConfig()
+	config.Version = version
+	admin, err := NewClusterAdmin([]string{b.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = admin.Close() })
+
+	return admin
+}
+
+// staleControllerAdmin wires two mock brokers into a controller-failover
+// scenario and returns a ready admin client. Broker 1 answers reqType with
+// errResp and flips fresh metadata to name broker 2 as controller, modeling a
+// stale cached controller; broker 2 answers with okResp. retriedOnNewController
+// reports whether broker 2 received the request.
+func staleControllerAdmin(t *testing.T, version KafkaVersion, reqType string, errResp, okResp requestHandlerFunc) (admin ClusterAdmin, retriedOnNewController func() bool) {
+	b1 := NewMockBroker(t, 1)
+	b2 := NewMockBroker(t, 2)
+	t.Cleanup(func() { b1.Close(); b2.Close() })
+
+	var controllerID atomic.Int32
+	controllerID.Store(b1.BrokerID())
+	meta := func(req *request) encoderWithHeader {
+		return NewMockMetadataResponse(t).SetController(controllerID.Load()).
+			SetBroker(b1.Addr(), b1.BrokerID()).
+			SetBroker(b2.Addr(), b2.BrokerID()).For(req.body)
+	}
+
+	var newControllerReceivedRequest atomic.Bool
+	b1.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": meta,
+		reqType: func(req *request) encoderWithHeader {
+			controllerID.Store(b2.BrokerID()) // flip so the post-error refresh elects broker 2
+			return errResp(req)
+		},
+	})
+	b2.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": meta,
+		reqType: func(req *request) encoderWithHeader {
+			newControllerReceivedRequest.Store(true)
+			return okResp(req)
+		},
 	})
 
 	config := NewTestConfig()
-	config.Version = V1_0_0_0
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	config.Version = version
+	config.Admin.Retry.Backoff = time.Millisecond
+	admin, err := NewClusterAdmin([]string{b1.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = admin.Close() })
 
-	rACLs := []*ResourceAcls{
-		{
-			Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"},
-			Acls: []*Acl{
-				{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
-			},
-		},
-		{
-			Resource: Resource{ResourceType: AclResourceTopic, ResourceName: "your_topic"},
-			Acls: []*Acl{
-				{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
-			},
-		},
-	}
-
-	err = admin.CreateACLs(rACLs)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	return admin, newControllerReceivedRequest.Load
 }
 
 func TestClusterAdminListAcls(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	defer seedBroker.Close()
+	resourceName := "my_topic"
+	filter := AclFilter{ResourceType: AclResourceTopic, Operation: AclOperationRead, ResourceName: &resourceName}
+	listOK := func(req *request) encoderWithHeader { return NewMockListAclsResponse(t).For(req.body) }
+	notController := func(req *request) encoderWithHeader {
+		return &DescribeAclsResponse{Version: req.body.version(), Err: ErrNotController}
+	}
 
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
-		"DescribeAclsRequest": NewMockListAclsResponse(t),
-		"CreateAclsRequest":   NewMockCreateAclsResponse(t),
+	t.Run("lists acls", func(t *testing.T) {
+		admin := singleBrokerAdmin(t, V1_0_0_0, map[string]requestHandlerFunc{
+			"DescribeAclsRequest": listOK,
+			"CreateAclsRequest":   func(req *request) encoderWithHeader { return NewMockCreateAclsResponse(t).For(req.body) },
+		})
+
+		err := admin.CreateACL(
+			Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"},
+			Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny},
+		)
+		require.NoError(t, err)
+
+		acls, err := admin.ListAcls(filter)
+		require.NoError(t, err)
+		assert.NotEmpty(t, acls)
 	})
 
-	config := NewTestConfig()
-	config.Version = V1_0_0_0
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("retries on stale controller", func(t *testing.T) {
+		admin, retriedOnNewController := staleControllerAdmin(t, V1_0_0_0, "DescribeAclsRequest", notController, listOK)
 
-	r := Resource{ResourceType: AclResourceTopic, ResourceName: "my_topic"}
-	a := Acl{Host: "localhost", Operation: AclOperationAlter, PermissionType: AclPermissionAny}
+		acls, err := admin.ListAcls(filter)
+		require.NoError(t, err)
+		assert.NotEmpty(t, acls)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
 
-	err = admin.CreateACL(r, a)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resourceName := "my_topic"
-	filter := AclFilter{
-		ResourceType: AclResourceTopic,
-		Operation:    AclOperationRead,
-		ResourceName: &resourceName,
-	}
+	t.Run("returns error when retries exhausted", func(t *testing.T) {
+		admin, _ := staleControllerAdmin(t, V1_0_0_0, "DescribeAclsRequest", notController, notController)
 
-	rAcls, err := admin.ListAcls(filter)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rAcls) == 0 {
-		t.Fatal("no acls present")
-	}
-
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+		_, err := admin.ListAcls(filter)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrNotController)
+	})
 }
 
 func TestClusterAdminDeleteAcl(t *testing.T) {
-	seedBroker := NewMockBroker(t, 1)
-	defer seedBroker.Close()
+	resourceName := "my_topic"
+	filter := AclFilter{ResourceType: AclResourceTopic, Operation: AclOperationAlter, ResourceName: &resourceName}
+	deleteOK := func(req *request) encoderWithHeader { return NewMockDeleteAclsResponse(t).For(req.body) }
+	notController := func(req *request) encoderWithHeader {
+		return &DeleteAclsResponse{
+			Version:         req.body.version(),
+			FilterResponses: []*FilterResponse{{Err: ErrNotController}},
+		}
+	}
 
-	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(seedBroker.BrokerID()).
-			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
-		"DeleteAclsRequest": NewMockDeleteAclsResponse(t),
+	t.Run("deletes acls", func(t *testing.T) {
+		admin := singleBrokerAdmin(t, V1_0_0_0, map[string]requestHandlerFunc{
+			"DeleteAclsRequest": deleteOK,
+		})
+
+		_, err := admin.DeleteACL(filter, false)
+		require.NoError(t, err)
 	})
 
-	config := NewTestConfig()
-	config.Version = V1_0_0_0
-	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
-	if err != nil {
-		t.Fatal(err)
+	t.Run("retries on stale controller", func(t *testing.T) {
+		admin, retriedOnNewController := staleControllerAdmin(t, V1_0_0_0, "DeleteAclsRequest", notController, deleteOK)
+
+		_, err := admin.DeleteACL(filter, false)
+		require.NoError(t, err)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
+
+	t.Run("returns error when retries exhausted", func(t *testing.T) {
+		admin, _ := staleControllerAdmin(t, V1_0_0_0, "DeleteAclsRequest", notController, notController)
+
+		_, err := admin.DeleteACL(filter, false)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrNotController)
+	})
+}
+
+func TestClusterAdminDescribeUserScramCredentials(t *testing.T) {
+	users := []string{"my_user"}
+	describeOK := func(req *request) encoderWithHeader {
+		return &DescribeUserScramCredentialsResponse{
+			Version: req.body.version(),
+			Results: []*DescribeUserScramCredentialsResult{{User: "my_user"}},
+		}
+	}
+	notController := func(req *request) encoderWithHeader {
+		return &DescribeUserScramCredentialsResponse{Version: req.body.version(), ErrorCode: ErrNotController}
 	}
 
-	resourceName := "my_topic"
-	filter := AclFilter{
-		ResourceType: AclResourceTopic,
-		Operation:    AclOperationAlter,
-		ResourceName: &resourceName,
-	}
+	t.Run("describes credentials", func(t *testing.T) {
+		admin := singleBrokerAdmin(t, V2_7_0_0, map[string]requestHandlerFunc{
+			"DescribeUserScramCredentialsRequest": describeOK,
+		})
 
-	_, err = admin.DeleteACL(filter, false)
-	if err != nil {
-		t.Fatal(err)
-	}
+		results, err := admin.DescribeUserScramCredentials(users)
+		require.NoError(t, err)
+		assert.NotEmpty(t, results)
+	})
 
-	err = admin.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	t.Run("retries on stale controller", func(t *testing.T) {
+		admin, retriedOnNewController := staleControllerAdmin(t, V2_7_0_0, "DescribeUserScramCredentialsRequest", notController, describeOK)
+
+		results, err := admin.DescribeUserScramCredentials(users)
+		require.NoError(t, err)
+		assert.NotEmpty(t, results)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
+
+	t.Run("returns error when retries exhausted", func(t *testing.T) {
+		admin, _ := staleControllerAdmin(t, V2_7_0_0, "DescribeUserScramCredentialsRequest", notController, notController)
+
+		_, err := admin.DescribeUserScramCredentials(users)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrNotController)
+	})
 }
 
 func TestElectLeaders(t *testing.T) {
