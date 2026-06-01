@@ -364,7 +364,7 @@ func TestFuncInitProducerId3(t *testing.T) {
 
 type messageHandler struct {
 	*testing.T
-	h         func(*ConsumerMessage)
+	h         func(ConsumerGroupSession, *ConsumerMessage)
 	started   chan struct{}
 	startOnce sync.Once
 }
@@ -377,22 +377,59 @@ func (h *messageHandler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerG
 
 	for msg := range claim.Messages() {
 		h.Logf("consumed msg %v", msg)
-		h.h(msg)
+		h.h(sess, msg)
 	}
 	return nil
 }
 
 func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 	checkKafkaVersion(t, "0.11.0.0")
+
+	t.Run("legacy group ID", func(t *testing.T) {
+		testTxnProduceAndCommitOffset(t, MaxVersion, "TestFuncTxnProduceAndCommitOffset", "test-produce",
+			func(producer AsyncProducer, _ ConsumerGroupSession, msg *ConsumerMessage, groupID string) error {
+				return producer.AddMessageToTxn(msg, groupID, nil)
+			})
+	})
+
+	// test the v2/v3 TxnOffsetCommit protocol boundaries across broker versions
+	versions := []struct {
+		name     string
+		version  KafkaVersion
+		minKafka string
+	}{
+		{"v2", V2_1_0_0, "2.1.0"},
+		{"v3 with group metadata", V2_5_0_0, "2.5.0"},
+	}
+	for _, v := range versions {
+		t.Run(v.name, func(t *testing.T) {
+			checkKafkaVersion(t, v.minKafka)
+			groupID := "test-produce-" + v.version.String()
+			txnID := "TestFuncTxnProduceAndCommitOffset-" + v.version.String()
+			testTxnProduceAndCommitOffset(t, v.version, txnID, groupID,
+				func(producer AsyncProducer, sess ConsumerGroupSession, msg *ConsumerMessage, groupID string) error {
+					return producer.AddMessageToTxnWithGroupMetadata(msg, NewConsumerGroupMetadataFromSession(sess, groupID, nil), nil)
+				})
+		})
+	}
+}
+
+func testTxnProduceAndCommitOffset(
+	t *testing.T,
+	version KafkaVersion,
+	txnID, groupID string,
+	addOffsetToTxn func(producer AsyncProducer, sess ConsumerGroupSession, msg *ConsumerMessage, groupID string) error,
+) {
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
 	config := NewFunctionalTestConfig()
+	config.Version = version
 	config.ChannelBufferSize = 20
 	config.Producer.Flush.Frequency = 50 * time.Millisecond
 	config.Producer.Flush.Messages = 200
 	config.Producer.Idempotent = true
-	config.Producer.Transaction.ID = "TestFuncTxnProduceAndCommitOffset"
+	config.Producer.Transaction.ID = txnID
 	config.Producer.RequiredAcks = WaitForAll
 	config.Producer.Transaction.Retry.Max = 200
 	config.Consumer.IsolationLevel = ReadCommitted
@@ -411,7 +448,7 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 	require.NoError(t, err)
 	defer producer.Close()
 
-	cg, err := NewConsumerGroupFromClient("test-produce", client)
+	cg, err := NewConsumerGroupFromClient(groupID, client)
 	require.NoError(t, err)
 	defer cg.Close()
 
@@ -420,14 +457,11 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 
 	handler := &messageHandler{started: make(chan struct{})}
 	handler.T = t
-	handler.h = func(msg *ConsumerMessage) {
-		err := producer.BeginTxn()
-		require.NoError(t, err)
+	handler.h = func(sess ConsumerGroupSession, msg *ConsumerMessage) {
+		require.NoError(t, producer.BeginTxn())
 		producer.Input() <- &ProducerMessage{Topic: "test.1", Value: StringEncoder("test-prod")}
-		err = producer.AddMessageToTxn(msg, "test-produce", nil)
-		require.NoError(t, err)
-		err = producer.CommitTxn()
-		require.NoError(t, err)
+		require.NoError(t, addOffsetToTxn(producer, sess, msg, groupID))
+		require.NoError(t, producer.CommitTxn())
 	}
 
 	go func() {
@@ -465,7 +499,7 @@ func TestFuncTxnProduceAndCommitOffset(t *testing.T) {
 
 	topicPartitions := make(map[string][]int32)
 	topicPartitions["test.4"] = []int32{0, 1, 2, 3}
-	topicsDescription, err := admin.ListConsumerGroupOffsets("test-produce", topicPartitions)
+	topicsDescription, err := admin.ListConsumerGroupOffsets(groupID, topicPartitions)
 	require.NoError(t, err)
 
 	for _, partition := range topicPartitions["test.4"] {

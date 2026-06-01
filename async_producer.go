@@ -82,8 +82,18 @@ type AsyncProducer interface {
 	// AddOffsetsToTxn add associated offsets to current transaction.
 	AddOffsetsToTxn(offsets map[string][]*PartitionOffsetMetadata, groupId string) error
 
+	// AddOffsetsToTxnWithGroupMetadata adds associated offsets to the current
+	// transaction, carrying the consumer group member metadata so the broker
+	// can fence stale members (KIP-447).
+	AddOffsetsToTxnWithGroupMetadata(offsets map[string][]*PartitionOffsetMetadata, groupMetadata *ConsumerGroupMetadata) error
+
 	// AddMessageToTxn add message offsets to current transaction.
 	AddMessageToTxn(msg *ConsumerMessage, groupId string, metadata *string) error
+
+	// AddMessageToTxnWithGroupMetadata adds the message offset to the current
+	// transaction, carrying the consumer group member metadata so the broker
+	// can fence stale members (KIP-447).
+	AddMessageToTxnWithGroupMetadata(msg *ConsumerMessage, groupMetadata *ConsumerGroupMetadata, metadata *string) error
 }
 
 type asyncProducer struct {
@@ -437,6 +447,10 @@ func (p *asyncProducer) IsTransactional() bool {
 }
 
 func (p *asyncProducer) AddMessageToTxn(msg *ConsumerMessage, groupId string, metadata *string) error {
+	return p.AddMessageToTxnWithGroupMetadata(msg, NewConsumerGroupMetadata(groupId), metadata)
+}
+
+func (p *asyncProducer) AddMessageToTxnWithGroupMetadata(msg *ConsumerMessage, groupMetadata *ConsumerGroupMetadata, metadata *string) error {
 	offsets := make(map[string][]*PartitionOffsetMetadata)
 	offsets[msg.Topic] = []*PartitionOffsetMetadata{
 		{
@@ -445,10 +459,14 @@ func (p *asyncProducer) AddMessageToTxn(msg *ConsumerMessage, groupId string, me
 			Metadata:  metadata,
 		},
 	}
-	return p.AddOffsetsToTxn(offsets, groupId)
+	return p.AddOffsetsToTxnWithGroupMetadata(offsets, groupMetadata)
 }
 
 func (p *asyncProducer) AddOffsetsToTxn(offsets map[string][]*PartitionOffsetMetadata, groupId string) error {
+	return p.AddOffsetsToTxnWithGroupMetadata(offsets, NewConsumerGroupMetadata(groupId))
+}
+
+func (p *asyncProducer) AddOffsetsToTxnWithGroupMetadata(offsets map[string][]*PartitionOffsetMetadata, groupMetadata *ConsumerGroupMetadata) error {
 	p.txLock.Lock()
 	defer p.txLock.Unlock()
 
@@ -458,7 +476,7 @@ func (p *asyncProducer) AddOffsetsToTxn(offsets map[string][]*PartitionOffsetMet
 	}
 
 	DebugLogger.Printf("producer/txnmgr [%s] add offsets to transaction\n", p.txnmgr.transactionalID)
-	return p.txnmgr.addOffsetsToTxn(offsets, groupId)
+	return p.txnmgr.addOffsetsToTxn(offsets, groupMetadata)
 }
 
 func (p *asyncProducer) TxnStatus() ProducerTxnStatusFlag {
