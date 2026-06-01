@@ -158,7 +158,7 @@ func TestProduceSetRequestBuilding(t *testing.T) {
 		safeAddMessage(t, ps, msg)
 	}
 
-	req := ps.buildRequest()
+	req, _ := ps.buildRequest()
 
 	if req.RequiredAcks != WaitForAll {
 		t.Error("RequiredAcks not set properly")
@@ -191,7 +191,7 @@ func TestProduceSetCompressedRequestBuilding(t *testing.T) {
 		safeAddMessage(t, ps, msg)
 	}
 
-	req := ps.buildRequest()
+	req, _ := ps.buildRequest()
 
 	if req.Version != 2 {
 		t.Error("Wrong request version")
@@ -251,7 +251,7 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 		msg.Timestamp = msg.Timestamp.Add(time.Second)
 	}
 
-	req := ps.buildRequest()
+	req, _ := ps.buildRequest()
 
 	if req.Version != 3 {
 		t.Error("Wrong request version")
@@ -333,7 +333,7 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 		msg.Timestamp = msg.Timestamp.Add(time.Second)
 	}
 
-	req := ps.buildRequest()
+	req, _ := ps.buildRequest()
 
 	if req.Version != 3 {
 		t.Error("Wrong request version")
@@ -409,7 +409,7 @@ func TestProduceSetConsistentTimestamps(t *testing.T) {
 
 	safeAddMessage(t, ps1, msg1)
 	safeAddMessage(t, ps1, msg3)
-	req1 := ps1.buildRequest()
+	req1, _ := ps1.buildRequest()
 	if req1.Version != 3 {
 		t.Error("Wrong request version")
 	}
@@ -419,7 +419,7 @@ func TestProduceSetConsistentTimestamps(t *testing.T) {
 
 	safeAddMessage(t, ps2, msg2)
 	safeAddMessage(t, ps2, msg3)
-	req2 := ps2.buildRequest()
+	req2, _ := ps2.buildRequest()
 	if req2.Version != 3 {
 		t.Error("Wrong request version")
 	}

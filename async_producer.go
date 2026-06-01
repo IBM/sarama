@@ -984,7 +984,23 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		var wg sync.WaitGroup
 
 		for set := range bridge {
-			request := set.buildRequest()
+			request, err := set.buildRequest()
+			if err != nil {
+				// Count the in flight requests to know when we can close the pending channel safely
+				wg.Add(1)
+				// capture the muted set. unmuting is deferred to handleResponse.
+				mutedSet := set
+				sendResponse := func(response *ProduceResponse, err error) {
+					pending <- &brokerProducerResponse{
+						set: mutedSet,
+						err: err,
+						res: response,
+					}
+					wg.Done()
+				}
+				sendResponse(nil, err)
+				continue
+			}
 
 			// Count the in flight requests to know when we can close the pending channel safely
 			wg.Add(1)
@@ -1013,7 +1029,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			// Use AsyncProduce vs Produce to not block waiting for the response
 			// so that we can pipeline multiple produce requests and achieve higher throughput, see:
 			// https://kafka.apache.org/protocol#protocol_network
-			err := broker.AsyncProduce(request, sendResponse)
+			err = broker.AsyncProduce(request, sendResponse)
 			if err != nil {
 				// Request failed to be sent
 				sendResponse(nil, err)
