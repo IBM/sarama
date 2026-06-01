@@ -42,6 +42,9 @@ func (d *DeleteRecordsResponse) encode(pe packetEncoder) error {
 			return err
 		}
 	}
+
+	pe.putEmptyTaggedFieldArray()
+
 	return nil
 }
 
@@ -72,6 +75,10 @@ func (d *DeleteRecordsResponse) decode(pd packetDecoder, version int16) (err err
 		}
 	}
 
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -84,20 +91,33 @@ func (d *DeleteRecordsResponse) version() int16 {
 }
 
 func (d *DeleteRecordsResponse) headerVersion() int16 {
+	if d.Version >= 2 {
+		return 1
+	}
 	return 0
 }
 
 func (d *DeleteRecordsResponse) isValidVersion() bool {
-	return d.Version >= 0 && d.Version <= 1
+	return d.Version >= 0 && d.Version <= 2
 }
 
 func (d *DeleteRecordsResponse) requiredVersion() KafkaVersion {
 	switch d.Version {
+	case 2:
+		return V2_6_0_0
 	case 1:
 		return V2_0_0_0
 	default:
 		return V0_11_0_0
 	}
+}
+
+func (d *DeleteRecordsResponse) isFlexible() bool {
+	return d.isFlexibleVersion(d.Version)
+}
+
+func (d *DeleteRecordsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 2
 }
 
 func (r *DeleteRecordsResponse) throttleTime() time.Duration {
@@ -123,6 +143,9 @@ func (t *DeleteRecordsResponseTopic) encode(pe packetEncoder) error {
 			return err
 		}
 	}
+
+	pe.putEmptyTaggedFieldArray()
+
 	return nil
 }
 
@@ -147,6 +170,10 @@ func (t *DeleteRecordsResponseTopic) decode(pd packetDecoder, version int16) err
 		}
 	}
 
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -158,6 +185,7 @@ type DeleteRecordsResponsePartition struct {
 func (t *DeleteRecordsResponsePartition) encode(pe packetEncoder) error {
 	pe.putInt64(t.LowWatermark)
 	pe.putKError(t.Err)
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -170,6 +198,10 @@ func (t *DeleteRecordsResponsePartition) decode(pd packetDecoder, version int16)
 
 	t.Err, err = pd.getKError()
 	if err != nil {
+		return err
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 		return err
 	}
 

@@ -551,6 +551,52 @@ func TestFuncAdminListOffsets(t *testing.T) {
 	)
 }
 
+func TestFuncAdminDeleteRecords(t *testing.T) {
+	t.Parallel()
+	checkKafkaVersion(t, "0.11.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	const (
+		partitionsCount      = int32(1)
+		messagesPerPartition = 10
+		deleteBeforeOffset   = int64(5)
+	)
+
+	config := NewFunctionalTestConfig()
+	config.ClientID = t.Name()
+	config.Producer.Partitioner = NewManualPartitioner
+	config.Producer.Return.Successes = true
+
+	client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	adminClient, err := NewClusterAdminFromClient(client)
+	require.NoError(t, err)
+
+	topic, err := topicWithEvenLeaders(t, adminClient, client, partitionsCount)
+	require.NoError(t, err)
+
+	produceMessagesForPartitions(t, client, topic, partitionsCount, messagesPerPartition, time.Now().UnixMilli())
+
+	require.NoError(t, client.RefreshMetadata(topic))
+
+	err = adminClient.DeleteRecords(topic, map[int32]int64{0: deleteBeforeOffset})
+	require.NoError(t, err)
+
+	// truncating records before deleteBeforeOffset moves the partition low water mark there
+	listOffsetsAndValidate(
+		t,
+		adminClient,
+		topic,
+		partitionsCount,
+		OffsetOldest,
+		deleteBeforeOffset,
+		"earliest after delete",
+	)
+}
+
 func TestFuncAdminAlterConsumerGroupOffsets(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "2.1.0.0")
