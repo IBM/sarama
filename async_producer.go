@@ -986,13 +986,10 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		for set := range bridge {
 			request, err := set.buildRequest()
 			if err != nil {
-				// Count the in flight requests to know when we can close the pending channel safely
-				wg.Add(1)
 				pending <- &brokerProducerResponse{
 					set: set,
 					err: err,
 				}
-				wg.Done()
 				continue
 			}
 
