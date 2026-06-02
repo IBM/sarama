@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func makeProduceSet() (*asyncProducer, *produceSet) {
@@ -158,7 +160,8 @@ func TestProduceSetRequestBuilding(t *testing.T) {
 		safeAddMessage(t, ps, msg)
 	}
 
-	req, _ := ps.buildRequest()
+	req, err := ps.buildRequest()
+	require.NoError(t, err)
 
 	if req.RequiredAcks != WaitForAll {
 		t.Error("RequiredAcks not set properly")
@@ -191,7 +194,8 @@ func TestProduceSetCompressedRequestBuilding(t *testing.T) {
 		safeAddMessage(t, ps, msg)
 	}
 
-	req, _ := ps.buildRequest()
+	req, err := ps.buildRequest()
+	require.NoError(t, err)
 
 	if req.Version != 2 {
 		t.Error("Wrong request version")
@@ -251,7 +255,8 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 		msg.Timestamp = msg.Timestamp.Add(time.Second)
 	}
 
-	req, _ := ps.buildRequest()
+	req, err := ps.buildRequest()
+	require.NoError(t, err)
 
 	if req.Version != 3 {
 		t.Error("Wrong request version")
@@ -333,7 +338,8 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 		msg.Timestamp = msg.Timestamp.Add(time.Second)
 	}
 
-	req, _ := ps.buildRequest()
+	req, err := ps.buildRequest()
+	require.NoError(t, err)
 
 	if req.Version != 3 {
 		t.Error("Wrong request version")
@@ -409,7 +415,8 @@ func TestProduceSetConsistentTimestamps(t *testing.T) {
 
 	safeAddMessage(t, ps1, msg1)
 	safeAddMessage(t, ps1, msg3)
-	req1, _ := ps1.buildRequest()
+	req1, err := ps1.buildRequest()
+	require.NoError(t, err)
 	if req1.Version != 3 {
 		t.Error("Wrong request version")
 	}
@@ -419,7 +426,8 @@ func TestProduceSetConsistentTimestamps(t *testing.T) {
 
 	safeAddMessage(t, ps2, msg2)
 	safeAddMessage(t, ps2, msg3)
-	req2, _ := ps2.buildRequest()
+	req2, err := ps2.buildRequest()
+	require.NoError(t, err)
 	if req2.Version != 3 {
 		t.Error("Wrong request version")
 	}

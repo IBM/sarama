@@ -988,17 +988,11 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			if err != nil {
 				// Count the in flight requests to know when we can close the pending channel safely
 				wg.Add(1)
-				// capture the muted set. unmuting is deferred to handleResponse.
-				mutedSet := set
-				sendResponse := func(response *ProduceResponse, err error) {
-					pending <- &brokerProducerResponse{
-						set: mutedSet,
-						err: err,
-						res: response,
-					}
-					wg.Done()
+				pending <- &brokerProducerResponse{
+					set: set,
+					err: err,
 				}
-				sendResponse(nil, err)
+				wg.Done()
 				continue
 			}
 
