@@ -73,19 +73,32 @@ func releaseEncoder(params ZstdEncoderParams, enc *zstd.Encoder) {
 	}
 }
 
-func getDecoder(params ZstdDecoderParams) *zstd.Decoder {
-	if ret, ok := zstdDecMap.Load(params); ok {
+// zstdDecoderKey keys the decoder cache on maxDecodedSize as well as params,
+// since the size bound is fixed when the decoder is built and can't be changed
+// per call.
+type zstdDecoderKey struct {
+	ZstdDecoderParams
+	maxDecodedSize int
+}
+
+func getDecoder(params ZstdDecoderParams, maxDecodedSize int) *zstd.Decoder {
+	key := zstdDecoderKey{params, maxDecodedSize}
+	if ret, ok := zstdDecMap.Load(key); ok {
 		return ret.(*zstd.Decoder)
+	}
+	opts := []zstd.DOption{zstd.WithDecoderConcurrency(0)}
+	if maxDecodedSize > 0 {
+		opts = append(opts, zstd.WithDecoderMaxMemory(uint64(maxDecodedSize)))
 	}
 	// It's possible to race and create multiple new readers.
 	// Only one will survive GC after use.
-	zstdDec, _ := zstd.NewReader(nil, zstd.WithDecoderConcurrency(0))
-	zstdDecMap.Store(params, zstdDec)
+	zstdDec, _ := zstd.NewReader(nil, opts...)
+	zstdDecMap.Store(key, zstdDec)
 	return zstdDec
 }
 
-func zstdDecompress(params ZstdDecoderParams, dst, src []byte) ([]byte, error) {
-	return getDecoder(params).DecodeAll(src, dst)
+func zstdDecompress(params ZstdDecoderParams, dst, src []byte, maxDecodedSize int) ([]byte, error) {
+	return getDecoder(params, maxDecodedSize).DecodeAll(src, dst)
 }
 
 func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {

@@ -111,6 +111,16 @@ var (
 	// the size of responses they send. In particular, they can send arbitrarily large fetch responses to consumers
 	// (see https://issues.apache.org/jira/browse/KAFKA-2063).
 	MaxResponseSize int32 = 100 * 1024 * 1024
+
+	// MaxDecompressedBatchSize bounds the number of bytes a single compressed record
+	// batch may inflate to during consumer-side decompression. A small compressed payload
+	// can decompress into a much larger allocation (a "compression bomb"). When this is
+	// set and a batch decompresses to more than this many bytes, Sarama stops
+	// decompressing and returns ErrDecompressedBatchTooLarge instead of holding the full
+	// payload in memory.
+	//
+	// The default of 0 leaves decompression unbounded.
+	MaxDecompressedBatchSize int32 = 0
 )
 
 // StdLogger is used to log error messages.
