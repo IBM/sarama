@@ -34,6 +34,21 @@ const (
 	SourceDefault
 )
 
+type ConfigType int8
+
+const (
+	UnknownConfigType ConfigType = iota
+	BooleanConfigType
+	StringConfigType
+	IntConfigType
+	ShortConfigType
+	LongConfigType
+	DoubleConfigType
+	ListConfigType
+	ClassConfigType
+	PasswordConfigType
+)
+
 type DescribeConfigError struct {
 	Err    KError
 	ErrMsg string
@@ -70,13 +85,15 @@ type ResourceResponse struct {
 }
 
 type ConfigEntry struct {
-	Name      string
-	Value     string
-	ReadOnly  bool
-	Default   bool
-	Source    ConfigSource
-	Sensitive bool
-	Synonyms  []*ConfigSynonym
+	Name          string
+	Value         string
+	ReadOnly      bool
+	Default       bool
+	Source        ConfigSource
+	Sensitive     bool
+	Synonyms      []*ConfigSynonym
+	Type          ConfigType // v3
+	Documentation *string    // v3
 }
 
 type ConfigSynonym struct {
@@ -96,6 +113,8 @@ func (r *DescribeConfigsResponse) encode(pe packetEncoder) (err error) {
 			return err
 		}
 	}
+
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -120,6 +139,10 @@ func (r *DescribeConfigsResponse) decode(pd packetDecoder, version int16) (err e
 		r.Resources[i] = rr
 	}
 
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -132,15 +155,30 @@ func (r *DescribeConfigsResponse) version() int16 {
 }
 
 func (r *DescribeConfigsResponse) headerVersion() int16 {
+	if r.Version >= 4 {
+		return 1
+	}
 	return 0
 }
 
 func (r *DescribeConfigsResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 2
+	return r.Version >= 0 && r.Version <= 4
+}
+
+func (r *DescribeConfigsResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *DescribeConfigsResponse) isFlexibleVersion(version int16) bool {
+	return version >= 4
 }
 
 func (r *DescribeConfigsResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 4:
+		return V2_8_0_0
+	case 3:
+		return V2_6_0_0
 	case 2:
 		return V2_0_0_0
 	case 1:
@@ -178,6 +216,9 @@ func (r *ResourceResponse) encode(pe packetEncoder, version int16) (err error) {
 			return err
 		}
 	}
+
+	pe.putEmptyTaggedFieldArray()
+
 	return nil
 }
 
@@ -219,6 +260,11 @@ func (r *ResourceResponse) decode(pd packetDecoder, version int16) (err error) {
 		}
 		r.Configs[i] = c
 	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -249,6 +295,15 @@ func (r *ConfigEntry) encode(pe packetEncoder, version int16) (err error) {
 			}
 		}
 	}
+
+	if version >= 3 {
+		pe.putInt8(int8(r.Type))
+		if err = pe.putNullableString(r.Documentation); err != nil {
+			return err
+		}
+	}
+
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -315,6 +370,24 @@ func (r *ConfigEntry) decode(pd packetDecoder, version int16) (err error) {
 			r.Synonyms[i] = s
 		}
 	}
+
+	if version >= 3 {
+		configType, err := pd.getInt8()
+		if err != nil {
+			return err
+		}
+		r.Type = ConfigType(configType)
+
+		r.Documentation, err = pd.getNullableString()
+		if err != nil {
+			return err
+		}
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -330,6 +403,8 @@ func (c *ConfigSynonym) encode(pe packetEncoder, version int16) (err error) {
 	}
 
 	pe.putInt8(int8(c.Source))
+
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -352,5 +427,10 @@ func (c *ConfigSynonym) decode(pd packetDecoder, version int16) error {
 		return err
 	}
 	c.Source = ConfigSource(source)
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+
 	return nil
 }

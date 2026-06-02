@@ -1,9 +1,10 @@
 package sarama
 
 type DescribeConfigsRequest struct {
-	Version         int16
-	Resources       []*ConfigResource
-	IncludeSynonyms bool
+	Version              int16
+	Resources            []*ConfigResource
+	IncludeSynonyms      bool
+	IncludeDocumentation bool // v3
 }
 
 func (r *DescribeConfigsRequest) setVersion(v int16) {
@@ -28,17 +29,25 @@ func (r *DescribeConfigsRequest) encode(pe packetEncoder) error {
 		}
 
 		if len(c.ConfigNames) == 0 {
-			pe.putInt32(-1)
-			continue
-		}
-		if err := pe.putStringArray(c.ConfigNames); err != nil {
+			if err := pe.putArrayLength(-1); err != nil {
+				return err
+			}
+		} else if err := pe.putStringArray(c.ConfigNames); err != nil {
 			return err
 		}
+
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	if r.Version >= 1 {
 		pe.putBool(r.IncludeSynonyms)
 	}
+
+	if r.Version >= 3 {
+		pe.putBool(r.IncludeDocumentation)
+	}
+
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -69,19 +78,21 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 			return err
 		}
 
-		if confLength == -1 {
-			continue
+		if confLength != -1 {
+			cfnames := make([]string, confLength)
+			for i := 0; i < confLength; i++ {
+				s, err := pd.getString()
+				if err != nil {
+					return err
+				}
+				cfnames[i] = s
+			}
+			r.Resources[i].ConfigNames = cfnames
 		}
 
-		cfnames := make([]string, confLength)
-		for i := 0; i < confLength; i++ {
-			s, err := pd.getString()
-			if err != nil {
-				return err
-			}
-			cfnames[i] = s
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
 		}
-		r.Resources[i].ConfigNames = cfnames
 	}
 	r.Version = version
 	if r.Version >= 1 {
@@ -90,6 +101,18 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 			return err
 		}
 		r.IncludeSynonyms = b
+	}
+
+	if r.Version >= 3 {
+		b, err := pd.getBool()
+		if err != nil {
+			return err
+		}
+		r.IncludeDocumentation = b
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
@@ -104,15 +127,30 @@ func (r *DescribeConfigsRequest) version() int16 {
 }
 
 func (r *DescribeConfigsRequest) headerVersion() int16 {
+	if r.Version >= 4 {
+		return 2
+	}
 	return 1
 }
 
 func (r *DescribeConfigsRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 2
+	return r.Version >= 0 && r.Version <= 4
+}
+
+func (r *DescribeConfigsRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *DescribeConfigsRequest) isFlexibleVersion(version int16) bool {
+	return version >= 4
 }
 
 func (r *DescribeConfigsRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 4:
+		return V2_8_0_0
+	case 3:
+		return V2_6_0_0
 	case 2:
 		return V2_0_0_0
 	case 1:
