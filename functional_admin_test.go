@@ -691,6 +691,64 @@ func TestFuncAdminDescribeLogDirs(t *testing.T) {
 	}
 }
 
+func TestFuncAdminDescribeConfig(t *testing.T) {
+	t.Parallel()
+	checkKafkaVersion(t, "0.11.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	kafkaVersion, err := ParseKafkaVersion(FunctionalTestEnv.KafkaVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := NewFunctionalTestConfig()
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, adminClient)
+
+	// describe all broker configs (nil ConfigNames) to exercise the null
+	// compact-array path on the v4 flexible wire format
+	results, err := adminClient.DescribeConfigs(
+		[]*ConfigResource{{Type: BrokerResource, Name: "1"}},
+		DescribeConfigsOptions{},
+	)
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	require.Equal(t, ErrNoError, results[0].ErrorCode)
+	require.NotEmpty(t, results[0].Configs)
+
+	for _, entry := range results[0].Configs {
+		assert.NotEmpty(t, entry.Name)
+	}
+
+	// IncludeDocumentation, ConfigType and Documentation are available from v3
+	// (Kafka 2.6.0); request them via the DescribeConfigs options
+	if kafkaVersion.IsAtLeast(V2_6_0_0) {
+		documented, err := adminClient.DescribeConfigs(
+			[]*ConfigResource{{Type: BrokerResource, Name: "1"}},
+			DescribeConfigsOptions{IncludeSynonyms: true, IncludeDocumentation: true},
+		)
+		require.NoError(t, err)
+		require.Len(t, documented, 1)
+		require.NotEmpty(t, documented[0].Configs)
+
+		var typed, hasDoc bool
+		for _, entry := range documented[0].Configs {
+			if entry.Type != UnknownConfigType {
+				typed = true
+			}
+			if entry.Documentation != nil && *entry.Documentation != "" {
+				hasDoc = true
+			}
+		}
+		assert.True(t, typed, "expected at least one config with a known ConfigType")
+		assert.True(t, hasDoc, "expected at least one config with Documentation")
+	}
+}
+
 func TestFuncAdminDeleteGroup(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "2.4.0")

@@ -64,7 +64,22 @@ type ClusterAdmin interface {
 	// The value of config entries where Sensitive is true is always nil so
 	// sensitive information is not disclosed.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
+	//
+	// Deprecated: use DescribeConfigs, which describes multiple resources in a
+	// single call, returns per-resource errors, and accepts options to request
+	// synonyms and documentation.
 	DescribeConfig(resource ConfigResource) ([]ConfigEntry, error)
+
+	// Get the configuration for the specified resources.
+	// The returned configuration includes default values and the Default is true
+	// can be used to distinguish them from user supplied values.
+	// Config entries where ReadOnly is true cannot be updated.
+	// The value of config entries where Sensitive is true is always nil so
+	// sensitive information is not disclosed.
+	// Use the options to request the synonyms (Kafka 1.1.0+) or the type and
+	// documentation (Kafka 2.6.0+) for each config entry.
+	// This operation is supported by brokers with version 0.11.0.0 or higher.
+	DescribeConfigs(resources []*ConfigResource, options DescribeConfigsOptions) ([]*ConfigResourceResult, error)
 
 	// Update the configuration for the specified resources with the default options.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
@@ -526,12 +541,14 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 			Resources: describeConfigsResources,
 		}
 
-		if ca.conf.Version.IsAtLeast(V1_1_0_0) {
-			describeConfigsReq.Version = 1
-		}
-
-		if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+		if ca.conf.Version.IsAtLeast(V2_8_0_0) {
+			describeConfigsReq.Version = 4
+		} else if ca.conf.Version.IsAtLeast(V2_6_0_0) {
+			describeConfigsReq.Version = 3
+		} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 			describeConfigsReq.Version = 2
+		} else if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+			describeConfigsReq.Version = 1
 		}
 
 		describeConfigsResp, err := b.DescribeConfigs(describeConfigsReq)
@@ -810,65 +827,135 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 
 // Returns a bool indicating whether the resource request needs to go to a
 // specific broker
-func dependsOnSpecificNode(resource ConfigResource) bool {
+func dependsOnSpecificNode(resource *ConfigResource) bool {
 	return (resource.Type == BrokerResource && resource.Name != "") ||
 		resource.Type == BrokerLoggerResource
 }
 
+// DescribeConfigsOptions holds the optional flags for DescribeConfigs.
+type DescribeConfigsOptions struct {
+	// IncludeSynonyms requests the synonyms for each config entry (Kafka 1.1.0+).
+	IncludeSynonyms bool
+	// IncludeDocumentation requests the type and documentation for each config
+	// entry (Kafka 2.6.0+).
+	IncludeDocumentation bool
+}
+
+// ConfigResourceResult is the described configuration for a single resource.
+type ConfigResourceResult struct {
+	Type      ConfigResourceType
+	Name      string
+	ErrorCode KError
+	ErrorMsg  string
+	Configs   []ConfigEntry
+}
+
+// Deprecated: use DescribeConfigs.
 func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, error) {
-	var entries []ConfigEntry
-	var resources []*ConfigResource
-	resources = append(resources, &resource)
-
-	request := &DescribeConfigsRequest{
-		Resources: resources,
+	results, err := ca.DescribeConfigs([]*ConfigResource{&resource}, DescribeConfigsOptions{})
+	if err != nil {
+		return nil, err
 	}
 
-	if ca.conf.Version.IsAtLeast(V1_1_0_0) {
-		request.Version = 1
+	entries := make([]ConfigEntry, 0, len(results))
+	for _, result := range results {
+		if result.Name != resource.Name {
+			continue
+		}
+		if result.ErrorCode != 0 {
+			return nil, &DescribeConfigError{Err: result.ErrorCode, ErrMsg: result.ErrorMsg}
+		}
+		entries = append(entries, result.Configs...)
+	}
+	return entries, nil
+}
+
+func (ca *clusterAdmin) DescribeConfigs(resources []*ConfigResource, options DescribeConfigsOptions) ([]*ConfigResourceResult, error) {
+	if len(resources) == 0 {
+		return nil, nil
 	}
 
-	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
-		request.Version = 2
+	// broker and broker-logger configs must be described on the specific node;
+	// everything else can be served by any broker, so group the resources by the
+	// broker that must handle them and send one request per broker
+	groups := make(map[*Broker][]*ConfigResource)
+	var anyBroker *Broker
+	for _, resource := range resources {
+		var b *Broker
+		switch {
+		case dependsOnSpecificNode(resource):
+			id, err := strconv.ParseInt(resource.Name, 10, 32)
+			if err != nil {
+				return nil, err
+			}
+			b, err = ca.findBroker(int32(id))
+			if err != nil {
+				return nil, err
+			}
+		case anyBroker == nil:
+			broker, err := ca.findAnyBroker()
+			if err != nil {
+				return nil, err
+			}
+			anyBroker = broker
+			fallthrough
+		default:
+			b = anyBroker
+		}
+		groups[b] = append(groups[b], resource)
 	}
 
-	var (
-		b   *Broker
-		err error
-	)
+	type resourceKey struct {
+		Type ConfigResourceType
+		Name string
+	}
+	resultByKey := make(map[resourceKey]*ConfigResourceResult)
+	for b, group := range groups {
+		request := &DescribeConfigsRequest{
+			Resources:            group,
+			IncludeSynonyms:      options.IncludeSynonyms,
+			IncludeDocumentation: options.IncludeDocumentation,
+		}
 
-	// DescribeConfig of broker/broker logger must be sent to the broker in question
-	if dependsOnSpecificNode(resource) {
-		var id int64
-		id, err = strconv.ParseInt(resource.Name, 10, 32)
+		if ca.conf.Version.IsAtLeast(V2_8_0_0) {
+			request.Version = 4
+		} else if ca.conf.Version.IsAtLeast(V2_6_0_0) {
+			request.Version = 3
+		} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+			request.Version = 2
+		} else if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+			request.Version = 1
+		}
+
+		_ = b.Open(ca.client.Config())
+		rsp, err := b.DescribeConfigs(request)
 		if err != nil {
 			return nil, err
 		}
-		b, err = ca.findBroker(int32(id))
-	} else {
-		b, err = ca.findAnyBroker()
-	}
-	if err != nil {
-		return nil, err
-	}
 
-	_ = b.Open(ca.client.Config())
-	rsp, err := b.DescribeConfigs(request)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, rspResource := range rsp.Resources {
-		if rspResource.Name == resource.Name {
-			if rspResource.ErrorCode != 0 {
-				return nil, &DescribeConfigError{Err: KError(rspResource.ErrorCode), ErrMsg: rspResource.ErrorMsg}
+		for _, resource := range rsp.Resources {
+			result := &ConfigResourceResult{
+				Type:      resource.Type,
+				Name:      resource.Name,
+				ErrorCode: KError(resource.ErrorCode),
+				ErrorMsg:  resource.ErrorMsg,
 			}
-			for _, cfgEntry := range rspResource.Configs {
-				entries = append(entries, *cfgEntry)
+			for _, config := range resource.Configs {
+				result.Configs = append(result.Configs, *config)
 			}
+			resultByKey[resourceKey{resource.Type, resource.Name}] = result
 		}
 	}
-	return entries, nil
+
+	// return the results in the order the resources were requested
+	results := make([]*ConfigResourceResult, 0, len(resources))
+	for _, resource := range resources {
+		key := resourceKey{resource.Type, resource.Name}
+		if result, ok := resultByKey[key]; ok {
+			results = append(results, result)
+		}
+	}
+	return results, nil
 }
 
 func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string, entries map[string]*string, validateOnly bool) error {
@@ -893,7 +980,7 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 	)
 
 	// AlterConfig of broker/broker logger must be sent to the broker in question
-	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
+	if dependsOnSpecificNode(&ConfigResource{Name: name, Type: resourceType}) {
 		var id int64
 		id, err = strconv.ParseInt(name, 10, 32)
 		if err != nil {
@@ -946,7 +1033,7 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 	)
 
 	// AlterConfig of broker/broker logger must be sent to the broker in question
-	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
+	if dependsOnSpecificNode(&ConfigResource{Name: name, Type: resourceType}) {
 		var id int64
 		id, err = strconv.ParseInt(name, 10, 32)
 		if err != nil {

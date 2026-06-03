@@ -894,6 +894,8 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 		{V1_1_0_0, 1, true},
 		{V1_1_1_0, 1, true},
 		{V2_0_0_0, 2, true},
+		{V2_6_0_0, 3, true},
+		{V2_8_0_0, 4, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.saramaVersion.String(), func(t *testing.T) {
@@ -940,6 +942,50 @@ func TestClusterAdminDescribeConfig(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClusterAdminDescribeConfigs(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"DescribeConfigsRequest": NewMockDescribeConfigsResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_8_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer func() { _ = admin.Close() }()
+
+	resources := []*ConfigResource{
+		{Name: "r1", Type: TopicResource, ConfigNames: []string{"my_topic"}},
+		{Name: "r2", Type: TopicResource, ConfigNames: []string{"my_topic"}},
+	}
+
+	results, err := admin.DescribeConfigs(resources, DescribeConfigsOptions{
+		IncludeSynonyms:      true,
+		IncludeDocumentation: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	assert.Equal(t, "r1", results[0].Name)
+	assert.Equal(t, "r2", results[1].Name)
+	for _, result := range results {
+		assert.Equal(t, ErrNoError, result.ErrorCode)
+		assert.NotEmpty(t, result.Configs)
+	}
+
+	history := seedBroker.History()
+	describeReq, ok := history[len(history)-1].Request.(*DescribeConfigsRequest)
+	require.True(t, ok, "failed to find DescribeConfigsRequest in mockBroker history")
+	assert.Equal(t, int16(4), describeReq.Version)
+	assert.True(t, describeReq.IncludeSynonyms)
+	assert.True(t, describeReq.IncludeDocumentation)
+	assert.Len(t, describeReq.Resources, 2)
 }
 
 func TestClusterAdminDescribeConfigWithErrorCode(t *testing.T) {

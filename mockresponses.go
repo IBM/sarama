@@ -868,6 +868,7 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 			)
 			res.Resources = append(res.Resources, &ResourceResponse{
 				Name:    r.Name,
+				Type:    r.Type,
 				Configs: configEntries,
 			})
 		case BrokerLoggerResource:
@@ -881,6 +882,7 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 			)
 			res.Resources = append(res.Resources, &ResourceResponse{
 				Name:    r.Name,
+				Type:    r.Type,
 				Configs: configEntries,
 			})
 		case TopicResource:
@@ -928,6 +930,7 @@ func (mr *MockDescribeConfigsResponse) For(reqBody versionedDecoder) encoderWith
 				configEntries, maxMessageBytes, retentionMs, password)
 			res.Resources = append(res.Resources, &ResourceResponse{
 				Name:    r.Name,
+				Type:    r.Type,
 				Configs: configEntries,
 			})
 		}
