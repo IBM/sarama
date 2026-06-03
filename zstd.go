@@ -13,7 +13,10 @@ type ZstdEncoderParams struct {
 type ZstdDecoderParams struct {
 }
 
-var zstdDecMap sync.Map
+var (
+	zstdDecMap        sync.Map
+	zstdDecoderInitMu sync.Mutex
+)
 
 var (
 	zstdAvailableEncoders sync.Map
@@ -86,12 +89,18 @@ func getDecoder(params ZstdDecoderParams, maxDecodedSize int) *zstd.Decoder {
 	if ret, ok := zstdDecMap.Load(key); ok {
 		return ret.(*zstd.Decoder)
 	}
+
+	zstdDecoderInitMu.Lock()
+	defer zstdDecoderInitMu.Unlock()
+
+	if ret, ok := zstdDecMap.Load(key); ok {
+		return ret.(*zstd.Decoder)
+	}
+
 	opts := []zstd.DOption{zstd.WithDecoderConcurrency(0)}
 	if maxDecodedSize > 0 {
 		opts = append(opts, zstd.WithDecoderMaxMemory(uint64(maxDecodedSize)))
 	}
-	// It's possible to race and create multiple new readers.
-	// Only one will survive GC after use.
 	zstdDec, _ := zstd.NewReader(nil, opts...)
 	zstdDecMap.Store(key, zstdDec)
 	return zstdDec

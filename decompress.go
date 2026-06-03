@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"slices"
 	"sync"
 
 	"github.com/klauspost/compress/gzip"
@@ -45,25 +46,24 @@ func newDecompressedBatchTooLargeError(cc CompressionCodec, limit int) error {
 // fully inflates. A non-positive limit disables the cap.
 func boundedDecompress(cc CompressionCodec, reader io.Reader, limit int) ([]byte, error) {
 	buffer := bufferPool.Get().(*bytes.Buffer)
-	var src io.Reader = reader
+	defer func() {
+		buffer.Reset()
+		bufferPool.Put(buffer)
+	}()
+
+	src := reader
 	if limit > 0 {
 		src = io.LimitReader(reader, int64(limit)+1)
 	}
+
 	n, err := buffer.ReadFrom(src)
-
-	var res []byte
-	switch {
-	case err != nil:
-	case limit > 0 && n > int64(limit):
-		err = newDecompressedBatchTooLargeError(cc, limit)
-	default:
-		res = make([]byte, buffer.Len())
-		copy(res, buffer.Bytes())
+	if err != nil {
+		return nil, err
 	}
-
-	buffer.Reset()
-	bufferPool.Put(buffer)
-	return res, err
+	if limit > 0 && n > int64(limit) {
+		return nil, newDecompressedBatchTooLargeError(cc, limit)
+	}
+	return slices.Clone(buffer.Bytes()), nil
 }
 
 // boundedSnappyDecode decodes xerial/snappy into a capped buffer grown on
@@ -77,11 +77,12 @@ func boundedSnappyDecode(cc CompressionCodec, data []byte, limit int) ([]byte, e
 
 	bufp := bytesPool.Get().(*[]byte)
 	buf := *bufp
+	defer func() {
+		*bufp = buf[:0]
+		bytesPool.Put(bufp)
+	}()
 
-	size := cap(buf)
-	if size < 1024 {
-		size = 1024
-	}
+	size := max(cap(buf), 1024)
 	var out []byte
 	var err error
 	for {
@@ -98,19 +99,14 @@ func boundedSnappyDecode(cc CompressionCodec, data []byte, limit int) ([]byte, e
 		size *= 2
 	}
 
-	var res []byte
 	switch {
 	case errors.Is(err, snappy.ErrDstTooSmall):
-		err = newDecompressedBatchTooLargeError(cc, limit)
+		return nil, newDecompressedBatchTooLargeError(cc, limit)
 	case err != nil:
+		return nil, err
 	default:
-		res = make([]byte, len(out))
-		copy(res, out)
+		return slices.Clone(out), nil
 	}
-
-	*bufp = buf[:0]
-	bytesPool.Put(bufp)
-	return res, err
 }
 
 // boundedZstdDecode decodes into a pooled buffer using a decoder whose max
@@ -118,20 +114,19 @@ func boundedSnappyDecode(cc CompressionCodec, data []byte, limit int) ([]byte, e
 // output. ErrDecoderSizeExceeded is translated into a too-large error.
 func boundedZstdDecode(cc CompressionCodec, data []byte, limit int) ([]byte, error) {
 	buffer := *bytesPool.Get().(*[]byte)
+	defer func() {
+		buffer = buffer[:0]
+		bytesPool.Put(&buffer)
+	}()
+
 	buffer, err := zstdDecompress(ZstdDecoderParams{}, buffer, data, limit)
 	if errors.Is(err, zstd.ErrDecoderSizeExceeded) {
-		err = newDecompressedBatchTooLargeError(cc, limit)
+		return nil, newDecompressedBatchTooLargeError(cc, limit)
 	}
-	var res []byte
-	if err == nil {
-		// copy the buffer to a new slice with the correct length and reuse buffer
-		res = make([]byte, len(buffer))
-		copy(res, buffer)
+	if err != nil {
+		return nil, err
 	}
-	buffer = buffer[:0]
-	bytesPool.Put(&buffer)
-
-	return res, err
+	return slices.Clone(buffer), nil
 }
 
 func decompress(cc CompressionCodec, data []byte) ([]byte, error) {
