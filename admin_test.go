@@ -961,7 +961,7 @@ func TestClusterAdminDescribeConfigs(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = admin.Close() }()
 
-	resources := []ConfigResource{
+	resources := []*ConfigResource{
 		{Name: "r1", Type: TopicResource, ConfigNames: []string{"my_topic"}},
 		{Name: "r2", Type: TopicResource, ConfigNames: []string{"my_topic"}},
 	}

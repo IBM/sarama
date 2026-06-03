@@ -712,7 +712,7 @@ func TestFuncAdminDescribeConfig(t *testing.T) {
 	// describe all broker configs (nil ConfigNames) to exercise the null
 	// compact-array path on the v4 flexible wire format
 	results, err := adminClient.DescribeConfigs(
-		[]ConfigResource{{Type: BrokerResource, Name: "1"}},
+		[]*ConfigResource{{Type: BrokerResource, Name: "1"}},
 		DescribeConfigsOptions{},
 	)
 	require.NoError(t, err)
@@ -728,7 +728,7 @@ func TestFuncAdminDescribeConfig(t *testing.T) {
 	// (Kafka 2.6.0); request them via the DescribeConfigs options
 	if kafkaVersion.IsAtLeast(V2_6_0_0) {
 		documented, err := adminClient.DescribeConfigs(
-			[]ConfigResource{{Type: BrokerResource, Name: "1"}},
+			[]*ConfigResource{{Type: BrokerResource, Name: "1"}},
 			DescribeConfigsOptions{IncludeSynonyms: true, IncludeDocumentation: true},
 		)
 		require.NoError(t, err)

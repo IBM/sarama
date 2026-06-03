@@ -79,7 +79,7 @@ type ClusterAdmin interface {
 	// Use the options to request the synonyms (Kafka 1.1.0+) or the type and
 	// documentation (Kafka 2.6.0+) for each config entry.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
-	DescribeConfigs(resources []ConfigResource, options DescribeConfigsOptions) ([]ConfigResourceResult, error)
+	DescribeConfigs(resources []*ConfigResource, options DescribeConfigsOptions) ([]*ConfigResourceResult, error)
 
 	// Update the configuration for the specified resources with the default options.
 	// This operation is supported by brokers with version 0.11.0.0 or higher.
@@ -827,7 +827,7 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 
 // Returns a bool indicating whether the resource request needs to go to a
 // specific broker
-func dependsOnSpecificNode(resource ConfigResource) bool {
+func dependsOnSpecificNode(resource *ConfigResource) bool {
 	return (resource.Type == BrokerResource && resource.Name != "") ||
 		resource.Type == BrokerLoggerResource
 }
@@ -852,12 +852,12 @@ type ConfigResourceResult struct {
 
 // Deprecated: use DescribeConfigs.
 func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, error) {
-	results, err := ca.DescribeConfigs([]ConfigResource{resource}, DescribeConfigsOptions{})
+	results, err := ca.DescribeConfigs([]*ConfigResource{&resource}, DescribeConfigsOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	var entries []ConfigEntry
+	entries := make([]ConfigEntry, 0, len(results))
 	for _, result := range results {
 		if result.Name != resource.Name {
 			continue
@@ -870,7 +870,7 @@ func (ca *clusterAdmin) DescribeConfig(resource ConfigResource) ([]ConfigEntry, 
 	return entries, nil
 }
 
-func (ca *clusterAdmin) DescribeConfigs(resources []ConfigResource, options DescribeConfigsOptions) ([]ConfigResourceResult, error) {
+func (ca *clusterAdmin) DescribeConfigs(resources []*ConfigResource, options DescribeConfigsOptions) ([]*ConfigResourceResult, error) {
 	if len(resources) == 0 {
 		return nil, nil
 	}
@@ -880,10 +880,10 @@ func (ca *clusterAdmin) DescribeConfigs(resources []ConfigResource, options Desc
 	// broker that must handle them and send one request per broker
 	groups := make(map[*Broker][]*ConfigResource)
 	var anyBroker *Broker
-	for i := range resources {
-		resource := &resources[i]
+	for _, resource := range resources {
 		var b *Broker
-		if dependsOnSpecificNode(*resource) {
+		switch {
+		case dependsOnSpecificNode(resource):
 			id, err := strconv.ParseInt(resource.Name, 10, 32)
 			if err != nil {
 				return nil, err
@@ -892,14 +892,14 @@ func (ca *clusterAdmin) DescribeConfigs(resources []ConfigResource, options Desc
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			if anyBroker == nil {
-				broker, err := ca.findAnyBroker()
-				if err != nil {
-					return nil, err
-				}
-				anyBroker = broker
+		case anyBroker == nil:
+			broker, err := ca.findAnyBroker()
+			if err != nil {
+				return nil, err
 			}
+			anyBroker = broker
+			fallthrough
+		default:
 			b = anyBroker
 		}
 		groups[b] = append(groups[b], resource)
@@ -909,10 +909,10 @@ func (ca *clusterAdmin) DescribeConfigs(resources []ConfigResource, options Desc
 		Type ConfigResourceType
 		Name string
 	}
-	resultByKey := make(map[resourceKey]ConfigResourceResult)
-	for b, grouped := range groups {
+	resultByKey := make(map[resourceKey]*ConfigResourceResult)
+	for b, group := range groups {
 		request := &DescribeConfigsRequest{
-			Resources:            grouped,
+			Resources:            group,
 			IncludeSynonyms:      options.IncludeSynonyms,
 			IncludeDocumentation: options.IncludeDocumentation,
 		}
@@ -933,24 +933,24 @@ func (ca *clusterAdmin) DescribeConfigs(resources []ConfigResource, options Desc
 			return nil, err
 		}
 
-		for _, rspResource := range rsp.Resources {
-			result := ConfigResourceResult{
-				Type:      rspResource.Type,
-				Name:      rspResource.Name,
-				ErrorCode: KError(rspResource.ErrorCode),
-				ErrorMsg:  rspResource.ErrorMsg,
+		for _, resource := range rsp.Resources {
+			result := &ConfigResourceResult{
+				Type:      resource.Type,
+				Name:      resource.Name,
+				ErrorCode: KError(resource.ErrorCode),
+				ErrorMsg:  resource.ErrorMsg,
 			}
-			for _, cfgEntry := range rspResource.Configs {
-				result.Configs = append(result.Configs, *cfgEntry)
+			for _, config := range resource.Configs {
+				result.Configs = append(result.Configs, *config)
 			}
-			resultByKey[resourceKey{rspResource.Type, rspResource.Name}] = result
+			resultByKey[resourceKey{resource.Type, resource.Name}] = result
 		}
 	}
 
 	// return the results in the order the resources were requested
-	results := make([]ConfigResourceResult, 0, len(resources))
-	for i := range resources {
-		key := resourceKey{resources[i].Type, resources[i].Name}
+	results := make([]*ConfigResourceResult, 0, len(resources))
+	for _, resource := range resources {
+		key := resourceKey{resource.Type, resource.Name}
 		if result, ok := resultByKey[key]; ok {
 			results = append(results, result)
 		}
@@ -980,7 +980,7 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 	)
 
 	// AlterConfig of broker/broker logger must be sent to the broker in question
-	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
+	if dependsOnSpecificNode(&ConfigResource{Name: name, Type: resourceType}) {
 		var id int64
 		id, err = strconv.ParseInt(name, 10, 32)
 		if err != nil {
@@ -1033,7 +1033,7 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 	)
 
 	// AlterConfig of broker/broker logger must be sent to the broker in question
-	if dependsOnSpecificNode(ConfigResource{Name: name, Type: resourceType}) {
+	if dependsOnSpecificNode(&ConfigResource{Name: name, Type: resourceType}) {
 		var id int64
 		id, err = strconv.ParseInt(name, 10, 32)
 		if err != nil {
