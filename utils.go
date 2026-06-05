@@ -305,7 +305,7 @@ var (
 	}
 	MinVersion     = V0_8_2_0
 	MaxVersion     = V4_3_0_0
-	DefaultVersion = V2_1_0_0
+	DefaultVersion = V2_6_0_0
 )
 
 var (
