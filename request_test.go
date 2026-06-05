@@ -397,14 +397,13 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V2_7_0_0,
 			map[int16]int16{
-				apiKeyInitProducerId:               4, // up from 3
-				apiKeyAddPartitionsToTxn:           2, // up from 1
-				apiKeyAddOffsetsToTxn:              2, // up from 1
-				apiKeyEndTxn:                       2, // up from 1
-				apiKeyDescribeUserScramCredentials: 0, // new in 2.7
-				apiKeyAlterUserScramCredentials:    0, // new in 2.7
-				// TODO: FetchRequest v12 is not supported, but expected for KafkaVersion 2.7.0
-				// apiKeyFetch:            12, // up from 11
+				apiKeyInitProducerId:               4,  // up from 3
+				apiKeyAddPartitionsToTxn:           2,  // up from 1
+				apiKeyAddOffsetsToTxn:              2,  // up from 1
+				apiKeyEndTxn:                       2,  // up from 1
+				apiKeyDescribeUserScramCredentials: 0,  // new in 2.7
+				apiKeyAlterUserScramCredentials:    0,  // new in 2.7
+				apiKeyFetch:                        12, // up from 11
 				// TODO: CreateTopicsRequest v6 is not supported, but expected for KafkaVersion 2.7.0
 				// apiKeyCreateTopics:     6, // up from 5
 				// TODO: DeleteTopicsRequest v5 is not supported, but expected for KafkaVersion 2.7.0

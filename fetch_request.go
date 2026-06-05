@@ -8,6 +8,8 @@ type fetchRequestBlock struct {
 	currentLeaderEpoch int32
 	// fetchOffset contains the message offset.
 	fetchOffset int64
+	// lastFetchedEpoch contains the epoch of the last fetched record.
+	lastFetchedEpoch int32
 	// logStartOffset contains the earliest available offset of the follower
 	// replica.  The field is only used when the request is sent by the
 	// follower.
@@ -23,10 +25,14 @@ func (b *fetchRequestBlock) encode(pe packetEncoder, version int16) error {
 		pe.putInt32(b.currentLeaderEpoch)
 	}
 	pe.putInt64(b.fetchOffset)
+	if b.Version >= 12 {
+		pe.putInt32(b.lastFetchedEpoch)
+	}
 	if b.Version >= 5 {
 		pe.putInt64(b.logStartOffset)
 	}
 	pe.putInt32(b.maxBytes)
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -40,6 +46,11 @@ func (b *fetchRequestBlock) decode(pd packetDecoder, version int16) (err error) 
 	if b.fetchOffset, err = pd.getInt64(); err != nil {
 		return err
 	}
+	if b.Version >= 12 {
+		if b.lastFetchedEpoch, err = pd.getInt32(); err != nil {
+			return err
+		}
+	}
 	if b.Version >= 5 {
 		if b.logStartOffset, err = pd.getInt64(); err != nil {
 			return err
@@ -48,7 +59,8 @@ func (b *fetchRequestBlock) decode(pd packetDecoder, version int16) (err error) 
 	if b.maxBytes, err = pd.getInt32(); err != nil {
 		return err
 	}
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 // FetchRequest (API key 1) will fetch Kafka messages. Version 3 introduced the MaxBytes field. See
@@ -136,6 +148,7 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 				return err
 			}
 		}
+		pe.putEmptyTaggedFieldArray()
 		getOrRegisterTopicMeter("consumer-fetch-rate", topic, metricRegistry).Mark(1)
 	}
 	if r.Version >= 7 {
@@ -155,6 +168,7 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 			for _, partition := range partitions {
 				pe.putInt32(partition)
 			}
+			pe.putEmptyTaggedFieldArray()
 		}
 	}
 	if r.Version >= 11 {
@@ -164,6 +178,7 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 		}
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -205,7 +220,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
-	if topicCount == 0 {
+	if topicCount == 0 && r.Version < 7 {
 		return nil
 	}
 	r.blocks = make(map[string]map[int32]*fetchRequestBlock)
@@ -229,6 +244,9 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 				return err
 			}
 			r.blocks[topic][partition] = fetchBlock
+		}
+		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
 		}
 	}
 
@@ -259,6 +277,9 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 				}
 				r.forgotten[topic][j] = partition
 			}
+			if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -269,7 +290,8 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *FetchRequest) key() int16 {
@@ -281,15 +303,28 @@ func (r *FetchRequest) version() int16 {
 }
 
 func (r *FetchRequest) headerVersion() int16 {
+	if r.Version >= 12 {
+		return 2
+	}
 	return 1
 }
 
 func (r *FetchRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 11
+	return r.Version >= 0 && r.Version <= 12
+}
+
+func (r *FetchRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *FetchRequest) isFlexibleVersion(version int16) bool {
+	return version >= 12
 }
 
 func (r *FetchRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 12:
+		return V2_7_0_0
 	case 11:
 		return V2_3_0_0
 	case 9, 10:
@@ -332,6 +367,9 @@ func (r *FetchRequest) AddBlock(topic string, partitionID int32, fetchOffset int
 	tmp.Version = r.Version
 	tmp.maxBytes = maxBytes
 	tmp.fetchOffset = fetchOffset
+	if r.Version >= 12 {
+		tmp.lastFetchedEpoch = -1
+	}
 	if r.Version >= 9 {
 		tmp.currentLeaderEpoch = leaderEpoch
 	}

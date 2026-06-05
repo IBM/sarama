@@ -472,6 +472,9 @@ func (rd *realFlexibleDecoder) getBytes() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if n == 0 {
+		return nil, nil
+	}
 	if n > 0 && n-1 > uint64(rd.remaining()) {
 		rd.off = len(rd.raw)
 		return nil, ErrInsufficientData
