@@ -1,5 +1,31 @@
 # Changelog
 
+## Version 1.50.2 (2026-06-05)
+
+## What's Changed
+### :tada: New Features / Improvements
+* feat(consumer): add support for SyncGroupRequest/Response v5 (KIP-559) by @dnwe in https://github.com/IBM/sarama/pull/3591
+* feat(txn): add protocol support for TxnOffsetCommit v3 by @dnwe in https://github.com/IBM/sarama/pull/3592
+* feat(txn): support consumer group metadata in TxnOffsetCommit v3 by @dnwe in https://github.com/IBM/sarama/pull/3593
+* feat(admin): add protocol support for DeleteRecords v2 (KIP-482) by @dnwe in https://github.com/IBM/sarama/pull/3594
+* feat(protocol): add support for DescribeConfigs v3 and v4 by @dnwe in https://github.com/IBM/sarama/pull/3596
+* feat(admin): add DescribeConfigs for multiple resources by @dnwe in https://github.com/IBM/sarama/pull/3600
+* feat(consumer): option to cap decompressed batch size by @dnwe in https://github.com/IBM/sarama/pull/3604
+### :bug: Fixes
+* fix(admin): retry ACL and SCRAM ops on stale controller by @dnwe in https://github.com/IBM/sarama/pull/3598
+### :package: Dependency updates
+* fix(deps): update module github.com/pierrec/lz4/v4 to v4.1.27 by @renovate[bot] in https://github.com/IBM/sarama/pull/3597
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.50.1...v1.50.2
+
+## Version 1.50.1 (2026-05-27)
+
+## What's Changed
+### :bug: Fixes
+* fix: correct requiredVersion for V8 JoinGroup and add protocol version placeholders by @dnwe in https://github.com/IBM/sarama/pull/3585
+
+**Full Changelog**: https://github.com/IBM/sarama/compare/v1.50.0...v1.50.1
+
 ## Version 1.50.0 (2026-05-27)
 
 ## What's Changed
