@@ -1291,56 +1291,58 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 		MinBytes:    bc.consumer.conf.Consumer.Fetch.Min,
 		MaxWaitTime: int32(bc.consumer.conf.Consumer.MaxWaitTime / time.Millisecond),
 	}
+	// pick the highest Fetch version supported by the negotiated Kafka version
+	switch {
+	// Version 12 adds flexible version support and last fetched epoch.
+	case bc.consumer.conf.Version.IsAtLeast(V2_7_0_0):
+		request.Version = 12
+	// Version 11 adds RackID for KIP-392 fetch from closest replica.
+	case bc.consumer.conf.Version.IsAtLeast(V2_3_0_0):
+		request.Version = 11
+	// Version 9 adds CurrentLeaderEpoch (KIP-320); version 10 allows the ZStd
+	// compression algorithm (KIP-110).
+	case bc.consumer.conf.Version.IsAtLeast(V2_1_0_0):
+		request.Version = 10
+	// Version 8 is the same as version 7.
+	case bc.consumer.conf.Version.IsAtLeast(V2_0_0_0):
+		request.Version = 8
+	// Version 7 adds incremental fetch request support.
+	case bc.consumer.conf.Version.IsAtLeast(V1_1_0_0):
+		request.Version = 7
+	// Version 6 is the same as version 5.
+	case bc.consumer.conf.Version.IsAtLeast(V1_0_0_0):
+		request.Version = 6
+	// Version 4 adds IsolationLevel and requires Kafka log message format
+	// version 2; version 5 adds LogStartOffset.
+	case bc.consumer.conf.Version.IsAtLeast(V0_11_0_0):
+		request.Version = 5
+	// Version 3 adds MaxBytes and makes partition ordering significant:
+	// partitions are processed in the order they appear in the request.
+	case bc.consumer.conf.Version.IsAtLeast(V0_10_1_0):
+		request.Version = 3
+	// Starting in version 2, the requestor must be able to handle Kafka log
+	// message format version 1.
+	case bc.consumer.conf.Version.IsAtLeast(V0_10_0_0):
+		request.Version = 2
 	// Version 1 is the same as version 0.
-	if bc.consumer.conf.Version.IsAtLeast(V0_9_0_0) {
+	case bc.consumer.conf.Version.IsAtLeast(V0_9_0_0):
 		request.Version = 1
 	}
-	// Starting in Version 2, the requestor must be able to handle Kafka Log
-	// Message format version 1.
-	if bc.consumer.conf.Version.IsAtLeast(V0_10_0_0) {
-		request.Version = 2
-	}
-	// Version 3 adds MaxBytes.  Starting in version 3, the partition ordering in
-	// the request is now relevant.  Partitions will be processed in the order
-	// they appear in the request.
-	if bc.consumer.conf.Version.IsAtLeast(V0_10_1_0) {
-		request.Version = 3
+
+	if request.Version >= 3 {
 		request.MaxBytes = bc.consumer.conf.Consumer.Fetch.MaxBytes
 	}
-	// Version 4 adds IsolationLevel.  Starting in version 4, the reqestor must be
-	// able to handle Kafka log message format version 2.
-	// Version 5 adds LogStartOffset to indicate the earliest available offset of
-	// partition data that can be consumed.
-	if bc.consumer.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 5
+	if request.Version >= 4 {
 		request.Isolation = bc.consumer.conf.Consumer.IsolationLevel
 	}
-	// Version 6 is the same as version 5.
-	if bc.consumer.conf.Version.IsAtLeast(V1_0_0_0) {
-		request.Version = 6
-	}
-	// Version 7 adds incremental fetch request support.
-	if bc.consumer.conf.Version.IsAtLeast(V1_1_0_0) {
-		request.Version = 7
+	if request.Version >= 7 {
 		// We do not currently implement KIP-227 FetchSessions. Setting the id to 0
 		// and the epoch to -1 tells the broker not to generate as session ID we're going
 		// to just ignore anyway.
 		request.SessionID = 0
 		request.SessionEpoch = -1
 	}
-	// Version 8 is the same as version 7.
-	if bc.consumer.conf.Version.IsAtLeast(V2_0_0_0) {
-		request.Version = 8
-	}
-	// Version 9 adds CurrentLeaderEpoch, as described in KIP-320.
-	// Version 10 indicates that we can use the ZStd compression algorithm, as
-	// described in KIP-110.
-	if bc.consumer.conf.Version.IsAtLeast(V2_1_0_0) {
-		request.Version = 10
-	}
-	// Version 11 adds RackID for KIP-392 fetch from closest replica
-	if bc.consumer.conf.Version.IsAtLeast(V2_3_0_0) {
-		request.Version = 11
+	if request.Version >= 11 {
 		request.RackID = bc.consumer.conf.RackID
 	}
 

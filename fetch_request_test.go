@@ -50,6 +50,30 @@ var (
 		0x00, 0x00, 0x00, 0x00,
 		0x00, 0x06, 'r', 'a', 'c', 'k', '0', '1', // rackID
 	}
+
+	fetchRequestOneBlockV12 = []byte{
+		0xFF, 0xFF, 0xFF, 0xFF, // replicaID
+		0x00, 0x00, 0x00, 0x00, // maxWaitTime
+		0x00, 0x00, 0x00, 0x00, // minBytes
+		0x00, 0x00, 0x00, 0xFF, // maxBytes
+		0x01,                   // isolation
+		0x00, 0x00, 0x00, 0xAA, // sessionID
+		0x00, 0x00, 0x00, 0xEE, // sessionEpoch
+		0x02,                          // topics
+		0x06, 't', 'o', 'p', 'i', 'c', // topic
+		0x02,                   // partitions
+		0x00, 0x00, 0x00, 0x12, // partitionID
+		0x00, 0x00, 0x00, 0x66, // currentLeaderEpoch
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x34, // fetchOffset
+		0xFF, 0xFF, 0xFF, 0xFF, // lastFetchedEpoch
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // logStartOffset
+		0x00, 0x00, 0x00, 0x56, // maxBytes
+		0x00,                               // partition tagged fields
+		0x00,                               // topic tagged fields
+		0x01,                               // forgotten topics
+		0x07, 'r', 'a', 'c', 'k', '0', '1', // rackID
+		0x00, // request tagged fields
+	}
 )
 
 func TestFetchRequest(t *testing.T) {
@@ -92,5 +116,17 @@ func TestFetchRequest(t *testing.T) {
 		request.AddBlock("topic", 0x12, 0x34, 0x56, 0x66)
 		request.RackID = "rack01"
 		testRequest(t, "one block v11 rackid", request, fetchRequestOneBlockV11)
+	})
+
+	t.Run("one block v12 flexible", func(t *testing.T) {
+		request := new(FetchRequest)
+		request.Version = 12
+		request.MaxBytes = 0xFF
+		request.Isolation = ReadCommitted
+		request.SessionID = 0xAA
+		request.SessionEpoch = 0xEE
+		request.AddBlock("topic", 0x12, 0x34, 0x56, 0x66)
+		request.RackID = "rack01"
+		testRequest(t, "one block v12 flexible", request, fetchRequestOneBlockV12)
 	})
 }

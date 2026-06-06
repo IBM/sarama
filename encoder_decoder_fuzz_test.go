@@ -42,6 +42,7 @@ func FuzzDecodeEncodeFetchRequest(f *testing.F) {
 		fetchRequestOneBlock,
 		fetchRequestOneBlockV4,
 		fetchRequestOneBlockV11,
+		fetchRequestOneBlockV12,
 	} {
 		f.Add(seed)
 	}

@@ -6,6 +6,9 @@ import (
 	"bytes"
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -201,6 +204,57 @@ var (
 		0x00,
 		0xFF, 0xFF, 0xFF, 0xFF,
 		0x00, 0x00, 0x00, 0x02, 0x00, 0xEE,
+	}
+
+	preferredReplicaFetchResponseV12 = []byte{
+		0x00, 0x00, 0x00, 0x00, // ThrottleTime
+		0x00, 0x02, // ErrorCode
+		0x00, 0x00, 0x00, 0xAC, // SessionID
+		0x02,                          // Topics
+		0x06, 't', 'o', 'p', 'i', 'c', // Topic
+		0x02,                   // Partitions
+		0x00, 0x00, 0x00, 0x05, // Partition
+		0x00, 0x01, // Error
+		0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x10, // High Watermark Offset
+		0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x09, // Last Stable Offset
+		0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, // Log Start Offset
+		0x01,                   // Aborted Transactions
+		0x00, 0x00, 0x00, 0x03, // Preferred Read Replica
+		0x01,                   // Records
+		0x02,                   // Partition tagged fields
+		0x00,                   // DivergingEpoch tag
+		0x0C,                   // DivergingEpoch tag size
+		0x00, 0x00, 0x00, 0x77, // DivergingEpoch epoch
+		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // DivergingEpoch end offset
+		0x01,                   // CurrentLeader tag
+		0x08,                   // CurrentLeader tag size
+		0x00, 0x00, 0x00, 0x09, // CurrentLeader leader ID
+		0x00, 0x00, 0x00, 0x88, // CurrentLeader leader epoch
+		0x00, // Topic tagged fields
+		0x00, // Response tagged fields
+	}
+
+	abortedTxnFetchResponseV12 = []byte{
+		0x00, 0x00, 0x00, 0x00, // ThrottleTime
+		0x00, 0x00, // ErrorCode
+		0x00, 0x00, 0x00, 0xAC, // SessionID
+		0x02,                          // Topics
+		0x06, 't', 'o', 'p', 'i', 'c', // Topic
+		0x02,                   // Partitions
+		0x00, 0x00, 0x00, 0x05, // Partition
+		0x00, 0x00, // Error
+		0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x10, // High Watermark Offset
+		0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x09, // Last Stable Offset
+		0x00, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, // Log Start Offset
+		0x02,                                           // Aborted Transactions
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8, // ProducerID
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x42, // FirstOffset
+		0x00,                   // AbortedTransaction tagged fields
+		0xFF, 0xFF, 0xFF, 0xFF, // Preferred Read Replica
+		0x01, // Records
+		0x00, // Partition tagged fields
+		0x00, // Topic tagged fields
+		0x00, // Response tagged fields
 	}
 )
 
@@ -527,74 +581,147 @@ func TestOneMessageFetchResponseV4(t *testing.T) {
 	}
 }
 
-func TestPreferredReplicaFetchResponseV11(t *testing.T) {
-	response := FetchResponse{}
-	testVersionDecodable(
-		t, "preferred replica fetch response v11", &response,
-		preferredReplicaFetchResponseV11, 11)
+func TestPreferredReplicaFetchResponse(t *testing.T) {
+	t.Run("decodes v11", func(t *testing.T) {
+		response := FetchResponse{}
+		testVersionDecodable(
+			t, "preferred replica fetch response v11", &response,
+			preferredReplicaFetchResponseV11, 11)
 
-	if response.ErrorCode != 0x0002 {
-		t.Fatal("Decoding produced incorrect error code.")
-	}
+		if response.ErrorCode != 0x0002 {
+			t.Fatal("Decoding produced incorrect error code.")
+		}
 
-	if response.SessionID != 0x000000AC {
-		t.Fatal("Decoding produced incorrect session ID.")
-	}
+		if response.SessionID != 0x000000AC {
+			t.Fatal("Decoding produced incorrect session ID.")
+		}
 
-	if len(response.Blocks) != 1 {
-		t.Fatal("Decoding produced incorrect number of topic blocks.")
-	}
+		if len(response.Blocks) != 1 {
+			t.Fatal("Decoding produced incorrect number of topic blocks.")
+		}
 
-	if len(response.Blocks["topic"]) != 1 {
-		t.Fatal("Decoding produced incorrect number of partition blocks for topic.")
-	}
+		if len(response.Blocks["topic"]) != 1 {
+			t.Fatal("Decoding produced incorrect number of partition blocks for topic.")
+		}
 
-	block := response.GetBlock("topic", 5)
-	if block == nil {
-		t.Fatal("GetBlock didn't return block.")
-	}
-	if !errors.Is(block.Err, ErrOffsetOutOfRange) {
-		t.Error("Decoding didn't produce correct error code.")
-	}
-	if block.HighWaterMarkOffset != 0x10101010 {
-		t.Error("Decoding didn't produce correct high water mark offset.")
-	}
-	if block.LastStableOffset != 0x10101009 {
-		t.Error("Decoding didn't produce correct last stable offset.")
-	}
-	if block.LogStartOffset != 0x01010101 {
-		t.Error("Decoding didn't produce correct log start offset.")
-	}
-	if block.PreferredReadReplica != 0x0003 {
-		t.Error("Decoding didn't produce correct preferred read replica.")
-	}
-	partial, err := block.isPartial()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if partial {
-		t.Error("Decoding detected a partial trailing record where there wasn't one.")
-	}
+		block := response.GetBlock("topic", 5)
+		if block == nil {
+			t.Fatal("GetBlock didn't return block.")
+		}
+		if !errors.Is(block.Err, ErrOffsetOutOfRange) {
+			t.Error("Decoding didn't produce correct error code.")
+		}
+		if block.HighWaterMarkOffset != 0x10101010 {
+			t.Error("Decoding didn't produce correct high water mark offset.")
+		}
+		if block.LastStableOffset != 0x10101009 {
+			t.Error("Decoding didn't produce correct last stable offset.")
+		}
+		if block.LogStartOffset != 0x01010101 {
+			t.Error("Decoding didn't produce correct log start offset.")
+		}
+		if block.PreferredReadReplica != 0x0003 {
+			t.Error("Decoding didn't produce correct preferred read replica.")
+		}
+		partial, err := block.isPartial()
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if partial {
+			t.Error("Decoding detected a partial trailing record where there wasn't one.")
+		}
 
-	n, err := block.numRecords()
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if n != 1 {
-		t.Fatal("Decoding produced incorrect number of records.")
-	}
-	msgBlock := block.RecordsSet[0].MsgSet.Messages[0]
-	if msgBlock.Offset != 0x550000 {
-		t.Error("Decoding produced incorrect message offset.")
-	}
-	msg := msgBlock.Msg
-	if msg.Codec != CompressionNone {
-		t.Error("Decoding produced incorrect message compression.")
-	}
-	if msg.Key != nil {
-		t.Error("Decoding produced message key where there was none.")
-	}
-	if !bytes.Equal(msg.Value, []byte{0x00, 0xEE}) {
-		t.Error("Decoding produced incorrect message value.")
-	}
+		n, err := block.numRecords()
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+		if n != 1 {
+			t.Fatal("Decoding produced incorrect number of records.")
+		}
+		msgBlock := block.RecordsSet[0].MsgSet.Messages[0]
+		if msgBlock.Offset != 0x550000 {
+			t.Error("Decoding produced incorrect message offset.")
+		}
+		msg := msgBlock.Msg
+		if msg.Codec != CompressionNone {
+			t.Error("Decoding produced incorrect message compression.")
+		}
+		if msg.Key != nil {
+			t.Error("Decoding produced message key where there was none.")
+		}
+		if !bytes.Equal(msg.Value, []byte{0x00, 0xEE}) {
+			t.Error("Decoding produced incorrect message value.")
+		}
+	})
+
+	t.Run("round trips v12 tagged fields", func(t *testing.T) {
+		response := &FetchResponse{
+			Version:   12,
+			ErrorCode: 0x0002,
+			SessionID: 0x000000AC,
+			Blocks: map[string]map[int32]*FetchResponseBlock{
+				"topic": {
+					5: {
+						Err:                  ErrOffsetOutOfRange,
+						HighWaterMarkOffset:  0x10101010,
+						LastStableOffset:     0x10101009,
+						LogStartOffset:       0x01010101,
+						AbortedTransactions:  []*AbortedTransaction{},
+						PreferredReadReplica: 0x0003,
+						RecordsSet:           []*Records{},
+						DivergingEpoch: &FetchResponseDivergingEpoch{
+							Epoch:     0x77,
+							EndOffset: 0x0102030405060708,
+						},
+						CurrentLeader: &FetchResponseCurrentLeader{
+							LeaderID:    0x09,
+							LeaderEpoch: 0x88,
+						},
+					},
+				},
+			},
+		}
+		testResponse(t, "preferred replica fetch response v12", response, preferredReplicaFetchResponseV12)
+
+		decoded := &FetchResponse{}
+		require.NoError(t, versionedDecode(preferredReplicaFetchResponseV12, decoded, 12, nil))
+		block := decoded.GetBlock("topic", 5)
+		require.NotNil(t, block)
+		require.NotNil(t, block.DivergingEpoch)
+		require.NotNil(t, block.CurrentLeader)
+		assert.Equal(t, int32(0x77), block.DivergingEpoch.Epoch)
+		assert.Equal(t, int64(0x0102030405060708), block.DivergingEpoch.EndOffset)
+		assert.Equal(t, int32(0x09), block.CurrentLeader.LeaderID)
+		assert.Equal(t, int32(0x88), block.CurrentLeader.LeaderEpoch)
+	})
+
+	t.Run("round trips v12 aborted transactions", func(t *testing.T) {
+		response := &FetchResponse{
+			Version:   12,
+			SessionID: 0x000000AC,
+			Blocks: map[string]map[int32]*FetchResponseBlock{
+				"topic": {
+					5: {
+						HighWaterMarkOffset: 0x10101010,
+						LastStableOffset:    0x10101009,
+						LogStartOffset:      0x01010101,
+						AbortedTransactions: []*AbortedTransaction{
+							{ProducerID: 1000, FirstOffset: 0x42},
+						},
+						PreferredReadReplica: -1,
+						RecordsSet:           []*Records{},
+					},
+				},
+			},
+		}
+		testResponse(t, "aborted txn fetch response v12", response, abortedTxnFetchResponseV12)
+
+		decoded := &FetchResponse{}
+		require.NoError(t, versionedDecode(abortedTxnFetchResponseV12, decoded, 12, nil))
+		block := decoded.GetBlock("topic", 5)
+		require.NotNil(t, block)
+		require.Len(t, block.AbortedTransactions, 1)
+		assert.Equal(t, int64(1000), block.AbortedTransactions[0].ProducerID)
+		assert.Equal(t, int64(0x42), block.AbortedTransactions[0].FirstOffset)
+	})
 }
