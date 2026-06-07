@@ -47,6 +47,9 @@ func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	d.TopicErrorCodes = make(map[string]KError, n)
 

@@ -59,6 +59,9 @@ func (r *LeaveGroupResponse) decode(pd packetDecoder, version int16) (err error)
 		if err != nil {
 			return err
 		}
+		if membersLen < 0 {
+			return errInvalidArrayLength
+		}
 		r.Members = make([]MemberResponse, membersLen)
 		for i := 0; i < len(r.Members); i++ {
 			if r.Members[i].MemberId, err = pd.getString(); err != nil {

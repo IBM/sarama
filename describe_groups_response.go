@@ -42,8 +42,12 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 			return err
 		}
 	}
-	if numGroups, err := pd.getArrayLength(); err != nil {
+	numGroups, err := pd.getArrayLength()
+	if err != nil {
 		return err
+	}
+	if numGroups < 0 {
+		return errInvalidArrayLength
 	} else if numGroups > 0 {
 		r.Groups = make([]*GroupDescription, numGroups)
 		for i := 0; i < numGroups; i++ {
@@ -188,8 +192,12 @@ func (gd *GroupDescription) decode(pd packetDecoder, version int16) (err error) 
 		return err
 	}
 
-	if numMembers, err := pd.getArrayLength(); err != nil {
+	numMembers, err := pd.getArrayLength()
+	if err != nil {
 		return err
+	}
+	if numMembers < 0 {
+		return errInvalidArrayLength
 	} else if numMembers > 0 {
 		gd.Members = make(map[string]*GroupMemberDescription, numMembers)
 		for i := 0; i < numMembers; i++ {

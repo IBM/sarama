@@ -179,6 +179,9 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 		if err != nil {
 			return err
 		}
+		if groupCount < 0 {
+			return errInvalidArrayLength
+		}
 		if groupCount > 0 {
 			r.Groups = make([]OffsetFetchResponseGroup, groupCount)
 		}
@@ -193,6 +196,9 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 			if err != nil {
 				return err
 			}
+			if numTopics < 0 {
+				return errInvalidArrayLength
+			}
 
 			blocks := make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
 			for range numTopics {
@@ -205,8 +211,10 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 				if err != nil {
 					return err
 				}
+				if numBlocks < 0 {
+					return errInvalidArrayLength
+				}
 
-				blocks[name] = nil
 				if numBlocks > 0 {
 					blocks[name] = make(map[int32]*OffsetFetchResponseBlock, numBlocks)
 				}
@@ -252,6 +260,9 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 	if err != nil {
 		return err
 	}
+	if numTopics < 0 {
+		return errInvalidArrayLength
+	}
 
 	if numTopics > 0 {
 		r.Blocks = make(map[string]map[int32]*OffsetFetchResponseBlock, numTopics)
@@ -264,6 +275,9 @@ func (r *OffsetFetchResponse) decode(pd packetDecoder, version int16) (err error
 			numBlocks, err := pd.getArrayLength()
 			if err != nil {
 				return err
+			}
+			if numBlocks < 0 {
+				return errInvalidArrayLength
 			}
 
 			r.Blocks[name] = nil

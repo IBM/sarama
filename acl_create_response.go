@@ -41,6 +41,9 @@ func (c *CreateAclsResponse) decode(pd packetDecoder, version int16) (err error)
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	c.AclCreationResponses = make([]*AclCreationResponse, n)
 	for i := 0; i < n; i++ {

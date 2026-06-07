@@ -105,8 +105,9 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 	if err != nil {
 		return err
 	}
-
-	if numUsers > 0 {
+	if numUsers < 0 {
+		return errInvalidArrayLength
+	} else if numUsers > 0 {
 		r.Results = make([]*DescribeUserScramCredentialsResult, numUsers)
 		for i := 0; i < numUsers; i++ {
 			r.Results[i] = &DescribeUserScramCredentialsResult{}
@@ -125,6 +126,9 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 			numCredentialInfos, err := pd.getArrayLength()
 			if err != nil {
 				return err
+			}
+			if numCredentialInfos < 0 {
+				return errInvalidArrayLength
 			}
 
 			r.Results[i].CredentialInfos = make([]*UserScramCredentialsResponseInfo, numCredentialInfos)

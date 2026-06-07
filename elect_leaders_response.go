@@ -86,6 +86,9 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 	if err != nil {
 		return err
 	}
+	if numTopics < 0 {
+		return errInvalidArrayLength
+	}
 
 	r.ReplicaElectionResults = make(map[string]map[int32]*PartitionResult, numTopics)
 	for i := 0; i < numTopics; i++ {
@@ -97,6 +100,9 @@ func (r *ElectLeadersResponse) decode(pd packetDecoder, version int16) (err erro
 		numPartitions, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if numPartitions < 0 {
+			return errInvalidArrayLength
 		}
 		r.ReplicaElectionResults[topic] = make(map[int32]*PartitionResult, numPartitions)
 		for j := 0; j < numPartitions; j++ {

@@ -52,6 +52,9 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	t.Topics = make(map[string][]*PartitionError)
 
@@ -64,6 +67,9 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 		m, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if m < 0 {
+			return errInvalidArrayLength
 		}
 
 		t.Topics[topic] = make([]*PartitionError, m)

@@ -64,6 +64,9 @@ func (c *CreateTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	c.TopicErrors = make(map[string]*TopicError, n)
 	if version >= 5 {
@@ -245,15 +248,19 @@ func (r *CreatableTopicResult) decode(pd packetDecoder, version int16) (err erro
 	if err != nil {
 		return err
 	}
-	r.Configs = make(map[string]*CreatableTopicConfigs, n)
-	for i := 0; i < n; i++ {
-		name, err := pd.getString()
-		if err != nil {
-			return err
-		}
-		r.Configs[name] = &CreatableTopicConfigs{}
-		if err := r.Configs[name].decode(pd, version); err != nil {
-			return err
+	if n < 0 {
+		// null allowed
+	} else {
+		r.Configs = make(map[string]*CreatableTopicConfigs, n)
+		for i := 0; i < n; i++ {
+			name, err := pd.getString()
+			if err != nil {
+				return err
+			}
+			r.Configs[name] = &CreatableTopicConfigs{}
+			if err := r.Configs[name].decode(pd, version); err != nil {
+				return err
+			}
 		}
 	}
 	err = pd.getTaggedFieldArray(taggedFieldDecoders{
