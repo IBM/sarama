@@ -66,6 +66,9 @@ func (a *AlterConfigsResponse) decode(pd packetDecoder, version int16) (err erro
 	if err != nil {
 		return err
 	}
+	if responseCount < 0 {
+		return errInvalidArrayLength
+	}
 
 	a.Resources = make([]*AlterConfigsResourceResponse, responseCount)
 

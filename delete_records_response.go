@@ -59,6 +59,9 @@ func (d *DeleteRecordsResponse) decode(pd packetDecoder, version int16) (err err
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	if n > 0 {
 		d.Topics = make(map[string]*DeleteRecordsResponseTopic, n)
@@ -154,8 +157,9 @@ func (t *DeleteRecordsResponseTopic) decode(pd packetDecoder, version int16) err
 	if err != nil {
 		return err
 	}
-
-	if n > 0 {
+	if n < 0 {
+		return errInvalidArrayLength
+	} else if n > 0 {
 		t.Partitions = make(map[int32]*DeleteRecordsResponsePartition, n)
 		for i := 0; i < n; i++ {
 			partition, err := pd.getInt32()

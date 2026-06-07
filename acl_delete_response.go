@@ -40,8 +40,11 @@ func (d *DeleteAclsResponse) decode(pd packetDecoder, version int16) (err error)
 	if err != nil {
 		return err
 	}
-	d.FilterResponses = make([]*FilterResponse, n)
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
+	d.FilterResponses = make([]*FilterResponse, n)
 	for i := 0; i < n; i++ {
 		d.FilterResponses[i] = new(FilterResponse)
 		if err := d.FilterResponses[i].decode(pd, version); err != nil {
@@ -134,6 +137,9 @@ func (f *FilterResponse) decode(pd packetDecoder, version int16) (err error) {
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return errInvalidArrayLength
 	}
 	f.MatchingAcls = make([]*MatchingAcl, n)
 	for i := 0; i < n; i++ {

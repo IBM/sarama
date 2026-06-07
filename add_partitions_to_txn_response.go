@@ -48,6 +48,9 @@ func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (er
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	a.Errors = make(map[string][]*PartitionError)
 
@@ -60,6 +63,9 @@ func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (er
 		m, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if m < 0 {
+			return errInvalidArrayLength
 		}
 
 		a.Errors[topic] = make([]*PartitionError, m)

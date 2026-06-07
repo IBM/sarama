@@ -65,6 +65,9 @@ func (r *DeleteOffsetsResponse) decode(pd packetDecoder, version int16) (err err
 	if err != nil || numTopics == 0 {
 		return err
 	}
+	if numTopics < 0 {
+		return errInvalidArrayLength
+	}
 
 	r.Errors = make(map[string]map[int32]KError, numTopics)
 	for i := 0; i < numTopics; i++ {
@@ -76,6 +79,9 @@ func (r *DeleteOffsetsResponse) decode(pd packetDecoder, version int16) (err err
 		numErrors, err := pd.getArrayLength()
 		if err != nil {
 			return err
+		}
+		if numErrors < 0 {
+			return errInvalidArrayLength
 		}
 
 		r.Errors[name] = make(map[int32]KError, numErrors)

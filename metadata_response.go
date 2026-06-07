@@ -147,6 +147,9 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 	t.Partitions = make([]*PartitionMetadata, n)
 	for i := 0; i < n; i++ {
 		block := &PartitionMetadata{}
@@ -237,6 +240,9 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
+	if brokerArrayLen < 0 {
+		return errInvalidArrayLength
+	}
 
 	r.Brokers = make([]*Broker, brokerArrayLen)
 	for i := 0; i < brokerArrayLen; i++ {
@@ -263,6 +269,9 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	topicArrayLen, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if topicArrayLen < 0 {
+		return errInvalidArrayLength
 	}
 
 	r.Topics = make([]*TopicMetadata, topicArrayLen)

@@ -55,7 +55,9 @@ func (a *AlterClientQuotasResponse) decode(pd packetDecoder, version int16) (err
 	if err != nil {
 		return err
 	}
-	if entryCount > 0 {
+	if entryCount < 0 {
+		return errInvalidArrayLength
+	} else if entryCount > 0 {
 		a.Entries = make([]AlterClientQuotasEntryResponse, entryCount)
 		for i := range a.Entries {
 			e := AlterClientQuotasEntryResponse{}
