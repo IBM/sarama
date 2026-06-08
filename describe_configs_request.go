@@ -57,6 +57,9 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	r.Resources = make([]*ConfigResource, n)
 

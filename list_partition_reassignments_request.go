@@ -56,6 +56,9 @@ func (r *ListPartitionReassignmentsRequest) decode(pd packetDecoder, version int
 			if err != nil {
 				return err
 			}
+			if partitionCount < 0 {
+				return errInvalidArrayLength
+			}
 			r.blocks[topic] = make([]int32, partitionCount)
 			for j := 0; j < partitionCount; j++ {
 				partition, err := pd.getInt32()
