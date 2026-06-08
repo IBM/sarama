@@ -246,6 +246,7 @@ func allocateBody(key, version int16) protocolBody {
 // supported response decoder uniformly.
 //
 //nolint:unused
+//lint:ignore U1000 -- used in _test.go and fuzz tests but stored alongside allocateBody for convenience.
 func allocateResponseBody(key, version int16) protocolBody {
 	switch key {
 	case apiKeyProduce:
