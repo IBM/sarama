@@ -85,102 +85,6 @@ var names = map[int16]string{
 	68:                                 "ConsumerGroupHeartbeatRequest",
 }
 
-// allocateResponseBody is a test-only clone of allocateBody. There's no
-// central registry of types, so we can't do this using reflection for Response
-// types and assuming that the struct is identically named, just with Response
-// instead of Request.
-func allocateResponseBody(req protocolBody) protocolBody {
-	key := req.key()
-	version := req.version()
-	switch key {
-	case apiKeyProduce:
-		return &ProduceResponse{Version: version}
-	case apiKeyFetch:
-		return &FetchResponse{Version: version}
-	case apiKeyListOffsets:
-		return &OffsetResponse{Version: version}
-	case apiKeyMetadata:
-		return &MetadataResponse{Version: version}
-	case apiKeyOffsetCommit:
-		return &OffsetCommitResponse{Version: version}
-	case apiKeyOffsetFetch:
-		return &OffsetFetchResponse{Version: version}
-	case apiKeyFindCoordinator:
-		return &FindCoordinatorResponse{Version: version}
-	case apiKeyJoinGroup:
-		return &JoinGroupResponse{Version: version}
-	case apiKeyHeartbeat:
-		return &HeartbeatResponse{Version: version}
-	case apiKeyLeaveGroup:
-		return &LeaveGroupResponse{Version: version}
-	case apiKeySyncGroup:
-		return &SyncGroupResponse{Version: version}
-	case apiKeyDescribeGroups:
-		return &DescribeGroupsResponse{Version: version}
-	case apiKeyListGroups:
-		return &ListGroupsResponse{Version: version}
-	case apiKeySaslHandshake:
-		return &SaslHandshakeResponse{Version: version}
-	case apiKeyApiVersions:
-		return &ApiVersionsResponse{Version: version}
-	case apiKeyCreateTopics:
-		return &CreateTopicsResponse{Version: version}
-	case apiKeyDeleteTopics:
-		return &DeleteTopicsResponse{Version: version}
-	case apiKeyDeleteRecords:
-		return &DeleteRecordsResponse{Version: version}
-	case apiKeyInitProducerId:
-		return &InitProducerIDResponse{Version: version}
-	case apiKeyAddPartitionsToTxn:
-		return &AddPartitionsToTxnResponse{Version: version}
-	case apiKeyAddOffsetsToTxn:
-		return &AddOffsetsToTxnResponse{Version: version}
-	case apiKeyEndTxn:
-		return &EndTxnResponse{Version: version}
-	case apiKeyTxnOffsetCommit:
-		return &TxnOffsetCommitResponse{Version: version}
-	case apiKeyDescribeAcls:
-		return &DescribeAclsResponse{Version: version}
-	case apiKeyCreateAcls:
-		return &CreateAclsResponse{Version: version}
-	case apiKeyDeleteAcls:
-		return &DeleteAclsResponse{Version: version}
-	case apiKeyDescribeConfigs:
-		return &DescribeConfigsResponse{Version: version}
-	case apiKeyAlterConfigs:
-		return &AlterConfigsResponse{Version: version}
-	case apiKeyDescribeLogDirs:
-		return &DescribeLogDirsResponse{Version: version}
-	case apiKeySASLAuth:
-		return &SaslAuthenticateResponse{Version: version}
-	case apiKeyCreatePartitions:
-		return &CreatePartitionsResponse{Version: version}
-	case apiKeyDeleteGroups:
-		return &DeleteGroupsResponse{Version: version}
-	case apiKeyElectLeaders:
-		return &ElectLeadersResponse{Version: version}
-	case apiKeyIncrementalAlterConfigs:
-		return &IncrementalAlterConfigsResponse{Version: version}
-	case apiKeyAlterPartitionReassignments:
-		return &AlterPartitionReassignmentsResponse{Version: version}
-	case apiKeyListPartitionReassignments:
-		return &ListPartitionReassignmentsResponse{Version: version}
-	case apiKeyOffsetDelete:
-		return &DeleteOffsetsResponse{Version: version}
-	case apiKeyDescribeClientQuotas:
-		return &DescribeClientQuotasResponse{Version: version}
-	case apiKeyAlterClientQuotas:
-		return &AlterClientQuotasResponse{Version: version}
-	case apiKeyDescribeUserScramCredentials:
-		return &DescribeUserScramCredentialsResponse{Version: version}
-	case apiKeyAlterUserScramCredentials:
-		return &AlterUserScramCredentialsResponse{Version: version}
-	case apiKeyDescribeCluster:
-		return &DescribeClusterResponse{Version: version}
-	}
-	return nil
-}
-
 // TestAllocateBodyProtocolVersions tests two related version expectations:
 //  1. uncommented entries are protocol versions Sarama currently supports with
 //     parity to a given Kafka release version
@@ -656,7 +560,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 					t.Skipf("apikey %d is not implemented", key)
 				}
 				t.Logf("Testing %s V%d", reflect.TypeOf(req), version)
-				resp := allocateResponseBody(req)
+				resp := allocateResponseBody(req.key(), req.version())
 				assert.NotNil(t, resp, "%s has no matching response type in allocateResponseBody", reflect.TypeOf(req))
 				assert.Equal(t, req.isValidVersion(), resp.isValidVersion(), "%s isValidVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp))
 				assert.Equal(t, req.requiredVersion(), resp.requiredVersion(), "%s requiredVersion should match %s", reflect.TypeOf(req), reflect.TypeOf(resp))
