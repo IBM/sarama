@@ -233,12 +233,15 @@ func (rd *realDecoder) getNullableString() (*string, error) {
 	return &tmpStr, err
 }
 
-func (rd *realDecoder) getInt32Array() ([]int32, error) {
+func (rd *realDecoder) getNullableInt32Array() ([]int32, error) {
 	n, err := rd.getArrayLength()
 	if err != nil {
 		return nil, err
 	}
-	if n <= 0 {
+	if n < -1 {
+		return nil, errInvalidArrayLength
+	}
+	if n == -1 {
 		return nil, nil
 	}
 
@@ -253,6 +256,14 @@ func (rd *realDecoder) getInt32Array() ([]int32, error) {
 		rd.off += 4
 	}
 	return ret, nil
+}
+
+func (rd *realDecoder) getInt32Array() ([]int32, error) {
+	ret, err := rd.getNullableInt32Array()
+	if ret == nil && err == nil {
+		return nil, errInvalidArrayLength
+	}
+	return ret, err
 }
 
 func (rd *realDecoder) getInt64Array() ([]int64, error) {
@@ -533,6 +544,14 @@ func (rd *realFlexibleDecoder) getNullableString() (*string, error) {
 }
 
 func (rd *realFlexibleDecoder) getInt32Array() ([]int32, error) {
+	ret, err := rd.getNullableInt32Array()
+	if ret == nil && err == nil {
+		return nil, errInvalidArrayLength
+	}
+	return ret, err
+}
+
+func (rd *realFlexibleDecoder) getNullableInt32Array() ([]int32, error) {
 	n, err := rd.getUVarint()
 	if err != nil {
 		return nil, err

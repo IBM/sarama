@@ -14,7 +14,7 @@ func (b *alterPartitionReassignmentsBlock) encode(pe packetEncoder) error {
 }
 
 func (b *alterPartitionReassignmentsBlock) decode(pd packetDecoder) (err error) {
-	if b.replicas, err = pd.getInt32Array(); err != nil {
+	if b.replicas, err = pd.getNullableInt32Array(); err != nil {
 		return err
 	}
 	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {

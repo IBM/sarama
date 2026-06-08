@@ -52,20 +52,8 @@ func (r *ListPartitionReassignmentsRequest) decode(pd packetDecoder, version int
 			if err != nil {
 				return err
 			}
-			partitionCount, err := pd.getArrayLength()
-			if err != nil {
+			if r.blocks[topic], err = pd.getInt32Array(); err != nil {
 				return err
-			}
-			if partitionCount < 0 {
-				return errInvalidArrayLength
-			}
-			r.blocks[topic] = make([]int32, partitionCount)
-			for j := 0; j < partitionCount; j++ {
-				partition, err := pd.getInt32()
-				if err != nil {
-					return err
-				}
-				r.blocks[topic][j] = partition
 			}
 			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
