@@ -79,6 +79,9 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	if err != nil {
 		return err
 	}
+	if numDeletions < 0 {
+		return errInvalidArrayLength
+	}
 
 	r.Deletions = make([]AlterUserScramCredentialsDelete, numDeletions)
 	for i := 0; i < numDeletions; i++ {
@@ -99,6 +102,9 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	numUpsertions, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if numUpsertions < 0 {
+		return errInvalidArrayLength
 	}
 
 	r.Upsertions = make([]AlterUserScramCredentialsUpsert, numUpsertions)

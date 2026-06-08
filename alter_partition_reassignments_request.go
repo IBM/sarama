@@ -72,6 +72,9 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 	if err != nil {
 		return err
 	}
+	if topicCount < 0 {
+		return errInvalidArrayLength
+	}
 	if topicCount > 0 {
 		r.blocks = make(map[string]map[int32]*alterPartitionReassignmentsBlock)
 		for i := 0; i < topicCount; i++ {
@@ -82,6 +85,9 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 			partitionCount, err := pd.getArrayLength()
 			if err != nil {
 				return err
+			}
+			if partitionCount < 0 {
+				return errInvalidArrayLength
 			}
 			r.blocks[topic] = make(map[int32]*alterPartitionReassignmentsBlock)
 			for j := 0; j < partitionCount; j++ {

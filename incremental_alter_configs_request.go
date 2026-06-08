@@ -53,6 +53,9 @@ func (a *IncrementalAlterConfigsRequest) decode(pd packetDecoder, version int16)
 	if err != nil {
 		return err
 	}
+	if resourceCount < 0 {
+		return errInvalidArrayLength
+	}
 
 	a.Resources = make([]*IncrementalAlterConfigsResource, resourceCount)
 	for i := range a.Resources {
@@ -116,6 +119,9 @@ func (a *IncrementalAlterConfigsResource) decode(pd packetDecoder, version int16
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return errInvalidArrayLength
 	}
 
 	if n > 0 {

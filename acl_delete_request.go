@@ -32,6 +32,9 @@ func (d *DeleteAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	d.Filters = make([]*AclFilter, n)
 	for i := 0; i < n; i++ {
