@@ -40,6 +40,9 @@ func (c *CreatePartitionsRequest) decode(pd packetDecoder, version int16) (err e
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 	c.TopicPartitions = make(map[string]*TopicPartition, n)
 	for i := 0; i < n; i++ {
 		topic, err := pd.getString()

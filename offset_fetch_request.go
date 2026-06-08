@@ -172,6 +172,9 @@ func (r *OffsetFetchRequest) decode(pd packetDecoder, version int16) (err error)
 		if err != nil {
 			return err
 		}
+		if groupCount < 0 {
+			return errInvalidArrayLength
+		}
 		if groupCount > 0 {
 			r.Groups = make([]OffsetFetchRequestGroup, groupCount)
 		}

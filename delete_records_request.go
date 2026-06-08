@@ -52,6 +52,9 @@ func (d *DeleteRecordsRequest) decode(pd packetDecoder, version int16) error {
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	if n > 0 {
 		d.Topics = make(map[string]*DeleteRecordsRequestTopic, n)
@@ -145,6 +148,9 @@ func (t *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) erro
 	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return errInvalidArrayLength
 	}
 
 	if n > 0 {

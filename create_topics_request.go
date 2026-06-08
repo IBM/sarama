@@ -77,6 +77,9 @@ func (c *CreateTopicsRequest) decode(pd packetDecoder, version int16) (err error
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	c.TopicDetails = make(map[string]*TopicDetail, n)
 
@@ -215,6 +218,9 @@ func (t *TopicDetail) decode(pd packetDecoder, version int16) (err error) {
 	if err != nil {
 		return err
 	}
+	if n < 0 {
+		return errInvalidArrayLength
+	}
 
 	if n > 0 {
 		t.ReplicaAssignment = make(map[int32][]int32, n)
@@ -235,6 +241,9 @@ func (t *TopicDetail) decode(pd packetDecoder, version int16) (err error) {
 	n, err = pd.getArrayLength()
 	if err != nil {
 		return err
+	}
+	if n < 0 {
+		return errInvalidArrayLength
 	}
 
 	if n > 0 {
