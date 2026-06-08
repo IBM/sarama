@@ -1,7 +1,5 @@
 package sarama
 
-import "fmt"
-
 type fetchRequestBlock struct {
 	Version int16
 	// currentLeaderEpoch contains the current leader epoch of the partition.
@@ -161,12 +159,9 @@ func (r *FetchRequest) encode(pe packetEncoder) (err error) {
 			if err != nil {
 				return err
 			}
-			err = pe.putArrayLength(len(partitions))
+			err = pe.putInt32Array(partitions)
 			if err != nil {
 				return err
-			}
-			for _, partition := range partitions {
-				pe.putInt32(partition)
 			}
 			pe.putEmptyTaggedFieldArray()
 		}
@@ -270,21 +265,8 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 			if err != nil {
 				return err
 			}
-			partitionCount, err := pd.getArrayLength()
-			if err != nil {
+			if r.forgotten[topic], err = pd.getInt32Array(); err != nil {
 				return err
-			}
-			if partitionCount < 0 {
-				return fmt.Errorf("partitionCount %d is invalid", partitionCount)
-			}
-			r.forgotten[topic] = make([]int32, partitionCount)
-
-			for j := 0; j < partitionCount; j++ {
-				partition, err := pd.getInt32()
-				if err != nil {
-					return err
-				}
-				r.forgotten[topic][j] = partition
 			}
 			if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
