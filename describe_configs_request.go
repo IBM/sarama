@@ -81,7 +81,7 @@ func (r *DescribeConfigsRequest) decode(pd packetDecoder, version int16) (err er
 			return err
 		}
 
-		if confLength != -1 {
+		if confLength >= 0 {
 			cfnames := make([]string, confLength)
 			for i := 0; i < confLength; i++ {
 				s, err := pd.getString()
