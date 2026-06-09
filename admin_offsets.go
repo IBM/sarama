@@ -101,10 +101,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 	var wg sync.WaitGroup
 
 	for broker, req := range requests {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
+		wg.Go(func() {
 			var resp *OffsetResponse
 			err := ca.retryOnError(isRetriableBrokerError, func() error {
 				var err error
@@ -134,7 +131,7 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 			}
 
 			results <- brokerOffsetResult{result: partitionResults}
-		}()
+		})
 	}
 
 	go func() {

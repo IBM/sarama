@@ -193,14 +193,12 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			for c := range commitsPerPartition {
 				pom.MarkOffset(int64(c+1), "")
 				om.Commit()
 			}
-			wg.Done()
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -326,14 +324,12 @@ func TestOffsetManagerCommitConcurrentDeadlock(t *testing.T) {
 		var wg sync.WaitGroup
 		for p := range numPartitions {
 			pom := poms[p]
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for c := range commitsPerGoroutine {
 					pom.MarkOffset(int64(c+1), "")
 					om.Commit()
 				}
-			}()
+			})
 		}
 		wg.Wait()
 		close(done)
