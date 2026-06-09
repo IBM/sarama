@@ -24,7 +24,7 @@ import (
 // ErrorReporter is a simple interface that includes the testing.T methods we use to report
 // expectation violations when using the mock objects.
 type ErrorReporter interface {
-	Errorf(string, ...interface{})
+	Errorf(string, ...any)
 }
 
 // ValueChecker is a function type to be set in each expectation of the producer mocks

@@ -140,7 +140,7 @@ func main() {
 	}
 }
 
-func printErrorAndExit(code int, format string, values ...interface{}) {
+func printErrorAndExit(code int, format string, values ...any) {
 	fmt.Fprintf(os.Stderr, "ERROR: %s\n", fmt.Sprintf(format, values...))
 	fmt.Fprintln(os.Stderr)
 	os.Exit(code)

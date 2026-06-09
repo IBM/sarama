@@ -1010,7 +1010,7 @@ func newReadReplicaTest(t *testing.T, testConfig readReplicaTestConfig) (Partiti
 		SetOffset("my_topic", 0, OffsetOldest, 0)
 
 	toSequence := func(fetches []readReplicaFetch) MockResponse {
-		responses := make([]interface{}, len(fetches))
+		responses := make([]any, len(fetches))
 		for i, fetch := range fetches {
 			responses[i] = fetch
 		}

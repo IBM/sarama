@@ -2261,9 +2261,9 @@ func verifyValidityAndBalance(t *testing.T, consumers map[string]ConsumerGroupMe
 
 // Produces the intersection of two slices
 // From https://github.com/juliangruber/go-intersect
-func intersection(a interface{}, b interface{}) []interface{} {
-	set := make([]interface{}, 0)
-	hash := make(map[interface{}]bool)
+func intersection(a any, b any) []any {
+	set := make([]any, 0)
+	hash := make(map[any]bool)
 	av := reflect.ValueOf(a)
 	bv := reflect.ValueOf(b)
 

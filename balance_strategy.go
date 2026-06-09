@@ -1135,12 +1135,12 @@ func (pq assignmentPriorityQueue) Swap(i, j int) {
 	pq[i], pq[j] = pq[j], pq[i]
 }
 
-func (pq *assignmentPriorityQueue) Push(x interface{}) {
+func (pq *assignmentPriorityQueue) Push(x any) {
 	member := x.(*consumerGroupMember)
 	*pq = append(*pq, member)
 }
 
-func (pq *assignmentPriorityQueue) Pop() interface{} {
+func (pq *assignmentPriorityQueue) Pop() any {
 	old := *pq
 	n := len(old)
 	member := old[n-1]

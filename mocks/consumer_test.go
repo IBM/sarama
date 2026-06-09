@@ -12,12 +12,12 @@ import (
 )
 
 func TestMockConsumerImplementsConsumerInterface(t *testing.T) {
-	var c interface{} = &Consumer{}
+	var c any = &Consumer{}
 	if _, ok := c.(sarama.Consumer); !ok {
 		t.Error("The mock consumer should implement the sarama.Consumer interface.")
 	}
 
-	var pc interface{} = &PartitionConsumer{}
+	var pc any = &PartitionConsumer{}
 	if _, ok := pc.(sarama.PartitionConsumer); !ok {
 		t.Error("The mock partitionconsumer should implement the sarama.PartitionConsumer interface.")
 	}

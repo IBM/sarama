@@ -357,7 +357,7 @@ type ProducerMessage struct {
 	// will be available when receiving on the Successes and Errors channels.
 	// Sarama completely ignores this field and is only to be used for
 	// pass-through data.
-	Metadata interface{}
+	Metadata any
 
 	// Below this point are filled in by the producer as the message is processed
 

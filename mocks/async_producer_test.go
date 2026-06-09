@@ -33,12 +33,12 @@ func newTestReporterMock() *testReporterMock {
 	return &testReporterMock{errors: make([]string, 0)}
 }
 
-func (trm *testReporterMock) Errorf(format string, args ...interface{}) {
+func (trm *testReporterMock) Errorf(format string, args ...any) {
 	trm.errors = append(trm.errors, fmt.Sprintf(format, args...))
 }
 
 func TestMockAsyncProducerImplementsAsyncProducerInterface(t *testing.T) {
-	var mp interface{} = &AsyncProducer{}
+	var mp any = &AsyncProducer{}
 	if _, ok := mp.(sarama.AsyncProducer); !ok {
 		t.Error("The mock producer should implement the sarama.Producer interface.")
 	}
