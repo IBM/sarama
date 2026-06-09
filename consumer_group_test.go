@@ -5,6 +5,7 @@ package sarama
 import (
 	"context"
 	"errors"
+	"maps"
 	"slices"
 	"sync"
 	"testing"
@@ -535,9 +536,7 @@ func TestConsumerGroupReason(t *testing.T) {
 			"FetchRequest": NewMockFetchResponse(t, 1).
 				SetMessage("my-topic", 0, 0, StringEncoder("foo")),
 		}
-		for k, v := range overrides {
-			handlers[k] = v
-		}
+		maps.Copy(handlers, overrides)
 		broker0.SetHandlerByMap(handlers)
 
 		group, err := NewConsumerGroup([]string{broker0.Addr()}, "my-group", config)
