@@ -2800,24 +2800,20 @@ func TestProducerRetryBufferLimits(t *testing.T) {
 				errorFound                bool
 			)
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for range producer.Successes() {
 					successes++
 				}
-			}()
+			})
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for errMsg := range producer.Errors() {
 					if errors.Is(errMsg.Err, ErrProducerRetryBufferOverflow) {
 						errorFound = true
 					}
 					producerErrors++
 				}
-			}()
+			})
 
 			longString := strings.Repeat("a", tt.messageSize)
 			val := StringEncoder(longString)
@@ -2895,22 +2891,18 @@ func ExampleAsyncProducer_goroutines() {
 		enqueued, successes, producerErrors int
 	)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range producer.Successes() {
 			successes++
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for err := range producer.Errors() {
 			log.Println(err)
 			producerErrors++
 		}
-	}()
+	})
 
 ProducerLoop:
 	for {

@@ -388,8 +388,7 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 	var wg gosync.WaitGroup
 	if throughput > 0 {
 		for _, messages := range messages {
-			wg.Add(1)
-			go func() {
+			wg.Go(func() {
 				ticker := time.NewTicker(time.Second)
 				for _, message := range messages {
 					for range throughput {
@@ -401,21 +400,18 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 					<-ticker.C
 				}
 				ticker.Stop()
-				wg.Done()
-			}()
+			})
 		}
 	} else {
 		for _, messages := range messages {
-			wg.Add(1)
-			go func() {
+			wg.Go(func() {
 				for _, message := range messages {
 					_, _, err = producer.SendMessage(message)
 					if err != nil {
 						printErrorAndExit(69, "Failed to send message: %s", err)
 					}
 				}
-				wg.Done()
-			}()
+			})
 		}
 	}
 	wg.Wait()

@@ -728,13 +728,11 @@ func TestClientResurrectDeadSeeds(t *testing.T) {
 	client.brokers = map[int32]*Broker{}
 
 	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
+	wg.Go(func() {
 		if err := client.RefreshMetadata(); err != nil {
 			t.Error(err)
 		}
-		wg.Done()
-	}()
+	})
 	seed1.Close()
 	seed2.Close()
 

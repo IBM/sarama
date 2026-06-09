@@ -301,10 +301,7 @@ func (pc *PartitionConsumer) Close() error {
 		wg       sync.WaitGroup
 	)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
+	wg.Go(func() {
 		errs := make(sarama.ConsumerErrors, 0)
 		for err := range pc.errors {
 			errs = append(errs, err)
@@ -313,23 +310,19 @@ func (pc *PartitionConsumer) Close() error {
 		if len(errs) > 0 {
 			closeErr = errs
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range pc.messages {
 			// drain
 		}
-	}()
+	})
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for range pc.suppressedMessages {
 			// drain
 		}
-	}()
+	})
 
 	wg.Wait()
 	return closeErr

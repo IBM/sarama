@@ -234,8 +234,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 	wg := sync.WaitGroup{}
 
 	for range 100 {
-		wg.Add(1)
-		go func() {
+		wg.Go(func() {
 			msg := &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
 			partition, _, err := producer.SendMessage(msg)
 			if partition != 0 {
@@ -244,8 +243,7 @@ func TestConcurrentSyncProducer(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
-			wg.Done()
-		}()
+		})
 	}
 	wg.Wait()
 
