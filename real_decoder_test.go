@@ -82,7 +82,179 @@ func makeInput(length int) []byte {
 	return input
 }
 
+func TestRealDecoderGetNullableInt32Array(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []byte
+		want    []int32
+		wantErr error
+	}{
+		{
+			name:  "null array",
+			input: []byte{0xFF, 0xFF, 0xFF, 0xFF},
+		},
+		{
+			name:  "empty array",
+			input: []byte{0x00, 0x00, 0x00, 0x00},
+			want:  []int32{},
+		},
+		{
+			name:  "valid array",
+			input: []byte{0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02},
+			want:  []int32{1, 2},
+		},
+		{
+			name:    "insufficient data for length",
+			input:   []byte{0x00, 0x00, 0x00},
+			wantErr: ErrInsufficientData,
+		},
+		{
+			name:    "insufficient data for elements",
+			input:   []byte{0x00, 0x00, 0x00, 0x02},
+			wantErr: ErrInsufficientData,
+		},
+		{
+			name:    "invalid length",
+			input:   []byte{0x80, 0x00, 0x00, 0x00},
+			wantErr: errInvalidArrayLength,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rd := &realDecoder{raw: tt.input}
+			got, err := rd.getNullableInt32Array()
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRealDecoderGetInt32Array(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []byte
+		want    []int32
+		wantErr error
+	}{
+		{
+			name:    "null array",
+			input:   []byte{0xFF, 0xFF, 0xFF, 0xFF},
+			wantErr: errInvalidArrayLength,
+		},
+		{
+			name:  "empty array",
+			input: []byte{0x00, 0x00, 0x00, 0x00},
+			want:  []int32{},
+		},
+		{
+			name:  "valid array",
+			input: []byte{0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02},
+			want:  []int32{1, 2},
+		},
+		{
+			name:    "insufficient data for length",
+			input:   []byte{0x00, 0x00, 0x00},
+			wantErr: ErrInsufficientData,
+		},
+		{
+			name:    "insufficient data for elements",
+			input:   []byte{0x00, 0x00, 0x00, 0x02},
+			wantErr: ErrInsufficientData,
+		},
+		{
+			name:    "invalid length",
+			input:   []byte{0x80, 0x00, 0x00, 0x00},
+			wantErr: errInvalidArrayLength,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rd := &realDecoder{raw: tt.input}
+			got, err := rd.getInt32Array()
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestRealFlexibleDecoderGetNullableInt32Array(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []byte
+		want    []int32
+		wantErr error
+	}{
+		{
+			name:  "null array",
+			input: []byte{0x00},
+		},
+		{
+			name:  "empty array",
+			input: []byte{0x01},
+			want:  []int32{},
+		},
+		{
+			name:  "valid array",
+			input: []byte{0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02},
+			want:  []int32{1, 2},
+		},
+		{
+			name:    "insufficient data",
+			input:   []byte{0x03},
+			wantErr: ErrInsufficientData,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rd := &realFlexibleDecoder{&realDecoder{raw: tt.input}}
+			got, err := rd.getNullableInt32Array()
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestRealFlexibleDecoderGetInt32Array(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   []byte
+		want    []int32
+		wantErr error
+	}{
+		{
+			name:    "null array",
+			input:   []byte{0x00},
+			wantErr: errInvalidArrayLength,
+		},
+		{
+			name:  "empty array",
+			input: []byte{0x01},
+			want:  []int32{},
+		},
+		{
+			name:    "valid array",
+			input:   []byte{0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02},
+			want:    []int32{1, 2},
+			wantErr: nil,
+		},
+		{
+			name:    "insufficient data",
+			input:   []byte{0x03},
+			wantErr: ErrInsufficientData,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rd := &realFlexibleDecoder{&realDecoder{raw: tt.input}}
+			got, err := rd.getInt32Array()
+			require.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 	t.Run("returns insufficient data for compact length exceeding int64", func(t *testing.T) {
 		var input [binary.MaxVarintLen64]byte
 		n := binary.PutUvarint(input[:], 1<<63)
