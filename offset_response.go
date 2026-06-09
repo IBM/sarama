@@ -95,7 +95,7 @@ func (r *OffsetResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	r.Blocks = make(map[string]map[int32]*OffsetResponseBlock, numTopics)
-	for i := 0; i < numTopics; i++ {
+	for range numTopics {
 		name, err := pd.getString()
 		if err != nil {
 			return err
@@ -111,7 +111,7 @@ func (r *OffsetResponse) decode(pd packetDecoder, version int16) (err error) {
 
 		r.Blocks[name] = make(map[int32]*OffsetResponseBlock, numBlocks)
 
-		for j := 0; j < numBlocks; j++ {
+		for range numBlocks {
 			id, err := pd.getInt32()
 			if err != nil {
 				return err

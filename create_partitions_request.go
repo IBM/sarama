@@ -44,7 +44,7 @@ func (c *CreatePartitionsRequest) decode(pd packetDecoder, version int16) (err e
 		return errInvalidArrayLength
 	}
 	c.TopicPartitions = make(map[string]*TopicPartition, n)
-	for i := 0; i < n; i++ {
+	for range n {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -155,7 +155,7 @@ func (t *TopicPartition) decode(pd packetDecoder, version int16) (err error) {
 	}
 	t.Assignment = make([][]int32, n)
 
-	for i := 0; i < n; i++ {
+	for i := range n {
 		if t.Assignment[i], err = pd.getInt32Array(); err != nil {
 			return err
 		}

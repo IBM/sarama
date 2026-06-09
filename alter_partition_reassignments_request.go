@@ -77,7 +77,7 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 	}
 	if topicCount > 0 {
 		r.blocks = make(map[string]map[int32]*alterPartitionReassignmentsBlock)
-		for i := 0; i < topicCount; i++ {
+		for range topicCount {
 			topic, err := pd.getString()
 			if err != nil {
 				return err
@@ -90,7 +90,7 @@ func (r *AlterPartitionReassignmentsRequest) decode(pd packetDecoder, version in
 				return errInvalidArrayLength
 			}
 			r.blocks[topic] = make(map[int32]*alterPartitionReassignmentsBlock)
-			for j := 0; j < partitionCount; j++ {
+			for range partitionCount {
 				partition, err := pd.getInt32()
 				if err != nil {
 					return err

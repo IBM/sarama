@@ -53,7 +53,7 @@ func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 
 	d.TopicErrorCodes = make(map[string]KError, n)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		topic, err := pd.getString()
 		if err != nil {
 			return err

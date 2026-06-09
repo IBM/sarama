@@ -54,7 +54,7 @@ func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (er
 
 	a.Errors = make(map[string][]*PartitionError)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -70,7 +70,7 @@ func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (er
 
 		a.Errors[topic] = make([]*PartitionError, m)
 
-		for j := 0; j < m; j++ {
+		for j := range m {
 			a.Errors[topic][j] = new(PartitionError)
 			if err := a.Errors[topic][j].decode(pd, version); err != nil {
 				return err

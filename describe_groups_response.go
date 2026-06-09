@@ -50,7 +50,7 @@ func (r *DescribeGroupsResponse) decode(pd packetDecoder, version int16) (err er
 		return errInvalidArrayLength
 	} else if numGroups > 0 {
 		r.Groups = make([]*GroupDescription, numGroups)
-		for i := 0; i < numGroups; i++ {
+		for i := range numGroups {
 			block := &GroupDescription{}
 			if err := block.decode(pd, r.Version); err != nil {
 				return err
@@ -200,7 +200,7 @@ func (gd *GroupDescription) decode(pd packetDecoder, version int16) (err error) 
 		return errInvalidArrayLength
 	} else if numMembers > 0 {
 		gd.Members = make(map[string]*GroupMemberDescription, numMembers)
-		for i := 0; i < numMembers; i++ {
+		for range numMembers {
 			block := &GroupMemberDescription{}
 			if err := block.decode(pd, gd.Version); err != nil {
 				return err

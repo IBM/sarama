@@ -55,7 +55,7 @@ func (r *AlterUserScramCredentialsResponse) decode(pd packetDecoder, version int
 		return errInvalidArrayLength
 	} else if numResults > 0 {
 		r.Results = make([]*AlterUserScramCredentialsResult, numResults)
-		for i := 0; i < numResults; i++ {
+		for i := range numResults {
 			r.Results[i] = &AlterUserScramCredentialsResult{}
 			if r.Results[i].User, err = pd.getString(); err != nil {
 				return err

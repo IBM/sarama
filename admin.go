@@ -693,7 +693,7 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 		Version:   int16(0),
 	}
 
-	for i := 0; i < len(assignment); i++ {
+	for i := range assignment {
 		request.AddBlock(topic, int32(i), assignment[i])
 	}
 

@@ -84,7 +84,7 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	}
 
 	r.Deletions = make([]AlterUserScramCredentialsDelete, numDeletions)
-	for i := 0; i < numDeletions; i++ {
+	for i := range numDeletions {
 		r.Deletions[i] = AlterUserScramCredentialsDelete{}
 		if r.Deletions[i].Name, err = pd.getString(); err != nil {
 			return err
@@ -108,7 +108,7 @@ func (r *AlterUserScramCredentialsRequest) decode(pd packetDecoder, version int1
 	}
 
 	r.Upsertions = make([]AlterUserScramCredentialsUpsert, numUpsertions)
-	for i := 0; i < numUpsertions; i++ {
+	for i := range numUpsertions {
 		r.Upsertions[i] = AlterUserScramCredentialsUpsert{}
 		if r.Upsertions[i].Name, err = pd.getString(); err != nil {
 			return err

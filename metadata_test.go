@@ -65,7 +65,7 @@ func TestMetadataRefreshConcurrency(t *testing.T) {
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		wg.Add(1)
 		time.Sleep(time.Millisecond)
 		go func() {

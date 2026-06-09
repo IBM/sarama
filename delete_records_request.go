@@ -58,7 +58,7 @@ func (d *DeleteRecordsRequest) decode(pd packetDecoder, version int16) error {
 
 	if n > 0 {
 		d.Topics = make(map[string]*DeleteRecordsRequestTopic, n)
-		for i := 0; i < n; i++ {
+		for range n {
 			topic, err := pd.getString()
 			if err != nil {
 				return err
@@ -155,7 +155,7 @@ func (t *DeleteRecordsRequestTopic) decode(pd packetDecoder, version int16) erro
 
 	if n > 0 {
 		t.PartitionOffsets = make(map[int32]int64, n)
-		for i := 0; i < n; i++ {
+		for range n {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err

@@ -415,7 +415,7 @@ func (rd *realFlexibleDecoder) getEmptyTaggedFieldArray() (int, error) {
 
 	// skip over any tagged fields without deserializing them
 	// as we don't currently support doing anything with them
-	for i := uint64(0); i < tagCount; i++ {
+	for range tagCount {
 		// fetch and ignore tag identifier
 		_, err := rd.getUVarint()
 		if err != nil {
@@ -449,7 +449,7 @@ func (rd *realFlexibleDecoder) getTaggedFieldArray(decoders taggedFieldDecoders)
 		return err
 	}
 
-	for i := uint64(0); i < tagCount; i++ {
+	for range tagCount {
 		// fetch and ignore tag identifier
 		id, err := rd.getUVarint()
 		if err != nil {

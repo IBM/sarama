@@ -61,7 +61,7 @@ func (r *DescribeLogDirsResponse) decode(pd packetDecoder, version int16) (err e
 	}
 
 	r.LogDirs = make([]DescribeLogDirsResponseDirMetadata, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		dir := DescribeLogDirsResponseDirMetadata{}
 		if err := dir.decode(pd, version); err != nil {
 			return err
@@ -178,7 +178,7 @@ func (r *DescribeLogDirsResponseDirMetadata) decode(pd packetDecoder, version in
 	}
 
 	r.Topics = make([]DescribeLogDirsResponseTopic, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		t := DescribeLogDirsResponseTopic{}
 
 		if err := t.decode(pd, version); err != nil {
@@ -244,7 +244,7 @@ func (r *DescribeLogDirsResponseTopic) decode(pd packetDecoder, version int16) e
 	}
 
 	r.Partitions = make([]DescribeLogDirsResponsePartition, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		p := DescribeLogDirsResponsePartition{}
 		if err := p.decode(pd, version); err != nil {
 			return err

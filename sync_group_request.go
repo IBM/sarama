@@ -130,7 +130,7 @@ func (s *SyncGroupRequest) decode(pd packetDecoder, version int16) (err error) {
 		return errInvalidArrayLength
 	} else if numAssignments > 0 {
 		s.GroupAssignments = make([]SyncGroupRequestAssignment, numAssignments)
-		for i := 0; i < numAssignments; i++ {
+		for i := range numAssignments {
 			var block SyncGroupRequestAssignment
 			if err := block.decode(pd, s.Version); err != nil {
 				return err

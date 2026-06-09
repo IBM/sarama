@@ -46,7 +46,7 @@ func (c *CreateAclsResponse) decode(pd packetDecoder, version int16) (err error)
 	}
 
 	c.AclCreationResponses = make([]*AclCreationResponse, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		c.AclCreationResponses[i] = new(AclCreationResponse)
 		if err := c.AclCreationResponses[i].decode(pd, version); err != nil {
 			return err

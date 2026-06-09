@@ -116,7 +116,7 @@ func (a *AlterClientQuotasEntryResponse) decode(pd packetDecoder, version int16)
 	}
 	if componentCount > 0 {
 		a.Entity = make([]QuotaEntityComponent, componentCount)
-		for i := 0; i < componentCount; i++ {
+		for i := range componentCount {
 			component := QuotaEntityComponent{}
 			if err := component.decode(pd, version); err != nil {
 				return err

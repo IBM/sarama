@@ -37,7 +37,7 @@ func (d *DeleteAclsRequest) decode(pd packetDecoder, version int16) (err error) 
 	}
 
 	d.Filters = make([]*AclFilter, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		d.Filters[i] = new(AclFilter)
 		d.Filters[i].Version = int(version)
 		if err := d.Filters[i].decode(pd, version); err != nil {

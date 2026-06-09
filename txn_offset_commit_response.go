@@ -58,7 +58,7 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 
 	t.Topics = make(map[string][]*PartitionError)
 
-	for i := 0; i < n; i++ {
+	for range n {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -74,7 +74,7 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 
 		t.Topics[topic] = make([]*PartitionError, m)
 
-		for j := 0; j < m; j++ {
+		for j := range m {
 			t.Topics[topic][j] = new(PartitionError)
 			if err := t.Topics[topic][j].decode(pd, version); err != nil {
 				return err

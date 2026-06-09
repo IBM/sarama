@@ -222,7 +222,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 		return nil
 	}
 	r.blocks = make(map[string]map[int32]*fetchRequestBlock)
-	for i := 0; i < topicCount; i++ {
+	for range topicCount {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -235,7 +235,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 			return errInvalidArrayLength
 		}
 		r.blocks[topic] = make(map[int32]*fetchRequestBlock)
-		for j := 0; j < partitionCount; j++ {
+		for range partitionCount {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err
@@ -260,7 +260,7 @@ func (r *FetchRequest) decode(pd packetDecoder, version int16) (err error) {
 			return errInvalidArrayLength
 		}
 		r.forgotten = make(map[string][]int32)
-		for i := 0; i < forgottenCount; i++ {
+		for range forgottenCount {
 			topic, err := pd.getString()
 			if err != nil {
 				return err

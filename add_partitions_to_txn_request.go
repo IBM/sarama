@@ -55,7 +55,7 @@ func (a *AddPartitionsToTxnRequest) decode(pd packetDecoder, version int16) (err
 	}
 
 	a.TopicPartitions = make(map[string][]int32)
-	for i := 0; i < n; i++ {
+	for range n {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
