@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"errors"
+	"maps"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -1464,9 +1465,7 @@ func singleBrokerAdmin(t *testing.T, version KafkaVersion, handlers map[string]r
 				SetBroker(b.Addr(), b.BrokerID()).For(req.body)
 		},
 	}
-	for reqType, handler := range handlers {
-		hm[reqType] = handler
-	}
+	maps.Copy(hm, handlers)
 	b.SetHandlerFuncByMap(hm)
 
 	config := NewTestConfig()
