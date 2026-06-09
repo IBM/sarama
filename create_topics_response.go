@@ -119,11 +119,13 @@ func (c *CreateTopicsResponse) isFlexibleVersion(version int16) bool {
 }
 
 func (c *CreateTopicsResponse) isValidVersion() bool {
-	return c.Version >= 0 && c.Version <= 5
+	return c.Version >= 0 && c.Version <= 6
 }
 
 func (c *CreateTopicsResponse) requiredVersion() KafkaVersion {
 	switch c.Version {
+	case 6:
+		return V2_7_0_0
 	case 5:
 		return V2_4_0_0
 	case 4:

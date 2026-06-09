@@ -32,6 +32,9 @@ func NewCreateTopicsRequest(
 		ValidateOnly: validateOnly,
 	}
 	switch {
+	case version.IsAtLeast(V2_7_0_0):
+		// version 6 may return THROTTLING_QUOTA_EXCEEDED
+		r.Version = 6
 	case version.IsAtLeast(V2_4_0_0):
 		// Version 5 is the first flexible version
 		// Version 4 makes partitions/replicationFactor optional even when assignments are not present (KIP-464)
@@ -136,11 +139,13 @@ func (c *CreateTopicsRequest) isFlexibleVersion(version int16) bool {
 }
 
 func (c *CreateTopicsRequest) isValidVersion() bool {
-	return c.Version >= 0 && c.Version <= 5
+	return c.Version >= 0 && c.Version <= 6
 }
 
 func (c *CreateTopicsRequest) requiredVersion() KafkaVersion {
 	switch c.Version {
+	case 6:
+		return V2_7_0_0
 	case 5:
 		return V2_4_0_0
 	case 4:

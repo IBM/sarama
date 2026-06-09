@@ -41,6 +41,8 @@ var (
 		1,
 		0, // empty tagged fields
 	}
+
+	createTopicsRequestV6 = createTopicsRequestV5
 )
 
 func TestCreateTopicsRequest(t *testing.T) {
@@ -71,4 +73,7 @@ func TestCreateTopicsRequest(t *testing.T) {
 
 	req.Version = 5
 	testRequest(t, "version 5", req, createTopicsRequestV5)
+
+	req.Version = 6
+	testRequest(t, "version 6", req, createTopicsRequestV6)
 }

@@ -454,6 +454,8 @@ func (err KError) Error() string {
 		return "kafka server: This record has failed the validation on broker and hence will be rejected"
 	case ErrUnstableOffsetCommit:
 		return "kafka server: There are unstable offsets that need to be cleared"
+	case ErrThrottlingQuotaExceeded:
+		return "kafka server: The throttling quota has been exceeded"
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
