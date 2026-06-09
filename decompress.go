@@ -16,7 +16,7 @@ import (
 
 var (
 	lz4ReaderPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return lz4.NewReader(nil)
 		},
 	}
@@ -24,13 +24,13 @@ var (
 	gzipReaderPool sync.Pool
 
 	bufferPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return new(bytes.Buffer)
 		},
 	}
 
 	bytesPool = sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			res := make([]byte, 0, 4096)
 			return &res
 		},

@@ -97,7 +97,7 @@ var (
 
 	// PanicHandler is called for recovering from panics spawned internally to the library (and thus
 	// not recoverable by the caller's goroutine). Defaults to nil, which means panics are not recovered.
-	PanicHandler func(interface{})
+	PanicHandler func(any)
 
 	// MaxRequestSize is the maximum size (in bytes) of any request that Sarama will attempt to send. Trying
 	// to send a request larger than this will result in an PacketEncodingError. The default of 100 MiB is aligned
@@ -125,20 +125,20 @@ var (
 
 // StdLogger is used to log error messages.
 type StdLogger interface {
-	Print(v ...interface{})
-	Printf(format string, v ...interface{})
-	Println(v ...interface{})
+	Print(v ...any)
+	Printf(format string, v ...any)
+	Println(v ...any)
 }
 
 type debugLogger struct{}
 
-func (d *debugLogger) Print(v ...interface{}) {
+func (d *debugLogger) Print(v ...any) {
 	Logger.Print(v...)
 }
-func (d *debugLogger) Printf(format string, v ...interface{}) {
+func (d *debugLogger) Printf(format string, v ...any) {
 	Logger.Printf(format, v...)
 }
-func (d *debugLogger) Println(v ...interface{}) {
+func (d *debugLogger) Println(v ...any) {
 	Logger.Println(v...)
 }
 

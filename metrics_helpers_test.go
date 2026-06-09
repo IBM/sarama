@@ -9,7 +9,7 @@ import (
 // Common type and functions for metric validation
 type metricValidator struct {
 	name      string
-	validator func(*testing.T, interface{})
+	validator func(*testing.T, any)
 }
 
 type metricValidators []*metricValidator
@@ -46,7 +46,7 @@ func (m metricValidators) run(t *testing.T, r metrics.Registry) {
 func meterValidator(name string, extraValidator func(*testing.T, metrics.Meter)) *metricValidator {
 	return &metricValidator{
 		name: name,
-		validator: func(t *testing.T, metric interface{}) {
+		validator: func(t *testing.T, metric any) {
 			t.Helper()
 			if meter, ok := metric.(metrics.Meter); !ok {
 				t.Errorf("Expected meter metric for '%s', got %T", name, metric)
@@ -70,7 +70,7 @@ func countMeterValidator(name string, expectedCount int) *metricValidator {
 func histogramValidator(name string, extraValidator func(*testing.T, metrics.Histogram)) *metricValidator {
 	return &metricValidator{
 		name: name,
-		validator: func(t *testing.T, metric interface{}) {
+		validator: func(t *testing.T, metric any) {
 			t.Helper()
 			if histogram, ok := metric.(metrics.Histogram); !ok {
 				t.Errorf("Expected histogram metric for '%s', got %T", name, metric)
@@ -109,7 +109,7 @@ func minMaxHistogramValidator(name string, expectedMin int, expectedMax int) *me
 func counterValidator(name string, expectedCount int) *metricValidator {
 	return &metricValidator{
 		name: name,
-		validator: func(t *testing.T, metric interface{}) {
+		validator: func(t *testing.T, metric any) {
 			t.Helper()
 			if counter, ok := metric.(metrics.Counter); !ok {
 				t.Errorf("Expected counter metric for '%s', got %T", name, metric)

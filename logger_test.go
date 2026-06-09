@@ -14,7 +14,7 @@ type testLogger struct {
 }
 
 // nolint:unused
-func (l *testLogger) Print(v ...interface{}) {
+func (l *testLogger) Print(v ...any) {
 	if l.t != nil {
 		l.t.Helper()
 		l.t.Log(v...)
@@ -22,7 +22,7 @@ func (l *testLogger) Print(v ...interface{}) {
 }
 
 // nolint:unused
-func (l *testLogger) Printf(format string, v ...interface{}) {
+func (l *testLogger) Printf(format string, v ...any) {
 	if l.t != nil {
 		l.t.Helper()
 		l.t.Logf(format, v...)
@@ -30,7 +30,7 @@ func (l *testLogger) Printf(format string, v ...interface{}) {
 }
 
 // nolint:unused
-func (l *testLogger) Println(v ...interface{}) {
+func (l *testLogger) Println(v ...any) {
 	if l.t != nil {
 		l.t.Helper()
 		l.t.Log(v...)

@@ -11,7 +11,7 @@ import (
 )
 
 func TestMockSyncProducerImplementsSyncProducerInterface(t *testing.T) {
-	var mp interface{} = &SyncProducer{}
+	var mp any = &SyncProducer{}
 	if _, ok := mp.(sarama.SyncProducer); !ok {
 		t.Error("The mock async producer should implement the sarama.SyncProducer interface.")
 	}

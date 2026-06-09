@@ -3,7 +3,7 @@ package sarama
 import "sync"
 
 var expectationsPool = sync.Pool{
-	New: func() interface{} {
+	New: func() any {
 		return make(chan *ProducerError, 1)
 	},
 }
