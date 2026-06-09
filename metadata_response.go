@@ -131,7 +131,7 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 			return err
 		}
 		t.Uuid = [16]byte{}
-		for i := 0; i < 16; i++ {
+		for i := range 16 {
 			t.Uuid[i] = uuid[i]
 		}
 	}
@@ -151,7 +151,7 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 		return errInvalidArrayLength
 	}
 	t.Partitions = make([]*PartitionMetadata, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		block := &PartitionMetadata{}
 		if err := block.decode(pd, t.Version); err != nil {
 			return err
@@ -245,7 +245,7 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	r.Brokers = make([]*Broker, brokerArrayLen)
-	for i := 0; i < brokerArrayLen; i++ {
+	for i := range brokerArrayLen {
 		r.Brokers[i] = new(Broker)
 		err = r.Brokers[i].decode(pd, version)
 		if err != nil {
@@ -275,7 +275,7 @@ func (r *MetadataResponse) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	r.Topics = make([]*TopicMetadata, topicArrayLen)
-	for i := 0; i < topicArrayLen; i++ {
+	for i := range topicArrayLen {
 		r.Topics[i] = new(TopicMetadata)
 		err = r.Topics[i].decode(pd, version)
 		if err != nil {

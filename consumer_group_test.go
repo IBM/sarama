@@ -563,7 +563,7 @@ func TestConsumerGroupReason(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer close(done)
-			for i := 0; i < 2; i++ {
+			for range 2 {
 				_ = group.Consume(ctx, []string{"my-topic"}, &drainHandler{})
 			}
 		}()

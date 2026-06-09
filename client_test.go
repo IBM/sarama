@@ -1096,7 +1096,7 @@ func TestClientUpdateMetadataErrorAndRetry(t *testing.T) {
 	}
 	waitGroup := sync.WaitGroup{}
 	waitGroup.Add(10)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		go func() {
 			defer waitGroup.Done()
 			err := client.RefreshMetadata("new_topic")
@@ -1160,7 +1160,7 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 
 	var waitGroup sync.WaitGroup
 	waitGroup.Add(100)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		go func() {
 			defer waitGroup.Done()
 			assert.NoError(t, client.RefreshMetadata("topic1"))

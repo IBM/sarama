@@ -187,7 +187,7 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 	const commitsPerPartition = 1000
 
 	var wg sync.WaitGroup
-	for p := 0; p < numPartitions; p++ {
+	for p := range numPartitions {
 		pom, err := om.ManagePartition("topic", int32(p))
 		if err != nil {
 			t.Fatal(err)
@@ -195,7 +195,7 @@ func TestOffsetManagerCommitSequence(t *testing.T) {
 
 		wg.Add(1)
 		go func() {
-			for c := 0; c < commitsPerPartition; c++ {
+			for c := range commitsPerPartition {
 				pom.MarkOffset(int64(c+1), "")
 				om.Commit()
 			}
@@ -313,7 +313,7 @@ func TestOffsetManagerCommitConcurrentDeadlock(t *testing.T) {
 	const numPartitions = 4
 	const commitsPerGoroutine = 200
 	poms := make([]PartitionOffsetManager, numPartitions)
-	for p := 0; p < numPartitions; p++ {
+	for p := range numPartitions {
 		pom, err := om.ManagePartition("topic", int32(p))
 		if err != nil {
 			t.Fatal(err)
@@ -324,12 +324,12 @@ func TestOffsetManagerCommitConcurrentDeadlock(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		var wg sync.WaitGroup
-		for p := 0; p < numPartitions; p++ {
+		for p := range numPartitions {
 			pom := poms[p]
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				for c := 0; c < commitsPerGoroutine; c++ {
+				for c := range commitsPerGoroutine {
 					pom.MarkOffset(int64(c+1), "")
 					om.Commit()
 				}

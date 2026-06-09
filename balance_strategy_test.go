@@ -1590,17 +1590,17 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerLeaves(t *testi
 
 	// PLAN 1
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		topics := make([]string, 20)
-		for j := 0; j < 20; j++ {
+		for j := range 20 {
 			topics[j] = fmt.Sprintf("topic%d", j)
 		}
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: topics}
 	}
 	topics := make(map[string][]int32, 20)
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		partitions := make([]int32, 20)
-		for j := 0; j < 20; j++ {
+		for j := range 20 {
 			partitions[j] = int32(j)
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions
@@ -1609,9 +1609,9 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerLeaves(t *testi
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		topics := make([]string, 20)
-		for j := 0; j < 20; j++ {
+		for j := range 20 {
 			topics[j] = fmt.Sprintf("topic%d", j)
 		}
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{
@@ -1630,11 +1630,11 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentAfterOneConsumerAdded(t *testin
 
 	// PLAN 1
 	members := make(map[string]ConsumerGroupMemberMetadata)
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: []string{"topic1"}}
 	}
 	partitions := make([]int32, 20)
-	for j := 0; j < 20; j++ {
+	for j := range 20 {
 		partitions[j] = int32(j)
 	}
 	topics := map[string][]int32{"topic1": partitions}
@@ -1654,15 +1654,15 @@ func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
 
 	// PLAN 1
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		topics := make([]string, 15)
-		for j := 0; j < 15; j++ {
+		for j := range 15 {
 			topics[j] = fmt.Sprintf("topic%d", j)
 		}
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: topics}
 	}
 	topics := make(map[string][]int32, 15)
-	for i := 0; i < 15; i++ {
+	for i := range 15 {
 		partitions := make([]int32, i)
 		for j := 0; j < i; j++ {
 			partitions[j] = int32(j)
@@ -1674,7 +1674,7 @@ func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
 
 	// PLAN 2
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{
 			Topics:   members[fmt.Sprintf("consumer%d", i)].Topics,
 			UserData: encodeSubscriberPlan(t, plan1[fmt.Sprintf("consumer%d", i)]),
@@ -1692,18 +1692,18 @@ func Test_stickyBalanceStrategy_Plan_LargeAssignmentWithMultipleConsumersLeaving
 
 	// PLAN 1
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		topics := make([]string, 200)
-		for j := 0; j < 200; j++ {
+		for j := range 200 {
 			topics[j] = fmt.Sprintf("topic%d", j)
 		}
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: topics}
 	}
 	topics := make(map[string][]int32, 40)
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		partitionCount := r.Intn(20)
 		partitions := make([]int32, partitionCount)
-		for j := 0; j < partitionCount; j++ {
+		for j := range partitionCount {
 			partitions[j] = int32(j)
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions
@@ -1712,13 +1712,13 @@ func Test_stickyBalanceStrategy_Plan_LargeAssignmentWithMultipleConsumersLeaving
 	plan1, err := s.Plan(members, topics)
 	verifyPlanIsBalancedAndSticky(t, s, members, plan1, err)
 
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{
 			Topics:   members[fmt.Sprintf("consumer%d", i)].Topics,
 			UserData: encodeSubscriberPlan(t, plan1[fmt.Sprintf("consumer%d", i)]),
 		}
 	}
-	for i := 0; i < 50; i++ {
+	for i := range 50 {
 		delete(members, fmt.Sprintf("consumer%d", i))
 	}
 
@@ -1730,7 +1730,7 @@ func Test_stickyBalanceStrategy_Plan_NewSubscription(t *testing.T) {
 	s := &stickyBalanceStrategy{}
 
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		topics := make([]string, 0)
 		for j := i; j <= 3*i-2; j++ {
 			topics = append(topics, fmt.Sprintf("topic%d", j))
@@ -1763,15 +1763,15 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChang
 	minNumTopics := 10
 	maxNumTopics := 20
 
-	for round := 0; round < 100; round++ {
+	for range 100 {
 		numTopics := minNumTopics + r.Intn(maxNumTopics-minNumTopics)
 		topics := make([]string, numTopics)
 		partitionsPerTopic := make(map[string][]int32, numTopics)
-		for i := 0; i < numTopics; i++ {
+		for i := range numTopics {
 			topicName := fmt.Sprintf("topic%d", i)
 			topics[i] = topicName
 			partitions := make([]int32, maxNumTopics)
-			for j := 0; j < maxNumTopics; j++ {
+			for j := range maxNumTopics {
 				partitions[j] = int32(j)
 			}
 			partitionsPerTopic[topicName] = partitions
@@ -1779,7 +1779,7 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChang
 
 		numConsumers := minNumConsumers + r.Intn(maxNumConsumers-minNumConsumers)
 		members := make(map[string]ConsumerGroupMemberMetadata, numConsumers)
-		for i := 0; i < numConsumers; i++ {
+		for i := range numConsumers {
 			sub := getRandomSublist(r, topics)
 			sort.Strings(sub)
 			members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: sub}
@@ -1791,7 +1791,7 @@ func Test_stickyBalanceStrategy_Plan_ReassignmentWithRandomSubscriptionsAndChang
 
 		// PLAN 2
 		membersPlan2 := make(map[string]ConsumerGroupMemberMetadata, numConsumers)
-		for i := 0; i < numConsumers; i++ {
+		for i := range numConsumers {
 			sub := getRandomSublist(r, topics)
 			sort.Strings(sub)
 			membersPlan2[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{
@@ -1863,7 +1863,7 @@ func Test_stickyBalanceStrategy_Plan_AssignmentUpdatedForDeletedTopic(t *testing
 	topics := make(map[string][]int32, 2)
 	topics["topic1"] = []int32{0}
 	topics["topic3"] = make([]int32, 100)
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		topics["topic3"][i] = int32(i)
 	}
 	members := map[string]ConsumerGroupMemberMetadata{
@@ -2088,7 +2088,7 @@ func Test_stickyBalanceStrategy_Plan_AssignmentData(t *testing.T) {
 }
 
 func Test_stickyBalanceStrategy_Plan_data_race(t *testing.T) {
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		go func(bs BalanceStrategy) {
 			members := map[string]ConsumerGroupMemberMetadata{
 				"m1": {
@@ -2108,18 +2108,18 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopics(b *testing.B) {
 	s := &stickyBalanceStrategy{}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		topics := make([]string, 200)
-		for j := 0; j < 200; j++ {
+		for j := range 200 {
 			topics[j] = fmt.Sprintf("topic%d", j)
 		}
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: topics}
 	}
 	topics := make(map[string][]int32, 40)
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		partitionCount := r.Intn(20)
 		partitions := make([]int32, partitionCount)
-		for j := 0; j < partitionCount; j++ {
+		for j := range partitionCount {
 			partitions[j] = int32(j)
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions
@@ -2136,31 +2136,31 @@ func BenchmarkStickAssignmentWithLargeNumberOfConsumersAndTopicsAndExistingAssig
 	s := &stickyBalanceStrategy{}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	members := make(map[string]ConsumerGroupMemberMetadata, 20)
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		topics := make([]string, 200)
-		for j := 0; j < 200; j++ {
+		for j := range 200 {
 			topics[j] = fmt.Sprintf("topic%d", j)
 		}
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{Topics: topics}
 	}
 	topics := make(map[string][]int32, 40)
-	for i := 0; i < 40; i++ {
+	for i := range 40 {
 		partitionCount := r.Intn(20)
 		partitions := make([]int32, partitionCount)
-		for j := 0; j < partitionCount; j++ {
+		for j := range partitionCount {
 			partitions[j] = int32(j)
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions
 	}
 	plan, _ := s.Plan(members, topics)
 
-	for i := 0; i < 200; i++ {
+	for i := range 200 {
 		members[fmt.Sprintf("consumer%d", i)] = ConsumerGroupMemberMetadata{
 			Topics:   members[fmt.Sprintf("consumer%d", i)].Topics,
 			UserData: encodeSubscriberPlanWithGenerationForBenchmark(b, plan[fmt.Sprintf("consumer%d", i)], 1),
 		}
 	}
-	for i := 0; i < 1; i++ {
+	for i := range 1 {
 		delete(members, fmt.Sprintf("consumer%d", i))
 	}
 
@@ -2349,7 +2349,7 @@ func getRandomSublist(r *rand.Rand, s []string) []string {
 	for i, s := range s {
 		allEntriesMap[i] = s
 	}
-	for i := 0; i < howManyToRemove; i++ {
+	for range howManyToRemove {
 		delete(allEntriesMap, r.Intn(len(allEntriesMap)))
 	}
 

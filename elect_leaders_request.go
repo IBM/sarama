@@ -54,7 +54,7 @@ func (r *ElectLeadersRequest) decode(pd packetDecoder, version int16) (err error
 	}
 	if topicCount > 0 {
 		r.TopicPartitions = make(map[string][]int32)
-		for i := 0; i < topicCount; i++ {
+		for range topicCount {
 			topic, err := pd.getString()
 			if err != nil {
 				return err

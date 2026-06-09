@@ -111,7 +111,7 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 		return errInvalidArrayLength
 	} else if numTopics > 0 {
 		r.Errors = make(map[string]map[int32]*alterPartitionReassignmentsErrorBlock, numTopics)
-		for i := 0; i < numTopics; i++ {
+		for range numTopics {
 			topic, err := pd.getString()
 			if err != nil {
 				return err
@@ -127,7 +127,7 @@ func (r *AlterPartitionReassignmentsResponse) decode(pd packetDecoder, version i
 
 			r.Errors[topic] = make(map[int32]*alterPartitionReassignmentsErrorBlock, ongoingPartitionReassignments)
 
-			for j := 0; j < ongoingPartitionReassignments; j++ {
+			for range ongoingPartitionReassignments {
 				partition, err := pd.getInt32()
 				if err != nil {
 					return err

@@ -147,7 +147,7 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 		return nil
 	}
 	r.blocks = make(map[string]map[int32]*offsetRequestBlock)
-	for i := 0; i < blockCount; i++ {
+	for range blockCount {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -160,7 +160,7 @@ func (r *OffsetRequest) decode(pd packetDecoder, version int16) error {
 			return errInvalidArrayLength
 		}
 		r.blocks[topic] = make(map[int32]*offsetRequestBlock)
-		for j := 0; j < partitionCount; j++ {
+		for range partitionCount {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err

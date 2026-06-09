@@ -72,7 +72,7 @@ func (c *CreateTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 	if version >= 5 {
 		c.TopicResults = make(map[string]*CreatableTopicResult, n)
 	}
-	for i := 0; i < n; i++ {
+	for range n {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -252,7 +252,7 @@ func (r *CreatableTopicResult) decode(pd packetDecoder, version int16) (err erro
 		// null allowed
 	} else {
 		r.Configs = make(map[string]*CreatableTopicConfigs, n)
-		for i := 0; i < n; i++ {
+		for range n {
 			name, err := pd.getString()
 			if err != nil {
 				return err

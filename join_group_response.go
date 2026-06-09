@@ -153,7 +153,7 @@ func (r *JoinGroupResponse) decode(pd packetDecoder, version int16) (err error) 
 	}
 
 	r.Members = make([]GroupMember, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		memberId, err := pd.getString()
 		if err != nil {
 			return err

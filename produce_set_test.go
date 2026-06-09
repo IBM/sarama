@@ -58,7 +58,7 @@ func TestProduceSetAddingMessagesOverflowMessagesLimit(t *testing.T) {
 
 	msg := &ProducerMessage{Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
 
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		if ps.wouldOverflow(msg) {
 			t.Error("set shouldn't fill up after only", i+1, "messages")
 		}
@@ -146,15 +146,15 @@ func TestProduceSetRequestBuilding(t *testing.T) {
 		Key:       StringEncoder(TestMessage),
 		Value:     StringEncoder(TestMessage),
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		safeAddMessage(t, ps, msg)
 	}
 	msg.Partition = 1
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		safeAddMessage(t, ps, msg)
 	}
 	msg.Topic = "t2"
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		safeAddMessage(t, ps, msg)
 	}
 
@@ -187,7 +187,7 @@ func TestProduceSetCompressedRequestBuilding(t *testing.T) {
 		Value:     StringEncoder(TestMessage),
 		Timestamp: time.Now(),
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		safeAddMessage(t, ps, msg)
 	}
 
@@ -246,7 +246,7 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 		},
 		Timestamp: now,
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		safeAddMessage(t, ps, msg)
 		msg.Timestamp = msg.Timestamp.Add(time.Second)
 	}
@@ -264,7 +264,7 @@ func TestProduceSetV3RequestBuilding(t *testing.T) {
 	if !batch.MaxTimestamp.Equal(now.Add(9 * time.Second).Truncate(time.Millisecond)) {
 		t.Errorf("Wrong max timestamp: %v", batch.MaxTimestamp)
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		rec := batch.Records[i]
 		if rec.TimestampDelta != time.Duration(i)*time.Second {
 			t.Errorf("Wrong timestamp delta: %v", rec.TimestampDelta)
@@ -328,7 +328,7 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 		Timestamp:      now,
 		sequenceNumber: 123,
 	}
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		safeAddMessage(t, ps, msg)
 		msg.Timestamp = msg.Timestamp.Add(time.Second)
 	}
@@ -352,7 +352,7 @@ func TestProduceSetIdempotentRequestBuilding(t *testing.T) {
 	if batch.FirstSequence != 123 {
 		t.Errorf("Wrong first sequence: %v", batch.FirstSequence)
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		rec := batch.Records[i]
 		if rec.TimestampDelta != time.Duration(i)*time.Second {
 			t.Errorf("Wrong timestamp delta: %v", rec.TimestampDelta)

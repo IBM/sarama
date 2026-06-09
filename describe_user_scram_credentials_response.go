@@ -109,7 +109,7 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 		return errInvalidArrayLength
 	} else if numUsers > 0 {
 		r.Results = make([]*DescribeUserScramCredentialsResult, numUsers)
-		for i := 0; i < numUsers; i++ {
+		for i := range numUsers {
 			r.Results[i] = &DescribeUserScramCredentialsResult{}
 			if r.Results[i].User, err = pd.getString(); err != nil {
 				return err
@@ -132,7 +132,7 @@ func (r *DescribeUserScramCredentialsResponse) decode(pd packetDecoder, version 
 			}
 
 			r.Results[i].CredentialInfos = make([]*UserScramCredentialsResponseInfo, numCredentialInfos)
-			for j := 0; j < numCredentialInfos; j++ {
+			for j := range numCredentialInfos {
 				r.Results[i].CredentialInfos[j] = &UserScramCredentialsResponseInfo{}
 				scramMechanism, err := pd.getInt8()
 				if err != nil {

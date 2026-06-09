@@ -110,7 +110,7 @@ func (r *ApiVersionsResponse) decode(pd packetDecoder, version int16) (err error
 		return errInvalidArrayLength
 	}
 	r.ApiKeys = make([]ApiVersionsResponseKey, numApiKeys)
-	for i := 0; i < numApiKeys; i++ {
+	for i := range numApiKeys {
 		var block ApiVersionsResponseKey
 		if err = block.decode(pd, r.Version); err != nil {
 			return err

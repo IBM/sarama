@@ -126,7 +126,7 @@ func (a *IncrementalAlterConfigsResource) decode(pd packetDecoder, version int16
 
 	if n > 0 {
 		a.ConfigEntries = make(map[string]IncrementalAlterConfigsEntry, n)
-		for i := 0; i < n; i++ {
+		for range n {
 			name, err := pd.getString()
 			if err != nil {
 				return err

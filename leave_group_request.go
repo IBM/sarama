@@ -69,7 +69,7 @@ func (r *LeaveGroupRequest) decode(pd packetDecoder, version int16) (err error) 
 			return errInvalidArrayLength
 		}
 		r.Members = make([]MemberIdentity, memberCount)
-		for i := 0; i < memberCount; i++ {
+		for i := range memberCount {
 			memberIdentity := MemberIdentity{}
 			if memberIdentity.MemberId, err = pd.getString(); err != nil {
 				return err

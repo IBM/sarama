@@ -299,7 +299,7 @@ func TestWithCustomFallbackPartitioner(t *testing.T) {
 
 	// Should use round robin implementation if there is no key
 	var i int32
-	for i = 0; i < 50; i++ {
+	for i = range 50 {
 		choice, err := partitioner.Partition(&ProducerMessage{Key: nil}, 7)
 		if err != nil {
 			t.Error(partitioner, err)
@@ -311,7 +311,7 @@ func TestWithCustomFallbackPartitioner(t *testing.T) {
 
 	// should use hash partitioner if key is specified
 	buf := make([]byte, 256)
-	for i := 0; i < 50; i++ {
+	for range 50 {
 		if _, err := rand.Read(buf); err != nil {
 			t.Error(err)
 		}
@@ -357,7 +357,7 @@ func TestMurmur2Partitioner(t *testing.T) {
 	})
 
 	t.Run("nil key returns random partition in range", func(t *testing.T) {
-		for i := 0; i < 50; i++ {
+		for range 50 {
 			choice, err := partitioner.Partition(&ProducerMessage{}, 50)
 			if err != nil {
 				t.Fatal(err)

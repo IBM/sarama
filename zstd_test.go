@@ -9,7 +9,7 @@ import (
 func BenchmarkZstdMemoryConsumption(b *testing.B) {
 	params := ZstdEncoderParams{Level: 9}
 	buf := make([]byte, 1024*1024)
-	for i := 0; i < len(buf); i++ {
+	for i := range buf {
 		buf[i] = byte((i / 256) + (i * 257))
 	}
 

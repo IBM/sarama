@@ -15,11 +15,11 @@ func TestQueue(t *testing.T) {
 
 	t.Run("add then peek then remove preserves FIFO order", func(t *testing.T) {
 		var q Queue[int]
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			q.Add(i)
 		}
 		assert.Equal(t, 5, q.Length())
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			assert.Equal(t, i, q.Peek())
 			assert.Equal(t, i, q.Remove())
 		}
@@ -29,11 +29,11 @@ func TestQueue(t *testing.T) {
 	t.Run("grows beyond initial capacity", func(t *testing.T) {
 		var q Queue[int]
 		const n = 1024
-		for i := 0; i < n; i++ {
+		for i := range n {
 			q.Add(i)
 		}
 		assert.Equal(t, n, q.Length())
-		for i := 0; i < n; i++ {
+		for i := range n {
 			assert.Equal(t, i, q.Remove())
 		}
 		assert.Equal(t, 0, q.Length())
@@ -42,7 +42,7 @@ func TestQueue(t *testing.T) {
 	t.Run("interleaved add and remove wraps around buffer", func(t *testing.T) {
 		var q Queue[int]
 		var want []int
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			q.Add(i)
 			q.Add(i + 1000)
 			want = append(want, i, i+1000)
@@ -52,7 +52,7 @@ func TestQueue(t *testing.T) {
 			got = append(got, q.Remove())
 		}
 		// re-add and drain to force wrap-around past the original tail
-		for i := 0; i < 50; i++ {
+		for i := range 50 {
 			q.Add(i)
 		}
 		for q.Length() > 0 {
@@ -86,12 +86,12 @@ func TestQueue(t *testing.T) {
 	t.Run("shrinks when sparsely populated", func(t *testing.T) {
 		var q Queue[int]
 		// grow well beyond minLen
-		for i := 0; i < 1024; i++ {
+		for i := range 1024 {
 			q.Add(i)
 		}
 		grownCap := cap(q.buf)
 		// drain most elements to trigger shrink path repeatedly
-		for i := 0; i < 1020; i++ {
+		for range 1020 {
 			q.Remove()
 		}
 		assert.Less(t, cap(q.buf), grownCap)

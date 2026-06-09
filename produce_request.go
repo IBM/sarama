@@ -174,7 +174,7 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 	}
 
 	r.records = make(map[string]map[int32]Records)
-	for i := 0; i < topicCount; i++ {
+	for range topicCount {
 		topic, err := pd.getString()
 		if err != nil {
 			return err
@@ -188,7 +188,7 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 		}
 		r.records[topic] = make(map[int32]Records)
 
-		for j := 0; j < partitionCount; j++ {
+		for range partitionCount {
 			partition, err := pd.getInt32()
 			if err != nil {
 				return err

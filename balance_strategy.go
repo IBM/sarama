@@ -1099,7 +1099,7 @@ func indexOfSubList(source []string, target []string) int {
 nextCand:
 	for candidate := 0; candidate <= maxCandidate; candidate++ {
 		j := candidate
-		for i := 0; i < targetSize; i++ {
+		for i := range targetSize {
 			if target[i] != source[j] {
 				// Element mismatch, try next cand
 				continue nextCand

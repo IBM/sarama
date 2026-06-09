@@ -156,10 +156,10 @@ func TestAsyncProducer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Metadata: i}
 	}
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
@@ -207,8 +207,8 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for flush := 0; flush < 3; flush++ {
-		for i := 0; i < 5; i++ {
+	for range 3 {
+		for range 5 {
 			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 		}
 		expectResults(t, producer, 5, 0)
@@ -248,7 +248,7 @@ func TestAsyncProducerMultipleBrokers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	expectResults(t, producer, 10, 0)
@@ -291,7 +291,7 @@ func TestAsyncProducerCustomPartitioner(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	expectResults(t, producer, 2, 3)
@@ -321,7 +321,7 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	}
 	seedBroker.Close()
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	prodNotLeader := new(ProduceResponse)
@@ -339,7 +339,7 @@ func TestAsyncProducerFailureRetry(t *testing.T) {
 	expectResults(t, producer, 10, 0)
 	leader1.Close()
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader2.Returns(prodSuccess)
@@ -459,7 +459,7 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for flush := 0; flush < 3; flush++ {
+	for range 3 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(true), Value: flakyEncoder(false)}
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(false), Value: flakyEncoder(true)}
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: flakyEncoder(true), Value: flakyEncoder(true)}
@@ -534,7 +534,7 @@ func TestAsyncProducerBrokerBounceWithStaleMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader1.Close()                     // producer should get EOF
@@ -577,7 +577,7 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	prodNotLeader := new(ProduceResponse)
@@ -601,7 +601,7 @@ func TestAsyncProducerMultipleRetries(t *testing.T) {
 	leader2.Returns(prodSuccess)
 	expectResults(t, producer, 10, 0)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	leader2.Returns(prodSuccess)
@@ -730,7 +730,7 @@ func TestAsyncProducerWithExponentialBackoffDurations(t *testing.T) {
 	broker.Returns(metadataResponse)
 	broker.Returns(successResponse)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		producer.Input() <- &ProducerMessage{Topic: topic, Value: StringEncoder("test")}
 	}
 
@@ -785,7 +785,7 @@ func TestAsyncProducerMultipleRetriesWithConcurrentRequests(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -874,7 +874,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 
 	pushMsg := func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 			time.Sleep(50 * time.Millisecond)
 		}
@@ -883,7 +883,7 @@ func TestAsyncProducerBrokerRestart(t *testing.T) {
 	wg.Add(1)
 	go pushMsg()
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		time.Sleep(100 * time.Millisecond)
 
 		wg.Add(1)
@@ -934,7 +934,7 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -942,7 +942,7 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
 	leader.Returns(prodNotLeader)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		select {
 		case msg := <-producer.Errors():
 			if !errors.Is(msg.Err, ErrNotLeaderForPartition) {
@@ -955,7 +955,7 @@ func TestAsyncProducerOutOfRetries(t *testing.T) {
 
 	seedBroker.Returns(metadataResponse)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -1049,8 +1049,8 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 	}
 
 	// prime partitions
-	for p := int32(0); p < 2; p++ {
-		for i := 0; i < 5; i++ {
+	for p := range int32(2) {
+		for range 5 {
 			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: p}
 		}
 		prodSuccess := new(ProduceResponse)
@@ -1060,7 +1060,7 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 	}
 
 	// send more messages on partition 0
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 0}
 	}
 	prodNotLeader := new(ProduceResponse)
@@ -1079,7 +1079,7 @@ func TestAsyncProducerFlusherRetryCondition(t *testing.T) {
 	expectResults(t, producer, 5, 0)
 
 	// put five more through
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage), Partition: 0}
 	}
 	prodSuccess = new(ProduceResponse)
@@ -1111,7 +1111,7 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	producer.AsyncClose()
@@ -1161,7 +1161,7 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -1214,7 +1214,7 @@ func TestAsyncProducerIdempotentGoldenPath(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -1359,12 +1359,12 @@ func TestAsyncProducerIdempotentRetryCheckBatch(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 		}
 
 		go func() {
-			for i := 0; i < 7; i++ {
+			for range 7 {
 				producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("goroutine")}
 				time.Sleep(100 * time.Millisecond)
 			}
@@ -1428,12 +1428,12 @@ func TestAsyncProducerIdempotentRetryCheckBatch_2378(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
 	go func() {
-		for i := 0; i < 7; i++ {
+		for range 7 {
 			producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder("goroutine")}
 			time.Sleep(100 * time.Millisecond)
 		}
@@ -1546,7 +1546,7 @@ func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -2139,7 +2139,7 @@ func testProducerInterceptor(
 		t.Fatal(err)
 	}
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 
@@ -2147,7 +2147,7 @@ func testProducerInterceptor(
 	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
 	leader.Returns(prodSuccess)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		select {
 		case msg := <-producer.Errors():
 			t.Error(msg.Err)
@@ -3084,7 +3084,7 @@ func TestAsyncProducerPartitionUnmuting(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		for i := 0; i < 3; i++ {
+		for range 3 {
 			producer.Input() <- &ProducerMessage{
 				Topic:     topic,
 				Partition: 0,
@@ -3093,7 +3093,7 @@ func TestAsyncProducerPartitionUnmuting(t *testing.T) {
 		}
 
 		successCount := 0
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			select {
 			case <-producer.Successes():
 				successCount++
@@ -3175,7 +3175,7 @@ func TestAsyncProducerPartitionUnmuting(t *testing.T) {
 		}
 
 		var successCount int
-		for i := 0; i < 2; i++ {
+		for range 2 {
 			select {
 			case <-producer.Successes():
 				successCount++

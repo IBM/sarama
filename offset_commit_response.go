@@ -69,7 +69,7 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err erro
 
 	if numTopics > 0 {
 		r.Errors = make(map[string]map[int32]KError, numTopics)
-		for i := 0; i < numTopics; i++ {
+		for range numTopics {
 			name, err := pd.getString()
 			if err != nil {
 				return err
@@ -85,7 +85,7 @@ func (r *OffsetCommitResponse) decode(pd packetDecoder, version int16) (err erro
 
 			r.Errors[name] = make(map[int32]KError, numErrors)
 
-			for j := 0; j < numErrors; j++ {
+			for range numErrors {
 				id, err := pd.getInt32()
 				if err != nil {
 					return err
