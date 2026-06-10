@@ -49,6 +49,19 @@ func topicWithEvenLeaders(t *testing.T, adminClient ClusterAdmin, client Client,
 	if err != nil {
 		return "", err
 	}
+
+	// topic creation is asynchronous; wait for every partition to have an
+	// elected leader before returning (producing too early fails with
+	// ErrNotLeaderForPartition or ErrUnknownTopicOrPartition)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.NoError(t, client.RefreshMetadata(topic))
+		for partition := int32(0); partition < numPartitions; partition++ {
+			leader, err := client.Leader(topic, partition)
+			require.NoError(t, err, "no leader for %s/%d", topic, partition)
+			require.NotNil(t, leader)
+		}
+	}, 30*time.Second, 250*time.Millisecond, "leaders were not elected for all partitions of %s", topic)
+
 	return topic, nil
 }
 
