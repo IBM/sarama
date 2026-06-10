@@ -33,8 +33,10 @@ func (a *AddPartitionsToTxnResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -76,9 +78,14 @@ func (a *AddPartitionsToTxnResponse) decode(pd packetDecoder, version int16) (er
 				return err
 			}
 		}
+
+		if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (a *AddPartitionsToTxnResponse) key() int16 {
@@ -90,15 +97,28 @@ func (a *AddPartitionsToTxnResponse) version() int16 {
 }
 
 func (a *AddPartitionsToTxnResponse) headerVersion() int16 {
+	if a.Version >= 3 {
+		return 1
+	}
 	return 0
 }
 
 func (a *AddPartitionsToTxnResponse) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 2
+	return a.Version >= 0 && a.Version <= 3
+}
+
+func (a *AddPartitionsToTxnResponse) isFlexible() bool {
+	return a.isFlexibleVersion(a.Version)
+}
+
+func (a *AddPartitionsToTxnResponse) isFlexibleVersion(version int16) bool {
+	return version >= 3
 }
 
 func (a *AddPartitionsToTxnResponse) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 3:
+		return V2_8_0_0
 	case 2:
 		return V2_7_0_0
 	case 1:

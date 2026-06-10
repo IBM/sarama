@@ -839,7 +839,10 @@ func (t *transactionManager) publishTxnPartitions() error {
 			ProducerEpoch:   t.producerEpoch,
 			TopicPartitions: t.pendingPartitionsInCurrentTxn.mapToRequest(),
 		}
-		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+		if t.client.Config().Version.IsAtLeast(V2_8_0_0) {
+			// Version 3 is first flexible version
+			request.Version = 3
+		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
 			// Version 2 adds the support for new error code PRODUCER_FENCED.
 			request.Version = 2
 		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
