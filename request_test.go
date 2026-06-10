@@ -308,8 +308,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeUserScramCredentials: 0,  // new in 2.7
 				apiKeyAlterUserScramCredentials:    0,  // new in 2.7
 				apiKeyFetch:                        12, // up from 11
-				// TODO: CreateTopicsRequest v6 is not supported, but expected for KafkaVersion 2.7.0
-				// apiKeyCreateTopics:     6, // up from 5
+				apiKeyCreateTopics:                 6,  // up from 5
 				// TODO: DeleteTopicsRequest v5 is not supported, but expected for KafkaVersion 2.7.0
 				// apiKeyDeleteTopics:     5, // up from 4
 				// TODO: CreatePartitionsRequest v3 is not supported, but expected for KafkaVersion 2.7.0

@@ -49,6 +49,25 @@ var (
 		0, // empty tagged fields
 	}
 
+	createTopicsResponseV6 = []byte{
+		0, 0, 0, 100,
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		0, 89, // throttling quota exceeded error
+		4, 'm', 's', 'g', // error message
+		0, 0, 0, 1, // num partitions
+		0, 2, // replication factor
+		2,                // 1 config
+		4, 'b', 'a', 'r', // name
+		4, 'b', 'a', 'z', // value
+		0, // read only
+		5, // source default
+		0, // is sensitive
+		0, // empty tagged fields
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
+
 	createTopicsResponseV5WithTopicConfigError = []byte{
 		0, 0, 0, 100,
 		2,
@@ -109,6 +128,12 @@ func TestCreateTopicsResponse(t *testing.T) {
 	}
 	testResponse(t, "version 5", resp, createTopicsResponseV5)
 
+	resp.Version = 6
+	resp.TopicErrors["topic"].Err = ErrThrottlingQuotaExceeded
+	testResponse(t, "version 6", resp, createTopicsResponseV6)
+
+	resp.Version = 5
+	resp.TopicErrors["topic"].Err = ErrInvalidRequest
 	resp.TopicResults["topic"].TopicConfigErrorCode = ErrTopicAuthorizationFailed
 	testResponse(t, "version 5", resp, createTopicsResponseV5WithTopicConfigError)
 }
