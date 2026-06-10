@@ -21,6 +21,8 @@ var (
 		0, 0, 0, 100,
 		0, // empty tagged fields
 	}
+
+	deleteTopicsRequestV5 = deleteTopicsRequestV4
 )
 
 func TestDeleteTopicsRequestV0(t *testing.T) {
@@ -51,4 +53,14 @@ func TestDeleteTopicsRequestV4(t *testing.T) {
 	}
 
 	testRequest(t, "", req, deleteTopicsRequestV4)
+}
+
+func TestDeleteTopicsRequestV5(t *testing.T) {
+	req := &DeleteTopicsRequest{
+		Version: 5,
+		Topics:  []string{"topic", "other"},
+		Timeout: 100 * time.Millisecond,
+	}
+
+	testRequest(t, "", req, deleteTopicsRequestV5)
 }

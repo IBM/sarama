@@ -29,6 +29,16 @@ var (
 		0, // empty tagged fields
 		0, // empty tagged fields
 	}
+
+	deleteTopicsResponseV5 = []byte{
+		0, 0, 0, 100,
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		0, 89, // throttling quota exceeded error
+		4, 'm', 's', 'g', // error message
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestDeleteTopicsResponse(t *testing.T) {
@@ -47,4 +57,11 @@ func TestDeleteTopicsResponse(t *testing.T) {
 
 	resp.Version = 4
 	testResponse(t, "version 4", resp, deleteTopicsResponseV4)
+
+	resp.Version = 5
+	resp.TopicErrorCodes["topic"] = ErrThrottlingQuotaExceeded
+	resp.TopicErrorMessages = map[string]*string{
+		"topic": nullString("msg"),
+	}
+	testResponse(t, "version 5", resp, deleteTopicsResponseV5)
 }
