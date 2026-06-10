@@ -31,7 +31,6 @@ func (t *TxnOffsetCommitResponse) encode(pe packetEncoder) error {
 			if err := partitionError.encode(pe); err != nil {
 				return err
 			}
-			pe.putEmptyTaggedFieldArray()
 		}
 		pe.putEmptyTaggedFieldArray()
 	}
@@ -77,9 +76,6 @@ func (t *TxnOffsetCommitResponse) decode(pd packetDecoder, version int16) (err e
 		for j := range m {
 			t.Topics[topic][j] = new(PartitionError)
 			if err := t.Topics[topic][j].decode(pd, version); err != nil {
-				return err
-			}
-			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
 			}
 		}

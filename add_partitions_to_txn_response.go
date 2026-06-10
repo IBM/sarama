@@ -121,6 +121,7 @@ type PartitionError struct {
 func (p *PartitionError) encode(pe packetEncoder) error {
 	pe.putInt32(p.Partition)
 	pe.putKError(p.Err)
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -134,5 +135,6 @@ func (p *PartitionError) decode(pd packetDecoder, version int16) (err error) {
 		return err
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
