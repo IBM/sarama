@@ -589,22 +589,11 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		return ErrInvalidTopic
 	}
 
-	request := &DeleteTopicsRequest{
-		Topics:  []string{topic},
-		Timeout: ca.conf.Admin.Timeout,
-	}
-
-	// Versions 0, 1, 2, and 3 are the same.
-	// Version 4 is first flexible version.
-	if ca.conf.Version.IsAtLeast(V2_4_0_0) {
-		request.Version = 4
-	} else if ca.conf.Version.IsAtLeast(V2_1_0_0) {
-		request.Version = 3
-	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
-		request.Version = 2
-	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 1
-	}
+	request := NewDeleteTopicsRequest(
+		ca.conf.Version,
+		[]string{topic},
+		ca.conf.Admin.Timeout,
+	)
 
 	return ca.retryOnError(isRetriableControllerError, func() error {
 		b, err := ca.Controller()
