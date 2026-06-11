@@ -217,6 +217,8 @@ func allocateBody(key, version int16) protocolBody {
 		return &DescribeUserScramCredentialsRequest{Version: version}
 	case apiKeyAlterUserScramCredentials:
 		return &AlterUserScramCredentialsRequest{Version: version}
+	case apiKeyUpdateFeatures:
+		return &UpdateFeaturesRequest{Version: version}
 	case apiKeyDescribeCluster:
 		return &DescribeClusterRequest{Version: version}
 		// 52: VoteRequest
@@ -224,7 +226,6 @@ func allocateBody(key, version int16) protocolBody {
 		// 54: EndQuorumEpochRequest
 		// 55: DescribeQuorumRequest
 		// 56: AlterPartitionRequest
-		// 57: UpdateFeaturesRequest
 		// 58: EnvelopeRequest
 		// 59: FetchSnapshotRequest
 		// 60: DescribeClusterRequest
@@ -331,6 +332,8 @@ func allocateResponseBody(key, version int16) protocolBody {
 		return &DescribeUserScramCredentialsResponse{Version: version}
 	case apiKeyAlterUserScramCredentials:
 		return &AlterUserScramCredentialsResponse{Version: version}
+	case apiKeyUpdateFeatures:
+		return &UpdateFeaturesResponse{Version: version}
 	case apiKeyDescribeCluster:
 		return &DescribeClusterResponse{Version: version}
 	}

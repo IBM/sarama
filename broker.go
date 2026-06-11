@@ -1003,6 +1003,18 @@ func (b *Broker) AlterUserScramCredentials(req *AlterUserScramCredentialsRequest
 	return res, nil
 }
 
+// UpdateFeatures sends a request to update finalized feature versions
+func (b *Broker) UpdateFeatures(req *UpdateFeaturesRequest) (*UpdateFeaturesResponse, error) {
+	res := new(UpdateFeaturesResponse)
+
+	err := b.sendAndReceive(req, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // DescribeClientQuotas sends a request to get the broker's quotas
 func (b *Broker) DescribeClientQuotas(request *DescribeClientQuotasRequest) (*DescribeClientQuotasResponse, error) {
 	response := new(DescribeClientQuotasResponse)
