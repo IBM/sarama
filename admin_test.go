@@ -2648,3 +2648,31 @@ func Test_retryOnError(t *testing.T) {
 		}
 	})
 }
+
+func TestClusterAdminUpdateFeatures(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"UpdateFeaturesRequest": NewMockUpdateFeaturesResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_7_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, admin.Close())
+	}()
+
+	t.Run("returns per-feature results", func(t *testing.T) {
+		results, err := admin.UpdateFeatures([]FeatureUpdate{
+			{Feature: "metadata.version", MaxVersionLevel: 2},
+		})
+		require.NoError(t, err)
+		require.Equal(t, []UpdatableFeatureResult{{Feature: "metadata.version"}}, results)
+	})
+}

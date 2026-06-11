@@ -1547,3 +1547,22 @@ func (m *MockInitProducerIDResponse) For(reqBody versionedDecoder) encoderWithHe
 	}
 	return res
 }
+
+type MockUpdateFeaturesResponse struct {
+	t TestReporter
+}
+
+func NewMockUpdateFeaturesResponse(t TestReporter) *MockUpdateFeaturesResponse {
+	return &MockUpdateFeaturesResponse{t: t}
+}
+
+func (m *MockUpdateFeaturesResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*UpdateFeaturesRequest)
+	res := &UpdateFeaturesResponse{Version: req.version()}
+	for i := range req.FeatureUpdates {
+		res.Results = append(res.Results, UpdatableFeatureResult{
+			Feature: req.FeatureUpdates[i].Feature,
+		})
+	}
+	return res
+}

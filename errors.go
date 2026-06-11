@@ -268,6 +268,7 @@ const (
 	ErrUnstableOffsetCommit               KError = 88 // Errors.UNSTABLE_OFFSET_COMMIT
 	ErrThrottlingQuotaExceeded            KError = 89 // Errors.THROTTLING_QUOTA_EXCEEDED
 	ErrProducerFenced                     KError = 90 // Errors.PRODUCER_FENCED
+	ErrInvalidUpdateVersion               KError = 95 // Errors.INVALID_UPDATE_VERSION
 )
 
 func (err KError) Error() string {
@@ -456,6 +457,8 @@ func (err KError) Error() string {
 		return "kafka server: There are unstable offsets that need to be cleared"
 	case ErrThrottlingQuotaExceeded:
 		return "kafka server: The throttling quota has been exceeded"
+	case ErrInvalidUpdateVersion:
+		return "kafka server: The given update version was invalid"
 	}
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
