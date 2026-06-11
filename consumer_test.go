@@ -1735,7 +1735,7 @@ func TestPartitionConsumerDispatcherOrphanedClose(t *testing.T) {
 			children:        make(map[string]map[int32]*partitionConsumer),
 			brokerConsumers: make(map[*Broker]*brokerConsumer),
 		}
-		bc := &brokerConsumer{consumer: c, input: make(chan *brokerSubscription), refs: 1}
+		bc := &brokerConsumer{consumer: c, input: make(chan *brokerSubscription), refs: 1, stop: make(chan none)}
 		child := &partitionConsumer{
 			consumer:       c,
 			conf:           config,
@@ -2320,6 +2320,55 @@ func TestConsumerError(t *testing.T) {
 	if !errors.Is(err, ErrOutOfBrokers) {
 		t.Error("unexpected errors.Is")
 	}
+}
+
+func TestConsumerQueueSubscriptionAfterUnref(t *testing.T) {
+	metrics.UseNilMetrics = true
+	defer func() { metrics.UseNilMetrics = false }()
+
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+	config := NewTestConfig()
+
+	broker0 := NewMockBroker(t, 0)
+	defer broker0.Close()
+	broker0.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker0.Addr(), broker0.BrokerID()),
+	})
+
+	client, err := NewClient([]string{broker0.Addr()}, config)
+	require.NoError(t, err)
+	defer client.Close()
+
+	c := &consumer{
+		client:          client,
+		conf:            config,
+		children:        make(map[string]map[int32]*partitionConsumer),
+		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		metricRegistry:  newCleanupRegistry(config.MetricRegistry),
+	}
+
+	realBroker := client.Brokers()[0]
+
+	child := &partitionConsumer{
+		consumer:       c,
+		conf:           config,
+		topic:          "my_topic",
+		partition:      0,
+		trigger:        make(chan none, 1),
+		dying:          make(chan none),
+		dispatcherStop: make(chan none),
+	}
+
+	// a responseFeeder requeueing a timed-out subscription holds no ref on the
+	// brokerConsumer, so the requeue can arrive after the last unref
+	bc := c.refBrokerConsumer(realBroker)
+	c.unrefBrokerConsumer(bc)
+
+	require.NotPanics(t, func() {
+		require.False(t, bc.queueSubscription(newBrokerSubscription(child)))
+	})
 }
 
 // TestConsumerAbortNoGoroutineLeak verifies that brokerConsumer.abort() does
