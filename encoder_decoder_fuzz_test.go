@@ -63,6 +63,7 @@ func FuzzVersionedDecodeRequest(f *testing.F) {
 		{key: apiKeyAlterClientQuotas, version: 0, body: alterClientQuotasRequestSingleOp},
 		{key: apiKeyDescribeUserScramCredentials, version: 0, body: emptyDescribeUserScramCredentialsRequest},
 		{key: apiKeyAlterUserScramCredentials, version: 0, body: emptyAlterUserScramCredentialsRequest},
+		{key: apiKeyUpdateFeatures, version: 0, body: updateFeaturesRequestV0},
 	} {
 		f.Add(seed.key, seed.version, seed.body)
 	}
@@ -117,6 +118,7 @@ func FuzzVersionedDecodeResponse(f *testing.F) {
 		{key: apiKeyAlterClientQuotas, version: 0, body: alterClientQuotasResponseError},
 		{key: apiKeyDescribeUserScramCredentials, version: 0, body: emptyDescribeUserScramCredentialsResponse},
 		{key: apiKeyAlterUserScramCredentials, version: 0, body: emptyAlterUserScramCredentialsResponse},
+		{key: apiKeyUpdateFeatures, version: 0, body: updateFeaturesResponseV0},
 	} {
 		f.Add(seed.key, seed.version, seed.body)
 	}

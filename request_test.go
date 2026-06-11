@@ -71,7 +71,7 @@ var names = map[int16]string{
 	54:                                 "EndQuorumEpochRequest",
 	55:                                 "DescribeQuorumRequest",
 	56:                                 "AlterPartitionRequest",
-	57:                                 "UpdateFeaturesRequest",
+	apiKeyUpdateFeatures:               "UpdateFeaturesRequest",
 	58:                                 "EnvelopeRequest",
 	59:                                 "FetchSnapshotRequest",
 	apiKeyDescribeCluster:              "DescribeClusterRequest",
@@ -311,8 +311,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyCreateTopics:                 6,  // up from 5
 				apiKeyDeleteTopics:                 5,  // up from 4
 				apiKeyCreatePartitions:             3,  // up from 2
-				// TODO: UpdateFeaturesRequest v0 is not supported, but expected for KafkaVersion 2.7.0
-				// apiKeyUpdateFeatures /* (57) */: 0, // new in 2.7
+				apiKeyUpdateFeatures:               0,  // new in 2.7
 			},
 		},
 		{
@@ -542,6 +541,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyAlterClientQuotas:            maxVersion(&AlterClientQuotasRequest{}),
 				apiKeyDescribeUserScramCredentials: maxVersion(&DescribeUserScramCredentialsRequest{}),
 				apiKeyAlterUserScramCredentials:    maxVersion(&AlterUserScramCredentialsRequest{}),
+				apiKeyUpdateFeatures:               maxVersion(&UpdateFeaturesRequest{}),
 				apiKeyDescribeCluster:              maxVersion(&DescribeClusterRequest{}),
 			},
 		},
