@@ -38,6 +38,28 @@ type ProduceResponseRecordError struct {
 	BatchIndexErrorMessage *string // v8, batch_index_error_message (nullable)
 }
 
+func (p *ProduceResponseRecordError) encode(pe packetEncoder) error {
+	pe.putInt32(p.BatchIndex)
+	if err := pe.putNullableString(p.BatchIndexErrorMessage); err != nil {
+		return err
+	}
+	pe.putEmptyTaggedFieldArray()
+	return nil
+}
+
+func (p *ProduceResponseRecordError) decode(pd packetDecoder) (err error) {
+	if p.BatchIndex, err = pd.getInt32(); err != nil {
+		return err
+	}
+	if p.BatchIndexErrorMessage, err = pd.getNullableString(); err != nil {
+		return err
+	}
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err error) {
 	b.Err, err = pd.getKError()
 	if err != nil {
@@ -75,10 +97,7 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 		if numRecordErrors > 0 {
 			b.RecordErrors = make([]ProduceResponseRecordError, numRecordErrors)
 			for i := range b.RecordErrors {
-				if b.RecordErrors[i].BatchIndex, err = pd.getInt32(); err != nil {
-					return err
-				}
-				if b.RecordErrors[i].BatchIndexErrorMessage, err = pd.getNullableString(); err != nil {
+				if err := b.RecordErrors[i].decode(pd); err != nil {
 					return err
 				}
 			}
@@ -86,6 +105,10 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 		if b.ErrorMessage, err = pd.getNullableString(); err != nil {
 			return err
 		}
+	}
+
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
 	}
 
 	return nil
@@ -113,9 +136,8 @@ func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err erro
 		if err = pe.putArrayLength(len(b.RecordErrors)); err != nil {
 			return err
 		}
-		for _, re := range b.RecordErrors {
-			pe.putInt32(re.BatchIndex)
-			if err = pe.putNullableString(re.BatchIndexErrorMessage); err != nil {
+		for i := range b.RecordErrors {
+			if err = b.RecordErrors[i].encode(pe); err != nil {
 				return err
 			}
 		}
@@ -123,6 +145,8 @@ func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err erro
 			return err
 		}
 	}
+
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -178,6 +202,10 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 			}
 			r.Blocks[name][id] = block
 		}
+
+		if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+			return err
+		}
 	}
 
 	if r.Version >= 1 {
@@ -186,7 +214,8 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *ProduceResponse) encode(pe packetEncoder) error {
@@ -210,11 +239,13 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 				return err
 			}
 		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	if r.Version >= 1 {
 		pe.putDurationMs(r.ThrottleTime)
 	}
+	pe.putEmptyTaggedFieldArray()
 	return nil
 }
 
@@ -227,15 +258,28 @@ func (r *ProduceResponse) version() int16 {
 }
 
 func (r *ProduceResponse) headerVersion() int16 {
+	if r.Version >= 9 {
+		return 1
+	}
 	return 0
 }
 
+func (r *ProduceResponse) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *ProduceResponse) isFlexibleVersion(version int16) bool {
+	return version >= 9
+}
+
 func (r *ProduceResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 8
+	return r.Version >= 0 && r.Version <= 9
 }
 
 func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 9:
+		return V2_8_0_0
 	case 8:
 		return V2_4_0_0
 	case 7:

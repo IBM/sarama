@@ -83,6 +83,28 @@ var (
 
 			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
 		},
+		9: { // version 9 is the first flexible version
+			0x02, // 1 topic
+
+			0x04, 'f', 'o', 'o',
+			0x02, // 1 partition
+
+			0x00, 0x00, 0x00, 0x01, // Partition 1
+			0x00, 0x02, // ErrInvalidMessage
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, // Offset 255
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0xE8, // Timestamp January 1st 0001 at 00:00:01,000 UTC (LogAppendTime was used)
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x32, // StartOffset 50
+			0x02,                   // 1 record error
+			0x00, 0x00, 0x00, 0x03, // BatchIndex 3
+			0x08, 'b', 'a', 'd', ' ', 'r', 'e', 'c', // BatchIndexErrorMessage
+			0x00,                                              // record error tagged fields
+			0x0A, 'b', 'a', 'd', ' ', 'b', 'a', 't', 'c', 'h', // ErrorMessage
+			0x00, // partition tagged fields
+			0x00, // topic tagged fields
+
+			0x00, 0x00, 0x00, 0x64, // 100 ms throttle time
+			0x00, // response tagged fields
+		},
 	}
 )
 
