@@ -203,6 +203,9 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 	if ps.parent.conf.Version.IsAtLeast(V2_4_0_0) {
 		req.Version = 8
 	}
+	if ps.parent.conf.Version.IsAtLeast(V2_8_0_0) {
+		req.Version = 9
+	}
 
 	for topic, partitionSets := range ps.msgs {
 		for partition, set := range partitionSets {

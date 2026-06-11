@@ -110,14 +110,27 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		for id, records := range partitions {
 			startOffset := pe.offset()
 			pe.putInt32(id)
-			pe.push(&lengthField{})
-			err = records.encode(pe)
-			if err != nil {
-				return err
-			}
-			err = pe.pop()
-			if err != nil {
-				return err
+			if r.Version >= 9 {
+				// compact bytes: size the records with a prep pass to write
+				// the uvarint prefix, then encode the batch non-flexibly
+				var prep prepEncoder
+				if err = records.encode(&prep); err != nil {
+					return err
+				}
+				pe.putUVarint(uint64(prep.length) + 1)
+				if err = records.encode(downgradeFlexibleEncoder(pe)); err != nil {
+					return err
+				}
+			} else {
+				pe.push(&lengthField{})
+				err = records.encode(pe)
+				if err != nil {
+					return err
+				}
+				err = pe.pop()
+				if err != nil {
+					return err
+				}
 			}
 			if metricRegistry != nil {
 				if r.Version >= 3 {
@@ -129,7 +142,9 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 				batchSizeMetric.Update(batchSize)
 				topicBatchSizeMetric.Update(batchSize)
 			}
+			pe.putEmptyTaggedFieldArray()
 		}
+		pe.putEmptyTaggedFieldArray()
 		if topicRecordCount > 0 {
 			getOrRegisterTopicMeter("record-send-rate", topic, metricRegistry).Mark(topicRecordCount)
 			getOrRegisterTopicHistogram("records-per-request", topic, metricRegistry).Update(topicRecordCount)
@@ -140,6 +155,7 @@ func (r *ProduceRequest) encode(pe packetEncoder) error {
 		metrics.GetOrRegisterMeter("record-send-rate", metricRegistry).Mark(totalRecordCount)
 		getOrRegisterHistogram("records-per-request", metricRegistry).Update(totalRecordCount)
 	}
+	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
@@ -169,47 +185,50 @@ func (r *ProduceRequest) decode(pd packetDecoder, version int16) error {
 	if topicCount < 0 {
 		return errInvalidArrayLength
 	}
-	if topicCount == 0 {
-		return nil
+
+	if topicCount > 0 {
+		r.records = make(map[string]map[int32]Records, topicCount)
+		for range topicCount {
+			topic, err := pd.getString()
+			if err != nil {
+				return err
+			}
+			partitionCount, err := pd.getArrayLength()
+			if err != nil {
+				return err
+			}
+			if partitionCount < 0 {
+				return errInvalidArrayLength
+			}
+			r.records[topic] = make(map[int32]Records, partitionCount)
+
+			for range partitionCount {
+				partition, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				// getBytes handles both the legacy and compact length prefix
+				recordsBytes, err := pd.getBytes()
+				if err != nil {
+					return err
+				}
+				var records Records
+				if err := records.decode(&realDecoder{raw: recordsBytes}); err != nil {
+					return err
+				}
+				r.records[topic][partition] = records
+				if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+					return err
+				}
+			}
+			if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+				return err
+			}
+		}
 	}
 
-	r.records = make(map[string]map[int32]Records)
-	for range topicCount {
-		topic, err := pd.getString()
-		if err != nil {
-			return err
-		}
-		partitionCount, err := pd.getArrayLength()
-		if err != nil {
-			return err
-		}
-		if partitionCount < 0 {
-			return errInvalidArrayLength
-		}
-		r.records[topic] = make(map[int32]Records)
-
-		for range partitionCount {
-			partition, err := pd.getInt32()
-			if err != nil {
-				return err
-			}
-			size, err := pd.getInt32()
-			if err != nil {
-				return err
-			}
-			recordsDecoder, err := pd.getSubset(int(size))
-			if err != nil {
-				return err
-			}
-			var records Records
-			if err := records.decode(recordsDecoder); err != nil {
-				return err
-			}
-			r.records[topic][partition] = records
-		}
-	}
-
-	return nil
+	_, err = pd.getEmptyTaggedFieldArray()
+	return err
 }
 
 func (r *ProduceRequest) key() int16 {
@@ -221,15 +240,28 @@ func (r *ProduceRequest) version() int16 {
 }
 
 func (r *ProduceRequest) headerVersion() int16 {
+	if r.Version >= 9 {
+		return 2
+	}
 	return 1
 }
 
+func (r *ProduceRequest) isFlexible() bool {
+	return r.isFlexibleVersion(r.Version)
+}
+
+func (r *ProduceRequest) isFlexibleVersion(version int16) bool {
+	return version >= 9
+}
+
 func (r *ProduceRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 8
+	return r.Version >= 0 && r.Version <= 9
 }
 
 func (r *ProduceRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 9:
+		return V2_8_0_0
 	case 8:
 		return V2_4_0_0
 	case 7:

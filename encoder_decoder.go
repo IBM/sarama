@@ -132,3 +132,14 @@ func downgradeFlexibleDecoder(pd packetDecoder) packetDecoder {
 	}
 	return pd
 }
+
+func downgradeFlexibleEncoder(pe packetEncoder) packetEncoder {
+	switch pe := pe.(type) {
+	case *prepFlexibleEncoder:
+		return pe.prepEncoder
+	case *realFlexibleEncoder:
+		return pe.realEncoder
+	default:
+		return pe
+	}
+}

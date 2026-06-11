@@ -324,8 +324,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeCluster:      0,  // new in 2.8
 				apiKeyDescribeConfigs:      4,  // up from 3
 				apiKeyAddPartitionsToTxn:   3,  // up from 2
-				// TODO: ProduceRequest v9 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyProduce:              9, // up from 8
+				apiKeyProduce:              9,  // up from 8
 				// TODO: ListOffsetsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyListOffsets:          6, // up from 5
 				// TODO: MetadataRequest v11 is not supported, but expected for KafkaVersion 2.8.0
