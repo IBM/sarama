@@ -101,4 +101,8 @@ func TestCreatePartitionsResponseV2(t *testing.T) {
 		},
 	}
 	testResponse(t, "success", resp, createPartitionResponseSuccessV2)
+
+	// v3 wire format is identical to v2
+	resp.Version = 3
+	testResponse(t, "success v3", resp, createPartitionResponseSuccessV2)
 }

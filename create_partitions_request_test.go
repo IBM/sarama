@@ -70,4 +70,9 @@ func TestCreatePartitionsRequest(t *testing.T) {
 	req.Version = 2
 	buf = testRequestEncode(t, "assignment v2", req, createPartitionRequestAssignmentV2)
 	testRequestDecode(t, "assignment v2", req, buf)
+
+	// v3 wire format is identical to v2
+	req.Version = 3
+	buf = testRequestEncode(t, "assignment v3", req, createPartitionRequestAssignmentV2)
+	testRequestDecode(t, "assignment v3", req, buf)
 }

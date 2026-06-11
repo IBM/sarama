@@ -639,7 +639,9 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		Timeout:         ca.conf.Admin.Timeout,
 		ValidateOnly:    validateOnly,
 	}
-	if ca.conf.Version.IsAtLeast(V2_5_0_0) {
+	if ca.conf.Version.IsAtLeast(V2_7_0_0) {
+		request.Version = 3
+	} else if ca.conf.Version.IsAtLeast(V2_5_0_0) {
 		request.Version = 2
 	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 		request.Version = 1
