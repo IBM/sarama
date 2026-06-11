@@ -267,7 +267,7 @@ func (c *consumer) unrefBrokerConsumer(brokerWorker *brokerConsumer) {
 	brokerWorker.refs--
 
 	if brokerWorker.refs == 0 {
-		close(brokerWorker.input)
+		brokerWorker.stopConsuming()
 		if c.brokerConsumers[brokerWorker.broker] == brokerWorker {
 			delete(c.brokerConsumers, brokerWorker.broker)
 		}
@@ -1066,10 +1066,7 @@ func (bc *brokerConsumer) subscriptionManager() {
 		select {
 		case <-bc.stop:
 			return
-		case subscription, ok := <-bc.input:
-			if !ok {
-				return
-			}
+		case subscription := <-bc.input:
 			subscriptions = append(subscriptions, subscription)
 		case bc.newSubscriptions <- nil:
 			continue
@@ -1077,18 +1074,12 @@ func (bc *brokerConsumer) subscriptionManager() {
 
 		// drain input of any further incoming subscriptions
 		timer := time.NewTimer(partitionConsumersBatchTimeout)
-		inputClosed := false
 		for batchComplete := false; !batchComplete; {
 			select {
 			case <-bc.stop:
 				stopping = true
 				batchComplete = true
-			case subscription, ok := <-bc.input:
-				if !ok {
-					inputClosed = true
-					batchComplete = true
-					continue
-				}
+			case subscription := <-bc.input:
 				subscriptions = append(subscriptions, subscription)
 			case <-timer.C:
 				batchComplete = true
@@ -1101,7 +1092,7 @@ func (bc *brokerConsumer) subscriptionManager() {
 			bc.broker.ID(), len(subscriptions))
 
 		bc.newSubscriptions <- subscriptions
-		if inputClosed || stopping {
+		if stopping {
 			return
 		}
 	}
