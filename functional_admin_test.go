@@ -1045,8 +1045,9 @@ func TestFuncAdminUpdateFeatures(t *testing.T) {
 	require.NoError(t, err)
 
 	describeFeatures := func(t require.TestingT) (supported map[string]int16, finalized map[string]int16) {
+		// v4 needed: v0-v3 responses omit supported features with min version 0
 		rsp, err := controller.ApiVersions(&ApiVersionsRequest{
-			Version:               3,
+			Version:               4,
 			ClientSoftwareName:    defaultClientSoftwareName,
 			ClientSoftwareVersion: version(),
 		})

@@ -26,3 +26,12 @@ func TestApiVersionsRequestV3(t *testing.T) {
 	request.ClientSoftwareVersion = "0.10.0"
 	testRequest(t, "v3", request, apiVersionRequestV3)
 }
+
+func TestApiVersionsRequestV4(t *testing.T) {
+	// v4 shares the v3 wire format
+	request := new(ApiVersionsRequest)
+	request.Version = 4
+	request.ClientSoftwareName = "sarama"
+	request.ClientSoftwareVersion = "0.10.0"
+	testRequest(t, "v4", request, apiVersionRequestV3)
+}
