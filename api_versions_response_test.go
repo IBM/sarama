@@ -48,6 +48,29 @@ var (
 		0x00, // empty tagged fields
 	}
 
+	apiVersionResponseV3Features = []byte{
+		0x00, 0x00, // no error
+		0x02,                               // compact array length 1 (APIs)
+		0x00, 0x12, 0x00, 0x00, 0x00, 0x03, // API Version ApiVersions (v0-3)
+		0x00,                   // empty tagged fields
+		0x00, 0x00, 0x00, 0x80, // throttle time (128ms)
+		0x03,       // 3 tagged fields
+		0x00, 0x14, // tag 0 (supported_features), length 20
+		0x02,                                                                  // compact array length 1
+		0x0e, 's', 'h', 'a', 'r', 'e', '.', 'v', 'e', 'r', 's', 'i', 'o', 'n', // name
+		0x00, 0x00, // min version 0
+		0x00, 0x01, // max version 1
+		0x00,       // empty tagged fields
+		0x01, 0x08, // tag 1 (finalized_features_epoch), length 8
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x27, // epoch 39
+		0x02, 0x14, // tag 2 (finalized_features), length 20
+		0x02,                                                                  // compact array length 1
+		0x0e, 's', 'h', 'a', 'r', 'e', '.', 'v', 'e', 'r', 's', 'i', 'o', 'n', // name
+		0x00, 0x01, // max version level 1
+		0x00, 0x00, // min version level 0
+		0x00, // empty tagged fields
+	}
+
 	// unsupported version from kafka 0.10.2.1
 	apiVersionsResponseUnsupportedVersionV0 = []byte{
 		0x00, 0x23, // unsupported version error
@@ -122,6 +145,25 @@ func TestApiVersionsResponseV3(t *testing.T) {
 		{v, 5, 0, 2},  // API Version StopReplica (v0-2)
 	}, response.ApiKeys)
 	assert.Equal(t, int32(128), response.ThrottleTimeMs)
+	assert.Equal(t, int64(-1), response.FinalizedFeaturesEpoch)
+	assert.Empty(t, response.SupportedFeatures)
+	assert.Empty(t, response.FinalizedFeatures)
+
+	withFeatures := &ApiVersionsResponse{
+		Version: v,
+		ApiKeys: []ApiVersionsResponseKey{
+			{v, 18, 0, 3}, // API Version ApiVersions (v0-3)
+		},
+		ThrottleTimeMs: 128,
+		SupportedFeatures: []SupportedFeatureKey{
+			{Name: "share.version", MinVersion: 0, MaxVersion: 1},
+		},
+		FinalizedFeaturesEpoch: 39,
+		FinalizedFeatures: []FinalizedFeatureKey{
+			{Name: "share.version", MaxVersionLevel: 1, MinVersionLevel: 0},
+		},
+	}
+	testResponse(t, "with features V3", withFeatures, apiVersionResponseV3Features)
 }
 
 func TestApiVersionsResponseUnsupportedVersion(t *testing.T) {
