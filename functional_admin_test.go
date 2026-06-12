@@ -1041,16 +1041,60 @@ func TestFuncAdminUpdateFeatures(t *testing.T) {
 	}})
 	require.ErrorIs(t, err, ErrInvalidUpdateVersion)
 
-	// share.version (KIP-932) ships disabled on 4.1 (finalized 0, max 1),
-	// so we can do a real upgrade here
-	if kafkaVersion.IsAtLeast(V4_1_0_0) && !kafkaVersion.IsAtLeast(V4_2_0_0) {
-		results, err := adminClient.UpdateFeatures([]FeatureUpdate{{
-			Feature:         "share.version",
-			MaxVersionLevel: 1,
-		}})
+	controller, err := adminClient.Controller()
+	require.NoError(t, err)
+
+	describeFeatures := func(t require.TestingT) (supported map[string]int16, finalized map[string]int16) {
+		// v4 needed: v0-v3 responses omit supported features with min version 0
+		rsp, err := controller.ApiVersions(&ApiVersionsRequest{
+			Version:               4,
+			ClientSoftwareName:    defaultClientSoftwareName,
+			ClientSoftwareVersion: version(),
+		})
 		require.NoError(t, err)
-		require.Len(t, results, 1)
-		assert.Equal(t, "share.version", results[0].Feature)
-		assert.Equal(t, ErrNoError, results[0].ErrorCode)
+		supported = make(map[string]int16, len(rsp.SupportedFeatures))
+		for _, f := range rsp.SupportedFeatures {
+			supported[f.Name] = f.MaxVersion
+		}
+		finalized = make(map[string]int16, len(rsp.FinalizedFeatures))
+		for _, f := range rsp.FinalizedFeatures {
+			finalized[f.Name] = f.MaxVersionLevel
+		}
+		return supported, finalized
 	}
+
+	supported, finalized := describeFeatures(t)
+	require.NotEmpty(t, supported)
+
+	// upgrade every feature whose finalized level sits below the supported
+	// max, one batch each so a single rejection doesn't sink the rest
+	upgraded := make(map[string]int16)
+	for name, maxVersion := range supported {
+		// kraft.version upgrades are refused on a static-quorum cluster
+		if name == "kraft.version" || finalized[name] >= maxVersion {
+			continue
+		}
+		results, err := adminClient.UpdateFeatures([]FeatureUpdate{{
+			Feature:         name,
+			MaxVersionLevel: maxVersion,
+		}})
+		require.NoError(t, err, "upgrade %s to %d", name, maxVersion)
+		require.Len(t, results, 1)
+		assert.Equal(t, name, results[0].Feature)
+		assert.Equal(t, ErrNoError, results[0].ErrorCode)
+		upgraded[name] = maxVersion
+	}
+	if len(upgraded) == 0 {
+		t.Log("no features eligible for upgrade")
+		return
+	}
+	t.Logf("upgraded features: %v", upgraded)
+
+	// finalized levels propagate to brokers via the metadata log, so poll
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		_, finalized := describeFeatures(t)
+		for name, level := range upgraded {
+			assert.Equal(t, level, finalized[name], "feature %s", name)
+		}
+	}, 30*time.Second, 250*time.Millisecond, "finalized feature levels did not reach the requested levels")
 }

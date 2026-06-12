@@ -447,8 +447,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyListOffsets:         9, // up from 8
 				// TODO: FindCoordinatorRequest v6 is not supported, but expected for KafkaVersion 3.9.0
 				// apiKeyFindCoordinator:     6,  // up from 5
-				// TODO: ApiVersionsRequest v4 is not supported, but expected for KafkaVersion 3.9.0
-				// apiKeyApiVersions:         4,  // up from 3
+				apiKeyApiVersions: 4, // up from 3
 			},
 		},
 		{

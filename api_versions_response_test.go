@@ -149,21 +149,24 @@ func TestApiVersionsResponseV3(t *testing.T) {
 	assert.Empty(t, response.SupportedFeatures)
 	assert.Empty(t, response.FinalizedFeatures)
 
-	withFeatures := &ApiVersionsResponse{
-		Version: v,
-		ApiKeys: []ApiVersionsResponseKey{
-			{v, 18, 0, 3}, // API Version ApiVersions (v0-3)
-		},
-		ThrottleTimeMs: 128,
-		SupportedFeatures: []SupportedFeatureKey{
-			{Name: "share.version", MinVersion: 0, MaxVersion: 1},
-		},
-		FinalizedFeaturesEpoch: 39,
-		FinalizedFeatures: []FinalizedFeatureKey{
-			{Name: "share.version", MaxVersionLevel: 1, MinVersionLevel: 0},
-		},
+	// v4 shares the v3 wire format
+	for _, fv := range []int16{3, 4} {
+		withFeatures := &ApiVersionsResponse{
+			Version: fv,
+			ApiKeys: []ApiVersionsResponseKey{
+				{fv, 18, 0, 3}, // API Version ApiVersions (v0-3)
+			},
+			ThrottleTimeMs: 128,
+			SupportedFeatures: []SupportedFeatureKey{
+				{Name: "share.version", MinVersion: 0, MaxVersion: 1},
+			},
+			FinalizedFeaturesEpoch: 39,
+			FinalizedFeatures: []FinalizedFeatureKey{
+				{Name: "share.version", MaxVersionLevel: 1, MinVersionLevel: 0},
+			},
+		}
+		testResponse(t, "with features", withFeatures, apiVersionResponseV3Features)
 	}
-	testResponse(t, "with features V3", withFeatures, apiVersionResponseV3Features)
 }
 
 func TestApiVersionsResponseUnsupportedVersion(t *testing.T) {
