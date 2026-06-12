@@ -450,6 +450,12 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 			c.userData = c.config.Consumer.Group.Member.UserData
 		}
 
+		// Notify a stateful strategy of the assignment it just received, so it
+		// can carry leader-computed state into its next subscription.
+		if onAssign, ok := strategy.(OnAssignmentBalanceStrategy); ok {
+			onAssign.OnAssignment(members, join.GenerationId)
+		}
+
 		for _, partitions := range claims {
 			sort.Sort(int32Slice(partitions))
 		}
