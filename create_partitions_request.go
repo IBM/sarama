@@ -85,7 +85,7 @@ func (r *CreatePartitionsRequest) headerVersion() int16 {
 }
 
 func (r *CreatePartitionsRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 2
+	return r.Version >= 0 && r.Version <= 3
 }
 
 func (r *CreatePartitionsRequest) isFlexible() bool {
@@ -98,6 +98,8 @@ func (r *CreatePartitionsRequest) isFlexibleVersion(version int16) bool {
 
 func (r *CreatePartitionsRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 3:
+		return V2_7_0_0
 	case 2:
 		return V2_5_0_0
 	case 1:

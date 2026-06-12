@@ -310,8 +310,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyFetch:                        12, // up from 11
 				apiKeyCreateTopics:                 6,  // up from 5
 				apiKeyDeleteTopics:                 5,  // up from 4
-				// TODO: CreatePartitionsRequest v3 is not supported, but expected for KafkaVersion 2.7.0
-				// apiKeyCreatePartitions: 3, // up from 2
+				apiKeyCreatePartitions:             3,  // up from 2
 				// TODO: UpdateFeaturesRequest v0 is not supported, but expected for KafkaVersion 2.7.0
 				// apiKeyUpdateFeatures /* (57) */: 0, // new in 2.7
 			},
