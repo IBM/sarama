@@ -317,7 +317,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V2_8_0_0,
 			map[int16]int16{
-				apiKeyMetadata:             10, // up from 9
+				apiKeyMetadata:             11, // up from 9
 				apiKeyDescribeClientQuotas: 1,  // up from 0
 				apiKeyDescribeCluster:      0,  // new in 2.8
 				apiKeyDescribeConfigs:      4,  // up from 3
@@ -325,8 +325,6 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyProduce:              9,  // up from 8
 				// TODO: ListOffsetsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyListOffsets:          6, // up from 5
-				// TODO: MetadataRequest v11 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyMetadata:             11, // up from 9
 				// TODO: AddOffsetsToTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyAddOffsetsToTxn:      3, // up from 2
 				// TODO: EndTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0

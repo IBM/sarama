@@ -5,8 +5,8 @@ import "testing"
 func TestRestrictApiVersionLowersVersionToBrokerMax(t *testing.T) {
 	request := NewMetadataRequest(V2_8_0_0, []string{"test-topic"})
 
-	if request.version() != 10 {
-		t.Errorf("Expected MetadataRequest version to be 10, got %d", request.version())
+	if request.version() != 11 {
+		t.Errorf("Expected MetadataRequest version to be 11, got %d", request.version())
 	}
 
 	brokerVersions := apiVersionMap{

@@ -5,6 +5,9 @@ package sarama
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var (
@@ -174,6 +177,43 @@ var (
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7b, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x01, 0x00, 0x00, 0x00, 0x02, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
 		0x00, 0x00, 0x02, 0x01, 0x00, 0x00, 0x00, 0x01, 'Y', 0x00, 0x00, 0x00, 0x00, 0xea, 0x00,
+	}
+
+	// v11 drops the ClusterAuthorizedOperations response field (KIP-700);
+	// it is now exposed by the DescribeCluster API.
+	OneTopicV11 = []byte{
+		0x00, 0x00, 0x00, 0x00, // ThrottleTimeMs
+		0x02, // Brokers
+		// broker
+		0x00, 0x00, 0x00, 0x00, // NodeId
+		0x05, 'h', 'o', 's', 't', // Host
+		0x00, 0x00, 0x23, 0x84, // Port
+		0x00, // Rack
+		0x00, // tagged fields
+
+		0x0a, 'c', 'l', 'u', 's', 't', 'e', 'r', 'I', 'd', // ClusterId
+		0x00, 0x00, 0x00, 0x01, // ControllerId
+		0x02, // Topics
+		// topic
+		0x00, 0x00, // ErrorCode
+		0x05, 't', 'o', 'n', 'y', // Name
+		0x84, 0xcd, 0xa7, 'U', 0x7e, 0x84, 'K', 0xf9, 0xb7, 0xdc, 0xfc, 0x11, 0x82, 0x07, 'r', 'J', // TopicId
+		0x00, // IsInternal
+		0x02, // Partitions
+		// partition
+		0x00, 0x00, // ErrorCode
+		0x00, 0x00, 0x00, 0x00, // PartitionIndex
+		0x00, 0x00, 0x00, 0x00, // LeaderId
+		0x00, 0x00, 0x00, 0x7b, // LeaderEpoch
+		0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, // ReplicaNodes
+		0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02, // IsrNodes
+		0x01, // OfflineReplicas
+		0x00, // tagged fields
+
+		0x00, 0x00, 0x01, 'Y', // TopicAuthorizedOperations
+		0x00, // tagged fields
+
+		0x00, // tagged fields
 	}
 )
 
@@ -533,6 +573,27 @@ func TestMetadataResponseV10(t *testing.T) {
 	if response.Topics[0].Partitions[0].LeaderEpoch != 123 {
 		t.Error("Decoding produced", response.Topics[0].Partitions[0].LeaderEpoch, "should have been 123!")
 	}
+}
+
+func TestMetadataResponseV11(t *testing.T) {
+	response := MetadataResponse{}
+
+	testVersionDecodable(t, "1 topic with topic id V11", &response, OneTopicV11, 11)
+	assert.Zero(t, response.ThrottleTimeMs)
+	require.Len(t, response.Brokers, 1)
+	assert.Equal(t, "host:9092", response.Brokers[0].addr)
+	assert.Equal(t, int32(1), response.ControllerID)
+	require.NotNil(t, response.ClusterID)
+	assert.Equal(t, "clusterId", *response.ClusterID)
+	require.Len(t, response.Topics, 1)
+	assert.Equal(t, Uuid{
+		0x84, 0xcd, 0xa7, 0x55, 0x7e, 0x84, 0x4b, 0xf9,
+		0xb7, 0xdc, 0xfc, 0x11, 0x82, 0x07, 0x72, 0x4a,
+	}, response.Topics[0].Uuid)
+	assert.Equal(t, int32(345), response.Topics[0].TopicAuthorizedOperations)
+	require.Len(t, response.Topics[0].Partitions, 1)
+	assert.Empty(t, response.Topics[0].Partitions[0].OfflineReplicas)
+	assert.Equal(t, int32(123), response.Topics[0].Partitions[0].LeaderEpoch)
 }
 
 func TestFlexibleMetadataResponseInvalidInt32ArrayLength(t *testing.T) {
