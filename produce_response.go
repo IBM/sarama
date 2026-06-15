@@ -22,12 +22,62 @@ import (
 
 // partition_responses in protocol
 type ProduceResponseBlock struct {
-	Err          KError                       // v0, error_code
-	Offset       int64                        // v0, base_offset
-	Timestamp    time.Time                    // v2, log_append_time, and the broker is configured with `LogAppendTime`
-	StartOffset  int64                        // v5, log_start_offset
-	RecordErrors []ProduceResponseRecordError // v8, record_errors (KIP-467)
-	ErrorMessage *string                      // v8, error_message (KIP-467)
+	Err           KError                        // v0, error_code
+	Offset        int64                         // v0, base_offset
+	Timestamp     time.Time                     // v2, log_append_time, and the broker is configured with `LogAppendTime`
+	StartOffset   int64                         // v5, log_start_offset
+	RecordErrors  []ProduceResponseRecordError  // v8, record_errors (KIP-467)
+	ErrorMessage  *string                       // v8, error_message (KIP-467)
+	CurrentLeader *ProduceResponseCurrentLeader // v10, current_leader (tagged)
+}
+
+// ProduceResponseCurrentLeader is the new partition leader the broker returns
+// on a NOT_LEADER_OR_FOLLOWER error, so the client can retry without a metadata
+// refresh. Added in Produce response v10 (KIP-951).
+type ProduceResponseCurrentLeader struct {
+	LeaderID    int32 // v10, leader_id
+	LeaderEpoch int32 // v10, leader_epoch
+}
+
+// ProduceResponseNodeEndpoint is the host and port for a leader named by a
+// CurrentLeader hint. Added in Produce response v10 (KIP-951).
+type ProduceResponseNodeEndpoint struct {
+	NodeID int32   // v10, node_id
+	Host   string  // v10, host
+	Port   int32   // v10, port
+	Rack   *string // v10, rack (nullable)
+}
+
+func (e *ProduceResponseNodeEndpoint) encode(pe packetEncoder) error {
+	pe.putInt32(e.NodeID)
+	if err := pe.putString(e.Host); err != nil {
+		return err
+	}
+	pe.putInt32(e.Port)
+	if err := pe.putNullableString(e.Rack); err != nil {
+		return err
+	}
+	pe.putEmptyTaggedFieldArray()
+	return nil
+}
+
+func (e *ProduceResponseNodeEndpoint) decode(pd packetDecoder) (err error) {
+	if e.NodeID, err = pd.getInt32(); err != nil {
+		return err
+	}
+	if e.Host, err = pd.getString(); err != nil {
+		return err
+	}
+	if e.Port, err = pd.getInt32(); err != nil {
+		return err
+	}
+	if e.Rack, err = pd.getNullableString(); err != nil {
+		return err
+	}
+	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // ProduceResponseRecordError identifies a record within a produced batch that
@@ -107,6 +157,23 @@ func (b *ProduceResponseBlock) decode(pd packetDecoder, version int16) (err erro
 		}
 	}
 
+	if version >= 10 {
+		return pd.getTaggedFieldArray(taggedFieldDecoders{
+			0: func(pd packetDecoder) error {
+				leaderID, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				leaderEpoch, err := pd.getInt32()
+				if err != nil {
+					return err
+				}
+				b.CurrentLeader = &ProduceResponseCurrentLeader{LeaderID: leaderID, LeaderEpoch: leaderEpoch}
+				return nil
+			},
+		})
+	}
+
 	if _, err := pd.getEmptyTaggedFieldArray(); err != nil {
 		return err
 	}
@@ -146,15 +213,35 @@ func (b *ProduceResponseBlock) encode(pe packetEncoder, version int16) (err erro
 		}
 	}
 
+	if version >= 10 {
+		b.encodeTaggedFields(pe)
+		return nil
+	}
+
 	pe.putEmptyTaggedFieldArray()
 
 	return nil
 }
 
+func (b *ProduceResponseBlock) encodeTaggedFields(pe packetEncoder) {
+	if b.CurrentLeader == nil {
+		pe.putEmptyTaggedFieldArray()
+		return
+	}
+
+	pe.putUVarint(1) // one tagged field
+	pe.putUVarint(0) // tag 0: CurrentLeader
+	pe.putUVarint(9) // two int32s plus the struct's empty tagged fields
+	pe.putInt32(b.CurrentLeader.LeaderID)
+	pe.putInt32(b.CurrentLeader.LeaderEpoch)
+	pe.putEmptyTaggedFieldArray()
+}
+
 type ProduceResponse struct {
-	Blocks       map[string]map[int32]*ProduceResponseBlock // v0, responses
-	Version      int16
-	ThrottleTime time.Duration // v1, throttle_time_ms
+	Blocks        map[string]map[int32]*ProduceResponseBlock // v0, responses
+	Version       int16
+	ThrottleTime  time.Duration                  // v1, throttle_time_ms
+	NodeEndpoints []*ProduceResponseNodeEndpoint // v10, node_endpoints (tagged)
 }
 
 func (r *ProduceResponse) setVersion(v int16) {
@@ -214,6 +301,26 @@ func (r *ProduceResponse) decode(pd packetDecoder, version int16) (err error) {
 		}
 	}
 
+	if r.Version >= 10 {
+		return pd.getTaggedFieldArray(taggedFieldDecoders{
+			0: func(pd packetDecoder) error {
+				n, err := pd.getArrayLength()
+				if err != nil {
+					return err
+				}
+				r.NodeEndpoints = make([]*ProduceResponseNodeEndpoint, n)
+				for i := range r.NodeEndpoints {
+					ep := new(ProduceResponseNodeEndpoint)
+					if err := ep.decode(pd); err != nil {
+						return err
+					}
+					r.NodeEndpoints[i] = ep
+				}
+				return nil
+			},
+		})
+	}
+
 	_, err = pd.getEmptyTaggedFieldArray()
 	return err
 }
@@ -245,8 +352,40 @@ func (r *ProduceResponse) encode(pe packetEncoder) error {
 	if r.Version >= 1 {
 		pe.putDurationMs(r.ThrottleTime)
 	}
+
+	if r.Version >= 10 {
+		return r.encodeTaggedFields(pe)
+	}
+
 	pe.putEmptyTaggedFieldArray()
 	return nil
+}
+
+func (r *ProduceResponse) encodeTaggedFields(pe packetEncoder) error {
+	if len(r.NodeEndpoints) == 0 {
+		pe.putEmptyTaggedFieldArray()
+		return nil
+	}
+
+	value, err := encode(taggedFieldValue(func(pe packetEncoder) error {
+		if err := pe.putArrayLength(len(r.NodeEndpoints)); err != nil {
+			return err
+		}
+		for i := range r.NodeEndpoints {
+			if err := r.NodeEndpoints[i].encode(pe); err != nil {
+				return err
+			}
+		}
+		return nil
+	}), nil)
+	if err != nil {
+		return err
+	}
+
+	pe.putUVarint(1)
+	pe.putUVarint(0)
+	pe.putUVarint(uint64(len(value)))
+	return pe.putRawBytes(value)
 }
 
 func (r *ProduceResponse) key() int16 {
@@ -273,11 +412,13 @@ func (r *ProduceResponse) isFlexibleVersion(version int16) bool {
 }
 
 func (r *ProduceResponse) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 9
+	return r.Version >= 0 && r.Version <= 10
 }
 
 func (r *ProduceResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 10:
+		return V3_7_0_0
 	case 9:
 		return V2_8_0_0
 	case 8:

@@ -407,9 +407,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V3_7_0_0,
 			map[int16]int16{
-				apiKeyDescribeCluster: 1, // up from 0
-				// TODO: ProduceRequest v10 is not supported, but expected for KafkaVersion 3.7.0
-				// apiKeyProduce:         10, // up from 9
+				apiKeyDescribeCluster: 1,  // up from 0
+				apiKeyProduce:         10, // up from 9
 				// TODO: FetchRequest v16 is not supported, but expected for KafkaVersion 3.7.0
 				// apiKeyFetch:           16, // up from 15
 				// TODO: OffsetFetchRequest v9 is not supported, but expected for KafkaVersion 3.7.0
