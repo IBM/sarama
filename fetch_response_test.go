@@ -223,13 +223,15 @@ var (
 		0x01,                   // Records
 		0x02,                   // Partition tagged fields
 		0x00,                   // DivergingEpoch tag
-		0x0C,                   // DivergingEpoch tag size
+		0x0D,                   // DivergingEpoch tag size
 		0x00, 0x00, 0x00, 0x77, // DivergingEpoch epoch
 		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // DivergingEpoch end offset
+		0x00,                   // DivergingEpoch tagged fields
 		0x01,                   // CurrentLeader tag
-		0x08,                   // CurrentLeader tag size
+		0x09,                   // CurrentLeader tag size
 		0x00, 0x00, 0x00, 0x09, // CurrentLeader leader ID
 		0x00, 0x00, 0x00, 0x88, // CurrentLeader leader epoch
+		0x00, // CurrentLeader tagged fields
 		0x00, // Topic tagged fields
 		0x00, // Response tagged fields
 	}
