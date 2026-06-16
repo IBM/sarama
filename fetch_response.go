@@ -357,15 +357,17 @@ func (b *FetchResponseBlock) encodeTaggedFields(pe packetEncoder) {
 	pe.putUVarint(numTaggedFields)
 	if b.DivergingEpoch != nil {
 		pe.putUVarint(0)
-		pe.putUVarint(12)
+		pe.putUVarint(13) // int32 plus int64 plus the struct's empty tagged fields
 		pe.putInt32(b.DivergingEpoch.Epoch)
 		pe.putInt64(b.DivergingEpoch.EndOffset)
+		pe.putEmptyTaggedFieldArray()
 	}
 	if b.CurrentLeader != nil {
 		pe.putUVarint(1)
-		pe.putUVarint(8)
+		pe.putUVarint(9) // two int32s plus the struct's empty tagged fields
 		pe.putInt32(b.CurrentLeader.LeaderID)
 		pe.putInt32(b.CurrentLeader.LeaderEpoch)
+		pe.putEmptyTaggedFieldArray()
 	}
 }
 
