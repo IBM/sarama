@@ -2130,37 +2130,39 @@ func TestRetryBatchRespectsPartitionMuter(t *testing.T) {
 	}
 }
 
-func TestHandleSuccessNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
+func TestHandleErrorNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
 	config.Producer.Retry.Backoff = 0
 
-	txnMgr := &transactionManager{
-		producerID:      0,
-		producerEpoch:   0,
-		sequenceNumbers: make(map[string]int32),
-	}
 	parent := &asyncProducer{
 		conf:       config,
 		muter:      newPartitionMuter(),
 		brokers:    make(map[*Broker]*brokerProducer),
 		brokerRefs: make(map[*brokerProducer]int),
-		retries:    make(chan *ProducerMessage, 1),
-		txnmgr:     txnMgr,
+		txnmgr:     &transactionManager{},
 	}
-	leader := &Broker{id: 1}
-	parent.client = &stubLeaderClient{leader: leader, cfg: config}
+	failedBroker := &Broker{id: 1}
+	retryLeader := &Broker{id: 2}
+	parent.client = &stubLeaderClient{leader: retryLeader, cfg: config}
+
+	output := make(chan *produceSet)
+	retryBP := &brokerProducer{
+		parent: parent,
+		broker: retryLeader,
+		output: output,
+		input:  make(chan *ProducerMessage),
+	}
+	parent.brokers[retryLeader] = retryBP
 
 	bp := &brokerProducer{
 		parent:            parent,
-		broker:            leader,
+		broker:            failedBroker,
 		input:             make(chan *ProducerMessage),
 		accumulatingBatch: newProduceSet(parent),
 		currentRetries:    make(map[string]map[int32]error),
 	}
-	parent.brokers[leader] = bp
-	parent.brokerRefs[bp] = 1
 
 	sent := newProduceSet(parent)
 	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
@@ -2168,15 +2170,18 @@ func TestHandleSuccessNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
 	if !parent.muter.tryMute(sent) {
 		t.Fatal("expected sent batch to mute partitions")
 	}
-	defer parent.muter.unmute(sent)
 
-	response := new(ProduceResponse)
-	response.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
-	bp.handleSuccess(sent, response)
+	done := make(chan struct{})
+	go func() {
+		bp.handleError(sent, ErrOutOfBrokers)
+		close(done)
+	}()
+	assertDoneWithin(t, done, 2*time.Second)
 
-	retried := assertDoneWithin(t, parent.retries, 2*time.Second)
-	require.Equal(t, retryPartitionSet.msgs[0], retried)
-	require.True(t, retried.reusePartitionMute)
+	retrySet := assertDoneWithin(t, output, 2*time.Second)
+	defer parent.muter.unmute(retrySet)
+	require.Equal(t, retryPartitionSet, retrySet.msgs["topic"][0])
+	require.Equal(t, 1, retryPartitionSet.msgs[0].retries)
 
 	contender := newProduceSet(parent)
 	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
@@ -2184,13 +2189,54 @@ func TestHandleSuccessNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
 		parent.muter.unmute(contender)
 		t.Fatal("expected partition to remain muted by the retrying batch")
 	}
+}
 
-	safeAddMessage(t, bp.accumulatingBatch, retried)
-	if !bp.tryBuildFlushingBatch() {
-		t.Fatal("expected retry batch to reuse the existing partition mute")
+func TestHandleErrorNonIdempotentRetryReleasesMuteOnLeaderError(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Return.Errors = true
+
+	parent := &asyncProducer{
+		conf:       config,
+		muter:      newPartitionMuter(),
+		brokers:    make(map[*Broker]*brokerProducer),
+		brokerRefs: make(map[*brokerProducer]int),
+		errors:     make(chan *ProducerError, 1),
+		txnmgr:     &transactionManager{},
 	}
-	require.Equal(t, retryPartitionSet.msgs[0], bp.flushingBatch.msgs["topic"][0].msgs[0])
-	require.False(t, retryPartitionSet.msgs[0].reusePartitionMute)
+	parent.client = &failingLeaderClient{
+		stubLeaderClient: stubLeaderClient{cfg: config},
+		err:              ErrOutOfBrokers,
+	}
+
+	bp := &brokerProducer{
+		parent:            parent,
+		broker:            &Broker{id: 1},
+		input:             make(chan *ProducerMessage),
+		accumulatingBatch: newProduceSet(parent),
+		currentRetries:    make(map[string]map[int32]error),
+	}
+
+	sent := newProduceSet(parent)
+	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+	if !parent.muter.tryMute(sent) {
+		t.Fatal("expected sent batch to mute partitions")
+	}
+	parent.inFlight.Add(1)
+
+	bp.handleError(sent, ErrOutOfBrokers)
+
+	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+	require.Equal(t, ErrOutOfBrokers, producerErr.Err)
+
+	contender := newProduceSet(parent)
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+	if !parent.muter.tryMute(contender) {
+		t.Fatal("expected partition mute to be released after retry leader lookup failure")
+	}
+	parent.muter.unmute(contender)
 }
 
 type stubLeaderClient struct {
@@ -2227,6 +2273,19 @@ func (c *stubLeaderClient) LeastLoadedBroker() *Broker                       { r
 func (c *stubLeaderClient) PartitionNotReadable(string, int32) bool          { return false }
 func (c *stubLeaderClient) Close() error                                     { return nil }
 func (c *stubLeaderClient) Closed() bool                                     { return false }
+
+type failingLeaderClient struct {
+	stubLeaderClient
+	err error
+}
+
+func (c *failingLeaderClient) Leader(string, int32) (*Broker, error) {
+	return nil, c.err
+}
+
+func (c *failingLeaderClient) LeaderAndEpoch(string, int32) (*Broker, int32, error) {
+	return nil, 0, c.err
+}
 
 func testProducerInterceptor(
 	t *testing.T,
