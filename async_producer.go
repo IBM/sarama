@@ -1133,8 +1133,7 @@ func (bp *brokerProducer) run() {
 
 	for {
 		var unmuteCh <-chan struct{}
-		readyToFlush := bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush())
-		if readyToFlush {
+		if bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush()) {
 			bp.tryBuildFlushingBatch()
 			if bp.flushingBatch == nil {
 				if ch, blocked := bp.parent.muter.awaitUnmuteChan(bp.accumulatingBatch); blocked {
