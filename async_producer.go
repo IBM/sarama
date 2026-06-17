@@ -388,17 +388,17 @@ type ProducerMessage struct {
 	// successfully delivered and RequiredAcks is not NoResponse.
 	Timestamp time.Time
 
-	retries int
-	flags   flagSet
+	retries        int
+	flags          flagSet
+	expectation    chan *ProducerError
+	sequenceNumber int32
+	producerEpoch  int16
+	hasSequence    bool
 	// reusePartitionMute is a one-shot marker for non-idempotent retries. The
 	// first retried message from a failed, still-muted batch may reuse that
 	// existing in-flight reservation so later same-partition messages cannot
 	// slip in between the failed send and its retry.
 	reusePartitionMute bool
-	expectation        chan *ProducerError
-	sequenceNumber     int32
-	producerEpoch      int16
-	hasSequence        bool
 }
 
 const producerMessageOverhead = 26 // the metadata overhead of CRC, flags, etc.
@@ -1132,9 +1132,15 @@ func (bp *brokerProducer) run() {
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
 	for {
-		readyToFlush := bp.timerFired || bp.accumulatingBatch.readyToFlush()
-		if bp.flushingBatch == nil && readyToFlush {
+		var unmuteCh <-chan struct{}
+		readyToFlush := bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush())
+		if readyToFlush {
 			bp.tryBuildFlushingBatch()
+			if bp.flushingBatch == nil {
+				if ch, blocked := bp.parent.muter.awaitUnmuteChan(bp.accumulatingBatch); blocked {
+					unmuteCh = ch
+				}
+			}
 		}
 
 		var timerChan <-chan time.Time
@@ -1146,13 +1152,6 @@ func (bp *brokerProducer) run() {
 			output = bp.output
 		} else {
 			output = nil
-		}
-
-		var unmuteCh <-chan struct{}
-		if bp.flushingBatch == nil && readyToFlush {
-			if ch, blocked := bp.parent.muter.awaitUnmuteChan(bp.accumulatingBatch); blocked {
-				unmuteCh = ch
-			}
 		}
 
 		select {
