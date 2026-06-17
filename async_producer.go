@@ -1448,6 +1448,9 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				if bp.parent.conf.Producer.Idempotent {
 					go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
 				} else {
+					// Non-idempotent response retries must go back through partitionProducer.
+					// That path advances the retry high watermark and refreshes the partition
+					// leader before sending the retry; retryBatch would bypass that state.
 					bp.parent.retryMessages(pSet.msgs, block.Err)
 				}
 				// dropping the following messages has the side effect of incrementing their retry count
@@ -1544,7 +1547,10 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		}
 		keepMuted := make(map[string]map[int32]struct{})
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
-			// keep partition marked as in-flight during retry (connection error)
+			// Connection failures have no ProduceResponse to feed back through
+			// partitionProducer. Keep the sent batch muted and retry it asynchronously
+			// so later same-partition batches cannot pass it, without blocking the
+			// brokerProducer response loop (#1203).
 			if bp.currentRetries[topic] == nil {
 				bp.currentRetries[topic] = make(map[int32]error)
 			}

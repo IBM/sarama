@@ -2191,6 +2191,50 @@ func TestHandleErrorNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
 	}
 }
 
+func TestHandleSuccessNonIdempotentRetryUsesPartitionProducer(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+
+	parent := &asyncProducer{
+		conf:    config,
+		muter:   newPartitionMuter(),
+		retries: make(chan *ProducerMessage, 1),
+		txnmgr:  &transactionManager{},
+	}
+
+	bp := &brokerProducer{
+		parent:            parent,
+		broker:            &Broker{id: 1},
+		input:             make(chan *ProducerMessage),
+		accumulatingBatch: newProduceSet(parent),
+		currentRetries:    make(map[string]map[int32]error),
+	}
+
+	sent := newProduceSet(parent)
+	msg := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")}
+	safeAddMessage(t, sent, msg)
+	if !parent.muter.tryMute(sent) {
+		t.Fatal("expected sent batch to mute partitions")
+	}
+
+	response := new(ProduceResponse)
+	response.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
+	bp.handleSuccess(sent, response)
+
+	retried := assertDoneWithin(t, parent.retries, 2*time.Second)
+	require.Equal(t, msg, retried)
+	require.Equal(t, 1, retried.retries)
+
+	contender := newProduceSet(parent)
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+	if !parent.muter.tryMute(contender) {
+		t.Fatal("expected response retry to release sent mute before partitionProducer retry")
+	}
+	parent.muter.unmute(contender)
+}
+
 func TestHandleErrorNonIdempotentRetryReleasesMuteOnLeaderError(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
