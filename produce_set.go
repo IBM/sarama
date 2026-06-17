@@ -12,15 +12,18 @@ type partitionSet struct {
 	bufferBytes   int
 }
 
-// canRetry prevents holding a partition mute when every message in the set will
-// be returned as an error instead of being retried.
-func (ps *partitionSet) canRetry(maxRetries int) bool {
+// shouldKeepMuted matches retryBatch's whole-batch retry rule: if any message has
+// exhausted retries, the batch will be failed instead of retried.
+func (ps *partitionSet) shouldKeepMuted(maxRetries int) bool {
+	if len(ps.msgs) == 0 {
+		return false
+	}
 	for _, msg := range ps.msgs {
-		if msg.retries < maxRetries {
-			return true
+		if msg.retries >= maxRetries {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 type produceSet struct {
