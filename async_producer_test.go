@@ -1899,6 +1899,53 @@ func TestBrokerProducerFlushSkipsMutedPartitions(t *testing.T) {
 	}
 }
 
+func TestBrokerProducerRunFlushesAfterExternalUnmute(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 1
+	parent := &asyncProducer{
+		conf:   config,
+		muter:  newPartitionMuter(),
+		txnmgr: &transactionManager{},
+	}
+
+	blockedSet := newProduceSet(parent)
+	safeAddMessage(t, blockedSet, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("held")})
+	if !parent.muter.tryMute(blockedSet) {
+		t.Fatal("expected to mute partition externally")
+	}
+
+	input := make(chan *ProducerMessage)
+	output := make(chan *produceSet, 1)
+	responses := make(chan *brokerProducerResponse)
+	bp := &brokerProducer{
+		parent:            parent,
+		broker:            &Broker{id: 1},
+		input:             input,
+		output:            output,
+		responses:         responses,
+		accumulatingBatch: newProduceSet(parent),
+		currentRetries:    make(map[string]map[int32]error),
+	}
+	retryMsg := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("waiting")}
+	safeAddMessage(t, bp.accumulatingBatch, retryMsg)
+
+	done := make(chan struct{})
+	go func() {
+		bp.run()
+		close(done)
+	}()
+
+	assertNotDone(t, output, 50*time.Millisecond)
+	parent.muter.unmute(blockedSet)
+
+	flushed := assertDoneWithin(t, output, 2*time.Second)
+	require.Equal(t, retryMsg, flushed.msgs["topic"][0].msgs[0])
+
+	close(input)
+	close(responses)
+	assertDoneWithin(t, done, 2*time.Second)
+}
+
 // TestBrokerProducerWaitForSpaceAllPartitionsMuted verifies that waitForSpace unblocks
 // when all partitions in the accumulating batch are externally muted and later unmuted.
 func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
@@ -2081,6 +2128,69 @@ func TestRetryBatchRespectsPartitionMuter(t *testing.T) {
 	if parent.muter.tryMute(contender) {
 		t.Fatal("expected partition to remain muted by retry batch")
 	}
+}
+
+func TestHandleSuccessNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+
+	txnMgr := &transactionManager{
+		producerID:      0,
+		producerEpoch:   0,
+		sequenceNumbers: make(map[string]int32),
+	}
+	parent := &asyncProducer{
+		conf:       config,
+		muter:      newPartitionMuter(),
+		brokers:    make(map[*Broker]*brokerProducer),
+		brokerRefs: make(map[*brokerProducer]int),
+		retries:    make(chan *ProducerMessage, 1),
+		txnmgr:     txnMgr,
+	}
+	leader := &Broker{id: 1}
+	parent.client = &stubLeaderClient{leader: leader, cfg: config}
+
+	bp := &brokerProducer{
+		parent:            parent,
+		broker:            leader,
+		input:             make(chan *ProducerMessage),
+		accumulatingBatch: newProduceSet(parent),
+		currentRetries:    make(map[string]map[int32]error),
+	}
+	parent.brokers[leader] = bp
+	parent.brokerRefs[bp] = 1
+
+	sent := newProduceSet(parent)
+	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+	retryPartitionSet := sent.msgs["topic"][0]
+	if !parent.muter.tryMute(sent) {
+		t.Fatal("expected sent batch to mute partitions")
+	}
+	defer parent.muter.unmute(sent)
+
+	response := new(ProduceResponse)
+	response.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
+	bp.handleSuccess(sent, response)
+
+	retried := assertDoneWithin(t, parent.retries, 2*time.Second)
+	require.Equal(t, retryPartitionSet.msgs[0], retried)
+	require.True(t, retried.reusePartitionMute)
+
+	contender := newProduceSet(parent)
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+	if parent.muter.tryMute(contender) {
+		parent.muter.unmute(contender)
+		t.Fatal("expected partition to remain muted by the retrying batch")
+	}
+
+	safeAddMessage(t, bp.accumulatingBatch, retried)
+	if !bp.tryBuildFlushingBatch() {
+		t.Fatal("expected retry batch to reuse the existing partition mute")
+	}
+	require.Equal(t, retryPartitionSet.msgs[0], bp.flushingBatch.msgs["topic"][0].msgs[0])
+	require.False(t, retryPartitionSet.msgs[0].reusePartitionMute)
 }
 
 type stubLeaderClient struct {
