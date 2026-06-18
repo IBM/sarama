@@ -2238,6 +2238,55 @@ func TestHandleErrorNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
 	}
 }
 
+func TestHandleErrorNonIdempotentRetryFailsWholeBatch(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Return.Errors = true
+
+	parent := &asyncProducer{
+		conf:    config,
+		muter:   newPartitionMuter(),
+		errors:  make(chan *ProducerError, 2),
+		retries: make(chan *ProducerMessage, 2),
+		txnmgr:  &transactionManager{},
+	}
+
+	bp := &brokerProducer{
+		parent:            parent,
+		broker:            &Broker{id: 1},
+		accumulatingBatch: newProduceSet(parent),
+		currentRetries:    make(map[string]map[int32]error),
+	}
+
+	exhausted := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("exhausted"), retries: 1}
+	retryable := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retryable")}
+	sent := newProduceSet(parent)
+	safeAddMessage(t, sent, exhausted)
+	safeAddMessage(t, sent, retryable)
+	if !parent.muter.tryMute(sent) {
+		t.Fatal("expected sent batch to mute partitions")
+	}
+	parent.inFlight.Add(2)
+
+	bp.handleError(sent, ErrOutOfBrokers)
+
+	firstErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+	secondErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+	require.Equal(t, exhausted, firstErr.Msg)
+	require.Equal(t, ErrOutOfBrokers, firstErr.Err)
+	require.Equal(t, retryable, secondErr.Msg)
+	require.Equal(t, ErrOutOfBrokers, secondErr.Err)
+	assertNotDone(t, parent.retries, 50*time.Millisecond)
+
+	contender := newProduceSet(parent)
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+	if !parent.muter.tryMute(contender) {
+		t.Fatal("expected partition mute to be released after whole-batch failure")
+	}
+	parent.muter.unmute(contender)
+}
+
 func TestHandleErrorNonIdempotentRetryDoesNotWaitForMetadataRefresh(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
