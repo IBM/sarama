@@ -50,6 +50,15 @@ func newProduceSetWithMeta(parent *asyncProducer, producerID int64, producerEpoc
 	}
 }
 
+func (ps *produceSet) addPartitionSet(topic string, partition int32, set *partitionSet) {
+	if ps.msgs[topic] == nil {
+		ps.msgs[topic] = make(map[int32]*partitionSet)
+	}
+	ps.msgs[topic][partition] = set
+	ps.bufferBytes += set.bufferBytes
+	ps.bufferCount += len(set.msgs)
+}
+
 func (ps *produceSet) add(msg *ProducerMessage) error {
 	var err error
 	var key, val []byte
