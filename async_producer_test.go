@@ -1737,6 +1737,8 @@ func TestBrokerProducerShutdown(t *testing.T) {
 	bp := producer.(*asyncProducer).getBrokerProducer(broker)
 	// Initiate the shutdown of all of them
 	producer.(*asyncProducer).unrefBrokerProducer(broker, bp)
+	assertDoneWithin(t, bp.done, time.Second)
+	require.NotPanics(t, bp.shutdown)
 
 	_ = producer.Close()
 	mockBroker.Close()
@@ -1839,7 +1841,7 @@ func newBlockingRetryProducer(config *Config, errorBuffer int) (*asyncProducer, 
 		brokers:    make(map[*Broker]*brokerProducer),
 		brokerRefs: make(map[*brokerProducer]int),
 		errors:     make(chan *ProducerError, errorBuffer),
-		shutdownCh: make(chan struct{}),
+		done:       make(chan struct{}),
 		txnmgr:     &transactionManager{},
 	}
 	leader := &Broker{id: 1}
@@ -2572,7 +2574,7 @@ func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
 		brokers:    make(map[*Broker]*brokerProducer),
 		brokerRefs: make(map[*brokerProducer]int),
 		errors:     make(chan *ProducerError, 1),
-		shutdownCh: make(chan struct{}),
+		done:       make(chan struct{}),
 		txnmgr:     &transactionManager{},
 	}
 	leader := &Broker{id: 1}
@@ -2601,8 +2603,8 @@ func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
 	}()
 	waitForProducerBuffer(t, parent, 1, -1)
 
-	if parent.shutdownChClosed.CompareAndSwap(false, true) {
-		close(parent.shutdownCh)
+	if parent.closed.CompareAndSwap(false, true) {
+		close(parent.done)
 	}
 
 	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
@@ -2741,7 +2743,7 @@ func TestRetryBatchesAfterRefreshReleasesMuteWhenBrokerProducerDone(t *testing.T
 		brokers:    make(map[*Broker]*brokerProducer),
 		brokerRefs: make(map[*brokerProducer]int),
 		errors:     make(chan *ProducerError, 1),
-		shutdownCh: make(chan struct{}),
+		done:       make(chan struct{}),
 		txnmgr:     &transactionManager{},
 	}
 	leader := &Broker{id: 1}
