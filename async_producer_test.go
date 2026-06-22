@@ -1812,37 +1812,16 @@ func assertDoneWithin[T any](t *testing.T, ch <-chan T, timeout time.Duration) T
 	}
 }
 
-func waitForProducerBuffer(t *testing.T, parent *asyncProducer, messages, bytes int64) {
-	t.Helper()
-	deadline := time.After(2 * time.Second)
-	ticker := time.NewTicker(time.Millisecond)
-	defer ticker.Stop()
-	for {
-		parent.retryBuffer.mu.Lock()
-		gotMessages := parent.retryBuffer.messages
-		gotBytes := parent.retryBuffer.bytes
-		parent.retryBuffer.mu.Unlock()
-		if (messages < 0 || gotMessages == messages) && (bytes < 0 || gotBytes == bytes) {
-			return
-		}
-		select {
-		case <-deadline:
-			t.Fatalf("timed out waiting for buffer budget messages=%d bytes=%d, got messages=%d bytes=%d",
-				messages, bytes, gotMessages, gotBytes)
-		case <-ticker.C:
-		}
-	}
-}
-
 func newBlockingRetryProducer(config *Config, errorBuffer int) (*asyncProducer, *brokerProducer) {
 	parent := &asyncProducer{
-		conf:       config,
-		muter:      newPartitionMuter(),
-		brokers:    make(map[*Broker]*brokerProducer),
-		brokerRefs: make(map[*brokerProducer]int),
-		errors:     make(chan *ProducerError, errorBuffer),
-		done:       make(chan struct{}),
-		txnmgr:     &transactionManager{},
+		conf:             config,
+		muter:            newPartitionMuter(),
+		brokers:          make(map[*Broker]*brokerProducer),
+		brokerRefs:       make(map[*brokerProducer]int),
+		errors:           make(chan *ProducerError, errorBuffer),
+		done:             make(chan struct{}),
+		txnmgr:           &transactionManager{},
+		retryBufferQuota: newRetryBufferQuota(config),
 	}
 	leader := &Broker{id: 1}
 	parent.client = &stubLeaderClient{leader: leader, cfg: config}
@@ -1855,6 +1834,52 @@ func newBlockingRetryProducer(config *Config, errorBuffer int) (*asyncProducer, 
 	}
 	parent.brokers[leader] = retryBP
 	return parent, retryBP
+}
+
+// holdFirstRetryAfterReserve lets the test prove a second retry sees quota held by the first.
+func holdFirstRetryAfterReserve(parent *asyncProducer, retryBP *brokerProducer, afterRefresh bool) (<-chan struct{}, func()) {
+	firstRetryReserved := make(chan struct{}, 1)
+	blockFirstRetry := make(chan struct{}, 1)
+	releaseFirstRetry := make(chan struct{}, 1)
+	blockFirstRetry <- struct{}{}
+
+	hold := func() {
+		select {
+		case <-blockFirstRetry:
+			firstRetryReserved <- struct{}{}
+			<-releaseFirstRetry
+		default:
+		}
+	}
+	release := func() {
+		select {
+		case releaseFirstRetry <- struct{}{}:
+		default:
+		}
+	}
+
+	if afterRefresh {
+		parent.client = &stubLeaderClient{
+			leader: retryBP.broker,
+			cfg:    parent.conf,
+			refreshMetadata: func(...string) error {
+				hold()
+				return nil
+			},
+		}
+	} else {
+		parent.client = &stubLeaderClient{
+			cfg: parent.conf,
+			leaderFunc: func(_ string, partition int32) (*Broker, error) {
+				if partition == 0 {
+					hold()
+				}
+				return retryBP.broker, nil
+			},
+		}
+	}
+
+	return firstRetryReserved, release
 }
 
 // TestBrokerProducerWaitForSpaceRespectsExternalUnmute ensures waitForSpace does not
@@ -2135,11 +2160,12 @@ func TestRetryBatchRespectsPartitionMuter(t *testing.T) {
 	}
 
 	parent := &asyncProducer{
-		conf:       config,
-		muter:      newPartitionMuter(),
-		brokers:    make(map[*Broker]*brokerProducer),
-		brokerRefs: make(map[*brokerProducer]int),
-		txnmgr:     txnMgr,
+		conf:             config,
+		muter:            newPartitionMuter(),
+		brokers:          make(map[*Broker]*brokerProducer),
+		brokerRefs:       make(map[*brokerProducer]int),
+		txnmgr:           txnMgr,
+		retryBufferQuota: newRetryBufferQuota(config),
 	}
 	leader := &Broker{}
 	parent.client = &stubLeaderClient{leader: leader, cfg: config}
@@ -2170,7 +2196,6 @@ func TestRetryBatchRespectsPartitionMuter(t *testing.T) {
 	default:
 		t.Fatal("expected retry batch to be dispatched")
 	}
-	waitForProducerBuffer(t, parent, 0, 0)
 
 	contender := newProduceSet(parent)
 	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
@@ -2297,18 +2322,28 @@ func TestHandleErrorNonIdempotentRetryDoesNotWaitForMetadataRefresh(t *testing.T
 	config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength
 
 	parent := &asyncProducer{
-		conf:       config,
-		muter:      newPartitionMuter(),
-		brokers:    make(map[*Broker]*brokerProducer),
-		brokerRefs: make(map[*brokerProducer]int),
-		txnmgr:     &transactionManager{},
+		conf:             config,
+		muter:            newPartitionMuter(),
+		brokers:          make(map[*Broker]*brokerProducer),
+		brokerRefs:       make(map[*brokerProducer]int),
+		txnmgr:           &transactionManager{},
+		retryBufferQuota: newRetryBufferQuota(config),
 	}
 	failedBroker := &Broker{id: 1}
 	retryLeader := &Broker{id: 2}
-	client := &blockingRefreshClient{
-		stubLeaderClient: stubLeaderClient{leader: retryLeader, cfg: config},
-		started:          make(chan struct{}, 1),
-		release:          make(chan struct{}),
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	client := &stubLeaderClient{
+		leader: retryLeader,
+		cfg:    config,
+		refreshMetadata: func(...string) error {
+			select {
+			case started <- struct{}{}:
+			default:
+			}
+			<-release
+			return nil
+		},
 	}
 	parent.client = client
 
@@ -2342,8 +2377,7 @@ func TestHandleErrorNonIdempotentRetryDoesNotWaitForMetadataRefresh(t *testing.T
 		close(done)
 	}()
 	assertDoneWithin(t, done, 2*time.Second)
-	assertDoneWithin(t, client.started, 2*time.Second)
-	waitForProducerBuffer(t, parent, 1, -1)
+	assertDoneWithin(t, started, 2*time.Second)
 
 	contender := newProduceSet(parent)
 	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
@@ -2352,11 +2386,10 @@ func TestHandleErrorNonIdempotentRetryDoesNotWaitForMetadataRefresh(t *testing.T
 		t.Fatal("expected partition to remain muted while async metadata refresh is pending")
 	}
 
-	close(client.release)
+	close(release)
 	retrySet := assertDoneWithin(t, output, 2*time.Second)
 	defer parent.muter.unmute(retrySet)
 	require.Equal(t, retryPartitionSet, retrySet.msgs["topic"][0])
-	waitForProducerBuffer(t, parent, 0, 0)
 }
 
 func TestHandleErrorNonIdempotentRetryRefreshesMetadataOncePerFailedRequest(t *testing.T) {
@@ -2374,9 +2407,14 @@ func TestHandleErrorNonIdempotentRetryRefreshesMetadataOncePerFailedRequest(t *t
 	}
 	failedBroker := &Broker{id: 1}
 	retryLeader := &Broker{id: 2}
-	client := &countingRefreshClient{
-		stubLeaderClient: stubLeaderClient{leader: retryLeader, cfg: config},
-		calls:            make(chan []string, 1),
+	calls := make(chan []string, 1)
+	client := &stubLeaderClient{
+		leader: retryLeader,
+		cfg:    config,
+		refreshMetadata: func(topics ...string) error {
+			calls <- append([]string(nil), topics...)
+			return nil
+		},
 	}
 	parent.client = client
 
@@ -2409,10 +2447,10 @@ func TestHandleErrorNonIdempotentRetryRefreshesMetadataOncePerFailedRequest(t *t
 
 	bp.handleError(sent, ErrOutOfBrokers)
 
-	require.Equal(t, []string{"topic"}, assertDoneWithin(t, client.calls, 2*time.Second))
+	require.Equal(t, []string{"topic"}, assertDoneWithin(t, calls, 2*time.Second))
 	retrySet := assertDoneWithin(t, output, 2*time.Second)
 	defer parent.muter.unmute(retrySet)
-	assertNotDone(t, client.calls, 50*time.Millisecond)
+	assertNotDone(t, calls, 50*time.Millisecond)
 	assertNotDone(t, output, 50*time.Millisecond)
 
 	retriedPartitions := make(map[int32]*partitionSet)
@@ -2439,8 +2477,9 @@ func TestHandleErrorNonIdempotentRetryGroupsBatchesByLeader(t *testing.T) {
 	failedBroker := &Broker{id: 1}
 	leaderA := &Broker{id: 2}
 	leaderB := &Broker{id: 3}
-	client := &routingLeaderClient{
-		stubLeaderClient: stubLeaderClient{cfg: config},
+	calls := make(chan []string, 1)
+	client := &stubLeaderClient{
+		cfg: config,
 		leaders: map[string]map[int32]*Broker{
 			"topic-a": {
 				0: leaderA,
@@ -2451,7 +2490,10 @@ func TestHandleErrorNonIdempotentRetryGroupsBatchesByLeader(t *testing.T) {
 				1: leaderB,
 			},
 		},
-		calls: make(chan []string, 1),
+		refreshMetadata: func(topics ...string) error {
+			calls <- append([]string(nil), topics...)
+			return nil
+		},
 	}
 	parent.client = client
 
@@ -2491,7 +2533,7 @@ func TestHandleErrorNonIdempotentRetryGroupsBatchesByLeader(t *testing.T) {
 
 	bp.handleError(sent, ErrOutOfBrokers)
 
-	require.ElementsMatch(t, []string{"topic-a", "topic-b"}, assertDoneWithin(t, client.calls, 2*time.Second))
+	require.ElementsMatch(t, []string{"topic-a", "topic-b"}, assertDoneWithin(t, calls, 2*time.Second))
 	retrySetA := assertDoneWithin(t, outputA, 2*time.Second)
 	defer parent.muter.unmute(retrySetA)
 	retrySetB := assertDoneWithin(t, outputB, 2*time.Second)
@@ -2569,16 +2611,27 @@ func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
 	config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength
 
 	parent := &asyncProducer{
-		conf:       config,
-		muter:      newPartitionMuter(),
-		brokers:    make(map[*Broker]*brokerProducer),
-		brokerRefs: make(map[*brokerProducer]int),
-		errors:     make(chan *ProducerError, 1),
-		done:       make(chan struct{}),
-		txnmgr:     &transactionManager{},
+		conf:             config,
+		muter:            newPartitionMuter(),
+		brokers:          make(map[*Broker]*brokerProducer),
+		brokerRefs:       make(map[*brokerProducer]int),
+		errors:           make(chan *ProducerError, 1),
+		done:             make(chan struct{}),
+		txnmgr:           &transactionManager{},
+		retryBufferQuota: newRetryBufferQuota(config),
 	}
 	leader := &Broker{id: 1}
-	parent.client = &stubLeaderClient{leader: leader, cfg: config}
+	leaderLookup := make(chan struct{}, 1)
+	parent.client = &stubLeaderClient{
+		cfg: config,
+		leaderFunc: func(string, int32) (*Broker, error) {
+			select {
+			case leaderLookup <- struct{}{}:
+			default:
+			}
+			return leader, nil
+		},
+	}
 	retryBP := &brokerProducer{
 		parent: parent,
 		broker: leader,
@@ -2601,7 +2654,7 @@ func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
 		parent.retryBatch("topic", 0, retryPartitionSet, ErrOutOfBrokers, true)
 		close(done)
 	}()
-	waitForProducerBuffer(t, parent, 1, -1)
+	assertDoneWithin(t, leaderLookup, 2*time.Second)
 
 	if parent.closed.CompareAndSwap(false, true) {
 		close(parent.done)
@@ -2610,7 +2663,6 @@ func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
 	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
 	require.Equal(t, ErrShuttingDown, producerErr.Err)
 	assertDoneWithin(t, done, 2*time.Second)
-	waitForProducerBuffer(t, parent, 0, 0)
 
 	contender := newProduceSet(parent)
 	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
@@ -2620,114 +2672,105 @@ func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
 	parent.muter.unmute(contender)
 }
 
-func TestRetryBatchUsesSharedBufferLengthBudget(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.Idempotent = true
-	config.Producer.Retry.Max = 1
-	config.Producer.Retry.Backoff = 0
-	config.Producer.Return.Errors = true
-	config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength + 1
-
-	parent, retryBP := newBlockingRetryProducer(config, minFunctionalRetryBufferLength+1)
-
-	first := newProduceSet(parent)
-	for i := 0; i < minFunctionalRetryBufferLength; i++ {
-		safeAddMessage(t, first, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+func TestRetryUsesSharedBufferBudget(t *testing.T) {
+	tests := []struct {
+		name         string
+		afterRefresh bool
+		bytesLimit   bool
+	}{
+		{name: "retryBatch length"},
+		{name: "retryBatch bytes", bytesLimit: true},
+		{name: "retryBatchesAfterRefresh length", afterRefresh: true},
+		{name: "retryBatchesAfterRefresh bytes", afterRefresh: true, bytesLimit: true},
 	}
-	firstPartitionSet := first.msgs["topic"][0]
-	if !parent.muter.tryMute(first) {
-		t.Fatal("expected first retry batch to mute partitions")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := NewTestConfig()
+			config.Producer.Idempotent = !tt.afterRefresh
+			config.Producer.Retry.Max = 1
+			config.Producer.Retry.Backoff = 0
+			config.Producer.Return.Errors = true
+
+			firstCount := 1
+			errorBuffer := 2
+			var firstMsg *ProducerMessage
+			secondMsg := &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("overflow")}
+
+			if tt.bytesLimit {
+				firstMsg = &ProducerMessage{Topic: "topic", Partition: 0, Value: ByteEncoder(make([]byte, minFunctionalRetryBufferBytes))}
+				version := producerMessageByteSizeVersion(config)
+				firstBytes := int64(firstMsg.ByteSize(version))
+				secondBytes := int64(secondMsg.ByteSize(version))
+				config.Producer.Retry.MaxBufferBytes = firstBytes + secondBytes
+			} else {
+				config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength + 1
+				firstCount = minFunctionalRetryBufferLength
+				errorBuffer = minFunctionalRetryBufferLength + 1
+			}
+
+			parent, retryBP := newBlockingRetryProducer(config, errorBuffer)
+			firstRetryReserved, releaseFirstRetry := holdFirstRetryAfterReserve(parent, retryBP, tt.afterRefresh)
+			defer releaseFirstRetry()
+
+			retry := func(partition int32, pSet *partitionSet) {
+				if tt.afterRefresh {
+					parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
+						topic:     "topic",
+						partition: partition,
+						pSet:      pSet,
+					}}, ErrOutOfBrokers)
+					return
+				}
+				parent.retryBatch("topic", partition, pSet, ErrNotEnoughReplicas, true)
+			}
+
+			first := newProduceSet(parent)
+			if tt.bytesLimit {
+				safeAddMessage(t, first, firstMsg)
+			} else {
+				for i := 0; i < minFunctionalRetryBufferLength; i++ {
+					safeAddMessage(t, first, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+				}
+			}
+			firstPartitionSet := first.msgs["topic"][0]
+			if !parent.muter.tryMute(first) {
+				t.Fatal("expected first retry batch to mute partitions")
+			}
+			parent.inFlight.Add(firstCount)
+
+			firstDone := make(chan struct{})
+			go func() {
+				retry(0, firstPartitionSet)
+				close(firstDone)
+			}()
+			assertDoneWithin(t, firstRetryReserved, 2*time.Second)
+
+			second := newProduceSet(parent)
+			safeAddMessage(t, second, secondMsg)
+			secondPartitionSet := second.msgs["topic"][1]
+			if !parent.muter.tryMute(second) {
+				t.Fatal("expected second retry batch to mute partitions")
+			}
+			parent.inFlight.Add(1)
+			retry(1, secondPartitionSet)
+
+			producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+			require.Equal(t, ErrProducerRetryBufferOverflow, producerErr.Err)
+			require.Equal(t, int32(1), producerErr.Msg.Partition)
+
+			contender := newProduceSet(parent)
+			safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("next")})
+			if !parent.muter.tryMute(contender) {
+				t.Fatal("expected overflowed retry batch to release partition mute")
+			}
+			parent.muter.unmute(contender)
+
+			close(retryBP.done)
+			releaseFirstRetry()
+			assertDoneWithin(t, firstDone, 2*time.Second)
+		})
 	}
-	parent.inFlight.Add(minFunctionalRetryBufferLength)
-
-	firstDone := make(chan struct{})
-	go func() {
-		parent.retryBatch("topic", 0, firstPartitionSet, ErrNotEnoughReplicas, true)
-		close(firstDone)
-	}()
-	waitForProducerBuffer(t, parent, minFunctionalRetryBufferLength, -1)
-
-	second := newProduceSet(parent)
-	safeAddMessage(t, second, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("overflow")})
-	secondPartitionSet := second.msgs["topic"][1]
-	if !parent.muter.tryMute(second) {
-		t.Fatal("expected second retry batch to mute partitions")
-	}
-	parent.inFlight.Add(1)
-	parent.retryBatch("topic", 1, secondPartitionSet, ErrNotEnoughReplicas, true)
-
-	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
-	require.Equal(t, ErrProducerRetryBufferOverflow, producerErr.Err)
-	require.Equal(t, int32(1), producerErr.Msg.Partition)
-	waitForProducerBuffer(t, parent, minFunctionalRetryBufferLength, -1)
-
-	contender := newProduceSet(parent)
-	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("next")})
-	if !parent.muter.tryMute(contender) {
-		t.Fatal("expected overflowed retry batch to release partition mute")
-	}
-	parent.muter.unmute(contender)
-
-	close(retryBP.done)
-	assertDoneWithin(t, firstDone, 2*time.Second)
-	waitForProducerBuffer(t, parent, 0, 0)
-}
-
-func TestRetryBatchUsesSharedBufferBytesBudget(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.Idempotent = true
-	config.Producer.Retry.Max = 1
-	config.Producer.Retry.Backoff = 0
-	config.Producer.Return.Errors = true
-
-	parent, retryBP := newBlockingRetryProducer(config, 2)
-
-	firstMsg := &ProducerMessage{Topic: "topic", Partition: 0, Value: ByteEncoder(make([]byte, minFunctionalRetryBufferBytes))}
-	secondMsg := &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("overflow")}
-	version := parent.producerMessageByteSizeVersion()
-	firstBytes := int64(firstMsg.ByteSize(version))
-	secondBytes := int64(secondMsg.ByteSize(version))
-	config.Producer.Retry.MaxBufferBytes = firstBytes + secondBytes
-
-	first := newProduceSet(parent)
-	safeAddMessage(t, first, firstMsg)
-	firstPartitionSet := first.msgs["topic"][0]
-	if !parent.muter.tryMute(first) {
-		t.Fatal("expected first retry batch to mute partitions")
-	}
-	parent.inFlight.Add(1)
-
-	firstDone := make(chan struct{})
-	go func() {
-		parent.retryBatch("topic", 0, firstPartitionSet, ErrNotEnoughReplicas, true)
-		close(firstDone)
-	}()
-	waitForProducerBuffer(t, parent, -1, firstBytes)
-
-	second := newProduceSet(parent)
-	safeAddMessage(t, second, secondMsg)
-	secondPartitionSet := second.msgs["topic"][1]
-	if !parent.muter.tryMute(second) {
-		t.Fatal("expected second retry batch to mute partitions")
-	}
-	parent.inFlight.Add(1)
-	parent.retryBatch("topic", 1, secondPartitionSet, ErrNotEnoughReplicas, true)
-
-	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
-	require.Equal(t, ErrProducerRetryBufferOverflow, producerErr.Err)
-	require.Equal(t, int32(1), producerErr.Msg.Partition)
-	waitForProducerBuffer(t, parent, -1, firstBytes)
-
-	contender := newProduceSet(parent)
-	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("next")})
-	if !parent.muter.tryMute(contender) {
-		t.Fatal("expected overflowed retry batch to release partition mute")
-	}
-	parent.muter.unmute(contender)
-
-	close(retryBP.done)
-	assertDoneWithin(t, firstDone, 2*time.Second)
-	waitForProducerBuffer(t, parent, 0, 0)
 }
 
 func TestRetryBatchesAfterRefreshReleasesMuteWhenBrokerProducerDone(t *testing.T) {
@@ -2788,128 +2831,6 @@ func TestRetryBatchesAfterRefreshReleasesMuteWhenBrokerProducerDone(t *testing.T
 	parent.muter.unmute(contender)
 }
 
-func TestRetryBatchesAfterRefreshUsesSharedBufferLengthBudget(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.Idempotent = false
-	config.Producer.Retry.Max = 1
-	config.Producer.Retry.Backoff = 0
-	config.Producer.Return.Errors = true
-	config.Producer.Retry.MaxBufferLength = minFunctionalRetryBufferLength + 1
-
-	parent, retryBP := newBlockingRetryProducer(config, minFunctionalRetryBufferLength+1)
-
-	first := newProduceSet(parent)
-	for i := 0; i < minFunctionalRetryBufferLength; i++ {
-		safeAddMessage(t, first, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
-	}
-	if !parent.muter.tryMute(first) {
-		t.Fatal("expected first retry batch to mute partitions")
-	}
-	parent.inFlight.Add(minFunctionalRetryBufferLength)
-
-	firstDone := make(chan struct{})
-	go func() {
-		parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
-			topic:     "topic",
-			partition: 0,
-			pSet:      first.msgs["topic"][0],
-		}}, ErrOutOfBrokers)
-		close(firstDone)
-	}()
-	waitForProducerBuffer(t, parent, minFunctionalRetryBufferLength, -1)
-
-	second := newProduceSet(parent)
-	safeAddMessage(t, second, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("overflow")})
-	if !parent.muter.tryMute(second) {
-		t.Fatal("expected second retry batch to mute partitions")
-	}
-	parent.inFlight.Add(1)
-	parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
-		topic:     "topic",
-		partition: 1,
-		pSet:      second.msgs["topic"][1],
-	}}, ErrOutOfBrokers)
-
-	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
-	require.Equal(t, ErrProducerRetryBufferOverflow, producerErr.Err)
-	require.Equal(t, int32(1), producerErr.Msg.Partition)
-	waitForProducerBuffer(t, parent, minFunctionalRetryBufferLength, -1)
-
-	contender := newProduceSet(parent)
-	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("next")})
-	if !parent.muter.tryMute(contender) {
-		t.Fatal("expected overflowed retry batch to release partition mute")
-	}
-	parent.muter.unmute(contender)
-
-	close(retryBP.done)
-	assertDoneWithin(t, firstDone, 2*time.Second)
-	waitForProducerBuffer(t, parent, 0, 0)
-}
-
-func TestRetryBatchesAfterRefreshUsesSharedBufferBytesBudget(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.Idempotent = false
-	config.Producer.Retry.Max = 1
-	config.Producer.Retry.Backoff = 0
-	config.Producer.Return.Errors = true
-
-	parent, retryBP := newBlockingRetryProducer(config, 2)
-
-	firstMsg := &ProducerMessage{Topic: "topic", Partition: 0, Value: ByteEncoder(make([]byte, minFunctionalRetryBufferBytes))}
-	secondMsg := &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("overflow")}
-	version := parent.producerMessageByteSizeVersion()
-	firstBytes := int64(firstMsg.ByteSize(version))
-	secondBytes := int64(secondMsg.ByteSize(version))
-	config.Producer.Retry.MaxBufferBytes = firstBytes + secondBytes
-
-	first := newProduceSet(parent)
-	safeAddMessage(t, first, firstMsg)
-	if !parent.muter.tryMute(first) {
-		t.Fatal("expected first retry batch to mute partitions")
-	}
-	parent.inFlight.Add(1)
-
-	firstDone := make(chan struct{})
-	go func() {
-		parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
-			topic:     "topic",
-			partition: 0,
-			pSet:      first.msgs["topic"][0],
-		}}, ErrOutOfBrokers)
-		close(firstDone)
-	}()
-	waitForProducerBuffer(t, parent, -1, firstBytes)
-
-	second := newProduceSet(parent)
-	safeAddMessage(t, second, secondMsg)
-	if !parent.muter.tryMute(second) {
-		t.Fatal("expected second retry batch to mute partitions")
-	}
-	parent.inFlight.Add(1)
-	parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
-		topic:     "topic",
-		partition: 1,
-		pSet:      second.msgs["topic"][1],
-	}}, ErrOutOfBrokers)
-
-	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
-	require.Equal(t, ErrProducerRetryBufferOverflow, producerErr.Err)
-	require.Equal(t, int32(1), producerErr.Msg.Partition)
-	waitForProducerBuffer(t, parent, -1, firstBytes)
-
-	contender := newProduceSet(parent)
-	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("next")})
-	if !parent.muter.tryMute(contender) {
-		t.Fatal("expected overflowed retry batch to release partition mute")
-	}
-	parent.muter.unmute(contender)
-
-	close(retryBP.done)
-	assertDoneWithin(t, firstDone, 2*time.Second)
-	waitForProducerBuffer(t, parent, 0, 0)
-}
-
 func TestHandleErrorNonIdempotentRetryReleasesMuteOnLeaderError(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
@@ -2925,10 +2846,7 @@ func TestHandleErrorNonIdempotentRetryReleasesMuteOnLeaderError(t *testing.T) {
 		errors:     make(chan *ProducerError, 1),
 		txnmgr:     &transactionManager{},
 	}
-	parent.client = &failingLeaderClient{
-		stubLeaderClient: stubLeaderClient{cfg: config},
-		err:              ErrOutOfBrokers,
-	}
+	parent.client = &stubLeaderClient{cfg: config, leaderErr: ErrOutOfBrokers}
 
 	bp := &brokerProducer{
 		parent:            parent,
@@ -2959,8 +2877,12 @@ func TestHandleErrorNonIdempotentRetryReleasesMuteOnLeaderError(t *testing.T) {
 }
 
 type stubLeaderClient struct {
-	cfg    *Config
-	leader *Broker
+	cfg             *Config
+	leader          *Broker
+	leaderFunc      func(string, int32) (*Broker, error)
+	leaderErr       error
+	leaders         map[string]map[int32]*Broker
+	refreshMetadata func(...string) error
 }
 
 func (c *stubLeaderClient) Config() *Config                            { return c.cfg }
@@ -2972,16 +2894,36 @@ func (c *stubLeaderClient) Topics() ([]string, error)                  { return 
 func (c *stubLeaderClient) Partitions(string) ([]int32, error)         { return nil, nil }
 func (c *stubLeaderClient) WritablePartitions(string) ([]int32, error) { return nil, nil }
 func (c *stubLeaderClient) Leader(topic string, partitionID int32) (*Broker, error) {
+	if c.leaderFunc != nil {
+		return c.leaderFunc(topic, partitionID)
+	}
+	if c.leaderErr != nil {
+		return nil, c.leaderErr
+	}
+	if partitions := c.leaders[topic]; partitions != nil {
+		if leader := partitions[partitionID]; leader != nil {
+			return leader, nil
+		}
+	}
+	if c.leaders != nil {
+		return nil, ErrLeaderNotAvailable
+	}
 	return c.leader, nil
 }
-func (c *stubLeaderClient) LeaderAndEpoch(string, int32) (*Broker, int32, error) {
-	return c.leader, 0, nil
+func (c *stubLeaderClient) LeaderAndEpoch(topic string, partition int32) (*Broker, int32, error) {
+	leader, err := c.Leader(topic, partition)
+	return leader, 0, err
 }
-func (c *stubLeaderClient) Replicas(string, int32) ([]int32, error)          { return nil, nil }
-func (c *stubLeaderClient) InSyncReplicas(string, int32) ([]int32, error)    { return nil, nil }
-func (c *stubLeaderClient) OfflineReplicas(string, int32) ([]int32, error)   { return nil, nil }
-func (c *stubLeaderClient) RefreshBrokers([]string) error                    { return nil }
-func (c *stubLeaderClient) RefreshMetadata(...string) error                  { return nil }
+func (c *stubLeaderClient) Replicas(string, int32) ([]int32, error)        { return nil, nil }
+func (c *stubLeaderClient) InSyncReplicas(string, int32) ([]int32, error)  { return nil, nil }
+func (c *stubLeaderClient) OfflineReplicas(string, int32) ([]int32, error) { return nil, nil }
+func (c *stubLeaderClient) RefreshBrokers([]string) error                  { return nil }
+func (c *stubLeaderClient) RefreshMetadata(topics ...string) error {
+	if c.refreshMetadata != nil {
+		return c.refreshMetadata(topics...)
+	}
+	return nil
+}
 func (c *stubLeaderClient) GetOffset(string, int32, int64) (int64, error)    { return 0, nil }
 func (c *stubLeaderClient) Coordinator(string) (*Broker, error)              { return nil, nil }
 func (c *stubLeaderClient) RefreshCoordinator(string) error                  { return nil }
@@ -2992,69 +2934,6 @@ func (c *stubLeaderClient) LeastLoadedBroker() *Broker                       { r
 func (c *stubLeaderClient) PartitionNotReadable(string, int32) bool          { return false }
 func (c *stubLeaderClient) Close() error                                     { return nil }
 func (c *stubLeaderClient) Closed() bool                                     { return false }
-
-type failingLeaderClient struct {
-	stubLeaderClient
-	err error
-}
-
-func (c *failingLeaderClient) Leader(string, int32) (*Broker, error) {
-	return nil, c.err
-}
-
-func (c *failingLeaderClient) LeaderAndEpoch(string, int32) (*Broker, int32, error) {
-	return nil, 0, c.err
-}
-
-type blockingRefreshClient struct {
-	stubLeaderClient
-	started chan struct{}
-	release chan struct{}
-}
-
-func (c *blockingRefreshClient) RefreshMetadata(...string) error {
-	select {
-	case c.started <- struct{}{}:
-	default:
-	}
-	<-c.release
-	return nil
-}
-
-type countingRefreshClient struct {
-	stubLeaderClient
-	calls chan []string
-}
-
-func (c *countingRefreshClient) RefreshMetadata(topics ...string) error {
-	c.calls <- append([]string(nil), topics...)
-	return nil
-}
-
-type routingLeaderClient struct {
-	stubLeaderClient
-	leaders map[string]map[int32]*Broker
-	calls   chan []string
-}
-
-func (c *routingLeaderClient) Leader(topic string, partition int32) (*Broker, error) {
-	if partitions := c.leaders[topic]; partitions != nil {
-		if leader := partitions[partition]; leader != nil {
-			return leader, nil
-		}
-	}
-	return nil, ErrLeaderNotAvailable
-}
-
-func (c *routingLeaderClient) LeaderAndEpoch(topic string, partition int32) (*Broker, int32, error) {
-	leader, err := c.Leader(topic, partition)
-	return leader, 0, err
-}
-
-func (c *routingLeaderClient) RefreshMetadata(topics ...string) error {
-	c.calls <- append([]string(nil), topics...)
-	return nil
-}
 
 func testProducerInterceptor(
 	t *testing.T,
