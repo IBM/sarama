@@ -1746,7 +1746,7 @@ func TestBrokerProducerShutdown(t *testing.T) {
 
 // TestBrokerProducerWaitForSpaceEmptyBufferRollover ensures forced rollovers with an empty buffer
 // do not deadlock waiting for responses when no partitions are muted.
-func TestBrokerProducerWaitForSpaceEmptyBufferRollover(t *testing.T) {
+func TestBrokerProducerWaitForSpaceEmptyRollover(t *testing.T) {
 	config := NewTestConfig()
 	parent := &asyncProducer{
 		conf:   config,
@@ -1882,9 +1882,9 @@ func holdFirstRetryAfterReserve(parent *asyncProducer, retryBP *brokerProducer, 
 	return firstRetryReserved, release
 }
 
-// TestBrokerProducerWaitForSpaceRespectsExternalUnmute ensures waitForSpace does not
+// TestBrokerProducerWaitForSpaceExternalUnmute ensures waitForSpace does not
 // deadlock when partitions are muted by another producer and are unmuted elsewhere.
-func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
+func TestBrokerProducerWaitForSpaceExternalUnmute(t *testing.T) {
 	config := NewTestConfig()
 	txnMgr := &transactionManager{
 		producerID:      0,
@@ -1971,7 +1971,7 @@ func TestBrokerProducerFlushSkipsMutedPartitions(t *testing.T) {
 	}
 }
 
-func TestBrokerProducerRunFlushesAfterExternalUnmute(t *testing.T) {
+func TestBrokerProducerRunExternalUnmute(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Flush.Messages = 1
 	parent := &asyncProducer{
@@ -2018,9 +2018,9 @@ func TestBrokerProducerRunFlushesAfterExternalUnmute(t *testing.T) {
 	assertDoneWithin(t, done, 2*time.Second)
 }
 
-// TestBrokerProducerWaitForSpaceAllPartitionsMuted verifies that waitForSpace unblocks
+// TestBrokerProducerWaitForSpaceAllMuted verifies that waitForSpace unblocks
 // when all partitions in the accumulating batch are externally muted and later unmuted.
-func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
+func TestBrokerProducerWaitForSpaceAllMuted(t *testing.T) {
 	config := NewTestConfig()
 	parent := &asyncProducer{
 		conf:   config,
@@ -2053,9 +2053,9 @@ func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
 	require.NoError(t, assertDoneWithin(t, done, 2*time.Second))
 }
 
-// TestPartitionMuterCloseWakesWaitUntilMuted verifies that closing the muter wakes
+// TestPartitionMuterCloseWakesWait verifies that closing the muter wakes
 // goroutines blocked in waitUntilMuted.
-func TestPartitionMuterCloseWakesWaitUntilMuted(t *testing.T) {
+func TestPartitionMuterCloseWakesWait(t *testing.T) {
 	config := NewTestConfig()
 	parent := &asyncProducer{
 		conf:   config,
@@ -2204,7 +2204,7 @@ func TestRetryBatchRespectsPartitionMuter(t *testing.T) {
 	}
 }
 
-func TestHandleErrorNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
+func TestHandleErrorRetryKeepsMute(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2265,7 +2265,7 @@ func TestHandleErrorNonIdempotentRetryKeepsPartitionMuted(t *testing.T) {
 	}
 }
 
-func TestHandleErrorNonIdempotentRetryFailsWholeBatch(t *testing.T) {
+func TestHandleErrorRetryFailsBatch(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2314,7 +2314,7 @@ func TestHandleErrorNonIdempotentRetryFailsWholeBatch(t *testing.T) {
 	parent.muter.unmute(contender)
 }
 
-func TestHandleErrorNonIdempotentRetryDoesNotWaitForMetadataRefresh(t *testing.T) {
+func TestHandleErrorRetryAsyncRefresh(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2392,7 +2392,7 @@ func TestHandleErrorNonIdempotentRetryDoesNotWaitForMetadataRefresh(t *testing.T
 	require.Equal(t, retryPartitionSet, retrySet.msgs["topic"][0])
 }
 
-func TestHandleErrorNonIdempotentRetryRefreshesMetadataOncePerFailedRequest(t *testing.T) {
+func TestHandleErrorRetryRefreshOnce(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2461,7 +2461,7 @@ func TestHandleErrorNonIdempotentRetryRefreshesMetadataOncePerFailedRequest(t *t
 	require.Same(t, retryPartitionSet1, retriedPartitions[int32(1)])
 }
 
-func TestHandleErrorNonIdempotentRetryGroupsBatchesByLeader(t *testing.T) {
+func TestHandleErrorRetryGroupsByLeader(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2558,7 +2558,7 @@ func TestHandleErrorNonIdempotentRetryGroupsBatchesByLeader(t *testing.T) {
 	assertNotDone(t, outputB, 50*time.Millisecond)
 }
 
-func TestHandleSuccessNonIdempotentRetryUsesPartitionProducer(t *testing.T) {
+func TestHandleSuccessRetryUsesPartitionProducer(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2602,7 +2602,7 @@ func TestHandleSuccessNonIdempotentRetryUsesPartitionProducer(t *testing.T) {
 	parent.muter.unmute(contender)
 }
 
-func TestRetryBatchReleasesMuteWhenHandoffAbortedByShutdown(t *testing.T) {
+func TestRetryBatchShutdownReleasesMute(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2715,11 +2715,9 @@ func TestRetryUsesSharedBufferBudget(t *testing.T) {
 
 			retry := func(partition int32, pSet *partitionSet) {
 				if tt.afterRefresh {
-					parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
-						topic:     "topic",
-						partition: partition,
-						pSet:      pSet,
-					}}, ErrOutOfBrokers)
+					retrySet := newProduceSet(parent)
+					retrySet.addPartitionSet("topic", partition, pSet)
+					parent.retryBatchesAfterRefresh(retrySet, ErrOutOfBrokers)
 					return
 				}
 				parent.retryBatch("topic", partition, pSet, ErrNotEnoughReplicas, true)
@@ -2773,7 +2771,7 @@ func TestRetryUsesSharedBufferBudget(t *testing.T) {
 	}
 }
 
-func TestRetryBatchesAfterRefreshReleasesMuteWhenBrokerProducerDone(t *testing.T) {
+func TestRetryBatchesAfterRefreshBrokerDone(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
@@ -2810,11 +2808,9 @@ func TestRetryBatchesAfterRefreshReleasesMuteWhenBrokerProducerDone(t *testing.T
 
 	done := make(chan struct{})
 	go func() {
-		parent.retryBatchesAfterRefresh([]string{"topic"}, []partitionBatchRetry{{
-			topic:     "topic",
-			partition: 0,
-			pSet:      retryPartitionSet,
-		}}, ErrOutOfBrokers)
+		retrySet := newProduceSet(parent)
+		retrySet.addPartitionSet("topic", 0, retryPartitionSet)
+		parent.retryBatchesAfterRefresh(retrySet, ErrOutOfBrokers)
 		close(done)
 	}()
 
@@ -2831,7 +2827,70 @@ func TestRetryBatchesAfterRefreshReleasesMuteWhenBrokerProducerDone(t *testing.T
 	parent.muter.unmute(contender)
 }
 
-func TestHandleErrorNonIdempotentRetryReleasesMuteOnLeaderError(t *testing.T) {
+func TestRetryBatchesAfterRefreshShutdown(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Return.Errors = true
+
+	parent := &asyncProducer{
+		conf:       config,
+		muter:      newPartitionMuter(),
+		brokers:    make(map[*Broker]*brokerProducer),
+		brokerRefs: make(map[*brokerProducer]int),
+		errors:     make(chan *ProducerError, 2),
+		done:       make(chan struct{}),
+		txnmgr:     &transactionManager{},
+	}
+	leader := &Broker{id: 1}
+	output := make(chan *produceSet, 1)
+	parent.brokers[leader] = &brokerProducer{
+		parent: parent,
+		broker: leader,
+		output: output,
+		input:  make(chan *ProducerMessage),
+		done:   make(chan struct{}),
+	}
+	shutdownStarted := false
+	parent.client = &stubLeaderClient{
+		cfg: config,
+		leaderFunc: func(string, int32) (*Broker, error) {
+			if !shutdownStarted {
+				close(parent.done)
+				shutdownStarted = true
+			}
+			return leader, nil
+		},
+	}
+
+	sent := newProduceSet(parent)
+	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry-0")})
+	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("retry-1")})
+	if !parent.muter.tryMute(sent) {
+		t.Fatal("expected sent batch to mute partitions")
+	}
+	parent.inFlight.Add(2)
+
+	parent.retryBatchesAfterRefresh(sent, ErrOutOfBrokers)
+
+	firstErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+	secondErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+	require.Equal(t, ErrShuttingDown, firstErr.Err)
+	require.Equal(t, ErrShuttingDown, secondErr.Err)
+	require.ElementsMatch(t, []int32{0, 1}, []int32{firstErr.Msg.Partition, secondErr.Msg.Partition})
+	assertNotDone(t, output, 50*time.Millisecond)
+
+	contender := newProduceSet(parent)
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next-0")})
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("next-1")})
+	if !parent.muter.tryMute(contender) {
+		t.Fatal("expected partition mutes to be released after shutdown")
+	}
+	parent.muter.unmute(contender)
+}
+
+func TestHandleErrorRetryLeaderError(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.Idempotent = false
 	config.Producer.Retry.Max = 1
