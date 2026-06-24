@@ -314,3 +314,29 @@ func TestMetadataRequestV11(t *testing.T) {
 	request.IncludeTopicAuthorizedOperations = true
 	testRequest(t, "two topics, auto create, topic auth", request, metadataRequestAutoCreateTopicAuthV11)
 }
+
+func TestNewMetadataRequestVersionMapping(t *testing.T) {
+	// NewMetadataRequest must select the highest metadata request version
+	// supported by the configured Kafka version. A duplicate V2_4_0_0 check
+	// previously shadowed the V8 branch, so Kafka 2.3.0 fell through to V7.
+	tests := []struct {
+		version KafkaVersion
+		want    int16
+	}{
+		{V2_8_0_0, 11},
+		{V2_4_0_0, 9},
+		{V2_3_0_0, 8},
+		{V2_1_0_0, 7},
+		{V2_0_0_0, 6},
+		{V1_0_0_0, 5},
+		{V0_11_0_0, 4},
+		{V0_10_1_0, 2},
+		{V0_10_0_0, 1},
+	}
+	for _, tt := range tests {
+		got := NewMetadataRequest(tt.version, nil).Version
+		if got != tt.want {
+			t.Errorf("NewMetadataRequest(%s).Version = %d, want %d", tt.version, got, tt.want)
+		}
+	}
+}
