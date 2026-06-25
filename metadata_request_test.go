@@ -2,7 +2,11 @@
 
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 var (
 	// The v0 metadata request has a non-nullable array of topic names
@@ -313,4 +317,21 @@ func TestMetadataRequestV11(t *testing.T) {
 	request.AllowAutoTopicCreation = true
 	request.IncludeTopicAuthorizedOperations = true
 	testRequest(t, "two topics, auto create, topic auth", request, metadataRequestAutoCreateTopicAuthV11)
+}
+
+func TestNewMetadataRequest(t *testing.T) {
+	// NewMetadataRequest and requiredVersion map between KafkaVersion and protocol
+	// version in opposite directions and must stay consistent: configuring the
+	// client at a protocol version's requiredVersion must select at least that version
+	r := &MetadataRequest{}
+	for v := int16(0); ; v++ {
+		r.Version = v
+		if !r.isValidVersion() {
+			break
+		}
+		got := NewMetadataRequest(r.requiredVersion(), nil).Version
+		assert.GreaterOrEqualf(t, got, v,
+			"NewMetadataRequest(%s) selected v%d, below v%d which requires it",
+			r.requiredVersion(), got, v)
+	}
 }

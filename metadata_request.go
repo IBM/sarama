@@ -31,7 +31,7 @@ func NewMetadataRequest(version KafkaVersion, topics []string) *MetadataRequest 
 		m.Version = 11
 	} else if version.IsAtLeast(V2_4_0_0) {
 		m.Version = 9
-	} else if version.IsAtLeast(V2_4_0_0) {
+	} else if version.IsAtLeast(V2_3_0_0) {
 		m.Version = 8
 	} else if version.IsAtLeast(V2_1_0_0) {
 		m.Version = 7
