@@ -827,6 +827,23 @@ func (pp *partitionProducer) updateLeaderIfBrokerProducerIsNil(msg *ProducerMess
 	return nil
 }
 
+func (pp *partitionProducer) tryUpdateLeader(old *Broker) bool {
+	leader, err := pp.parent.client.Leader(pp.topic, pp.partition)
+	if err != nil {
+		return false
+	}
+	if old != nil && leader.ID() == old.ID() {
+		return false
+	}
+
+	pp.leader = leader
+	pp.brokerProducer = pp.parent.getBrokerProducer(pp.leader)
+	pp.parent.inFlight.Add(1)
+	pp.brokerProducer.input <- &ProducerMessage{Topic: pp.topic, Partition: pp.partition, flags: syn}
+	Logger.Printf("producer/leader/%s/%d selected broker %d\n", pp.topic, pp.partition, pp.leader.ID())
+	return true
+}
+
 func (pp *partitionProducer) dispatch() {
 	// try to prefetch the leader; if this doesn't work, we'll do a proper call to `updateLeader`
 	// on the first message
@@ -849,9 +866,12 @@ func (pp *partitionProducer) dispatch() {
 			case <-pp.brokerProducer.abandoned:
 				// a message on the abandoned channel means that our current broker selection is out of date
 				Logger.Printf("producer/leader/%s/%d abandoning broker %d\n", pp.topic, pp.partition, pp.leader.ID())
+				oldLeader := pp.leader
 				pp.parent.unrefBrokerProducer(pp.leader, pp.brokerProducer)
 				pp.brokerProducer = nil
-				time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+				if !pp.tryUpdateLeader(oldLeader) {
+					time.Sleep(pp.parent.conf.Producer.Retry.Backoff)
+				}
 			default:
 				// producer connection is still open.
 			}
@@ -990,6 +1010,7 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 		input:             input,
 		output:            bridge,
 		responses:         responses,
+		abandoned:         make(chan struct{}),
 		done:              make(chan struct{}),
 		accumulatingBatch: newProduceSet(p),
 		currentRetries:    make(map[string]map[int32]error),
@@ -1080,10 +1101,6 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			}
 		}
 	})
-
-	if p.conf.Producer.Retry.Max <= 0 {
-		bp.abandoned = make(chan struct{})
-	}
 
 	return bp
 }
@@ -1379,8 +1396,9 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
 	var (
-		retryTopics []string
-		keepMuted   map[string]map[int32]struct{}
+		shouldAbandonBroker bool
+		retryTopics         []string
+		keepMuted           map[string]map[int32]struct{}
 		// Group by broker error so failed retries report the original partition error.
 		responseRetries map[KError]*produceSet
 	)
@@ -1432,11 +1450,11 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		// Duplicate
 		case ErrDuplicateSequenceNumber:
 			bp.parent.returnSuccesses(pSet.msgs)
-		// Retriable errors
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend, ErrKafkaStorageError:
+			// Retriable errors
+			shouldAbandonBroker = true
 			if bp.parent.conf.Producer.Retry.Max <= 0 {
-				bp.parent.abandonBrokerConnection(bp.broker)
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
@@ -1451,6 +1469,10 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 			bp.parent.returnErrors(pSet.msgs, block.Err)
 		}
 	})
+
+	if shouldAbandonBroker {
+		bp.parent.abandonBrokerConnection(bp.broker)
+	}
 
 	if len(retryTopics) > 0 {
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
