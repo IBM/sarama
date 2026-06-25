@@ -2135,6 +2135,58 @@ func TestRetryBatchReleasesMuteOnShutdown(t *testing.T) {
 	parent.muter.unmute(contender)
 }
 
+func TestBrokerProducerHandleError(t *testing.T) {
+	t.Run("keeps non-idempotent connection retries muted", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Producer.Idempotent = false
+		config.Producer.Retry.Max = 1
+		config.Producer.Retry.Backoff = 0
+
+		parent := &asyncProducer{
+			conf:       config,
+			muter:      newPartitionMuter(),
+			brokers:    make(map[*Broker]*brokerProducer),
+			brokerRefs: make(map[*brokerProducer]int),
+			retries:    make(chan *ProducerMessage, 4),
+			txnmgr:     &transactionManager{},
+		}
+		retryLeader := &Broker{id: 2}
+		parent.client = &stubLeaderClient{leader: retryLeader, cfg: config}
+
+		output := make(chan *produceSet, 1)
+		parent.brokers[retryLeader] = &brokerProducer{
+			parent: parent,
+			broker: retryLeader,
+			output: output,
+			input:  make(chan *ProducerMessage),
+		}
+
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             make(chan *ProducerMessage),
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+
+		sent := newProduceSet(parent)
+		safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+		retryPartitionSet := sent.msgs["topic"][0]
+		require.True(t, parent.muter.tryMute(sent), "sent batch should mute its partition")
+
+		bp.handleError(sent, ErrOutOfBrokers)
+
+		retrySet := assertDoneWithin(t, output, 2*time.Second)
+		defer parent.muter.unmute(retrySet)
+		require.Equal(t, retryPartitionSet, retrySet.msgs["topic"][0])
+		require.Equal(t, 1, retryPartitionSet.msgs[0].retries)
+
+		contender := newProduceSet(parent)
+		safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+		require.False(t, parent.muter.tryMute(contender), "partition should stay muted by the retrying batch")
+	})
+}
+
 type stubLeaderClient struct {
 	cfg    *Config
 	leader *Broker
