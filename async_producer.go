@@ -130,19 +130,16 @@ type asyncProducer struct {
 
 type partitionMuter struct {
 	mu             sync.Mutex
-	cond           *sync.Cond
 	closed         bool
 	inFlightCounts map[string]map[int32]int // topic -> partition -> in-flight count
 	unmuteSignal   chan struct{}
 }
 
 func newPartitionMuter() *partitionMuter {
-	m := &partitionMuter{
+	return &partitionMuter{
 		inFlightCounts: make(map[string]map[int32]int),
 		unmuteSignal:   make(chan struct{}),
 	}
-	m.cond = sync.NewCond(&m.mu)
-	return m
 }
 
 // isMuted reports whether the partition has an in-flight batch.
@@ -205,30 +202,6 @@ func (m *partitionMuter) tryMutePartition(topic string, partition int32) bool {
 	return true
 }
 
-// waitUntilMuted blocks until all partitions in the set can be muted, then mutes them.
-// Returns false if the muter was closed before all partitions could be muted.
-func (m *partitionMuter) waitUntilMuted(set *produceSet) bool {
-	if set == nil || set.empty() {
-		return false
-	}
-
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	for {
-		if m.closed {
-			return false
-		}
-		if !m.isAnyMuted(set) {
-			break
-		}
-		m.cond.Wait()
-	}
-
-	m.muteSet(set)
-	return true
-}
-
 func (m *partitionMuter) awaitUnmuteChan(set *produceSet) (<-chan struct{}, bool) {
 	if set == nil || set.empty() {
 		return nil, false
@@ -272,10 +245,9 @@ func (m *partitionMuter) unmute(set *produceSet) {
 	})
 	close(m.unmuteSignal)
 	m.unmuteSignal = make(chan struct{})
-	m.cond.Broadcast()
 }
 
-// close shuts down the muter, waking any goroutines blocked in waitUntilMuted.
+// close shuts down the muter, waking goroutines waiting for an unmute signal.
 func (m *partitionMuter) close() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -285,7 +257,6 @@ func (m *partitionMuter) close() {
 	}
 	m.closed = true
 	close(m.unmuteSignal)
-	m.cond.Broadcast()
 }
 
 // NewAsyncProducer creates a new AsyncProducer using the given broker addresses and configuration.

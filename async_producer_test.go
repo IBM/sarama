@@ -2041,43 +2041,6 @@ func TestBrokerProducerWaitForSpaceAllMuted(t *testing.T) {
 	require.NoError(t, assertDoneWithin(t, done, 2*time.Second))
 }
 
-// TestPartitionMuterCloseWakesWait verifies that closing the muter wakes
-// goroutines blocked in waitUntilMuted.
-func TestPartitionMuterCloseWakesWait(t *testing.T) {
-	config := NewTestConfig()
-	parent := &asyncProducer{
-		conf:   config,
-		muter:  newPartitionMuter(),
-		txnmgr: &transactionManager{},
-	}
-
-	blockedSet := newProduceSet(parent)
-	safeAddMessage(t, blockedSet, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("held")})
-	if !parent.muter.tryMute(blockedSet) {
-		t.Fatal("expected to mute partition")
-	}
-
-	waitSet := newProduceSet(parent)
-	safeAddMessage(t, waitSet, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("waiting")})
-
-	done := make(chan bool, 1)
-	go func() {
-		done <- parent.muter.waitUntilMuted(waitSet)
-	}()
-
-	assertNotDone(t, done, 50*time.Millisecond)
-	parent.muter.close()
-
-	select {
-	case result := <-done:
-		if result {
-			t.Fatal("expected waitUntilMuted to return false after close")
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("timed out")
-	}
-}
-
 // TestBrokerProducerRollOverClearsTimer ensures timer events from a previous batch
 // do not cause a flush of a fresh empty batch after rollOver.
 func TestBrokerProducerRollOverClearsTimer(t *testing.T) {
