@@ -1529,7 +1529,7 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 			retryTopicSeen[topic] = struct{}{}
 			retryTopics = append(retryTopics, topic)
 		})
-		if bp.parent.conf.Producer.Idempotent && len(retryTopics) > 0 {
+		if len(retryTopics) > 0 {
 			refreshErr := bp.parent.client.RefreshMetadata(retryTopics...)
 			if refreshErr != nil {
 				Logger.Printf("Failed refreshing metadata because of %v\n", refreshErr)
@@ -1542,15 +1542,13 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 				bp.currentRetries[topic] = make(map[int32]error)
 			}
 			bp.currentRetries[topic][partition] = err
-			if bp.parent.conf.Producer.Idempotent {
-				if keepMuted[topic] == nil {
-					keepMuted[topic] = make(map[int32]struct{})
-				}
-				keepMuted[topic][partition] = struct{}{}
-				go bp.parent.retryBatch(topic, partition, pSet, err, true)
-			} else {
-				bp.parent.retryMessages(pSet.msgs, err)
+			// retry directly so the batch stays muted; retryMessages would release
+			// the mute and let a later same-partition batch flush ahead of it
+			if keepMuted[topic] == nil {
+				keepMuted[topic] = make(map[int32]struct{})
 			}
+			keepMuted[topic][partition] = struct{}{}
+			go bp.parent.retryBatch(topic, partition, pSet, err, true)
 		})
 		bp.accumulatingBatch.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 			bp.parent.retryMessages(pSet.msgs, err)
