@@ -105,8 +105,8 @@ type asyncProducer struct {
 	input, successes, retries chan *ProducerMessage
 	inFlight                  sync.WaitGroup
 
-	// done is closed before waiting on in-flight messages so retryBatch
-	// goroutines can stop waiting on broker handoff and release partition mutes.
+	// done is closed before waiting on in-flight messages so retry goroutines can
+	// stop waiting on broker handoff and release partition mutes.
 	done   chan struct{}
 	closed atomic.Bool
 
@@ -1407,8 +1407,32 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceResponse) {
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
-	var retryTopics []string
-	keepMuted := make(map[string]map[int32]struct{})
+	var (
+		retryTopics []string
+		keepMuted   map[string]map[int32]struct{}
+		// Group by broker error so failed retries report the original partition error.
+		responseRetries map[KError]*produceSet
+	)
+	markKeepMuted := func(topic string, partition int32) {
+		if keepMuted == nil {
+			keepMuted = make(map[string]map[int32]struct{})
+		}
+		if keepMuted[topic] == nil {
+			keepMuted[topic] = make(map[int32]struct{})
+		}
+		keepMuted[topic][partition] = struct{}{}
+	}
+	addResponseRetry := func(retryErr KError, topic string, partition int32, pSet *partitionSet) {
+		if responseRetries == nil {
+			responseRetries = make(map[KError]*produceSet)
+		}
+		retrySet := responseRetries[retryErr]
+		if retrySet == nil {
+			retrySet = newProduceSet(bp.parent)
+			responseRetries[retryErr] = retrySet
+		}
+		retrySet.addPartitionSet(topic, partition, pSet)
+	}
 	sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 		if response == nil {
 			// this only happens when RequiredAcks is NoResponse, so we have to assume success
@@ -1445,12 +1469,8 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
-				if bp.parent.conf.Producer.Idempotent {
-					if keepMuted[topic] == nil {
-						keepMuted[topic] = make(map[int32]struct{})
-					}
-					keepMuted[topic][partition] = struct{}{}
-				}
+				markKeepMuted(topic, partition)
+				addResponseRetry(block.Err, topic, partition, pSet)
 			}
 		// Other non-retriable errors
 		default:
@@ -1462,13 +1482,6 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 	})
 
 	if len(retryTopics) > 0 {
-		if bp.parent.conf.Producer.Idempotent {
-			err := bp.parent.client.RefreshMetadata(retryTopics...)
-			if err != nil {
-				Logger.Printf("Failed refreshing metadata because of %v\n", err)
-			}
-		}
-
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 			block := response.GetBlock(topic, partition)
 			if block == nil {
@@ -1485,18 +1498,14 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 					bp.currentRetries[topic] = make(map[int32]error)
 				}
 				bp.currentRetries[topic][partition] = block.Err
-				if bp.parent.conf.Producer.Idempotent {
-					go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
-				} else {
-					// Non-idempotent response retries must go back through partitionProducer.
-					// That path advances the retry high watermark and refreshes the partition
-					// leader before sending the retry; retryBatch would bypass that state.
-					bp.parent.retryMessages(pSet.msgs, block.Err)
-				}
 				// dropping the following messages has the side effect of incrementing their retry count
 				bp.parent.retryMessages(bp.accumulatingBatch.dropPartition(topic, partition), block.Err)
 			}
 		})
+	}
+
+	for retryErr, retrySet := range responseRetries {
+		go bp.parent.retryBatchesAfterRefresh(retrySet, retryErr)
 	}
 
 	unmuteSet := sent.copyFunc(func(topic string, partition int32) bool {
@@ -1507,63 +1516,6 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		return true
 	})
 	bp.parent.muter.unmute(unmuteSet)
-}
-
-func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitionSet, retryErr error, alreadyMuted bool) {
-	Logger.Printf("Retrying batch for %v-%d because of %v\n", topic, partition, retryErr)
-	produceSet := newProduceSet(p)
-	produceSet.addPartitionSet(topic, partition, pSet)
-	bufferMessages, bufferBytes := int64(produceSet.bufferCount), int64(produceSet.bufferBytes)
-
-	muted := alreadyMuted
-	failBatch := func(err error) {
-		// Release the partition before reporting errors so a blocked Errors
-		// consumer cannot keep later same-partition messages muted.
-		if muted {
-			p.muter.unmute(produceSet)
-			muted = false
-		}
-		p.returnErrors(pSet.msgs, err)
-	}
-	for _, msg := range pSet.msgs {
-		if msg.retries >= p.conf.Producer.Retry.Max {
-			failBatch(retryErr)
-			return
-		}
-		msg.retries++
-	}
-	if !p.retryBufferQuota.tryReserve(bufferMessages, bufferBytes) {
-		failBatch(ErrProducerRetryBufferOverflow)
-		return
-	}
-	defer p.retryBufferQuota.release(bufferMessages, bufferBytes)
-
-	// Honor Producer.Retry.Backoff between retry attempts (#2469). retryBatch
-	// dispatches the produceSet directly to the broker, bypassing partitionProducer.dispatch.
-	if len(pSet.msgs) > 0 && !p.backoffOrDone(pSet.msgs[0].retries) {
-		failBatch(ErrShuttingDown)
-		return
-	}
-
-	// it's expected that a metadata refresh has been requested prior to calling retryBatch
-	leader, leaderErr := p.client.Leader(topic, partition)
-	if leaderErr != nil {
-		Logger.Printf("Failed retrying batch for %v-%d because of %v while looking up for new leader\n", topic, partition, leaderErr)
-		failBatch(retryErr)
-		return
-	}
-	if !alreadyMuted {
-		if !p.muter.waitUntilMuted(produceSet) {
-			failBatch(retryErr)
-			return
-		}
-		muted = true
-	}
-	bp := p.getBrokerProducer(leader)
-	defer p.unrefBrokerProducer(leader, bp)
-	if !p.handoffRetryBatch(bp, produceSet) {
-		failBatch(ErrShuttingDown)
-	}
 }
 
 func (p *asyncProducer) failMutedSet(set *produceSet, err error) {

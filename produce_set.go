@@ -12,7 +12,7 @@ type partitionSet struct {
 	bufferBytes   int
 }
 
-// shouldKeepMuted matches retryBatch's whole-batch retry rule: if any message has
+// shouldKeepMuted matches the whole-batch retry rule: if any message has
 // exhausted retries, the batch will be failed instead of retried.
 func (ps *partitionSet) shouldKeepMuted(maxRetries int) bool {
 	if len(ps.msgs) == 0 {
