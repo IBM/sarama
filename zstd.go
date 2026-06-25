@@ -47,22 +47,21 @@ func getZstdEncoderChannel(params ZstdEncoderParams) chan *zstd.Encoder {
 	return ch
 }
 
-func newZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
+func newZstdEncoder(params ZstdEncoderParams) (*zstd.Encoder, error) {
 	encoderLevel := zstd.SpeedDefault
 	if params.Level != CompressionLevelDefault {
 		encoderLevel = zstd.EncoderLevelFromZstd(params.Level)
 	}
-	enc, _ := zstd.NewWriter(nil,
+	return zstd.NewWriter(nil,
 		zstd.WithZeroFrames(true),
 		zstd.WithEncoderLevel(encoderLevel),
 		zstd.WithEncoderConcurrency(1))
-	return enc
 }
 
-func getZstdEncoder(params ZstdEncoderParams) *zstd.Encoder {
+func getZstdEncoder(params ZstdEncoderParams) (*zstd.Encoder, error) {
 	select {
 	case enc := <-getZstdEncoderChannel(params):
-		return enc
+		return enc, nil
 	default:
 		return newZstdEncoder(params)
 	}
@@ -84,34 +83,44 @@ type zstdDecoderKey struct {
 	maxDecodedSize int
 }
 
-func getDecoder(params ZstdDecoderParams, maxDecodedSize int) *zstd.Decoder {
+func getDecoder(params ZstdDecoderParams, maxDecodedSize int) (*zstd.Decoder, error) {
 	key := zstdDecoderKey{params, maxDecodedSize}
 	if ret, ok := zstdDecMap.Load(key); ok {
-		return ret.(*zstd.Decoder)
+		return ret.(*zstd.Decoder), nil
 	}
 
 	zstdDecoderInitMu.Lock()
 	defer zstdDecoderInitMu.Unlock()
 
 	if ret, ok := zstdDecMap.Load(key); ok {
-		return ret.(*zstd.Decoder)
+		return ret.(*zstd.Decoder), nil
 	}
 
 	opts := []zstd.DOption{zstd.WithDecoderConcurrency(0)}
 	if maxDecodedSize > 0 {
 		opts = append(opts, zstd.WithDecoderMaxMemory(uint64(maxDecodedSize)))
 	}
-	zstdDec, _ := zstd.NewReader(nil, opts...)
-	zstdDecMap.Store(key, zstdDec)
-	return zstdDec
+	dec, err := zstd.NewReader(nil, opts...)
+	if err != nil {
+		return nil, err
+	}
+	zstdDecMap.Store(key, dec)
+	return dec, nil
 }
 
 func zstdDecompress(params ZstdDecoderParams, dst, src []byte, maxDecodedSize int) ([]byte, error) {
-	return getDecoder(params, maxDecodedSize).DecodeAll(src, dst)
+	dec, err := getDecoder(params, maxDecodedSize)
+	if err != nil {
+		return nil, err
+	}
+	return dec.DecodeAll(src, dst)
 }
 
 func zstdCompress(params ZstdEncoderParams, dst, src []byte) ([]byte, error) {
-	enc := getZstdEncoder(params)
+	enc, err := getZstdEncoder(params)
+	if err != nil {
+		return nil, err
+	}
 	out := enc.EncodeAll(src, dst)
 	releaseEncoder(params, enc)
 	return out, nil

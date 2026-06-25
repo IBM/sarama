@@ -25,7 +25,7 @@ func BenchmarkZstdMemoryConsumption(b *testing.B) {
 		b.ReportAllocs()
 		for b.Loop() {
 			_, _ = zstdCompress(params, nil, buf)
-			_ = getZstdEncoder(params)
+			_, _ = getZstdEncoder(params)
 		}
 	})
 
