@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/eapache/go-resiliency/breaker"
@@ -114,6 +115,11 @@ type asyncProducer struct {
 	// muter ensures per-partition ordering by preventing concurrent in-flight requests,
 	// mirroring Kafka's RecordAccumulator.
 	muter *partitionMuter
+
+	// done is closed on shutdown so a retryBatch goroutine blocked handing a muted
+	// batch to a broker can release the mute and fail instead of waiting forever.
+	done   chan struct{}
+	closed atomic.Bool
 
 	metricsRegistry metrics.Registry
 }
@@ -314,6 +320,7 @@ func newAsyncProducer(client Client) (AsyncProducer, error) {
 		input:           make(chan *ProducerMessage),
 		successes:       make(chan *ProducerMessage),
 		retries:         make(chan *ProducerMessage),
+		done:            make(chan struct{}),
 		brokers:         make(map[*Broker]*brokerProducer),
 		brokerRefs:      make(map[*brokerProducer]int),
 		txnmgr:          txnmgr,
@@ -1504,8 +1511,15 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 		}
 	}
 	bp := p.getBrokerProducer(leader)
-	bp.output <- produceSet
-	p.unrefBrokerProducer(leader, bp)
+	defer p.unrefBrokerProducer(leader, bp)
+	select {
+	case bp.output <- produceSet:
+	case <-p.done:
+		for _, msg := range pSet.msgs {
+			p.returnError(msg, ErrShuttingDown)
+		}
+		p.muter.unmute(produceSet)
+	}
 }
 
 func (bp *brokerProducer) handleError(sent *produceSet, err error) {
@@ -1634,6 +1648,9 @@ func (p *asyncProducer) retryHandler() {
 
 func (p *asyncProducer) shutdown() {
 	Logger.Println("Producer shutting down.")
+	if p.done != nil && p.closed.CompareAndSwap(false, true) {
+		close(p.done)
+	}
 	p.inFlight.Add(1)
 	p.input <- &ProducerMessage{flags: shutdown}
 

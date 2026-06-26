@@ -2083,6 +2083,58 @@ func TestRetryBatchRespectsPartitionMuter(t *testing.T) {
 	}
 }
 
+func TestRetryBatchReleasesMuteOnShutdown(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Return.Errors = true
+
+	parent := &asyncProducer{
+		conf:       config,
+		muter:      newPartitionMuter(),
+		brokers:    make(map[*Broker]*brokerProducer),
+		brokerRefs: make(map[*brokerProducer]int),
+		errors:     make(chan *ProducerError, 1),
+		done:       make(chan struct{}),
+		txnmgr:     &transactionManager{},
+	}
+	leader := &Broker{id: 1}
+	parent.client = &stubLeaderClient{leader: leader, cfg: config}
+
+	// unbuffered and never read, so the handoff can only complete via shutdown
+	parent.brokers[leader] = &brokerProducer{
+		parent: parent,
+		broker: leader,
+		output: make(chan *produceSet),
+		input:  make(chan *ProducerMessage),
+	}
+
+	sent := newProduceSet(parent)
+	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+	retryPartitionSet := sent.msgs["topic"][0]
+	require.True(t, parent.muter.tryMute(sent), "sent batch should mute its partition")
+	parent.inFlight.Add(1)
+
+	done := make(chan struct{})
+	go func() {
+		parent.retryBatch("topic", 0, retryPartitionSet, ErrOutOfBrokers, true)
+		close(done)
+	}()
+
+	require.True(t, parent.closed.CompareAndSwap(false, true))
+	close(parent.done)
+
+	producerErr := assertDoneWithin(t, parent.errors, 2*time.Second)
+	require.Equal(t, ErrShuttingDown, producerErr.Err)
+	assertDoneWithin(t, done, 2*time.Second)
+
+	contender := newProduceSet(parent)
+	safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+	require.True(t, parent.muter.tryMute(contender), "partition mute should be released after aborted handoff")
+	parent.muter.unmute(contender)
+}
+
 type stubLeaderClient struct {
 	cfg    *Config
 	leader *Broker
