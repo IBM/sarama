@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -50,10 +51,17 @@ func (p *iamTokenProvider) Token() (*sarama.AccessToken, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	// Sarama calls Token() on the initial SASL handshake and again on every
+	// re-authentication (KIP-368, triggered by the broker's
+	// connections.max.reauth.ms). While the cached token is still valid we
+	// reuse it, so re-authentication does not force a fresh IAM exchange.
 	if p.token != "" && time.Now().Before(p.expiresAt) {
+		log.Printf("[token] reusing cached IAM token (valid for another %s)",
+			time.Until(p.expiresAt).Round(time.Second))
 		return &sarama.AccessToken{Token: p.token}, nil
 	}
 
+	log.Println("[token] requesting a new IAM access token (initial auth or re-authentication)")
 	token, expiresIn, err := p.fetchToken()
 	if err != nil {
 		return nil, err
@@ -61,6 +69,8 @@ func (p *iamTokenProvider) Token() (*sarama.AccessToken, error) {
 
 	p.token = token
 	p.expiresAt = time.Now().Add(time.Duration(expiresIn) * time.Second).Add(-expiryWindow)
+	log.Printf("[token] obtained new IAM token (expires_in=%ds, will refresh after %s)",
+		expiresIn, p.expiresAt.Format(time.RFC3339))
 
 	return &sarama.AccessToken{Token: p.token}, nil
 }
