@@ -775,7 +775,7 @@ func (t *transactionManager) maybeAddPartitionToCurrentTxn(topic string, partiti
 	t.pendingPartitionsInCurrentTxn[tp] = struct{}{}
 }
 
-// Makes a request to kafka to add a list of partitions ot the current transaction.
+// Makes a request to kafka to add a list of partitions to the current transaction.
 func (t *transactionManager) publishTxnPartitions() error {
 	t.partitionInTxnLock.Lock()
 	defer t.partitionInTxnLock.Unlock()
