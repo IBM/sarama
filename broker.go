@@ -101,7 +101,7 @@ type AccessToken struct {
 	Extensions map[string]string
 }
 
-// AccessTokenProvider is the interface that encapsulates how implementors
+// AccessTokenProvider is the interface that encapsulates how implementers
 // can generate access tokens for Kafka broker authentication.
 type AccessTokenProvider interface {
 	// Token returns an access token. The implementation should ensure token

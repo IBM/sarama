@@ -1311,7 +1311,7 @@ func (bc *brokerConsumer) fetchNewMessages() (*FetchResponse, error) {
 	// partitions are processed in the order they appear in the request.
 	case bc.consumer.conf.Version.IsAtLeast(V0_10_1_0):
 		request.Version = 3
-	// Starting in version 2, the requestor must be able to handle Kafka log
+	// Starting in version 2, the requester must be able to handle Kafka log
 	// message format version 1.
 	case bc.consumer.conf.Version.IsAtLeast(V0_10_0_0):
 		request.Version = 2

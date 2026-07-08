@@ -275,7 +275,7 @@ func (client *client) Broker(brokerID int32) (*Broker, error) {
 }
 
 func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
-	// FIXME: this InitProducerID seems to only be called from client_test.go (TestInitProducerIDConnectionRefused) and has been superceded by transaction_manager.go?
+	// FIXME: this InitProducerID seems to only be called from client_test.go (TestInitProducerIDConnectionRefused) and has been superseded by transaction_manager.go?
 	brokerErrors := make([]error, 0)
 	for broker := client.LeastLoadedBroker(); broker != nil; broker = client.LeastLoadedBroker() {
 		request := &InitProducerIDRequest{}

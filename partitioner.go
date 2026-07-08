@@ -194,7 +194,7 @@ func NewReferenceHashPartitioner(topic string) Partitioner {
 	return p
 }
 
-// NewConsistentCRCHashPartitioner is like NewHashPartitioner execpt that it uses the *unsigned* crc32 hash
+// NewConsistentCRCHashPartitioner is like NewHashPartitioner except that it uses the *unsigned* crc32 hash
 // of the encoded bytes of the message key modulus the number of partitions.  This is compatible with
 // librdkafka's `consistent_random` partitioner
 func NewConsistentCRCHashPartitioner(topic string) Partitioner {
