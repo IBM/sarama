@@ -75,7 +75,7 @@ var names = map[int16]string{
 	58:                                 "EnvelopeRequest",
 	59:                                 "FetchSnapshotRequest",
 	apiKeyDescribeCluster:              "DescribeClusterRequest",
-	61:                                 "DescribeProducersRequest",
+	apiKeyDescribeProducers:            "DescribeProducersRequest",
 	62:                                 "BrokerRegistrationRequest",
 	63:                                 "BrokerHeartbeatRequest",
 	64:                                 "UnregisterBrokerRequest",
@@ -323,6 +323,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeConfigs:      4,  // up from 3
 				apiKeyAddPartitionsToTxn:   3,  // up from 2
 				apiKeyProduce:              9,  // up from 8
+				apiKeyDescribeProducers:    0,  // new in 2.8
 				// TODO: ListOffsetsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyListOffsets:          6, // up from 5
 				// TODO: AddOffsetsToTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0
@@ -337,8 +338,6 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyCreateTopics:         7, // up from 6
 				// TODO: DeleteTopicsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyDeleteTopics:         6, // up from 5
-				// TODO: DescribeProducersRequest v0 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyDescribeProducers /* (61) */: 0, // new in 2.8
 			},
 		},
 		{
@@ -539,6 +538,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyAlterUserScramCredentials:    maxVersion(&AlterUserScramCredentialsRequest{}),
 				apiKeyUpdateFeatures:               maxVersion(&UpdateFeaturesRequest{}),
 				apiKeyDescribeCluster:              maxVersion(&DescribeClusterRequest{}),
+				apiKeyDescribeProducers:            maxVersion(&DescribeProducersRequest{}),
 			},
 		},
 	}

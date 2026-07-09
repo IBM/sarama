@@ -1021,6 +1021,19 @@ func (b *Broker) UpdateFeatures(req *UpdateFeaturesRequest) (*UpdateFeaturesResp
 	return res, nil
 }
 
+// DescribeProducers sends a request to list the active producer state for
+// topic partitions led by this broker
+func (b *Broker) DescribeProducers(req *DescribeProducersRequest) (*DescribeProducersResponse, error) {
+	res := new(DescribeProducersResponse)
+
+	err := b.sendAndReceive(req, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // DescribeClientQuotas sends a request to get the broker's quotas
 func (b *Broker) DescribeClientQuotas(request *DescribeClientQuotasRequest) (*DescribeClientQuotasResponse, error) {
 	response := new(DescribeClientQuotasResponse)
