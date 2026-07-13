@@ -43,6 +43,8 @@ var (
 	}
 
 	createTopicsRequestV6 = createTopicsRequestV5
+
+	createTopicsRequestV7 = createTopicsRequestV5
 )
 
 func TestCreateTopicsRequest(t *testing.T) {
@@ -76,4 +78,7 @@ func TestCreateTopicsRequest(t *testing.T) {
 
 	req.Version = 6
 	testRequest(t, "version 6", req, createTopicsRequestV6)
+
+	req.Version = 7
+	testRequest(t, "version 7", req, createTopicsRequestV7)
 }

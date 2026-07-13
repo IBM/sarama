@@ -68,6 +68,26 @@ var (
 		0, // empty tagged fields
 	}
 
+	createTopicsResponseV7 = []byte{
+		0, 0, 0, 100,
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // topic ID
+		0, 42, // invalid request error
+		4, 'm', 's', 'g', // error message
+		0, 0, 0, 1, // num partitions
+		0, 2, // replication factor
+		2,                // 1 config
+		4, 'b', 'a', 'r', // name
+		4, 'b', 'a', 'z', // value
+		0, // read only
+		5, // source default
+		0, // is sensitive
+		0, // empty tagged fields
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
+
 	createTopicsResponseV5WithTopicConfigError = []byte{
 		0, 0, 0, 100,
 		2,
@@ -136,6 +156,11 @@ func TestCreateTopicsResponse(t *testing.T) {
 	resp.TopicErrors["topic"].Err = ErrInvalidRequest
 	resp.TopicResults["topic"].TopicConfigErrorCode = ErrTopicAuthorizationFailed
 	testResponse(t, "version 5", resp, createTopicsResponseV5WithTopicConfigError)
+
+	resp.Version = 7
+	resp.TopicResults["topic"].TopicConfigErrorCode = ErrNoError
+	resp.TopicResults["topic"].TopicID = Uuid{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+	testResponse(t, "version 7", resp, createTopicsResponseV7)
 }
 
 func TestTopicError(t *testing.T) {
