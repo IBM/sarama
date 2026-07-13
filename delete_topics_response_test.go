@@ -39,6 +39,17 @@ var (
 		0, // empty tagged fields
 		0, // empty tagged fields
 	}
+
+	deleteTopicsResponseV6 = []byte{
+		0, 0, 0, 100,
+		2,
+		6, 't', 'o', 'p', 'i', 'c',
+		1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, // topic ID
+		0, 89, // throttling quota exceeded error
+		4, 'm', 's', 'g', // error message
+		0, // empty tagged fields
+		0, // empty tagged fields
+	}
 )
 
 func TestDeleteTopicsResponse(t *testing.T) {
@@ -64,4 +75,10 @@ func TestDeleteTopicsResponse(t *testing.T) {
 		"topic": nullString("msg"),
 	}
 	testResponse(t, "version 5", resp, deleteTopicsResponseV5)
+
+	resp.Version = 6
+	resp.TopicIDs = map[string]Uuid{
+		"topic": {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16},
+	}
+	testResponse(t, "version 6", resp, deleteTopicsResponseV6)
 }

@@ -9,6 +9,7 @@ type DeleteTopicsResponse struct {
 	ThrottleTime       time.Duration
 	TopicErrorCodes    map[string]KError
 	TopicErrorMessages map[string]*string // v5, ErrorMessage
+	TopicIDs           map[string]Uuid    // v6, TopicId (KIP-516)
 }
 
 func (d *DeleteTopicsResponse) setVersion(v int16) {
@@ -24,8 +25,17 @@ func (d *DeleteTopicsResponse) encode(pe packetEncoder) error {
 		return err
 	}
 	for topic, errorCode := range d.TopicErrorCodes {
-		if err := pe.putString(topic); err != nil {
-			return err
+		if d.Version >= 6 {
+			if err := pe.putNullableString(&topic); err != nil {
+				return err
+			}
+			if err := pe.putUuid(d.TopicIDs[topic]); err != nil {
+				return err
+			}
+		} else {
+			if err := pe.putString(topic); err != nil {
+				return err
+			}
 		}
 		pe.putKError(errorCode)
 		if d.Version >= 5 {
@@ -61,11 +71,27 @@ func (d *DeleteTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 	if version >= 5 {
 		d.TopicErrorMessages = make(map[string]*string, n)
 	}
+	if version >= 6 {
+		d.TopicIDs = make(map[string]Uuid, n)
+	}
 
 	for range n {
-		topic, err := pd.getString()
-		if err != nil {
-			return err
+		var topic string
+		if version >= 6 {
+			name, err := pd.getNullableString()
+			if err != nil {
+				return err
+			}
+			if name != nil {
+				topic = *name
+			}
+			if d.TopicIDs[topic], err = pd.getUuid(); err != nil {
+				return err
+			}
+		} else {
+			if topic, err = pd.getString(); err != nil {
+				return err
+			}
 		}
 		d.TopicErrorCodes[topic], err = pd.getKError()
 		if err != nil {
@@ -110,11 +136,13 @@ func (d *DeleteTopicsResponse) isFlexibleVersion(version int16) bool {
 }
 
 func (d *DeleteTopicsResponse) isValidVersion() bool {
-	return d.Version >= 0 && d.Version <= 5
+	return d.Version >= 0 && d.Version <= 6
 }
 
 func (d *DeleteTopicsResponse) requiredVersion() KafkaVersion {
 	switch d.Version {
+	case 6:
+		return V2_8_0_0
 	case 5:
 		return V2_7_0_0
 	case 4:
