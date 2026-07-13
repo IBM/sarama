@@ -329,8 +329,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyEndTxn:               3,  // up from 2
 				apiKeyAlterConfigs:         2,  // up from 1
 				apiKeyAlterClientQuotas:    1,  // up from 0
-				// TODO: CreateTopicsRequest v7 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyCreateTopics:         7, // up from 6
+				apiKeyCreateTopics:         7,  // up from 6
 				// TODO: DeleteTopicsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyDeleteTopics:         6, // up from 5
 			},
