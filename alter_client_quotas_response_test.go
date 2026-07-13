@@ -25,6 +25,19 @@ var (
 		255, 255, // entityName
 	}
 
+	alterClientQuotasResponseSingleEntryV1 = []byte{
+		0, 0, 0, 0, // ThrottleTime
+		2,    // Entries
+		0, 0, // ErrorCode
+		0,                     // ErrorMsg
+		2,                     // Entity
+		5, 'u', 's', 'e', 'r', // EntityType
+		0, // EntityName
+		0, // tagged fields (entity)
+		0, // tagged fields (entry)
+		0, // tagged fields
+	}
+
 	alterClientQuotasResponseMultipleEntries = []byte{
 		0, 0, 0, 0, // ThrottleTime
 		0, 0, 0, 2, // Entries len
@@ -80,6 +93,10 @@ func TestAlterClientQuotasResponse(t *testing.T) {
 		Entries:      []AlterClientQuotasEntryResponse{entry},
 	}
 	testResponse(t, "Altered single entry", res, alterClientQuotasResponseSingleEntry)
+
+	res.Version = 1
+	testResponse(t, "Altered single entry v1", res, alterClientQuotasResponseSingleEntryV1)
+	res.Version = 0
 
 	// Response Altered multiple entries
 	entry1 := AlterClientQuotasEntryResponse{

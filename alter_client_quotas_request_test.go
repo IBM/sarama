@@ -17,6 +17,22 @@ var (
 		0, // validate only
 	}
 
+	alterClientQuotasRequestSingleOpV1 = []byte{
+		2,                     // Entries
+		2,                     // Entity
+		5, 'u', 's', 'e', 'r', // EntityType
+		0,                                                                                            // EntityName
+		0,                                                                                            // tagged fields (entity)
+		2,                                                                                            // Ops
+		19, 'p', 'r', 'o', 'd', 'u', 'c', 'e', 'r', '_', 'b', 'y', 't', 'e', '_', 'r', 'a', 't', 'e', // Key
+		65, 46, 132, 128, 0, 0, 0, 0, // Value
+		0, // Remove
+		0, // tagged fields (op)
+		0, // tagged fields (entry)
+		0, // ValidateOnly
+		0, // tagged fields
+	}
+
 	alterClientQuotasRequestRemoveSingleOp = []byte{
 		0, 0, 0, 1, // entries len
 		0, 0, 0, 1, // entity len
@@ -92,6 +108,9 @@ func TestAlterClientQuotasRequest(t *testing.T) {
 		ValidateOnly: false,
 	}
 	testRequest(t, "Add single Quota op", req, alterClientQuotasRequestSingleOp)
+
+	req.Version = 1
+	testRequest(t, "Add single Quota op v1", req, alterClientQuotasRequestSingleOpV1)
 
 	// Remove Quota from default user
 	op = ClientQuotasOp{
