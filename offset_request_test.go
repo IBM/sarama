@@ -60,6 +60,20 @@ var (
 		0xff, 0xff, 0xff, 0xff, // leader epoch
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // timestamp
 	}
+
+	offsetRequestV6 = []byte{
+		0xff, 0xff, 0xff, 0xff, // ReplicaId
+		0x01,                         // IsolationLevel
+		0x02,                         // Topics
+		0x05, 0x64, 0x6e, 0x77, 0x65, // Name
+		0x02,                   // Partitions
+		0x00, 0x00, 0x00, 0x09, // PartitionIndex
+		0xff, 0xff, 0xff, 0xff, // CurrentLeaderEpoch
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Timestamp
+		0x00, // tagged fields (partition)
+		0x00, // tagged fields (topic)
+		0x00, // tagged fields
+	}
 )
 
 func TestOffsetRequest(t *testing.T) {
@@ -107,4 +121,12 @@ func TestOffsetRequestV4(t *testing.T) {
 	request.IsolationLevel = ReadCommitted
 	request.AddBlock("dnwe", 9, -1, -1)
 	testRequest(t, "V4", request, offsetRequestV4)
+}
+
+func TestOffsetRequestV6(t *testing.T) {
+	request := new(OffsetRequest)
+	request.Version = 6
+	request.IsolationLevel = ReadCommitted
+	request.AddBlock("dnwe", 9, -1, -1)
+	testRequest(t, "V6", request, offsetRequestV6)
 }

@@ -52,6 +52,21 @@ var (
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // offset
 		0xff, 0xff, 0xff, 0xff, // leaderEpoch
 	}
+
+	offsetResponseV6 = []byte{
+		0x00, 0x00, 0x00, 0x00, // ThrottleTimeMs
+		0x02,                         // Topics
+		0x05, 0x64, 0x6e, 0x77, 0x65, // Name
+		0x02,                   // Partitions
+		0x00, 0x00, 0x00, 0x09, // PartitionIndex
+		0x00, 0x00, // ErrorCode
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // Timestamp
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Offset
+		0xff, 0xff, 0xff, 0xff, // LeaderEpoch
+		0x00, // tagged fields (partition)
+		0x00, // tagged fields (topic)
+		0x00, // tagged fields
+	}
 )
 
 func TestEmptyOffsetResponse(t *testing.T) {
@@ -134,4 +149,23 @@ func TestOffsetResponseV4(t *testing.T) {
 	response := OffsetResponse{}
 
 	testVersionDecodable(t, "v4", &response, offsetResponseV4, 4)
+}
+
+func TestOffsetResponseV6(t *testing.T) {
+	response := &OffsetResponse{
+		Version: 6,
+		Blocks: map[string]map[int32]*OffsetResponseBlock{
+			"dnwe": {
+				9: {
+					Err:         ErrNoError,
+					Offsets:     []int64{0},
+					Timestamp:   -1,
+					Offset:      0,
+					LeaderEpoch: -1,
+				},
+			},
+		},
+	}
+
+	testResponse(t, "v6", response, offsetResponseV6)
 }
