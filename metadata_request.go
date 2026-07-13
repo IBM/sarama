@@ -8,8 +8,6 @@ func (u Uuid) String() string {
 	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(u[:])
 }
 
-var NullUUID = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-
 type MetadataRequest struct {
 	// Version defines the protocol version to use for encode and decode
 	Version int16
@@ -66,7 +64,7 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 			}
 		} else { // r.Version >= 10
 			for _, topicName := range r.Topics {
-				if err := pe.putRawBytes(NullUUID); err != nil {
+				if err := pe.putUuid(Uuid{}); err != nil {
 					return err
 				}
 				// Avoid implicit memory aliasing in for loop
@@ -118,7 +116,7 @@ func (r *MetadataRequest) decode(pd packetDecoder, version int16) (err error) {
 		}
 	} else {
 		for i := range r.Topics {
-			if _, err = pd.getRawBytes(16); err != nil { // skip UUID
+			if _, err = pd.getUuid(); err != nil { // skip UUID
 				return err
 			}
 			topic, err := pd.getNullableString()
