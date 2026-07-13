@@ -98,6 +98,11 @@ func (pe *prepEncoder) putRawBytes(in []byte) error {
 	return nil
 }
 
+func (pe *prepEncoder) putUuid(in Uuid) error {
+	pe.length += 16
+	return nil
+}
+
 func (pe *prepEncoder) putNullableString(in *string) error {
 	if in == nil {
 		pe.length += 2

@@ -84,6 +84,10 @@ func (re *realEncoder) putRawBytes(in []byte) error {
 	return nil
 }
 
+func (re *realEncoder) putUuid(in Uuid) error {
+	return re.putRawBytes(in[:])
+}
+
 func (re *realEncoder) putBytes(in []byte) error {
 	if in == nil {
 		re.putInt32(-1)

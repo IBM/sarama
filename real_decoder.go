@@ -323,6 +323,16 @@ func (rd *realDecoder) getSubset(length int) (packetDecoder, error) {
 	return &realDecoder{raw: buf}, nil
 }
 
+func (rd *realDecoder) getUuid() (Uuid, error) {
+	var uuid Uuid
+	raw, err := rd.getRawBytes(16)
+	if err != nil {
+		return uuid, err
+	}
+	copy(uuid[:], raw)
+	return uuid, nil
+}
+
 func (rd *realDecoder) getRawBytes(length int) ([]byte, error) {
 	if length < 0 {
 		return nil, errInvalidByteSliceLength

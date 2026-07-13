@@ -126,13 +126,9 @@ func (t *TopicMetadata) decode(pd packetDecoder, version int16) (err error) {
 	}
 
 	if t.Version >= 10 {
-		uuid, err := pd.getRawBytes(16)
+		t.Uuid, err = pd.getUuid()
 		if err != nil {
 			return err
-		}
-		t.Uuid = [16]byte{}
-		for i := range 16 {
-			t.Uuid[i] = uuid[i]
 		}
 	}
 
@@ -180,7 +176,7 @@ func (t *TopicMetadata) encode(pe packetEncoder, version int16) (err error) {
 	}
 
 	if t.Version >= 10 {
-		err = pe.putRawBytes(t.Uuid[:])
+		err = pe.putUuid(t.Uuid)
 		if err != nil {
 			return err
 		}
