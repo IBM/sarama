@@ -326,8 +326,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeProducers:    0,  // new in 2.8
 				// TODO: ListOffsetsRequest v6 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyListOffsets:          6, // up from 5
-				// TODO: AddOffsetsToTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyAddOffsetsToTxn:      3, // up from 2
+				apiKeyAddOffsetsToTxn: 3, // up from 2
 				// TODO: EndTxnRequest v3 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyEndTxn:               3, // up from 2
 				// TODO: AlterConfigsRequest v2 is not supported, but expected for KafkaVersion 2.8.0
