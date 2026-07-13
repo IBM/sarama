@@ -664,7 +664,10 @@ func (t *transactionManager) endTxn(commit bool) error {
 			ProducerID:        t.producerID,
 			TransactionResult: commit,
 		}
-		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+		if t.client.Config().Version.IsAtLeast(V2_8_0_0) {
+			// Version 3 enables flexible versions.
+			request.Version = 3
+		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
 			// Version 2 adds the support for new error code PRODUCER_FENCED.
 			request.Version = 2
 		} else if t.client.Config().Version.IsAtLeast(V2_0_0_0) {
