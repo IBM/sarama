@@ -267,6 +267,15 @@ func (re *realFlexibleEncoder) putNullableInt32Array(in []int32) error {
 	return nil
 }
 
+func (re *realFlexibleEncoder) putInt64Array(in []int64) error {
+	// 0 represents a null array, so +1 has to be added
+	re.putUVarint(uint64(len(in)) + 1)
+	for _, val := range in {
+		re.putInt64(val)
+	}
+	return nil
+}
+
 func (re *realFlexibleEncoder) putEmptyTaggedFieldArray() {
 	re.putUVarint(0)
 }

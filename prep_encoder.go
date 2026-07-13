@@ -257,6 +257,12 @@ func (pe *prepFlexibleEncoder) putNullableInt32Array(in []int32) error {
 	return nil
 }
 
+func (pe *prepFlexibleEncoder) putInt64Array(in []int64) error {
+	pe.putUVarint(uint64(len(in)) + 1)
+	pe.length += 8 * len(in)
+	return nil
+}
+
 func (pe *prepFlexibleEncoder) putEmptyTaggedFieldArray() {
 	pe.putUVarint(0)
 }

@@ -577,6 +577,40 @@ func (rd *realFlexibleDecoder) getNullableInt32Array() ([]int32, error) {
 	return ret, nil
 }
 
+func (rd *realFlexibleDecoder) getInt64Array() ([]int64, error) {
+	ret, err := rd.getNullableInt64Array()
+	if ret == nil && err == nil {
+		return nil, errInvalidArrayLength
+	}
+	return ret, err
+}
+
+func (rd *realFlexibleDecoder) getNullableInt64Array() ([]int64, error) {
+	n, err := rd.getUVarint()
+	if err != nil {
+		return nil, err
+	}
+
+	if n == 0 {
+		return nil, nil
+	}
+
+	arrayLength := n - 1
+
+	if uint64(rd.remaining()/8) < arrayLength { //nolint:gosec // G115 - remaining() is non-negative
+		rd.off = len(rd.raw)
+		return nil, ErrInsufficientData
+	}
+
+	ret := make([]int64, int(arrayLength)) //nolint:gosec // G115 - value bounded by remaining() above
+
+	for i := range ret {
+		ret[i] = int64(binary.BigEndian.Uint64(rd.raw[rd.off:]))
+		rd.off += 8
+	}
+	return ret, nil
+}
+
 func (rd *realFlexibleDecoder) getStringArray() ([]string, error) {
 	n, err := rd.getArrayLength()
 	if err != nil {
