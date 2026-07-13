@@ -66,6 +66,8 @@ func FuzzVersionedDecodeRequest(f *testing.F) {
 		{key: apiKeyUpdateFeatures, version: 0, body: updateFeaturesRequestV0},
 		{key: apiKeyDescribeProducers, version: 0, body: describeProducersRequestV0},
 		{key: apiKeyDescribeTransactions, version: 0, body: describeTransactionsRequestV0},
+		{key: apiKeyListTransactions, version: 0, body: listTransactionsRequestV0},
+		{key: apiKeyListTransactions, version: 1, body: listTransactionsRequestV1},
 	} {
 		f.Add(seed.key, seed.version, seed.body)
 	}
@@ -123,6 +125,7 @@ func FuzzVersionedDecodeResponse(f *testing.F) {
 		{key: apiKeyUpdateFeatures, version: 0, body: updateFeaturesResponseV0},
 		{key: apiKeyDescribeProducers, version: 0, body: describeProducersResponseV0},
 		{key: apiKeyDescribeTransactions, version: 0, body: describeTransactionsResponseV0},
+		{key: apiKeyListTransactions, version: 0, body: listTransactionsResponseV0},
 	} {
 		f.Add(seed.key, seed.version, seed.body)
 	}
