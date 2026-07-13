@@ -23,6 +23,18 @@ var (
 	}
 
 	deleteTopicsRequestV5 = deleteTopicsRequestV4
+
+	deleteTopicsRequestV6 = []byte{
+		3,                          // Topics
+		6, 't', 'o', 'p', 'i', 'c', // Name
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // TopicId
+		0,                          // tagged fields (topic)
+		6, 'o', 't', 'h', 'e', 'r', // Name
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // TopicId
+		0,            // tagged fields (topic)
+		0, 0, 0, 100, // TimeoutMs
+		0, // tagged fields
+	}
 )
 
 func TestDeleteTopicsRequestV0(t *testing.T) {
@@ -63,4 +75,14 @@ func TestDeleteTopicsRequestV5(t *testing.T) {
 	}
 
 	testRequest(t, "", req, deleteTopicsRequestV5)
+}
+
+func TestDeleteTopicsRequestV6(t *testing.T) {
+	req := &DeleteTopicsRequest{
+		Version: 6,
+		Topics:  []string{"topic", "other"},
+		Timeout: 100 * time.Millisecond,
+	}
+
+	testRequest(t, "", req, deleteTopicsRequestV6)
 }
