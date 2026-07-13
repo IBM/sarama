@@ -130,53 +130,14 @@ func TestRealDecoderGetNullableInt32Array(t *testing.T) {
 	}
 }
 
+// getInt32Array only diverges from getNullableInt32Array on null input
 func TestRealDecoderGetInt32Array(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   []byte
-		want    []int32
-		wantErr error
-	}{
-		{
-			name:    "null array",
-			input:   []byte{0xFF, 0xFF, 0xFF, 0xFF},
-			wantErr: errInvalidArrayLength,
-		},
-		{
-			name:  "empty array",
-			input: []byte{0x00, 0x00, 0x00, 0x00},
-			want:  []int32{},
-		},
-		{
-			name:  "valid array",
-			input: []byte{0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02},
-			want:  []int32{1, 2},
-		},
-		{
-			name:    "insufficient data for length",
-			input:   []byte{0x00, 0x00, 0x00},
-			wantErr: ErrInsufficientData,
-		},
-		{
-			name:    "insufficient data for elements",
-			input:   []byte{0x00, 0x00, 0x00, 0x02},
-			wantErr: ErrInsufficientData,
-		},
-		{
-			name:    "invalid length",
-			input:   []byte{0x80, 0x00, 0x00, 0x00},
-			wantErr: errInvalidArrayLength,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			rd := &realDecoder{raw: tt.input}
-			got, err := rd.getInt32Array()
-			require.ErrorIs(t, err, tt.wantErr)
-			assert.Equal(t, tt.want, got)
-		})
-	}
+	t.Run("returns errInvalidArrayLength for null array", func(t *testing.T) {
+		rd := &realDecoder{raw: []byte{0xFF, 0xFF, 0xFF, 0xFF}}
+		got, err := rd.getInt32Array()
+		require.ErrorIs(t, err, errInvalidArrayLength)
+		assert.Nil(t, got)
+	})
 }
 
 func TestRealFlexibleDecoderGetNullableInt32Array(t *testing.T) {
@@ -215,30 +176,52 @@ func TestRealFlexibleDecoderGetNullableInt32Array(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+	t.Run("returns insufficient data for compact length exceeding int64", func(t *testing.T) {
+		var input [binary.MaxVarintLen64]byte
+		n := binary.PutUvarint(input[:], 1<<63)
+
+		rd := &realFlexibleDecoder{&realDecoder{raw: input[:n]}}
+		array, err := rd.getNullableInt32Array()
+
+		require.ErrorIs(t, err, ErrInsufficientData)
+		assert.Nil(t, array)
+	})
 }
 
+// getInt32Array only diverges from getNullableInt32Array on null input
 func TestRealFlexibleDecoderGetInt32Array(t *testing.T) {
+	t.Run("returns errInvalidArrayLength for null array", func(t *testing.T) {
+		rd := &realFlexibleDecoder{&realDecoder{raw: []byte{0x00}}}
+		got, err := rd.getInt32Array()
+		require.ErrorIs(t, err, errInvalidArrayLength)
+		assert.Nil(t, got)
+	})
+}
+
+func TestRealFlexibleDecoderGetNullableInt64Array(t *testing.T) {
 	tests := []struct {
 		name    string
 		input   []byte
-		want    []int32
+		want    []int64
 		wantErr error
 	}{
 		{
-			name:    "null array",
-			input:   []byte{0x00},
-			wantErr: errInvalidArrayLength,
+			name:  "null array",
+			input: []byte{0x00},
 		},
 		{
 			name:  "empty array",
 			input: []byte{0x01},
-			want:  []int32{},
+			want:  []int64{},
 		},
 		{
-			name:    "valid array",
-			input:   []byte{0x03, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02},
-			want:    []int32{1, 2},
-			wantErr: nil,
+			name: "valid array",
+			input: []byte{
+				0x03,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+			},
+			want: []int64{1, 2},
 		},
 		{
 			name:    "insufficient data",
@@ -250,7 +233,7 @@ func TestRealFlexibleDecoderGetInt32Array(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			rd := &realFlexibleDecoder{&realDecoder{raw: tt.input}}
-			got, err := rd.getInt32Array()
+			got, err := rd.getNullableInt64Array()
 			require.ErrorIs(t, err, tt.wantErr)
 			assert.Equal(t, tt.want, got)
 		})
@@ -260,9 +243,19 @@ func TestRealFlexibleDecoderGetInt32Array(t *testing.T) {
 		n := binary.PutUvarint(input[:], 1<<63)
 
 		rd := &realFlexibleDecoder{&realDecoder{raw: input[:n]}}
-		array, err := rd.getInt32Array()
+		array, err := rd.getNullableInt64Array()
 
 		require.ErrorIs(t, err, ErrInsufficientData)
 		assert.Nil(t, array)
+	})
+}
+
+// getInt64Array only diverges from getNullableInt64Array on null input
+func TestRealFlexibleDecoderGetInt64Array(t *testing.T) {
+	t.Run("returns errInvalidArrayLength for null array", func(t *testing.T) {
+		rd := &realFlexibleDecoder{&realDecoder{raw: []byte{0x00}}}
+		got, err := rd.getInt64Array()
+		require.ErrorIs(t, err, errInvalidArrayLength)
+		assert.Nil(t, got)
 	})
 }
