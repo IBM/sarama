@@ -32,6 +32,9 @@ func NewCreateTopicsRequest(
 		ValidateOnly: validateOnly,
 	}
 	switch {
+	case version.IsAtLeast(V2_8_0_0):
+		// Version 7 returns the topic ID of the newly created topic in the response
+		r.Version = 7
 	case version.IsAtLeast(V2_7_0_0):
 		// version 6 may return THROTTLING_QUOTA_EXCEEDED
 		r.Version = 6
@@ -139,11 +142,13 @@ func (c *CreateTopicsRequest) isFlexibleVersion(version int16) bool {
 }
 
 func (c *CreateTopicsRequest) isValidVersion() bool {
-	return c.Version >= 0 && c.Version <= 6
+	return c.Version >= 0 && c.Version <= 7
 }
 
 func (c *CreateTopicsRequest) requiredVersion() KafkaVersion {
 	switch c.Version {
+	case 7:
+		return V2_8_0_0
 	case 6:
 		return V2_7_0_0
 	case 5:

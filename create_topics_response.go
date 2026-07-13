@@ -33,14 +33,23 @@ func (c *CreateTopicsResponse) encode(pe packetEncoder) error {
 		if err := pe.putString(topic); err != nil {
 			return err
 		}
+		var result *CreatableTopicResult
+		if c.Version >= 5 {
+			var ok bool
+			result, ok = c.TopicResults[topic]
+			if !ok {
+				return fmt.Errorf("expected TopicResult for topic, %s, for V5 protocol", topic)
+			}
+		}
+		if c.Version >= 7 {
+			if err := pe.putUuid(result.TopicID); err != nil {
+				return err
+			}
+		}
 		if err := topicError.encode(pe, c.Version); err != nil {
 			return err
 		}
 		if c.Version >= 5 {
-			result, ok := c.TopicResults[topic]
-			if !ok {
-				return fmt.Errorf("expected TopicResult for topic, %s, for V5 protocol", topic)
-			}
 			if err := result.encode(pe, c.Version); err != nil {
 				return err
 			}
@@ -77,12 +86,19 @@ func (c *CreateTopicsResponse) decode(pd packetDecoder, version int16) (err erro
 		if err != nil {
 			return err
 		}
+		if version >= 5 {
+			c.TopicResults[topic] = &CreatableTopicResult{}
+		}
+		if version >= 7 {
+			if c.TopicResults[topic].TopicID, err = pd.getUuid(); err != nil {
+				return err
+			}
+		}
 		c.TopicErrors[topic] = new(TopicError)
 		if err := c.TopicErrors[topic].decode(pd, version); err != nil {
 			return err
 		}
 		if version >= 5 {
-			c.TopicResults[topic] = &CreatableTopicResult{}
 			if err := c.TopicResults[topic].decode(pd, version); err != nil {
 				return err
 			}
@@ -119,11 +135,13 @@ func (c *CreateTopicsResponse) isFlexibleVersion(version int16) bool {
 }
 
 func (c *CreateTopicsResponse) isValidVersion() bool {
-	return c.Version >= 0 && c.Version <= 6
+	return c.Version >= 0 && c.Version <= 7
 }
 
 func (c *CreateTopicsResponse) requiredVersion() KafkaVersion {
 	switch c.Version {
+	case 7:
+		return V2_8_0_0
 	case 6:
 		return V2_7_0_0
 	case 5:
@@ -193,6 +211,8 @@ func (t *TopicError) decode(pd packetDecoder, version int16) (err error) {
 
 // CreatableTopicResult struct {
 type CreatableTopicResult struct {
+	// TopicID contains the unique topic ID.
+	TopicID Uuid // v7, topic_id (KIP-516)
 	// TopicConfigErrorCode contains a Optional topic config error returned if configs are not returned in the response.
 	TopicConfigErrorCode KError
 	// NumPartitions contains a Number of partitions of the topic.
