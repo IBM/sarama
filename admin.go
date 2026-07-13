@@ -1700,6 +1700,10 @@ func (ca *clusterAdmin) AlterClientQuotas(entity []QuotaEntityComponent, op Clie
 		Entries:      []AlterClientQuotasEntry{entry},
 		ValidateOnly: validateOnly,
 	}
+	if ca.conf.Version.IsAtLeast(V2_8_0_0) {
+		// Version 1 enables flexible versions.
+		request.Version = 1
+	}
 
 	b, err := ca.Controller()
 	if err != nil {
