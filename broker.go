@@ -1034,6 +1034,19 @@ func (b *Broker) DescribeProducers(req *DescribeProducersRequest) (*DescribeProd
 	return res, nil
 }
 
+// DescribeTransactions sends a request to retrieve the current state of
+// transactions from the transaction coordinator
+func (b *Broker) DescribeTransactions(req *DescribeTransactionsRequest) (*DescribeTransactionsResponse, error) {
+	res := new(DescribeTransactionsResponse)
+
+	err := b.sendAndReceive(req, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // DescribeClientQuotas sends a request to get the broker's quotas
 func (b *Broker) DescribeClientQuotas(request *DescribeClientQuotasRequest) (*DescribeClientQuotasResponse, error) {
 	response := new(DescribeClientQuotasResponse)
