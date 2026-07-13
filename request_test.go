@@ -328,8 +328,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyListOffsets:          6, // up from 5
 				apiKeyAddOffsetsToTxn: 3, // up from 2
 				apiKeyEndTxn:          3, // up from 2
-				// TODO: AlterConfigsRequest v2 is not supported, but expected for KafkaVersion 2.8.0
-				// apiKeyAlterConfigs:         2, // up from 1
+				apiKeyAlterConfigs:    2, // up from 1
 				// TODO: AlterClientQuotasRequest v1 is not supported, but expected for KafkaVersion 2.8.0
 				// apiKeyAlterClientQuotas:    1, // up from 0
 				// TODO: CreateTopicsRequest v7 is not supported, but expected for KafkaVersion 2.8.0
