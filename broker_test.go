@@ -1469,7 +1469,8 @@ var brokerFailedReqTestTable = []struct {
 			request.RequiredAcks = NoResponse
 			err := broker.AsyncProduce(&request, nil)
 			if err == nil {
-				t.Fatal("Expected a non nil error because broker is not listening")
+				// no callback with NoResponse, so a late failure is unobservable
+				t.Skip("dial raced the listener close")
 			}
 			t.Log("Got error:", err)
 		},
@@ -1482,9 +1483,29 @@ var brokerFailedReqTestTable = []struct {
 		runner: func(t *testing.T, broker *Broker) {
 			request := ProduceRequest{}
 			request.RequiredAcks = WaitForLocal
-			err := broker.AsyncProduce(&request, nil)
+			produceResPromise := newProduceResponsePromise()
+			err := broker.AsyncProduce(&request, produceResPromise.callback)
+			if err == nil {
+				// if the dial raced the listener close, the failure arrives via the callback
+				_, err = produceResPromise.Get()
+			}
 			if err == nil {
 				t.Fatal("Expected a non nil error because broker is not listening")
+			}
+			t.Log("Got error:", err)
+		},
+	},
+
+	{
+		version:    V0_10_0_0,
+		name:       "ProduceRequest (WaitForLocal) using AsyncProduce and nil callback",
+		stopBroker: true,
+		runner: func(t *testing.T, broker *Broker) {
+			request := ProduceRequest{}
+			request.RequiredAcks = WaitForLocal
+			err := broker.AsyncProduce(&request, nil)
+			if err == nil {
+				t.Fatal("Expected a non nil error because the callback is nil")
 			}
 			t.Log("Got error:", err)
 		},

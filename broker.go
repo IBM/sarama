@@ -515,7 +515,8 @@ type ProduceCallback func(*ProduceResponse, error)
 // If the maximum number of in flight request configured is reached then
 // the request will be blocked till a previous response is received.
 //
-// When configured with RequiredAcks == NoResponse, the callback will not be invoked.
+// When configured with RequiredAcks == NoResponse, the callback will not be invoked
+// and may be nil; otherwise a nil callback is rejected with an error.
 // If an error is returned because the request could not be sent then the callback
 // will not be invoked either.
 //
@@ -529,6 +530,12 @@ func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error
 	var promise *responsePromise
 
 	if needAcks {
+		if cb == nil {
+			// the promise handler invokes cb on every outcome, so a nil cb
+			// would panic in the responseReceiver goroutine
+			return ConfigurationError("a callback is required when RequiredAcks != NoResponse")
+		}
+
 		metricRegistry := b.metricRegistry
 
 		// Create ProduceResponse early to provide the header version
