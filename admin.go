@@ -965,7 +965,10 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		Resources:    resources,
 		ValidateOnly: validateOnly,
 	}
-	if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+	if ca.conf.Version.IsAtLeast(V2_8_0_0) {
+		// Version 2 enables flexible versions.
+		request.Version = 2
+	} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
 		request.Version = 1
 	}
 

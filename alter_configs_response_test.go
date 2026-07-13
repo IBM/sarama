@@ -21,6 +21,17 @@ var (
 		2, // topic
 		0, 3, 'f', 'o', 'o',
 	}
+
+	alterResponsePopulatedV2 = []byte{
+		0, 0, 0, 0, // ThrottleTimeMs
+		2,    // Responses
+		0, 0, // ErrorCode
+		1,                // ErrorMessage
+		2,                // ResourceType
+		4, 'f', 'o', 'o', // ResourceName
+		0, // tagged fields (resource)
+		0, // tagged fields
+	}
 )
 
 func TestAlterConfigsResponse(t *testing.T) {
@@ -45,6 +56,9 @@ func TestAlterConfigsResponse(t *testing.T) {
 		},
 	}
 	testResponse(t, "response with error", response, alterResponsePopulated)
+
+	response.Version = 2
+	testResponse(t, "response with error v2", response, alterResponsePopulatedV2)
 }
 
 func TestAlterConfigError(t *testing.T) {
