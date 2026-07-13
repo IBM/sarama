@@ -80,7 +80,7 @@ var names = map[int16]string{
 	63:                                 "BrokerHeartbeatRequest",
 	64:                                 "UnregisterBrokerRequest",
 	apiKeyDescribeTransactions:         "DescribeTransactionsRequest",
-	66:                                 "ListTransactionsRequest",
+	apiKeyListTransactions:             "ListTransactionsRequest",
 	67:                                 "AllocateProducerIdsRequest",
 	68:                                 "ConsumerGroupHeartbeatRequest",
 }
@@ -345,6 +345,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			map[int16]int16{
 				apiKeyOffsetFetch:          8, // up from 7
 				apiKeyDescribeTransactions: 0, // new in 3.0
+				apiKeyListTransactions:     0, // new in 3.0
 				// TODO: ListOffsetsRequest v7 is not supported, but expected for KafkaVersion 3.0.0
 				// apiKeyListOffsets:     7, // up from 6
 				// TODO: FindCoordinatorRequest v4 is not supported, but expected for KafkaVersion 3.0.0
@@ -418,7 +419,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V3_8_0_0,
 			map[int16]int16{
-				apiKeyListGroups: 5, // up from 4
+				apiKeyListGroups:       5, // up from 4
+				apiKeyListTransactions: 1, // up from 0
 				// TODO: ProduceRequest v11 is not supported, but expected for KafkaVersion 3.8.0
 				// apiKeyProduce:            11, // up from 10
 				// TODO: FindCoordinatorRequest v5 is not supported, but expected for KafkaVersion 3.8.0
@@ -541,6 +543,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeCluster:              maxVersion(&DescribeClusterRequest{}),
 				apiKeyDescribeProducers:            maxVersion(&DescribeProducersRequest{}),
 				apiKeyDescribeTransactions:         maxVersion(&DescribeTransactionsRequest{}),
+				apiKeyListTransactions:             maxVersion(&ListTransactionsRequest{}),
 			},
 		},
 	}

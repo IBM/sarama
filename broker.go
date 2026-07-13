@@ -1047,6 +1047,19 @@ func (b *Broker) DescribeTransactions(req *DescribeTransactionsRequest) (*Descri
 	return res, nil
 }
 
+// ListTransactions sends a request to list the transactions known to the
+// transaction coordinator
+func (b *Broker) ListTransactions(req *ListTransactionsRequest) (*ListTransactionsResponse, error) {
+	res := new(ListTransactionsResponse)
+
+	err := b.sendAndReceive(req, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // DescribeClientQuotas sends a request to get the broker's quotas
 func (b *Broker) DescribeClientQuotas(request *DescribeClientQuotasRequest) (*DescribeClientQuotasResponse, error) {
 	response := new(DescribeClientQuotasResponse)
