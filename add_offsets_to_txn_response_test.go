@@ -7,10 +7,18 @@ import (
 	"time"
 )
 
-var addOffsetsToTxnResponse = []byte{
-	0, 0, 0, 100,
-	0, 47,
-}
+var (
+	addOffsetsToTxnResponse = []byte{
+		0, 0, 0, 100,
+		0, 47,
+	}
+
+	addOffsetsToTxnResponseV3 = []byte{
+		0, 0, 0, 100, // ThrottleTimeMs
+		0, 47, // ErrorCode
+		0, // tagged fields
+	}
+)
 
 func TestAddOffsetsToTxnResponse(t *testing.T) {
 	resp := &AddOffsetsToTxnResponse{
@@ -18,5 +26,8 @@ func TestAddOffsetsToTxnResponse(t *testing.T) {
 		Err:          ErrInvalidProducerEpoch,
 	}
 
-	testResponse(t, "", resp, addOffsetsToTxnResponse)
+	testResponse(t, "v0", resp, addOffsetsToTxnResponse)
+
+	resp.Version = 3
+	testResponse(t, "v3", resp, addOffsetsToTxnResponseV3)
 }
