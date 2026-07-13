@@ -85,4 +85,5 @@ const (
 	apiKeyDescribeCluster              = 60
 	apiKeyDescribeProducers            = 61
 	apiKeyDescribeTransactions         = 65
+	apiKeyListTransactions             = 66
 )
