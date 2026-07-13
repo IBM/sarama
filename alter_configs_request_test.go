@@ -22,6 +22,18 @@ var (
 		0, // don't validate
 	}
 
+	singleAlterConfigsRequestV2 = []byte{
+		2,                // Resources
+		2,                // ResourceType
+		4, 'f', 'o', 'o', // ResourceName
+		2,                                                    // Configs
+		11, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's', // Name
+		5, '1', '0', '0', '0', // Value
+		0, // tagged fields (resource)
+		0, // ValidateOnly
+		0, // tagged fields
+	}
+
 	doubleAlterConfigsRequest = []byte{
 		0, 0, 0, 2, // 2 config
 		2,                   // a topic
@@ -64,6 +76,10 @@ func TestAlterConfigsRequest(t *testing.T) {
 	}
 
 	testRequest(t, "one config", request, singleAlterConfigsRequest)
+
+	request.Version = 2
+	testRequest(t, "one config v2", request, singleAlterConfigsRequestV2)
+	request.Version = 0
 
 	request = &AlterConfigsRequest{
 		Resources: []*AlterConfigsResource{
