@@ -35,7 +35,10 @@ type offsetManager struct {
 
 	memberID        string
 	groupInstanceId *string
-	generation      int32
+
+	// generationLock prevents a commit from crossing a generation boundary
+	generation     int32
+	generationLock sync.RWMutex
 
 	broker     *Broker
 	brokerLock sync.RWMutex
@@ -255,17 +258,30 @@ func (om *offsetManager) Commit() {
 	om.releasePOMs(false)
 }
 
+func (om *offsetManager) setGeneration(generation int32) {
+	om.generationLock.Lock()
+	defer om.generationLock.Unlock()
+	om.generation = generation
+}
+
 func (om *offsetManager) flushToBroker() {
+	om.flushToBrokerFor(nil)
+}
+
+func (om *offsetManager) flushToBrokerFor(targets map[string]map[int32]none) {
+	om.generationLock.RLock()
+	defer om.generationLock.RUnlock()
+
 	broker, err := om.coordinator()
 	if err != nil {
-		om.handleError(err)
+		om.handleErrorFor(err, targets)
 		return
 	}
 
 	// Care needs to be taken to unlock this. Don't want to defer the unlock as this would
 	// cause the lock to be held while waiting for the broker to reply.
 	broker.lock.Lock()
-	req := om.constructRequest()
+	req := om.constructRequestFor(targets)
 	if req == nil {
 		broker.lock.Unlock()
 		return
@@ -274,7 +290,7 @@ func (om *offsetManager) flushToBroker() {
 	broker.lock.Unlock()
 
 	if err != nil {
-		om.handleError(err)
+		om.handleErrorFor(err, targets)
 		om.releaseCoordinator(broker)
 		_ = broker.Close()
 		return
@@ -282,7 +298,7 @@ func (om *offsetManager) flushToBroker() {
 
 	err = handleResponsePromise(req, resp, rp, nil)
 	if err != nil {
-		om.handleError(err)
+		om.handleErrorFor(err, targets)
 		om.releaseCoordinator(broker)
 		_ = broker.Close()
 		return
@@ -304,6 +320,10 @@ func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCom
 }
 
 func (om *offsetManager) constructRequest() *OffsetCommitRequest {
+	return om.constructRequestFor(nil)
+}
+
+func (om *offsetManager) constructRequestFor(targets map[string]map[int32]none) *OffsetCommitRequest {
 	r := &OffsetCommitRequest{
 		Version:                 1,
 		ConsumerGroup:           om.group,
@@ -361,8 +381,13 @@ func (om *offsetManager) constructRequest() *OffsetCommitRequest {
 	om.pomsLock.RLock()
 	defer om.pomsLock.RUnlock()
 
-	for _, topicManagers := range om.poms {
-		for _, pom := range topicManagers {
+	for topic, topicManagers := range om.poms {
+		for partition, pom := range topicManagers {
+			if targets != nil {
+				if _, ok := targets[topic][partition]; !ok {
+					continue
+				}
+			}
 			pom.lock.Lock()
 			if pom.dirty {
 				r.AddBlockWithLeaderEpoch(pom.topic, pom.partition, pom.offset, pom.leaderEpoch, commitTimestamp, pom.metadata)
@@ -439,11 +464,20 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 }
 
 func (om *offsetManager) handleError(err error) {
+	om.handleErrorFor(err, nil)
+}
+
+func (om *offsetManager) handleErrorFor(err error, targets map[string]map[int32]none) {
 	om.pomsLock.RLock()
 	defer om.pomsLock.RUnlock()
 
-	for _, topicManagers := range om.poms {
-		for _, pom := range topicManagers {
+	for topic, topicManagers := range om.poms {
+		for partition, pom := range topicManagers {
+			if targets != nil {
+				if _, ok := targets[topic][partition]; !ok {
+					continue
+				}
+			}
 			pom.handleError(err)
 		}
 	}
@@ -460,13 +494,58 @@ func (om *offsetManager) asyncClosePOMs() {
 	}
 }
 
+// removePartitions closes partitions revoked during a rebalance, committing first when configured
+func (om *offsetManager) removePartitions(topicPartitions map[string][]int32) {
+	targets := make(map[string]map[int32]none, len(topicPartitions))
+	for topic, partitions := range topicPartitions {
+		targets[topic] = make(map[int32]none, len(partitions))
+		for _, partition := range partitions {
+			targets[topic][partition] = none{}
+		}
+	}
+
+	om.pomsLock.RLock()
+	for topic, partitions := range targets {
+		for partition := range partitions {
+			if pom := om.poms[topic][partition]; pom != nil {
+				pom.AsyncClose()
+			}
+		}
+	}
+	om.pomsLock.RUnlock()
+
+	if !om.conf.Consumer.Offsets.AutoCommit.Enable {
+		om.releaseSelectedPOMs(true, targets)
+		return
+	}
+
+	for attempt := 0; attempt <= om.conf.Consumer.Offsets.Retry.Max; attempt++ {
+		om.flushToBrokerFor(targets)
+		if om.releaseSelectedPOMs(false, targets) == 0 {
+			return
+		}
+	}
+	om.releaseSelectedPOMs(true, targets)
+}
+
 // Releases/removes closed POMs once they are clean (or when forced)
 func (om *offsetManager) releasePOMs(force bool) (remaining int) {
+	return om.releaseSelectedPOMs(force, nil)
+}
+
+// releaseSelectedPOMs holds the write lock while closing POM error channels
+func (om *offsetManager) releaseSelectedPOMs(force bool, targets map[string]map[int32]none) (remaining int) {
 	om.pomsLock.Lock()
 	defer om.pomsLock.Unlock()
 
 	for topic, topicManagers := range om.poms {
 		for partition, pom := range topicManagers {
+			if targets != nil {
+				if _, targeted := targets[topic][partition]; !targeted {
+					continue
+				}
+			}
+
 			pom.lock.Lock()
 			releaseDue := pom.done && (force || !pom.dirty)
 			pom.lock.Unlock()
@@ -478,9 +557,10 @@ func (om *offsetManager) releasePOMs(force bool) (remaining int) {
 				if len(om.poms[topic]) == 0 {
 					delete(om.poms, topic)
 				}
+			} else {
+				remaining++
 			}
 		}
-		remaining += len(om.poms[topic])
 	}
 	return
 }

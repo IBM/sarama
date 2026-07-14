@@ -929,3 +929,263 @@ func TestConstructRequestRetentionTime(t *testing.T) {
 		}
 	}
 }
+
+type offsetCommitCapture struct {
+	inner MockResponse
+	mu    sync.Mutex
+	reqs  []*OffsetCommitRequest
+}
+
+func (c *offsetCommitCapture) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*OffsetCommitRequest)
+	c.mu.Lock()
+	c.reqs = append(c.reqs, req)
+	c.mu.Unlock()
+	return c.inner.For(reqBody)
+}
+
+func (c *offsetCommitCapture) requests() []*OffsetCommitRequest {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]*OffsetCommitRequest(nil), c.reqs...)
+}
+
+func initHandledOffsetManager(t *testing.T, config *Config, commit MockResponse) (*offsetManager, Client, *MockBroker) {
+	t.Helper()
+	config.Version = V2_0_0_0
+
+	broker := NewMockBroker(t, 1)
+	metadata := NewMockMetadataResponse(t).SetBroker(broker.Addr(), broker.BrokerID())
+	offsetFetch := NewMockOffsetFetchResponse(t).SetError(ErrNoError)
+	for p := int32(0); p < 4; p++ {
+		metadata = metadata.SetLeader("my_topic", p, broker.BrokerID())
+		offsetFetch = offsetFetch.SetOffset("group", "my_topic", p, 5, "", ErrNoError)
+	}
+	broker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest":        metadata,
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, "group", broker),
+		"OffsetFetchRequest":     offsetFetch,
+		"OffsetCommitRequest":    commit,
+	})
+
+	client, err := NewClient([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+
+	om, err := newOffsetManagerFromClient("group", "member", 1, client, nil)
+	require.NoError(t, err)
+	return om, client, broker
+}
+
+func TestOffsetManagerRemovePartitions(t *testing.T) {
+	t.Run("commits marked offsets and stops managing the partitions", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = true
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		om, client, broker := initHandledOffsetManager(t, config, capture)
+		defer broker.Close()
+		defer safeClose(t, client)
+		defer safeClose(t, om)
+
+		poms := map[int32]PartitionOffsetManager{}
+		for p := int32(0); p < 4; p++ {
+			pom, err := om.ManagePartition("my_topic", p)
+			require.NoError(t, err)
+			pom.MarkOffset(int64(100+p), "")
+			poms[p] = pom
+		}
+
+		om.removePartitions(map[string][]int32{"my_topic": {2, 3}})
+
+		var committed []int32
+		for _, req := range capture.requests() {
+			for p := range req.blocks["my_topic"] {
+				committed = append(committed, p)
+			}
+		}
+		require.Contains(t, committed, int32(2))
+		require.Contains(t, committed, int32(3))
+		require.NotContains(t, committed, int32(0))
+		require.NotContains(t, committed, int32(1))
+
+		require.Nil(t, om.findPOM("my_topic", 2))
+		require.Nil(t, om.findPOM("my_topic", 3))
+		require.NotNil(t, om.findPOM("my_topic", 0))
+		require.NotNil(t, om.findPOM("my_topic", 1))
+
+		_, open := <-poms[2].Errors()
+		require.False(t, open)
+	})
+
+	t.Run("does not commit marked offsets when auto-commit is disabled", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		om, client, broker := initHandledOffsetManager(t, config, capture)
+		defer broker.Close()
+		defer safeClose(t, client)
+		defer safeClose(t, om)
+
+		poms := map[int32]PartitionOffsetManager{}
+		for p := int32(0); p < 2; p++ {
+			pom, err := om.ManagePartition("my_topic", p)
+			require.NoError(t, err)
+			pom.MarkOffset(int64(100+p), "")
+			poms[p] = pom
+		}
+
+		om.removePartitions(map[string][]int32{"my_topic": {1}})
+
+		require.Empty(t, capture.requests())
+		require.Nil(t, om.findPOM("my_topic", 1))
+		require.NotNil(t, om.findPOM("my_topic", 0))
+		_, open := <-poms[1].Errors()
+		require.False(t, open)
+	})
+
+	t.Run("ignores partitions that are not managed", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		om, client, broker := initHandledOffsetManager(t, config, NewMockOffsetCommitResponse(t))
+		defer broker.Close()
+		defer safeClose(t, client)
+		defer safeClose(t, om)
+
+		_, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+
+		om.removePartitions(map[string][]int32{"my_topic": {3}, "other_topic": {0}})
+		require.NotNil(t, om.findPOM("my_topic", 0))
+	})
+
+	// cover the send-on-closed-channel regression from #2608
+	t.Run("is safe against a concurrent commit", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		config.Consumer.Offsets.Retry.Max = 0
+		config.Consumer.Return.Errors = true
+
+		commit := NewMockOffsetCommitResponse(t)
+		for p := int32(0); p < 4; p++ {
+			commit = commit.SetError("group", "my_topic", p, ErrOffsetMetadataTooLarge)
+		}
+		om, client, broker := initHandledOffsetManager(t, config, commit)
+		defer broker.Close()
+		defer safeClose(t, client)
+		defer safeClose(t, om)
+
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := 0; i < 300; i++ {
+				om.Commit()
+			}
+		}()
+
+		for i := 0; i < 120; i++ {
+			p := int32(i % 4)
+			pom, err := om.ManagePartition("my_topic", p)
+			require.NoError(t, err)
+			go func() {
+				for range pom.Errors() {
+				}
+			}()
+			pom.MarkOffset(int64(100+i), "")
+			om.removePartitions(map[string][]int32{"my_topic": {p}})
+		}
+		wg.Wait()
+	})
+}
+
+func TestOffsetManagerSetGeneration(t *testing.T) {
+	t.Run("commits carry the generation most recently set", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		om, client, broker := initHandledOffsetManager(t, config, capture)
+		defer broker.Close()
+		defer safeClose(t, client)
+		defer safeClose(t, om)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+
+		pom.MarkOffset(100, "")
+		om.Commit()
+		om.setGeneration(7)
+		pom.MarkOffset(101, "")
+		om.Commit()
+
+		reqs := capture.requests()
+		require.NotEmpty(t, reqs)
+		require.Equal(t, int32(1), reqs[0].ConsumerGroupGeneration)
+		require.Equal(t, int32(7), reqs[len(reqs)-1].ConsumerGroupGeneration)
+	})
+
+	t.Run("waits for an in-flight commit to finish", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		gate := &gatedResponse{inner: capture, entered: make(chan none), release: make(chan none)}
+		om, client, broker := initHandledOffsetManager(t, config, gate)
+		defer broker.Close()
+		defer safeClose(t, client)
+		defer safeClose(t, om)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		commitDone := make(chan none)
+		go func() {
+			om.Commit()
+			close(commitDone)
+		}()
+		<-gate.entered
+
+		genDone := make(chan none)
+		go func() {
+			om.setGeneration(7)
+			close(genDone)
+		}()
+		require.Never(t, func() bool {
+			select {
+			case <-genDone:
+				return true
+			default:
+				return false
+			}
+		}, 150*time.Millisecond, 20*time.Millisecond)
+
+		close(gate.release)
+		<-commitDone
+		<-genDone
+
+		pom.MarkOffset(101, "")
+		om.Commit()
+
+		reqs := capture.requests()
+		require.Equal(t, int32(1), reqs[0].ConsumerGroupGeneration)
+		require.Equal(t, int32(7), reqs[len(reqs)-1].ConsumerGroupGeneration)
+	})
+}
+
+type gatedResponse struct {
+	inner   MockResponse
+	n       int
+	mu      sync.Mutex
+	entered chan none
+	release chan none
+}
+
+func (g *gatedResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	g.mu.Lock()
+	g.n++
+	first := g.n == 1
+	g.mu.Unlock()
+	if first {
+		close(g.entered)
+		<-g.release
+	}
+	return g.inner.For(reqBody)
+}
