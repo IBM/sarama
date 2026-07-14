@@ -78,6 +78,7 @@ func testMain(m *testing.M) int {
 	if err != nil {
 		panic(err)
 	}
+	env.UsingExisting = usingExisting
 	if !usingExisting {
 		err := prepareDockerTestEnvironment(ctx, &env)
 		if err != nil {
@@ -113,6 +114,16 @@ type testEnvironment struct {
 	Proxies          map[string]*toxiproxy.Proxy
 	KafkaBrokerAddrs []string
 	KafkaVersion     string
+
+	// UsingExisting is true when the test process did not start the cluster
+	UsingExisting bool
+}
+
+func skipIfExistingEnvironment(t *testing.T) {
+	t.Helper()
+	if FunctionalTestEnv.UsingExisting {
+		t.Skip("Skipping test that requires docker compose exec against an existing environment")
+	}
 }
 
 // setupToxiProxies will configure the toxiproxy proxies with routes for the
