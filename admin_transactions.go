@@ -57,9 +57,9 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 		}
 	}
 
-	for broker, tps := range partitionsPerBroker {
+	for broker, topicPartitions := range partitionsPerBroker {
 		partitionsPerTopic := make(map[string][]int32)
-		for _, tp := range tps {
+		for _, tp := range topicPartitions {
 			partitionsPerTopic[tp.topic] = append(partitionsPerTopic[tp.topic], tp.partition)
 		}
 
