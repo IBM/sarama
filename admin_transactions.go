@@ -109,44 +109,66 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 		idsPerCoordinator[coordinator] = append(idsPerCoordinator[coordinator], id)
 	}
 
+	// Query each coordinator in parallel and merge the results.
+	type queryResult struct {
+		states []TransactionState
+		err    error
+	}
+	results := make(chan queryResult)
+
+	var wg sync.WaitGroup
 	for _, ids := range idsPerCoordinator {
-		var response *DescribeTransactionsResponse
-		err := ca.retryOnError(isRetriableTransactionCoordinatorError, func() (err error) {
-			defer func() {
-				if err != nil && isRetriableTransactionCoordinatorError(err) {
-					for _, id := range ids {
-						_ = ca.client.RefreshTransactionCoordinator(id)
+		wg.Go(func() {
+			var response *DescribeTransactionsResponse
+			err := ca.retryOnError(isRetriableTransactionCoordinatorError, func() (err error) {
+				defer func() {
+					if err != nil && isRetriableTransactionCoordinatorError(err) {
+						for _, id := range ids {
+							_ = ca.client.RefreshTransactionCoordinator(id)
+						}
+					}
+				}()
+
+				coordinator, err := ca.client.TransactionCoordinator(ids[0])
+				if err != nil {
+					return err
+				}
+
+				response, err = coordinator.DescribeTransactions(&DescribeTransactionsRequest{TransactionalIDs: ids})
+				if err != nil {
+					return err
+				}
+
+				// A moved or loading coordinator answers successfully but tags the
+				// affected transactions with a retriable coordinator code; lift it so
+				// the coordinator is refreshed and the request retried.
+				for _, state := range response.TransactionStates {
+					if isRetriableTransactionCoordinatorError(state.ErrorCode) {
+						return state.ErrorCode
 					}
 				}
-			}()
 
-			coordinator, err := ca.client.TransactionCoordinator(ids[0])
+				return nil
+			})
 			if err != nil {
-				return err
+				results <- queryResult{err: err}
+				return
 			}
-
-			response, err = coordinator.DescribeTransactions(&DescribeTransactionsRequest{TransactionalIDs: ids})
-			if err != nil {
-				return err
-			}
-
-			// A moved or loading coordinator answers successfully but tags the
-			// affected transactions with a retriable coordinator code; lift it so
-			// the coordinator is refreshed and the request retried.
-			for _, state := range response.TransactionStates {
-				if isRetriableTransactionCoordinatorError(state.ErrorCode) {
-					return state.ErrorCode
-				}
-			}
-
-			return nil
+			results <- queryResult{states: response.TransactionStates}
 		})
-		if err != nil {
-			errs = append(errs, err)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	for r := range results {
+		if r.err != nil {
+			errs = append(errs, r.err)
 			continue
 		}
-
-		for _, state := range response.TransactionStates {
+		for _, state := range r.states {
 			result[state.TransactionalID] = state
 		}
 	}
@@ -178,10 +200,14 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 	// Transactions may be listed by any broker, so query all brokers in parallel
 	// and merge the results.
 	brokers := ca.client.Brokers()
-	results := make(chan []ListTransactionsResponseTransactionState, len(brokers))
-	errChan := make(chan error, len(brokers))
-	var wg sync.WaitGroup
 
+	type queryResult struct {
+		states []ListTransactionsResponseTransactionState
+		err    error
+	}
+	results := make(chan queryResult)
+
+	var wg sync.WaitGroup
 	for _, b := range brokers {
 		wg.Go(func() {
 			_ = b.Open(ca.conf) // Ensure that broker is opened
@@ -198,31 +224,30 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 			}
 
 			response, err := b.ListTransactions(request)
-			if err != nil {
-				errChan <- err
-				return
+			switch {
+			case err != nil:
+				results <- queryResult{err: err}
+			case !errors.Is(response.ErrorCode, ErrNoError):
+				results <- queryResult{err: response.ErrorCode}
+			default:
+				results <- queryResult{states: response.TransactionStates}
 			}
-			if !errors.Is(response.ErrorCode, ErrNoError) {
-				errChan <- response.ErrorCode
-				return
-			}
-
-			results <- response.TransactionStates
 		})
 	}
 
-	wg.Wait()
-	close(results)
-	close(errChan)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
 
 	var allTransactions []ListTransactionsResponseTransactionState
-	for states := range results {
-		allTransactions = append(allTransactions, states...)
-	}
-
 	var errs []error
-	for err := range errChan {
-		errs = append(errs, err)
+	for r := range results {
+		if r.err != nil {
+			errs = append(errs, r.err)
+			continue
+		}
+		allTransactions = append(allTransactions, r.states...)
 	}
 
 	return allTransactions, errors.Join(errs...)
