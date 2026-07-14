@@ -32,7 +32,7 @@ type TransactionClusterAdmin interface {
 var _ TransactionClusterAdmin = (*clusterAdmin)(nil)
 
 func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (map[string]map[int32]DescribeProducersResponsePartition, error) {
-	result := make(map[string]map[int32]DescribeProducersResponsePartition)
+	var result map[string]map[int32]DescribeProducersResponsePartition
 	if len(topicPartitions) == 0 {
 		return result, nil
 	}
@@ -79,6 +79,9 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 
 		for _, topic := range response.Topics {
 			for _, partition := range topic.Partitions {
+				if result == nil {
+					result = make(map[string]map[int32]DescribeProducersResponsePartition)
+				}
 				if result[topic.Name] == nil {
 					result[topic.Name] = make(map[int32]DescribeProducersResponsePartition)
 				}
