@@ -94,7 +94,7 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 }
 
 func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[string]TransactionState, error) {
-	result := make(map[string]TransactionState)
+	var result map[string]TransactionState
 	if len(transactionalIDs) == 0 {
 		return result, nil
 	}
@@ -172,6 +172,9 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 			continue
 		}
 		for _, state := range r.states {
+			if result == nil {
+				result = make(map[string]TransactionState)
+			}
 			result[state.TransactionalID] = state
 		}
 	}
