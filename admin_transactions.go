@@ -180,7 +180,7 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 	brokers := ca.client.Brokers()
 	results := make(chan []ListTransactionsResponseTransactionState, len(brokers))
 	errChan := make(chan error, len(brokers))
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 
 	for _, b := range brokers {
 		wg.Add(1)
