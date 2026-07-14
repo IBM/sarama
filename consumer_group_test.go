@@ -252,8 +252,142 @@ func TestConsumerShouldNotRetrySessionIfContextCancelled(t *testing.T) {
 	cancel()
 	_, err := c.newSession(ctx, nil, nil, 1024)
 	assert.Equal(t, context.Canceled, err)
-	_, err = c.retryNewSession(ctx, nil, nil, 1024, true)
+	_, err = c.retryJoinSync(ctx, nil, nil, 1024, true)
 	assert.Equal(t, context.Canceled, err)
+}
+
+func TestConsumerGroupJoinSync(t *testing.T) {
+	setup := func(t *testing.T, joinResponse, syncResponse MockResponse) (*consumerGroup, *MockBroker) {
+		t.Helper()
+
+		config := NewTestConfig()
+		config.ClientID = t.Name()
+		config.Version = V3_2_0_0
+		config.Consumer.Group.Rebalance.Retry.Backoff = 0
+
+		broker := NewMockBroker(t, 0)
+		t.Cleanup(broker.Close)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetBroker(broker.Addr(), broker.BrokerID()),
+			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+				SetCoordinator(CoordinatorGroup, "my-group", broker),
+			"JoinGroupRequest":  joinResponse,
+			"SyncGroupRequest":  syncResponse,
+			"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
+		})
+
+		group, err := NewConsumerGroup([]string{broker.Addr()}, "my-group", config)
+		assert.NoError(t, err)
+		t.Cleanup(func() {
+			assert.NoError(t, group.Close())
+		})
+
+		return group.(*consumerGroup), broker
+	}
+
+	joinRequests := func(broker *MockBroker) []*JoinGroupRequest {
+		var requests []*JoinGroupRequest
+		for _, exchange := range broker.History() {
+			if request, ok := exchange.Request.(*JoinGroupRequest); ok {
+				requests = append(requests, request)
+			}
+		}
+		return requests
+	}
+
+	t.Run("returns the negotiated assignment and reports retained ownership", func(t *testing.T) {
+		c, broker := setup(
+			t,
+			NewMockJoinGroupResponse(t).
+				SetGroupProtocol(RangeBalanceStrategyName).
+				SetGenerationId(7).
+				SetLeaderId("other-member").
+				SetMemberId("member-1"),
+			NewMockSyncGroupResponse(t).SetMemberAssignment(
+				&ConsumerGroupMemberAssignment{
+					Topics: map[string][]int32{"my-topic": {2, 0}},
+				},
+			),
+		)
+		c.memberID = "member-1"
+		held := &heldAssignment{
+			claims:       map[string][]int32{"my-topic": {3, 1}},
+			generationID: 6,
+		}
+
+		result, err := c.joinSync(t.Context(), []string{"my-topic"}, held, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, "member-1", result.memberID)
+		assert.Equal(t, int32(7), result.generationID)
+		assert.Equal(t, map[string][]int32{"my-topic": {0, 2}}, result.claims)
+		assert.False(t, result.isLeader)
+
+		requests := joinRequests(broker)
+		assert.Len(t, requests, 1)
+		assert.Len(t, requests[0].OrderedGroupProtocols, 1)
+		metadata := &ConsumerGroupMemberMetadata{}
+		assert.NoError(t, decode(requests[0].OrderedGroupProtocols[0].Metadata, metadata, nil))
+		assert.Equal(t, []*OwnedPartition{
+			{Topic: "my-topic", Partitions: []int32{1, 3}},
+		}, metadata.OwnedPartitions)
+		assert.Equal(t, int32(6), metadata.GenerationID)
+	})
+
+	t.Run("retries unknown membership when no assignment is retained", func(t *testing.T) {
+		c, broker := setup(
+			t,
+			NewMockSequence(
+				NewMockJoinGroupResponse(t).SetError(ErrUnknownMemberId),
+				NewMockJoinGroupResponse(t).
+					SetGroupProtocol(RangeBalanceStrategyName).
+					SetMemberId("member-2"),
+			),
+			NewMockSyncGroupResponse(t),
+		)
+		c.memberID = "stale-member"
+
+		result, err := c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
+		assert.NoError(t, err)
+		assert.Equal(t, "member-2", result.memberID)
+		assert.Len(t, joinRequests(broker), 2)
+	})
+
+	t.Run("returns unknown membership when retained ownership is lost", func(t *testing.T) {
+		c, broker := setup(
+			t,
+			NewMockJoinGroupResponse(t).SetError(ErrUnknownMemberId),
+			NewMockSyncGroupResponse(t),
+		)
+		c.memberID = "stale-member"
+
+		result, err := c.joinSync(t.Context(), []string{"my-topic"}, &heldAssignment{
+			claims:       map[string][]int32{"my-topic": {0}},
+			generationID: 4,
+		}, 1)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, ErrUnknownMemberId)
+		assert.Len(t, joinRequests(broker), 1)
+	})
+
+	t.Run("returns illegal generation when sync invalidates retained ownership", func(t *testing.T) {
+		c, broker := setup(
+			t,
+			NewMockJoinGroupResponse(t).
+				SetGroupProtocol(RangeBalanceStrategyName).
+				SetMemberId("member-3"),
+			NewMockSyncGroupResponse(t).SetError(ErrIllegalGeneration),
+		)
+		c.memberID = "member-3"
+
+		result, err := c.joinSync(t.Context(), []string{"my-topic"}, &heldAssignment{
+			claims:       map[string][]int32{"my-topic": {0}},
+			generationID: 4,
+		}, 1)
+		assert.Nil(t, result)
+		assert.ErrorIs(t, err, ErrIllegalGeneration)
+		assert.Len(t, joinRequests(broker), 1)
+	})
 }
 
 // strategyWithSubscriptionUserData wraps a BalanceStrategy and adds a
