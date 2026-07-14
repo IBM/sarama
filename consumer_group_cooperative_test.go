@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -610,5 +611,24 @@ func TestConsumerGroupCooperativeRebalance(t *testing.T) {
 
 		require.NoError(t, group.Close())
 		require.NoError(t, <-consumeDone)
+	})
+}
+
+func TestRecordAssignmentChange(t *testing.T) {
+	t.Run("counts what a rebalance moved", func(t *testing.T) {
+		registry := metrics.NewRegistry()
+		c := &consumerGroup{groupID: "g", metricRegistry: registry}
+
+		c.recordAssignmentChange(4, 0, 4)
+		c.recordAssignmentChange(0, 2, 2)
+		c.recordAssignmentChange(0, 2, 0)
+
+		assigned := registry.Get("consumer-group-partitions-assigned-g").(metrics.Counter)
+		revoked := registry.Get("consumer-group-partitions-revoked-g").(metrics.Counter)
+		owned := registry.Get("consumer-group-partitions-owned-g").(metrics.Gauge)
+
+		require.Equal(t, int64(4), assigned.Count())
+		require.Equal(t, int64(4), revoked.Count())
+		require.Zero(t, owned.Value())
 	})
 }

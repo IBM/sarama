@@ -95,6 +95,7 @@ func (s *consumerGroupSession) reconcile(res *rebalanceResult) (revokedAny bool,
 	}
 
 	s.claims.Store(&res.claims)
+	s.parent.recordAssignmentChange(countPartitions(added), countPartitions(revoked), countPartitions(res.claims))
 
 	for topic, partitions := range added {
 		if err := s.parent.client.RefreshMetadata(topic); err != nil {
