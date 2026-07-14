@@ -160,10 +160,18 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 // (COORDINATOR_NOT_AVAILABLE, NOT_COORDINATOR, COORDINATOR_LOAD_IN_PROGRESS) plus
 // EOF for a dropped connection.
 func isRetriableTransactionCoordinatorError(err error) bool {
-	return errors.Is(err, ErrConsumerCoordinatorNotAvailable) ||
-		errors.Is(err, ErrNotCoordinatorForConsumer) ||
-		errors.Is(err, ErrOffsetsLoadInProgress) ||
-		errors.Is(err, io.EOF)
+	switch {
+	case errors.Is(err, ErrConsumerCoordinatorNotAvailable):
+		return true
+	case errors.Is(err, ErrNotCoordinatorForConsumer):
+		return true
+	case errors.Is(err, ErrOffsetsLoadInProgress):
+		return true
+	case errors.Is(err, io.EOF):
+		return true
+	default:
+		return false
+	}
 }
 
 func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilters []int64, durationFilterMs int64) ([]ListTransactionsResponseTransactionState, error) {
