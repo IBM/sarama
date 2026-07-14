@@ -109,6 +109,9 @@ type consumerGroup struct {
 
 	userData []byte
 
+	// protocol is fixed at construction from the configured balance strategies
+	protocol RebalanceProtocol
+
 	metricRegistry metrics.Registry
 }
 
@@ -145,6 +148,11 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		return nil, ConfigurationError("consumer groups require Version to be >= V0_10_2_0")
 	}
 
+	protocol, err := selectRebalanceProtocol(config.groupStrategies())
+	if err != nil {
+		return nil, err
+	}
+
 	consumer, err := newConsumer(client)
 	if err != nil {
 		return nil, err
@@ -158,6 +166,7 @@ func newConsumerGroup(groupID string, client Client) (ConsumerGroup, error) {
 		errors:         make(chan error, config.ChannelBufferSize),
 		closed:         make(chan none),
 		userData:       config.Consumer.Group.Member.UserData,
+		protocol:       protocol,
 		metricRegistry: newCleanupRegistry(config.MetricRegistry),
 	}
 	if config.Consumer.Group.InstanceId != "" && config.Version.IsAtLeast(V2_3_0_0) {
@@ -514,19 +523,30 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 		c.lastSessionCause = nil
 	}
 
-	if strategy := c.config.Consumer.Group.Rebalance.Strategy; strategy != nil {
-		if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
+	// Under the eager protocol the previous session has already been torn down
+	// by the time we rejoin, so this member owns nothing and has no generation
+	// to report. The cooperative path supplies both.
+	for _, strategy := range c.config.groupStrategies() {
+		meta := c.subscriptionMetadata(strategy, topics, nil, defaultGeneration)
+		if err := req.AddGroupProtocolMetadata(strategy.Name(), meta); err != nil {
 			return nil, err
-		}
-	} else {
-		for _, strategy := range c.config.Consumer.Group.Rebalance.GroupStrategies {
-			if err := req.AddGroupProtocolMetadata(strategy.Name(), c.subscriptionMetadata(strategy, topics)); err != nil {
-				return nil, err
-			}
 		}
 	}
 
 	return coordinator.JoinGroup(req)
+}
+
+// subscriptionVersion is based on the broker version rather than the rebalance
+// protocol so owned partitions are available during a rolling upgrade
+func (c *consumerGroup) subscriptionVersion() int16 {
+	switch {
+	case c.config.Version.IsAtLeast(V3_2_0_0):
+		return 2 // KIP-792: GenerationID
+	case c.config.Version.IsAtLeast(V2_4_0_0):
+		return 1 // KIP-429: OwnedPartitions
+	default:
+		return 0
+	}
 }
 
 // subscriptionMetadata builds the ConsumerGroupMemberMetadata for a single
@@ -534,26 +554,32 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string) (
 // SubscriptionUserDataBalanceStrategy, its SubscriptionUserData hook is invoked
 // to obtain per-cycle UserData; on error the statically configured
 // Consumer.Group.Member.UserData is used and the error is logged.
-func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []string) *ConsumerGroupMemberMetadata {
-	if p, ok := strategy.(SubscriptionUserDataBalanceStrategy); ok {
-		// Hand the provider a throwaway copy so it cannot mutate the slice
-		// we later attach to the JoinGroup request.
-		userData, err := p.SubscriptionUserData(slices.Clone(topics))
-		if err == nil {
-			return &ConsumerGroupMemberMetadata{
-				Topics:   topics,
-				UserData: userData,
-			}
-		}
+func (c *consumerGroup) subscriptionMetadata(strategy BalanceStrategy, topics []string, owned map[string][]int32, generationID int32) *ConsumerGroupMemberMetadata {
+	meta := &ConsumerGroupMemberMetadata{
+		Version:         c.subscriptionVersion(),
+		Topics:          topics,
+		UserData:        c.userData,
+		OwnedPartitions: ownedPartitions(owned),
+		GenerationID:    generationID,
+	}
+
+	p, ok := strategy.(SubscriptionUserDataBalanceStrategy)
+	if !ok {
+		return meta
+	}
+
+	// Hand the provider a throwaway copy so it cannot mutate the slice
+	// we later attach to the JoinGroup request.
+	userData, err := p.SubscriptionUserData(slices.Clone(topics))
+	if err != nil {
 		Logger.Printf(
 			"consumergroup/%s: falling back to static user data for strategy %q due to %v\n",
 			c.groupID, strategy.Name(), err,
 		)
+		return meta
 	}
-	return &ConsumerGroupMemberMetadata{
-		Topics:   topics,
-		UserData: c.userData,
-	}
+	meta.UserData = userData
+	return meta
 }
 
 // findStrategy returns the BalanceStrategy with the specified protocolName

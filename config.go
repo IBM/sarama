@@ -607,6 +607,14 @@ func NewConfig() *Config {
 	return c
 }
 
+// groupStrategies gives the deprecated Strategy field precedence when set
+func (c *Config) groupStrategies() []BalanceStrategy {
+	if strategy := c.Consumer.Group.Rebalance.Strategy; strategy != nil {
+		return []BalanceStrategy{strategy}
+	}
+	return c.Consumer.Group.Rebalance.GroupStrategies
+}
+
 // Validate checks a Config instance. It will return a
 // ConfigurationError if the specified values don't make sense.
 //
@@ -881,6 +889,16 @@ func (c *Config) Validate() error {
 	for _, strategy := range c.Consumer.Group.Rebalance.GroupStrategies {
 		if strategy == nil {
 			return ConfigurationError("elements in Consumer.Group.Rebalance.Strategies must not be empty")
+		}
+	}
+
+	if strategies := c.groupStrategies(); len(strategies) > 0 {
+		protocol, err := selectRebalanceProtocol(strategies)
+		if err != nil {
+			return err
+		}
+		if protocol >= RebalanceProtocolCooperative && !c.Version.IsAtLeast(V2_4_0_0) {
+			return ConfigurationError("cooperative balance strategies require Version >= 2.4")
 		}
 	}
 

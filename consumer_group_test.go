@@ -272,61 +272,67 @@ func (s *strategyWithSubscriptionUserData) SubscriptionUserData(topics []string)
 	return s.data, s.err
 }
 
+func newSubscriptionMetadataTestGroup(userData []byte, version KafkaVersion) *consumerGroup {
+	config := NewTestConfig()
+	config.Version = version
+	return &consumerGroup{config: config, userData: userData}
+}
+
 func TestSubscriptionMetadata(t *testing.T) {
 	staticUserData := []byte("static")
 	topics := []string{"my-topic"}
 
 	t.Run("strategy without provider uses static user data", func(t *testing.T) {
-		c := &consumerGroup{userData: staticUserData}
-		meta := c.subscriptionMetadata(NewBalanceStrategyRange(), topics)
+		c := newSubscriptionMetadataTestGroup(staticUserData, V2_4_0_0)
+		meta := c.subscriptionMetadata(NewBalanceStrategyRange(), topics, nil, defaultGeneration)
 		assert.Equal(t, topics, meta.Topics)
 		assert.Equal(t, staticUserData, meta.UserData)
 	})
 
 	t.Run("provider returning bytes overrides static user data", func(t *testing.T) {
-		c := &consumerGroup{userData: staticUserData}
+		c := newSubscriptionMetadataTestGroup(staticUserData, V2_4_0_0)
 		strategy := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            []byte("per-cycle"),
 		}
-		meta := c.subscriptionMetadata(strategy, topics)
+		meta := c.subscriptionMetadata(strategy, topics, nil, defaultGeneration)
 		assert.Equal(t, []byte("per-cycle"), meta.UserData)
 		assert.Equal(t, [][]string{topics}, strategy.called)
 	})
 
 	t.Run("provider returning nil clears static user data", func(t *testing.T) {
-		c := &consumerGroup{userData: staticUserData}
+		c := newSubscriptionMetadataTestGroup(staticUserData, V2_4_0_0)
 		strategy := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            nil,
 		}
-		meta := c.subscriptionMetadata(strategy, topics)
+		meta := c.subscriptionMetadata(strategy, topics, nil, defaultGeneration)
 		assert.Nil(t, meta.UserData)
 	})
 
 	t.Run("provider returning empty slice clears static user data", func(t *testing.T) {
-		c := &consumerGroup{userData: staticUserData}
+		c := newSubscriptionMetadataTestGroup(staticUserData, V2_4_0_0)
 		strategy := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            []byte{},
 		}
-		meta := c.subscriptionMetadata(strategy, topics)
+		meta := c.subscriptionMetadata(strategy, topics, nil, defaultGeneration)
 		assert.Equal(t, []byte{}, meta.UserData)
 	})
 
 	t.Run("provider returning error falls back to static user data", func(t *testing.T) {
-		c := &consumerGroup{userData: staticUserData}
+		c := newSubscriptionMetadataTestGroup(staticUserData, V2_4_0_0)
 		strategy := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            []byte("ignored"),
 			err:             errors.New("boom"),
 		}
-		meta := c.subscriptionMetadata(strategy, topics)
+		meta := c.subscriptionMetadata(strategy, topics, nil, defaultGeneration)
 		assert.Equal(t, staticUserData, meta.UserData)
 	})
 
 	t.Run("each strategy in GroupStrategies receives its own user data", func(t *testing.T) {
-		c := &consumerGroup{userData: staticUserData}
+		c := newSubscriptionMetadataTestGroup(staticUserData, V2_4_0_0)
 		s1 := &strategyWithSubscriptionUserData{
 			BalanceStrategy: NewBalanceStrategyRange(),
 			data:            []byte("from-s1"),
@@ -335,8 +341,59 @@ func TestSubscriptionMetadata(t *testing.T) {
 			BalanceStrategy: NewBalanceStrategyRoundRobin(),
 			data:            []byte("from-s2"),
 		}
-		assert.Equal(t, []byte("from-s1"), c.subscriptionMetadata(s1, topics).UserData)
-		assert.Equal(t, []byte("from-s2"), c.subscriptionMetadata(s2, topics).UserData)
+		assert.Equal(t, []byte("from-s1"), c.subscriptionMetadata(s1, topics, nil, defaultGeneration).UserData)
+		assert.Equal(t, []byte("from-s2"), c.subscriptionMetadata(s2, topics, nil, defaultGeneration).UserData)
+	})
+
+	t.Run("subscription version tracks the configured Kafka version", func(t *testing.T) {
+		for _, tc := range []struct {
+			version KafkaVersion
+			want    int16
+		}{
+			{V2_3_0_0, 0},
+			{V2_4_0_0, 1}, // KIP-429 OwnedPartitions
+			{V3_1_0_0, 1},
+			{V3_2_0_0, 2}, // KIP-792 GenerationID
+			{MaxVersion, 2},
+		} {
+			c := newSubscriptionMetadataTestGroup(staticUserData, tc.version)
+			meta := c.subscriptionMetadata(NewBalanceStrategyRange(), topics, nil, defaultGeneration)
+			assert.Equal(t, tc.want, meta.Version, "for Kafka version %s", tc.version)
+		}
+	})
+
+	t.Run("owned partitions are reported sorted by topic and partition", func(t *testing.T) {
+		c := newSubscriptionMetadataTestGroup(staticUserData, V3_2_0_0)
+		owned := map[string][]int32{"b-topic": {2, 0, 1}, "a-topic": {5}}
+		meta := c.subscriptionMetadata(NewBalanceStrategyRange(), topics, owned, 7)
+		assert.Equal(t, []*OwnedPartition{
+			{Topic: "a-topic", Partitions: []int32{5}},
+			{Topic: "b-topic", Partitions: []int32{0, 1, 2}},
+		}, meta.OwnedPartitions)
+		assert.Equal(t, int32(7), meta.GenerationID)
+	})
+
+	t.Run("owning nothing reports no partitions", func(t *testing.T) {
+		c := newSubscriptionMetadataTestGroup(staticUserData, V3_2_0_0)
+		meta := c.subscriptionMetadata(NewBalanceStrategyRange(), topics, nil, defaultGeneration)
+		assert.Empty(t, meta.OwnedPartitions)
+		assert.Equal(t, int32(defaultGeneration), meta.GenerationID)
+	})
+
+	t.Run("owned partitions round-trip through the wire format", func(t *testing.T) {
+		c := newSubscriptionMetadataTestGroup(staticUserData, V3_2_0_0)
+		owned := map[string][]int32{"my-topic": {0, 3}}
+		meta := c.subscriptionMetadata(NewBalanceStrategyRange(), topics, owned, 7)
+
+		encoded, err := encode(meta, nil)
+		assert.NoError(t, err)
+		decoded := &ConsumerGroupMemberMetadata{}
+		assert.NoError(t, decode(encoded, decoded, nil))
+
+		assert.Equal(t, meta.Version, decoded.Version)
+		assert.Equal(t, meta.Topics, decoded.Topics)
+		assert.Equal(t, meta.OwnedPartitions, decoded.OwnedPartitions)
+		assert.Equal(t, meta.GenerationID, decoded.GenerationID)
 	})
 }
 

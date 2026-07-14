@@ -1,6 +1,10 @@
 package sarama
 
-import "errors"
+import (
+	"errors"
+	"maps"
+	"slices"
+)
 
 // ConsumerGroupMemberMetadata holds the metadata for consumer group
 // https://github.com/apache/kafka/blob/trunk/clients/src/main/resources/common/message/ConsumerProtocolSubscription.json
@@ -100,6 +104,20 @@ func (m *ConsumerGroupMemberMetadata) decode(pd packetDecoder) (err error) {
 type OwnedPartition struct {
 	Topic      string
 	Partitions []int32
+}
+
+// ownedPartitions sorts the wire representation to keep subscriptions stable
+func ownedPartitions(owned map[string][]int32) []*OwnedPartition {
+	if len(owned) == 0 {
+		return nil
+	}
+	result := make([]*OwnedPartition, 0, len(owned))
+	for _, topic := range slices.Sorted(maps.Keys(owned)) {
+		partitions := slices.Clone(owned[topic])
+		slices.Sort(partitions)
+		result = append(result, &OwnedPartition{Topic: topic, Partitions: partitions})
+	}
+	return result
 }
 
 func (m *OwnedPartition) encode(pe packetEncoder) error {
