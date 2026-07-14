@@ -352,8 +352,9 @@ type testFuncConsumerGroupMessage struct {
 }
 
 type testFuncConsumerGroupSink struct {
-	msgs  chan testFuncConsumerGroupMessage
-	count atomic.Int32
+	msgs   chan testFuncConsumerGroupMessage
+	filter func(*ConsumerMessage) bool
+	count  atomic.Int32
 }
 
 func (s *testFuncConsumerGroupSink) Len() int {
@@ -364,7 +365,7 @@ func (s *testFuncConsumerGroupSink) Len() int {
 }
 
 func (s *testFuncConsumerGroupSink) Push(clientID string, m *ConsumerMessage) {
-	if s != nil {
+	if s != nil && (s.filter == nil || s.filter(m)) {
 		s.msgs <- testFuncConsumerGroupMessage{ClientID: clientID, ConsumerMessage: m}
 		s.count.Add(1)
 	}
