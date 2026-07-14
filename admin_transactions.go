@@ -183,9 +183,7 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 	var wg sync.WaitGroup
 
 	for _, b := range brokers {
-		wg.Add(1)
-		go func(b *Broker) {
-			defer wg.Done()
+		wg.Go(func() {
 			_ = b.Open(ca.conf) // Ensure that broker is opened
 
 			request := &ListTransactionsRequest{
@@ -210,7 +208,7 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 			}
 
 			results <- response.TransactionStates
-		}(b)
+		})
 	}
 
 	wg.Wait()
