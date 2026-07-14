@@ -3,9 +3,12 @@ package sarama
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/rcrowley/go-metrics"
 )
 
 // ConsumerGroupSession represents a consumer group member session.
@@ -113,6 +116,9 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 	}
 	sess.generationID.Store(generationID)
 	sess.claims.Store(&claims)
+
+	owned := countPartitions(claims)
+	parent.recordAssignmentChange(owned, 0, owned)
 
 	// start heartbeat loop
 	go sess.heartbeatLoop()
@@ -352,6 +358,8 @@ func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 
 	// perform release
 	s.releaseOnce.Do(func() {
+		s.parent.recordAssignmentChange(0, countPartitions(s.Claims()), 0)
+
 		if withCleanup {
 			if e := s.handler.Cleanup(s); e != nil {
 				s.parent.handleError(e, "", -1)
@@ -378,6 +386,23 @@ func (s *consumerGroupSession) sendHeartbeat(coordinator *Broker) (*HeartbeatRes
 	s.generationMu.Lock()
 	defer s.generationMu.Unlock()
 	return s.parent.heartbeatRequest(coordinator, s.memberID, s.GenerationID())
+}
+
+func (c *consumerGroup) recordAssignmentChange(assigned, revoked, owned int) {
+	if c.metricRegistry == nil {
+		return
+	}
+	metrics.GetOrRegisterCounter(fmt.Sprintf("consumer-group-partitions-assigned-%s", c.groupID), c.metricRegistry).Inc(int64(assigned))
+	metrics.GetOrRegisterCounter(fmt.Sprintf("consumer-group-partitions-revoked-%s", c.groupID), c.metricRegistry).Inc(int64(revoked))
+	metrics.GetOrRegisterGauge(fmt.Sprintf("consumer-group-partitions-owned-%s", c.groupID), c.metricRegistry).Update(int64(owned))
+}
+
+func countPartitions(claims map[string][]int32) int {
+	var count int
+	for _, partitions := range claims {
+		count += len(partitions)
+	}
+	return count
 }
 
 func (s *consumerGroupSession) heartbeatLoop() {

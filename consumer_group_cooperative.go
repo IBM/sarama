@@ -97,6 +97,7 @@ func (s *consumerGroupSession) reconcileAssignment(res *rebalanceResult) (bool, 
 	}
 
 	s.claims.Store(&res.claims)
+	s.parent.recordAssignmentChange(countPartitions(added), countPartitions(revoked), countPartitions(res.claims))
 	s.startClaims(added)
 	s.watchPartitionNumbers(res)
 	return len(revoked) > 0, nil
