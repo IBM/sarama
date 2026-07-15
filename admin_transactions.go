@@ -32,9 +32,8 @@ type TransactionClusterAdmin interface {
 var _ TransactionClusterAdmin = (*clusterAdmin)(nil)
 
 func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (map[string]map[int32]DescribeProducersResponsePartition, error) {
-	var result map[string]map[int32]DescribeProducersResponsePartition
 	if len(topicPartitions) == 0 {
-		return result, nil
+		return nil, nil
 	}
 
 	type topicPartition struct {
@@ -57,6 +56,7 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 		}
 	}
 
+	var result map[string]map[int32]DescribeProducersResponsePartition
 	for broker, topicPartitions := range partitionsPerBroker {
 		partitionsPerTopic := make(map[string][]int32)
 		for _, tp := range topicPartitions {
@@ -94,9 +94,8 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 }
 
 func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[string]TransactionState, error) {
-	var result map[string]TransactionState
 	if len(transactionalIDs) == 0 {
-		return result, nil
+		return nil, nil
 	}
 
 	// Group the transactional ids by their coordinating broker so a single
@@ -166,6 +165,7 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 		close(results)
 	}()
 
+	var result map[string]TransactionState
 	for r := range results {
 		if r.err != nil {
 			errs = append(errs, r.err)
