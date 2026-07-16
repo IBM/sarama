@@ -1344,6 +1344,7 @@ func (b *Broker) responseReceiver() {
 		header := make([]byte, headerLength)
 
 		deadline := promise.requestTime.Add(b.conf.Net.ReadTimeout)
+
 		bytesReadHeader, err := b.readFull(header, deadline)
 		requestLatency := time.Since(promise.requestTime)
 		if err != nil {
