@@ -9,7 +9,7 @@ on:
       kafka-version:
         required: false
         type: string
-        default: "4.2.0"
+        default: "4.3.1"
       scala-version:
         required: false
         type: string
