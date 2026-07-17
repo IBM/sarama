@@ -309,9 +309,10 @@ var (
 		V4_3_0_0,
 		V4_3_1_0,
 	}
-	MinVersion     = V0_8_2_0
-	MaxVersion     = V4_3_1_0
-	DefaultVersion = V2_6_0_0
+	MinVersion = V0_8_2_0
+	MaxVersion = V4_3_1_0
+	// DefaultVersion is 2.8 as Sarama has full protocol coverage for that version
+	DefaultVersion = V2_8_0_0
 )
 
 var (

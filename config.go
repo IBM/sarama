@@ -529,7 +529,8 @@ type Config struct {
 	// and most 3rdparty ones.
 	ApiVersionsRequest bool
 	// The version of Kafka that Sarama will assume it is running against.
-	// Defaults to the oldest supported stable version. Since Kafka provides
+	// Defaults to 2.8 as Sarama has full protocol coverage for that
+	// version. Since Kafka provides
 	// backwards-compatibility, setting it to a version older than you have
 	// will not break anything, although it may prevent you from using the
 	// latest features. Setting it to a version greater than you are actually
