@@ -25,3 +25,7 @@ Basic example to use a producer interceptor that produces [OpenTelemetry](https:
 #### Alter partition reassignments
 
 [alter_partition_reassignments](./alter_partition_reassignments) shows how to raise the replication factor of an existing topic with `ClusterAdmin.AlterPartitionReassignments`, including how to construct the per-partition replica list and how to poll `ListPartitionReassignments` until the move completes.
+
+#### Event Streams SASL/OAUTHBEARER
+
+[eventstreams_sasl_oauth](./eventstreams_sasl_oauth) connects to IBM Cloud Event Streams using `SASL_SSL` with the `OAUTHBEARER` mechanism. It implements a `sarama.AccessTokenProvider` that performs the IBM IAM apikey → bearer token exchange, then lists the cluster topics.
