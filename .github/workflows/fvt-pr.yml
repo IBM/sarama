@@ -25,8 +25,9 @@ jobs:
         - 2.6.3   # accumulates many 2.x protocol bumps (KIP-227, KIP-320, KIP-345, KIP-429)
         - 3.6.2   # mid-3.x representative
         - 3.9.2   # last ZooKeeper-capable release
-        - 4.1.1   # stable KRaft-only (post-4.0 transition)
-        - 4.2.0   # latest
+        - 4.1.2   # stable KRaft-only (post-4.0 transition)
+        - 4.2.1   # previous stable
+        - 4.3.1   # latest
         include:
         - kafka-version: 1.0.2
           scala-version: 2.11
@@ -36,9 +37,11 @@ jobs:
           scala-version: 2.13
         - kafka-version: 3.9.2
           scala-version: 2.13
-        - kafka-version: 4.1.1
+        - kafka-version: 4.1.2
           scala-version: 2.13
-        - kafka-version: 4.2.0
+        - kafka-version: 4.2.1
+          scala-version: 2.13
+        - kafka-version: 4.3.1
           scala-version: 2.13
     uses: ./.github/workflows/fvt.yml
     with:
