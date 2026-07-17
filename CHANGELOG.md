@@ -161,7 +161,7 @@
 ### :wrench: Maintenance
 * chore: add kafka versions 3.9.2 and 4.2.0 by @edoardocomar in https://github.com/IBM/sarama/pull/3471
 ### :memo: Documentation
-* Update the Kakfa Protocol Specification Link by @MohishKhadse55 in https://github.com/IBM/sarama/pull/3463
+* Update the Kafka Protocol Specification Link by @MohishKhadse55 in https://github.com/IBM/sarama/pull/3463
 ### :heavy_plus_sign: Other Changes
 * chore(deps): update dependency golangci/golangci-lint to v2.11.4 by @renovate[bot] in https://github.com/IBM/sarama/pull/3482
 * fix: update API version URL as previous link was not working by @MohishKhadse55 in https://github.com/IBM/sarama/pull/3485
@@ -1348,7 +1348,7 @@ Note: this is the first release after the transition of Sarama ownership from Sh
 
 #1466 - @rubenvp8510  - Expose kerberos fast negotiation configuration
 #1695 - @KJTsanaktsidis - Use docker-compose to run the functional tests
-#1699 - @wclaeys  - Consumer group support for manually comitting offsets
+#1699 - @wclaeys  - Consumer group support for manually committing offsets
 #1714 - @bai - Bump Go to version 1.14.3, golangci-lint to 1.27.0
 #1726 - @d1egoaz - Include zstd on the functional tests
 #1730 - @d1egoaz - KIP-42 Add producer and consumer interceptors
@@ -1573,7 +1573,7 @@ Bug Fixes:
   ([1376](https://github.com/IBM/sarama/pull/1376)).
 - Handle and log throttled FetchResponses
   ([1383](https://github.com/IBM/sarama/pull/1383)).
-- Refactor misspelled word Resouce to Resource
+- Refactor misspelled word Resource to Resource
   ([1368](https://github.com/IBM/sarama/pull/1368)).
 
 ## Version 1.22.1 (2019-04-29)
@@ -1767,7 +1767,7 @@ Bug Fixes:
  - Fix consumer block when response did not contain all the
    expected topic/partition blocks
    ([#1086](https://github.com/IBM/sarama/pull/1086)).
- - Fix consumer block when response contains only constrol messages
+ - Fix consumer block when response contains only control messages
    ([#1115](https://github.com/IBM/sarama/pull/1115)).
  - Add timeout config for ClusterAdmin requests
    ([#1142](https://github.com/IBM/sarama/pull/1142)).
@@ -2313,7 +2313,7 @@ Version 1.0.0 is the first tagged version, and is almost a complete rewrite. The
 
 - The producer has been rewritten; there is now a `SyncProducer` with a blocking API, and an `AsyncProducer` that is non-blocking.
 - The consumer has been rewritten to only open one connection per broker instead of one connection per partition.
-- The main types of Sarama are now interfaces to make depedency injection easy; mock implementations for `Consumer`, `SyncProducer` and `AsyncProducer` are provided in the `github.com/IBM/sarama/mocks` package.
+- The main types of Sarama are now interfaces to make dependency injection easy; mock implementations for `Consumer`, `SyncProducer` and `AsyncProducer` are provided in the `github.com/IBM/sarama/mocks` package.
 - For most uses cases, it is no longer necessary to open a `Client`; this will be done for you.
 - All the configuration values have been unified in the `Config` struct.
 - Much improved test suite.
