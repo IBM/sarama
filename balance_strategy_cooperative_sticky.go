@@ -89,11 +89,9 @@ func adjustCooperativeAssignment(plan BalanceStrategyPlan, members map[string]Co
 			continue
 		}
 		topics := plan[newOwner]
-		partitions := slices.DeleteFunc(topics[tp.Topic], func(p int32) bool { return p == tp.Partition })
-		if len(partitions) == 0 {
+		topics[tp.Topic] = slices.DeleteFunc(topics[tp.Topic], func(p int32) bool { return p == tp.Partition })
+		if len(topics[tp.Topic]) == 0 {
 			delete(topics, tp.Topic)
-			continue
 		}
-		topics[tp.Topic] = partitions
 	}
 }
