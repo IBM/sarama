@@ -7,7 +7,7 @@ require (
 	github.com/eapache/go-resiliency v1.7.0
 	github.com/jcmturner/gofork v1.7.6
 	github.com/jcmturner/gokrb5/v8 v8.4.4
-	github.com/klauspost/compress v1.19.0
+	github.com/klauspost/compress v1.19.1
 	github.com/pierrec/lz4/v4 v4.1.27
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9
 	github.com/stretchr/testify v1.11.1
