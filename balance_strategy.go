@@ -21,6 +21,9 @@ const (
 	// StickyBalanceStrategyName identifies strategies that use the sticky-partition assignment strategy
 	StickyBalanceStrategyName = "sticky"
 
+	// CooperativeStickyBalanceStrategyName matches Java's cooperative assignor name
+	CooperativeStickyBalanceStrategyName = "cooperative-sticky"
+
 	defaultGeneration = -1
 )
 
@@ -220,6 +223,8 @@ func (s *balanceStrategy) AssignmentData(memberID string, topics map[string][]in
 
 type stickyBalanceStrategy struct {
 	movements partitionMovements
+
+	cooperative bool
 }
 
 // Name implements BalanceStrategy.
@@ -234,7 +239,7 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 	}
 
 	// prepopulate the current assignment state from userdata on the consumer group members
-	currentAssignment, prevAssignment, err := prepopulateCurrentAssignments(members)
+	currentAssignment, prevAssignment, err := prepopulateCurrentAssignments(members, s.cooperative)
 	if err != nil {
 		return nil, err
 	}
@@ -323,6 +328,9 @@ func (s *stickyBalanceStrategy) Plan(members map[string]ConsumerGroupMemberMetad
 				plan.Add(memberID, assignment.Topic, assignment.Partition)
 			}
 		}
+	}
+	if s.cooperative {
+		adjustCooperativeAssignment(plan, members)
 	}
 	return plan, nil
 }
@@ -865,17 +873,53 @@ func areSubscriptionsIdentical(partition2AllPotentialConsumers map[topicPartitio
 	return true
 }
 
+// memberData reads cooperative ownership from the subscription metadata
+func memberData(meta ConsumerGroupMemberMetadata, cooperative bool) (StickyAssignorUserData, error) {
+	if !cooperative {
+		return deserializeTopicPartitionAssignment(meta.UserData)
+	}
+
+	data := &cooperativeStickyAssignorUserData{
+		Generation:      defaultGeneration,
+		topicPartitions: ownedTopicPartitions(meta.OwnedPartitions),
+	}
+
+	if meta.Version >= 2 {
+		data.Generation = meta.GenerationID
+		return data, nil
+	}
+	if len(meta.UserData) > 0 {
+		encoded := &cooperativeStickyAssignorUserData{}
+		if err := decode(meta.UserData, encoded, nil); err != nil {
+			Logger.Printf("consumer/cooperative-sticky: ignoring undecodable user data: %v\n", err)
+			return data, nil
+		}
+		data.Generation = encoded.Generation
+	}
+	return data, nil
+}
+
+func ownedTopicPartitions(owned []*OwnedPartition) []topicPartitionAssignment {
+	partitions := make([]topicPartitionAssignment, 0, len(owned))
+	for _, op := range owned {
+		for _, partition := range op.Partitions {
+			partitions = append(partitions, topicPartitionAssignment{Topic: op.Topic, Partition: partition})
+		}
+	}
+	return partitions
+}
+
 // We need to process subscriptions' user data with each consumer's reported generation in mind
 // higher generations overwrite lower generations in case of a conflict
 // note that a conflict could exist only if user data is for different generations
-func prepopulateCurrentAssignments(members map[string]ConsumerGroupMemberMetadata) (map[string][]topicPartitionAssignment, map[topicPartitionAssignment]consumerGenerationPair, error) {
+func prepopulateCurrentAssignments(members map[string]ConsumerGroupMemberMetadata, cooperative bool) (map[string][]topicPartitionAssignment, map[topicPartitionAssignment]consumerGenerationPair, error) {
 	currentAssignment := make(map[string][]topicPartitionAssignment)
 	prevAssignment := make(map[topicPartitionAssignment]consumerGenerationPair)
 
 	// for each partition we create a sorted map of its consumers by generation
 	sortedPartitionConsumersByGeneration := make(map[topicPartitionAssignment]map[int]string)
 	for memberID, meta := range members {
-		consumerUserData, err := deserializeTopicPartitionAssignment(meta.UserData)
+		consumerUserData, err := memberData(meta, cooperative)
 		if err != nil {
 			return nil, nil, err
 		}
