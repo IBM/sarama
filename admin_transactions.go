@@ -121,7 +121,7 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 	var wg sync.WaitGroup
 	for _, ids := range idsPerCoordinator {
 		wg.Go(func() {
-			var response *DescribeTransactionsResponse
+			var states []TransactionState
 			err := ca.retryOnError(isRetriableTransactionCoordinatorError, func() (err error) {
 				defer func() {
 					if err != nil && isRetriableTransactionCoordinatorError(err) {
@@ -131,32 +131,41 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 					}
 				}()
 
-				coordinator, err := ca.client.TransactionCoordinator(ids[0])
-				if err != nil {
-					return err
+				perCoordinator := make(map[*Broker][]string)
+				for _, id := range ids {
+					coordinator, err := ca.client.TransactionCoordinator(id)
+					if err != nil {
+						return err
+					}
+					perCoordinator[coordinator] = append(perCoordinator[coordinator], id)
 				}
 
-				response, err = coordinator.DescribeTransactions(&DescribeTransactionsRequest{TransactionalIDs: ids})
-				if err != nil {
-					return err
-				}
+				var attemptStates []TransactionState
+				for coordinator, groupIDs := range perCoordinator {
+					response, err := coordinator.DescribeTransactions(&DescribeTransactionsRequest{TransactionalIDs: groupIDs})
+					if err != nil {
+						return err
+					}
 
-				// A moved or loading coordinator answers successfully but tags the
-				// affected transactions with a retriable coordinator code; lift it so
-				// the coordinator is refreshed and the request retried.
-				for _, state := range response.TransactionStates {
-					if isRetriableTransactionCoordinatorError(state.ErrorCode) {
-						return state.ErrorCode
+					// A moved or loading coordinator answers successfully but tags the
+					// affected transactions with a retriable coordinator code; lift it so
+					// the coordinator is refreshed and the request retried.
+					for _, state := range response.TransactionStates {
+						if isRetriableTransactionCoordinatorError(state.ErrorCode) {
+							return state.ErrorCode
+						}
+						attemptStates = append(attemptStates, state)
 					}
 				}
 
+				states = attemptStates
 				return nil
 			})
 			if err != nil {
 				results <- queryResult{err: err}
 				return
 			}
-			results <- queryResult{states: response.TransactionStates}
+			results <- queryResult{states: states}
 		})
 	}
 

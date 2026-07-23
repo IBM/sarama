@@ -2962,6 +2962,64 @@ func TestClusterAdminDescribeTransactionsRetriesOnRetriableCoordinatorError(t *t
 	}
 }
 
+func TestClusterAdminDescribeTransactionsRegroupsCoordinatorsOnRetry(t *testing.T) {
+	firstTx := "tx-1"
+	secondTx := "tx-2"
+	seedBroker := NewMockBroker(t, 1)
+	secondBroker := NewMockBroker(t, 2)
+	defer seedBroker.Close()
+	defer secondBroker.Close()
+
+	metadata := NewMockMetadataResponse(t).
+		SetController(seedBroker.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+		SetBroker(secondBroker.Addr(), secondBroker.BrokerID())
+
+	// Both transactions initially resolve to the seed broker, so they are grouped
+	// into a single request. The initial grouping issues exactly one
+	// FindCoordinator per id (both -> seed), consuming the first two sequence
+	// entries; every refresh afterwards sees tx-2 moved to the second broker.
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": metadata,
+		"FindCoordinatorRequest": NewMockSequence(
+			NewMockFindCoordinatorResponse(t).
+				SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+				SetCoordinator(CoordinatorTransaction, secondTx, seedBroker),
+			NewMockFindCoordinatorResponse(t).
+				SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+				SetCoordinator(CoordinatorTransaction, secondTx, seedBroker),
+			NewMockFindCoordinatorResponse(t).
+				SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+				SetCoordinator(CoordinatorTransaction, secondTx, secondBroker),
+		),
+		// The seed broker owns tx-1 but not tx-2, which it rejects with
+		// NOT_COORDINATOR on every attempt. The pre-fix code sent the whole group
+		// to ids[0]'s coordinator on retry, so tx-2 could never succeed here.
+		"DescribeTransactionsRequest": NewMockDescribeTransactionsResponse(t).
+			AddTransaction(firstTx, TransactionState{TransactionState: TransactionStateOngoing}).
+			SetError(secondTx, ErrNotCoordinatorForConsumer),
+	})
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": metadata,
+		"DescribeTransactionsRequest": NewMockDescribeTransactionsResponse(t).
+			AddTransaction(secondTx, TransactionState{TransactionState: TransactionStateEmpty}),
+	})
+
+	config := NewTestConfig()
+	config.Version = V3_0_0_0
+	config.Admin.Retry.Backoff = 0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer func() { _ = admin.Close() }()
+
+	txAdmin := admin.(TransactionClusterAdmin)
+	result, err := txAdmin.DescribeTransactions([]string{firstTx, secondTx})
+	require.NoError(t, err)
+	require.Len(t, result, 2)
+	require.Equal(t, TransactionStateOngoing, result[firstTx].TransactionState)
+	require.Equal(t, TransactionStateEmpty, result[secondTx].TransactionState)
+}
+
 func TestClusterAdminDescribeTransactionsPartialFailure(t *testing.T) {
 	okTx := "ok-tx"
 	badTx := "bad-tx"
