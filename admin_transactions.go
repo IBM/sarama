@@ -2,7 +2,9 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"io"
+	"strings"
 	"sync"
 )
 
@@ -49,7 +51,7 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 		for _, partition := range partitions {
 			leader, err := ca.client.Leader(topic, partition)
 			if err != nil {
-				errs = append(errs, err)
+				errs = append(errs, fmt.Errorf("describe producers: find leader for partition %d of topic %s: %w", partition, topic, err))
 				continue
 			}
 			partitionsPerBroker[leader] = append(partitionsPerBroker[leader], topicPartition{topic, partition})
@@ -81,7 +83,7 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 
 			response, err := broker.DescribeProducers(request)
 			if err != nil {
-				results <- queryResult{err: err}
+				results <- queryResult{err: fmt.Errorf("describe producers on broker %s: %w", broker.Addr(), err)}
 				return
 			}
 			results <- queryResult{topics: response.Topics}
@@ -127,7 +129,7 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 	for _, id := range transactionalIDs {
 		coordinator, err := ca.client.TransactionCoordinator(id)
 		if err != nil {
-			errs = append(errs, err)
+			errs = append(errs, fmt.Errorf("describe transactions: find coordinator for transactional id %s: %w", id, err))
 			continue
 		}
 		idsPerCoordinator[coordinator] = append(idsPerCoordinator[coordinator], id)
@@ -184,7 +186,7 @@ func (ca *clusterAdmin) DescribeTransactions(transactionalIDs []string) (map[str
 				return nil
 			})
 			if err != nil {
-				results <- queryResult{err: err}
+				results <- queryResult{err: fmt.Errorf("describe transactions for %s: %w", strings.Join(ids, ", "), err)}
 				return
 			}
 			results <- queryResult{states: states}
@@ -269,9 +271,9 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 			response, err := b.ListTransactions(request)
 			switch {
 			case err != nil:
-				results <- queryResult{err: err}
+				results <- queryResult{err: fmt.Errorf("list transactions on broker %s: %w", b.Addr(), err)}
 			case !errors.Is(response.ErrorCode, ErrNoError):
-				results <- queryResult{err: response.ErrorCode}
+				results <- queryResult{err: fmt.Errorf("list transactions on broker %s: %w", b.Addr(), response.ErrorCode)}
 			default:
 				results <- queryResult{states: response.TransactionStates}
 			}

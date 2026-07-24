@@ -132,6 +132,8 @@ func TestClusterAdminDescribeProducersPartialFailure(t *testing.T) {
 	// while the reachable partition still returns a result.
 	result, err := txAdmin.DescribeProducers(map[string][]int32{topicName: {0, 99}})
 	require.Error(t, err)
+	// The leader-lookup failure is wrapped with the partition and topic it was for.
+	require.ErrorContains(t, err, fmt.Sprintf("find leader for partition 99 of topic %s", topicName))
 	require.Equal(t, int64(7), result[topicName][0].ActiveProducers[0].ProducerID)
 }
 
@@ -199,6 +201,7 @@ func TestClusterAdminDescribeProducersBrokerTransportError(t *testing.T) {
 	// Cache both partition leaders while the brokers are reachable, then close the
 	// leader of partition 1 so its request fails at the transport layer while
 	// partition 0's leader still answers.
+	secondAddr := secondBroker.Addr()
 	ca := admin.(*clusterAdmin)
 	require.NoError(t, ca.client.RefreshMetadata(topicName))
 	secondBroker.Close()
@@ -207,8 +210,10 @@ func TestClusterAdminDescribeProducersBrokerTransportError(t *testing.T) {
 	txAdmin := admin.(TransactionClusterAdmin)
 	result, err := txAdmin.DescribeProducers(map[string][]int32{topicName: {0, 1}})
 	// The reachable partition is returned; the unreachable partition is dropped and
-	// its transport failure surfaces in the aggregate error.
+	// its transport failure surfaces in the aggregate error, wrapped with the broker
+	// it was sent to.
 	require.Error(t, err)
+	require.ErrorContains(t, err, fmt.Sprintf("describe producers on broker %s", secondAddr))
 	require.Equal(t, int64(7), result[topicName][0].ActiveProducers[0].ProducerID)
 	_, present := result[topicName][1]
 	require.False(t, present)
@@ -432,6 +437,8 @@ func TestClusterAdminDescribeTransactionsPartialFailure(t *testing.T) {
 	txAdmin := admin.(TransactionClusterAdmin)
 	result, err := txAdmin.DescribeTransactions([]string{okTx, badTx})
 	require.Error(t, err)
+	// The coordinator-lookup failure is wrapped with the transactional id it was for.
+	require.ErrorContains(t, err, fmt.Sprintf("find coordinator for transactional id %s", badTx))
 	require.Equal(t, TransactionStateOngoing, result[okTx].TransactionState)
 	_, present := result[badTx]
 	require.False(t, present)
@@ -498,6 +505,9 @@ func TestClusterAdminDescribeTransactionsExhaustsRetries(t *testing.T) {
 	// aggregate error and the transaction is left out of the result.
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrNotCoordinatorForConsumer)
+	// The surfaced error is wrapped with the transactional ids the request covered,
+	// while %w keeps the underlying coordinator code matchable above.
+	require.ErrorContains(t, err, fmt.Sprintf("describe transactions for %s", txID))
 	_, present := result[txID]
 	require.False(t, present)
 }
@@ -711,6 +721,10 @@ func TestClusterAdminListTransactionsPartialFailure(t *testing.T) {
 	txAdmin := admin.(TransactionClusterAdmin)
 	result, err := txAdmin.ListTransactions(nil, nil, -1)
 	require.Error(t, err)
+	// The failing broker's error is wrapped with its address, while %w keeps the
+	// underlying code matchable.
+	require.ErrorIs(t, err, ErrClusterAuthorizationFailed)
+	require.ErrorContains(t, err, fmt.Sprintf("list transactions on broker %s", secondBroker.Addr()))
 	require.Len(t, result, 1)
 	require.Equal(t, "tx-1", result[0].TransactionalID)
 }
@@ -736,6 +750,8 @@ func TestClusterAdminListTransactionsSurfacesTopLevelError(t *testing.T) {
 	txAdmin := admin.(TransactionClusterAdmin)
 	result, err := txAdmin.ListTransactions(nil, nil, -1)
 	require.Error(t, err)
+	require.ErrorIs(t, err, ErrClusterAuthorizationFailed)
+	require.ErrorContains(t, err, fmt.Sprintf("list transactions on broker %s", seedBroker.Addr()))
 	require.Empty(t, result)
 }
 
