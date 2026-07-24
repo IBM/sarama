@@ -258,15 +258,10 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 		wg.Go(func() {
 			_ = b.Open(ca.conf) // Ensure that broker is opened
 
-			request := &ListTransactionsRequest{
-				StateFilters:      stateFilters,
-				ProducerIDFilters: producerIDFilters,
-				DurationFilter:    durationFilterMs,
-			}
-			if ca.conf.Version.IsAtLeast(V3_8_0_0) {
-				// Version 1 adds the DurationFilter field.
-				request.Version = 1
-			}
+			request := NewListTransactionsRequest(ca.conf.Version)
+			request.StateFilters = stateFilters
+			request.ProducerIDFilters = producerIDFilters
+			request.DurationFilter = durationFilterMs
 
 			response, err := b.ListTransactions(request)
 			switch {
