@@ -37,6 +37,13 @@ func (r *ListTransactionsRequest) setVersion(v int16) {
 }
 
 func (r *ListTransactionsRequest) encode(pe packetEncoder) error {
+	// DurationFilter is only carried on the wire from v1. Guard here rather than
+	// silently dropping it: this catches both a too-low Config.Version and a
+	// runtime downgrade by restrictApiVersion, which runs before encode.
+	if r.DurationFilter >= 0 && r.Version < 1 {
+		return PacketEncodingError{"DurationFilter is not supported. use version 1 or later"}
+	}
+
 	if err := pe.putStringArray(r.StateFilters); err != nil {
 		return err
 	}

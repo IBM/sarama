@@ -644,14 +644,39 @@ func TestClusterAdminListTransactionsUsesV0BelowV3_8(t *testing.T) {
 	defer func() { _ = admin.Close() }()
 
 	txAdmin := admin.(TransactionClusterAdmin)
-	// A duration filter is requested but the broker version is below 3.8, so a v0
-	// request must be sent and the duration filter must not reach the wire.
-	_, err = txAdmin.ListTransactions(nil, nil, 5000)
+	// No duration filter is requested (disabled), so a v0 request is sent and the
+	// duration filter never reaches the wire.
+	_, err = txAdmin.ListTransactions(nil, nil, -1)
 	require.NoError(t, err)
 
 	req := mock.LastRequest()
 	require.Equal(t, int16(0), req.Version)
 	require.Equal(t, int64(-1), req.DurationFilter)
+}
+
+func TestClusterAdminListTransactionsRejectsDurationFilterBelowV3_8(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
+
+	config := NewTestConfig()
+	config.Version = V3_0_0_0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer func() { _ = admin.Close() }()
+
+	txAdmin := admin.(TransactionClusterAdmin)
+	// A real duration filter needs ListTransactions v1 (Kafka 3.8.0.0+); below
+	// that it must be rejected rather than silently ignored.
+	result, err := txAdmin.ListTransactions(nil, nil, 5000)
+	require.Nil(t, result)
+	var configErr ConfigurationError
+	require.ErrorAs(t, err, &configErr)
 }
 
 func TestClusterAdminListTransactionsPartialFailure(t *testing.T) {

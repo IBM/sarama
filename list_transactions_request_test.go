@@ -3,6 +3,7 @@
 package sarama
 
 import (
+	"errors"
 	"testing"
 )
 
@@ -36,4 +37,25 @@ func TestListTransactionsRequest(t *testing.T) {
 	request.Version = 1
 	request.DurationFilter = 100
 	testRequest(t, "v1", request, listTransactionsRequestV1)
+}
+
+// A DurationFilter can only be encoded from v1. If a v0 request still carries an
+// explicit filter (e.g. restrictApiVersion downgraded the version after the
+// admin call built it), encode must fail rather than silently drop the filter.
+func TestListTransactionsRequestDurationFilterRequiresV1(t *testing.T) {
+	request := &ListTransactionsRequest{
+		Version:        0,
+		DurationFilter: 5000,
+	}
+	err := request.encode(&prepEncoder{})
+	target := PacketEncodingError{}
+	if !errors.As(err, &target) {
+		t.Fatalf("expected PacketEncodingError, got %v", err)
+	}
+
+	// A disabled (negative) filter is always safe, even at v0.
+	request.DurationFilter = -1
+	if err := request.encode(&prepEncoder{}); err != nil {
+		t.Fatalf("disabled filter must encode at v0, got %v", err)
+	}
 }

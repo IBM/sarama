@@ -212,6 +212,13 @@ func isRetriableTransactionCoordinatorError(err error) bool {
 }
 
 func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilters []int64, durationFilterMs int64) ([]ListTransactionsResponseTransactionState, error) {
+	// The DurationFilter field was added in ListTransactions v1 (Kafka 3.8.0.0).
+	// Reject an explicit filter up front rather than silently ignoring it; a
+	// negative value disables the filter and is safe against any broker.
+	if durationFilterMs >= 0 && !ca.conf.Version.IsAtLeast(V3_8_0_0) {
+		return nil, ConfigurationError("ListTransactions durationFilterMs requires Version >= V3_8_0_0")
+	}
+
 	// Transactions may be listed by any broker, so query all brokers in parallel
 	// and merge the results.
 	brokers := ca.client.Brokers()
@@ -230,12 +237,11 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 			request := &ListTransactionsRequest{
 				StateFilters:      stateFilters,
 				ProducerIDFilters: producerIDFilters,
-				DurationFilter:    -1,
+				DurationFilter:    durationFilterMs,
 			}
 			if ca.conf.Version.IsAtLeast(V3_8_0_0) {
 				// Version 1 adds the DurationFilter field.
 				request.Version = 1
-				request.DurationFilter = durationFilterMs
 			}
 
 			response, err := b.ListTransactions(request)
