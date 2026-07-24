@@ -56,28 +56,50 @@ func (ca *clusterAdmin) DescribeProducers(topicPartitions map[string][]int32) (m
 		}
 	}
 
-	var result map[string]map[int32]DescribeProducersResponsePartition
+	// Query each leader in parallel and merge the results.
+	type queryResult struct {
+		topics []DescribeProducersResponseTopic
+		err    error
+	}
+	results := make(chan queryResult)
+
+	var wg sync.WaitGroup
 	for broker, topicPartitions := range partitionsPerBroker {
-		partitionsPerTopic := make(map[string][]int32)
-		for _, tp := range topicPartitions {
-			partitionsPerTopic[tp.topic] = append(partitionsPerTopic[tp.topic], tp.partition)
-		}
+		wg.Go(func() {
+			partitionsPerTopic := make(map[string][]int32)
+			for _, tp := range topicPartitions {
+				partitionsPerTopic[tp.topic] = append(partitionsPerTopic[tp.topic], tp.partition)
+			}
 
-		request := &DescribeProducersRequest{}
-		for topic, partitions := range partitionsPerTopic {
-			request.Topics = append(request.Topics, DescribeProducersRequestTopic{
-				Name:             topic,
-				PartitionIndexes: partitions,
-			})
-		}
+			request := &DescribeProducersRequest{}
+			for topic, partitions := range partitionsPerTopic {
+				request.Topics = append(request.Topics, DescribeProducersRequestTopic{
+					Name:             topic,
+					PartitionIndexes: partitions,
+				})
+			}
 
-		response, err := broker.DescribeProducers(request)
-		if err != nil {
-			errs = append(errs, err)
+			response, err := broker.DescribeProducers(request)
+			if err != nil {
+				results <- queryResult{err: err}
+				return
+			}
+			results <- queryResult{topics: response.Topics}
+		})
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var result map[string]map[int32]DescribeProducersResponsePartition
+	for r := range results {
+		if r.err != nil {
+			errs = append(errs, r.err)
 			continue
 		}
-
-		for _, topic := range response.Topics {
+		for _, topic := range r.topics {
 			for _, partition := range topic.Partitions {
 				if result == nil {
 					result = make(map[string]map[int32]DescribeProducersResponsePartition)
