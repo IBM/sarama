@@ -32,11 +32,34 @@ type ListTransactionsRequest struct {
 	DurationFilter int64
 }
 
+// NewListTransactionsRequest returns a ListTransactionsRequest for the given
+// Kafka version with DurationFilter defaulted to -1 (no filter). Prefer this
+// over a bare &ListTransactionsRequest{} literal: the zero value of
+// DurationFilter is 0, which reads as a valid v1-only filter and is rejected on
+// encode against a v0 request.
+func NewListTransactionsRequest(version KafkaVersion) *ListTransactionsRequest {
+	r := &ListTransactionsRequest{
+		DurationFilter: -1,
+	}
+	if version.IsAtLeast(V3_8_0_0) {
+		// Version 1 adds the DurationFilter field.
+		r.Version = 1
+	}
+	return r
+}
+
 func (r *ListTransactionsRequest) setVersion(v int16) {
 	r.Version = v
 }
 
 func (r *ListTransactionsRequest) encode(pe packetEncoder) error {
+	// DurationFilter is only carried on the wire from v1. Guard here rather than
+	// silently dropping it: this catches both a too-low Config.Version and a
+	// runtime downgrade by restrictApiVersion, which runs before encode.
+	if r.DurationFilter >= 0 && r.Version < 1 {
+		return PacketEncodingError{"DurationFilter is not supported. use version 1 or later"}
+	}
+
 	if err := pe.putStringArray(r.StateFilters); err != nil {
 		return err
 	}

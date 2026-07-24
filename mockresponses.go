@@ -1566,3 +1566,147 @@ func (m *MockUpdateFeaturesResponse) For(reqBody versionedDecoder) encoderWithHe
 	}
 	return res
 }
+
+// MockDescribeProducersResponse is a `DescribeProducersResponse` builder. It
+// echoes back the requested topic-partitions, populating each with any producers
+// or error code registered for it.
+type MockDescribeProducersResponse struct {
+	t         TestReporter
+	producers map[string]map[int32][]ProducerState
+	errors    map[string]map[int32]KError
+}
+
+func NewMockDescribeProducersResponse(t TestReporter) *MockDescribeProducersResponse {
+	return &MockDescribeProducersResponse{
+		t:         t,
+		producers: make(map[string]map[int32][]ProducerState),
+		errors:    make(map[string]map[int32]KError),
+	}
+}
+
+func (m *MockDescribeProducersResponse) AddProducer(topic string, partition int32, producer ProducerState) *MockDescribeProducersResponse {
+	if m.producers[topic] == nil {
+		m.producers[topic] = make(map[int32][]ProducerState)
+	}
+	m.producers[topic][partition] = append(m.producers[topic][partition], producer)
+	return m
+}
+
+func (m *MockDescribeProducersResponse) SetError(topic string, partition int32, kerror KError) *MockDescribeProducersResponse {
+	if m.errors[topic] == nil {
+		m.errors[topic] = make(map[int32]KError)
+	}
+	m.errors[topic][partition] = kerror
+	return m
+}
+
+func (m *MockDescribeProducersResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*DescribeProducersRequest)
+	res := &DescribeProducersResponse{Version: req.version()}
+	for _, reqTopic := range req.Topics {
+		resTopic := DescribeProducersResponseTopic{Name: reqTopic.Name}
+		for _, partition := range reqTopic.PartitionIndexes {
+			resPartition := DescribeProducersResponsePartition{PartitionIndex: partition}
+			if topicErrors, ok := m.errors[reqTopic.Name]; ok {
+				resPartition.ErrorCode = topicErrors[partition]
+			}
+			if topicProducers, ok := m.producers[reqTopic.Name]; ok {
+				resPartition.ActiveProducers = topicProducers[partition]
+			}
+			resTopic.Partitions = append(resTopic.Partitions, resPartition)
+		}
+		res.Topics = append(res.Topics, resTopic)
+	}
+	return res
+}
+
+// MockDescribeTransactionsResponse is a `DescribeTransactionsResponse` builder.
+// It echoes back the requested transactional ids, populating each with any state
+// or error code registered for it.
+type MockDescribeTransactionsResponse struct {
+	t      TestReporter
+	states map[string]TransactionState
+}
+
+func NewMockDescribeTransactionsResponse(t TestReporter) *MockDescribeTransactionsResponse {
+	return &MockDescribeTransactionsResponse{
+		t:      t,
+		states: make(map[string]TransactionState),
+	}
+}
+
+func (m *MockDescribeTransactionsResponse) AddTransaction(transactionalID string, state TransactionState) *MockDescribeTransactionsResponse {
+	state.TransactionalID = transactionalID
+	m.states[transactionalID] = state
+	return m
+}
+
+func (m *MockDescribeTransactionsResponse) SetError(transactionalID string, kerror KError) *MockDescribeTransactionsResponse {
+	state := m.states[transactionalID]
+	state.TransactionalID = transactionalID
+	state.ErrorCode = kerror
+	m.states[transactionalID] = state
+	return m
+}
+
+func (m *MockDescribeTransactionsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*DescribeTransactionsRequest)
+	res := &DescribeTransactionsResponse{Version: req.version()}
+	for _, id := range req.TransactionalIDs {
+		if state, ok := m.states[id]; ok {
+			res.TransactionStates = append(res.TransactionStates, state)
+		} else {
+			res.TransactionStates = append(res.TransactionStates, TransactionState{TransactionalID: id})
+		}
+	}
+	return res
+}
+
+// MockListTransactionsResponse is a `ListTransactionsResponse` builder. It
+// records the request it last handled so tests can assert on the negotiated
+// request version and filters.
+type MockListTransactionsResponse struct {
+	t            TestReporter
+	transactions []ListTransactionsResponseTransactionState
+	errorCode    KError
+
+	mu          sync.Mutex
+	lastRequest ListTransactionsRequest
+}
+
+func NewMockListTransactionsResponse(t TestReporter) *MockListTransactionsResponse {
+	return &MockListTransactionsResponse{t: t}
+}
+
+func (m *MockListTransactionsResponse) AddTransaction(transactionalID string, producerID int64, state string) *MockListTransactionsResponse {
+	m.transactions = append(m.transactions, ListTransactionsResponseTransactionState{
+		TransactionalID:  transactionalID,
+		ProducerID:       producerID,
+		TransactionState: state,
+	})
+	return m
+}
+
+func (m *MockListTransactionsResponse) SetError(kerror KError) *MockListTransactionsResponse {
+	m.errorCode = kerror
+	return m
+}
+
+func (m *MockListTransactionsResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*ListTransactionsRequest)
+	m.mu.Lock()
+	m.lastRequest = *req
+	m.mu.Unlock()
+	return &ListTransactionsResponse{
+		Version:           req.version(),
+		ErrorCode:         m.errorCode,
+		TransactionStates: m.transactions,
+	}
+}
+
+// LastRequest returns a copy of the most recent request handled, for assertions.
+func (m *MockListTransactionsResponse) LastRequest() ListTransactionsRequest {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.lastRequest
+}

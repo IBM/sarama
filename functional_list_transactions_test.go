@@ -34,7 +34,7 @@ func TestFuncListTransactions(t *testing.T) {
 	coordinator, err := client.TransactionCoordinator(config.Producer.Transaction.ID)
 	require.NoError(t, err)
 
-	res, err := coordinator.ListTransactions(&ListTransactionsRequest{})
+	res, err := coordinator.ListTransactions(NewListTransactionsRequest(config.Version))
 	require.NoError(t, err)
 	require.Equal(t, ErrNoError, res.ErrorCode)
 	assert.Empty(t, res.UnknownStateFilters)
