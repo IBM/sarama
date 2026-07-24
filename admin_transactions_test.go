@@ -512,6 +512,61 @@ func TestClusterAdminDescribeTransactionsExhaustsRetries(t *testing.T) {
 	require.False(t, present)
 }
 
+func TestClusterAdminDescribeTransactionsPartialResultOnRetryExhaustion(t *testing.T) {
+	okTx := "ok-tx"
+	badTx := "bad-tx"
+	seedBroker := NewMockBroker(t, 1)
+	secondBroker := NewMockBroker(t, 2)
+	defer seedBroker.Close()
+	defer secondBroker.Close()
+
+	metadata := NewMockMetadataResponse(t).
+		SetController(seedBroker.BrokerID()).
+		SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+		SetBroker(secondBroker.Addr(), secondBroker.BrokerID())
+
+	// ok-tx and bad-tx resolve to distinct coordinators, one goroutine each. bad-tx's
+	// coordinator tags it with a retriable code on every attempt, so that goroutine
+	// exhausts its describe retries and errors through the results channel while ok-tx
+	// succeeds.
+	findCoordinator := NewMockFindCoordinatorResponse(t).
+		SetCoordinator(CoordinatorTransaction, okTx, seedBroker).
+		SetCoordinator(CoordinatorTransaction, badTx, secondBroker)
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest":        metadata,
+		"FindCoordinatorRequest": findCoordinator,
+		"DescribeTransactionsRequest": NewMockDescribeTransactionsResponse(t).
+			AddTransaction(okTx, TransactionState{TransactionState: TransactionStateOngoing}),
+	})
+	secondBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest":        metadata,
+		"FindCoordinatorRequest": findCoordinator,
+		"DescribeTransactionsRequest": NewMockDescribeTransactionsResponse(t).
+			SetError(badTx, ErrNotCoordinatorForConsumer),
+	})
+
+	config := NewTestConfig()
+	config.Version = V3_0_0_0
+	config.Admin.Retry.Max = 2
+	config.Admin.Retry.Backoff = 0
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer func() { _ = admin.Close() }()
+
+	txAdmin := admin.(TransactionClusterAdmin)
+	result, err := txAdmin.DescribeTransactions([]string{okTx, badTx})
+	// bad-tx's exhausted retriable code is surfaced as the aggregate error, wrapped
+	// with the transactional id its request covered.
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrNotCoordinatorForConsumer)
+	require.ErrorContains(t, err, fmt.Sprintf("describe transactions for %s", badTx))
+	// ok-tx's result survives alongside the error; bad-tx is absent from the map.
+	require.Equal(t, TransactionStateOngoing, result[okTx].TransactionState)
+	require.Equal(t, ErrNoError, result[okTx].ErrorCode)
+	_, present := result[badTx]
+	require.False(t, present)
+}
+
 func TestIsRetriableTransactionCoordinatorError(t *testing.T) {
 	// The full "coordinator dropped an established connection" path cannot be
 	// reproduced deterministically with MockBroker, so the io.EOF branch is
