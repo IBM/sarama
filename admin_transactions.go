@@ -9,8 +9,9 @@ import (
 )
 
 // TransactionClusterAdmin extends ClusterAdmin with the read-only KIP-664
-// transaction-detection APIs (DescribeProducers, DescribeTransactions and
-// ListTransactions). The value returned by NewClusterAdmin and
+// transaction-detection APIs: DescribeProducers, DescribeTransactions, and
+// ListTransactions. Values returned by NewClusterAdmin and
+// NewClusterAdminFromClient implement TransactionClusterAdmin.
 type TransactionClusterAdmin interface {
 	ClusterAdmin
 
