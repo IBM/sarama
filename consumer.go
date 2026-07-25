@@ -100,14 +100,15 @@ type Consumer interface {
 const partitionConsumersBatchTimeout = 100 * time.Millisecond
 
 type consumer struct {
-	conf            *Config
+	conf           *Config
+	client         Client
+	metricRegistry metrics.Registry
+
+	// lock guards the fields below it
+	lock            sync.Mutex
 	children        map[string]map[int32]*partitionConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
-	client          Client
-	metricRegistry  metrics.Registry
-	lock            sync.Mutex
-
-	// paused retains pause state while a partition is reassigned, guarded by lock
+	// paused retains pause state while a partition is reassigned
 	paused map[string]map[int32]none
 }
 
