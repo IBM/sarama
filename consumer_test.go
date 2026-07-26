@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
@@ -2579,5 +2580,96 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			require.FailNow(t, "abort() did not return")
 		}
+	})
+}
+
+func TestConsumerPause(t *testing.T) {
+	newConsumerWithChild := func() (*consumer, *partitionConsumer) {
+		c := &consumer{
+			children: make(map[string]map[int32]*partitionConsumer),
+			paused:   make(map[string]map[int32]none),
+		}
+		return c, &partitionConsumer{topic: "my_topic", partition: 0}
+	}
+
+	t.Run("a paused partition stays paused when reassigned", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		require.NoError(t, c.addChild(child))
+		c.Pause(map[string][]int32{"my_topic": {0}})
+		assert.True(t, child.IsPaused())
+		c.removeChild(child)
+
+		reassigned := &partitionConsumer{topic: child.topic, partition: child.partition}
+		require.NoError(t, c.addChild(reassigned))
+		assert.True(t, reassigned.IsPaused())
+	})
+
+	t.Run("a partition paused by PauseAll comes back paused when reassigned", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		require.NoError(t, c.addChild(child))
+		c.PauseAll()
+		assert.True(t, child.IsPaused())
+		c.removeChild(child)
+
+		reassigned := &partitionConsumer{topic: child.topic, partition: child.partition}
+		require.NoError(t, c.addChild(reassigned))
+		assert.True(t, reassigned.IsPaused())
+	})
+
+	t.Run("resuming after PauseAll keeps the partition resumed when reassigned", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		require.NoError(t, c.addChild(child))
+		c.PauseAll()
+		c.Resume(map[string][]int32{child.topic: {child.partition}})
+		assert.False(t, child.IsPaused())
+		c.removeChild(child)
+
+		reassigned := &partitionConsumer{topic: child.topic, partition: child.partition}
+		require.NoError(t, c.addChild(reassigned))
+		assert.False(t, reassigned.IsPaused())
+	})
+
+	t.Run("resuming one partition retains pauses for other partitions", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		otherChild := &partitionConsumer{topic: child.topic, partition: 1}
+		require.NoError(t, c.addChild(child))
+		require.NoError(t, c.addChild(otherChild))
+		c.PauseAll()
+		c.Resume(map[string][]int32{child.topic: {child.partition}})
+		c.removeChild(child)
+		c.removeChild(otherChild)
+
+		reassigned := &partitionConsumer{topic: child.topic, partition: child.partition}
+		otherReassigned := &partitionConsumer{topic: otherChild.topic, partition: otherChild.partition}
+		require.NoError(t, c.addChild(reassigned))
+		require.NoError(t, c.addChild(otherReassigned))
+		assert.False(t, reassigned.IsPaused())
+		assert.True(t, otherReassigned.IsPaused())
+	})
+
+	t.Run("an unpaused partition is not affected", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		c.Pause(map[string][]int32{"my_topic": {1}, "other_topic": {0}})
+		require.NoError(t, c.addChild(child))
+		assert.False(t, child.IsPaused())
+	})
+
+	t.Run("pausing an unassigned partition does not affect a later assignment", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		c.Pause(map[string][]int32{"my_topic": {0}})
+		require.NoError(t, c.addChild(child))
+		assert.False(t, child.IsPaused())
+	})
+
+	t.Run("ResumeAll clears retained pauses", func(t *testing.T) {
+		c, child := newConsumerWithChild()
+		require.NoError(t, c.addChild(child))
+		c.PauseAll()
+		c.removeChild(child)
+		c.ResumeAll()
+
+		reassigned := &partitionConsumer{topic: child.topic, partition: child.partition}
+		require.NoError(t, c.addChild(reassigned))
+		assert.False(t, reassigned.IsPaused())
 	})
 }

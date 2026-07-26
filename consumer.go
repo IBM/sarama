@@ -100,12 +100,16 @@ type Consumer interface {
 const partitionConsumersBatchTimeout = 100 * time.Millisecond
 
 type consumer struct {
-	conf            *Config
+	conf           *Config
+	client         Client
+	metricRegistry metrics.Registry
+
+	// lock guards the fields below it
+	lock            sync.Mutex
 	children        map[string]map[int32]*partitionConsumer
 	brokerConsumers map[*Broker]*brokerConsumer
-	client          Client
-	metricRegistry  metrics.Registry
-	lock            sync.Mutex
+	// paused retains pause state while a partition is reassigned
+	paused map[string]map[int32]none
 }
 
 // NewConsumer creates a new consumer using the given broker addresses and configuration.
@@ -137,6 +141,7 @@ func newConsumer(client Client) (Consumer, error) {
 		conf:            client.Config(),
 		children:        make(map[string]map[int32]*partitionConsumer),
 		brokerConsumers: make(map[*Broker]*brokerConsumer),
+		paused:          make(map[string]map[int32]none),
 		metricRegistry:  newCleanupRegistry(client.Config().MetricRegistry),
 	}
 
@@ -234,6 +239,10 @@ func (c *consumer) addChild(child *partitionConsumer) error {
 		return ConfigurationError("That topic/partition is already being consumed")
 	}
 
+	if _, paused := c.paused[child.topic][child.partition]; paused {
+		child.Pause()
+	}
+
 	topicChildren[child.partition] = child
 	return nil
 }
@@ -290,6 +299,10 @@ func (c *consumer) Pause(topicPartitions map[string][]int32) {
 		for _, partition := range partitions {
 			if topicConsumers, ok := c.children[topic]; ok {
 				if partitionConsumer, ok := topicConsumers[partition]; ok {
+					if c.paused[topic] == nil {
+						c.paused[topic] = make(map[int32]none)
+					}
+					c.paused[topic][partition] = none{}
 					partitionConsumer.Pause()
 				}
 			}
@@ -304,6 +317,11 @@ func (c *consumer) Resume(topicPartitions map[string][]int32) {
 
 	for topic, partitions := range topicPartitions {
 		for _, partition := range partitions {
+			delete(c.paused[topic], partition)
+			if len(c.paused[topic]) == 0 {
+				delete(c.paused, topic)
+			}
+
 			if topicConsumers, ok := c.children[topic]; ok {
 				if partitionConsumer, ok := topicConsumers[partition]; ok {
 					partitionConsumer.Resume()
@@ -318,8 +336,13 @@ func (c *consumer) PauseAll() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	for _, partitions := range c.children {
-		for _, partitionConsumer := range partitions {
+	for topic, partitions := range c.children {
+		for partition, partitionConsumer := range partitions {
+			if c.paused[topic] == nil {
+				c.paused[topic] = make(map[int32]none)
+			}
+			c.paused[topic][partition] = none{}
+
 			partitionConsumer.Pause()
 		}
 	}
@@ -330,6 +353,7 @@ func (c *consumer) ResumeAll() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	clear(c.paused)
 	for _, partitions := range c.children {
 		for _, partitionConsumer := range partitions {
 			partitionConsumer.Resume()
