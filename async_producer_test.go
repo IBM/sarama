@@ -1776,16 +1776,11 @@ func TestBrokerProducerWaitForSpaceEmptyBufferRollover(t *testing.T) {
 
 func awaitMuterBlocked(t *testing.T, m *partitionMuter, set *produceSet) {
 	t.Helper()
-	deadline := time.Now().Add(500 * time.Millisecond)
-	for {
-		if _, blocked := m.awaitUnmuteChan(set); blocked {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("timeout waiting for muter to block on set")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		assert.True(c, m.isAnyMuted(set), "muter is not blocked on set")
+	}, 500*time.Millisecond, 5*time.Millisecond)
 }
 
 func assertNotDone[T any](t *testing.T, ch <-chan T, wait time.Duration) {
@@ -1859,44 +1854,100 @@ func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
 	}
 }
 
-func TestBrokerProducerFlushSkipsMutedPartitions(t *testing.T) {
+func TestBrokerProducerTryBuildFlushingBatch(t *testing.T) {
+	newTestBrokerProducer := func() *brokerProducer {
+		parent := &asyncProducer{
+			conf:   NewTestConfig(),
+			muter:  newPartitionMuter(),
+			txnmgr: &transactionManager{},
+		}
+		return &brokerProducer{
+			parent:            parent,
+			accumulatingBatch: newProduceSet(parent),
+		}
+	}
+
+	t.Run("signals when a batch stranded behind a muted partition can be retried", func(t *testing.T) {
+		bp := newTestBrokerProducer()
+		safeAddMessage(t, bp.accumulatingBatch, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("stranded")})
+
+		inFlightBatch := newProduceSet(bp.parent)
+		safeAddMessage(t, inFlightBatch, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retrying")})
+		require.True(t, bp.parent.muter.tryMute(inFlightBatch), "expected to mute partition")
+
+		unmuteSignal := bp.tryBuildFlushingBatch()
+		require.Nil(t, bp.flushingBatch, "expected the muted partition to remain buffered")
+		require.NotNil(t, unmuteSignal, "expected to await the muted partition")
+		select {
+		case <-unmuteSignal:
+			assert.Fail(t, "unmute signaled before the partition was unmuted")
+		default:
+		}
+
+		bp.parent.muter.unmute(inFlightBatch)
+		select {
+		case <-unmuteSignal:
+		default:
+			require.FailNow(t, "unmute was not signaled")
+		}
+
+		require.Nil(t, bp.tryBuildFlushingBatch(), "expected no unmute wait after building the batch")
+		require.NotNil(t, bp.flushingBatch, "expected to build the flushing batch")
+	})
+
+	t.Run("builds a partial batch from unmuted partitions", func(t *testing.T) {
+		bp := newTestBrokerProducer()
+		safeAddMessage(t, bp.accumulatingBatch, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("p0")})
+		safeAddMessage(t, bp.accumulatingBatch, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("p1")})
+
+		mutedBatch := newProduceSet(bp.parent)
+		safeAddMessage(t, mutedBatch, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("held")})
+		require.True(t, bp.parent.muter.tryMute(mutedBatch), "expected to mute partition")
+
+		require.Nil(t, bp.tryBuildFlushingBatch(), "expected no unmute wait after building a partial batch")
+		require.NotNil(t, bp.flushingBatch, "expected to flush available partitions")
+		assert.Contains(t, bp.flushingBatch.msgs["topic"], int32(0), "expected unmuted partition to flush")
+		assert.NotContains(t, bp.flushingBatch.msgs["topic"], int32(1), "expected muted partition to stay buffered")
+		assert.Contains(t, bp.accumulatingBatch.msgs["topic"], int32(1), "expected muted partition to remain buffered")
+	})
+}
+
+// TestAsyncProducerUnblocksOnExternalUnmute verifies that a batch stranded
+// behind a partition muted by another brokerProducer flushes once the mute is
+// released (#3689).
+func TestAsyncProducerUnblocksOnExternalUnmute(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+
 	config := NewTestConfig()
-	parent := &asyncProducer{
-		conf:   config,
-		muter:  newPartitionMuter(),
-		txnmgr: &transactionManager{},
-	}
-	bp := &brokerProducer{
-		parent:            parent,
-		accumulatingBatch: newProduceSet(parent),
-		currentRetries:    make(map[string]map[int32]error),
-	}
+	config.Producer.Return.Successes = true
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
 
-	safeAddMessage(t, bp.accumulatingBatch, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("p0")})
-	safeAddMessage(t, bp.accumulatingBatch, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("p1")})
+	// mute the partition externally, as a retryBatch with a batch still in flight would
+	parent := producer.(*asyncProducer)
+	retryingBatch := newProduceSet(parent)
+	safeAddMessage(t, retryingBatch, &ProducerMessage{Topic: "my_topic", Partition: 0, Value: StringEncoder("in-flight")})
+	require.True(t, parent.muter.tryMute(retryingBatch), "expected to mute partition")
 
-	blocked := newProduceSet(parent)
-	safeAddMessage(t, blocked, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("held")})
-	if !parent.muter.tryMute(blocked) {
-		t.Fatal("expected to mute blocked partition")
-	}
-	defer parent.muter.unmute(blocked)
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+	assertNotDone(t, producer.Successes(), 100*time.Millisecond)
 
-	if !bp.tryBuildFlushingBatch() {
-		t.Fatal("expected to flush available partitions")
-	}
-	if bp.flushingBatch == nil {
-		t.Fatal("expected flushing batch to be set")
-	}
-	if _, ok := bp.flushingBatch.msgs["topic"][1]; ok {
-		t.Fatal("expected muted partition to stay buffered")
-	}
-	if _, ok := bp.accumulatingBatch.msgs["topic"][0]; ok {
-		t.Fatal("expected unmuted partition to flush")
-	}
-	if _, ok := bp.accumulatingBatch.msgs["topic"][1]; !ok {
-		t.Fatal("expected muted partition to remain in accumulating batch")
-	}
+	parent.muter.unmute(retryingBatch)
+	expectResultsWithTimeout(t, producer, 1, 0, 5*time.Second)
+
+	closeProducerWithTimeout(t, producer, 5*time.Second)
+	leader.Close()
+	seedBroker.Close()
 }
 
 // TestBrokerProducerWaitForSpaceAllPartitionsMuted verifies that waitForSpace unblocks
