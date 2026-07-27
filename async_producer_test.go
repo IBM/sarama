@@ -2243,6 +2243,73 @@ func TestBrokerProducerHandleError(t *testing.T) {
 	})
 }
 
+// TestRetryBatchStoresBPRef verifies that retryBatch() stores the brokerProducer
+// reference in the produceSet so that handleResponse releases it, not retryBatch
+// itself.
+//
+// This keeps the brokerProducer alive for the entire batch lifecycle:
+// if the reference were released as soon as `bp.output <- produceSet` returns,
+// the refcount could drop to 0, close bp.input, and cause the run loop to exit
+// before the in-flight response is processed (leaving SyncProducer.SendMessages()
+// blocked forever on ProducerMessage.expectation).
+func TestRetryBatchStoresBPRef(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Idempotent = false
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+
+	parent := &asyncProducer{
+		conf:       config,
+		muter:      newPartitionMuter(),
+		brokers:    make(map[*Broker]*brokerProducer),
+		brokerRefs: make(map[*brokerProducer]int),
+		done:       make(chan struct{}),
+		txnmgr:     &transactionManager{},
+	}
+	leader := &Broker{id: 1}
+	parent.client = &stubLeaderClient{leader: leader, cfg: config}
+
+	// Use a buffered output so retryBatch can send without blocking.
+	bpOutput := make(chan *produceSet, 1)
+	bp := &brokerProducer{
+		parent: parent,
+		broker: leader,
+		output: bpOutput,
+		input:  make(chan *ProducerMessage),
+	}
+	parent.brokers[leader] = bp
+	parent.brokerRefs[bp] = 0
+
+	// Build the partition set, pre-muted as handleError leaves it.
+	sent := newProduceSet(parent)
+	safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+	retryPSet := sent.msgs["topic"][0]
+	require.True(t, parent.muter.tryMute(sent))
+
+	parent.retryBatch("topic", 0, retryPSet, ErrOutOfBrokers, true)
+
+	// retryBatch must have returned by now. Read the dispatched set.
+	select {
+	case dispatched := <-bpOutput:
+		// The BP reference must be stored in the set, not yet released.
+		require.NotNil(t, dispatched.bpRefBP,
+			"retryBatch must store the BP reference in the produceSet so handleResponse releases it")
+		require.Equal(t, bp, dispatched.bpRefBP)
+		require.Equal(t, leader, dispatched.bpRefBroker)
+
+		// The refcount must still be 1 (not yet released).
+		parent.brokerLock.Lock()
+		refs := parent.brokerRefs[bp]
+		parent.brokerLock.Unlock()
+		require.Equal(t, 1, refs, "BP refcount must remain 1 until handleResponse runs")
+
+		// Simulate handleResponse releasing the reference.
+		parent.unrefBrokerProducer(dispatched.bpRefBroker, dispatched.bpRefBP)
+	default:
+		t.Fatal("retryBatch did not dispatch the set")
+	}
+}
+
 type stubLeaderClient struct {
 	cfg    *Config
 	leader *Broker

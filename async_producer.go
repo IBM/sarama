@@ -1358,6 +1358,15 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 		bp.handleSuccess(response.set, response.res)
 	}
 
+	// Release the BP reference if this produceSet was holding one (from retryBatch).
+	// This must be done after handling the response to ensure the BP stays alive
+	// until all processing is complete.
+	if response.set.bpRefBP != nil {
+		bp.parent.unrefBrokerProducer(response.set.bpRefBroker, response.set.bpRefBP)
+		response.set.bpRefBroker = nil
+		response.set.bpRefBP = nil
+	}
+
 	if bp.accumulatingBatch.empty() {
 		bp.rollOver() // this can happen if the response invalidated our buffer
 	}
@@ -1506,14 +1515,22 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 		}
 	}
 	bp := p.getBrokerProducer(leader)
-	defer p.unrefBrokerProducer(leader, bp)
+
+	// Store the BP reference in the produceSet so it's released after the batch
+	// is fully handled (in handleResponse). This prevents the BP from shutting
+	// down prematurely while the batch is still in flight.
+	produceSet.bpRefBroker = leader
+	produceSet.bpRefBP = bp
+
 	select {
 	case bp.output <- produceSet:
+		// BP reference will be released by handleResponse after the batch is processed
 	case <-p.done:
 		for _, msg := range pSet.msgs {
 			p.returnError(msg, ErrShuttingDown)
 		}
 		p.muter.unmute(produceSet)
+		p.unrefBrokerProducer(leader, bp)
 	}
 }
 

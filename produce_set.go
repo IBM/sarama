@@ -20,6 +20,12 @@ type produceSet struct {
 
 	bufferBytes int
 	bufferCount int
+
+	// bpRefBroker and bpRefBP hold a reference to the brokerProducer that should
+	// be released after this produceSet is fully handled (success or retry exhausted).
+	// Used by retryBatch to keep the BP alive until the batch is processed.
+	bpRefBroker *Broker
+	bpRefBP     *brokerProducer
 }
 
 func newProduceSet(parent *asyncProducer) *produceSet {
