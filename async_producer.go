@@ -1126,8 +1126,20 @@ func (bp *brokerProducer) run() {
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
 	for {
+		// if the accumulating batch is ready to flush but every partition is
+		// blocked behind a mute (an in-flight retryBatch), watch for the
+		// unmute signal: no other event may ever arrive to wake us up again (#3689)
+		var unmuteChan <-chan struct{}
 		if bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush()) {
-			bp.tryBuildFlushingBatch()
+			for !bp.tryBuildFlushingBatch() && !bp.accumulatingBatch.empty() {
+				ch, blocked := bp.parent.muter.awaitUnmuteChan(bp.accumulatingBatch)
+				if blocked {
+					unmuteChan = ch
+					break
+				}
+				// raced with an unmute between the failed build and
+				// awaitUnmuteChan; retry the build immediately
+			}
 		}
 
 		var timerChan <-chan time.Time
@@ -1213,6 +1225,9 @@ func (bp *brokerProducer) run() {
 			bp.timerFired = true
 		case output <- bp.flushingBatch:
 			bp.flushingBatch = nil
+		case <-unmuteChan:
+			// a partition was unmuted; loop around to retry building the
+			// flushing batch
 		case response, ok := <-bp.responses:
 			if ok {
 				bp.handleResponse(response)

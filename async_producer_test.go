@@ -1859,6 +1859,56 @@ func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
 	}
 }
 
+// TestBrokerProducerRunFlushesAfterExternalUnmute ensures the run loop retries
+// a flush that was blocked behind a muted partition once the mute is released
+// by an in-flight retryBatch completing elsewhere (#3689).
+func TestBrokerProducerRunFlushesAfterExternalUnmute(t *testing.T) {
+	config := NewTestConfig()
+	parent := &asyncProducer{
+		conf:   config,
+		muter:  newPartitionMuter(),
+		txnmgr: &transactionManager{},
+	}
+
+	// simulate an in-flight retryBatch holding the partition mute
+	retrying := newProduceSet(parent)
+	safeAddMessage(t, retrying, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retrying")})
+	if !parent.muter.tryMute(retrying) {
+		t.Fatal("expected to mute partition")
+	}
+
+	output := make(chan *produceSet, 1)
+	responses := make(chan *brokerProducerResponse)
+	bp := &brokerProducer{
+		parent:            parent,
+		broker:            &Broker{id: 1},
+		input:             make(chan *ProducerMessage),
+		output:            output,
+		responses:         responses,
+		accumulatingBatch: newProduceSet(parent),
+		currentRetries:    make(map[string]map[int32]error),
+	}
+	safeAddMessage(t, bp.accumulatingBatch, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("stranded")})
+
+	go withRecover(bp.run)
+	defer func() {
+		close(bp.input)
+		close(responses)
+	}()
+
+	// the run loop must hold the batch back while the partition is muted
+	assertNotDone(t, output, 50*time.Millisecond)
+	awaitMuterBlocked(t, parent.muter, bp.accumulatingBatch)
+
+	// and must wake up and flush it once the retry completes and unmutes
+	parent.muter.unmute(retrying)
+	flushed := assertDoneWithin(t, output, 2*time.Second)
+	defer parent.muter.unmute(flushed)
+	if _, ok := flushed.msgs["topic"][0]; !ok {
+		t.Fatal("expected stranded batch to flush after unmute")
+	}
+}
+
 func TestBrokerProducerFlushSkipsMutedPartitions(t *testing.T) {
 	config := NewTestConfig()
 	parent := &asyncProducer{
