@@ -929,6 +929,54 @@ func TestClientController(t *testing.T) {
 	})
 }
 
+func TestClientClusterID(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	// V0_10_1_0 is the first version where MetadataResponse includes ClusterID.
+	t.Run("V0_10_1_0_returns_cluster_id", func(t *testing.T) {
+		seedBroker.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetController(seedBroker.BrokerID()).
+				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+				SetClusterID("test-cluster-id"),
+		})
+
+		cfg := NewTestConfig()
+		cfg.Version = V0_10_1_0
+		client, err := NewClient([]string{seedBroker.Addr()}, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, client)
+
+		if got := client.ClusterID(); got != "test-cluster-id" {
+			t.Errorf("expected ClusterID %q, got %q", "test-cluster-id", got)
+		}
+	})
+
+	// Pre-0.10.1 brokers do not return a ClusterID in metadata responses.
+	t.Run("V0_10_0_0_returns_empty", func(t *testing.T) {
+		seedBroker.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetController(seedBroker.BrokerID()).
+				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		})
+
+		cfg := NewTestConfig()
+		cfg.Version = V0_10_0_0
+		client, err := NewClient([]string{seedBroker.Addr()}, cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, client)
+
+		if got := client.ClusterID(); got != "" {
+			t.Errorf("expected empty ClusterID for old broker, got %q", got)
+		}
+	})
+}
+
 func TestClientMetadataTimeout(t *testing.T) {
 	tests := []struct {
 		name    string

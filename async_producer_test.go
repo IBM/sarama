@@ -2217,6 +2217,7 @@ func (c *stubLeaderClient) RefreshCoordinator(string) error                  { r
 func (c *stubLeaderClient) TransactionCoordinator(string) (*Broker, error)   { return nil, nil }
 func (c *stubLeaderClient) RefreshTransactionCoordinator(string) error       { return nil }
 func (c *stubLeaderClient) InitProducerID() (*InitProducerIDResponse, error) { return nil, nil }
+func (c *stubLeaderClient) ClusterID() string                                { return "" }
 func (c *stubLeaderClient) LeastLoadedBroker() *Broker                       { return c.leader }
 func (c *stubLeaderClient) PartitionNotReadable(string, int32) bool          { return false }
 func (c *stubLeaderClient) Close() error                                     { return nil }
