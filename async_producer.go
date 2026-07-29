@@ -225,18 +225,13 @@ func (m *partitionMuter) waitUntilMuted(set *produceSet) bool {
 	return true
 }
 
-func (m *partitionMuter) awaitUnmuteChan(set *produceSet) (<-chan struct{}, bool) {
-	if set == nil || set.empty() {
-		return nil, false
-	}
-
+// nextUnmuteSignal returns the channel that the next unmute (or close) will
+// close.
+func (m *partitionMuter) nextUnmuteSignal() <-chan struct{} {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if !m.isAnyMuted(set) {
-		return nil, false
-	}
-	return m.unmuteSignal, true
+	return m.unmuteSignal
 }
 
 // unmute decrements the in-flight counter for all partitions in the set.
@@ -1126,8 +1121,9 @@ func (bp *brokerProducer) run() {
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
 	for {
+		var unmuteSignal <-chan struct{}
 		if bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush()) {
-			bp.tryBuildFlushingBatch()
+			unmuteSignal = bp.tryBuildFlushingBatch()
 		}
 
 		var timerChan <-chan time.Time
@@ -1213,6 +1209,7 @@ func (bp *brokerProducer) run() {
 			bp.timerFired = true
 		case output <- bp.flushingBatch:
 			bp.flushingBatch = nil
+		case <-unmuteSignal:
 		case response, ok := <-bp.responses:
 			if ok {
 				bp.handleResponse(response)
@@ -1221,27 +1218,36 @@ func (bp *brokerProducer) run() {
 	}
 }
 
-func (bp *brokerProducer) tryBuildFlushingBatch() bool {
+// tryBuildFlushingBatch tries to promote the accumulating batch (or whichever
+// of its partitions aren't muted) into the flushing batch. If nothing could be
+// taken because every partition is muted, it returns a channel that the next
+// unmute will close so the caller knows when to try again.
+func (bp *brokerProducer) tryBuildFlushingBatch() <-chan struct{} {
 	if bp.flushingBatch != nil || bp.accumulatingBatch.empty() {
-		return false
+		return nil
 	}
+
+	// taken before the mute attempts so a racing unmute can't be missed
+	unmuteSignal := bp.parent.muter.nextUnmuteSignal()
 	if bp.parent.muter.tryMute(bp.accumulatingBatch) {
 		bp.flushingBatch = bp.accumulatingBatch
 		bp.rollOver()
-		return true
+		return nil
 	}
 
 	partial := bp.accumulatingBatch.takePartitions(func(topic string, partition int32) bool {
 		return bp.parent.muter.tryMutePartition(topic, partition)
 	})
 	if partial == nil {
-		return false
+		// the mute can be owned by another brokerProducer, so only the shared
+		// unmute signal is guaranteed to wake this one (#3689)
+		return unmuteSignal
 	}
 	bp.flushingBatch = partial
 	if bp.accumulatingBatch.empty() {
 		bp.rollOver()
 	}
-	return true
+	return nil
 }
 
 func (bp *brokerProducer) shutdown() {
@@ -1256,15 +1262,13 @@ func (bp *brokerProducer) shutdown() {
 	}
 	// then flush the current buffer
 	for !bp.accumulatingBatch.empty() || bp.flushingBatch != nil {
+		var unmuteSignal <-chan struct{}
 		if bp.flushingBatch == nil {
-			bp.tryBuildFlushingBatch()
+			unmuteSignal = bp.tryBuildFlushingBatch()
 		}
-		var unmuteCh <-chan struct{}
 		var outputCh chan<- *produceSet
 		if bp.flushingBatch != nil {
 			outputCh = bp.output
-		} else if ch, blocked := bp.parent.muter.awaitUnmuteChan(bp.accumulatingBatch); blocked {
-			unmuteCh = ch
 		}
 		select {
 		case response, ok := <-bp.responses:
@@ -1273,7 +1277,7 @@ func (bp *brokerProducer) shutdown() {
 			}
 		case outputCh <- bp.flushingBatch:
 			bp.flushingBatch = nil
-		case <-unmuteCh:
+		case <-unmuteSignal:
 		}
 	}
 	close(bp.output)
@@ -1325,18 +1329,14 @@ func (bp *brokerProducer) waitForSpace(msg *ProducerMessage, forceRollover bool)
 			return nil
 		}
 
-		if bp.tryBuildFlushingBatch() {
-			continue
-		}
-
-		if unmuteCh, blocked := bp.parent.muter.awaitUnmuteChan(bp.accumulatingBatch); blocked {
+		if unmuteSignal := bp.tryBuildFlushingBatch(); unmuteSignal != nil {
 			select {
 			case response := <-bp.responses:
 				bp.handleResponse(response)
 				if reason := bp.needsRetry(msg); reason != nil {
 					return reason
 				}
-			case <-unmuteCh:
+			case <-unmuteSignal:
 			}
 		}
 	}
