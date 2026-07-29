@@ -1016,7 +1016,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 				committed = append(committed, p)
 			}
 		}
-		require.ElementsMatch(t, []int32{2,3}, committed)
+		require.ElementsMatch(t, []int32{2, 3}, committed)
 
 		require.Nil(t, om.findPOM("my_topic", 2))
 		require.Nil(t, om.findPOM("my_topic", 3))
@@ -1094,7 +1094,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 	})
 }
 
-func TestOffsetManagerSetGeneration(t *testing.T) {
+func TestOffsetManagerTransitionGeneration(t *testing.T) {
 	t.Run("commits carry the generation most recently set", func(t *testing.T) {
 		om, capture := newCapturingOffsetManager(t, false)
 
@@ -1103,7 +1103,9 @@ func TestOffsetManagerSetGeneration(t *testing.T) {
 
 		pom.MarkOffset(100, "")
 		om.Commit()
-		om.setGeneration(7)
+		require.NoError(t, om.transitionGeneration(func() (int32, error) {
+			return 7, nil
+		}))
 		pom.MarkOffset(101, "")
 		om.Commit()
 
@@ -1131,10 +1133,11 @@ func TestOffsetManagerSetGeneration(t *testing.T) {
 		}()
 		<-gate.entered
 
-		genDone := make(chan none)
+		genDone := make(chan error, 1)
 		go func() {
-			om.setGeneration(7)
-			close(genDone)
+			genDone <- om.transitionGeneration(func() (int32, error) {
+				return 7, nil
+			})
 		}()
 		require.Never(t, func() bool {
 			select {
@@ -1147,7 +1150,7 @@ func TestOffsetManagerSetGeneration(t *testing.T) {
 
 		close(gate.release)
 		<-commitDone
-		<-genDone
+		require.NoError(t, <-genDone)
 
 		pom.MarkOffset(101, "")
 		om.Commit()
@@ -1155,6 +1158,49 @@ func TestOffsetManagerSetGeneration(t *testing.T) {
 		reqs := capture.requests()
 		require.Equal(t, int32(1), reqs[0].ConsumerGroupGeneration)
 		require.Equal(t, int32(7), reqs[len(reqs)-1].ConsumerGroupGeneration)
+	})
+
+	t.Run("holds commits until the next generation is established", func(t *testing.T) {
+		om, capture := newCapturingOffsetManager(t, false)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		started := make(chan none)
+		release := make(chan none)
+		transitionDone := make(chan error, 1)
+		go func() {
+			transitionDone <- om.transitionGeneration(func() (int32, error) {
+				close(started)
+				<-release
+				return 7, nil
+			})
+		}()
+		<-started
+
+		commitDone := make(chan none)
+		go func() {
+			om.Commit()
+			close(commitDone)
+		}()
+
+		require.Never(t, func() bool {
+			select {
+			case <-commitDone:
+				return true
+			default:
+				return false
+			}
+		}, 150*time.Millisecond, 20*time.Millisecond)
+
+		close(release)
+		require.NoError(t, <-transitionDone)
+		<-commitDone
+
+		reqs := capture.requests()
+		require.Len(t, reqs, 1)
+		require.Equal(t, int32(7), reqs[0].ConsumerGroupGeneration)
 	})
 }
 
