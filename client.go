@@ -35,6 +35,11 @@ type Client interface {
 	// and stores it in the local cache. Requires Kafka 0.10 or higher.
 	RefreshController() (*Broker, error)
 
+	// ClusterID returns the cluster ID reported by the broker in the most recent
+	// metadata response. It returns an empty string if the broker has not yet
+	// responded or if the Kafka version predates 0.10.1 (MetadataResponse v2).
+	ClusterID() string
+
 	// Brokers returns the current set of active brokers as retrieved from cluster metadata.
 	Brokers() []*Broker
 
@@ -156,6 +161,7 @@ type client struct {
 	deadSeeds   []*Broker
 
 	controllerID            int32                                   // cluster controller broker id
+	clusterID               string                                  // cluster ID from metadata response (Kafka ≥ 0.10.1)
 	brokers                 map[int32]*Broker                       // maps broker ids to brokers
 	metadata                map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
 	metadataTopics          map[string]none                         // topics that need to collect metadata
@@ -595,6 +601,12 @@ func (client *client) RefreshController() (*Broker, error) {
 
 	_ = controller.Open(client.conf)
 	return controller, nil
+}
+
+func (client *client) ClusterID() string {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+	return client.clusterID
 }
 
 func (client *client) Coordinator(consumerGroup string) (*Broker, error) {
@@ -1101,6 +1113,9 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 	client.updateBroker(data.Brokers)
 
 	client.controllerID = data.ControllerID
+	if data.ClusterID != nil && *data.ClusterID != "" {
+		client.clusterID = *data.ClusterID
+	}
 
 	if allKnownMetaData {
 		client.metadata = make(map[string]map[int32]*PartitionMetadata)
