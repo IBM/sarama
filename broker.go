@@ -1084,10 +1084,16 @@ func (b *Broker) AlterClientQuotas(request *AlterClientQuotasRequest) (*AlterCli
 	return response, nil
 }
 
-// readFull ensures the conn ReadDeadline has been setup before making a
-// call to io.ReadFull
-func (b *Broker) readFull(buf []byte) (n int, err error) {
-	if err := b.conn.SetReadDeadline(time.Now().Add(b.conf.Net.ReadTimeout)); err != nil {
+// readFull sets the read deadline to deadline and then calls io.ReadFull.
+//
+// The deadline is an absolute time.Time computed by the caller as
+// requestTime.Add(Net.ReadTimeout). Anchoring the deadline to the moment
+// the request was sent means a single deadline covers both the header and
+// body reads of one response; resetting it on every call would allow a
+// slow broker to stall indefinitely by returning bytes just before each
+// per-read timeout fires.
+func (b *Broker) readFull(buf []byte, deadline time.Time) (n int, err error) {
+	if err := b.conn.SetReadDeadline(deadline); err != nil {
 		return 0, err
 	}
 
@@ -1337,7 +1343,9 @@ func (b *Broker) responseReceiver() {
 		headerLength := getHeaderLength(promise.response.headerVersion())
 		header := make([]byte, headerLength)
 
-		bytesReadHeader, err := b.readFull(header)
+		deadline := promise.requestTime.Add(b.conf.Net.ReadTimeout)
+
+		bytesReadHeader, err := b.readFull(header, deadline)
 		requestLatency := time.Since(promise.requestTime)
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
@@ -1364,7 +1372,7 @@ func (b *Broker) responseReceiver() {
 		}
 
 		buf := make([]byte, decodedHeader.length-int32(headerLength)+4)
-		bytesReadBody, err := b.readFull(buf)
+		bytesReadBody, err := b.readFull(buf, deadline)
 		b.updateIncomingCommunicationMetrics(bytesReadHeader+bytesReadBody, requestLatency)
 		if err != nil {
 			dead = err
@@ -1448,8 +1456,9 @@ func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error
 	// Kafka protocol response structure:
 	// - Message length (4 bytes): Total length of the response excluding this field
 	// - ResponseHeader v0 (4 bytes): Contains correlation ID for request-response matching
+	deadline := requestTime.Add(b.conf.Net.ReadTimeout)
 	header := make([]byte, 8)
-	_, err = b.readFull(header)
+	_, err = b.readFull(header, deadline)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		Logger.Printf("Failed to read ApiVersionsResponse V%d header from %s: %s\n", v, b.addr, err)
@@ -1461,7 +1470,7 @@ func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error
 	// correlationID := binary.BigEndian.Uint32(header[4:])
 
 	payload := make([]byte, length-4)
-	n, err := b.readFull(payload)
+	n, err := b.readFull(payload, deadline)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		Logger.Printf("Failed to read ApiVersionsResponse V%d payload from %s: %s\n", v, b.addr, err)
@@ -1592,8 +1601,9 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 	}
 	b.correlationID++
 
+	deadline := requestTime.Add(b.conf.Net.ReadTimeout)
 	header := make([]byte, 8) // response header
-	_, err = b.readFull(header)
+	_, err = b.readFull(header, deadline)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		Logger.Printf("Failed to read SASL handshake header : %s\n", err.Error())
@@ -1602,7 +1612,7 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 
 	length := binary.BigEndian.Uint32(header[:4])
 	payload := make([]byte, length-4)
-	n, err := b.readFull(payload)
+	n, err := b.readFull(payload, deadline)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
 		Logger.Printf("Failed to read SASL handshake payload : %s\n", err.Error())
@@ -1676,7 +1686,7 @@ func (b *Broker) sendAndReceiveSASLPlainAuthV0() error {
 	}
 
 	header := make([]byte, 4)
-	n, err := b.readFull(header)
+	n, err := b.readFull(header, requestTime.Add(b.conf.Net.ReadTimeout))
 	b.updateIncomingCommunicationMetrics(n, time.Since(requestTime))
 	// If the credentials are valid, we would get a 4 byte response filled with null characters.
 	// Otherwise, the broker closes the connection and we get an EOF
@@ -1759,8 +1769,9 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 			return err
 		}
 		b.correlationID++
+		deadline := requestTime.Add(b.conf.Net.ReadTimeout)
 		header := make([]byte, 4)
-		_, err = b.readFull(header)
+		_, err = b.readFull(header, deadline)
 		if err != nil {
 			b.addRequestInFlightMetrics(-1)
 			Logger.Printf("Failed to read response header while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
@@ -1771,7 +1782,7 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 			return PacketDecodingError{fmt.Sprintf("SASL response of length %d too large", payloadLength)}
 		}
 		payload := make([]byte, int(payloadLength))
-		n, err := b.readFull(payload)
+		n, err := b.readFull(payload, deadline)
 		if err != nil {
 			b.addRequestInFlightMetrics(-1)
 			Logger.Printf("Failed to read response payload while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
