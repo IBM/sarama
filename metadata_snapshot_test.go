@@ -45,11 +45,11 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 	require.NotNil(t, snapshot)
 	require.Zero(t, refreshes)
 	require.Equal(t, int32(2), snapshot.ControllerID)
-	require.Equal(t, map[int32]BrokerMetadata{
+	require.Equal(t, map[int32]BrokerSnapshot{
 		1: {Addr: "broker-1:9092", Rack: &rack},
 		2: {Addr: "broker-2:9092"},
 	}, snapshot.Brokers)
-	require.Equal(t, PartitionMetadata{
+	require.Equal(t, PartitionSnapshot{
 		Version:         7,
 		Err:             ErrReplicaNotAvailable,
 		ID:              0,
@@ -68,7 +68,7 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 	partition.Replicas[0] = 99
 	partition.Isr[0] = 99
 	partition.OfflineReplicas[0] = 99
-	snapshot.Topics["topic"][0] = PartitionMetadata{Leader: 99}
+	snapshot.Topics["topic"][0] = PartitionSnapshot{Leader: 99}
 
 	require.Equal(t, "broker-1:9092", client.brokers[1].Addr())
 	require.Equal(t, "rack-a", client.brokers[1].Rack())
@@ -96,8 +96,8 @@ func TestMetadataSnapshotAvailability(t *testing.T) {
 			brokers:         map[int32]*Broker{},
 			metadataUpdated: true,
 			expectedSnapshot: &MetadataSnapshot{
-				Brokers: map[int32]BrokerMetadata{},
-				Topics:  map[string]map[int32]PartitionMetadata{},
+				Brokers: map[int32]BrokerSnapshot{},
+				Topics:  map[string]map[int32]PartitionSnapshot{},
 			},
 		},
 		{

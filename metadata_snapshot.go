@@ -21,18 +21,38 @@ type MetadataSnapshot struct {
 	// ControllerID is the broker ID of the cluster controller.
 	ControllerID int32
 	// Brokers maps broker IDs to their cached metadata.
-	Brokers map[int32]BrokerMetadata
+	Brokers map[int32]BrokerSnapshot
 	// Topics maps topic names and partition IDs to their cached metadata.
-	Topics map[string]map[int32]PartitionMetadata
+	Topics map[string]map[int32]PartitionSnapshot
 }
 
-// BrokerMetadata contains the cluster metadata cached for a broker.
-type BrokerMetadata struct {
+// BrokerSnapshot contains the cluster metadata cached for a broker.
+type BrokerSnapshot struct {
 	// Addr is the broker address advertised in cluster metadata.
 	Addr string
 	// Rack is the broker rack advertised in cluster metadata, or nil if the
 	// broker did not advertise a rack.
 	Rack *string
+}
+
+// PartitionSnapshot contains the cluster metadata cached for a partition.
+type PartitionSnapshot struct {
+	// Version is the metadata protocol version used to decode the partition.
+	Version int16
+	// Err is the partition error, or ErrNoError if there was no error.
+	Err KError
+	// ID is the partition ID.
+	ID int32
+	// Leader is the broker ID of the partition leader.
+	Leader int32
+	// LeaderEpoch is the epoch of the partition leader.
+	LeaderEpoch int32
+	// Replicas contains the broker IDs of all partition replicas.
+	Replicas []int32
+	// Isr contains the broker IDs of all in-sync replicas.
+	Isr []int32
+	// OfflineReplicas contains the broker IDs of all offline replicas.
+	OfflineReplicas []int32
 }
 
 // MetadataSnapshot returns a detached copy of the current cached metadata
@@ -50,27 +70,32 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 
 	snapshot := &MetadataSnapshot{
 		ControllerID: client.controllerID,
-		Brokers:      make(map[int32]BrokerMetadata, len(client.brokers)),
-		Topics:       make(map[string]map[int32]PartitionMetadata, len(client.metadata)),
+		Brokers:      make(map[int32]BrokerSnapshot, len(client.brokers)),
+		Topics:       make(map[string]map[int32]PartitionSnapshot, len(client.metadata)),
 	}
 
 	for id, broker := range client.brokers {
-		metadata := BrokerMetadata{Addr: broker.Addr()}
+		brokerSnapshot := BrokerSnapshot{Addr: broker.Addr()}
 		if broker.rack != nil {
 			rack := *broker.rack
-			metadata.Rack = &rack
+			brokerSnapshot.Rack = &rack
 		}
-		snapshot.Brokers[id] = metadata
+		snapshot.Brokers[id] = brokerSnapshot
 	}
 
 	for topic, partitions := range client.metadata {
-		snapshot.Topics[topic] = make(map[int32]PartitionMetadata, len(partitions))
+		snapshot.Topics[topic] = make(map[int32]PartitionSnapshot, len(partitions))
 		for id, metadata := range partitions {
-			partition := *metadata
-			partition.Replicas = slices.Clone(metadata.Replicas)
-			partition.Isr = slices.Clone(metadata.Isr)
-			partition.OfflineReplicas = slices.Clone(metadata.OfflineReplicas)
-			snapshot.Topics[topic][id] = partition
+			snapshot.Topics[topic][id] = PartitionSnapshot{
+				Version:         metadata.Version,
+				Err:             metadata.Err,
+				ID:              metadata.ID,
+				Leader:          metadata.Leader,
+				LeaderEpoch:     metadata.LeaderEpoch,
+				Replicas:        slices.Clone(metadata.Replicas),
+				Isr:             slices.Clone(metadata.Isr),
+				OfflineReplicas: slices.Clone(metadata.OfflineReplicas),
+			}
 		}
 	}
 
