@@ -9,9 +9,13 @@ import (
 
 func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 	refreshes := 0
+	rack := "rack-a"
+	brokerWithRack := NewBroker("broker-1:9092")
+	brokerWithRack.rack = &rack
 	client := &client{
+		controllerID: 2,
 		brokers: map[int32]*Broker{
-			1: NewBroker("broker-1:9092"),
+			1: brokerWithRack,
 			2: NewBroker("broker-2:9092"),
 		},
 		metadata: map[string]map[int32]*PartitionMetadata{
@@ -40,9 +44,10 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, snapshot)
 	require.Zero(t, refreshes)
-	require.Equal(t, map[int32]string{
-		1: "broker-1:9092",
-		2: "broker-2:9092",
+	require.Equal(t, int32(2), snapshot.ControllerID)
+	require.Equal(t, map[int32]BrokerMetadata{
+		1: {Addr: "broker-1:9092", Rack: &rack},
+		2: {Addr: "broker-2:9092"},
 	}, snapshot.Brokers)
 	require.Equal(t, PartitionMetadata{
 		Version:         7,
@@ -55,7 +60,10 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 		OfflineReplicas: []int32{2},
 	}, snapshot.Topics["topic"][0])
 
-	snapshot.Brokers[1] = "changed:9092"
+	broker := snapshot.Brokers[1]
+	broker.Addr = "changed:9092"
+	*broker.Rack = "rack-b"
+	snapshot.Brokers[1] = broker
 	partition := snapshot.Topics["topic"][0]
 	partition.Replicas[0] = 99
 	partition.Isr[0] = 99
@@ -63,6 +71,7 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 	snapshot.Topics["topic"][0] = PartitionMetadata{Leader: 99}
 
 	require.Equal(t, "broker-1:9092", client.brokers[1].Addr())
+	require.Equal(t, "rack-a", client.brokers[1].Rack())
 	require.Equal(t, int32(1), client.metadata["topic"][0].Leader)
 	require.Equal(t, []int32{1, 2}, client.metadata["topic"][0].Replicas)
 	require.Equal(t, []int32{1}, client.metadata["topic"][0].Isr)
@@ -87,7 +96,7 @@ func TestMetadataSnapshotAvailability(t *testing.T) {
 			brokers:         map[int32]*Broker{},
 			metadataUpdated: true,
 			expectedSnapshot: &MetadataSnapshot{
-				Brokers: map[int32]string{},
+				Brokers: map[int32]BrokerMetadata{},
 				Topics:  map[string]map[int32]PartitionMetadata{},
 			},
 		},
