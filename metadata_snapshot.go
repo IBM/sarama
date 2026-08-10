@@ -77,6 +77,7 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 	for id, broker := range client.brokers {
 		brokerSnapshot := BrokerSnapshot{Addr: broker.Addr()}
 		if broker.rack != nil {
+			// Copy the pointed-to string so the snapshot cannot mutate the client cache.
 			rack := *broker.rack
 			brokerSnapshot.Rack = &rack
 		}
