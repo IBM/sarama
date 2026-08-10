@@ -16,6 +16,10 @@ var ErrBrokerNotFound = errors.New("kafka: broker for ID is not found")
 // ErrClosedClient is the error returned when a method is called on a client that has been closed.
 var ErrClosedClient = errors.New("kafka: tried to use a client that was closed")
 
+// ErrMetadataNotInitialized is returned when cached metadata is requested before the client has
+// completed a metadata refresh.
+var ErrMetadataNotInitialized = errors.New("kafka: metadata is not initialized")
+
 // ErrIncompleteResponse is the error returned when the server returns a syntactically valid response, but it does
 // not contain the expected information.
 var ErrIncompleteResponse = errors.New("kafka: response did not contain all the expected topic/partition blocks")

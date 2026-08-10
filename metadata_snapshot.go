@@ -8,9 +8,11 @@ type MetadataSnapshotterClient interface {
 	Client
 
 	// MetadataSnapshot returns a detached copy of the current cached metadata
-	// without sending a request or triggering a metadata refresh. It returns nil
-	// if the client is closed or has not completed a metadata refresh.
-	MetadataSnapshot() *MetadataSnapshot
+	// without sending a request or triggering a metadata refresh.
+	//
+	// It returns ErrClosedClient if the client is closed, or
+	// ErrMetadataNotInitialized if the client has not completed a metadata refresh.
+	MetadataSnapshot() (*MetadataSnapshot, error)
 }
 
 // MetadataSnapshot contains a point-in-time copy of a client's cached cluster
@@ -22,12 +24,15 @@ type MetadataSnapshot struct {
 
 // MetadataSnapshot returns a detached copy of the current cached metadata
 // without sending a request or triggering a metadata refresh.
-func (client *client) MetadataSnapshot() *MetadataSnapshot {
+func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	if client.brokers == nil || client.updateMetadataMs.Load() == 0 {
-		return nil
+	if client.brokers == nil {
+		return nil, ErrClosedClient
+	}
+	if client.updateMetadataMs.Load() == 0 {
+		return nil, ErrMetadataNotInitialized
 	}
 
 	snapshot := &MetadataSnapshot{
@@ -50,7 +55,7 @@ func (client *client) MetadataSnapshot() *MetadataSnapshot {
 		}
 	}
 
-	return snapshot
+	return snapshot, nil
 }
 
 var _ MetadataSnapshotterClient = (*client)(nil)

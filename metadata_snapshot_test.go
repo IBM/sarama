@@ -35,8 +35,9 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 	}
 	client.updateMetadataMs.Store(time.Now().UnixMilli())
 
-	snapshot := client.MetadataSnapshot()
+	snapshot, err := client.MetadataSnapshot()
 
+	require.NoError(t, err)
 	require.NotNil(t, snapshot)
 	require.Zero(t, refreshes)
 	require.Equal(t, map[int32]string{
@@ -74,10 +75,12 @@ func TestMetadataSnapshotAvailability(t *testing.T) {
 		brokers          map[int32]*Broker
 		metadataUpdated  bool
 		expectedSnapshot *MetadataSnapshot
+		expectedError    error
 	}{
 		{
-			name:    "before metadata refresh",
-			brokers: map[int32]*Broker{},
+			name:          "before metadata refresh",
+			brokers:       map[int32]*Broker{},
+			expectedError: ErrMetadataNotInitialized,
 		},
 		{
 			name:            "after empty metadata refresh",
@@ -91,6 +94,7 @@ func TestMetadataSnapshotAvailability(t *testing.T) {
 		{
 			name:            "after client close",
 			metadataUpdated: true,
+			expectedError:   ErrClosedClient,
 		},
 	}
 
@@ -104,7 +108,13 @@ func TestMetadataSnapshotAvailability(t *testing.T) {
 				client.updateMetadataMs.Store(time.Now().UnixMilli())
 			}
 
-			require.Equal(t, test.expectedSnapshot, client.MetadataSnapshot())
+			snapshot, err := client.MetadataSnapshot()
+			if test.expectedError != nil {
+				require.ErrorIs(t, err, test.expectedError)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, test.expectedSnapshot, snapshot)
 		})
 	}
 }
