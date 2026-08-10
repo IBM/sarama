@@ -1,0 +1,110 @@
+package sarama
+
+import (
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+)
+
+func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
+	refreshes := 0
+	client := &client{
+		brokers: map[int32]*Broker{
+			1: NewBroker("broker-1:9092"),
+			2: NewBroker("broker-2:9092"),
+		},
+		metadata: map[string]map[int32]*PartitionMetadata{
+			"topic": {
+				0: {
+					Version:         7,
+					Err:             ErrReplicaNotAvailable,
+					ID:              0,
+					Leader:          1,
+					LeaderEpoch:     9,
+					Replicas:        []int32{1, 2},
+					Isr:             []int32{1},
+					OfflineReplicas: []int32{2},
+				},
+			},
+		},
+		metadataRefresh: func([]string) error {
+			refreshes++
+			return nil
+		},
+	}
+	client.updateMetadataMs.Store(time.Now().UnixMilli())
+
+	snapshot := client.MetadataSnapshot()
+
+	require.NotNil(t, snapshot)
+	require.Zero(t, refreshes)
+	require.Equal(t, map[int32]string{
+		1: "broker-1:9092",
+		2: "broker-2:9092",
+	}, snapshot.Brokers)
+	require.Equal(t, PartitionMetadata{
+		Version:         7,
+		Err:             ErrReplicaNotAvailable,
+		ID:              0,
+		Leader:          1,
+		LeaderEpoch:     9,
+		Replicas:        []int32{1, 2},
+		Isr:             []int32{1},
+		OfflineReplicas: []int32{2},
+	}, snapshot.Topics["topic"][0])
+
+	snapshot.Brokers[1] = "changed:9092"
+	partition := snapshot.Topics["topic"][0]
+	partition.Replicas[0] = 99
+	partition.Isr[0] = 99
+	partition.OfflineReplicas[0] = 99
+	snapshot.Topics["topic"][0] = PartitionMetadata{Leader: 99}
+
+	require.Equal(t, "broker-1:9092", client.brokers[1].Addr())
+	require.Equal(t, int32(1), client.metadata["topic"][0].Leader)
+	require.Equal(t, []int32{1, 2}, client.metadata["topic"][0].Replicas)
+	require.Equal(t, []int32{1}, client.metadata["topic"][0].Isr)
+	require.Equal(t, []int32{2}, client.metadata["topic"][0].OfflineReplicas)
+}
+
+func TestMetadataSnapshotAvailability(t *testing.T) {
+	tests := []struct {
+		name             string
+		brokers          map[int32]*Broker
+		metadataUpdated  bool
+		expectedSnapshot *MetadataSnapshot
+	}{
+		{
+			name:    "before metadata refresh",
+			brokers: map[int32]*Broker{},
+		},
+		{
+			name:            "after empty metadata refresh",
+			brokers:         map[int32]*Broker{},
+			metadataUpdated: true,
+			expectedSnapshot: &MetadataSnapshot{
+				Brokers: map[int32]string{},
+				Topics:  map[string]map[int32]PartitionMetadata{},
+			},
+		},
+		{
+			name:            "after client close",
+			metadataUpdated: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			client := &client{
+				brokers:  test.brokers,
+				metadata: map[string]map[int32]*PartitionMetadata{},
+			}
+			if test.metadataUpdated {
+				client.updateMetadataMs.Store(time.Now().UnixMilli())
+			}
+
+			require.Equal(t, test.expectedSnapshot, client.MetadataSnapshot())
+		})
+	}
+}
