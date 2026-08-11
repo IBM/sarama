@@ -73,7 +73,7 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 	requestsBeforeSnapshot := len(seedBroker.History())
 	snapshot, err := client.MetadataSnapshot()
 	require.NoError(t, err)
-	require.Equal(t, requestsBeforeSnapshot, len(seedBroker.History()))
+	require.Len(t, seedBroker.History(), requestsBeforeSnapshot)
 	require.Equal(t, expected, snapshot)
 
 	// Mutating any reference-bearing part of the snapshot must not affect the
