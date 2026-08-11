@@ -1016,7 +1016,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 				committed = append(committed, p)
 			}
 		}
-		require.ElementsMatch(t, []int32{2,3}, committed)
+		require.ElementsMatch(t, []int32{2, 3}, committed)
 
 		require.Nil(t, om.findPOM("my_topic", 2))
 		require.Nil(t, om.findPOM("my_topic", 3))
