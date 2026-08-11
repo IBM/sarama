@@ -31,7 +31,8 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 	metadataResponse.Topics[0].Partitions[0].LeaderEpoch = 9
 	seedBroker.Returns(metadataResponse)
 
-	config := NewTestConfig()
+	config := NewConfig()
+	config.ApiVersionsRequest = false
 	config.Version = V2_8_0_0
 	config.Metadata.Retry.Max = 0
 	baseClient, err := NewClient([]string{seedBroker.Addr()}, config)
