@@ -69,15 +69,17 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 		},
 	}
 
-	// Reading the cached snapshot must not send another request to Kafka.
 	requestsBeforeSnapshot := len(seedBroker.History())
 	snapshot, err := client.MetadataSnapshot()
 	require.NoError(t, err)
-	require.Len(t, seedBroker.History(), requestsBeforeSnapshot)
+	require.Len(
+		t,
+		seedBroker.History(),
+		requestsBeforeSnapshot,
+		"MetadataSnapshot must not issue another Kafka request",
+	)
 	require.Equal(t, expected, snapshot)
 
-	// Mutating any reference-bearing part of the snapshot must not affect the
-	// client's cached metadata.
 	snapshot.ControllerID = 99
 	broker := snapshot.Brokers[1]
 	broker.Addr = "changed:9092"
@@ -92,15 +94,13 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 	snapshot.Topics["topic"][0] = partition
 	snapshot.Topics["added"] = map[int32]PartitionSnapshot{}
 
-	// A new snapshot should still expose the original cached state.
 	snapshot, err = client.MetadataSnapshot()
 	require.NoError(t, err)
-	require.Equal(t, expected, snapshot)
+	require.Equal(t, expected, snapshot, "mutating a snapshot must not affect the client cache")
 
-	// Exercise the real close path rather than constructing its internal state.
 	require.NoError(t, baseClient.Close())
 	snapshot, err = client.MetadataSnapshot()
-	require.ErrorIs(t, err, ErrClosedClient)
+	require.ErrorIs(t, err, ErrClosedClient, "MetadataSnapshot must report a closed client after Close")
 	require.Nil(t, snapshot)
 }
 
@@ -177,7 +177,6 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 		defer writer.Done()
 		for iteration := 0; ; iteration++ {
 			state := states[iteration%len(states)]
-			// Each cache state is installed atomically, just as metadata updates are.
 			client.lock.Lock()
 			client.controllerID = state.controllerID
 			client.brokers = state.brokers
@@ -201,7 +200,6 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 		writer.Wait()
 	}()
 
-	// Every point-in-time snapshot must be one complete state, never a mixture.
 	for range 10_000 {
 		snapshot, err := client.MetadataSnapshot()
 		require.NoError(t, err)
