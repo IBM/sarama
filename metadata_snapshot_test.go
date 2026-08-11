@@ -1,28 +1,62 @@
 package sarama
 
 import (
+	"reflect"
+	"runtime"
+	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
-	refreshes := 0
+func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	t.Cleanup(seedBroker.Close)
+
 	rack := "rack-a"
-	brokerWithRack := NewBroker("broker-1:9092")
-	brokerWithRack.rack = &rack
-	client := &client{
-		controllerID: 2,
-		brokers: map[int32]*Broker{
-			1: brokerWithRack,
-			2: NewBroker("broker-2:9092"),
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.Brokers[0].rack = &rack
+	metadataResponse.AddBroker("broker-2:9092", 2)
+	metadataResponse.ControllerID = 2
+	metadataResponse.AddTopicPartition(
+		"topic",
+		0,
+		seedBroker.BrokerID(),
+		[]int32{1, 2},
+		[]int32{1},
+		[]int32{2},
+		ErrNoError,
+	)
+	metadataResponse.Topics[0].Partitions[0].LeaderEpoch = 9
+	seedBroker.Returns(metadataResponse)
+
+	config := NewTestConfig()
+	config.Version = V2_8_0_0
+	config.Metadata.Retry.Max = 0
+	baseClient, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		if !baseClient.Closed() {
+			require.NoError(t, baseClient.Close())
+		}
+	})
+
+	client, ok := baseClient.(MetadataSnapshotterClient)
+	require.True(t, ok)
+
+	expectedRack := "rack-a"
+	expected := &MetadataSnapshot{
+		ControllerID: 2,
+		Brokers: map[int32]BrokerSnapshot{
+			1: {Addr: seedBroker.Addr(), Rack: &expectedRack},
+			2: {Addr: "broker-2:9092"},
 		},
-		metadata: map[string]map[int32]*PartitionMetadata{
+		Topics: map[string]map[int32]PartitionSnapshot{
 			"topic": {
 				0: {
-					Version:         7,
-					Err:             ErrReplicaNotAvailable,
+					Version:         11,
+					Err:             ErrNoError,
 					ID:              0,
 					Leader:          1,
 					LeaderEpoch:     9,
@@ -32,98 +66,147 @@ func TestMetadataSnapshotCopyWithoutRefresh(t *testing.T) {
 				},
 			},
 		},
-		metadataRefresh: func([]string) error {
-			refreshes++
-			return nil
-		},
 	}
-	client.updateMetadataMs.Store(time.Now().UnixMilli())
 
+	// Reading the cached snapshot must not send another request to Kafka.
+	requestsBeforeSnapshot := len(seedBroker.History())
 	snapshot, err := client.MetadataSnapshot()
-
 	require.NoError(t, err)
-	require.NotNil(t, snapshot)
-	require.Zero(t, refreshes)
-	require.Equal(t, int32(2), snapshot.ControllerID)
-	require.Equal(t, map[int32]BrokerSnapshot{
-		1: {Addr: "broker-1:9092", Rack: &rack},
-		2: {Addr: "broker-2:9092"},
-	}, snapshot.Brokers)
-	require.Equal(t, PartitionSnapshot{
-		Version:         7,
-		Err:             ErrReplicaNotAvailable,
-		ID:              0,
-		Leader:          1,
-		LeaderEpoch:     9,
-		Replicas:        []int32{1, 2},
-		Isr:             []int32{1},
-		OfflineReplicas: []int32{2},
-	}, snapshot.Topics["topic"][0])
+	require.Equal(t, requestsBeforeSnapshot, len(seedBroker.History()))
+	require.Equal(t, expected, snapshot)
 
+	// Mutating any reference-bearing part of the snapshot must not affect the
+	// client's cached metadata.
+	snapshot.ControllerID = 99
 	broker := snapshot.Brokers[1]
 	broker.Addr = "changed:9092"
 	*broker.Rack = "rack-b"
 	snapshot.Brokers[1] = broker
+	delete(snapshot.Brokers, 2)
 	partition := snapshot.Topics["topic"][0]
+	partition.Leader = 99
 	partition.Replicas[0] = 99
 	partition.Isr[0] = 99
 	partition.OfflineReplicas[0] = 99
-	snapshot.Topics["topic"][0] = PartitionSnapshot{Leader: 99}
+	snapshot.Topics["topic"][0] = partition
+	snapshot.Topics["added"] = map[int32]PartitionSnapshot{}
 
-	require.Equal(t, "broker-1:9092", client.brokers[1].Addr())
-	require.Equal(t, "rack-a", client.brokers[1].Rack())
-	require.Equal(t, int32(1), client.metadata["topic"][0].Leader)
-	require.Equal(t, []int32{1, 2}, client.metadata["topic"][0].Replicas)
-	require.Equal(t, []int32{1}, client.metadata["topic"][0].Isr)
-	require.Equal(t, []int32{2}, client.metadata["topic"][0].OfflineReplicas)
+	// A new snapshot should still expose the original cached state.
+	snapshot, err = client.MetadataSnapshot()
+	require.NoError(t, err)
+	require.Equal(t, expected, snapshot)
+
+	// Exercise the real close path rather than constructing its internal state.
+	require.NoError(t, baseClient.Close())
+	snapshot, err = client.MetadataSnapshot()
+	require.ErrorIs(t, err, ErrClosedClient)
+	require.Nil(t, snapshot)
 }
 
 func TestMetadataSnapshotAvailability(t *testing.T) {
-	tests := []struct {
-		name             string
-		brokers          map[int32]*Broker
-		metadataUpdated  bool
-		expectedSnapshot *MetadataSnapshot
-		expectedError    error
-	}{
-		{
-			name:          "before metadata refresh",
-			brokers:       map[int32]*Broker{},
-			expectedError: ErrMetadataNotInitialized,
-		},
-		{
-			name:            "after empty metadata refresh",
-			brokers:         map[int32]*Broker{},
-			metadataUpdated: true,
-			expectedSnapshot: &MetadataSnapshot{
-				Brokers: map[int32]BrokerSnapshot{},
-				Topics:  map[string]map[int32]PartitionSnapshot{},
-			},
-		},
-		{
-			name:            "after client close",
-			metadataUpdated: true,
-			expectedError:   ErrClosedClient,
-		},
+	t.Run("before metadata refresh", func(t *testing.T) {
+		client := &client{
+			brokers:  map[int32]*Broker{},
+			metadata: map[string]map[int32]*PartitionMetadata{},
+		}
+
+		snapshot, err := client.MetadataSnapshot()
+
+		require.ErrorIs(t, err, ErrMetadataNotInitialized)
+		require.Nil(t, snapshot)
+	})
+
+	t.Run("after empty metadata refresh", func(t *testing.T) {
+		client := &client{
+			brokers:  map[int32]*Broker{},
+			metadata: map[string]map[int32]*PartitionMetadata{},
+		}
+		client.updateMetadataMs.Store(1)
+
+		snapshot, err := client.MetadataSnapshot()
+
+		require.NoError(t, err)
+		require.NotNil(t, snapshot)
+		require.Empty(t, snapshot.Brokers)
+		require.Empty(t, snapshot.Topics)
+	})
+}
+
+func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
+	type metadataState struct {
+		controllerID int32
+		brokers      map[int32]*Broker
+		metadata     map[string]map[int32]*PartitionMetadata
+		snapshot     *MetadataSnapshot
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			client := &client{
-				brokers:  test.brokers,
-				metadata: map[string]map[int32]*PartitionMetadata{},
-			}
-			if test.metadataUpdated {
-				client.updateMetadataMs.Store(time.Now().UnixMilli())
-			}
+	newState := func(controllerID, partitionID int32, brokerAddr, topic string) metadataState {
+		return metadataState{
+			controllerID: controllerID,
+			brokers:      map[int32]*Broker{controllerID: NewBroker(brokerAddr)},
+			metadata: map[string]map[int32]*PartitionMetadata{
+				topic: {partitionID: {ID: partitionID, Leader: controllerID, Replicas: []int32{controllerID}}},
+			},
+			snapshot: &MetadataSnapshot{
+				ControllerID: controllerID,
+				Brokers:      map[int32]BrokerSnapshot{controllerID: {Addr: brokerAddr}},
+				Topics: map[string]map[int32]PartitionSnapshot{
+					topic: {partitionID: {ID: partitionID, Leader: controllerID, Replicas: []int32{controllerID}}},
+				},
+			},
+		}
+	}
+	states := []metadataState{
+		newState(1, 0, "broker-a:9092", "topic-a"),
+		newState(2, 1, "broker-b:9092", "topic-b"),
+	}
 
-			snapshot, err := client.MetadataSnapshot()
-			if test.expectedError != nil {
-				require.ErrorIs(t, err, test.expectedError)
-			} else {
-				require.NoError(t, err)
+	client := &client{
+		controllerID: states[0].controllerID,
+		brokers:      states[0].brokers,
+		metadata:     states[0].metadata,
+	}
+	client.updateMetadataMs.Store(1)
+
+	started := make(chan struct{})
+	done := make(chan struct{})
+	var writer sync.WaitGroup
+	writer.Add(1)
+	go func() {
+		defer writer.Done()
+		for iteration := 0; ; iteration++ {
+			state := states[iteration%len(states)]
+			// Each cache state is installed atomically, just as metadata updates are.
+			client.lock.Lock()
+			client.controllerID = state.controllerID
+			client.brokers = state.brokers
+			client.metadata = state.metadata
+			client.lock.Unlock()
+
+			if iteration == 0 {
+				close(started)
 			}
-			require.Equal(t, test.expectedSnapshot, snapshot)
-		})
+			select {
+			case <-done:
+				return
+			default:
+				runtime.Gosched()
+			}
+		}
+	}()
+	<-started
+	defer func() {
+		close(done)
+		writer.Wait()
+	}()
+
+	// Every point-in-time snapshot must be one complete state, never a mixture.
+	for range 10_000 {
+		snapshot, err := client.MetadataSnapshot()
+		require.NoError(t, err)
+		if !reflect.DeepEqual(snapshot, states[0].snapshot) &&
+			!reflect.DeepEqual(snapshot, states[1].snapshot) {
+			t.Fatalf("metadata snapshot combines multiple cache states: %#v", snapshot)
+		}
 	}
 }
