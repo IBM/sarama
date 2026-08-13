@@ -267,6 +267,8 @@ type Config struct {
 			// broker request. Defaults to 0 for unlimited. Similar to
 			// `queue.buffering.max.messages` in the JVM producer.
 			MaxMessages int
+
+			FlushCallback func(clientID string, size int) // register callback when flush buffer to the kafka broker
 		}
 
 		Retry struct {
