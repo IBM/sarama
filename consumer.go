@@ -120,6 +120,7 @@ func NewConsumer(addrs []string, config *Config) (Consumer, error) {
 	}
 	c, err := newConsumer(client)
 	if err != nil {
+		// Return nil rather than a Consumer interface with a nil value
 		return nil, err
 	}
 
@@ -134,6 +135,7 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 	cli := &nopCloserClient{client}
 	c, err := newConsumer(cli)
 	if err != nil {
+		// Return nil rather than a Consumer interface with a nil value
 		return nil, err
 	}
 
@@ -174,12 +176,14 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
 	pc, err := c.consumePartition(topic, partition, offset)
 	if err != nil {
+		// Return nil rather than a PartitionConsumer interface with a nil value
 		return nil, err
 	}
 
 	return pc, nil
 }
 
+// consumePartition returns the concrete partitionConsumer struct used internally in the ConsumerGroup implementation
 func (c *consumer) consumePartition(topic string, partition int32, offset int64) (*partitionConsumer, error) {
 	child := &partitionConsumer{
 		consumer:             c,

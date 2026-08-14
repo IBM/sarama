@@ -448,9 +448,9 @@ type ConsumerGroupClaim interface {
 }
 
 type consumerGroupClaim struct {
+	*partitionConsumer
 	topic     string
 	partition int32
-	*partitionConsumer
 }
 
 func newConsumerGroupClaim(sess *consumerGroupSession, topic string, partition int32, offset int64) (*consumerGroupClaim, error) {
@@ -471,9 +471,9 @@ func newConsumerGroupClaim(sess *consumerGroupSession, topic string, partition i
 	}()
 
 	return &consumerGroupClaim{
+		partitionConsumer: pcm,
 		topic:             topic,
 		partition:         partition,
-		partitionConsumer: pcm,
 	}, nil
 }
 
