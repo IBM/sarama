@@ -61,10 +61,10 @@ type Broker struct {
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
 
+	throttleLock     sync.Mutex
 	throttleDeadline time.Time
 	throttleNotify   chan struct{}
 	throttleCanceled bool
-	throttleLock     sync.Mutex
 }
 
 // SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
@@ -2018,16 +2018,9 @@ func (b *Broker) waitIfThrottled() error {
 		b.throttleLock.Unlock()
 
 		DebugLogger.Printf("broker/%d waiting for throttle timer\n", b.ID())
-		timer := time.NewTimer(remaining)
 		select {
-		case <-timer.C:
+		case <-time.After(remaining):
 		case <-notify:
-			if !timer.Stop() {
-				select {
-				case <-timer.C:
-				default:
-				}
-			}
 		}
 	}
 }
