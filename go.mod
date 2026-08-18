@@ -10,7 +10,7 @@ require (
 	github.com/klauspost/compress v1.19.2
 	github.com/pierrec/lz4/v4 v4.1.28
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.0
 	go.uber.org/goleak v1.3.0
 	golang.org/x/net v0.57.0
 	golang.org/x/sync v0.22.0
