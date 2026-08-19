@@ -258,11 +258,18 @@ func (om *offsetManager) Commit() {
 	om.releasePOMs(false)
 }
 
-//lint:ignore U1000 // consumed by the cooperative rebalancing path added in a following PR; the only in-build caller here is the unit test (excluded by the integration build tag)
-func (om *offsetManager) setGeneration(generation int32) {
+// transitionGeneration keeps commits out while the coordinator establishes
+// the next generation
+func (om *offsetManager) transitionGeneration(next func() (int32, error)) error {
 	om.generationLock.Lock()
 	defer om.generationLock.Unlock()
+
+	generation, err := next()
+	if err != nil {
+		return err
+	}
 	om.generation = generation
+	return nil
 }
 
 // partitionTargets names a subset of managed partitions; a nil set means all of them
@@ -496,8 +503,6 @@ func (om *offsetManager) asyncClosePOMs() {
 }
 
 // removePartitions closes partitions revoked during a rebalance, committing first when configured
-//
-//lint:ignore U1000 // consumed by the cooperative rebalancing path added in a following PR; the only in-build caller here is the unit test (excluded by the integration build tag)
 func (om *offsetManager) removePartitions(topicPartitions map[string][]int32) {
 	targets := make(partitionTargets, len(topicPartitions))
 	for topic, partitions := range topicPartitions {
