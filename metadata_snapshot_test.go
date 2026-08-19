@@ -1,6 +1,7 @@
 package sarama
 
 import (
+	"fmt"
 	"reflect"
 	"runtime"
 	"sync"
@@ -104,33 +105,63 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 	require.Nil(t, snapshot)
 }
 
-func TestMetadataSnapshotAvailability(t *testing.T) {
-	t.Run("before metadata refresh", func(t *testing.T) {
-		client := &client{
-			brokers:  map[int32]*Broker{},
-			metadata: map[string]map[int32]*PartitionMetadata{},
-		}
+func TestMetadataSnapshotReturnsPartialCacheAfterIncompleteRefresh(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	t.Cleanup(seedBroker.Close)
 
-		snapshot, err := client.MetadataSnapshot()
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddTopicPartition(
+		"topic",
+		0,
+		seedBroker.BrokerID(),
+		[]int32{seedBroker.BrokerID()},
+		[]int32{seedBroker.BrokerID()},
+		[]int32{},
+		ErrNoError,
+	)
+	metadataResponse.AddTopicPartition(
+		"topic",
+		1,
+		-1,
+		[]int32{seedBroker.BrokerID()},
+		[]int32{},
+		[]int32{},
+		ErrLeaderNotAvailable,
+	)
+	seedBroker.Returns(metadataResponse)
 
-		require.ErrorIs(t, err, ErrMetadataNotInitialized)
-		require.Nil(t, snapshot)
+	config := NewConfig()
+	config.ApiVersionsRequest = false
+	config.Metadata.Retry.Max = 0
+	baseClient, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, baseClient.Close())
 	})
 
-	t.Run("after empty metadata refresh", func(t *testing.T) {
-		client := &client{
-			brokers:  map[int32]*Broker{},
-			metadata: map[string]map[int32]*PartitionMetadata{},
-		}
-		client.updateMetadataMs.Store(1)
+	client, ok := baseClient.(MetadataSnapshotterClient)
+	require.True(t, ok)
 
-		snapshot, err := client.MetadataSnapshot()
+	snapshot, err := client.MetadataSnapshot()
 
-		require.NoError(t, err)
-		require.NotNil(t, snapshot)
-		require.Empty(t, snapshot.Brokers)
-		require.Empty(t, snapshot.Topics)
-	})
+	require.NoError(t, err)
+	require.Contains(t, snapshot.Topics["topic"], int32(0),
+		"MetadataSnapshot must expose usable metadata cached by an incomplete refresh")
+}
+
+func TestMetadataSnapshotReturnsEmptyCacheBeforeRefresh(t *testing.T) {
+	client := &client{
+		brokers:  map[int32]*Broker{},
+		metadata: map[string]map[int32]*PartitionMetadata{},
+	}
+
+	snapshot, err := client.MetadataSnapshot()
+
+	require.NoError(t, err)
+	require.NotNil(t, snapshot)
+	require.Empty(t, snapshot.Brokers)
+	require.Empty(t, snapshot.Topics)
 }
 
 func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
@@ -167,8 +198,6 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 		brokers:      states[0].brokers,
 		metadata:     states[0].metadata,
 	}
-	client.updateMetadataMs.Store(1)
-
 	started := make(chan struct{})
 	done := make(chan struct{})
 	var writer sync.WaitGroup
@@ -207,5 +236,35 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 			!reflect.DeepEqual(snapshot, states[1].snapshot) {
 			t.Fatalf("metadata snapshot combines multiple cache states: %#v", snapshot)
 		}
+	}
+}
+
+func BenchmarkMetadataSnapshot(b *testing.B) {
+	for _, partitionCount := range []int{10_000, 100_000} {
+		b.Run(fmt.Sprintf("partitions-%d", partitionCount), func(b *testing.B) {
+			partitions := make(map[int32]*PartitionMetadata, partitionCount)
+			for partitionID := range partitionCount {
+				id := int32(partitionID)
+				partitions[id] = &PartitionMetadata{
+					ID:              id,
+					Leader:          1,
+					Replicas:        []int32{1, 2, 3},
+					Isr:             []int32{1, 2},
+					OfflineReplicas: []int32{3},
+				}
+			}
+			client := &client{
+				brokers:  map[int32]*Broker{1: NewBroker("broker:9092")},
+				metadata: map[string]map[int32]*PartitionMetadata{"topic": partitions},
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				if _, err := client.MetadataSnapshot(); err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
 	}
 }

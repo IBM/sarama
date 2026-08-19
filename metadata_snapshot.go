@@ -10,8 +10,8 @@ type MetadataSnapshotterClient interface {
 	// MetadataSnapshot returns a detached copy of the current cached metadata
 	// without sending a request or triggering a metadata refresh.
 	//
-	// It returns ErrClosedClient if the client is closed, or
-	// ErrMetadataNotInitialized if the client has not completed a metadata refresh.
+	// It returns ErrClosedClient if the client is closed. Before metadata has
+	// been cached, it returns an empty snapshot.
 	MetadataSnapshot() (*MetadataSnapshot, error)
 }
 
@@ -22,7 +22,8 @@ type MetadataSnapshot struct {
 	ControllerID int32
 	// Brokers maps broker IDs to their cached metadata.
 	Brokers map[int32]BrokerSnapshot
-	// Topics maps topic names and partition IDs to their cached metadata.
+	// Topics maps topic names and partition IDs to their cached metadata. It may
+	// not contain all cluster topics when Config.Metadata.Full is false.
 	Topics map[string]map[int32]PartitionSnapshot
 }
 
@@ -63,9 +64,6 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 
 	if client.brokers == nil {
 		return nil, ErrClosedClient
-	}
-	if client.updateMetadataMs.Load() == 0 {
-		return nil, ErrMetadataNotInitialized
 	}
 
 	snapshot := &MetadataSnapshot{
