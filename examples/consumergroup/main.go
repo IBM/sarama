@@ -84,11 +84,15 @@ func main() {
 		config.Consumer.Offsets.Initial = sarama.OffsetOldest
 	}
 
+	consumerReady := make(chan struct{})
+
 	/**
 	 * Setup a new Sarama consumer group
 	 */
 	consumer := Consumer{
-		ready: make(chan bool),
+		ready: sync.OnceFunc(func() {
+			close(consumerReady)
+		}),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -116,11 +120,10 @@ func main() {
 			if ctx.Err() != nil {
 				return
 			}
-			consumer.ready = make(chan bool)
 		}
 	}()
 
-	<-consumer.ready // Await till the consumer has been set up
+	<-consumerReady // Await till the consumer has been set up
 	log.Println("Sarama consumer up and running!...")
 
 	sigusr1 := make(chan os.Signal, 1)
@@ -162,13 +165,13 @@ func toggleConsumptionFlow(client sarama.ConsumerGroup, isPaused *bool) {
 
 // Consumer represents a Sarama consumer group consumer
 type Consumer struct {
-	ready chan bool
+	ready func()
 }
 
 // Setup is run at the beginning of a new session, before ConsumeClaim
 func (consumer *Consumer) Setup(sarama.ConsumerGroupSession) error {
 	// Mark the consumer as ready
-	close(consumer.ready)
+	consumer.ready()
 	return nil
 }
 
