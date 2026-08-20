@@ -1,3 +1,5 @@
+//go:build !functional
+
 package sarama
 
 import (
@@ -146,8 +148,10 @@ func TestMetadataSnapshotReturnsPartialCacheAfterIncompleteRefresh(t *testing.T)
 	snapshot, err := client.MetadataSnapshot()
 
 	require.NoError(t, err)
-	require.Contains(t, snapshot.Topics["topic"], int32(0),
-		"MetadataSnapshot must expose usable metadata cached by an incomplete refresh")
+	require.Len(t, snapshot.Topics["topic"], 2,
+		"MetadataSnapshot must expose all metadata cached by an incomplete refresh")
+	require.Equal(t, ErrNoError, snapshot.Topics["topic"][0].Err)
+	require.Equal(t, ErrLeaderNotAvailable, snapshot.Topics["topic"][1].Err)
 }
 
 func TestMetadataSnapshotReturnsEmptyCacheBeforeRefresh(t *testing.T) {
@@ -167,18 +171,18 @@ func TestMetadataSnapshotReturnsEmptyCacheBeforeRefresh(t *testing.T) {
 func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 	type metadataState struct {
 		controllerID int32
-		brokers      map[int32]*Broker
-		metadata     map[string]map[int32]*PartitionMetadata
+		partitionID  int32
+		broker       *Broker
+		topic        string
 		snapshot     *MetadataSnapshot
 	}
 
 	newState := func(controllerID, partitionID int32, brokerAddr, topic string) metadataState {
 		return metadataState{
 			controllerID: controllerID,
-			brokers:      map[int32]*Broker{controllerID: NewBroker(brokerAddr)},
-			metadata: map[string]map[int32]*PartitionMetadata{
-				topic: {partitionID: {ID: partitionID, Leader: controllerID, Replicas: []int32{controllerID}}},
-			},
+			partitionID:  partitionID,
+			broker:       NewBroker(brokerAddr),
+			topic:        topic,
 			snapshot: &MetadataSnapshot{
 				ControllerID: controllerID,
 				Brokers:      map[int32]BrokerSnapshot{controllerID: {Addr: brokerAddr}},
@@ -193,10 +197,11 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 		newState(2, 1, "broker-b:9092", "topic-b"),
 	}
 
+	partitions := make(map[int32]*PartitionMetadata)
+	partition := &PartitionMetadata{Replicas: make([]int32, 1)}
 	client := &client{
-		controllerID: states[0].controllerID,
-		brokers:      states[0].brokers,
-		metadata:     states[0].metadata,
+		brokers:  make(map[int32]*Broker),
+		metadata: make(map[string]map[int32]*PartitionMetadata),
 	}
 	started := make(chan struct{})
 	done := make(chan struct{})
@@ -208,8 +213,15 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 			state := states[iteration%len(states)]
 			client.lock.Lock()
 			client.controllerID = state.controllerID
-			client.brokers = state.brokers
-			client.metadata = state.metadata
+			clear(client.brokers)
+			client.brokers[state.controllerID] = state.broker
+			clear(client.metadata)
+			clear(partitions)
+			partition.ID = state.partitionID
+			partition.Leader = state.controllerID
+			partition.Replicas[0] = state.controllerID
+			partitions[state.partitionID] = partition
+			client.metadata[state.topic] = partitions
 			client.lock.Unlock()
 
 			if iteration == 0 {
