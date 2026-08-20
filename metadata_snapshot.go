@@ -18,7 +18,8 @@ type MetadataSnapshotterClient interface {
 // MetadataSnapshot contains a point-in-time copy of a client's cached cluster
 // metadata. Modifying a snapshot does not affect the client cache.
 type MetadataSnapshot struct {
-	// ControllerID is the broker ID of the cluster controller.
+	// ControllerID is the broker ID of the cluster controller, or -1 if the
+	// controller is not yet known or the metadata protocol does not report it.
 	ControllerID int32
 	// Brokers maps broker IDs to their cached metadata.
 	Brokers map[int32]BrokerSnapshot

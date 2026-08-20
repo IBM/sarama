@@ -5,7 +5,6 @@ package sarama
 import (
 	"fmt"
 	"reflect"
-	"runtime"
 	"sync"
 	"testing"
 
@@ -154,78 +153,154 @@ func TestMetadataSnapshotReturnsPartialCacheAfterIncompleteRefresh(t *testing.T)
 	require.Equal(t, ErrLeaderNotAvailable, snapshot.Topics["topic"][1].Err)
 }
 
-func TestMetadataSnapshotReturnsEmptyCacheBeforeRefresh(t *testing.T) {
-	client := &client{
-		brokers:  map[int32]*Broker{},
-		metadata: map[string]map[int32]*PartitionMetadata{},
-	}
+func TestMetadataSnapshotWithMetadataFullDisabled(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	t.Cleanup(seedBroker.Close)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.ControllerID = seedBroker.BrokerID()
+	metadataResponse.AddTopicPartition(
+		"topic-a",
+		0,
+		seedBroker.BrokerID(),
+		[]int32{seedBroker.BrokerID()},
+		[]int32{seedBroker.BrokerID()},
+		[]int32{},
+		ErrNoError,
+	)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.ApiVersionsRequest = false
+	config.Version = V2_8_0_0
+	config.Metadata.Full = false
+	config.Metadata.RefreshFrequency = 0
+	config.Metadata.Retry.Max = 0
+	baseClient, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, baseClient.Close())
+	})
+
+	client, ok := baseClient.(MetadataSnapshotterClient)
+	require.True(t, ok)
+	require.Empty(t, seedBroker.History(), "NewClient must not fetch metadata when Metadata.Full is false")
 
 	snapshot, err := client.MetadataSnapshot()
 
 	require.NoError(t, err)
-	require.NotNil(t, snapshot)
+	require.Equal(t, int32(-1), snapshot.ControllerID)
 	require.Empty(t, snapshot.Brokers)
 	require.Empty(t, snapshot.Topics)
+	require.Empty(t, seedBroker.History(), "MetadataSnapshot must not fetch metadata")
+
+	require.NoError(t, baseClient.RefreshMetadata("topic-a"))
+	requestsBeforeSnapshot := len(seedBroker.History())
+	snapshot, err = client.MetadataSnapshot()
+	require.NoError(t, err)
+	require.Equal(t, seedBroker.BrokerID(), snapshot.ControllerID)
+	require.Contains(t, snapshot.Topics, "topic-a")
+	require.Len(t, seedBroker.History(), requestsBeforeSnapshot,
+		"MetadataSnapshot must not issue another Kafka request")
+}
+
+func TestMetadataSnapshotReportsUnknownControllerForMetadataVersionZero(t *testing.T) {
+	seedBroker := NewMockBroker(t, 0)
+	t.Cleanup(seedBroker.Close)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.ControllerID = 7
+	seedBroker.Returns(metadataResponse)
+
+	config := NewConfig()
+	config.ApiVersionsRequest = false
+	config.Version = V0_8_2_0
+	config.Metadata.Retry.Max = 0
+	baseClient, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, baseClient.Close())
+	})
+
+	client, ok := baseClient.(MetadataSnapshotterClient)
+	require.True(t, ok)
+
+	snapshot, err := client.MetadataSnapshot()
+	require.NoError(t, err)
+	require.Equal(t, int32(-1), snapshot.ControllerID)
 }
 
 func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 	type metadataState struct {
-		controllerID int32
-		partitionID  int32
-		broker       *Broker
-		topic        string
-		snapshot     *MetadataSnapshot
+		response *MetadataResponse
+		snapshot *MetadataSnapshot
 	}
 
-	newState := func(controllerID, partitionID int32, brokerAddr, topic string) metadataState {
+	newState := func(controllerID, partitionID int32) metadataState {
+		response := &MetadataResponse{Version: 11, ControllerID: controllerID}
+		response.AddBroker("broker-a:9092", 1)
+		response.AddBroker("broker-b:9092", 2)
+		response.AddTopicPartition(
+			"topic",
+			partitionID,
+			controllerID,
+			[]int32{controllerID},
+			[]int32{controllerID},
+			[]int32{},
+			ErrNoError,
+		)
+		response.Topics[0].Partitions[0].Version = response.Version
+
 		return metadataState{
-			controllerID: controllerID,
-			partitionID:  partitionID,
-			broker:       NewBroker(brokerAddr),
-			topic:        topic,
+			response: response,
 			snapshot: &MetadataSnapshot{
 				ControllerID: controllerID,
-				Brokers:      map[int32]BrokerSnapshot{controllerID: {Addr: brokerAddr}},
+				Brokers: map[int32]BrokerSnapshot{
+					1: {Addr: "broker-a:9092"},
+					2: {Addr: "broker-b:9092"},
+				},
 				Topics: map[string]map[int32]PartitionSnapshot{
-					topic: {partitionID: {ID: partitionID, Leader: controllerID, Replicas: []int32{controllerID}}},
+					"topic": {
+						partitionID: {
+							Version:         11,
+							ID:              partitionID,
+							Leader:          controllerID,
+							Replicas:        []int32{controllerID},
+							Isr:             []int32{controllerID},
+							OfflineReplicas: []int32{},
+						},
+					},
 				},
 			},
 		}
 	}
 	states := []metadataState{
-		newState(1, 0, "broker-a:9092", "topic-a"),
-		newState(2, 1, "broker-b:9092", "topic-b"),
+		newState(1, 0),
+		newState(2, 1),
 	}
 
-	// Reuse the same maps, PartitionMetadata, and backing slice across updates.
-	// This ensures the test catches implementations that release client.lock
-	// before the snapshot has been fully detached from the mutable cache.
-	partitions := make(map[int32]*PartitionMetadata)
-	partition := &PartitionMetadata{Replicas: make([]int32, 1)}
 	client := &client{
-		brokers:  make(map[int32]*Broker),
-		metadata: make(map[string]map[int32]*PartitionMetadata),
+		conf:                    NewConfig(),
+		brokers:                 make(map[int32]*Broker),
+		metadata:                make(map[string]map[int32]*PartitionMetadata),
+		metadataTopics:          make(map[string]none),
+		cachedPartitionsResults: make(map[string][maxPartitionIndex][]int32),
 	}
 	started := make(chan struct{})
 	done := make(chan struct{})
+	writerErr := make(chan error, 1)
 	var writer sync.WaitGroup
 	writer.Add(1)
 	go func() {
 		defer writer.Done()
 		for iteration := 0; ; iteration++ {
 			state := states[iteration%len(states)]
-			client.lock.Lock()
-			client.controllerID = state.controllerID
-			clear(client.brokers)
-			client.brokers[state.controllerID] = state.broker
-			clear(client.metadata)
-			clear(partitions)
-			partition.ID = state.partitionID
-			partition.Leader = state.controllerID
-			partition.Replicas[0] = state.controllerID
-			partitions[state.partitionID] = partition
-			client.metadata[state.topic] = partitions
-			client.lock.Unlock()
+			if _, err := client.updateMetadata(state.response, false); err != nil {
+				writerErr <- err
+				return
+			}
 
 			if iteration == 0 {
 				close(started)
@@ -234,7 +309,6 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 			case <-done:
 				return
 			default:
-				runtime.Gosched()
 			}
 		}
 	}()
@@ -245,6 +319,11 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 	}()
 
 	for range 10_000 {
+		select {
+		case err := <-writerErr:
+			t.Fatalf("update metadata: %v", err)
+		default:
+		}
 		snapshot, err := client.MetadataSnapshot()
 		require.NoError(t, err)
 		if !reflect.DeepEqual(snapshot, states[0].snapshot) &&
