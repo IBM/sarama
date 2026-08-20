@@ -788,21 +788,50 @@ func (client *client) resurrectDeadBrokers() {
 }
 
 // LeastLoadedBroker returns the broker with the least pending requests.
-// Firstly, choose the broker from cached broker list. If the broker list is empty, choose from seed brokers.
+//
+// The aim is to choose the broker, from the cached broker list, that offers
+// the best balance between the lowest current load and the cost of a new connection,
+// in accordance with the following list of priorities:
+//
+//  1. Returns an already connected broker if and only if it is idle.
+//  2. Returns a broker that is not yet connected. Etablish a new connection
+//     before to return it.
+//  3. Returns the currently connected broker with the least number of pending requests.
+//  4. If the cached list of brokers is empty, returns a seed broker.
+//
+// As the order in which brokers are iterated is not stable, the broker
+// returned may vary from one call to the next if several brokers of the list
+// share the same selection criteria.
 func (client *client) LeastLoadedBroker() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	var leastLoadedBroker *Broker
-	pendingRequests := math.MaxInt
-	for _, broker := range client.brokers {
-		if pendingRequests > broker.ResponseSize() {
-			pendingRequests = broker.ResponseSize()
-			leastLoadedBroker = broker
+	var leastLoadedBroker, notConnectedBroker *Broker
+	leastPendingRequests := math.MaxInt
+
+	for _, b := range client.brokers {
+		isConnected, pendingRequests := b.status()
+		if !isConnected {
+			notConnectedBroker = b
+			continue
+		}
+
+		if pendingRequests == 0 {
+			return b
+		}
+
+		if pendingRequests < leastPendingRequests {
+			leastPendingRequests = pendingRequests
+			leastLoadedBroker = b
 		}
 	}
+
+	if notConnectedBroker != nil {
+		_ = notConnectedBroker.Open(client.conf)
+		return notConnectedBroker
+	}
+
 	if leastLoadedBroker != nil {
-		_ = leastLoadedBroker.Open(client.conf)
 		return leastLoadedBroker
 	}
 
@@ -811,7 +840,7 @@ func (client *client) LeastLoadedBroker() *Broker {
 		return client.seedBrokers[0]
 	}
 
-	return leastLoadedBroker
+	return nil
 }
 
 // private caching/lazy metadata helpers
