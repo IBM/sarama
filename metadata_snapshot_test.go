@@ -197,6 +197,9 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 		newState(2, 1, "broker-b:9092", "topic-b"),
 	}
 
+	// Reuse the same maps, PartitionMetadata, and backing slice across updates.
+	// This ensures the test catches implementations that release client.lock
+	// before the snapshot has been fully detached from the mutable cache.
 	partitions := make(map[int32]*PartitionMetadata)
 	partition := &PartitionMetadata{Replicas: make([]int32, 1)}
 	client := &client{
