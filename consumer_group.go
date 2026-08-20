@@ -95,7 +95,7 @@ type consumerGroup struct {
 	client Client
 
 	config           *Config
-	consumer         Consumer
+	consumer         *consumer
 	groupID          string
 	groupInstanceId  *string
 	memberID         string
