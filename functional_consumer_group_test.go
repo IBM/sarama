@@ -17,6 +17,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// noopConsumerGroupHandler just lets the client join the group; it doesn't
+// need to handle any claims.
+type noopConsumerGroupHandler struct{}
+
+func (noopConsumerGroupHandler) Setup(ConsumerGroupSession) error   { return nil }
+func (noopConsumerGroupHandler) Cleanup(ConsumerGroupSession) error { return nil }
+func (noopConsumerGroupHandler) ConsumeClaim(ConsumerGroupSession, ConsumerGroupClaim) error {
+	return nil
+}
+
+// TestFuncJoinGroupVersionSelection checks the JoinGroup version picked for
+// each Config.Version against a real broker. 3.1.x wrongly picks v8, which
+// needs 3.2.0 (see #3585).
+func TestFuncJoinGroupVersionSelection(t *testing.T) {
+	checkKafkaVersion(t, "3.2.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	// A consumer group join should succeed for any of these versions - they're
+	// all real Kafka releases the test broker supports. Before the fix, 3.1.0,
+	// 3.1.1 and 3.1.2 wrongly send a JoinGroup v8 request and fail.
+	versions := []KafkaVersion{V3_1_0_0, V3_1_1_0, V3_1_2_0, V3_2_0_0}
+
+	for _, version := range versions {
+		t.Run(version.String(), func(t *testing.T) {
+			config := NewConfig()
+			config.Version = version
+			config.ClientID = t.Name()
+			config.Consumer.Group.Rebalance.Timeout = 6 * time.Second
+			config.Consumer.Group.Session.Timeout = 6 * time.Second
+
+			group, err := NewConsumerGroup(FunctionalTestEnv.KafkaBrokerAddrs, testFuncConsumerGroupID(t), config)
+			require.NoError(t, err)
+			defer func() { _ = group.Close() }()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			err = group.Consume(ctx, []string{"test.4"}, noopConsumerGroupHandler{})
+			t.Logf("Config.Version=%s: join err=%v", version, err)
+			assert.NoError(t, err)
+		})
+	}
+}
+
 func TestFuncConsumerGroupPartitioning(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "0.10.2")

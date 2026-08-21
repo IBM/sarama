@@ -390,6 +390,60 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 	})
 }
 
+// TestJoinGroupVersionSelection checks the JoinGroup version picked for each
+// Config.Version. 3.1.x should get v7, not v8 (v8 needs 3.2.0, see #3585).
+func TestJoinGroupVersionSelection(t *testing.T) {
+	versions := []struct {
+		version     KafkaVersion
+		wantVersion int16
+	}{
+		{V3_1_0_0, 7},
+		{V3_1_1_0, 7},
+		{V3_1_2_0, 7},
+		{V3_2_0_0, 8},
+	}
+
+	for _, tc := range versions {
+		t.Run(tc.version.String(), func(t *testing.T) {
+			config := NewTestConfig()
+			config.ClientID = t.Name()
+			config.Version = tc.version
+			config.Consumer.Group.Rebalance.Retry.Backoff = 0
+
+			broker := NewMockBroker(t, 0)
+			t.Cleanup(broker.Close)
+			broker.SetHandlerByMap(map[string]MockResponse{
+				"MetadataRequest": NewMockMetadataResponse(t).
+					SetBroker(broker.Addr(), broker.BrokerID()),
+				"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+					SetCoordinator(CoordinatorGroup, "my-group", broker),
+				"JoinGroupRequest": NewMockJoinGroupResponse(t).
+					SetGroupProtocol(RangeBalanceStrategyName).
+					SetMemberId("member-1"),
+				"SyncGroupRequest":  NewMockSyncGroupResponse(t),
+				"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
+			})
+
+			group, err := NewConsumerGroup([]string{broker.Addr()}, "my-group", config)
+			assert.NoError(t, err)
+			c := group.(*consumerGroup)
+			t.Cleanup(func() { assert.NoError(t, group.Close()) })
+
+			_, err = c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
+			assert.NoError(t, err)
+
+			var requests []*JoinGroupRequest
+			for _, exchange := range broker.History() {
+				if request, ok := exchange.Request.(*JoinGroupRequest); ok {
+					requests = append(requests, request)
+				}
+			}
+			assert.Len(t, requests, 1)
+			assert.Equal(t, tc.wantVersion, requests[0].Version)
+		})
+	}
+}
+
 // strategyWithSubscriptionUserData wraps a BalanceStrategy and adds a
 // SubscriptionUserDataBalanceStrategy implementation that returns the
 // configured data/error. It also records the topics it was invoked with so

@@ -540,7 +540,7 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string, h
 	// send two JoinGroupRequests, once with the empty member id, and then again
 	// with the assigned id from the first response. This is handled via the
 	// ErrMemberIdRequired case.
-	if c.config.Version.IsAtLeast(V3_1_0_0) {
+	if c.config.Version.IsAtLeast(V3_2_0_0) {
 		req.Version = 8
 	} else if c.config.Version.IsAtLeast(V2_5_0_0) {
 		req.Version = 7
