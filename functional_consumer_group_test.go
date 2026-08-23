@@ -27,26 +27,24 @@ func (noopConsumerGroupHandler) ConsumeClaim(ConsumerGroupSession, ConsumerGroup
 	return nil
 }
 
-// TestFuncJoinGroupVersionSelection checks the JoinGroup version picked for
-// each Config.Version against a real broker. 3.1.x wrongly picks v8, which
-// needs 3.2.0 (see #3585).
+// TestFuncJoinGroupVersionSelection joins a real broker with Config.Version
+// values either side of the v7/v8 JoinGroup boundary. A 3.1.x config must
+// select v7: v8 needs a 3.2.0 broker, and the client refuses to send it to
+// anything older (#3585).
 func TestFuncJoinGroupVersionSelection(t *testing.T) {
+	t.Parallel()
+	// a >= 3.2.0 broker is required: against older brokers restrictApiVersion
+	// clamps v8 to v7 and would mask a wrong version selection
 	checkKafkaVersion(t, "3.2.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
-	// A consumer group join should succeed for any of these versions - they're
-	// all real Kafka releases the test broker supports. Before the fix, 3.1.0,
-	// 3.1.1 and 3.1.2 wrongly send a JoinGroup v8 request and fail.
 	versions := []KafkaVersion{V3_1_0_0, V3_1_1_0, V3_1_2_0, V3_2_0_0}
 
 	for _, version := range versions {
 		t.Run(version.String(), func(t *testing.T) {
-			config := NewConfig()
+			config := defaultConfig(t.Name())
 			config.Version = version
-			config.ClientID = t.Name()
-			config.Consumer.Group.Rebalance.Timeout = 6 * time.Second
-			config.Consumer.Group.Session.Timeout = 6 * time.Second
 
 			group, err := NewConsumerGroup(FunctionalTestEnv.KafkaBrokerAddrs, testFuncConsumerGroupID(t), config)
 			require.NoError(t, err)
@@ -55,9 +53,7 @@ func TestFuncJoinGroupVersionSelection(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
 
-			err = group.Consume(ctx, []string{"test.4"}, noopConsumerGroupHandler{})
-			t.Logf("Config.Version=%s: join err=%v", version, err)
-			assert.NoError(t, err)
+			assert.NoError(t, group.Consume(ctx, []string{"test.4"}, noopConsumerGroupHandler{}))
 		})
 	}
 }
