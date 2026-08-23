@@ -256,49 +256,52 @@ func TestConsumerShouldNotRetrySessionIfContextCancelled(t *testing.T) {
 	assert.Equal(t, context.Canceled, err)
 }
 
-func TestConsumerGroupJoinSync(t *testing.T) {
-	setup := func(t *testing.T, joinResponse, syncResponse MockResponse) (*consumerGroup, *MockBroker) {
-		t.Helper()
+// newJoinSyncConsumerGroup starts a mock broker that answers the join/sync
+// flow with the given responses and returns the group wired to it.
+func newJoinSyncConsumerGroup(t *testing.T, version KafkaVersion, joinResponse, syncResponse MockResponse) (*consumerGroup, *MockBroker) {
+	t.Helper()
 
-		config := NewTestConfig()
-		config.ClientID = t.Name()
-		config.Version = V3_2_0_0
-		config.Consumer.Group.Rebalance.Retry.Backoff = 0
+	config := NewTestConfig()
+	config.ClientID = t.Name()
+	config.Version = version
+	config.Consumer.Group.Rebalance.Retry.Backoff = 0
 
-		broker := NewMockBroker(t, 0)
-		t.Cleanup(broker.Close)
-		broker.SetHandlerByMap(map[string]MockResponse{
-			"MetadataRequest": NewMockMetadataResponse(t).
-				SetBroker(broker.Addr(), broker.BrokerID()),
-			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
-				SetCoordinator(CoordinatorGroup, "my-group", broker),
-			"JoinGroupRequest":  joinResponse,
-			"SyncGroupRequest":  syncResponse,
-			"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
-		})
+	broker := NewMockBroker(t, 0)
+	t.Cleanup(broker.Close)
+	broker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(broker.Addr(), broker.BrokerID()),
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorGroup, "my-group", broker),
+		"JoinGroupRequest":  joinResponse,
+		"SyncGroupRequest":  syncResponse,
+		"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
+	})
 
-		group, err := NewConsumerGroup([]string{broker.Addr()}, "my-group", config)
-		assert.NoError(t, err)
-		t.Cleanup(func() {
-			assert.NoError(t, group.Close())
-		})
+	group, err := NewConsumerGroup([]string{broker.Addr()}, "my-group", config)
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		assert.NoError(t, group.Close())
+	})
 
-		return group.(*consumerGroup), broker
-	}
+	return group.(*consumerGroup), broker
+}
 
-	joinRequests := func(broker *MockBroker) []*JoinGroupRequest {
-		var requests []*JoinGroupRequest
-		for _, exchange := range broker.History() {
-			if request, ok := exchange.Request.(*JoinGroupRequest); ok {
-				requests = append(requests, request)
-			}
+// joinGroupRequests filters the broker history down to the JoinGroup requests.
+func joinGroupRequests(broker *MockBroker) []*JoinGroupRequest {
+	var requests []*JoinGroupRequest
+	for _, exchange := range broker.History() {
+		if request, ok := exchange.Request.(*JoinGroupRequest); ok {
+			requests = append(requests, request)
 		}
-		return requests
 	}
+	return requests
+}
 
+func TestConsumerGroupJoinSync(t *testing.T) {
 	t.Run("returns the negotiated assignment and reports retained ownership", func(t *testing.T) {
-		c, broker := setup(
-			t,
+		c, broker := newJoinSyncConsumerGroup(
+			t, V3_2_0_0,
 			NewMockJoinGroupResponse(t).
 				SetGroupProtocol(RangeBalanceStrategyName).
 				SetGenerationId(7).
@@ -323,7 +326,7 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 		assert.Equal(t, map[string][]int32{"my-topic": {0, 2}}, result.claims)
 		assert.False(t, result.isLeader)
 
-		requests := joinRequests(broker)
+		requests := joinGroupRequests(broker)
 		assert.Len(t, requests, 1)
 		assert.Len(t, requests[0].OrderedGroupProtocols, 1)
 		metadata := &ConsumerGroupMemberMetadata{}
@@ -335,8 +338,8 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 	})
 
 	t.Run("retries unknown membership when no assignment is retained", func(t *testing.T) {
-		c, broker := setup(
-			t,
+		c, broker := newJoinSyncConsumerGroup(
+			t, V3_2_0_0,
 			NewMockSequence(
 				NewMockJoinGroupResponse(t).SetError(ErrUnknownMemberId),
 				NewMockJoinGroupResponse(t).
@@ -350,12 +353,12 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 		result, err := c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
 		assert.NoError(t, err)
 		assert.Equal(t, "member-2", result.memberID)
-		assert.Len(t, joinRequests(broker), 2)
+		assert.Len(t, joinGroupRequests(broker), 2)
 	})
 
 	t.Run("returns unknown membership when retained ownership is lost", func(t *testing.T) {
-		c, broker := setup(
-			t,
+		c, broker := newJoinSyncConsumerGroup(
+			t, V3_2_0_0,
 			NewMockJoinGroupResponse(t).SetError(ErrUnknownMemberId),
 			NewMockSyncGroupResponse(t),
 		)
@@ -367,12 +370,12 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 		}, 1)
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, ErrUnknownMemberId)
-		assert.Len(t, joinRequests(broker), 1)
+		assert.Len(t, joinGroupRequests(broker), 1)
 	})
 
 	t.Run("returns illegal generation when sync invalidates retained ownership", func(t *testing.T) {
-		c, broker := setup(
-			t,
+		c, broker := newJoinSyncConsumerGroup(
+			t, V3_2_0_0,
 			NewMockJoinGroupResponse(t).
 				SetGroupProtocol(RangeBalanceStrategyName).
 				SetMemberId("member-3"),
@@ -386,17 +389,30 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 		}, 1)
 		assert.Nil(t, result)
 		assert.ErrorIs(t, err, ErrIllegalGeneration)
-		assert.Len(t, joinRequests(broker), 1)
+		assert.Len(t, joinGroupRequests(broker), 1)
 	})
 }
 
 // TestJoinGroupVersionSelection checks the JoinGroup version picked for each
-// Config.Version. 3.1.x should get v7, not v8 (v8 needs 3.2.0, see #3585).
+// Config.Version. 3.1.x should get v7, not v8 (v8 needs 3.2.0, #3585).
 func TestJoinGroupVersionSelection(t *testing.T) {
+	t.Run("every supported config version can send the version it selects", func(t *testing.T) {
+		for _, kv := range SupportedVersions {
+			if !kv.IsAtLeast(V0_10_2_0) {
+				continue // consumer groups require 0.10.2
+			}
+			req := NewJoinGroupRequest(kv)
+			assert.Truef(t, req.isValidVersion(), "JoinGroup v%d selected for %s is not a valid version", req.Version, kv)
+			assert.Truef(t, kv.IsAtLeast(req.requiredVersion()),
+				"JoinGroup v%d selected for %s requires %s", req.Version, kv, req.requiredVersion())
+		}
+	})
+
 	versions := []struct {
 		version     KafkaVersion
 		wantVersion int16
 	}{
+		{V2_5_0_0, 7},
 		{V3_1_0_0, 7},
 		{V3_1_1_0, 7},
 		{V3_1_2_0, 7},
@@ -405,43 +421,54 @@ func TestJoinGroupVersionSelection(t *testing.T) {
 
 	for _, tc := range versions {
 		t.Run(tc.version.String(), func(t *testing.T) {
-			config := NewTestConfig()
-			config.ClientID = t.Name()
-			config.Version = tc.version
-			config.Consumer.Group.Rebalance.Retry.Backoff = 0
+			// answer the initial join with ErrMemberIdRequired so both
+			// KIP-394 requests are captured
+			c, broker := newJoinSyncConsumerGroup(
+				t, tc.version,
+				NewMockSequence(
+					NewMockJoinGroupResponse(t).SetError(ErrMemberIdRequired).SetMemberId("member-1"),
+					NewMockJoinGroupResponse(t).
+						SetGroupProtocol(RangeBalanceStrategyName).
+						SetMemberId("member-1"),
+				),
+				NewMockSyncGroupResponse(t),
+			)
 
-			broker := NewMockBroker(t, 0)
-			t.Cleanup(broker.Close)
-			broker.SetHandlerByMap(map[string]MockResponse{
-				"MetadataRequest": NewMockMetadataResponse(t).
-					SetBroker(broker.Addr(), broker.BrokerID()),
-				"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
-					SetCoordinator(CoordinatorGroup, "my-group", broker),
-				"JoinGroupRequest": NewMockJoinGroupResponse(t).
-					SetGroupProtocol(RangeBalanceStrategyName).
-					SetMemberId("member-1"),
-				"SyncGroupRequest":  NewMockSyncGroupResponse(t),
-				"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
-			})
-
-			group, err := NewConsumerGroup([]string{broker.Addr()}, "my-group", config)
-			assert.NoError(t, err)
-			c := group.(*consumerGroup)
-			t.Cleanup(func() { assert.NoError(t, group.Close()) })
-
-			_, err = c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
+			_, err := c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
 			assert.NoError(t, err)
 
-			var requests []*JoinGroupRequest
-			for _, exchange := range broker.History() {
-				if request, ok := exchange.Request.(*JoinGroupRequest); ok {
-					requests = append(requests, request)
-				}
+			requests := joinGroupRequests(broker)
+			assert.Len(t, requests, 2)
+			for _, request := range requests {
+				assert.Equal(t, tc.wantVersion, request.Version)
 			}
-			assert.Len(t, requests, 1)
-			assert.Equal(t, tc.wantVersion, requests[0].Version)
 		})
 	}
+
+	t.Run("the rejoin for a member id repeats the reason", func(t *testing.T) {
+		c, broker := newJoinSyncConsumerGroup(
+			t, V3_2_0_0,
+			NewMockSequence(
+				NewMockJoinGroupResponse(t).SetError(ErrMemberIdRequired).SetMemberId("member-1"),
+				NewMockJoinGroupResponse(t).
+					SetGroupProtocol(RangeBalanceStrategyName).
+					SetMemberId("member-1"),
+			),
+			NewMockSyncGroupResponse(t),
+		)
+		c.lastSessionCause = ErrRebalanceInProgress
+
+		_, err := c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
+		assert.NoError(t, err)
+
+		requests := joinGroupRequests(broker)
+		assert.Len(t, requests, 2)
+		for _, request := range requests {
+			assert.NotNil(t, request.Reason)
+			assert.Equal(t, sessionCauseToReason(ErrRebalanceInProgress), *request.Reason)
+		}
+		assert.NoError(t, c.lastSessionCause)
+	})
 }
 
 // strategyWithSubscriptionUserData wraps a BalanceStrategy and adds a
