@@ -1072,7 +1072,15 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			select {
 			case res, ok := <-pending:
 				if !ok {
-					continue
+					// pending is closed and never blocks again, so select could keep
+					// racing this case against responses<- instead of progressing.
+					// Once closed, just drain buf directly in order.
+					for buf.Length() > 0 {
+						responses <- buf.Peek()
+						buf.Remove()
+					}
+					close(responses)
+					return
 				}
 				buf.Add(res)
 				continue
