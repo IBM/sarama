@@ -51,8 +51,8 @@ type PartitionSnapshot struct {
 	LeaderEpoch int32
 	// Replicas contains the broker IDs of all partition replicas.
 	Replicas []int32
-	// Isr contains the broker IDs of all in-sync replicas.
-	Isr []int32
+	// InSyncReplicas contains the broker IDs of all in-sync replicas.
+	InSyncReplicas []int32
 	// OfflineReplicas contains the broker IDs of all offline replicas.
 	OfflineReplicas []int32
 }
@@ -93,7 +93,7 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 				Leader:          metadata.Leader,
 				LeaderEpoch:     metadata.LeaderEpoch,
 				Replicas:        slices.Clone(metadata.Replicas),
-				Isr:             slices.Clone(metadata.Isr),
+				InSyncReplicas:  slices.Clone(metadata.Isr),
 				OfflineReplicas: slices.Clone(metadata.OfflineReplicas),
 			}
 		}

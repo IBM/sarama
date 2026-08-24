@@ -64,7 +64,7 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 					Leader:          1,
 					LeaderEpoch:     9,
 					Replicas:        []int32{1, 2},
-					Isr:             []int32{1},
+					InSyncReplicas:  []int32{1},
 					OfflineReplicas: []int32{2},
 				},
 			},
@@ -91,7 +91,7 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 	partition := snapshot.Topics["topic"][0]
 	partition.Leader = 99
 	partition.Replicas[0] = 99
-	partition.Isr[0] = 99
+	partition.InSyncReplicas[0] = 99
 	partition.OfflineReplicas[0] = 99
 	snapshot.Topics["topic"][0] = partition
 	snapshot.Topics["added"] = map[int32]PartitionSnapshot{}
@@ -268,7 +268,7 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 							ID:              partitionID,
 							Leader:          controllerID,
 							Replicas:        []int32{controllerID},
-							Isr:             []int32{controllerID},
+							InSyncReplicas:  []int32{controllerID},
 							OfflineReplicas: []int32{},
 						},
 					},
