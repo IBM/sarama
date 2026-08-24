@@ -17,6 +17,47 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// noopConsumerGroupHandler just lets the client join the group; it doesn't
+// need to handle any claims.
+type noopConsumerGroupHandler struct{}
+
+func (noopConsumerGroupHandler) Setup(ConsumerGroupSession) error   { return nil }
+func (noopConsumerGroupHandler) Cleanup(ConsumerGroupSession) error { return nil }
+func (noopConsumerGroupHandler) ConsumeClaim(ConsumerGroupSession, ConsumerGroupClaim) error {
+	return nil
+}
+
+// TestFuncJoinGroupVersionSelection joins a real broker with Config.Version
+// values either side of the v7/v8 JoinGroup boundary. A 3.1.x config must
+// select v7: v8 needs a 3.2.0 broker, and the client refuses to send it to
+// anything older (#3585).
+func TestFuncJoinGroupVersionSelection(t *testing.T) {
+	t.Parallel()
+	// a >= 3.2.0 broker is required: against older brokers restrictApiVersion
+	// clamps v8 to v7 and would mask a wrong version selection
+	checkKafkaVersion(t, "3.2.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	versions := []KafkaVersion{V3_1_0_0, V3_1_1_0, V3_1_2_0, V3_2_0_0}
+
+	for _, version := range versions {
+		t.Run(version.String(), func(t *testing.T) {
+			config := defaultConfig(t.Name())
+			config.Version = version
+
+			group, err := NewConsumerGroup(FunctionalTestEnv.KafkaBrokerAddrs, testFuncConsumerGroupID(t), config)
+			require.NoError(t, err)
+			defer func() { _ = group.Close() }()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+
+			assert.NoError(t, group.Consume(ctx, []string{"test.4"}, noopConsumerGroupHandler{}))
+		})
+	}
+}
+
 func TestFuncConsumerGroupPartitioning(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "0.10.2")

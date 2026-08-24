@@ -364,6 +364,9 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 	switch join.Err {
 	case ErrNoError:
 		c.memberID = join.MemberId
+		// clear the session cause only once a join succeeds so the KIP-394
+		// second request repeats the reason
+		c.lastSessionCause = nil
 	case ErrUnknownMemberId, ErrIllegalGeneration:
 		// reset member ID and retry immediately
 		c.memberID = ""
@@ -530,33 +533,11 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 }
 
 func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string, held *heldAssignment) (*JoinGroupResponse, error) {
-	req := &JoinGroupRequest{
-		GroupId:        c.groupID,
-		MemberId:       c.memberID,
-		SessionTimeout: int32(c.config.Consumer.Group.Session.Timeout / time.Millisecond),
-		ProtocolType:   "consumer",
-	}
-	// from JoinGroupRequest v4 onwards (due to KIP-394) the client will actually
-	// send two JoinGroupRequests, once with the empty member id, and then again
-	// with the assigned id from the first response. This is handled via the
-	// ErrMemberIdRequired case.
-	if c.config.Version.IsAtLeast(V3_1_0_0) {
-		req.Version = 8
-	} else if c.config.Version.IsAtLeast(V2_5_0_0) {
-		req.Version = 7
-	} else if c.config.Version.IsAtLeast(V2_4_0_0) {
-		req.Version = 6
-	} else if c.config.Version.IsAtLeast(V2_3_0_0) {
-		req.Version = 5
-	} else if c.config.Version.IsAtLeast(V2_2_0_0) {
-		req.Version = 4
-	} else if c.config.Version.IsAtLeast(V2_0_0_0) {
-		req.Version = 3
-	} else if c.config.Version.IsAtLeast(V0_11_0_0) {
-		req.Version = 2
-	} else if c.config.Version.IsAtLeast(V0_10_1_0) {
-		req.Version = 1
-	}
+	req := NewJoinGroupRequest(c.config.Version)
+	req.GroupId = c.groupID
+	req.MemberId = c.memberID
+	req.SessionTimeout = int32(c.config.Consumer.Group.Session.Timeout / time.Millisecond)
+	req.ProtocolType = "consumer"
 	if req.Version >= 1 {
 		req.RebalanceTimeout = int32(c.config.Consumer.Group.Rebalance.Timeout / time.Millisecond)
 	}
@@ -566,7 +547,6 @@ func (c *consumerGroup) joinGroupRequest(coordinator *Broker, topics []string, h
 	if req.Version >= 8 && c.lastSessionCause != nil {
 		reason := sessionCauseToReason(c.lastSessionCause)
 		req.Reason = &reason
-		c.lastSessionCause = nil
 	}
 
 	var owned map[string][]int32

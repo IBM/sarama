@@ -65,6 +65,38 @@ func (r *JoinGroupRequest) setVersion(v int16) {
 	r.Version = v
 }
 
+func NewJoinGroupRequest(version KafkaVersion) *JoinGroupRequest {
+	request := &JoinGroupRequest{}
+	if version.IsAtLeast(V3_2_0_0) {
+		// Version 8 adds the Reason for the (re-)join (KIP-800).
+		request.Version = 8
+	} else if version.IsAtLeast(V2_5_0_0) {
+		// Version 7 makes the response ProtocolName nullable (KIP-559).
+		request.Version = 7
+	} else if version.IsAtLeast(V2_4_0_0) {
+		// Version 6 is the first flexible version.
+		request.Version = 6
+	} else if version.IsAtLeast(V2_3_0_0) {
+		// Version 5 adds the GroupInstanceId for static membership (KIP-345).
+		request.Version = 5
+	} else if version.IsAtLeast(V2_2_0_0) {
+		// From version 4 onwards a join with an empty member id is answered
+		// with ErrMemberIdRequired and an assigned id, and the client sends a
+		// second request with that id to actually join (KIP-394).
+		request.Version = 4
+	} else if version.IsAtLeast(V2_0_0_0) {
+		// Version 3 is the same as version 2.
+		request.Version = 3
+	} else if version.IsAtLeast(V0_11_0_0) {
+		// Version 2 is the same as version 1.
+		request.Version = 2
+	} else if version.IsAtLeast(V0_10_1_0) {
+		// Version 1 adds the RebalanceTimeout.
+		request.Version = 1
+	}
+	return request
+}
+
 func (r *JoinGroupRequest) encode(pe packetEncoder) error {
 	if err := pe.putString(r.GroupId); err != nil {
 		return err
