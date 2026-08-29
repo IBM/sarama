@@ -29,35 +29,46 @@ var ErrSessionConsumeClaimExited = errors.New("kafka: ConsumeClaim goroutine exi
 // unreachable after retries).
 var ErrSessionHeartbeatFailed = errors.New("kafka: heartbeat loop failed")
 
+// ErrRebalanceTimedOut is set as the cancellation cause of a consumer group session
+// context when a ConsumeClaim did not return within Consumer.Group.Rebalance.Timeout
+// of the partition being revoked from it.
+var ErrRebalanceTimedOut = errors.New("kafka: ConsumeClaim did not exit within Consumer.Group.Rebalance.Timeout of being revoked")
+
+// errPartitionRevoked is set as the cancellation cause of a single claim's context
+// when the partition has been revoked by a cooperative rebalance. It is internal:
+// the session survives, and the handler is told by its Messages() channel closing.
+var errPartitionRevoked = errors.New("kafka: partition revoked by rebalance")
+
 // ConsumerGroup is responsible for dividing up processing of topics and partitions
 // over a collection of processes (the members of the consumer group).
 type ConsumerGroup interface {
 	// Consume joins a cluster of consumers for a given list of topics and
 	// starts a blocking ConsumerGroupSession through the ConsumerGroupHandler.
 	//
-	// The life-cycle of a session is represented by the following steps:
+	// A call to Consume follows this lifecycle:
 	//
-	// 1. The consumers join the group (as explained in https://kafka.apache.org/documentation/#intro_consumers)
-	//    and is assigned their "fair share" of partitions, aka 'claims'.
-	// 2. Before processing starts, the handler's Setup() hook is called to notify the user
-	//    of the claims and allow any necessary preparation or alteration of state.
-	// 3. For each of the assigned claims the handler's ConsumeClaim() function is then called
-	//    in a separate goroutine which requires it to be thread-safe. Any state must be carefully protected
-	//    from concurrent reads/writes.
-	// 4. The session will persist until one of the ConsumeClaim() functions exits. This can be either when the
-	//    parent context is canceled or when a server-side rebalance cycle is initiated.
-	// 5. Once all the ConsumeClaim() loops have exited, the handler's Cleanup() hook is called
-	//    to allow the user to perform any final tasks before a rebalance.
-	// 6. Finally, marked offsets are committed one last time before claims are released.
+	// 1. The consumer joins the group and receives its assigned topic partitions,
+	//    also known as claims.
+	// 2. The handler's Setup method runs before claim processing starts.
+	// 3. The handler's ConsumeClaim method runs in a separate goroutine for each
+	//    claim, so the handler must be safe for concurrent use.
+	// 4. When the session ends, Consume waits for the claims to return, calls the
+	//    handler's Cleanup method, and commits marked offsets before releasing them.
 	//
-	// Please note, that once a rebalance is triggered, sessions must be completed within
-	// Config.Consumer.Group.Rebalance.Timeout. This means that ConsumeClaim() functions must exit
-	// as quickly as possible to allow time for Cleanup() and the final offset commit. If the timeout
-	// is exceeded, the consumer will be removed from the group by Kafka, which will cause offset
-	// commit failures.
-	// This method should be called inside an infinite loop, when a
-	// server-side rebalance happens, the consumer session will need to be
-	// recreated to get the new claims.
+	// With an eager strategy, a rebalance ends the current session and this
+	// Consume call. The caller should invoke Consume from a loop to create the
+	// next session and receive the new claims.
+	//
+	// With a cooperative strategy, a rebalance updates the existing session:
+	//
+	//   - Setup runs on the first join and Cleanup runs when the member leaves.
+	//   - Retained claims keep running.
+	//   - A revoked claim has its Messages channel closed.
+	//   - Consume and the session context remain active across rebalances.
+	//
+	// A revoked ConsumeClaim must return within
+	// Config.Consumer.Group.Rebalance.Timeout. If it does not, Kafka may remove
+	// the member from the group and subsequent offset commits may fail.
 	Consume(ctx context.Context, topics []string, handler ConsumerGroupHandler) error
 
 	// Errors returns a read channel of errors that occurred during the consumer life-cycle.
@@ -234,8 +245,13 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	sess, err := c.newSession(ctx, topics, handler, c.config.Consumer.Group.Rebalance.Retry.Max)
 	if errors.Is(err, ErrClosedClient) {
 		return ErrClosedConsumerGroup
-	} else if err != nil {
+	}
+	if err != nil {
 		return err
+	}
+
+	if c.protocol == RebalanceProtocolCooperative {
+		return c.consumeCooperative(ctx, topics, sess)
 	}
 
 	// Wait for session exit signal or Close() call
@@ -247,15 +263,18 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	// Gracefully release session claims
 	err = sess.release(true)
 
-	// store the session cancellation cause so it can be sent as the reason
-	// on the next JoinGroup or LeaveGroup request
+	c.recordSessionCause(sess)
+
+	return err
+}
+
+// recordSessionCause keeps the reason for the next JoinGroup or LeaveGroup request
+func (c *consumerGroup) recordSessionCause(sess *consumerGroupSession) {
 	if cause := context.Cause(sess.ctx); !errors.Is(cause, context.Canceled) {
 		c.lastSessionCause = cause
 	} else {
 		c.lastSessionCause = nil
 	}
-
-	return err
 }
 
 // Pause implements ConsumerGroup.
@@ -525,9 +544,7 @@ func (c *consumerGroup) newSession(ctx context.Context, topics []string, handler
 	}
 
 	// only the leader needs to check whether there are newly-added partitions in order to trigger a rebalance
-	if res.isLeader {
-		go c.loopCheckPartitionNumbers(res.allSubscribedTopicPartitions, res.allSubscribedTopics, session)
-	}
+	session.watchPartitionNumbers(res)
 
 	return session, nil
 }
@@ -829,12 +846,11 @@ func (c *consumerGroup) handleError(err error, topic string, partition int32) {
 	}
 }
 
-func (c *consumerGroup) loopCheckPartitionNumbers(allSubscribedTopicPartitions map[string][]int32, topics []string, session *consumerGroupSession) {
+// loopCheckPartitionNumbers triggers a rebalance when a subscribed topic grows
+func (c *consumerGroup) loopCheckPartitionNumbers(ctx context.Context, allSubscribedTopicPartitions map[string][]int32, topics []string, session *consumerGroupSession) {
 	if c.config.Metadata.RefreshFrequency == time.Duration(0) {
 		return
 	}
-
-	defer session.cancel(ErrSessionPartitionCountChanged)
 
 	oldTopicToPartitionNum := make(map[string]int, len(allSubscribedTopicPartitions))
 	for topic, partitions := range allSubscribedTopicPartitions {
@@ -845,6 +861,7 @@ func (c *consumerGroup) loopCheckPartitionNumbers(allSubscribedTopicPartitions m
 	defer pause.Stop()
 	for {
 		if newTopicToPartitionNum, err := c.topicToPartitionNumbers(topics); err != nil {
+			session.triggerRebalance(ErrSessionPartitionCountChanged)
 			return
 		} else {
 			for topic, num := range oldTopicToPartitionNum {
@@ -852,17 +869,17 @@ func (c *consumerGroup) loopCheckPartitionNumbers(allSubscribedTopicPartitions m
 					Logger.Printf(
 						"consumergroup/%s loop check partition number goroutine find partitions in topics %s changed from %d to %d\n",
 						c.groupID, topics, num, newTopicToPartitionNum[topic])
-					return // trigger the end of the session on exit
+					session.triggerRebalance(ErrSessionPartitionCountChanged)
+					return
 				}
 			}
 		}
 		select {
 		case <-pause.C:
-		case <-session.ctx.Done():
+		case <-ctx.Done():
 			Logger.Printf(
 				"consumergroup/%s loop check partition number goroutine will exit, topics %s\n",
 				c.groupID, topics)
-			// if session closed by other, should be exited
 			return
 		case <-c.closed:
 			return
