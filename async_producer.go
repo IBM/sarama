@@ -1072,6 +1072,10 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			select {
 			case res, ok := <-pending:
 				if !ok {
+					for buf.Length() > 0 {
+						responses <- buf.Peek()
+						buf.Remove()
+					}
 					continue
 				}
 				buf.Add(res)
