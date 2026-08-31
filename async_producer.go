@@ -1602,6 +1602,10 @@ func (p *asyncProducer) retryHandler() {
 	var currentByteSize int64
 	var msg *ProducerMessage
 	var buf queue.Queue[*ProducerMessage]
+	// Each message's size, remembered on insert. Measuring it on removal
+	// instead would read a message we have already sent to p.input, which the
+	// dispatcher goroutine owns and modifies by then (data race).
+	var sizes queue.Queue[int64]
 
 	for {
 		if buf.Length() == 0 {
@@ -1610,8 +1614,8 @@ func (p *asyncProducer) retryHandler() {
 			select {
 			case msg = <-p.retries:
 			case p.input <- buf.Peek():
-				msgToRemove := buf.Remove()
-				currentByteSize -= int64(msgToRemove.ByteSize(version))
+				buf.Remove()
+				currentByteSize -= sizes.Remove()
 				continue
 			}
 		}
@@ -1620,8 +1624,10 @@ func (p *asyncProducer) retryHandler() {
 			return
 		}
 
+		size := int64(msg.ByteSize(version))
 		buf.Add(msg)
-		currentByteSize += int64(msg.ByteSize(version))
+		sizes.Add(size)
+		currentByteSize += size
 
 		if (maxBufferLength <= 0 || buf.Length() < maxBufferLength) && (maxBufferBytes <= 0 || currentByteSize < maxBufferBytes) {
 			continue
@@ -1632,10 +1638,10 @@ func (p *asyncProducer) retryHandler() {
 			select {
 			case p.input <- msgToHandle:
 				buf.Remove()
-				currentByteSize -= int64(msgToHandle.ByteSize(version))
+				currentByteSize -= sizes.Remove()
 			default:
 				buf.Remove()
-				currentByteSize -= int64(msgToHandle.ByteSize(version))
+				currentByteSize -= sizes.Remove()
 				p.returnError(msgToHandle, ErrProducerRetryBufferOverflow)
 			}
 		}
