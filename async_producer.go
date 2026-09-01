@@ -1580,6 +1580,15 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 	}
 }
 
+// Message in the retry buffer, paired with the size it contributed to currentByteSize.
+// The size is measured on insert: measuring it again on removal would read a message we have already sent to p.input,
+// which the dispatcher goroutine owns and could modifiy by then:
+// Potential data race through custom headerInterceptor.
+type retryBufEntry struct {
+	msg  *ProducerMessage
+	size int64
+}
+
 // singleton
 // effectively a "bridge" between the flushers and the dispatcher in order to avoid deadlock
 // based on https://godoc.org/github.com/eapache/channels#InfiniteChannel
@@ -1601,11 +1610,7 @@ func (p *asyncProducer) retryHandler() {
 
 	var currentByteSize int64
 	var msg *ProducerMessage
-	var buf queue.Queue[*ProducerMessage]
-	// Each message's size, remembered on insert. Measuring it on removal
-	// instead would read a message we have already sent to p.input, which the
-	// dispatcher goroutine owns and modifies by then (data race).
-	var sizes queue.Queue[int64]
+	var buf queue.Queue[retryBufEntry]
 
 	for {
 		if buf.Length() == 0 {
@@ -1613,9 +1618,8 @@ func (p *asyncProducer) retryHandler() {
 		} else {
 			select {
 			case msg = <-p.retries:
-			case p.input <- buf.Peek():
-				buf.Remove()
-				currentByteSize -= sizes.Remove()
+			case p.input <- buf.Peek().msg:
+				currentByteSize -= buf.Remove().size
 				continue
 			}
 		}
@@ -1625,23 +1629,20 @@ func (p *asyncProducer) retryHandler() {
 		}
 
 		size := int64(msg.ByteSize(version))
-		buf.Add(msg)
-		sizes.Add(size)
+		buf.Add(retryBufEntry{msg: msg, size: size})
 		currentByteSize += size
 
 		if (maxBufferLength <= 0 || buf.Length() < maxBufferLength) && (maxBufferBytes <= 0 || currentByteSize < maxBufferBytes) {
 			continue
 		}
 
-		msgToHandle := buf.Peek()
+		msgToHandle := buf.Peek().msg
 		if msgToHandle.flags == 0 {
 			select {
 			case p.input <- msgToHandle:
-				buf.Remove()
-				currentByteSize -= sizes.Remove()
+				currentByteSize -= buf.Remove().size
 			default:
-				buf.Remove()
-				currentByteSize -= sizes.Remove()
+				currentByteSize -= buf.Remove().size
 				p.returnError(msgToHandle, ErrProducerRetryBufferOverflow)
 			}
 		}
