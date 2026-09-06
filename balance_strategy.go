@@ -450,12 +450,15 @@ func (b *roundRobinBalancer) Plan(memberAndMetadata map[string]ConsumerGroupMemb
 	i := 0
 	n := len(members)
 	for _, tp := range topicPartitions {
-		m := members[i%n]
-		for !m.hasTopic(tp.topic) {
-			i++
-			m = members[i%n]
+		probe := 0
+		for probe < n && !members[(i+probe)%n].hasTopic(tp.topic) {
+			probe++
 		}
-		plan.Add(m.memberID, tp.topic, tp.partition)
+		if probe == n {
+			continue // no member subscribes to this topic
+		}
+		i += probe
+		plan.Add(members[i%n].memberID, tp.topic, tp.partition)
 		i++
 	}
 	return plan, nil
