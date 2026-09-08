@@ -242,6 +242,55 @@ func TestBrokerClose(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, connected)
 	})
+
+	t.Run("interrupts broker throttle waits", func(t *testing.T) {
+		mockBroker := NewMockBroker(t, 0)
+		defer mockBroker.Close()
+
+		broker := NewBroker(mockBroker.Addr())
+		conf := NewTestConfig()
+		conf.ApiVersionsRequest = false
+
+		require.NoError(t, broker.Open(conf))
+		connected, err := broker.Connected()
+		require.NoError(t, err)
+		require.True(t, connected)
+
+		broker.setThrottle(time.Hour)
+
+		request := ProduceRequest{RequiredAcks: NoResponse}
+		sendErrs := make(chan error, 1)
+		go func() {
+			sendErrs <- broker.AsyncProduce(&request, nil)
+		}()
+
+		require.Eventually(t, func() bool {
+			if broker.lock.TryLock() {
+				broker.lock.Unlock()
+				return false
+			}
+			return true
+		}, time.Second, time.Millisecond, "send did not enter the throttle wait")
+
+		closeErrs := make(chan error, 1)
+		go func() {
+			closeErrs <- broker.Close()
+		}()
+
+		select {
+		case err := <-sendErrs:
+			require.ErrorIs(t, err, ErrNotConnected)
+		case <-time.After(time.Second):
+			require.FailNow(t, "throttled send was not interrupted by Close")
+		}
+
+		select {
+		case err := <-closeErrs:
+			require.NoError(t, err)
+		case <-time.After(time.Second):
+			require.FailNow(t, "Close blocked on the broker throttle wait")
+		}
+	})
 }
 
 // closeImmediatelyDialer is a test dialer that returns a net.Conn whose peer is
@@ -1656,7 +1705,7 @@ func Test_handleThrottledResponse(t *testing.T) {
 			broker.brokerThrottleTime = broker.registerHistogram("throttle-time-in-ms")
 			startTime := time.Now()
 			broker.handleThrottledResponse(tt.response)
-			broker.waitIfThrottled()
+			require.NoError(t, broker.waitIfThrottled())
 			if tt.expectDelay {
 				if time.Since(startTime) < throttleTime {
 					t.Fatal("expected throttling to cause delay")
@@ -1680,17 +1729,32 @@ func Test_handleThrottledResponse(t *testing.T) {
 		broker.handleThrottledResponse(&MetadataResponse{
 			ThrottleTimeMs: int32(throttleTimeMs),
 		})
-		firstTimer := broker.throttleTimer
+		waitErrs := make(chan error, 1)
+		go func() {
+			broker.lock.Lock()
+			defer broker.lock.Unlock()
+			waitErrs <- broker.waitIfThrottled()
+		}()
+		require.Eventually(t, func() bool {
+			if broker.lock.TryLock() {
+				broker.lock.Unlock()
+				return false
+			}
+			return true
+		}, time.Second, time.Millisecond, "waitIfThrottled did not start waiting")
+
+		startTime := time.Now()
 		broker.handleThrottledResponse(&MetadataResponse{
 			ThrottleTimeMs: int32(throttleTimeMs * 2),
 		})
-		if firstTimer.Stop() {
-			t.Fatal("expected first timer to be stopped")
+		select {
+		case err := <-waitErrs:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("throttle wait did not use the replacement delay")
 		}
-		startTime := time.Now()
-		broker.waitIfThrottled()
-		if time.Since(startTime) < throttleTime*2 {
-			t.Fatal("expected throttling to use second delay")
+		if elapsed := time.Since(startTime); elapsed < throttleTime*2 {
+			t.Fatalf("expected replacement throttle delay of at least %v, got %v", throttleTime*2, elapsed)
 		}
 		if broker.brokerThrottleTime.Min() != int64(throttleTimeMs) {
 			t.Fatal("expected throttling to update metrics")
