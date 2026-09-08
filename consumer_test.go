@@ -1860,9 +1860,7 @@ func TestPartitionConsumerComputeBackoff(t *testing.T) {
 	t.Run("emits stuck warning at threshold and each multiple", func(t *testing.T) {
 		child := newChild()
 		var buf bytes.Buffer
-		orig := Logger
-		Logger = log.New(&buf, "", 0)
-		t.Cleanup(func() { Logger = orig })
+		redirectLogger(t, &buf)
 
 		expectStuckWarning := func(want string) {
 			t.Helper()
