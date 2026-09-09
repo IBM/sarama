@@ -177,7 +177,7 @@ func (ps *produceSet) copyFunc(predicate func(topic string, partition int32) boo
 	return out
 }
 
-func (ps *produceSet) buildRequest() *ProduceRequest {
+func (ps *produceSet) buildRequest() (*ProduceRequest, error) {
 	req := &ProduceRequest{
 		RequiredAcks: ps.parent.conf.Producer.RequiredAcks,
 		Timeout:      int32(ps.parent.conf.Producer.Timeout / time.Millisecond),
@@ -251,15 +251,14 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 					// to the inner messages. This lets the broker avoid
 					// recompressing the message set.
 					// (See https://cwiki.apache.org/confluence/display/KAFKA/KIP-31+-+Move+to+relative+offsets+in+compressed+message+sets
-					// for details on relative offsets.)
+					//  for details on relative offsets.)
 					for i, msg := range set.recordsToSend.MsgSet.Messages {
 						msg.Offset = int64(i)
 					}
 				}
 				payload, err := encode(set.recordsToSend.MsgSet, ps.parent.metricsRegistry)
 				if err != nil {
-					Logger.Println(err) // if this happens, it's basically our fault.
-					panic(err)
+					return nil, PacketEncodingError{err.Error()}
 				}
 				compMsg := &Message{
 					Codec:            ps.parent.conf.Producer.Compression,
@@ -277,7 +276,7 @@ func (ps *produceSet) buildRequest() *ProduceRequest {
 		}
 	}
 
-	return req
+	return req, nil
 }
 
 func (ps *produceSet) eachPartition(cb func(topic string, partition int32, pSet *partitionSet)) {
