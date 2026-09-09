@@ -4,8 +4,10 @@ package sarama
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"reflect"
 	"sync"
@@ -15,6 +17,7 @@ import (
 	"github.com/jcmturner/gokrb5/v8/krberror"
 	"github.com/rcrowley/go-metrics"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/net/proxy"
 )
 
 func ExampleBroker() {
@@ -1700,3 +1703,143 @@ func Test_handleThrottledResponse(t *testing.T) {
 		}
 	})
 }
+
+// dripDialer is a test proxy.Dialer whose server half writes a valid, framed
+// Kafka response in two chunks separated by a configurable pause. This lets
+// tests verify that Net.ReadTimeout is applied as a single per-request
+// deadline rather than being reset on every individual read call.
+//
+// The server goroutine writes:
+//
+//	[4-byte length][4-byte correlationID][body...]
+//
+// where body is a minimal, empty MetadataResponse v0 (4-byte broker-count of 0,
+// 4-byte topic-count of 0). It sends the length+correlationID header first,
+// sleeps for pauseBetweenChunks, then sends the body.
+type dripDialer struct {
+	pauseBetweenChunks time.Duration
+	correlationID      int32
+}
+
+func (d dripDialer) Dial(_, _ string) (net.Conn, error) {
+	client, server := net.Pipe()
+
+	go func() {
+		defer server.Close()
+
+		// Read and discard the incoming request so the client can proceed.
+		reqHeader := make([]byte, 4)
+		if _, err := io.ReadFull(server, reqHeader); err != nil {
+			return
+		}
+		reqLen := binary.BigEndian.Uint32(reqHeader)
+		reqBody := make([]byte, reqLen)
+		if _, err := io.ReadFull(server, reqBody); err != nil {
+			return
+		}
+
+		// Minimal MetadataResponse v0: zero brokers, zero topics.
+		body := []byte{
+			0x00, 0x00, 0x00, 0x00, // brokers array length = 0
+			0x00, 0x00, 0x00, 0x00, // topics array length = 0
+		}
+
+		// Frame header: [total-length (4)] [correlationID (4)]
+		// total-length covers everything after itself, so: 4 (corrID) + len(body)
+		frameLen := 4 + len(body)
+		header := make([]byte, 8)
+		binary.BigEndian.PutUint32(header[0:4], uint32(frameLen))
+		binary.BigEndian.PutUint32(header[4:8], uint32(d.correlationID))
+
+		if _, err := server.Write(header); err != nil {
+			return
+		}
+
+		// Pause between header and body to simulate a slow broker.
+		time.Sleep(d.pauseBetweenChunks)
+
+		_, _ = server.Write(body)
+	}()
+
+	return client, nil
+}
+
+// TestReadTimeoutDeadlineSetOncePerResponse verifies that Net.ReadTimeout acts
+// as a per-request budget rather than a per-read deadline.
+//
+// The server sends a valid response in two chunks: the frame header arrives
+// immediately but the body is delayed by pauseBetweenChunks. We configure
+// ReadTimeout to be longer than the total response time, so the request must
+// succeed even though each individual chunk took longer than zero time.
+//
+// Before the fix, readFull reset the deadline on every call, which could allow
+// this test to pass incidentally. The companion test
+// TestReadTimeoutExpiresAcrossChunks covers the failure path.
+func TestReadTimeoutDeadlineSetOncePerResponse(t *testing.T) {
+	t.Parallel()
+
+	const (
+		readTimeout        = 200 * time.Millisecond
+		pauseBetweenChunks = 50 * time.Millisecond // well within the budget
+	)
+
+	conf := NewTestConfig()
+	conf.Net.ReadTimeout = readTimeout
+	conf.Net.Proxy.Enable = true
+	conf.Net.Proxy.Dialer = dripDialer{
+		pauseBetweenChunks: pauseBetweenChunks,
+		correlationID:      1,
+	}
+
+	broker := NewBroker("localhost:0")
+	broker.correlationID = 1
+
+	if err := broker.Open(conf); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = broker.Close() })
+
+	_, err := broker.GetMetadata(&MetadataRequest{})
+	if err != nil {
+		t.Errorf("expected successful response when response arrives within ReadTimeout, got: %v", err)
+	}
+}
+
+// TestReadTimeoutExpiresAcrossChunks verifies that Net.ReadTimeout is enforced
+// across the entire response, not just the first read. The server sends the
+// frame header but then pauses longer than ReadTimeout before sending the body.
+// The broker must surface a timeout error.
+func TestReadTimeoutExpiresAcrossChunks(t *testing.T) {
+	t.Parallel()
+
+	const (
+		readTimeout        = 50 * time.Millisecond
+		pauseBetweenChunks = 200 * time.Millisecond // exceeds the budget
+	)
+
+	conf := NewTestConfig()
+	conf.Net.ReadTimeout = readTimeout
+	conf.Net.Proxy.Enable = true
+	conf.Net.Proxy.Dialer = dripDialer{
+		pauseBetweenChunks: pauseBetweenChunks,
+		correlationID:      1,
+	}
+
+	broker := NewBroker("localhost:0")
+	broker.correlationID = 1
+
+	if err := broker.Open(conf); err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = broker.Close() })
+
+	_, err := broker.GetMetadata(&MetadataRequest{})
+
+	var nerr net.Error
+	if !errors.As(err, &nerr) || !nerr.Timeout() {
+		t.Errorf("expected net.Error timeout when body arrives after ReadTimeout, got: %v", err)
+	}
+}
+
+// Compile-time assertion that dripDialer satisfies the proxy.Dialer interface.
+var _ proxy.Dialer = dripDialer{}
