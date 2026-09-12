@@ -240,6 +240,8 @@ func allocateBody(key, version int16) protocolBody {
 		return &ListTransactionsRequest{Version: version}
 		// 67: AllocateProducerIdsRequest
 		// 68: ConsumerGroupHeartbeatRequest
+	case apiKeyConsumerGroupDescribe:
+		return &ConsumerGroupDescribeRequest{Version: version}
 	}
 	return nil
 }
@@ -345,6 +347,8 @@ func allocateResponseBody(key, version int16) protocolBody {
 		return &DescribeTransactionsResponse{Version: version}
 	case apiKeyListTransactions:
 		return &ListTransactionsResponse{Version: version}
+	case apiKeyConsumerGroupDescribe:
+		return &ConsumerGroupDescribeResponse{Version: version}
 	}
 	return nil
 }

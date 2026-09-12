@@ -132,6 +132,45 @@ func (m *MockDescribeGroupsResponse) For(reqBody versionedDecoder) encoderWithHe
 	return response
 }
 
+// MockConsumerGroupDescribeResponse builds responses for KIP-848 group queries.
+type MockConsumerGroupDescribeResponse struct {
+	groups map[string]ConsumerGroupDescription
+	t      TestReporter
+}
+
+func NewMockConsumerGroupDescribeResponse(t TestReporter) *MockConsumerGroupDescribeResponse {
+	return &MockConsumerGroupDescribeResponse{
+		t:      t,
+		groups: make(map[string]ConsumerGroupDescription),
+	}
+}
+
+func (m *MockConsumerGroupDescribeResponse) AddGroupDescription(groupID string, description ConsumerGroupDescription) *MockConsumerGroupDescribeResponse {
+	description.GroupID = groupID
+	m.groups[groupID] = description
+	return m
+}
+
+func (m *MockConsumerGroupDescribeResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*ConsumerGroupDescribeRequest)
+	res := &ConsumerGroupDescribeResponse{Version: req.Version}
+	for _, groupID := range req.GroupIDs {
+		group, ok := m.groups[groupID]
+		if !ok {
+			group = ConsumerGroupDescription{
+				GroupID:              groupID,
+				ErrorCode:            ErrGroupIDNotFound,
+				AuthorizedOperations: -2147483648,
+			}
+		}
+		if !req.IncludeAuthorizedOperations {
+			group.AuthorizedOperations = -2147483648
+		}
+		res.Groups = append(res.Groups, group)
+	}
+	return res
+}
+
 // MockMetadataResponse is a `MetadataResponse` builder.
 type MockMetadataResponse struct {
 	controllerID int32
