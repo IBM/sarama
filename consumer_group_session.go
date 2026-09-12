@@ -4,18 +4,21 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
 // ConsumerGroupSession represents a consumer group member session.
 type ConsumerGroupSession interface {
-	// Claims returns information about the claimed partitions by topic.
+	// Claims returns the currently claimed partitions by topic. The claims may
+	// change across cooperative rebalances.
 	Claims() map[string][]int32
 
 	// MemberID returns the cluster member ID.
 	MemberID() string
 
-	// GenerationID returns the current generation ID.
+	// GenerationID returns the current generation ID. The generation changes
+	// across cooperative rebalances.
 	GenerationID() int32
 
 	// MarkOffset marks the provided offset, alongside a metadata string
@@ -52,16 +55,33 @@ type ConsumerGroupSession interface {
 	Context() context.Context
 }
 
-type consumerGroupSession struct {
-	parent       *consumerGroup
-	memberID     string
-	generationID int32
-	handler      ConsumerGroupHandler
+type runningClaim struct {
+	cancel context.CancelCauseFunc
+	done   chan none
+}
 
-	claims  map[string][]int32
+type consumerGroupSession struct {
+	parent   *consumerGroup
+	memberID string
+	handler  ConsumerGroupHandler
+
+	// cooperative sessions replace these values on each generation
+	generationID atomic.Int32
+	claims       atomic.Pointer[map[string][]int32]
+
 	offsets *offsetManager
 	ctx     context.Context
 	cancel  context.CancelCauseFunc
+
+	// only the Consume goroutine accesses running and partitionWatchCancel
+	running              map[topicPartitionAssignment]*runningClaim
+	partitionWatchCancel context.CancelFunc
+
+	// the buffered channel coalesces concurrent rebalance notifications
+	rejoin chan error
+
+	// serializes joining a new generation with heartbeat requests
+	generationMu sync.Mutex
 
 	waitGroup       sync.WaitGroup
 	releaseOnce     sync.Once
@@ -80,37 +100,27 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 
 	// init session
 	sess := &consumerGroupSession{
-		parent:       parent,
-		memberID:     memberID,
-		generationID: generationID,
-		handler:      handler,
-		offsets:      offsets,
-		claims:       claims,
-		ctx:          ctx,
-		cancel:       cancel,
-		hbDying:      make(chan none),
-		hbDead:       make(chan none),
+		parent:   parent,
+		memberID: memberID,
+		handler:  handler,
+		offsets:  offsets,
+		ctx:      ctx,
+		cancel:   cancel,
+		running:  make(map[topicPartitionAssignment]*runningClaim),
+		rejoin:   make(chan error, 1),
+		hbDying:  make(chan none),
+		hbDead:   make(chan none),
 	}
+	sess.generationID.Store(generationID)
+	sess.claims.Store(&claims)
 
 	// start heartbeat loop
 	go sess.heartbeatLoop()
 
 	// create a POM for each claim
-	for topic, partitions := range claims {
-		for _, partition := range partitions {
-			pom, err := offsets.ManagePartition(topic, partition)
-			if err != nil {
-				_ = sess.release(false)
-				return nil, err
-			}
-
-			// handle POM errors
-			go func(topic string, partition int32) {
-				for err := range pom.Errors() {
-					sess.parent.handleError(err, topic, partition)
-				}
-			}(topic, partition)
-		}
+	if err := sess.manageClaims(claims); err != nil {
+		_ = sess.release(false)
+		return nil, err
 	}
 
 	// perform setup
@@ -120,42 +130,103 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 	}
 
 	// start consuming each topic partition in its own goroutine
-	for topic, partitions := range claims {
-		for _, partition := range partitions {
-			sess.waitGroup.Add(1) // increment wait group before spawning goroutine
-			go func(topic string, partition int32) {
-				defer sess.waitGroup.Done()
-				// cancel the group session as soon as any of the consume calls return
-				defer sess.cancel(ErrSessionConsumeClaimExited)
-
-				// if partition not currently readable, wait for it to become readable
-				if sess.parent.client.PartitionNotReadable(topic, partition) {
-					timer := time.NewTimer(5 * time.Second)
-					defer timer.Stop()
-
-					for sess.parent.client.PartitionNotReadable(topic, partition) {
-						select {
-						case <-ctx.Done():
-							return
-						case <-parent.closed:
-							return
-						case <-timer.C:
-							timer.Reset(5 * time.Second)
-						}
-					}
-				}
-
-				// consume a single topic/partition, blocking
-				sess.consume(topic, partition)
-			}(topic, partition)
-		}
-	}
+	sess.startClaims(claims)
 	return sess, nil
 }
 
-func (s *consumerGroupSession) Claims() map[string][]int32 { return s.claims }
+// watchPartitionNumbers replaces the leader-only watcher for each generation
+func (s *consumerGroupSession) watchPartitionNumbers(res *rebalanceResult) {
+	if s.partitionWatchCancel != nil {
+		s.partitionWatchCancel()
+		s.partitionWatchCancel = nil
+	}
+	if !res.isLeader {
+		return
+	}
+
+	var ctx context.Context
+	ctx, s.partitionWatchCancel = context.WithCancel(s.ctx)
+	go s.parent.loopCheckPartitionNumbers(ctx, res.allSubscribedTopicPartitions, res.allSubscribedTopics, s)
+}
+
+func (s *consumerGroupSession) managePartition(topic string, partition int32) error {
+	pom, err := s.offsets.ManagePartition(topic, partition)
+	if err != nil {
+		return err
+	}
+
+	// handle POM errors
+	go func() {
+		for err := range pom.Errors() {
+			s.parent.handleError(err, topic, partition)
+		}
+	}()
+	return nil
+}
+
+func (s *consumerGroupSession) manageClaims(claims map[string][]int32) error {
+	for topic, partitions := range claims {
+		for _, partition := range partitions {
+			if err := s.managePartition(topic, partition); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (s *consumerGroupSession) startClaims(claims map[string][]int32) {
+	for topic, partitions := range claims {
+		for _, partition := range partitions {
+			s.startClaim(topic, partition)
+		}
+	}
+}
+
+// startClaim gives each partition a context that can be canceled independently
+func (s *consumerGroupSession) startClaim(topic string, partition int32) {
+	claimCtx, cancel := context.WithCancelCause(s.ctx)
+	claim := &runningClaim{
+		cancel: cancel,
+		done:   make(chan none),
+	}
+
+	s.running[topicPartitionAssignment{Topic: topic, Partition: partition}] = claim
+
+	s.waitGroup.Go(func() {
+		defer close(claim.done)
+		// a handler returning without revocation still ends the session
+		defer func() {
+			if !errors.Is(context.Cause(claimCtx), errPartitionRevoked) {
+				s.cancel(ErrSessionConsumeClaimExited)
+			}
+		}()
+
+		// if partition not currently readable, wait for it to become readable
+		if s.parent.client.PartitionNotReadable(topic, partition) {
+			timer := time.NewTimer(5 * time.Second)
+			defer timer.Stop()
+
+			for s.parent.client.PartitionNotReadable(topic, partition) {
+				select {
+				case <-claimCtx.Done():
+					return
+				case <-s.parent.closed:
+					return
+				case <-timer.C:
+					timer.Reset(5 * time.Second)
+				}
+			}
+		}
+
+		// consume a single topic/partition, blocking
+		s.consume(claimCtx, topic, partition)
+	})
+}
+
+func (s *consumerGroupSession) Claims() map[string][]int32 { return *s.claims.Load() }
 func (s *consumerGroupSession) MemberID() string           { return s.memberID }
-func (s *consumerGroupSession) GenerationID() int32        { return s.generationID }
+func (s *consumerGroupSession) GenerationID() int32        { return s.generationID.Load() }
 
 func (s *consumerGroupSession) MarkOffset(topic string, partition int32, offset int64, metadata string) {
 	if pom := s.offsets.findPOM(topic, partition); pom != nil {
@@ -184,7 +255,7 @@ func (s *consumerGroupSession) Context() context.Context {
 // newClaimWithRetry calls newConsumerGroupClaim, retrying transient errors so
 // that brief leader/metadata desync around a rebalance doesn't leave a
 // partition permanently unclaimed for the lifetime of this session
-func (s *consumerGroupSession) newClaimWithRetry(topic string, partition int32, offset int64) (*consumerGroupClaim, error) {
+func (s *consumerGroupSession) newClaimWithRetry(ctx context.Context, topic string, partition int32, offset int64) (*consumerGroupClaim, error) {
 	retries := s.parent.config.Metadata.Retry.Max
 	for {
 		claim, err := newConsumerGroupClaim(s, topic, partition, offset)
@@ -202,8 +273,8 @@ func (s *consumerGroupSession) newClaimWithRetry(topic string, partition int32, 
 			topic, partition, backoff/time.Millisecond, retries, err)
 
 		select {
-		case <-s.ctx.Done():
-			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		case <-s.parent.closed:
 			return nil, err
 		case <-time.After(backoff):
@@ -225,10 +296,10 @@ func isRetriableClaimError(err error) bool {
 		errors.Is(err, ErrReplicaNotAvailable)
 }
 
-func (s *consumerGroupSession) consume(topic string, partition int32) {
+func (s *consumerGroupSession) consume(ctx context.Context, topic string, partition int32) {
 	// quick exit if rebalance is due
 	select {
-	case <-s.ctx.Done():
+	case <-ctx.Done():
 		return
 	case <-s.parent.closed:
 		return
@@ -242,16 +313,19 @@ func (s *consumerGroupSession) consume(topic string, partition int32) {
 	}
 
 	// create new claim
-	claim, err := s.newClaimWithRetry(topic, partition, offset)
+	claim, err := s.newClaimWithRetry(ctx, topic, partition, offset)
 	if err != nil {
-		s.parent.handleError(err, topic, partition)
+		if ctx.Err() == nil {
+			s.parent.handleError(err, topic, partition)
+		}
 		return
 	}
 
-	// trigger close when session is done
+	// trigger close when the claim is revoked or the session is done; closing
+	// Messages() is how a handler is told to let the partition go
 	go func() {
 		select {
-		case <-s.ctx.Done():
+		case <-ctx.Done():
 		case <-s.parent.closed:
 		}
 		claim.AsyncClose()
@@ -300,6 +374,12 @@ func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 	return
 }
 
+func (s *consumerGroupSession) sendHeartbeat(coordinator *Broker) (*HeartbeatResponse, error) {
+	s.generationMu.Lock()
+	defer s.generationMu.Unlock()
+	return s.parent.heartbeatRequest(coordinator, s.memberID, s.GenerationID())
+}
+
 func (s *consumerGroupSession) heartbeatLoop() {
 	defer close(s.hbDead)
 	defer s.cancel(ErrSessionHeartbeatFailed) // trigger the end of the session on exit
@@ -334,7 +414,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 			continue
 		}
 
-		resp, err := s.parent.heartbeatRequest(coordinator, s.memberID, s.generationID)
+		resp, err := s.sendHeartbeat(coordinator)
 		if err != nil {
 			_ = coordinator.Close()
 
@@ -353,7 +433,7 @@ func (s *consumerGroupSession) heartbeatLoop() {
 			retries = s.parent.config.Metadata.Retry.Max
 		case ErrRebalanceInProgress:
 			retries = s.parent.config.Metadata.Retry.Max
-			s.cancel(err)
+			s.triggerRebalance(err)
 		case ErrUnknownMemberId, ErrIllegalGeneration:
 			s.cancel(err)
 			return
@@ -439,11 +519,9 @@ type ConsumerGroupClaim interface {
 	// You can use this to determine how far behind the processing is.
 	HighWaterMarkOffset() int64
 
-	// Messages returns the read channel for the messages that are returned by
-	// the broker. The messages channel will be closed when a new rebalance cycle
-	// is due. You must finish processing and mark offsets within
-	// Config.Consumer.Group.Session.Timeout before the topic/partition is eventually
-	// re-assigned to another group member.
+	// Messages returns messages from the broker. The channel closes when the
+	// claim is released. You must finish processing and mark offsets within
+	// Config.Consumer.Group.Rebalance.Timeout after a claim is revoked.
 	Messages() <-chan *ConsumerMessage
 }
 
