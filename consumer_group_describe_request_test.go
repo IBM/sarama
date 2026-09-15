@@ -25,6 +25,7 @@ func TestConsumerGroupDescribeRequest(t *testing.T) {
 				GroupIDs:                    []string{"g", "h"},
 				IncludeAuthorizedOperations: true,
 			}
+
 			testRequest(t, "groups", req, consumerGroupDescribeRequestV0)
 			testRequest(t, "empty", &ConsumerGroupDescribeRequest{
 				Version: version,
@@ -32,13 +33,16 @@ func TestConsumerGroupDescribeRequest(t *testing.T) {
 
 			withTags := append([]byte{}, consumerGroupDescribeRequestV0[:len(consumerGroupDescribeRequestV0)-1]...)
 			withTags = append(withTags, 1, 42, 2, 0xab, 0xcd)
+
 			var decoded ConsumerGroupDescribeRequest
+
 			require.NoError(t, versionedDecode(withTags, &decoded, version, nil))
 			require.Equal(t, req, &decoded)
 
 			for n := range len(consumerGroupDescribeRequestV0) {
 				require.Error(t, versionedDecode(consumerGroupDescribeRequestV0[:n], &ConsumerGroupDescribeRequest{}, version, nil), "truncated at %d", n)
 			}
+
 			require.Error(t, versionedDecode([]byte{255, 255, 255, 255, 15}, &ConsumerGroupDescribeRequest{}, version, nil), "oversized group IDs array")
 		})
 	}
@@ -57,6 +61,7 @@ func TestNewConsumerGroupDescribeRequest(t *testing.T) {
 		{MaxVersion, 1, V4_0_0_0},
 	} {
 		req := NewConsumerGroupDescribeRequest(tc.kafka)
+
 		require.Equal(t, tc.version, req.Version)
 		require.Equal(t, tc.required, req.requiredVersion())
 		require.Equal(t, int16(69), req.key())
@@ -67,11 +72,16 @@ func TestNewConsumerGroupDescribeRequest(t *testing.T) {
 func TestConsumerGroupDescribeInvalidVersion(t *testing.T) {
 	for _, version := range []int16{-1, 2} {
 		req := &ConsumerGroupDescribeRequest{Version: version}
+
 		_, err := encode(req, nil)
+
 		require.Error(t, err)
 		require.Error(t, versionedDecode(consumerGroupDescribeRequestV0, req, version, nil))
+
 		res := &ConsumerGroupDescribeResponse{Version: version}
+
 		_, err = encode(res, nil)
+
 		require.Error(t, err)
 		require.Error(t, versionedDecode(consumerGroupDescribeResponseV0, res, version, nil))
 	}

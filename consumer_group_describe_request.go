@@ -24,26 +24,35 @@ func (r *ConsumerGroupDescribeRequest) encode(pe packetEncoder) error {
 	if !r.isValidVersion() {
 		return PacketEncodingError{"invalid or unsupported ConsumerGroupDescribeRequest version"}
 	}
+
 	if err := pe.putStringArray(r.GroupIDs); err != nil {
 		return err
 	}
+
 	pe.putBool(r.IncludeAuthorizedOperations)
+
 	pe.putEmptyTaggedFieldArray()
+
 	return nil
 }
 
 func (r *ConsumerGroupDescribeRequest) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
+
 	if !r.isValidVersion() {
 		return PacketDecodingError{"invalid or unsupported ConsumerGroupDescribeRequest version"}
 	}
+
 	if r.GroupIDs, err = pd.getStringArray(); err != nil {
 		return err
 	}
+
 	if r.IncludeAuthorizedOperations, err = pd.getBool(); err != nil {
 		return err
 	}
+
 	_, err = pd.getEmptyTaggedFieldArray()
+
 	return err
 }
 

@@ -47,13 +47,16 @@ func consumerGroupDescribeResponseFixture(version int16, tags []byte) []byte {
 	)
 	b = append(b, tags...) // target topic
 	b = append(b, tags...) // target assignment
+
 	if version >= 1 {
 		b = append(b, 1) // consumer member
 	}
+
 	b = append(b, tags...)     // member
 	b = append(b, 0, 0, 0, 42) // authorized operations
 	b = append(b, tags...)     // group
-	return append(b, tags...)  // response
+
+	return append(b, tags...) // response
 }
 
 var (
@@ -63,10 +66,13 @@ var (
 
 func consumerGroupDescribeTestResponse(version int16) *ConsumerGroupDescribeResponse {
 	memberType := int8(-1)
+
 	if version >= 1 {
 		memberType = 1
 	}
+
 	topicID := Uuid{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
+
 	return &ConsumerGroupDescribeResponse{
 		Version:      version,
 		ThrottleTime: 100 * time.Millisecond,
@@ -93,6 +99,7 @@ func TestConsumerGroupDescribeResponse(t *testing.T) {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			expected := consumerGroupDescribeTestResponse(version)
 			fixture := consumerGroupDescribeResponseFixture(version, []byte{0})
+
 			testResponse(t, "member and assignments", expected, fixture)
 			require.Equal(t, 100*time.Millisecond, expected.throttleTime())
 			require.Equal(t, int16(1), expected.headerVersion())
@@ -106,6 +113,7 @@ func TestConsumerGroupDescribeResponse(t *testing.T) {
 			for n := range len(fixture) {
 				require.Error(t, versionedDecode(fixture[:n], &ConsumerGroupDescribeResponse{}, version, nil), "truncated at %d", n)
 			}
+
 			testResponse(t, "empty groups", &ConsumerGroupDescribeResponse{
 				Version: version, Groups: []ConsumerGroupDescription{},
 			}, []byte{0, 0, 0, 0, 1, 0})
@@ -147,6 +155,7 @@ func TestConsumerGroupDescribeResponseEmptyAssignment(t *testing.T) {
 		member.SubscribedTopicRegex = nullString("t.*")
 		member.Assignment.TopicPartitions = []ConsumerGroupTopicPartitions{}
 		member.TargetAssignment.TopicPartitions[0].Partitions = []int32{}
+
 		testResponse(t, "empty assignment and regex subscription", res, nil)
 	}
 }

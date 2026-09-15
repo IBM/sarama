@@ -147,15 +147,20 @@ func NewMockConsumerGroupDescribeResponse(t TestReporter) *MockConsumerGroupDesc
 
 func (m *MockConsumerGroupDescribeResponse) AddGroupDescription(groupID string, description ConsumerGroupDescription) *MockConsumerGroupDescribeResponse {
 	description.GroupID = groupID
+
 	m.groups[groupID] = description
+
 	return m
 }
 
 func (m *MockConsumerGroupDescribeResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	req := reqBody.(*ConsumerGroupDescribeRequest)
+
 	res := &ConsumerGroupDescribeResponse{Version: req.Version}
+
 	for _, groupID := range req.GroupIDs {
 		group, ok := m.groups[groupID]
+
 		if !ok {
 			group = ConsumerGroupDescription{
 				GroupID:              groupID,
@@ -163,11 +168,14 @@ func (m *MockConsumerGroupDescribeResponse) For(reqBody versionedDecoder) encode
 				AuthorizedOperations: -2147483648,
 			}
 		}
+
 		if !req.IncludeAuthorizedOperations {
 			group.AuthorizedOperations = -2147483648
 		}
+
 		res.Groups = append(res.Groups, group)
 	}
+
 	return res
 }
 

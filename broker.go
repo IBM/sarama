@@ -1024,9 +1024,11 @@ func (b *Broker) UpdateFeatures(req *UpdateFeaturesRequest) (*UpdateFeaturesResp
 // ConsumerGroupDescribe describes KIP-848 consumer groups coordinated by this broker.
 func (b *Broker) ConsumerGroupDescribe(req *ConsumerGroupDescribeRequest) (*ConsumerGroupDescribeResponse, error) {
 	res := new(ConsumerGroupDescribeResponse)
+
 	if err := b.sendAndReceive(req, res); err != nil {
 		return nil, err
 	}
+
 	return res, nil
 }
 
