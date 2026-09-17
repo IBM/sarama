@@ -86,4 +86,5 @@ const (
 	apiKeyDescribeProducers            = 61
 	apiKeyDescribeTransactions         = 65
 	apiKeyListTransactions             = 66
+	apiKeyConsumerGroupDescribe        = 69
 )
