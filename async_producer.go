@@ -1404,12 +1404,11 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
-				if bp.parent.conf.Producer.Idempotent {
-					if keepMuted[topic] == nil {
-						keepMuted[topic] = make(map[int32]struct{})
-					}
-					keepMuted[topic][partition] = struct{}{}
+				// keep partition muted during retry to preserve ordering
+				if keepMuted[topic] == nil {
+					keepMuted[topic] = make(map[int32]struct{})
 				}
+				keepMuted[topic][partition] = struct{}{}
 			}
 		// Other non-retriable errors
 		default:
@@ -1421,11 +1420,9 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 	})
 
 	if len(retryTopics) > 0 {
-		if bp.parent.conf.Producer.Idempotent {
-			err := bp.parent.client.RefreshMetadata(retryTopics...)
-			if err != nil {
-				Logger.Printf("Failed refreshing metadata because of %v\n", err)
-			}
+		err := bp.parent.client.RefreshMetadata(retryTopics...)
+		if err != nil {
+			Logger.Printf("Failed refreshing metadata because of %v\n", err)
 		}
 
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
@@ -1444,11 +1441,9 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 					bp.currentRetries[topic] = make(map[int32]error)
 				}
 				bp.currentRetries[topic][partition] = block.Err
-				if bp.parent.conf.Producer.Idempotent {
-					go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
-				} else {
-					bp.parent.retryMessages(pSet.msgs, block.Err)
-				}
+
+				go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
+
 				// dropping the following messages has the side effect of incrementing their retry count
 				bp.parent.retryMessages(bp.accumulatingBatch.dropPartition(topic, partition), block.Err)
 			}
