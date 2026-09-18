@@ -698,6 +698,152 @@ func TestClientGetBroker(t *testing.T) {
 	}
 }
 
+func TestClientLeastLoadedBroker(t *testing.T) {
+	createFakeBroker := func(t *testing.T, brokerID int32, connected bool, pendingRequests int) *Broker {
+		t.Helper()
+
+		mb := NewMockBroker(t, brokerID)
+		t.Cleanup(mb.Close)
+
+		broker := NewBroker(mb.Addr())
+		broker.id = brokerID
+
+		if connected {
+			conn, err := net.Dial("tcp", mb.listener.Addr().String())
+			require.NoErrorf(t, err, "Broker %d", brokerID)
+
+			broker.conn = conn.(*net.TCPConn)
+			broker.metricRegistry = metrics.NewRegistry()
+			broker.opened.Store(true)
+
+			if pendingRequests > 0 {
+				broker.responses = make(chan *responsePromise, pendingRequests)
+				for range pendingRequests {
+					broker.responses <- new(responsePromise)
+				}
+			}
+		}
+
+		return broker
+	}
+
+	createTestClient := func(t *testing.T, seedBrokers []*Broker, brokers []*Broker) Client {
+		t.Helper()
+
+		conf := NewTestConfig()
+		conf.ClientID = "test"
+		conf.Metadata.RefreshFrequency = 0
+		conf.Metadata.Full = false
+
+		ic, err := NewClient([]string{"fake-addr.local"}, conf)
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			assert.NoError(t, ic.Close())
+		})
+
+		c := ic.(*client)
+		c.seedBrokers = seedBrokers
+
+		c.brokers = make(map[int32]*Broker, len(brokers))
+		for _, b := range brokers {
+			c.brokers[b.ID()] = b
+		}
+
+		return ic
+	}
+
+	getBrokerIdent := func(b *Broker) string {
+		return fmt.Sprintf("broker %d (%s)", b.ID(), b.Addr())
+	}
+
+	assertBrokerMatch := func(t *testing.T, expectedBrokers []*Broker, broker *Broker) {
+		t.Helper()
+
+		expectedBrokerAddrs := make([]string, len(expectedBrokers))
+		expectedBrokerIdents := make([]string, len(expectedBrokers))
+		for i, b := range expectedBrokers {
+			expectedBrokerAddrs[i] = b.Addr()
+			expectedBrokerIdents[i] = getBrokerIdent(b)
+		}
+
+		assert.Containsf(t, expectedBrokerAddrs, broker.Addr(),
+			"Expected: {%s}, Got: %s",
+			strings.Join(expectedBrokerIdents, ", "),
+			getBrokerIdent(broker),
+		)
+	}
+
+	t.Run("ensure idle connected broker is returned", func(t *testing.T) {
+		broker1 := createFakeBroker(t, 1, true, 5)  // Broker 1 - Connected with 5 pending requests
+		broker2 := createFakeBroker(t, 2, true, 0)  // Broker 2 - Connected and idle.
+		broker3 := createFakeBroker(t, 3, false, 0) // Broker 3 - Not Connected
+		broker4 := createFakeBroker(t, 4, true, 2)  // Broker 4 - Connected with 2 pending requests
+		broker5 := createFakeBroker(t, 5, false, 0) // Broker 5 - Not connected
+
+		seed1 := createFakeBroker(t, -1, false, 0) // Not connected
+		seed2 := createFakeBroker(t, -1, false, 0) // Not connected
+
+		c := createTestClient(t, []*Broker{
+			seed1, seed2,
+		}, []*Broker{
+			broker1, broker2, broker3, broker4, broker5,
+		})
+
+		broker := c.LeastLoadedBroker()
+		assertBrokerMatch(t, []*Broker{broker2}, broker)
+	})
+
+	t.Run("ensure not connected broker is returned", func(t *testing.T) {
+		broker1 := createFakeBroker(t, 1, true, 5) // Broker 1 - Connected with 5 pending requests
+
+		broker3 := createFakeBroker(t, 3, false, 0) // Broker 3 - Not Connected
+		broker4 := createFakeBroker(t, 4, true, 2)  // Broker 4 - Connected with 2 pending requests
+		broker5 := createFakeBroker(t, 5, false, 0) // Broker 5 - Not connected
+
+		seed1 := createFakeBroker(t, -1, false, 0) // Not connected
+		seed2 := createFakeBroker(t, -1, false, 0) // Not connected
+
+		c := createTestClient(t, []*Broker{
+			seed1, seed2,
+		}, []*Broker{
+			broker1, broker3, broker4, broker5,
+		})
+
+		broker := c.LeastLoadedBroker()
+		assertBrokerMatch(t, []*Broker{broker3, broker5}, broker)
+	})
+
+	t.Run("ensure least loaded connected broker is returned", func(t *testing.T) {
+		broker1 := createFakeBroker(t, 1, true, 5) // Broker 1 - Connected with 5 pending requests
+		broker4 := createFakeBroker(t, 4, true, 2) // Broker 4 - Connected with 2 pending requests
+
+		seed1 := createFakeBroker(t, -1, false, 0) // Not connected
+		seed2 := createFakeBroker(t, -1, false, 0) // Not connected
+
+		c := createTestClient(t, []*Broker{
+			seed1, seed2,
+		}, []*Broker{
+			broker1, broker4,
+		})
+
+		broker := c.LeastLoadedBroker()
+		assertBrokerMatch(t, []*Broker{broker4}, broker)
+	})
+
+	t.Run("ensure seed broker is returned", func(t *testing.T) {
+		seed1 := createFakeBroker(t, -1, false, 0) // Not connected
+		seed2 := createFakeBroker(t, -1, false, 0) // Not connected
+
+		c := createTestClient(t, []*Broker{
+			seed1, seed2,
+		}, nil)
+
+		broker := c.LeastLoadedBroker()
+		assertBrokerMatch(t, []*Broker{seed1, seed2}, broker)
+	})
+}
+
 func TestClientResurrectDeadSeeds(t *testing.T) {
 	initialSeed := NewMockBroker(t, 0)
 	metadataResponse := new(MetadataResponse)

@@ -352,6 +352,14 @@ func (b *Broker) Connected() (bool, error) {
 	return b.conn != nil, b.connErr
 }
 
+// status is the short and one lock version of (Connected(), ResponseSize()).
+func (b *Broker) status() (bool, int) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	return b.conn != nil, len(b.responses)
+}
+
 // TLSConnectionState returns the client's TLS connection state. The second return value is false if this is not a tls connection or the connection has not yet been established.
 func (b *Broker) TLSConnectionState() (state tls.ConnectionState, ok bool) {
 	b.lock.Lock()
