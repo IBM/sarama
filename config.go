@@ -183,8 +183,15 @@ type Config struct {
 	// Producer is the namespace for configuration related to producing messages,
 	// used by the Producer.
 	Producer struct {
-		// The maximum permitted size of a message (defaults to 1000000). Should be
-		// set equal to or smaller than the broker's `message.max.bytes`.
+		// The maximum permitted size of a message and the pre-compression size estimate
+		// of a batch for a single topic and partition. Messages larger than this are
+		// rejected with a ConfigurationError and are not sent. When adding a message
+		// would reach the batch limit, the current batch is flushed first.
+		// Kafka applies the broker's `message.max.bytes` or topic's `max.message.bytes`
+		// to the whole record batch after compression, so this value may be higher when
+		// compression is enabled, but a compressed batch that exceeds the Kafka limit
+		// will still be rejected.
+		// This value must remain smaller than sarama.MaxRequestSize.
 		MaxMessageBytes int
 		// The level of acknowledgement reliability needed from the broker (defaults
 		// to WaitForLocal). Equivalent to the `request.required.acks` setting of the
@@ -250,22 +257,22 @@ type Config struct {
 		}
 
 		// The following config options control how often messages are batched up and
-		// sent to the broker. By default, messages are sent as fast as possible, and
-		// all messages received while the current batch is in-flight are placed
-		// into the subsequent batch.
+		// sent to the broker. The byte and message thresholds are evaluated per broker,
+		// across all its accumulated topic and partition batches. Producer.MaxMessageBytes
+		// separately limits the batch size for each topic and partition. By default,
+		// messages are sent as fast as possible, and all messages received while the
+		// current batch is in-flight are placed into the subsequent batch.
 		Flush struct {
-			// The best-effort number of bytes needed to trigger a flush. Use the
-			// global sarama.MaxRequestSize to set a hard upper limit.
+			// The best-effort number of bytes needed to trigger a flush.
 			Bytes int
 			// The best-effort number of messages needed to trigger a flush. Use
 			// `MaxMessages` to set a hard upper limit.
 			Messages int
-			// The best-effort frequency of flushes. Equivalent to
-			// `queue.buffering.max.ms` setting of JVM producer.
+			// The best-effort frequency of flushes. A flush may occur sooner if
+			// `Bytes` or `Messages` is reached.
 			Frequency time.Duration
 			// The maximum number of messages the producer will send in a single
-			// broker request. Defaults to 0 for unlimited. Similar to
-			// `queue.buffering.max.messages` in the JVM producer.
+			// broker request. Defaults to 0 for unlimited.
 			MaxMessages int
 		}
 
