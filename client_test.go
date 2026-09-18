@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"runtime"
 	"sync"
@@ -1366,9 +1365,7 @@ func TestClientBackgroundMetadataUpdater(t *testing.T) {
 		defer seedBroker.Close()
 
 		w := &matchWriter{substr: []byte("no specific topics to update metadata")}
-		orig := Logger
-		Logger = log.New(w, "", 0)
-		t.Cleanup(func() { Logger = orig })
+		redirectLogger(t, w)
 
 		conf := NewTestConfig()
 		conf.Metadata.Full = false
