@@ -580,6 +580,22 @@ func (om *offsetManager) releaseSelectedPOMs(force bool, targets partitionTarget
 	return
 }
 
+// releasePOM releases a closed POM without committing, unless it has
+// already been released and another POM now manages its partition
+func (om *offsetManager) releasePOM(pom *partitionOffsetManager) {
+	om.pomsLock.Lock()
+	defer om.pomsLock.Unlock()
+
+	if om.poms[pom.topic][pom.partition] != pom {
+		return
+	}
+	pom.release()
+	delete(om.poms[pom.topic], pom.partition)
+	if len(om.poms[pom.topic]) == 0 {
+		delete(om.poms, pom.topic)
+	}
+}
+
 func (om *offsetManager) findPOM(topic string, partition int32) *partitionOffsetManager {
 	om.pomsLock.RLock()
 	defer om.pomsLock.RUnlock()
@@ -649,7 +665,9 @@ type PartitionOffsetManager interface {
 	// Close stops the PartitionOffsetManager from managing offsets. It is required to
 	// call this function (or AsyncClose) before a PartitionOffsetManager object
 	// passes out of scope, as it will otherwise leak memory. You must call this
-	// before calling Close on the underlying client.
+	// before calling Close on the underlying client. If AutoCommit is disabled,
+	// Close does not commit the marked offset, so call Commit on the
+	// OffsetManager first.
 	Close() error
 }
 
@@ -740,6 +758,20 @@ func (pom *partitionOffsetManager) AsyncClose() {
 
 func (pom *partitionOffsetManager) Close() error {
 	pom.AsyncClose()
+
+	// without auto-commit nothing releases a closed POM until the parent
+	// commits or closes, so release it now without committing, as
+	// removePartitions does. A commit may be blocked sending on pom.errors
+	// while holding pomsLock, so release from another goroutine while this
+	// one drains the errors.
+	if !pom.parent.conf.Consumer.Offsets.AutoCommit.Enable {
+		released := make(chan none)
+		go func() {
+			defer close(released)
+			pom.parent.releasePOM(pom)
+		}()
+		defer func() { <-released }()
+	}
 
 	var errors ConsumerErrors
 	for err := range pom.errors {
