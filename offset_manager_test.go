@@ -1094,6 +1094,82 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 	})
 }
 
+func TestPartitionOffsetManagerCloseWithoutAutoCommit(t *testing.T) {
+	closeWithin := func(t *testing.T, pom PartitionOffsetManager) error {
+		t.Helper()
+		closed := make(chan error, 1)
+		go func() { closed <- pom.Close() }()
+		select {
+		case err := <-closed:
+			return err
+		case <-time.After(5 * time.Second):
+			t.Fatal("deadlock detected: Close() did not return with auto-commit disabled")
+			return nil
+		}
+	}
+
+	t.Run("releases the partition without committing", func(t *testing.T) {
+		om, capture := newCapturingOffsetManager(t, false)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		_, err = om.ManagePartition("my_topic", 1)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		require.NoError(t, closeWithin(t, pom))
+		require.Nil(t, om.findPOM("my_topic", 0))
+		require.NotNil(t, om.findPOM("my_topic", 1))
+		require.Empty(t, capture.requests())
+	})
+
+	t.Run("drains the error of a commit blocked on a full errors channel", func(t *testing.T) {
+		config := NewTestConfig()
+		config.ChannelBufferSize = 1
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		config.Consumer.Offsets.Retry.Max = 0
+		config.Consumer.Return.Errors = true
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t).SetError("group", "my_topic", 0, ErrOffsetMetadataTooLarge)}
+		om, _, _ := initHandledOffsetManager(t, config, capture)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		om.Commit() // fills the errors channel
+		go om.Commit()
+		// wait until the second commit holds pomsLock while blocked sending its error
+		require.Eventually(t, func() bool { return len(capture.requests()) == 2 }, 5*time.Second, time.Millisecond)
+		require.Eventually(t, func() bool {
+			if om.pomsLock.TryLock() {
+				om.pomsLock.Unlock()
+				return false
+			}
+			return true
+		}, 5*time.Second, time.Millisecond)
+
+		var errs ConsumerErrors
+		require.ErrorAs(t, closeWithin(t, pom), &errs)
+		require.Len(t, errs, 2)
+		require.Nil(t, om.findPOM("my_topic", 0))
+	})
+
+	t.Run("closing a released POM again leaves its successor alone", func(t *testing.T) {
+		om, _ := newCapturingOffsetManager(t, false)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		require.NoError(t, closeWithin(t, pom))
+
+		successor, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		successor.AsyncClose()
+
+		require.NoError(t, closeWithin(t, pom))
+		require.Same(t, successor, om.findPOM("my_topic", 0))
+	})
+}
+
 func TestOffsetManagerTransitionGeneration(t *testing.T) {
 	t.Run("commits carry the generation most recently set", func(t *testing.T) {
 		om, capture := newCapturingOffsetManager(t, false)
