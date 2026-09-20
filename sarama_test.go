@@ -23,14 +23,13 @@ func TestMain(m *testing.M) {
 // (for example safeAsyncClose) do not race on a write to the Logger variable.
 func redirectLogger(t *testing.T, w io.Writer) {
 	t.Helper()
-	std, ok := Logger.(*log.Logger)
-	if !ok {
-		orig := Logger
+	switch logger := Logger.(type) {
+	case *log.Logger:
+		prev := logger.Writer()
+		logger.SetOutput(w)
+		t.Cleanup(func() { logger.SetOutput(prev) })
+	default:
 		Logger = log.New(w, "", 0)
-		t.Cleanup(func() { Logger = orig })
-		return
+		t.Cleanup(func() { Logger = logger })
 	}
-	prev := std.Writer()
-	std.SetOutput(w)
-	t.Cleanup(func() { std.SetOutput(prev) })
 }
