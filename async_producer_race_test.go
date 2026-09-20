@@ -2,8 +2,8 @@ package sarama
 
 import "testing"
 
-// retryHandler reads a message (via ByteSize) after publishing it to p.input,
-// by which point the receiving goroutine owns and mutates it.
+// retryHandler must not read a message after sending it to p.input;
+// the receiving goroutine can mutate it
 func TestRetryHandlerHeadersRace(t *testing.T) {
 	conf := NewTestConfig()
 	conf.Version = V0_11_0_0 // -> version 2, so ByteSize reads msg.Headers
@@ -17,18 +17,23 @@ func TestRetryHandlerHeadersRace(t *testing.T) {
 	done := make(chan struct{})
 	go func() { defer close(done); p.retryHandler() }()
 
+	const numMessages = 10
+	received := make(chan struct{})
 	// Stands in for dispatcher(), which applies Producer.Interceptors to every
 	// message it receives from p.input, retries included. A tracing interceptor
 	// appends to msg.Headers.
 	go func() {
-		for msg := range p.input {
+		defer close(received)
+		for range numMessages {
+			msg := <-p.input
 			msg.Headers = append(msg.Headers, RecordHeader{Key: []byte("traceparent")})
 		}
 	}()
 
-	for range 10 {
+	for range numMessages {
 		p.retries <- &ProducerMessage{Topic: "t", Value: StringEncoder("x")}
 	}
+	<-received
 	close(p.retries)
 	<-done
 	close(p.input)
