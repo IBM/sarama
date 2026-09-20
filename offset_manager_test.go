@@ -476,7 +476,12 @@ func TestNewOffsetManagerOffsetsManualCommit(t *testing.T) {
 // Test recovery from ErrNotCoordinatorForConsumer
 // on first fetchInitialOffset call
 func TestOffsetManagerFetchInitialFail(t *testing.T) {
-	om, testClient, broker, coordinator := initOffsetManager(t, 0)
+	var retryCount atomic.Int32
+	backoff := func(retries, maxRetries int) time.Duration {
+		retryCount.Add(1)
+		return 0
+	}
+	om, testClient, broker, coordinator := initOffsetManagerWithBackoffFunc(t, 0, backoff, NewTestConfig())
 	defer broker.Close()
 	defer coordinator.Close()
 
@@ -508,13 +513,13 @@ func TestOffsetManagerFetchInitialFail(t *testing.T) {
 	newCoordinator.Returns(fetchResponse2)
 
 	pom, err := om.ManagePartition("my_topic", 0)
-	if err != nil {
-		t.Error(err)
-	}
+	require.NoError(t, err)
 
 	safeClose(t, pom)
 	safeClose(t, om)
 	safeClose(t, testClient)
+
+	require.NotZero(t, retryCount.Load(), "expected the retry to back off")
 }
 
 // Test fetchInitialOffset retry on ErrOffsetsLoadInProgress
