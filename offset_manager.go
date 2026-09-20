@@ -185,6 +185,15 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 			return 0, 0, "", block.Err
 		}
 		om.releaseCoordinator(broker)
+		// a coordinator still loading __consumer_offsets answers FindCoordinator
+		// with itself while rejecting the fetch, so wait between attempts
+		// (otherwise the retry budget is spent in a few milliseconds)
+		backoff := om.computeBackoff(retries)
+		select {
+		case <-om.closing:
+			return 0, 0, "", block.Err
+		case <-time.After(backoff):
+		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
 	case ErrOffsetsLoadInProgress:
 		if retries <= 0 {
