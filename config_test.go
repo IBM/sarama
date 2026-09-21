@@ -350,6 +350,16 @@ func TestProducerConfigValidates(t *testing.T) {
 			"Producer.MaxMessageBytes must be > 0",
 		},
 		{
+			"TopicMaxMessageBytes",
+			func(cfg *Config) {
+				cfg.Producer.TopicMaxMessageBytes = map[string]int{
+					"z-topic": 0,
+					"a-topic": -1,
+				}
+			},
+			`Producer.TopicMaxMessageBytes["a-topic"] must be > 0`,
+		},
+		{
 			"RequiredAcks",
 			func(cfg *Config) {
 				cfg.Producer.RequiredAcks = -2
@@ -465,6 +475,34 @@ func TestProducerConfigValidates(t *testing.T) {
 			t.Errorf("[%d]:[%s] Expected %s, Got %s\n", i, test.name, test.err, err)
 		}
 	}
+}
+
+func TestProducerMaxMessageBytesForTopic(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.MaxMessageBytes = 1000
+
+	maxMessageBytes, overridden := config.producerMaxMessageBytes("default-topic")
+	assert.Equal(t, 1000, maxMessageBytes)
+	assert.False(t, overridden)
+
+	config.Producer.TopicMaxMessageBytes = map[string]int{
+		"small-topic": 100,
+		"large-topic": 2000,
+	}
+
+	maxMessageBytes, overridden = config.producerMaxMessageBytes("small-topic")
+	assert.Equal(t, 100, maxMessageBytes)
+	assert.True(t, overridden)
+
+	maxMessageBytes, overridden = config.producerMaxMessageBytes("large-topic")
+	assert.Equal(t, 2000, maxMessageBytes)
+	assert.True(t, overridden)
+
+	maxMessageBytes, overridden = config.producerMaxMessageBytes("default-topic")
+	assert.Equal(t, 1000, maxMessageBytes)
+	assert.False(t, overridden)
+
+	assert.NoError(t, config.Validate())
 }
 
 func TestConsumerConfigValidates(t *testing.T) {
