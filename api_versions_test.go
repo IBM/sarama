@@ -1,6 +1,10 @@
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestRestrictApiVersionLowersVersionToBrokerMax(t *testing.T) {
 	request := NewMetadataRequest(V2_8_0_0, []string{"test-topic"})
@@ -78,7 +82,7 @@ func TestRestrictApiVersionDoesNotRaiseVersionBeyondUserSetMax(t *testing.T) {
 	}
 }
 
-func TestRestrictApiVersionDoesNothingIfBrokerVersionRangeMissing(t *testing.T) {
+func TestRestrictApiVersionDoesNothingIfBrokerAdvertisedNoVersions(t *testing.T) {
 	request := NewMetadataRequest(V2_8_0_0, []string{"test-topic"})
 	originalVersion := request.version()
 
@@ -94,4 +98,19 @@ func TestRestrictApiVersionDoesNothingIfBrokerVersionRangeMissing(t *testing.T) 
 	if request.version() != originalVersion {
 		t.Errorf("Expected version to remain %d, got %d", originalVersion, request.version())
 	}
+}
+
+func TestRestrictApiVersionRejectsApiAbsentFromAdvertisedVersions(t *testing.T) {
+	request := NewDescribeClusterRequest(V2_8_0_0)
+
+	// a broker older than DescribeCluster advertises the APIs it has and omits this one
+	brokerVersions := apiVersionMap{
+		apiKeyMetadata: &apiVersionRange{
+			minVersion: 0,
+			maxVersion: 9,
+		},
+	}
+
+	err := restrictApiVersion(request, brokerVersions)
+	require.ErrorIs(t, err, ErrUnsupportedVersion)
 }
