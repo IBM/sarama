@@ -397,7 +397,7 @@ func (b *MockBroker) serverError(err error) {
 	if isConnectionClosedError(err) {
 		return
 	}
-	b.t.Errorf(err.Error())
+	b.t.Error(err)
 }
 
 // NewMockBroker launches a fake Kafka broker. It takes a TestReporter as provided by the

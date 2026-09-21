@@ -768,8 +768,9 @@ func (client *client) deregisterBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
-	_, ok := client.brokers[broker.ID()]
-	if ok {
+	// the broker may have been replaced under its ID (e.g. by a metadata
+	// refresh) since the caller obtained it, so only remove this instance
+	if client.brokers[broker.ID()] == broker {
 		Logger.Printf("client/brokers deregistered broker #%d at %s", broker.ID(), broker.Addr())
 		delete(client.brokers, broker.ID())
 		return

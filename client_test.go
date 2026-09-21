@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"runtime"
 	"sync"
@@ -1366,9 +1365,7 @@ func TestClientBackgroundMetadataUpdater(t *testing.T) {
 		defer seedBroker.Close()
 
 		w := &matchWriter{substr: []byte("no specific topics to update metadata")}
-		orig := Logger
-		Logger = log.New(w, "", 0)
-		t.Cleanup(func() { Logger = orig })
+		redirectLogger(t, w)
 
 		conf := NewTestConfig()
 		conf.Metadata.Full = false
@@ -1608,4 +1605,25 @@ func TestUpdateBroker(t *testing.T) {
 		assert.Equal(t, 2, int(c.brokers[2].ID()))
 		assert.Equal(t, "127.0.0.1:19094", c.brokers[2].Addr())
 	})
+}
+
+func TestDeregisterBroker(t *testing.T) {
+	seed := NewBroker("127.0.0.1:9092")
+	stale := &Broker{id: 1, addr: "127.0.0.1:9093"}
+	c := &client{
+		brokers:     map[int32]*Broker{1: stale},
+		seedBrokers: []*Broker{seed},
+	}
+
+	// broker 1 moves to a new address while a caller still holds the old one
+	c.updateBroker([]*Broker{{id: 1, addr: "127.0.0.1:19093"}})
+	current := c.brokers[1]
+	require.NotSame(t, stale, current)
+
+	c.deregisterBroker(stale)
+	assert.Same(t, current, c.brokers[1], "stale broker removed its replacement")
+	assert.Equal(t, []*Broker{seed}, c.seedBrokers)
+
+	c.deregisterBroker(current)
+	assert.NotContains(t, c.brokers, int32(1))
 }

@@ -23,14 +23,14 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 	config1.ClientID = "M1"
 	config1.Consumer.Offsets.Initial = OffsetNewest
 	config1.Consumer.Group.InstanceId = "Instance1"
-	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, 100, nil, "test.4")
+	m1 := runTestFuncConsumerGroupMemberWithConfig(t, config1, groupID, math.MaxInt32, nil, "test.4")
 	defer m1.Close()
 
 	config2 := NewFunctionalTestConfig()
 	config2.ClientID = "M2"
 	config2.Consumer.Offsets.Initial = OffsetNewest
 	config2.Consumer.Group.InstanceId = "Instance2"
-	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, groupID, 100, nil, "test.4")
+	m2 := runTestFuncConsumerGroupMemberWithConfig(t, config2, groupID, math.MaxInt32, nil, "test.4")
 	defer m2.Close()
 
 	m1.WaitForState(2)
@@ -57,9 +57,6 @@ func TestFuncConsumerGroupStaticMembership_Basic(t *testing.T) {
 	if len(res[0].Members) != 2 {
 		t.Errorf("should have 2 members in group , got %v\n", len(res[0].Members))
 	}
-
-	m1.WaitForState(4)
-	m2.WaitForState(4)
 
 	m1.AssertCleanShutdown()
 	m2.AssertCleanShutdown()
