@@ -182,6 +182,7 @@ func (m *MockConsumerGroupDescribeResponse) For(reqBody versionedDecoder) encode
 // MockMetadataResponse is a `MetadataResponse` builder.
 type MockMetadataResponse struct {
 	controllerID int32
+	clusterID    string
 	errors       map[string]KError
 	leaders      map[string]map[int32]int32
 	brokers      map[string]int32
@@ -222,11 +223,19 @@ func (mmr *MockMetadataResponse) SetController(brokerID int32) *MockMetadataResp
 	return mmr
 }
 
+func (mmr *MockMetadataResponse) SetClusterID(clusterID string) *MockMetadataResponse {
+	mmr.clusterID = clusterID
+	return mmr
+}
+
 func (mmr *MockMetadataResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	metadataRequest := reqBody.(*MetadataRequest)
 	metadataResponse := &MetadataResponse{
 		Version:      metadataRequest.version(),
 		ControllerID: mmr.controllerID,
+	}
+	if mmr.clusterID != "" {
+		metadataResponse.ClusterID = &mmr.clusterID
 	}
 	for addr, brokerID := range mmr.brokers {
 		metadataResponse.AddBroker(addr, brokerID)
