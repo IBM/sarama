@@ -31,7 +31,7 @@ func init() {
 	flag.StringVar(&group, "group", "", "Kafka consumer group definition")
 	flag.StringVar(&version, "version", sarama.DefaultVersion.String(), "Kafka cluster version")
 	flag.StringVar(&topics, "topics", "", "Kafka topics to be consumed, as a comma separated list")
-	flag.StringVar(&assignor, "assignor", "range", "Consumer group partition assignment strategy (range, roundrobin, sticky)")
+	flag.StringVar(&assignor, "assignor", "range", "Consumer group partition assignment strategy (range, roundrobin, sticky, cooperative-sticky, cooperative-sticky-upgrade)")
 	flag.BoolVar(&oldest, "oldest", true, "Kafka consumer consume initial offset from oldest")
 	flag.BoolVar(&verbose, "verbose", false, "Sarama logging")
 	flag.Parse()
@@ -70,6 +70,13 @@ func main() {
 	config.Version = version
 
 	switch assignor {
+	case "cooperative-sticky":
+		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategyCooperativeSticky()}
+	case "cooperative-sticky-upgrade":
+		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{
+			sarama.NewBalanceStrategyCooperativeSticky(),
+			sarama.NewBalanceStrategyRange(),
+		}
 	case "sticky":
 		config.Consumer.Group.Rebalance.GroupStrategies = []sarama.BalanceStrategy{sarama.NewBalanceStrategySticky()}
 	case "roundrobin":
