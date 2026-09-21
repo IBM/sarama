@@ -3,114 +3,72 @@ package sarama
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRestrictApiVersionLowersVersionToBrokerMax(t *testing.T) {
-	request := NewMetadataRequest(V2_8_0_0, []string{"test-topic"})
-
-	if request.version() != 11 {
-		t.Errorf("Expected MetadataRequest version to be 11, got %d", request.version())
-	}
-
-	brokerVersions := apiVersionMap{
-		apiKeyMetadata: &apiVersionRange{
-			minVersion: 0,
-			maxVersion: 8,
+func TestRestrictApiVersion(t *testing.T) {
+	// the Kafka version a request is built with comes from conf.Version, the
+	// user-set maximum, which a broker's advertised range narrows but never raises
+	clamping := []struct {
+		name           string
+		kafkaVersion   KafkaVersion
+		clientVersion  int16
+		brokerVersions apiVersionMap
+		want           int16
+	}{
+		{
+			name:           "lowers the version to the broker's maximum",
+			kafkaVersion:   V2_8_0_0,
+			clientVersion:  11,
+			brokerVersions: apiVersionMap{apiKeyMetadata: &apiVersionRange{minVersion: 0, maxVersion: 8}},
+			want:           8,
+		},
+		{
+			name:           "leaves a version already inside the broker's range",
+			kafkaVersion:   V2_4_0_0,
+			clientVersion:  9,
+			brokerVersions: apiVersionMap{apiKeyMetadata: &apiVersionRange{minVersion: 0, maxVersion: 10}},
+			want:           9,
+		},
+		{
+			name:           "holds to the user's maximum below the broker's minimum",
+			kafkaVersion:   V0_10_0_0,
+			clientVersion:  1,
+			brokerVersions: apiVersionMap{apiKeyMetadata: &apiVersionRange{minVersion: 5, maxVersion: 10}},
+			want:           1,
+		},
+		{
+			name:           "leaves the version alone when the broker advertised nothing",
+			kafkaVersion:   V2_8_0_0,
+			clientVersion:  11,
+			brokerVersions: apiVersionMap{},
+			want:           11,
 		},
 	}
 
-	err := restrictApiVersion(request, brokerVersions)
-	if err != nil {
-		t.Errorf("restrictApiVersion returned unexpected error: %v", err)
+	for _, tc := range clamping {
+		t.Run(tc.name, func(t *testing.T) {
+			request := NewMetadataRequest(tc.kafkaVersion, []string{"test-topic"})
+			require.Equal(t, tc.clientVersion, request.version())
+
+			require.NoError(t, restrictApiVersion(request, tc.brokerVersions))
+			assert.Equal(t, tc.want, request.version())
+		})
 	}
 
-	if request.version() != 8 {
-		t.Errorf("Expected version to be restricted to 8, got %d", request.version())
-	}
-}
+	t.Run("rejects an API absent from what the broker advertised", func(t *testing.T) {
+		request := NewDescribeClusterRequest(V2_8_0_0)
 
-func TestRestrictApiVersionLeavesVersionUnchangedWhenWithinRange(t *testing.T) {
-	request := NewMetadataRequest(V2_4_0_0, []string{"test-topic"})
-	originalVersion := request.version()
+		// a broker older than DescribeCluster advertises the APIs it has and omits this one
+		brokerVersions := apiVersionMap{
+			apiKeyMetadata: &apiVersionRange{
+				minVersion: 0,
+				maxVersion: 9,
+			},
+		}
 
-	if originalVersion != 9 {
-		t.Errorf("Expected MetadataRequest version to be 9, got %d", originalVersion)
-	}
-
-	brokerVersions := apiVersionMap{
-		apiKeyMetadata: &apiVersionRange{
-			minVersion: 0,
-			maxVersion: 10,
-		},
-	}
-
-	err := restrictApiVersion(request, brokerVersions)
-	if err != nil {
-		t.Errorf("restrictApiVersion returned unexpected error: %v", err)
-	}
-
-	if request.version() != originalVersion {
-		t.Errorf("Expected version to remain %d, got %d", originalVersion, request.version())
-	}
-}
-
-func TestRestrictApiVersionDoesNotRaiseVersionBeyondUserSetMax(t *testing.T) {
-	// the Kafka version comes from conf.Version, which is the user-set max Kafka API version to use
-	request := NewMetadataRequest(V0_10_0_0, []string{"test-topic"})
-
-	if request.version() != 1 {
-		t.Errorf("Expected MetadataRequest version to be 1, got %d", request.version())
-	}
-
-	// broker doesn't support versions below 5
-	brokerVersions := apiVersionMap{
-		apiKeyMetadata: &apiVersionRange{
-			minVersion: 5,
-			maxVersion: 10,
-		},
-	}
-
-	// we expect the user's preference to be respected even when it's below the broker's minimum
-	err := restrictApiVersion(request, brokerVersions)
-	if err != nil {
-		t.Errorf("restrictApiVersion returned unexpected error: %v", err)
-	}
-
-	if request.version() != 1 {
-		t.Errorf("Expected version to be set to minimum 1, got %d", request.version())
-	}
-}
-
-func TestRestrictApiVersionDoesNothingIfBrokerAdvertisedNoVersions(t *testing.T) {
-	request := NewMetadataRequest(V2_8_0_0, []string{"test-topic"})
-	originalVersion := request.version()
-
-	brokerVersions := apiVersionMap{
-		// no entry for apiKeyMetadata
-	}
-
-	err := restrictApiVersion(request, brokerVersions)
-	if err != nil {
-		t.Errorf("restrictApiVersion returned unexpected error: %v", err)
-	}
-
-	if request.version() != originalVersion {
-		t.Errorf("Expected version to remain %d, got %d", originalVersion, request.version())
-	}
-}
-
-func TestRestrictApiVersionRejectsApiAbsentFromAdvertisedVersions(t *testing.T) {
-	request := NewDescribeClusterRequest(V2_8_0_0)
-
-	// a broker older than DescribeCluster advertises the APIs it has and omits this one
-	brokerVersions := apiVersionMap{
-		apiKeyMetadata: &apiVersionRange{
-			minVersion: 0,
-			maxVersion: 9,
-		},
-	}
-
-	err := restrictApiVersion(request, brokerVersions)
-	require.ErrorIs(t, err, ErrUnsupportedVersion)
+		err := restrictApiVersion(request, brokerVersions)
+		require.ErrorIs(t, err, ErrUnsupportedVersion)
+	})
 }
