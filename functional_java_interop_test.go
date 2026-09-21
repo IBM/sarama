@@ -215,6 +215,7 @@ func endOffsetForPartition(t *testing.T, topic string, partition int32) int64 {
 // console producer with various compression codecs can be correctly consumed and
 // decompressed by Sarama.
 func TestJavaProducerCompressionRoundTrip(t *testing.T) {
+	skipIfExistingEnvironment(t)
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -241,6 +242,7 @@ func TestJavaProducerCompressionRoundTrip(t *testing.T) {
 // with various compression codecs can be correctly consumed and decompressed
 // by Kafka's Java console consumer.
 func TestJavaConsumerCompressionRoundTrip(t *testing.T) {
+	skipIfExistingEnvironment(t)
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
@@ -398,6 +400,7 @@ func consumeKeyedFromPartition(t *testing.T, topic string, partition int32, star
 // routes keyed messages to the same partitions as the Apache Kafka Java client's
 // DefaultPartitioner (which uses murmur2 internally).
 func TestJavaMurmur2PartitionerInterop(t *testing.T) {
+	skipIfExistingEnvironment(t)
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 

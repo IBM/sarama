@@ -23,6 +23,7 @@ jobs:
         kafka-version:
         - 1.0.2   # oldest baseline, lowest protocol versions
         - 2.6.3   # accumulates many 2.x protocol bumps (KIP-227, KIP-320, KIP-345, KIP-429)
+        - 2.8.2   # oldest java client that can lead a cooperative group (KAFKA-13406)
         - 3.6.2   # mid-3.x representative
         - 3.9.2   # last ZooKeeper-capable release
         - 4.1.2   # stable KRaft-only (post-4.0 transition)
@@ -32,6 +33,8 @@ jobs:
         - kafka-version: 1.0.2
           scala-version: 2.11
         - kafka-version: 2.6.3
+          scala-version: 2.12
+        - kafka-version: 2.8.2
           scala-version: 2.12
         - kafka-version: 3.6.2
           scala-version: 2.13
