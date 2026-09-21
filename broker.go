@@ -1248,8 +1248,8 @@ func (b *Broker) sendAndReceive(req protocolBody, res protocolBody) error {
 // negotiateApiVersion clamps pb's version to the broker's advertised maximum
 // for pb's API (treating pb's current version as the client max). When the
 // broker has not advertised ApiVersions info, pb's version is left untouched
-// (optimistic). Returns (0, false) if the broker advertised its APIs without
-// pb's, or if the resulting version is below minVersion.
+// (optimistic). Returns (0, false) if the broker advertised ApiVersions info
+// that omits pb's API, or if the resulting version is below minVersion.
 func (b *Broker) negotiateApiVersion(pb protocolBody, minVersion int16) (int16, bool) {
 	b.lock.Lock()
 	defer b.lock.Unlock()

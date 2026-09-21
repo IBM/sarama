@@ -8,8 +8,8 @@ import (
 )
 
 func TestRestrictApiVersion(t *testing.T) {
-	// the Kafka version a request is built with comes from conf.Version, the
-	// user-set maximum, which a broker's advertised range narrows but never raises
+	// the version a request is built with comes from conf.Version, the user-set
+	// maximum that a broker's advertised range narrows but never raises
 	clamping := []struct {
 		name           string
 		kafkaVersion   KafkaVersion

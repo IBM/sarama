@@ -25,11 +25,9 @@ func restrictApiVersion(pb protocolBody, brokerVersions apiVersionMap) error {
 		return nil
 	}
 
-	// If brokerAPIVersions is populated (ApiVersionsRequest succeeded) but
-	// this key is absent, the broker does not support this API at all.
-	// Return ErrUnsupportedVersion so callers with fallback logic (e.g.
-	// DescribeCluster) can degrade gracefully instead of sending a request
-	// the broker will reject by closing the connection.
+	// an empty map means ApiVersions was never negotiated; a populated one that
+	// omits this key means the broker does not have the API and would close the
+	// connection on the request
 	if len(brokerVersions) > 0 {
 		return ErrUnsupportedVersion
 	}

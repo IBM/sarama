@@ -890,8 +890,8 @@ func TestClusterAdminDescribeCluster(t *testing.T) {
 		config := NewTestConfig()
 		config.ApiVersionsRequest = true
 		config.Version = V2_8_0_0
-		// the broker answers nothing it was not handed a handler for, so keep the
-		// wait for a reply that never arrives short
+		// the mock has no DescribeCluster handler, so a request that reaches it
+		// waits out this deadline
 		config.Net.ReadTimeout = time.Second
 		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
 		require.NoError(t, err)
@@ -2207,10 +2207,9 @@ func assertGroupOffset(t *testing.T, result map[string]*OffsetFetchResponseGroup
 	assert.Equal(t, expected, block.Offset)
 }
 
-// mockApiVersionsFor advertises the given API keys alongside the ones a client
-// needs to connect and locate a coordinator, each over a range wide enough to
-// leave the negotiated version at the client's own maximum. An API key that is
-// not advertised reads as unsupported, the way a broker predating it responds.
+// mockApiVersionsFor advertises the given API keys plus the ones a client needs
+// to connect and find a coordinator, each over a range that leaves the
+// negotiated version alone. An API key left out reads as unsupported.
 func mockApiVersionsFor(t *testing.T, keys ...ApiVersionsResponseKey) *MockApiVersionsResponse {
 	t.Helper()
 	advertised := map[int16]ApiVersionsResponseKey{}
