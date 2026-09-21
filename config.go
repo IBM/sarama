@@ -51,8 +51,17 @@ type Config struct {
 		// All three of the below configurations are similar to the
 		// `socket.timeout.ms` setting in JVM kafka. All of them default
 		// to 30 seconds.
-		DialTimeout  time.Duration // How long to wait for the initial connection.
-		ReadTimeout  time.Duration // How long to wait for a response.
+		DialTimeout time.Duration // How long to wait for the initial connection.
+
+		// ReadTimeout is the maximum duration the broker will wait for a
+		// complete response after a request has been fully sent. The deadline
+		// is set once when the request is sent and applies to the entire
+		// response read (header + body). It must therefore be set to at least
+		// the longest server-side operation you expect, such as
+		// Consumer.Group.Rebalance.Timeout, or reads will time out before the
+		// broker has finished processing.
+		ReadTimeout time.Duration
+
 		WriteTimeout time.Duration // How long to wait for a transmit.
 
 		// ResolveCanonicalBootstrapServers turns each bootstrap broker address
