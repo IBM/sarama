@@ -5,6 +5,8 @@ package sarama
 import (
 	"errors"
 	"maps"
+	"math"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -873,6 +875,39 @@ func TestClusterAdminDeleteRecordsWithLeaderNotAvailable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestClusterAdminDescribeCluster(t *testing.T) {
+	t.Run("falls back to metadata when the broker omits the DescribeCluster API", func(t *testing.T) {
+		broker := NewMockBroker(t, 1)
+		defer broker.Close()
+
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"ApiVersionsRequest": mockApiVersionsFor(t),
+			"MetadataRequest":    mockMetadataFor(t, broker),
+		})
+
+		config := NewTestConfig()
+		config.ApiVersionsRequest = true
+		config.Version = V2_8_0_0
+		// the mock has no DescribeCluster handler, so a request that reaches it
+		// waits out this deadline
+		config.Net.ReadTimeout = time.Second
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		defer safeClose(t, admin)
+
+		brokers, controllerID, err := admin.DescribeCluster()
+		require.NoError(t, err)
+		assert.Equal(t, broker.BrokerID(), controllerID)
+		require.Len(t, brokers, 1)
+		assert.Equal(t, broker.Addr(), brokers[0].Addr())
+
+		for _, exchange := range broker.History() {
+			_, sent := exchange.Request.(*DescribeClusterRequest)
+			assert.False(t, sent, "sent DescribeCluster to a broker that does not advertise it")
+		}
+	})
 }
 
 func TestClusterAdminDescribeConfig(t *testing.T) {
@@ -2012,9 +2047,9 @@ func TestListConsumerGroupOffsetsBatch(t *testing.T) {
 	t.Run("rejects broker downgrade below v8", func(t *testing.T) {
 		broker := newMockBroker(t, 1)
 		broker.SetHandlerByMap(map[string]MockResponse{
-			"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
-				{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 7},
-			}),
+			"ApiVersionsRequest": mockApiVersionsFor(t,
+				ApiVersionsResponseKey{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 7},
+			),
 			"MetadataRequest":        mockMetadataFor(t, broker),
 			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groupA, groupB),
 		})
@@ -2035,9 +2070,9 @@ func TestListConsumerGroupOffsetsBatch(t *testing.T) {
 		// 9999 keeps this test honest as we add more protocol versions later.
 		broker := newMockBroker(t, 1)
 		broker.SetHandlerByMap(map[string]MockResponse{
-			"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
-				{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 9999},
-			}),
+			"ApiVersionsRequest": mockApiVersionsFor(t,
+				ApiVersionsResponseKey{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 9999},
+			),
 			"MetadataRequest":        mockMetadataFor(t, broker),
 			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groupA, groupB),
 			"OffsetFetchRequest": NewMockOffsetFetchResponse(t).
@@ -2170,6 +2205,21 @@ func assertGroupOffset(t *testing.T, result map[string]*OffsetFetchResponseGroup
 	block := result[groupID].GetBlock(topic, partition)
 	require.NotNil(t, block)
 	assert.Equal(t, expected, block.Offset)
+}
+
+// mockApiVersionsFor advertises the given API keys plus the ones a client needs
+// to connect and find a coordinator, each over a range that leaves the
+// negotiated version alone. An API key left out reads as unsupported.
+func mockApiVersionsFor(t *testing.T, keys ...ApiVersionsResponseKey) *MockApiVersionsResponse {
+	t.Helper()
+	advertised := map[int16]ApiVersionsResponseKey{}
+	for _, key := range []int16{apiKeyMetadata, apiKeyFindCoordinator, apiKeyApiVersions} {
+		advertised[key] = ApiVersionsResponseKey{ApiKey: key, MinVersion: 0, MaxVersion: math.MaxInt16}
+	}
+	for _, key := range keys {
+		advertised[key.ApiKey] = key
+	}
+	return NewMockApiVersionsResponse(t).SetApiKeys(slices.Collect(maps.Values(advertised)))
 }
 
 // mockMetadataFor builds a MockMetadataResponse with controller and brokers
