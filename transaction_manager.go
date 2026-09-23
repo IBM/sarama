@@ -789,6 +789,18 @@ func (t *transactionManager) maybeAddPartitionToCurrentTxn(topic string, partiti
 	t.pendingPartitionsInCurrentTxn[tp] = struct{}{}
 }
 
+// allPartitionsInTxn reports whether every partition in the set has been
+// added to the current transaction.
+func (t *transactionManager) allPartitionsInTxn(set *produceSet) bool {
+	t.partitionInTxnLock.Lock()
+	defer t.partitionInTxnLock.Unlock()
+
+	return !set.anyPartition(func(topic string, partition int32, _ *partitionSet) bool {
+		_, ok := t.partitionsInCurrentTxn[topicPartition{topic: topic, partition: partition}]
+		return !ok
+	})
+}
+
 // Makes a request to kafka to add a list of partitions to the current transaction.
 func (t *transactionManager) publishTxnPartitions() error {
 	t.partitionInTxnLock.Lock()

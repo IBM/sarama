@@ -2980,6 +2980,27 @@ func TestTxnAbortAfterAddPartitionsFails(t *testing.T) {
 		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
 		assert.NoError(t, producer.BeginTxn())
 	})
+
+	t.Run("does not send a retried batch for a partition never added", func(t *testing.T) {
+		// the backoff keeps the batch waiting to retry while AbortTxn starts
+		producer, count := start(t, ErrOperationNotAttempted, 500*time.Millisecond)
+
+		// AbortTxn waits for the batch, whose error must be read meanwhile
+		errs := make(chan *ProducerError, 1)
+		go func() { errs <- <-producer.Errors() }()
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.NotZero(c, producer.TxnStatus()&ProducerTxnFlagAbortableError)
+		}, 5*time.Second, time.Millisecond)
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Zero(t, count("ProduceRequest"), "records sent for a partition outside the transaction")
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		pErr := assertDoneWithin(t, errs, 5*time.Second)
+		assert.Error(t, pErr.Err, "the batch should fail instead of being sent")
+	})
 }
 
 func TestProducerRetryBufferLimits(t *testing.T) {
