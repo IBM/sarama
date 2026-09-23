@@ -975,7 +975,15 @@ func newTransactionManager(conf *Config, client Client) (*transactionManager, er
 }
 
 // re-init producer-id and producer-epoch if needed.
-func (t *transactionManager) initializeTransactions() (err error) {
-	t.producerID, t.producerEpoch, err = t.initProducerId()
-	return
+func (t *transactionManager) initializeTransactions() error {
+	producerID, producerEpoch, err := t.initProducerId()
+	if err != nil {
+		// Keep the current producer id and epoch, and bump again on the next
+		// commit or abort. Otherwise the producer can reach Ready with no
+		// producer id.
+		t.epochBumpRequired = true
+		return err
+	}
+	t.producerID, t.producerEpoch = producerID, producerEpoch
+	return nil
 }
