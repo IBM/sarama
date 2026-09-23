@@ -57,16 +57,26 @@ func (c *consumerGroup) rejoinCooperative(ctx context.Context, topics []string, 
 	sess.generationMu.Lock()
 	defer sess.generationMu.Unlock()
 
+	// This join covers any rebalance signaled before it. Drop a signal still
+	// buffered, or the member would rejoin again for a rebalance it is
+	// already part of.
+	select {
+	case <-sess.rejoin:
+	default:
+	}
+
 	var res *rebalanceResult
-	err := sess.offsets.transitionGeneration(func() (int32, error) {
+	err := sess.offsets.transitionGeneration(func() (int32, string, error) {
 		result, err := c.joinSync(ctx, topics, held, c.config.Consumer.Group.Rebalance.Retry.Max)
 		if err != nil {
-			return 0, err
+			return 0, "", err
 		}
 
 		res = result
+		// joinSync rejoins under a new member id after UNKNOWN_MEMBER_ID
+		sess.memberID.Store(&res.memberID)
 		sess.generationID.Store(res.generationID)
-		return res.generationID, nil
+		return res.generationID, res.memberID, nil
 	})
 	if err != nil {
 		return nil, err

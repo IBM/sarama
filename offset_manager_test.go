@@ -1100,7 +1100,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 }
 
 func TestOffsetManagerTransitionGeneration(t *testing.T) {
-	t.Run("commits carry the generation most recently set", func(t *testing.T) {
+	t.Run("commits carry the generation and member id most recently set", func(t *testing.T) {
 		om, capture := newCapturingOffsetManager(t, false)
 
 		pom, err := om.ManagePartition("my_topic", 0)
@@ -1108,8 +1108,8 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 
 		pom.MarkOffset(100, "")
 		om.Commit()
-		require.NoError(t, om.transitionGeneration(func() (int32, error) {
-			return 7, nil
+		require.NoError(t, om.transitionGeneration(func() (int32, string, error) {
+			return 7, "new-member", nil
 		}))
 		pom.MarkOffset(101, "")
 		om.Commit()
@@ -1118,6 +1118,8 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 		require.NotEmpty(t, reqs)
 		require.Equal(t, int32(1), reqs[0].ConsumerGroupGeneration)
 		require.Equal(t, int32(7), reqs[len(reqs)-1].ConsumerGroupGeneration)
+		require.Equal(t, "member", reqs[0].ConsumerID)
+		require.Equal(t, "new-member", reqs[len(reqs)-1].ConsumerID)
 	})
 
 	t.Run("waits for an in-flight commit to finish", func(t *testing.T) {
@@ -1140,8 +1142,8 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 
 		genDone := make(chan error, 1)
 		go func() {
-			genDone <- om.transitionGeneration(func() (int32, error) {
-				return 7, nil
+			genDone <- om.transitionGeneration(func() (int32, string, error) {
+				return 7, "member", nil
 			})
 		}()
 		require.Never(t, func() bool {
@@ -1176,10 +1178,10 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 		release := make(chan none)
 		transitionDone := make(chan error, 1)
 		go func() {
-			transitionDone <- om.transitionGeneration(func() (int32, error) {
+			transitionDone <- om.transitionGeneration(func() (int32, string, error) {
 				close(started)
 				<-release
-				return 7, nil
+				return 7, "member", nil
 			})
 		}()
 		<-started

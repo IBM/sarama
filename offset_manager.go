@@ -268,16 +268,17 @@ func (om *offsetManager) Commit() {
 }
 
 // transitionGeneration keeps commits out while the coordinator establishes
-// the next generation
-func (om *offsetManager) transitionGeneration(next func() (int32, error)) error {
+// the next generation and member id
+func (om *offsetManager) transitionGeneration(next func() (int32, string, error)) error {
 	om.generationLock.Lock()
 	defer om.generationLock.Unlock()
 
-	generation, err := next()
+	generation, memberID, err := next()
 	if err != nil {
 		return err
 	}
 	om.generation = generation
+	om.memberID = memberID
 	return nil
 }
 
