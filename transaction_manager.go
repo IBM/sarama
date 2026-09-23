@@ -594,6 +594,8 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 				_ = coordinator.Close()
 				_ = t.client.RefreshTransactionCoordinator(t.transactionalID)
 			}
+		case ErrConcurrentTransactions:
+			// Retry: the coordinator is still finishing the previous transaction.
 		// Fatal errors
 		default:
 			return -1, -1, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
