@@ -531,11 +531,11 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 		if err != nil {
 			return -1, -1, err
 		}
-		DebugLogger.Printf("txnmgr/init-producer-id [%s] invoking InitProducerId for the first time in order to acquire a producer ID\n",
-			t.transactionalID)
-	} else {
 		DebugLogger.Printf("txnmgr/init-producer-id [%s] invoking InitProducerId with current producer ID %d and epoch %d in order to bump the epoch\n",
 			t.transactionalID, t.producerID, t.producerEpoch)
+	} else {
+		DebugLogger.Printf("txnmgr/init-producer-id [%s] invoking InitProducerId for the first time in order to acquire a producer ID\n",
+			t.transactionalID)
 	}
 
 	attemptsRemaining := t.client.Config().Producer.Transaction.Retry.Max
