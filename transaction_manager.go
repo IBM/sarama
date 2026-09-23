@@ -730,7 +730,13 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 
 	// if no records has been sent don't do anything.
 	if len(t.partitionsInCurrentTxn) == 0 {
-		return t.completeTransaction()
+		// There is no EndTxn to send, but a required epoch bump must still
+		// happen. Otherwise the producer stays in Initializing.
+		epochBump := t.epochBumpRequired
+		if err := t.completeTransaction(); err != nil || !epochBump {
+			return err
+		}
+		return t.initializeTransactions()
 	}
 
 	epochBump := t.epochBumpRequired
