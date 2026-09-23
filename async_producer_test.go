@@ -2918,9 +2918,11 @@ func TestMaybeTransitionToErrorState(t *testing.T) {
 
 func TestTxnAbortRecovery(t *testing.T) {
 	type scenario struct {
-		addErr       KError // answer to every AddPartitionsToTxn
-		endErr       KError // answer to every EndTxn
-		initFails    int    // InitProducerId calls to fail after the first
+		addErr       KError    // answer to every AddPartitionsToTxn
+		endErr       KError    // answer to every EndTxn
+		initFails    int       // InitProducerId calls to fail after the first
+		produceErr   KError    // answer to every Produce
+		produceGate  chan none // if set, Produce answers once it is closed
 		retryBackoff time.Duration
 	}
 
@@ -2968,8 +2970,11 @@ func TestTxnAbortRecovery(t *testing.T) {
 				}
 			},
 			"ProduceRequest": func(_ int, req *request) encoderWithHeader {
+				if sc.produceGate != nil {
+					<-sc.produceGate
+				}
 				res := &ProduceResponse{Version: req.body.version()}
-				res.AddTopicPartition("test-topic", 0, ErrNoError)
+				res.AddTopicPartition("test-topic", 0, sc.produceErr)
 				return res
 			},
 			"EndTxnRequest": func(_ int, req *request) encoderWithHeader {
@@ -3073,6 +3078,37 @@ func TestTxnAbortRecovery(t *testing.T) {
 		require.NoError(t, producer.AbortTxn())
 		assert.Equal(t, 5, count("InitProducerIDRequest"))
 		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+		assert.NoError(t, producer.BeginTxn())
+	})
+
+	t.Run("bumps the epoch after a produce fails during commit", func(t *testing.T) {
+		gate := make(chan none)
+		producer, count := start(t, scenario{
+			produceErr:   ErrOutOfOrderSequenceNumber,
+			produceGate:  gate,
+			retryBackoff: 10 * time.Millisecond,
+		})
+		errs := make(chan *ProducerError, 1)
+		go func() { errs <- <-producer.Errors() }()
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		commitDone := make(chan error, 1)
+		go func() { commitDone <- producer.CommitTxn() }()
+
+		// the batch fails only once the commit has started
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.NotZero(c, producer.TxnStatus()&ProducerTxnFlagEndTransaction)
+		}, 5*time.Second, time.Millisecond)
+		close(gate)
+		require.ErrorIs(t, assertDoneWithin(t, commitDone, 5*time.Second), ErrOutOfOrderSequenceNumber)
+		require.ErrorIs(t, assertDoneWithin(t, errs, 5*time.Second), ErrOutOfOrderSequenceNumber)
+
+		// the failed batch used sequence numbers the broker never saw, so the
+		// next transaction must start under a new epoch
+		require.NoError(t, producer.AbortTxn())
+		assert.Equal(t, 2, count("InitProducerIDRequest"))
 		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
 		assert.NoError(t, producer.BeginTxn())
 	})

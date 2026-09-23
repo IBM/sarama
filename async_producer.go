@@ -1722,7 +1722,7 @@ func (p *asyncProducer) maybeTransitionToErrorState(err error) error {
 		// would make the abort fail.
 		return nil
 	}
-	if p.txnmgr.coordinatorSupportsBumpingEpoch && p.txnmgr.currentTxnStatus()&ProducerTxnFlagEndTransaction == 0 {
+	if p.txnmgr.coordinatorSupportsBumpingEpoch {
 		p.txnmgr.epochBumpRequired.Store(true)
 	}
 	return p.txnmgr.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, err)
