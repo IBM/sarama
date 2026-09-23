@@ -1798,38 +1798,6 @@ func TestBrokerProducerShutdown(t *testing.T) {
 	mockBroker.Close()
 }
 
-// TestBrokerProducerWaitForSpaceEmptyBufferRollover ensures forced rollovers with an empty buffer
-// do not deadlock waiting for responses when no partitions are muted.
-func TestBrokerProducerWaitForSpaceEmptyBufferRollover(t *testing.T) {
-	config := NewTestConfig()
-	parent := &asyncProducer{
-		conf:   config,
-		muter:  newPartitionMuter(),
-		txnmgr: &transactionManager{},
-	}
-
-	bp := &brokerProducer{
-		parent:            parent,
-		accumulatingBatch: newProduceSet(parent),
-		output:            make(chan *produceSet, 1),
-		responses:         make(chan *brokerProducerResponse),
-	}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- bp.waitForSpace(&ProducerMessage{Topic: "topic", Partition: 0}, true)
-	}()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("waitForSpace blocked on empty buffer rollover")
-	}
-}
-
 func awaitMuterBlocked(t *testing.T, m *partitionMuter, set *produceSet) {
 	t.Helper()
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
@@ -1865,6 +1833,7 @@ func assertDoneWithin[T any](t *testing.T, ch <-chan T, timeout time.Duration) T
 // deadlock when partitions are muted by another producer and are unmuted elsewhere.
 func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
 	config := NewTestConfig()
+	config.Producer.Flush.MaxMessages = 1 // the queued message fills the batch
 	txnMgr := &transactionManager{
 		producerID:      0,
 		producerEpoch:   0,
@@ -1894,7 +1863,7 @@ func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- bp.waitForSpace(msg, true)
+		done <- bp.waitForSpace(msg)
 	}()
 
 	awaitMuterBlocked(t, parent.muter, bp.accumulatingBatch)
@@ -2010,6 +1979,7 @@ func TestAsyncProducerUnblocksOnExternalUnmute(t *testing.T) {
 // when all partitions in the accumulating batch are externally muted and later unmuted.
 func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
 	config := NewTestConfig()
+	config.Producer.Flush.MaxMessages = 1 // the waiting message fills the batch
 	parent := &asyncProducer{
 		conf:   config,
 		muter:  newPartitionMuter(),
@@ -2033,7 +2003,7 @@ func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- bp.waitForSpace(&ProducerMessage{Topic: "topic", Partition: 0}, true)
+		done <- bp.waitForSpace(&ProducerMessage{Topic: "topic", Partition: 0})
 	}()
 
 	assertNotDone(t, done, 50*time.Millisecond)
