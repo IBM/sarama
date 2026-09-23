@@ -232,13 +232,16 @@ func (t *transactionManager) transitionTo(target ProducerTxnStatusFlag, err erro
 	return err
 }
 
-func (t *transactionManager) getAndIncrementSequenceNumber(topic string, partition int32) (int32, int16) {
+// getAndAddSequenceNumbers reserves n sequence numbers for the partition and
+// returns the first, with the producer id and epoch they belong to. All three
+// come from one critical section, so an epoch bump cannot split a batch.
+func (t *transactionManager) getAndAddSequenceNumbers(topic string, partition int32, n int32) (int64, int16, int32) {
 	key := fmt.Sprintf("%s-%d", topic, partition)
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	sequence := t.sequenceNumbers[key]
-	t.sequenceNumbers[key] = sequence + 1
-	return sequence, t.producerEpoch
+	first := t.sequenceNumbers[key]
+	t.sequenceNumbers[key] = first + n
+	return t.producerID, t.producerEpoch, first
 }
 
 func (t *transactionManager) bumpEpoch() {
