@@ -1178,7 +1178,7 @@ func (bp *brokerProducer) run() {
 
 			if bp.accumulatingBatch.wouldOverflow(msg) {
 				Logger.Printf("producer/broker/%d maximum request accumulated, waiting for space\n", bp.broker.ID())
-				if err := bp.waitForSpace(msg, false); err != nil {
+				if err := bp.waitForSpace(msg); err != nil {
 					bp.parent.retryMessage(msg, err)
 					continue
 				}
@@ -1307,13 +1307,13 @@ func (bp *brokerProducer) needsRetry(msg *ProducerMessage) error {
 }
 
 // waitForSpace makes space in the accumulating batch by flushing. It loops until the message fits.
-func (bp *brokerProducer) waitForSpace(msg *ProducerMessage, forceRollover bool) error {
-	if bp.accumulatingBatch.empty() && !forceRollover {
+func (bp *brokerProducer) waitForSpace(msg *ProducerMessage) error {
+	if bp.accumulatingBatch.empty() {
 		return nil
 	}
 
 	for {
-		if !bp.accumulatingBatch.wouldOverflow(msg) && !forceRollover {
+		if !bp.accumulatingBatch.wouldOverflow(msg) {
 			return nil
 		}
 
@@ -1332,9 +1332,6 @@ func (bp *brokerProducer) waitForSpace(msg *ProducerMessage, forceRollover bool)
 		}
 
 		if bp.accumulatingBatch.empty() {
-			if forceRollover {
-				bp.rollOver()
-			}
 			return nil
 		}
 
