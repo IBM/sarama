@@ -894,15 +894,6 @@ func (pp *partitionProducer) dispatch() {
 			continue
 		}
 
-		// Now that we know we have a broker to actually try and send this message to, generate the sequence
-		// number for it.
-		// All messages being retried (sent or not) have already had their retry count updated
-		// Also, ignore "special" syn/fin messages used to sync the brokerProducer and the topicProducer.
-		if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 {
-			msg.sequenceNumber, msg.producerEpoch = pp.parent.txnmgr.getAndIncrementSequenceNumber(msg.Topic, msg.Partition)
-			msg.hasSequence = true
-		}
-
 		if pp.parent.IsTransactional() {
 			pp.parent.txnmgr.maybeAddPartitionToCurrentTxn(pp.topic, pp.partition)
 		}
@@ -941,10 +932,6 @@ func (pp *partitionProducer) flushRetryBuffers() {
 		}
 
 		for _, msg := range pp.retryState[pp.highWatermark].buf {
-			if pp.parent.conf.Producer.Idempotent && msg.retries == 0 && msg.flags == 0 && !msg.hasSequence {
-				msg.sequenceNumber, msg.producerEpoch = pp.parent.txnmgr.getAndIncrementSequenceNumber(msg.Topic, msg.Partition)
-				msg.hasSequence = true
-			}
 			pp.brokerProducer.input <- msg
 		}
 
@@ -1197,14 +1184,6 @@ func (bp *brokerProducer) run() {
 				}
 			}
 
-			if bp.parent.txnmgr.producerID != noProducerID && bp.accumulatingBatch.producerEpoch != msg.producerEpoch {
-				// The epoch was reset, need to roll the buffer over
-				Logger.Printf("producer/broker/%d detected epoch rollover, waiting for new buffer\n", bp.broker.ID())
-				if err := bp.waitForSpace(msg, true); err != nil {
-					bp.parent.retryMessage(msg, err)
-					continue
-				}
-			}
 			if err := bp.accumulatingBatch.add(msg); err != nil {
 				bp.parent.returnError(msg, err)
 				continue
@@ -1239,6 +1218,7 @@ func (bp *brokerProducer) tryBuildFlushingBatch() <-chan struct{} {
 	unmuteSignal := bp.parent.muter.nextUnmuteSignal()
 	if bp.parent.muter.tryMute(bp.accumulatingBatch) {
 		bp.flushingBatch = bp.accumulatingBatch
+		bp.sequenceFlushingBatch()
 		bp.rollOver()
 		return nil
 	}
@@ -1252,10 +1232,31 @@ func (bp *brokerProducer) tryBuildFlushingBatch() <-chan struct{} {
 		return unmuteSignal
 	}
 	bp.flushingBatch = partial
+	bp.sequenceFlushingBatch()
 	if bp.accumulatingBatch.empty() {
 		bp.rollOver()
 	}
 	return nil
+}
+
+// sequenceFlushingBatch numbers the records of an idempotent producer's
+// flushing batch. Numbering at flush, with one batch in flight per partition,
+// keeps sequence numbers in the order batches are sent. A batch that waited
+// through an epoch bump then starts the new epoch at 0; a number taken before
+// the bump would leave a gap after a failed batch, and the broker would
+// reject it as out of order.
+func (bp *brokerProducer) sequenceFlushingBatch() {
+	if !bp.parent.conf.Producer.Idempotent {
+		return
+	}
+	bp.flushingBatch.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
+		producerID, epoch, first := bp.parent.txnmgr.getAndAddSequenceNumbers(topic, partition, int32(len(pSet.msgs)))
+		batch := pSet.recordsToSend.RecordBatch
+		batch.ProducerID, batch.ProducerEpoch, batch.FirstSequence = producerID, epoch, first
+		for i, msg := range pSet.msgs {
+			msg.sequenceNumber, msg.producerEpoch, msg.hasSequence = first+int32(i), epoch, true
+		}
+	})
 }
 
 func (bp *brokerProducer) shutdown() {

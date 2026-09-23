@@ -60,47 +60,103 @@ func expectResults(t *testing.T, p AsyncProducer, successCount, errorCount int) 
 	expectResultsWithTimeout(t, p, successCount, errorCount, 5*time.Minute)
 }
 
-func TestPartitionProducerFlushRetryBuffersAssignsSequence(t *testing.T) {
-	cfg := NewTestConfig()
-	cfg.Producer.Idempotent = true
-
-	txnmgr := &transactionManager{
-		producerID:      1,
-		producerEpoch:   0,
-		sequenceNumbers: map[string]int32{"topic-0": 1},
+func TestBrokerProducerSequencing(t *testing.T) {
+	type batchID struct {
+		epoch    int16
+		firstSeq int32
 	}
 
-	parent := &asyncProducer{
-		conf:   cfg,
-		txnmgr: txnmgr,
+	newParent := func() *asyncProducer {
+		cfg := NewTestConfig()
+		cfg.Version = V0_11_0_0
+		cfg.Producer.Idempotent = true
+		return &asyncProducer{
+			conf:   cfg,
+			muter:  newPartitionMuter(),
+			txnmgr: &transactionManager{producerID: 1, sequenceNumbers: make(map[string]int32)},
+		}
 	}
 
-	bp := &brokerProducer{
-		input: make(chan *ProducerMessage, 1),
+	// start runs brokerProducer.run and returns its input and output, and a
+	// function that stops it
+	start := func(t *testing.T, parent *asyncProducer) (chan<- *ProducerMessage, <-chan *produceSet, func()) {
+		t.Helper()
+		input := make(chan *ProducerMessage)
+		output := make(chan *produceSet)
+		responses := make(chan *brokerProducerResponse)
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             input,
+			output:            output,
+			responses:         responses,
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			bp.run()
+		}()
+		return input, output, func() {
+			close(input)
+			// shutdown flushes what is left, then closes output
+			for set := range output {
+				parent.muter.unmute(set)
+			}
+			close(responses)
+			assertDoneWithin(t, done, 2*time.Second)
+		}
 	}
 
-	pp := &partitionProducer{
-		parent:         parent,
-		topic:          "topic",
-		partition:      0,
-		brokerProducer: bp,
-		retryState:     make([]partitionRetryState, 1),
-		highWatermark:  1,
+	// flushed waits for the next flushed batch, unmutes it, and returns its ID
+	flushed := func(t *testing.T, parent *asyncProducer, output <-chan *produceSet) batchID {
+		t.Helper()
+		set := assertDoneWithin(t, output, 2*time.Second)
+		parent.muter.unmute(set)
+		batch := set.msgs["topic"][0].recordsToSend.RecordBatch
+		return batchID{epoch: batch.ProducerEpoch, firstSeq: batch.FirstSequence}
 	}
 
-	msg := &ProducerMessage{Topic: "topic", Partition: 0}
-	pp.retryState[0].buf = []*ProducerMessage{msg}
-
-	pp.flushRetryBuffers()
-
-	select {
-	case flushed := <-bp.input:
-		require.True(t, flushed.hasSequence, "message should have a sequence assigned")
-		require.Equal(t, int32(1), flushed.sequenceNumber, "sequence number should have increased")
-		require.Equal(t, txnmgr.producerEpoch, flushed.producerEpoch, "producer epoch should be the same")
-	default:
-		t.Fatal("expected buffered message to flush")
+	newMessage := func(value string) *ProducerMessage {
+		return &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder(value)}
 	}
+
+	t.Run("numbers batches in the order they are sent", func(t *testing.T) {
+		parent := newParent()
+		input, output, stop := start(t, parent)
+		defer stop()
+
+		var sent []batchID
+		for _, value := range []string{"first", "second"} {
+			input <- newMessage(value)
+			sent = append(sent, flushed(t, parent, output))
+		}
+
+		assert.Equal(t, []batchID{{epoch: 0, firstSeq: 0}, {epoch: 0, firstSeq: 1}}, sent)
+	})
+
+	t.Run("starts the new epoch at zero for a batch that waited through a bump", func(t *testing.T) {
+		parent := newParent()
+		// sequence 0 went to a batch that failed, so the broker never saw it
+		parent.txnmgr.getAndAddSequenceNumbers("topic", 0, 1)
+		// that batch keeps the partition muted until its failure is handled
+		failed := newProduceSet(parent)
+		safeAddMessage(t, failed, newMessage("failed"))
+		require.True(t, parent.muter.tryMute(failed))
+
+		input, output, stop := start(t, parent)
+		defer stop()
+		// the second send returns once the first message has been handled
+		input <- newMessage("waiting")
+		input <- newMessage("waiting too")
+
+		// the failure bumps the epoch, then releases the partition
+		parent.txnmgr.bumpEpoch()
+		parent.muter.unmute(failed)
+
+		assert.Equal(t, batchID{epoch: 1, firstSeq: 0}, flushed(t, parent, output))
+	})
 }
 
 type testPartitioner chan *int32
