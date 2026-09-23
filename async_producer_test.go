@@ -2889,6 +2889,33 @@ func TestTxnCanAbort(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestMaybeTransitionToErrorState(t *testing.T) {
+	newProducer := func() *asyncProducer {
+		return &asyncProducer{
+			conf: NewTestConfig(),
+			txnmgr: &transactionManager{
+				transactionalID:                 "test",
+				coordinatorSupportsBumpingEpoch: true,
+				status:                          ProducerTxnFlagInitializing,
+			},
+		}
+	}
+
+	t.Run("is safe while the transaction completes", func(t *testing.T) {
+		// run with -race: a produce error arrives on a brokerProducer
+		// goroutine while the user goroutine completes the transaction,
+		// here while an epoch bump is pending
+		p := newProducer()
+		done := make(chan none)
+		go func() {
+			defer close(done)
+			_ = p.maybeTransitionToErrorState(ErrOutOfOrderSequenceNumber)
+		}()
+		_ = p.txnmgr.completeTransaction()
+		assertDoneWithin(t, done, 2*time.Second)
+	})
+}
+
 func TestTxnAbortRecovery(t *testing.T) {
 	type scenario struct {
 		addErr       KError // answer to every AddPartitionsToTxn

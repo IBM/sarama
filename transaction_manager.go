@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -84,8 +85,9 @@ type transactionManager struct {
 	// used to recover when producer failed.
 	coordinatorSupportsBumpingEpoch bool
 
-	// When producer need to bump it's epoch.
-	epochBumpRequired bool
+	// When producer need to bump it's epoch. Produce errors set it from
+	// brokerProducer goroutines, so it is atomic.
+	epochBumpRequired atomic.Bool
 	// Record last seen error.
 	lastError error
 
@@ -608,7 +610,7 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 // if kafka cluster is at least 2.5.0 mark txnmngr to bump epoch else mark it as fatal.
 func (t *transactionManager) abortableErrorIfPossible(err error) error {
 	if t.coordinatorSupportsBumpingEpoch {
-		t.epochBumpRequired = true
+		t.epochBumpRequired.Store(true)
 		return t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, err)
 	}
 	return t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, err)
@@ -616,7 +618,7 @@ func (t *transactionManager) abortableErrorIfPossible(err error) error {
 
 // End current transaction.
 func (t *transactionManager) completeTransaction() error {
-	if t.epochBumpRequired {
+	if t.epochBumpRequired.Load() {
 		err := t.transitionTo(ProducerTxnFlagInitializing, nil)
 		if err != nil {
 			return err
@@ -628,8 +630,7 @@ func (t *transactionManager) completeTransaction() error {
 		}
 	}
 
-	t.lastError = nil
-	t.epochBumpRequired = false
+	t.epochBumpRequired.Store(false)
 	t.partitionsInCurrentTxn = topicPartitionSet{}
 	t.pendingPartitionsInCurrentTxn = topicPartitionSet{}
 	t.offsetsInCurrentTxn = map[string]topicPartitionOffsets{}
@@ -735,14 +736,14 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 	if len(t.partitionsInCurrentTxn) == 0 {
 		// There is no EndTxn to send, but a required epoch bump must still
 		// happen. Otherwise the producer stays in Initializing.
-		epochBump := t.epochBumpRequired
+		epochBump := t.epochBumpRequired.Load()
 		if err := t.completeTransaction(); err != nil || !epochBump {
 			return err
 		}
 		return t.initializeTransactions()
 	}
 
-	epochBump := t.epochBumpRequired
+	epochBump := t.epochBumpRequired.Load()
 	// If we're aborting the transaction, so there should be no need to add offsets.
 	if commit && len(t.offsetsInCurrentTxn) > 0 {
 		for group, offsets := range t.offsetsInCurrentTxn {
@@ -981,7 +982,7 @@ func (t *transactionManager) initializeTransactions() error {
 		// Keep the current producer id and epoch, and bump again on the next
 		// commit or abort. Otherwise the producer can reach Ready with no
 		// producer id.
-		t.epochBumpRequired = true
+		t.epochBumpRequired.Store(true)
 		return err
 	}
 	t.producerID, t.producerEpoch = producerID, producerEpoch
