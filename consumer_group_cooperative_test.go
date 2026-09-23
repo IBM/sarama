@@ -31,6 +31,8 @@ type mockCooperativeCoordinator struct {
 	memberID    string
 	forgotten   bool
 	heartbeats  []string
+
+	rebalanceHeartbeats int
 }
 
 // rebalanceNow makes the coordinator announce a rebalance on the next heartbeat.
@@ -73,6 +75,7 @@ func (m *mockCooperativeCoordinator) heartbeat(reqBody versionedDecoder) encoder
 		err = ErrUnknownMemberId
 	case m.rebalancing:
 		err = ErrRebalanceInProgress
+		m.rebalanceHeartbeats++
 	case req.GenerationId != m.gen:
 		err = ErrIllegalGeneration
 	}
@@ -173,6 +176,14 @@ func (m *mockCooperativeCoordinator) ownedAt(n int) map[string][]int32 {
 	return m.owned[n]
 }
 
+// rebalanceHeartbeatCount returns how many heartbeats were told a rebalance
+// is in progress.
+func (m *mockCooperativeCoordinator) rebalanceHeartbeatCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.rebalanceHeartbeats
+}
+
 func (m *mockCooperativeCoordinator) joinCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -239,6 +250,30 @@ func (h *trackingHandler) snapshot() trackingSnapshot {
 		cleanups: h.cleanups,
 		entries:  maps.Clone(h.entries),
 		exits:    maps.Clone(h.exits),
+	}
+}
+
+// revokeHoldingHandler keeps a revoked claim's ConsumeClaim running until
+// release is closed.
+type revokeHoldingHandler struct {
+	*trackingHandler
+	revoked     chan none // closed when the first claim is revoked
+	revokedOnce sync.Once
+	release     chan none
+}
+
+func (h *revokeHoldingHandler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
+	err := h.trackingHandler.ConsumeClaim(sess, claim)
+	h.revokedOnce.Do(func() { close(h.revoked) })
+	<-h.release
+	return err
+}
+
+func newRevokeHoldingHandler() *revokeHoldingHandler {
+	return &revokeHoldingHandler{
+		trackingHandler: newTrackingHandler(),
+		revoked:         make(chan none),
+		release:         make(chan none),
 	}
 }
 
@@ -344,6 +379,24 @@ func waitForConsume(t *testing.T, consumeDone <-chan error) error {
 		require.FailNow(t, "Consume did not return")
 		return nil
 	}
+}
+
+// rebalanceAndWaitForHeartbeat starts a rebalance and waits until a heartbeat
+// has been told about it.
+func rebalanceAndWaitForHeartbeat(t *testing.T, coord *mockCooperativeCoordinator) {
+	t.Helper()
+	seen := coord.rebalanceHeartbeatCount()
+	coord.rebalanceNow()
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		assert.Greater(c, coord.rebalanceHeartbeatCount(), seen)
+	}, 10*time.Second, 5*time.Millisecond)
+}
+
+// requireJoinsStayAt checks that the member does not join again for a while.
+func requireJoinsStayAt(t *testing.T, coord *mockCooperativeCoordinator, n int) {
+	t.Helper()
+	require.Never(t, func() bool { return coord.joinCount() > n },
+		300*time.Millisecond, 20*time.Millisecond, "the member rejoined for a rebalance it had already joined")
 }
 
 func closeCooperativeGroup(t *testing.T, group ConsumerGroup, consumeDone <-chan error) {
@@ -459,6 +512,29 @@ func TestConsumerGroupCooperativeRebalance(t *testing.T) {
 		coord.rebalanceNow()
 
 		waitForJoins(t, coord, 3)
+
+		closeCooperativeGroup(t, group, consumeDone)
+	})
+
+	t.Run("a rebalance seen while revoking is joined only once", func(t *testing.T) {
+		coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName,
+			map[string][]int32{topic: {0, 1, 2, 3}},
+			map[string][]int32{topic: {0, 1}},
+		)
+		h := newRevokeHoldingHandler()
+		group, consumeDone := startCooperativeGroup(t, coord, nil, h)
+
+		waitForClaims(t, h.trackingHandler, 4)
+		coord.rebalanceNow()
+		assertDoneWithin(t, h.revoked, 10*time.Second)
+
+		// another member starts a rebalance while this one is still revoking
+		rebalanceAndWaitForHeartbeat(t, coord)
+		close(h.release)
+
+		// the follow-up rejoin after the revoke joins that rebalance
+		waitForJoins(t, coord, 3)
+		requireJoinsStayAt(t, coord, 3)
 
 		closeCooperativeGroup(t, group, consumeDone)
 	})
