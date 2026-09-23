@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -1502,9 +1503,7 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 	leader, leaderErr := p.client.Leader(topic, partition)
 	if leaderErr != nil {
 		Logger.Printf("Failed retrying batch for %v-%d because of %v while looking up for new leader\n", topic, partition, leaderErr)
-		for _, msg := range pSet.msgs {
-			p.returnError(msg, retryErr)
-		}
+		p.returnErrors(pSet.msgs, retryErr)
 		if alreadyMuted {
 			p.muter.unmute(produceSet)
 		}
@@ -1512,9 +1511,7 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 	}
 	if !alreadyMuted {
 		if !p.muter.waitUntilMuted(produceSet) {
-			for _, msg := range pSet.msgs {
-				p.returnError(msg, retryErr)
-			}
+			p.returnErrors(pSet.msgs, retryErr)
 			return
 		}
 	}
@@ -1523,9 +1520,7 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 	select {
 	case bp.output <- produceSet:
 	case <-p.done:
-		for _, msg := range pSet.msgs {
-			p.returnError(msg, ErrShuttingDown)
-		}
+		p.returnErrors(pSet.msgs, ErrShuttingDown)
 		p.muter.unmute(produceSet)
 	}
 }
@@ -1714,29 +1709,34 @@ func (p *asyncProducer) maybeTransitionToErrorState(err error) error {
 }
 
 func (p *asyncProducer) returnError(msg *ProducerMessage, err error) {
+	p.returnErrors([]*ProducerMessage{msg}, err)
+}
+
+// returnErrors fails a batch of messages. The transaction state and the
+// epoch are updated once for the whole batch.
+func (p *asyncProducer) returnErrors(batch []*ProducerMessage, err error) {
+	if len(batch) == 0 {
+		return
+	}
 	if p.IsTransactional() {
 		_ = p.maybeTransitionToErrorState(err)
 	}
 	// We need to reset the producer ID epoch if we set a sequence number on it, because the broker
 	// will never see a message with this number, so we can never continue the sequence.
-	if !p.IsTransactional() && msg.hasSequence {
-		Logger.Printf("producer/txnmanager rolling over epoch due to publish failure on %s/%d", msg.Topic, msg.Partition)
+	if !p.IsTransactional() && slices.ContainsFunc(batch, func(msg *ProducerMessage) bool { return msg.hasSequence }) {
+		Logger.Printf("producer/txnmanager rolling over epoch due to publish failure on %s/%d", batch[0].Topic, batch[0].Partition)
 		p.bumpIdempotentProducerEpoch()
 	}
 
-	msg.clear()
-	pErr := &ProducerError{Msg: msg, Err: err}
-	if p.conf.Producer.Return.Errors {
-		p.errors <- pErr
-	} else {
-		Logger.Println(pErr)
-	}
-	p.inFlight.Done()
-}
-
-func (p *asyncProducer) returnErrors(batch []*ProducerMessage, err error) {
 	for _, msg := range batch {
-		p.returnError(msg, err)
+		msg.clear()
+		pErr := &ProducerError{Msg: msg, Err: err}
+		if p.conf.Producer.Return.Errors {
+			p.errors <- pErr
+		} else {
+			Logger.Println(pErr)
+		}
+		p.inFlight.Done()
 	}
 }
 

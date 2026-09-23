@@ -1513,6 +1513,28 @@ func TestAsyncProducerIdempotentRetryBatchBackoff(t *testing.T) {
 		"BackoffFunc should be called at least Retry.Max times during idempotent retryBatch")
 }
 
+func TestReturnErrors(t *testing.T) {
+	t.Run("bumps the idempotent epoch once per failed batch", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Producer.Idempotent = true
+		config.Producer.Return.Errors = false
+		p := &asyncProducer{
+			conf:   config,
+			txnmgr: &transactionManager{producerID: 1, sequenceNumbers: make(map[string]int32)},
+		}
+		var batch []*ProducerMessage
+		for seq := range int32(3) {
+			batch = append(batch, &ProducerMessage{Topic: "topic", Partition: 0, sequenceNumber: seq, hasSequence: true})
+		}
+		p.inFlight.Add(len(batch))
+
+		p.returnErrors(batch, ErrOutOfOrderSequenceNumber)
+
+		_, epoch := p.txnmgr.getProducerID()
+		assert.Equal(t, int16(1), epoch)
+	})
+}
+
 func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
