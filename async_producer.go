@@ -1372,6 +1372,13 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 }
 
 func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceResponse) {
+	// On a retriable error, send the batch to retryBatch and keep its
+	// partition muted if the producer is idempotent, or if retryBatch already
+	// resent this batch. In the second case the partitionProducer may have
+	// moved newer messages to another brokerProducer, and unmuting would let
+	// them be sent first.
+	retryAsBatch := bp.parent.conf.Producer.Idempotent || sent.resent
+
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
 	var retryTopics []string
@@ -1412,7 +1419,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
-				if bp.parent.conf.Producer.Idempotent {
+				if retryAsBatch {
 					if keepMuted[topic] == nil {
 						keepMuted[topic] = make(map[int32]struct{})
 					}
@@ -1429,7 +1436,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 	})
 
 	if len(retryTopics) > 0 {
-		if bp.parent.conf.Producer.Idempotent {
+		if retryAsBatch {
 			err := bp.parent.client.RefreshMetadata(retryTopics...)
 			if err != nil {
 				Logger.Printf("Failed refreshing metadata because of %v\n", err)
@@ -1452,7 +1459,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 					bp.currentRetries[topic] = make(map[int32]error)
 				}
 				bp.currentRetries[topic][partition] = block.Err
-				if bp.parent.conf.Producer.Idempotent {
+				if retryAsBatch {
 					go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
 				} else {
 					bp.parent.retryMessages(pSet.msgs, block.Err)
@@ -1476,6 +1483,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitionSet, retryErr error, alreadyMuted bool) {
 	Logger.Printf("Retrying batch for %v-%d because of %v\n", topic, partition, retryErr)
 	produceSet := newProduceSet(p)
+	produceSet.resent = true
 	produceSet.msgs[topic] = make(map[int32]*partitionSet)
 	produceSet.msgs[topic][partition] = pSet
 	produceSet.bufferBytes += pSet.bufferBytes

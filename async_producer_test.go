@@ -2238,6 +2238,87 @@ func TestBrokerProducerHandleError(t *testing.T) {
 	})
 }
 
+func TestBrokerProducerHandleSuccess(t *testing.T) {
+	// setup returns a non-idempotent parent whose leader is served by a
+	// brokerProducer with the returned output, plus a brokerProducer to
+	// handle the response and a batch it sent, muted
+	setup := func(t *testing.T) (*asyncProducer, chan *produceSet, *brokerProducer, *produceSet) {
+		t.Helper()
+		config := NewTestConfig()
+		config.Producer.Idempotent = false
+		config.Producer.Retry.Max = 2
+		config.Producer.Retry.Backoff = 0
+
+		parent := &asyncProducer{
+			conf:       config,
+			muter:      newPartitionMuter(),
+			brokers:    make(map[*Broker]*brokerProducer),
+			brokerRefs: make(map[*brokerProducer]int),
+			retries:    make(chan *ProducerMessage, 4),
+			txnmgr:     &transactionManager{},
+		}
+		leader := &Broker{id: 2}
+		parent.client = &stubLeaderClient{leader: leader, cfg: config}
+		output := make(chan *produceSet, 1)
+		parent.brokers[leader] = &brokerProducer{
+			parent: parent,
+			broker: leader,
+			output: output,
+			input:  make(chan *ProducerMessage),
+		}
+
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             make(chan *ProducerMessage),
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+
+		sent := newProduceSet(parent)
+		safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+		require.True(t, parent.muter.tryMute(sent), "sent batch should mute its partition")
+		return parent, output, bp, sent
+	}
+
+	notLeader := func() *ProduceResponse {
+		res := new(ProduceResponse)
+		res.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
+		return res
+	}
+
+	newContender := func(t *testing.T, parent *asyncProducer) *produceSet {
+		t.Helper()
+		contender := newProduceSet(parent)
+		safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+		return contender
+	}
+
+	t.Run("keeps a resent batch muted on a retriable error", func(t *testing.T) {
+		parent, output, bp, sent := setup(t)
+		sent.resent = true
+		retryPartitionSet := sent.msgs["topic"][0]
+
+		bp.handleSuccess(sent, notLeader())
+
+		retrySet := assertDoneWithin(t, output, 2*time.Second)
+		defer parent.muter.unmute(retrySet)
+		require.Equal(t, retryPartitionSet, retrySet.msgs["topic"][0])
+		assert.False(t, parent.muter.tryMute(newContender(t, parent)), "partition should stay muted by the retrying batch")
+		assert.Empty(t, parent.retries, "the batch should not go back through the partitionProducer")
+	})
+
+	t.Run("sends a first attempt back through the partitionProducer", func(t *testing.T) {
+		parent, _, bp, sent := setup(t)
+
+		bp.handleSuccess(sent, notLeader())
+
+		retried := assertDoneWithin(t, parent.retries, 2*time.Second)
+		assert.Equal(t, 1, retried.retries)
+		assert.True(t, parent.muter.tryMute(newContender(t, parent)), "partition should be unmuted")
+	})
+}
+
 type stubLeaderClient struct {
 	cfg    *Config
 	leader *Broker
