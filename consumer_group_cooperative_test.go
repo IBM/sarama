@@ -28,6 +28,9 @@ type mockCooperativeCoordinator struct {
 	syncStarted chan none
 	syncRelease chan none
 	leaderID    string
+	memberID    string
+	forgotten   bool
+	heartbeats  []string
 }
 
 // rebalanceNow makes the coordinator announce a rebalance on the next heartbeat.
@@ -35,6 +38,22 @@ func (m *mockCooperativeCoordinator) rebalanceNow() {
 	m.mu.Lock()
 	m.rebalancing = true
 	m.mu.Unlock()
+}
+
+// forgetNow starts a rebalance in which the coordinator no longer knows the
+// member, so its rejoin gets UNKNOWN_MEMBER_ID and it joins as a new member.
+func (m *mockCooperativeCoordinator) forgetNow() {
+	m.mu.Lock()
+	m.forgotten = true
+	m.rebalancing = true
+	m.mu.Unlock()
+}
+
+// heartbeatMembers returns the member id of each heartbeat received.
+func (m *mockCooperativeCoordinator) heartbeatMembers() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return slices.Clone(m.heartbeats)
 }
 
 // fenceNow makes the coordinator forget the member.
@@ -47,9 +66,10 @@ func (m *mockCooperativeCoordinator) fenceNow() {
 func (m *mockCooperativeCoordinator) heartbeat(reqBody versionedDecoder) encoderWithHeader {
 	req := reqBody.(*HeartbeatRequest)
 	m.mu.Lock()
+	m.heartbeats = append(m.heartbeats, req.MemberId)
 	err := ErrNoError
 	switch {
-	case m.fenced:
+	case m.fenced, req.MemberId != m.memberID:
 		err = ErrUnknownMemberId
 	case m.rebalancing:
 		err = ErrRebalanceInProgress
@@ -61,13 +81,21 @@ func (m *mockCooperativeCoordinator) heartbeat(reqBody versionedDecoder) encoder
 }
 
 func newMockCooperativeCoordinator(t TestReporter, protocol string, script ...map[string][]int32) *mockCooperativeCoordinator {
-	return &mockCooperativeCoordinator{t: t, script: script, protocol: protocol, leaderID: "m1"}
+	return &mockCooperativeCoordinator{t: t, script: script, protocol: protocol, leaderID: "m1", memberID: "m1"}
 }
 
 func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithHeader {
 	req := reqBody.(*JoinGroupRequest)
 
 	m.mu.Lock()
+	if m.forgotten {
+		if req.MemberId != "" {
+			m.mu.Unlock()
+			return &JoinGroupResponse{Version: req.Version, Err: ErrUnknownMemberId}
+		}
+		m.forgotten = false
+		m.memberID = "m2"
+	}
 	owned := map[string][]int32{}
 	var metadata []byte
 	for _, p := range req.OrderedGroupProtocols {
@@ -86,6 +114,7 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 	m.gen++
 	m.rebalancing = false
 	gen := m.gen
+	memberID := m.memberID
 	m.mu.Unlock()
 
 	return &JoinGroupResponse{
@@ -94,8 +123,8 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 		GenerationId:  gen,
 		GroupProtocol: m.protocol,
 		LeaderId:      m.leaderID,
-		MemberId:      "m1",
-		Members:       []GroupMember{{MemberId: "m1", Metadata: metadata}},
+		MemberId:      memberID,
+		Members:       []GroupMember{{MemberId: memberID, Metadata: metadata}},
 	}
 }
 
@@ -533,6 +562,32 @@ func TestConsumerGroupCooperativeRebalance(t *testing.T) {
 		coord.fenceNow()
 
 		require.NoError(t, waitForConsume(t, consumeDone))
+	})
+
+	t.Run("a member rejoining under a new member id keeps its session", func(t *testing.T) {
+		coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName,
+			map[string][]int32{},              // generation 1: nothing assigned
+			map[string][]int32{topic: {0, 1}}, // generation 2: joined as m2
+		)
+		h := newTrackingHandler()
+		group, consumeDone := startCooperativeGroup(t, coord, nil, h)
+
+		waitForJoins(t, coord, 1)
+		coord.forgetNow()
+		waitForClaims(t, h, 2)
+
+		before := len(coord.heartbeatMembers())
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			after := coord.heartbeatMembers()[before:]
+			assert.NotEmpty(c, after)
+			assert.NotContains(c, after, "m1", "heartbeats after the rejoin should use the new member id")
+		}, 10*time.Second, 20*time.Millisecond)
+
+		state := h.snapshot()
+		require.Equal(t, 1, state.setups, "the session should survive the new member id")
+		require.Zero(t, state.cleanups)
+
+		closeCooperativeGroup(t, group, consumeDone)
 	})
 
 	t.Run("a partition count change makes the leader rejoin in place", func(t *testing.T) {

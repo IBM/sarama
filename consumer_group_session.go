@@ -61,11 +61,11 @@ type runningClaim struct {
 }
 
 type consumerGroupSession struct {
-	parent   *consumerGroup
-	memberID string
-	handler  ConsumerGroupHandler
+	parent  *consumerGroup
+	handler ConsumerGroupHandler
 
 	// cooperative sessions replace these values on each generation
+	memberID     atomic.Pointer[string]
 	generationID atomic.Int32
 	claims       atomic.Pointer[map[string][]int32]
 
@@ -100,17 +100,17 @@ func newConsumerGroupSession(ctx context.Context, parent *consumerGroup, claims 
 
 	// init session
 	sess := &consumerGroupSession{
-		parent:   parent,
-		memberID: memberID,
-		handler:  handler,
-		offsets:  offsets,
-		ctx:      ctx,
-		cancel:   cancel,
-		running:  make(map[topicPartitionAssignment]*runningClaim),
-		rejoin:   make(chan error, 1),
-		hbDying:  make(chan none),
-		hbDead:   make(chan none),
+		parent:  parent,
+		handler: handler,
+		offsets: offsets,
+		ctx:     ctx,
+		cancel:  cancel,
+		running: make(map[topicPartitionAssignment]*runningClaim),
+		rejoin:  make(chan error, 1),
+		hbDying: make(chan none),
+		hbDead:  make(chan none),
 	}
+	sess.memberID.Store(&memberID)
 	sess.generationID.Store(generationID)
 	sess.claims.Store(&claims)
 
@@ -225,7 +225,7 @@ func (s *consumerGroupSession) startClaim(topic string, partition int32) {
 }
 
 func (s *consumerGroupSession) Claims() map[string][]int32 { return *s.claims.Load() }
-func (s *consumerGroupSession) MemberID() string           { return s.memberID }
+func (s *consumerGroupSession) MemberID() string           { return *s.memberID.Load() }
 func (s *consumerGroupSession) GenerationID() int32        { return s.generationID.Load() }
 
 func (s *consumerGroupSession) MarkOffset(topic string, partition int32, offset int64, metadata string) {
@@ -377,7 +377,7 @@ func (s *consumerGroupSession) release(withCleanup bool) (err error) {
 func (s *consumerGroupSession) sendHeartbeat(coordinator *Broker) (*HeartbeatResponse, error) {
 	s.generationMu.Lock()
 	defer s.generationMu.Unlock()
-	return s.parent.heartbeatRequest(coordinator, s.memberID, s.GenerationID())
+	return s.parent.heartbeatRequest(coordinator, s.MemberID(), s.GenerationID())
 }
 
 func (s *consumerGroupSession) heartbeatLoop() {
