@@ -231,6 +231,14 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	// Close may have left the group between the check above and taking the
+	// lock; joining now would add a member that nothing ever removes
+	select {
+	case <-c.closed:
+		return ErrClosedConsumerGroup
+	default:
+	}
+
 	// Quick exit when no topics are provided
 	if len(topics) == 0 {
 		return fmt.Errorf("no topics provided")
