@@ -393,7 +393,7 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 			return nil, join.Err
 		}
 		return c.joinSync(ctx, topics, held, retries)
-	case ErrNotCoordinatorForConsumer, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
+	case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
 		// retry after backoff
 		if retries <= 0 {
 			return nil, join.Err
@@ -470,7 +470,7 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 			return nil, syncGroupResponse.Err
 		}
 		return c.joinSync(ctx, topics, held, retries)
-	case ErrNotCoordinatorForConsumer, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
+	case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
 		// retry after backoff
 		if retries <= 0 {
 			return nil, syncGroupResponse.Err
