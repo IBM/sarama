@@ -1676,3 +1676,54 @@ func TestClientCloseRaces(t *testing.T) {
 		_ = seedBroker.Close()
 	})
 }
+
+func TestClientLeaderEpoch(t *testing.T) {
+	for _, tc := range []struct {
+		name              string
+		firstID, secondID Uuid
+		wantEpoch         int32
+	}{
+		{"keeps the newer epoch when a lagging broker reports an older one", Uuid{1}, Uuid{1}, 5},
+		{"accepts an older epoch once the topic is re-created", Uuid{1}, Uuid{2}, 3},
+		{"accepts an older epoch when the broker sends no topic id", Uuid{}, Uuid{}, 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			seed := NewMockBroker(t, 1)
+			defer seed.Close()
+
+			var epoch atomic.Int32
+			var id atomic.Pointer[Uuid]
+			epoch.Store(5)
+			id.Store(&tc.firstID)
+			seed.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+				"MetadataRequest": func(req *request) encoderWithHeader {
+					res := &MetadataResponse{Version: req.body.version()}
+					res.AddBroker(seed.Addr(), seed.BrokerID())
+					res.AddTopicPartition("my_topic", 0, seed.BrokerID(), nil, nil, nil, ErrNoError)
+					res.Topics[0].Uuid = *id.Load()
+					res.Topics[0].Partitions[0].LeaderEpoch = epoch.Load()
+					return res
+				},
+			})
+
+			conf := NewTestConfig()
+			conf.Version = V2_8_0_0 // metadata responses carry topic ids
+			conf.Metadata.Retry.Max = 0
+			c, err := NewClient([]string{seed.Addr()}, conf)
+			require.NoError(t, err)
+			defer safeClose(t, c)
+
+			_, e, err := c.LeaderAndEpoch("my_topic", 0)
+			require.NoError(t, err)
+			require.Equal(t, int32(5), e)
+
+			epoch.Store(3)
+			id.Store(&tc.secondID)
+			require.NoError(t, c.RefreshMetadata("my_topic"))
+
+			_, e, err = c.LeaderAndEpoch("my_topic", 0)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantEpoch, e)
+		})
+	}
+}
