@@ -106,6 +106,10 @@ type transactionManager struct {
 	// Consumer group metadata per group whose offsets are added to the
 	// transaction, keyed by group ID.
 	groupMetadataInCurrentTxn map[string]*ConsumerGroupMetadata
+
+	// AddOffsetsToTxn has added a group to the transaction on the coordinator,
+	// so the transaction must end with EndTxn even with no records produced.
+	offsetsAddedToTxn bool
 }
 
 const (
@@ -387,6 +391,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 	if lastError != nil {
 		return offsets, lastError
 	}
+	t.offsetsAddedToTxn = true
 
 	resultOffsets := offsets
 	// Then TxnOffsetCommit
@@ -635,6 +640,7 @@ func (t *transactionManager) completeTransaction() error {
 	t.pendingPartitionsInCurrentTxn = topicPartitionSet{}
 	t.offsetsInCurrentTxn = map[string]topicPartitionOffsets{}
 	t.groupMetadataInCurrentTxn = map[string]*ConsumerGroupMetadata{}
+	t.offsetsAddedToTxn = false
 
 	return nil
 }
@@ -732,8 +738,10 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 		return t.lastError
 	}
 
-	// if no records has been sent don't do anything.
-	if len(t.partitionsInCurrentTxn) == 0 {
+	// if nothing has been added to the transaction on the brokers and a commit
+	// has no offsets to add, don't do anything.
+	if len(t.partitionsInCurrentTxn) == 0 && !t.offsetsAddedToTxn &&
+		(!commit || len(t.offsetsInCurrentTxn) == 0) {
 		// There is no EndTxn to send, but a required epoch bump must still
 		// happen. Otherwise the producer stays in Initializing.
 		epochBump := t.epochBumpRequired.Load()
