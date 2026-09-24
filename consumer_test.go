@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -2547,6 +2548,45 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		}
 	})
 
+	t.Run("keeps errors open while Close races the broker error", func(t *testing.T) {
+		// the errors buffer is full, so abort blocks sending the broker error
+		child := newChild(1)
+		child.errors <- &ConsumerError{
+			Topic:     child.topic,
+			Partition: child.partition,
+			Err:       errors.New("existing error"),
+		}
+		bc := newBrokerConsumer(child)
+
+		go withRecover(child.dispatcher)
+		go withRecover(child.responseFeeder)
+		go withRecover(bc.subscriptionManager)
+		aborted := make(chan any, 1)
+		go func() {
+			defer func() { aborted <- recover() }()
+			bc.abort(errors.New("broker disconnected"))
+		}()
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, goroutineBlocked("notifyError", "chan send"))
+		}, 5*time.Second, time.Millisecond, "abort did not block delivering the broker error")
+
+		child.AsyncClose()
+
+		// the dispatcher must wait for the handover while abort still owns the
+		// subscription; otherwise errors is closed under the blocked send
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, len(aborted) > 0 || goroutineBlocked("waitForBrokerHandover", "select"))
+		}, 5*time.Second, time.Millisecond)
+
+		var errs []string
+		for err := range child.errors {
+			errs = append(errs, err.Err.Error())
+		}
+		assert.Equal(t, []string{"existing error", "broker disconnected"}, errs)
+		require.Nil(t, assertDoneWithin(t, aborted, 5*time.Second), "abort panicked")
+	})
+
 	t.Run("rejects new subscriptions after abort starts", func(t *testing.T) {
 		child := newChild(config.ChannelBufferSize)
 		bc := newBrokerConsumer(child)
@@ -2670,4 +2710,18 @@ func TestConsumerPause(t *testing.T) {
 		require.NoError(t, c.addChild(reassigned))
 		assert.False(t, reassigned.IsPaused())
 	})
+}
+
+// goroutineBlocked reports whether a goroutine is parked in the given wait
+// state (as runtime.Stack prints it, e.g. "chan send") inside function.
+func goroutineBlocked(function, state string) bool {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	for g := range strings.SplitSeq(string(buf), "\n\n") {
+		header, _, _ := strings.Cut(g, "\n")
+		if strings.Contains(header, "["+state) && strings.Contains(g, "."+function+"(") {
+			return true
+		}
+	}
+	return false
 }
