@@ -558,8 +558,8 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 		var coordinator *Broker
 		if t.isTransactional() {
 			coordinator, err = t.client.TransactionCoordinator(t.transactionalID)
-		} else {
-			coordinator = t.client.LeastLoadedBroker()
+		} else if coordinator = t.client.LeastLoadedBroker(); coordinator == nil {
+			err = ErrOutOfBrokers
 		}
 		if err != nil {
 			return -1, -1, true, err
