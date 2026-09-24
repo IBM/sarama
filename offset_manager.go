@@ -159,6 +159,12 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 
 	partitions := map[string][]int32{topic: {partition}}
 	req := NewOffsetFetchRequest(om.conf.Version, om.group, partitions)
+	// a read_committed consumer must not start below an offset that a
+	// transaction has committed but whose commit marker is not yet written
+	// (otherwise it reprocesses records whose output that transaction commits)
+	req.RequireStable = om.conf.Consumer.IsolationLevel == ReadCommitted && req.Version >= 7
+	// fall back to an unstable fetch on brokers before 2.5, as the Java consumer does
+	req.dropUnsupportedRequireStable = true
 	resp, err := broker.FetchOffset(req)
 	if err != nil {
 		if retries <= 0 {
@@ -195,7 +201,7 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 		case <-time.After(backoff):
 		}
 		return om.fetchInitialOffset(topic, partition, retries-1)
-	case ErrOffsetsLoadInProgress:
+	case ErrOffsetsLoadInProgress, ErrUnstableOffsetCommit:
 		if retries <= 0 {
 			return 0, 0, "", block.Err
 		}
