@@ -1023,6 +1023,13 @@ func (p *asyncProducer) newBrokerProducer(broker *Broker) *brokerProducer {
 			if p.IsTransactional() {
 				// Add partition to tx before sending current batch
 				err := p.txnmgr.publishTxnPartitions()
+				if err == nil && !p.txnmgr.allPartitionsInTxn(set) {
+					// Never send records for a partition the coordinator has not
+					// added. This can happen when AddPartitionsToTxn failed and the
+					// transaction is being aborted. The records would sit outside
+					// any transaction and could leave it hanging on the broker.
+					err = ErrTransactionNotReady
+				}
 				if err != nil {
 					// Request failed to be sent
 					sendResponse(nil, err)
@@ -1532,7 +1539,9 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 
 func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 	var target PacketEncodingError
-	if errors.As(err, &target) {
+	// Neither error means the connection is bad, and a retry would fail the
+	// same way, so fail the batch.
+	if errors.As(err, &target) || errors.Is(err, ErrTransactionNotReady) {
 		sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 			bp.parent.returnErrors(pSet.msgs, err)
 		})
@@ -1704,8 +1713,14 @@ func (p *asyncProducer) maybeTransitionToErrorState(err error) error {
 	if errors.Is(err, ErrClusterAuthorizationFailed) ||
 		errors.Is(err, ErrProducerFenced) ||
 		errors.Is(err, ErrUnsupportedVersion) ||
-		errors.Is(err, ErrTransactionalIDAuthorizationFailed) {
+		errors.Is(err, ErrTransactionalIDAuthorizationFailed) ||
+		errors.Is(err, ErrInvalidProducerIDMapping) {
 		return p.txnmgr.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, err)
+	}
+	if p.txnmgr.currentTxnStatus()&ProducerTxnFlagAbortingTransaction != 0 {
+		// The transaction is already being aborted. Moving it to an error state
+		// would make the abort fail.
+		return nil
 	}
 	if p.txnmgr.coordinatorSupportsBumpingEpoch && p.txnmgr.currentTxnStatus()&ProducerTxnFlagEndTransaction == 0 {
 		p.txnmgr.epochBumpRequired = true

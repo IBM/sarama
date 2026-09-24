@@ -2889,6 +2889,168 @@ func TestTxnCanAbort(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestTxnAbortRecovery(t *testing.T) {
+	type scenario struct {
+		addErr       KError // answer to every AddPartitionsToTxn
+		endErr       KError // answer to every EndTxn
+		initFails    int    // InitProducerId calls to fail after the first
+		retryBackoff time.Duration
+	}
+
+	// start runs a transactional producer against a broker that behaves as
+	// sc describes, and returns the producer and a count of the requests the
+	// broker received by type
+	start := func(t *testing.T, sc scenario) (*asyncProducer, func(string) int) {
+		t.Helper()
+		broker := NewMockBroker(t, 1)
+		t.Cleanup(broker.Close)
+
+		var mu sync.Mutex
+		counts := make(map[string]int)
+		count := func(name string) int {
+			mu.Lock()
+			defer mu.Unlock()
+			return counts[name]
+		}
+		handlers := map[string]func(n int, req *request) encoderWithHeader{
+			"MetadataRequest": func(_ int, req *request) encoderWithHeader {
+				return NewMockMetadataResponse(t).
+					SetController(broker.BrokerID()).
+					SetBroker(broker.Addr(), broker.BrokerID()).
+					SetLeader("test-topic", 0, broker.BrokerID()).For(req.body)
+			},
+			"FindCoordinatorRequest": func(_ int, req *request) encoderWithHeader {
+				return NewMockFindCoordinatorResponse(t).
+					SetCoordinator(CoordinatorTransaction, "test", broker).For(req.body)
+			},
+			"InitProducerIDRequest": func(n int, req *request) encoderWithHeader {
+				if n > 1 && n <= 1+sc.initFails {
+					return &InitProducerIDResponse{Version: req.body.version(), Err: ErrConcurrentTransactions}
+				}
+				// each successful call bumps the epoch
+				epoch := n - 1
+				if n > 1 {
+					epoch -= sc.initFails
+				}
+				return &InitProducerIDResponse{Version: req.body.version(), ProducerID: 1000, ProducerEpoch: int16(epoch)}
+			},
+			"AddPartitionsToTxnRequest": func(_ int, req *request) encoderWithHeader {
+				return &AddPartitionsToTxnResponse{
+					Version: req.body.version(),
+					Errors:  map[string][]*PartitionError{"test-topic": {{Partition: 0, Err: sc.addErr}}},
+				}
+			},
+			"ProduceRequest": func(_ int, req *request) encoderWithHeader {
+				res := &ProduceResponse{Version: req.body.version()}
+				res.AddTopicPartition("test-topic", 0, ErrNoError)
+				return res
+			},
+			"EndTxnRequest": func(_ int, req *request) encoderWithHeader {
+				return &EndTxnResponse{Version: req.body.version(), Err: sc.endErr}
+			},
+		}
+		funcs := make(map[string]requestHandlerFunc, len(handlers))
+		for name, handle := range handlers {
+			funcs[name] = func(req *request) encoderWithHeader {
+				mu.Lock()
+				counts[name]++
+				n := counts[name]
+				mu.Unlock()
+				return handle(n, req)
+			}
+		}
+		broker.SetHandlerFuncByMap(funcs)
+
+		config := NewTestConfig()
+		config.Version = V2_6_0_0
+		config.ApiVersionsRequest = false
+		config.Producer.Idempotent = true
+		config.Producer.Transaction.ID = "test"
+		config.Producer.Transaction.Retry.Backoff = 10 * time.Millisecond
+		config.Producer.Transaction.Retry.Max = 2
+		config.Producer.RequiredAcks = WaitForAll
+		config.Producer.Partitioner = NewManualPartitioner
+		config.Producer.Return.Errors = true
+		config.Producer.Retry.Max = 1
+		config.Producer.Retry.Backoff = sc.retryBackoff
+		config.Net.MaxOpenRequests = 1
+
+		ap, err := NewAsyncProducer([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = ap.Close() })
+		return ap.(*asyncProducer), count
+	}
+
+	t.Run("bumps the epoch when no partition was added", func(t *testing.T) {
+		producer, count := start(t, scenario{addErr: ErrUnknownProducerID, retryBackoff: 10 * time.Millisecond})
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		pErr := assertDoneWithin(t, producer.Errors(), 5*time.Second)
+		require.ErrorIs(t, pErr, ErrUnknownProducerID)
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		assert.Equal(t, 2, count("InitProducerIDRequest"))
+		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+		assert.NoError(t, producer.BeginTxn())
+	})
+
+	t.Run("does not send a retried batch for a partition never added", func(t *testing.T) {
+		// the backoff keeps the batch waiting to retry while AbortTxn starts
+		producer, count := start(t, scenario{addErr: ErrOperationNotAttempted, retryBackoff: 500 * time.Millisecond})
+
+		// AbortTxn waits for the batch, whose error must be read meanwhile
+		errs := make(chan *ProducerError, 1)
+		go func() { errs <- <-producer.Errors() }()
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.NotZero(c, producer.TxnStatus()&ProducerTxnFlagAbortableError)
+		}, 5*time.Second, time.Millisecond)
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Zero(t, count("ProduceRequest"), "records sent for a partition outside the transaction")
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		pErr := assertDoneWithin(t, errs, 5*time.Second)
+		assert.Error(t, pErr.Err, "the batch should fail instead of being sent")
+	})
+
+	t.Run("treats an invalid producer id mapping as fatal", func(t *testing.T) {
+		producer, count := start(t, scenario{endErr: ErrInvalidProducerIDMapping, retryBackoff: 10 * time.Millisecond})
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		require.ErrorIs(t, producer.CommitTxn(), ErrInvalidProducerIDMapping)
+
+		// the transactional id has expired: carrying on under a new producer
+		// id could let an instance that was already fenced commit again
+		assert.NotZero(t, producer.TxnStatus()&ProducerTxnFlagFatalError)
+		require.Error(t, producer.AbortTxn())
+		assert.Equal(t, 1, count("InitProducerIDRequest"))
+	})
+
+	t.Run("retries a failed epoch bump on the next abort", func(t *testing.T) {
+		// the first bump fails on every attempt
+		producer, count := start(t, scenario{addErr: ErrUnknownProducerID, initFails: 3, retryBackoff: 10 * time.Millisecond})
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		pErr := assertDoneWithin(t, producer.Errors(), 5*time.Second)
+		require.ErrorIs(t, pErr, ErrUnknownProducerID)
+
+		require.ErrorIs(t, producer.AbortTxn(), ErrConcurrentTransactions)
+		assert.Equal(t, int64(1000), producer.txnmgr.producerID, "a failed bump should keep the producer id")
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Equal(t, 5, count("InitProducerIDRequest"))
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+		assert.NoError(t, producer.BeginTxn())
+	})
+}
+
 func TestProducerRetryBufferLimits(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()

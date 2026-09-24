@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -369,9 +368,11 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		case ErrConcurrentTransactions:
 			// Retry
 		case ErrUnknownProducerID:
-			fallthrough
-		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrInvalidProducerIDMapping:
+			// fatal: the transactional id expired, and re-initializing could let an
+			// instance that was already fenced commit again
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		case ErrGroupAuthorizationFailed:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		default:
@@ -594,6 +595,8 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 				_ = coordinator.Close()
 				_ = t.client.RefreshTransactionCoordinator(t.transactionalID)
 			}
+		case ErrConcurrentTransactions:
+			// Retry: the coordinator is still finishing the previous transaction.
 		// Fatal errors
 		default:
 			return -1, -1, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
@@ -702,9 +705,11 @@ func (t *transactionManager) endTxn(commit bool) error {
 		case ErrConcurrentTransactions:
 			// Just retry
 		case ErrUnknownProducerID:
-			fallthrough
-		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrInvalidProducerIDMapping:
+			// fatal: the transactional id expired, and re-initializing could let an
+			// instance that was already fenced commit again
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		// Fatal errors
 		default:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
@@ -728,7 +733,13 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 
 	// if no records has been sent don't do anything.
 	if len(t.partitionsInCurrentTxn) == 0 {
-		return t.completeTransaction()
+		// There is no EndTxn to send, but a required epoch bump must still
+		// happen. Otherwise the producer stays in Initializing.
+		epochBump := t.epochBumpRequired
+		if err := t.completeTransaction(); err != nil || !epochBump {
+			return err
+		}
+		return t.initializeTransactions()
 	}
 
 	epochBump := t.epochBumpRequired
@@ -749,14 +760,11 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 		return t.lastError
 	}
 
-	if !errors.Is(t.lastError, ErrInvalidProducerIDMapping) {
-		err := t.endTxn(commit)
-		if err != nil {
-			return err
-		}
-		if !epochBump {
-			return nil
-		}
+	if err := t.endTxn(commit); err != nil {
+		return err
+	}
+	if !epochBump {
+		return nil
 	}
 	// reset pid and epoch if needed.
 	return t.initializeTransactions()
@@ -779,6 +787,18 @@ func (t *transactionManager) maybeAddPartitionToCurrentTxn(topic string, partiti
 	}
 
 	t.pendingPartitionsInCurrentTxn[tp] = struct{}{}
+}
+
+// allPartitionsInTxn reports whether every partition in the set has been
+// added to the current transaction.
+func (t *transactionManager) allPartitionsInTxn(set *produceSet) bool {
+	t.partitionInTxnLock.Lock()
+	defer t.partitionInTxnLock.Unlock()
+
+	return !set.anyPartition(func(topic string, partition int32, _ *partitionSet) bool {
+		_, ok := t.partitionsInCurrentTxn[topicPartition{topic: topic, partition: partition}]
+		return !ok
+	})
 }
 
 // Makes a request to kafka to add a list of partitions to the current transaction.
@@ -897,10 +917,13 @@ func (t *transactionManager) publishTxnPartitions() error {
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 				case ErrUnknownProducerID:
-					fallthrough
-				case ErrInvalidProducerIDMapping:
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.abortableErrorIfPossible(response.Err)
+				case ErrInvalidProducerIDMapping:
+					// fatal: the transactional id expired, and re-initializing could let an
+					// instance that was already fenced commit again
+					removeAllPartitionsOnFatalOrAbortedError()
+					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 				// Fatal errors
 				default:
 					removeAllPartitionsOnFatalOrAbortedError()
@@ -952,7 +975,15 @@ func newTransactionManager(conf *Config, client Client) (*transactionManager, er
 }
 
 // re-init producer-id and producer-epoch if needed.
-func (t *transactionManager) initializeTransactions() (err error) {
-	t.producerID, t.producerEpoch, err = t.initProducerId()
-	return
+func (t *transactionManager) initializeTransactions() error {
+	producerID, producerEpoch, err := t.initProducerId()
+	if err != nil {
+		// Keep the current producer id and epoch, and bump again on the next
+		// commit or abort. Otherwise the producer can reach Ready with no
+		// producer id.
+		t.epochBumpRequired = true
+		return err
+	}
+	t.producerID, t.producerEpoch = producerID, producerEpoch
+	return nil
 }
