@@ -159,6 +159,7 @@ type client struct {
 	brokers                 map[int32]*Broker                       // maps broker ids to brokers
 	metadata                map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
 	metadataTopics          map[string]none                         // topics that need to collect metadata
+	topicIDs                map[string]Uuid                         // last topic id seen per topic, to tell a re-created topic from a lagging broker
 	coordinators            map[string]int32                        // Maps consumer group names to coordinating broker IDs
 	transactionCoordinators map[string]int32                        // Maps transaction ids to coordinating broker IDs
 
@@ -1113,6 +1114,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 
 	client.controllerID = data.ControllerID
 
+	previous := client.metadata
 	if allKnownMetaData {
 		client.metadata = make(map[string]map[int32]*PartitionMetadata)
 		client.metadataTopics = make(map[string]none)
@@ -1127,6 +1129,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		if _, exists := client.metadataTopics[topic.Name]; !exists {
 			client.metadataTopics[topic.Name] = none{}
 		}
+		cached := previous[topic.Name]
 		delete(client.metadata, topic.Name)
 		delete(client.cachedPartitionsResults, topic.Name)
 
@@ -1149,8 +1152,21 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 			continue
 		}
 
+		// a broker with a lagging metadata cache can report an older leader
+		// epoch; keep the newer entry unless the topic id shows the topic was
+		// re-created (leader epochs restart then)
+		sameTopic := topic.Uuid != (Uuid{}) && topic.Uuid == client.topicIDs[topic.Name]
+		if client.topicIDs == nil {
+			client.topicIDs = make(map[string]Uuid)
+		}
+		client.topicIDs[topic.Name] = topic.Uuid
+
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
+			if newer, ok := cached[partition.ID]; ok && sameTopic &&
+				partition.LeaderEpoch >= 0 && partition.LeaderEpoch < newer.LeaderEpoch {
+				partition = newer
+			}
 			client.metadata[topic.Name][partition.ID] = partition
 			if errors.Is(partition.Err, ErrLeaderNotAvailable) {
 				topicErrs.addError(topic.Name, partition.Err)
