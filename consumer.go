@@ -1230,6 +1230,7 @@ func (bc *brokerConsumer) handleResponses() {
 		}
 
 		// Discard any replica preference.
+		fromReplica := child.preferredReadReplica != invalidPreferredReplicaID
 		child.preferredReadReplica = invalidPreferredReplicaID
 		child.preferredReadReplicaExpiry = time.Time{}
 
@@ -1240,6 +1241,14 @@ func (bc *brokerConsumer) handleResponses() {
 			// so it will loop back through subscriptionManager so no need to
 			// release it here
 			delete(bc.subscriptions, child)
+		} else if errors.Is(result, ErrOffsetOutOfRange) && fromReplica {
+			// a follower can lag behind an offset the leader already served;
+			// refetch from the leader, which reports ErrOffsetOutOfRange itself
+			// if the offset really is out of range
+			Logger.Printf("consumer/broker/%d abandoned subscription to %s/%d because %s from preferred replica\n",
+				bc.broker.ID(), child.topic, child.partition, result)
+			child.triggerRedispatch()
+			bc.releaseSubscription(child)
 		} else if errors.Is(result, ErrOffsetOutOfRange) {
 			// there's no point in retrying this it will just fail the same way again
 			// shut it down and force the user to choose what to do
