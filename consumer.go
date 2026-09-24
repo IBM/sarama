@@ -287,7 +287,11 @@ func (c *consumer) abandonBrokerConsumer(brokerWorker *brokerConsumer) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	delete(c.brokerConsumers, brokerWorker.broker)
+	// a worker that was already replaced for its broker must leave the
+	// replacement in place
+	if c.brokerConsumers[brokerWorker.broker] == brokerWorker {
+		delete(c.brokerConsumers, brokerWorker.broker)
+	}
 }
 
 // Pause implements Consumer.
