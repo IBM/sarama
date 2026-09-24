@@ -1627,3 +1627,52 @@ func TestDeregisterBroker(t *testing.T) {
 	c.deregisterBroker(current)
 	assert.NotContains(t, c.brokers, int32(1))
 }
+
+func TestClientCloseRaces(t *testing.T) {
+	t.Run("a refresh in flight during Close does not reopen a seed broker", func(t *testing.T) {
+		seed := NewMockBroker(t, 1)
+		defer seed.Close()
+		leader := NewMockBroker(t, 2)
+
+		metadata := new(MetadataResponse)
+		metadata.AddBroker(leader.Addr(), leader.BrokerID())
+		metadata.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+		seed.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockWrapper(metadata),
+		})
+		received := make(chan none)
+		release := make(chan none)
+		leader.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				close(received)
+				<-release
+				return nil
+			},
+		})
+
+		conf := NewTestConfig()
+		conf.Metadata.Retry.Max = 0
+		c, err := NewClient([]string{seed.Addr()}, conf)
+		require.NoError(t, err)
+		seedBroker := c.(*client).seedBrokers[0]
+
+		refreshed := make(chan error, 1)
+		go func() { refreshed <- c.RefreshMetadata("my_topic") }()
+		<-received
+
+		require.NoError(t, c.Close())
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			connected, _ := seedBroker.Connected()
+			assert.False(ct, connected, "Close did not close the seed broker")
+		}, 5*time.Second, time.Millisecond)
+
+		// the leader drops the connection, so the refresh falls back to the seed
+		close(release)
+		leader.Close()
+		require.Error(t, assertDoneWithin(t, refreshed, 5*time.Second), "a refresh cut short by Close should fail")
+
+		connected, _ := seedBroker.Connected()
+		assert.False(t, connected, "seed broker reopened after Close")
+		_ = seedBroker.Close()
+	})
+}

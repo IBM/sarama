@@ -794,6 +794,11 @@ func (client *client) LeastLoadedBroker() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
+	// Close leaves seedBrokers set; opening one now would never be closed
+	if client.brokers == nil {
+		return nil
+	}
+
 	var leastLoadedBroker *Broker
 	pendingRequests := math.MaxInt
 	for _, broker := range client.brokers {
