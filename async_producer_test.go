@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -3570,5 +3571,133 @@ func TestAsyncProducerPartitionUnmuting(t *testing.T) {
 		}
 
 		closeProducer(t, producer)
+	})
+}
+
+// newTxnCoordinatorsMock serves a transaction coordinator and a group
+// coordinator whose group is at generation groupGeneration. TxnOffsetCommit
+// requests from any other generation get ILLEGAL_GENERATION.
+func newTxnCoordinatorsMock(t *testing.T, groupGeneration int32) *MockBroker {
+	broker := NewMockBroker(t, 1)
+	broker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			resp := &MetadataResponse{Version: req.body.version(), ControllerID: broker.BrokerID()}
+			resp.AddBroker(broker.Addr(), broker.BrokerID())
+			resp.AddTopicPartition("out", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+			return resp
+		},
+		"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+			return &FindCoordinatorResponse{
+				Version:     req.body.version(),
+				Coordinator: &Broker{id: broker.BrokerID(), addr: broker.Addr()},
+			}
+		},
+		"InitProducerIDRequest": func(req *request) encoderWithHeader {
+			return &InitProducerIDResponse{Version: req.body.version(), ProducerID: 1}
+		},
+		"AddPartitionsToTxnRequest": func(req *request) encoderWithHeader {
+			r := req.body.(*AddPartitionsToTxnRequest)
+			resp := &AddPartitionsToTxnResponse{Version: r.Version, Errors: map[string][]*PartitionError{}}
+			for topic, partitions := range r.TopicPartitions {
+				for _, p := range partitions {
+					resp.Errors[topic] = append(resp.Errors[topic], &PartitionError{Partition: p})
+				}
+			}
+			return resp
+		},
+		"ProduceRequest": func(req *request) encoderWithHeader {
+			resp := &ProduceResponse{Version: req.body.version()}
+			resp.AddTopicPartition("out", 0, ErrNoError)
+			return resp
+		},
+		"AddOffsetsToTxnRequest": func(req *request) encoderWithHeader {
+			return &AddOffsetsToTxnResponse{Version: req.body.version()}
+		},
+		"TxnOffsetCommitRequest": func(req *request) encoderWithHeader {
+			r := req.body.(*TxnOffsetCommitRequest)
+			kerr := ErrNoError
+			if r.Version >= 3 && r.GenerationID != groupGeneration {
+				kerr = ErrIllegalGeneration
+			}
+			resp := &TxnOffsetCommitResponse{Version: r.Version, Topics: map[string][]*PartitionError{}}
+			for topic, offsets := range r.Topics {
+				for _, o := range offsets {
+					resp.Topics[topic] = append(resp.Topics[topic], &PartitionError{Partition: o.Partition, Err: kerr})
+				}
+			}
+			return resp
+		},
+		"EndTxnRequest": func(req *request) encoderWithHeader {
+			return &EndTxnResponse{Version: req.body.version()}
+		},
+	})
+	return broker
+}
+
+func newTxnProducerForMock(t *testing.T, broker *MockBroker) *asyncProducer {
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V2_5_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Transaction.Retry.Backoff = 0
+
+	ap, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ap.Close() })
+	return ap.(*asyncProducer)
+}
+
+func TestTxnCommitOffsets(t *testing.T) {
+	t.Run("a transaction with only offsets commits them", func(t *testing.T) {
+		broker := newTxnCoordinatorsMock(t, 1)
+		defer broker.Close()
+		producer := newTxnProducerForMock(t, broker)
+
+		require.NoError(t, producer.BeginTxn())
+		group := &ConsumerGroupMetadata{GroupID: "group", GenerationID: 1, MemberID: "m1"}
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 0, Offset: 6}}}, group))
+		require.NoError(t, producer.CommitTxn())
+
+		var sent []string
+		for _, rr := range broker.History() {
+			switch rr.Request.(type) {
+			case *AddOffsetsToTxnRequest, *TxnOffsetCommitRequest, *EndTxnRequest:
+				sent = append(sent, fmt.Sprintf("%T", rr.Request))
+			}
+		}
+		assert.Equal(t, []string{"*sarama.AddOffsetsToTxnRequest", "*sarama.TxnOffsetCommitRequest", "*sarama.EndTxnRequest"}, sent,
+			"CommitTxn succeeded without committing the offsets")
+	})
+
+	t.Run("offsets keep the generation they were added with", func(t *testing.T) {
+		// offsets for partition 0 were added at generation 1; a cooperative
+		// rebalance then moved partition 0 away, and the retained partition 1
+		// added offsets at generation 2
+		broker := newTxnCoordinatorsMock(t, 2)
+		defer broker.Close()
+		producer := newTxnProducerForMock(t, broker)
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "out", Partition: 0, Value: StringEncoder("x")}
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 0, Offset: 6}}},
+			&ConsumerGroupMetadata{GroupID: "group", GenerationID: 1, MemberID: "m1"}))
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 1, Offset: 3}}},
+			&ConsumerGroupMetadata{GroupID: "group", GenerationID: 2, MemberID: "m1"}))
+
+		err := producer.CommitTxn()
+		for _, rr := range broker.History() {
+			if req, ok := rr.Request.(*TxnOffsetCommitRequest); ok {
+				for _, o := range req.Topics["in"] {
+					assert.False(t, o.Partition == 0 && req.GenerationID == 2,
+						"offset added at generation 1 sent with generation 2")
+				}
+			}
+		}
+		require.ErrorIs(t, err, ErrIllegalGeneration)
 	})
 }
