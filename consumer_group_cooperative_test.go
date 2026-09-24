@@ -33,6 +33,27 @@ type mockCooperativeCoordinator struct {
 	heartbeats  []string
 
 	rebalanceHeartbeats int
+
+	ownedGens []int32  // generation reported with the owned partitions, per join
+	syncErrs  []KError // errors to answer the next SyncGroup requests with
+}
+
+// failNextSync makes the coordinator answer the next SyncGroup with err.
+func (m *mockCooperativeCoordinator) failNextSync(err KError) {
+	m.mu.Lock()
+	m.syncErrs = append(m.syncErrs, err)
+	m.mu.Unlock()
+}
+
+// ownedGenAt returns the generation the nth JoinGroup reported with its
+// owned partitions.
+func (m *mockCooperativeCoordinator) ownedGenAt(n int) int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if n >= len(m.ownedGens) {
+		return -1
+	}
+	return m.ownedGens[n]
 }
 
 // rebalanceNow makes the coordinator announce a rebalance on the next heartbeat.
@@ -100,6 +121,7 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 		m.memberID = "m2"
 	}
 	owned := map[string][]int32{}
+	ownedGen := int32(-1)
 	var metadata []byte
 	for _, p := range req.OrderedGroupProtocols {
 		if p.Name != m.protocol {
@@ -112,8 +134,10 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 		for _, op := range meta.OwnedPartitions {
 			owned[op.Topic] = slices.Clone(op.Partitions)
 		}
+		ownedGen = meta.GenerationID
 	}
 	m.owned = append(m.owned, owned)
+	m.ownedGens = append(m.ownedGens, ownedGen)
 	m.gen++
 	m.rebalancing = false
 	gen := m.gen
@@ -135,6 +159,12 @@ func (m *mockCooperativeCoordinator) sync(reqBody versionedDecoder) encoderWithH
 	req := reqBody.(*SyncGroupRequest)
 
 	m.mu.Lock()
+	if len(m.syncErrs) > 0 {
+		err := m.syncErrs[0]
+		m.syncErrs = m.syncErrs[1:]
+		m.mu.Unlock()
+		return &SyncGroupResponse{Version: req.Version, Err: err}
+	}
 	idx := int(m.gen) - 1
 	if idx >= len(m.script) {
 		idx = len(m.script) - 1
@@ -708,6 +738,35 @@ func TestConsumerGroupCooperativeRebalance(t *testing.T) {
 		broker.SetHandlerByMap(cooperativeBrokerHandlers(t, broker, coord, 3))
 		coord.rebalanceNow()
 		waitForClaims(t, h, 3)
+
+		closeCooperativeGroup(t, group, consumeDone)
+	})
+}
+
+func TestConsumerGroupCooperativeRejoinErrors(t *testing.T) {
+	const topic = cooperativeTestTopic
+
+	newConfig := func(t *testing.T) *Config {
+		config := newCooperativeConfig(t)
+		config.Consumer.Group.Rebalance.Retry.Backoff = 10 * time.Millisecond
+		return config
+	}
+
+	t.Run("a rejoin after a failed SyncGroup reports the generation it joined", func(t *testing.T) {
+		all := map[string][]int32{topic: {0, 1, 2, 3}}
+		coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName, all, all, all)
+		h := newTrackingHandler()
+		group, consumeDone := startCooperativeGroup(t, coord, newConfig(t), h)
+
+		waitForClaims(t, h, 4)
+		coord.failNextSync(ErrRebalanceInProgress)
+		coord.rebalanceNow()
+		waitForJoins(t, coord, 3)
+
+		// the join for generation 2 succeeded before its SyncGroup failed, so
+		// the member still owns its partitions in generation 2
+		assert.Equal(t, int32(1), coord.ownedGenAt(1))
+		assert.Equal(t, int32(2), coord.ownedGenAt(2))
 
 		closeCooperativeGroup(t, group, consumeDone)
 	})
