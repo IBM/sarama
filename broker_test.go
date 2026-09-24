@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/jcmturner/gokrb5/v8/krberror"
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -241,6 +243,66 @@ func TestBrokerClose(t *testing.T) {
 		connected, err := broker.Connected()
 		require.NoError(t, err)
 		require.False(t, connected)
+	})
+}
+
+func TestBrokerMaxOpenRequests(t *testing.T) {
+	t.Run("holds back a request while the limit is reached", func(t *testing.T) {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		defer ln.Close()
+
+		// the server reads requests as they arrive and answers only when told
+		requests := make(chan *request, 2)
+		accepted := make(chan net.Conn, 1)
+		go func() {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted <- conn
+			for {
+				req, _, err := decodeRequest(conn)
+				if err != nil {
+					return
+				}
+				requests <- req
+			}
+		}()
+		respond := func(conn net.Conn, req *request) {
+			body, err := encode(&ProduceResponse{Version: req.body.version()}, nil)
+			require.NoError(t, err)
+			header := make([]byte, 8)
+			binary.BigEndian.PutUint32(header, uint32(len(body)+4))
+			binary.BigEndian.PutUint32(header[4:], uint32(req.correlationID))
+			_, err = conn.Write(append(header, body...))
+			require.NoError(t, err)
+		}
+
+		conf := NewTestConfig()
+		conf.Net.MaxOpenRequests = 1
+		broker := NewBroker(ln.Addr().String())
+		require.NoError(t, broker.Open(conf))
+		defer func() { _ = broker.Close() }()
+
+		results := make(chan error, 2)
+		callback := func(_ *ProduceResponse, err error) { results <- err }
+		require.NoError(t, broker.AsyncProduce(&ProduceRequest{RequiredAcks: WaitForLocal}, callback))
+		first := assertDoneWithin(t, requests, 5*time.Second)
+		conn := <-accepted
+		defer conn.Close()
+
+		go func() {
+			assert.NoError(t, broker.AsyncProduce(&ProduceRequest{RequiredAcks: WaitForLocal}, callback))
+		}()
+		// with the first request unanswered, the second must not be written
+		require.Never(t, func() bool { return len(requests) > 0 }, 200*time.Millisecond, 5*time.Millisecond,
+			"a request was written while correlation id %d was unanswered", first.correlationID)
+
+		respond(conn, first)
+		respond(conn, assertDoneWithin(t, requests, 5*time.Second))
+		require.NoError(t, assertDoneWithin(t, results, 5*time.Second))
+		require.NoError(t, assertDoneWithin(t, results, 5*time.Second))
 	})
 }
 
