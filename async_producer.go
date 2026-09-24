@@ -1713,7 +1713,8 @@ func (p *asyncProducer) maybeTransitionToErrorState(err error) error {
 	if errors.Is(err, ErrClusterAuthorizationFailed) ||
 		errors.Is(err, ErrProducerFenced) ||
 		errors.Is(err, ErrUnsupportedVersion) ||
-		errors.Is(err, ErrTransactionalIDAuthorizationFailed) {
+		errors.Is(err, ErrTransactionalIDAuthorizationFailed) ||
+		errors.Is(err, ErrInvalidProducerIDMapping) {
 		return p.txnmgr.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, err)
 	}
 	if p.txnmgr.currentTxnStatus()&ProducerTxnFlagAbortingTransaction != 0 {

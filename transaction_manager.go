@@ -1,7 +1,6 @@
 package sarama
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -369,9 +368,11 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		case ErrConcurrentTransactions:
 			// Retry
 		case ErrUnknownProducerID:
-			fallthrough
-		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrInvalidProducerIDMapping:
+			// fatal: the transactional id expired, and re-initializing could let an
+			// instance that was already fenced commit again
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		case ErrGroupAuthorizationFailed:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		default:
@@ -704,9 +705,11 @@ func (t *transactionManager) endTxn(commit bool) error {
 		case ErrConcurrentTransactions:
 			// Just retry
 		case ErrUnknownProducerID:
-			fallthrough
-		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrInvalidProducerIDMapping:
+			// fatal: the transactional id expired, and re-initializing could let an
+			// instance that was already fenced commit again
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		// Fatal errors
 		default:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
@@ -757,14 +760,11 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 		return t.lastError
 	}
 
-	if !errors.Is(t.lastError, ErrInvalidProducerIDMapping) {
-		err := t.endTxn(commit)
-		if err != nil {
-			return err
-		}
-		if !epochBump {
-			return nil
-		}
+	if err := t.endTxn(commit); err != nil {
+		return err
+	}
+	if !epochBump {
+		return nil
 	}
 	// reset pid and epoch if needed.
 	return t.initializeTransactions()
@@ -917,10 +917,13 @@ func (t *transactionManager) publishTxnPartitions() error {
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 				case ErrUnknownProducerID:
-					fallthrough
-				case ErrInvalidProducerIDMapping:
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.abortableErrorIfPossible(response.Err)
+				case ErrInvalidProducerIDMapping:
+					// fatal: the transactional id expired, and re-initializing could let an
+					// instance that was already fenced commit again
+					removeAllPartitionsOnFatalOrAbortedError()
+					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 				// Fatal errors
 				default:
 					removeAllPartitionsOnFatalOrAbortedError()
