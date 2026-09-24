@@ -301,9 +301,9 @@ func (client *client) InitProducerID() (*InitProducerIDResponse, error) {
 		} else {
 			// some error, remove that broker and try again
 			Logger.Printf("Client got error from broker %d when issuing InitProducerID : %v\n", broker.ID(), err)
-			_ = broker.Close()
 			brokerErrors = append(brokerErrors, err)
 			client.deregisterBroker(broker)
+			_ = broker.Close()
 		}
 	}
 
@@ -562,7 +562,6 @@ func (client *client) Controller() (*Broker, error) {
 		return nil, ErrControllerNotAvailable
 	}
 
-	_ = controller.Open(client.conf)
 	return controller, nil
 }
 
@@ -594,7 +593,6 @@ func (client *client) RefreshController() (*Broker, error) {
 		return nil, ErrControllerNotAvailable
 	}
 
-	_ = controller.Open(client.conf)
 	return controller, nil
 }
 
@@ -616,7 +614,6 @@ func (client *client) Coordinator(consumerGroup string) (*Broker, error) {
 		return nil, ErrConsumerCoordinatorNotAvailable
 	}
 
-	_ = coordinator.Open(client.conf)
 	return coordinator, nil
 }
 
@@ -655,7 +652,6 @@ func (client *client) TransactionCoordinator(transactionID string) (*Broker, err
 		return nil, ErrConsumerCoordinatorNotAvailable
 	}
 
-	_ = coordinator.Open(client.conf)
 	return coordinator, nil
 }
 
@@ -762,7 +758,9 @@ func (client *client) registerBroker(broker *Broker) {
 }
 
 // deregisterBroker removes a broker from the broker list, and if it's
-// not in the broker list, removes it from seedBrokers.
+// not in the broker list, removes it from seedBrokers. Deregister a failed
+// broker before closing it: while it is still listed, a concurrent lookup can
+// reopen it, and nothing would close that connection.
 func (client *client) deregisterBroker(broker *Broker) {
 	client.lock.Lock()
 	defer client.lock.Unlock()
@@ -1030,8 +1028,8 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			// When talking to the startup phase of a broker, it is possible to receive an empty metadata set. We should remove that broker and try next broker (https://issues.apache.org/jira/browse/KAFKA-7924).
 			if len(response.Brokers) == 0 {
 				Logger.Printf("client/metadata receiving empty brokers from the metadata response when requesting the broker #%d at %s", broker.ID(), broker.addr)
-				_ = broker.Close()
 				client.deregisterBroker(broker)
+				_ = broker.Close()
 				continue
 			}
 			allKnownMetaData := len(topics) == 0
@@ -1061,14 +1059,14 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			}
 			// else remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
-			_ = broker.Close()
 			client.deregisterBroker(broker)
+			_ = broker.Close()
 		} else {
 			// some other error, remove that broker and try again
 			Logger.Printf("client/metadata got error from broker %d while fetching metadata: %v\n", broker.ID(), err)
 			brokerErrors = append(brokerErrors, err)
-			_ = broker.Close()
 			client.deregisterBroker(broker)
+			_ = broker.Close()
 		}
 	}
 
@@ -1190,7 +1188,7 @@ func (client *client) cachedCoordinator(consumerGroup string) *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 	if coordinatorID, ok := client.coordinators[consumerGroup]; ok {
-		return client.brokers[coordinatorID]
+		return client.openCached(client.brokers[coordinatorID])
 	}
 	return nil
 }
@@ -1199,7 +1197,7 @@ func (client *client) cachedTransactionCoordinator(transactionID string) *Broker
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 	if coordinatorID, ok := client.transactionCoordinators[transactionID]; ok {
-		return client.brokers[coordinatorID]
+		return client.openCached(client.brokers[coordinatorID])
 	}
 	return nil
 }
@@ -1208,7 +1206,18 @@ func (client *client) cachedController() *Broker {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
 
-	return client.brokers[client.controllerID]
+	return client.openCached(client.brokers[client.controllerID])
+}
+
+// openCached opens b while the caller holds the client lock, as cachedLeader
+// does. Opened after the lock is released, a broker that was replaced or
+// closed in between reconnects and is never closed again. The caller must
+// hold the read or write lock.
+func (client *client) openCached(b *Broker) *Broker {
+	if b != nil {
+		_ = b.Open(client.conf)
+	}
+	return b
 }
 
 func computeMetadataBackoff(conf *Config, attemptsRemaining int) time.Duration {
@@ -1261,9 +1270,9 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 			if errors.As(err, &packetEncodingError) {
 				return nil, err
 			} else {
-				_ = broker.Close()
 				brokerErrors = append(brokerErrors, err)
 				client.deregisterBroker(broker)
+				_ = broker.Close()
 				continue
 			}
 		}

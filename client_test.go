@@ -1727,3 +1727,78 @@ func TestClientLeaderEpoch(t *testing.T) {
 		})
 	}
 }
+
+func TestClientCoordinatorMoves(t *testing.T) {
+	t.Run("replaced coordinator brokers are closed", func(t *testing.T) {
+		seed := NewMockBroker(t, 1)
+		defer seed.Close()
+		b1 := NewMockBroker(t, 2)
+		defer b1.Close()
+		b2 := NewMockBroker(t, 3)
+		defer b2.Close()
+
+		metadata := new(MetadataResponse)
+		metadata.AddBroker(seed.Addr(), seed.BrokerID())
+		// every FindCoordinator moves coordinator id 9 to the other address,
+		// so each refresh replaces the coordinator's *Broker
+		var moves atomic.Int64
+		handlers := map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader { return metadata },
+			"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+				addr := b1.Addr()
+				if moves.Add(1)%2 == 0 {
+					addr = b2.Addr()
+				}
+				return &FindCoordinatorResponse{Version: req.body.version(), Coordinator: &Broker{id: 9, addr: addr}}
+			},
+		}
+		seed.SetHandlerFuncByMap(handlers)
+		b1.SetHandlerFuncByMap(handlers)
+		b2.SetHandlerFuncByMap(handlers)
+
+		conf := NewTestConfig()
+		conf.Metadata.Retry.Max = 0
+		c, err := NewClient([]string{seed.Addr()}, conf)
+		require.NoError(t, err)
+		require.NoError(t, c.RefreshCoordinator("g"))
+
+		// readers look the coordinator up while it keeps moving
+		var mu sync.Mutex
+		seen := map[*Broker]none{}
+		stop := make(chan none)
+		var wg sync.WaitGroup
+		for range 4 {
+			wg.Go(func() {
+				for {
+					select {
+					case <-stop:
+						return
+					default:
+					}
+					if b, err := c.Coordinator("g"); err == nil {
+						mu.Lock()
+						seen[b] = none{}
+						mu.Unlock()
+					}
+				}
+			})
+		}
+		for range 500 {
+			_ = c.RefreshCoordinator("g")
+		}
+		close(stop)
+		wg.Wait()
+		require.NoError(t, c.Close())
+
+		// Close and the replacements close brokers asynchronously
+		require.EventuallyWithT(t, func(ct *assert.CollectT) {
+			leaked := 0
+			for b := range seen {
+				if connected, _ := b.Connected(); connected {
+					leaked++
+				}
+			}
+			assert.Zero(ct, leaked, "replaced coordinator brokers still connected after Close (of %d seen)", len(seen))
+		}, 5*time.Second, 10*time.Millisecond)
+	})
+}
