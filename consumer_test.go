@@ -856,7 +856,8 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 		t.Helper()
 		for _, want := range offsets {
 			select {
-			case msg := <-c.Messages():
+			case msg, ok := <-c.Messages():
+				require.Truef(t, ok, "partition consumer shut down before offset %d", want)
 				assertMessageOffset(t, msg, want)
 			case <-time.After(5 * time.Second):
 				require.Failf(t, "timed out waiting for message", "offset %d", want)
@@ -913,6 +914,39 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 			followerFetches: []readReplicaFetch{
 				{records: []int64{1, 2}},
 				{err: ErrUnknown},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("does not count the switch to the follower towards Retry.Max", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: func(cfg *Config) {
+				cfg.Consumer.Retry.Max = 1
+				cfg.Consumer.Retry.Backoff = 10 * time.Millisecond
+			},
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{err: ErrNotLeaderForPartition},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("falls back to leader on out of range offset from follower", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			leaderFetches: []readReplicaFetch{
+				{preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{1, 2}},
+				{err: ErrOffsetOutOfRange},
 			},
 		})
 		defer cleanup()
