@@ -460,9 +460,8 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 					_ = consumerGroupCoordinator.Close()
 					_ = t.client.RefreshCoordinator(groupId)
 					fallthrough
-				case ErrUnknownTopicOrPartition:
-					fallthrough
-				case ErrOffsetsLoadInProgress:
+				case ErrUnknownTopicOrPartition, ErrOffsetsLoadInProgress,
+					ErrConcurrentTransactions, ErrNetworkException:
 					// Do nothing just retry
 				case ErrIllegalGeneration:
 					fallthrough

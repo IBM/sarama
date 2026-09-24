@@ -600,6 +600,32 @@ func TestTxnOffsetsCommit(t *testing.T) {
 			expectedOffsets: originalOffsets,
 		},
 		{
+			brokerErr:    ErrConcurrentTransactions,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrConcurrentTransactions),
+			expectedOffsets: originalOffsets,
+		},
+		{
+			brokerErr:    ErrNetworkException,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrNetworkException),
+			expectedOffsets: originalOffsets,
+		},
+		{
 			brokerErr:    ErrIllegalGeneration,
 			initialFlags: ProducerTxnFlagInTransaction,
 			initialOffsets: topicPartitionOffsets{
