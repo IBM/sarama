@@ -369,19 +369,23 @@ func TestClusterAdminDescribeTransactionsRegroupsCoordinatorsOnRetry(t *testing.
 	// into a single request. The initial grouping issues exactly one
 	// FindCoordinator per id (both -> seed), consuming the first two sequence
 	// entries; every refresh afterwards sees tx-2 moved to the second broker.
+	// Any broker can be asked FindCoordinator, so both answer from this one
+	// sequence; the lookups are made one at a time. A broker without the
+	// handler ignores the lookup and the client waits out Net.ReadTimeout.
+	findCoordinator := NewMockSequence(
+		NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+			SetCoordinator(CoordinatorTransaction, secondTx, seedBroker),
+		NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+			SetCoordinator(CoordinatorTransaction, secondTx, seedBroker),
+		NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+			SetCoordinator(CoordinatorTransaction, secondTx, secondBroker),
+	)
 	seedBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": metadata,
-		"FindCoordinatorRequest": NewMockSequence(
-			NewMockFindCoordinatorResponse(t).
-				SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
-				SetCoordinator(CoordinatorTransaction, secondTx, seedBroker),
-			NewMockFindCoordinatorResponse(t).
-				SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
-				SetCoordinator(CoordinatorTransaction, secondTx, seedBroker),
-			NewMockFindCoordinatorResponse(t).
-				SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
-				SetCoordinator(CoordinatorTransaction, secondTx, secondBroker),
-		),
+		"MetadataRequest":        metadata,
+		"FindCoordinatorRequest": findCoordinator,
 		// The seed broker owns tx-1 but not tx-2, which it rejects with
 		// NOT_COORDINATOR on every attempt. The pre-fix code sent the whole group
 		// to ids[0]'s coordinator on retry, so tx-2 could never succeed here.
@@ -390,7 +394,8 @@ func TestClusterAdminDescribeTransactionsRegroupsCoordinatorsOnRetry(t *testing.
 			SetError(secondTx, ErrNotCoordinatorForConsumer),
 	})
 	secondBroker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": metadata,
+		"MetadataRequest":        metadata,
+		"FindCoordinatorRequest": findCoordinator,
 		"DescribeTransactionsRequest": NewMockDescribeTransactionsResponse(t).
 			AddTransaction(secondTx, TransactionState{TransactionState: TransactionStateEmpty}),
 	})
