@@ -2579,6 +2579,18 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 			require.FailNow(t, "abort() did not return")
 		}
 	})
+
+	t.Run("abandoning a replaced broker consumer keeps its replacement", func(t *testing.T) {
+		old := newBrokerConsumer(newChild(config.ChannelBufferSize))
+		c := old.consumer
+		// the old worker's last child left and a new one took the broker
+		replacement := &brokerConsumer{consumer: c, broker: realBroker, refs: 1}
+		c.brokerConsumers[realBroker] = replacement
+
+		c.abandonBrokerConsumer(old)
+
+		assert.Same(t, replacement, c.brokerConsumers[realBroker])
+	})
 }
 
 func TestConsumerPause(t *testing.T) {
