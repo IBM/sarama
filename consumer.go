@@ -474,6 +474,10 @@ type partitionConsumer struct {
 	fetchSize          int32
 	offset             int64
 	retries            atomic.Int32
+	// set when a successful fetch moves the child to or from its preferred read
+	// replica, so the next dispatch runs without backoff and is not counted
+	// towards Consumer.Retry.Max
+	switchingBroker atomic.Bool
 
 	paused atomic.Bool // accessed atomically, 0 = not paused, 1 = paused
 }
@@ -586,10 +590,17 @@ func (child *partitionConsumer) dispatcher() {
 			// only set the timer when none is pending, so retries increments
 			// once per dispatch attempt rather than once per trigger
 			if backoff == nil {
-				backoff = time.After(child.computeBackoff())
+				if child.switchingBroker.Swap(false) {
+					backoff = time.After(0)
+				} else {
+					backoff = time.After(child.computeBackoff())
+				}
 			}
 		case <-backoff:
 			backoff = nil
+			// clear a switch whose trigger merged into a pending retry (otherwise
+			// the next failure skips its backoff and is not counted)
+			child.switchingBroker.Store(false)
 			if child.broker != nil {
 				child.consumer.unrefBrokerConsumer(child.broker)
 				child.broker = nil
@@ -1222,6 +1233,7 @@ func (bc *brokerConsumer) handleResponses() {
 					Logger.Printf(
 						"consumer/broker/%d abandoned in favor of preferred replica broker/%d\n",
 						bc.broker.ID(), preferredBroker.ID())
+					child.switchingBroker.Store(true)
 					child.triggerRedispatch()
 					bc.releaseSubscription(child)
 				}
