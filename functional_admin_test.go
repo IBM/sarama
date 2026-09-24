@@ -1015,6 +1015,49 @@ func TestFuncAdminIncrementalAlterConfigs(t *testing.T) {
 	}
 }
 
+func TestFuncAdminAlterConfig(t *testing.T) {
+	t.Parallel()
+	checkKafkaVersion(t, "2.8.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	config := NewFunctionalTestConfig()
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	require.NoError(t, err)
+	defer safeClose(t, adminClient)
+
+	topic := fmt.Sprintf("alter-config-%d", time.Now().UnixNano())
+	require.NoError(t, adminClient.CreateTopic(topic, &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false))
+	defer func() {
+		if err := adminClient.DeleteTopic(topic); err != nil {
+			t.Logf("delete topic %q: %v", topic, err)
+		}
+	}()
+
+	// two entries so each one needs its own tagged fields on v2
+	retentionMs, segmentMs := "3600000", "600000"
+	entries := map[string]*string{
+		"retention.ms": &retentionMs,
+		"segment.ms":   &segmentMs,
+	}
+
+	// topic creation is asynchronous, so retry until the broker knows the topic
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		require.NoError(t, adminClient.AlterConfig(TopicResource, topic, entries, false))
+		res, err := adminClient.DescribeConfig(ConfigResource{
+			Type:        TopicResource,
+			Name:        topic,
+			ConfigNames: []string{"retention.ms", "segment.ms"},
+		})
+		require.NoError(t, err)
+		got := make(map[string]string, len(res))
+		for _, entry := range res {
+			got[entry.Name] = entry.Value
+		}
+		assert.Equal(t, map[string]string{"retention.ms": retentionMs, "segment.ms": segmentMs}, got)
+	}, 30*time.Second, 250*time.Millisecond, "configs for %s were not altered", topic)
+}
+
 func TestFuncAdminUpdateFeatures(t *testing.T) {
 	t.Parallel()
 	// feature updates need a KRaft cluster; ZooKeeper-mode brokers don't
