@@ -1275,26 +1275,29 @@ func (bc *brokerConsumer) abort(err error) {
 	bc.stopConsuming()
 	_ = bc.broker.Close() // we don't care about the error this might return, we already have one
 
+	// notify each child before releasing it: once released, a closing child's
+	// dispatcher closes feeder and its responseFeeder then closes errors,
+	// which the notification may still be sending on
 	for child := range bc.subscriptions {
-		bc.releaseSubscription(child)
 		select {
 		case <-child.dying:
 			child.stopDispatcher()
 		default:
 			child.notifyError(err)
 		}
+		bc.releaseSubscription(child)
 	}
 
 	for newSubscriptions := range bc.newSubscriptions {
 		for _, subscription := range newSubscriptions {
 			child := subscription.child
-			subscription.release()
 			select {
 			case <-child.dying:
 				child.stopDispatcher()
 			default:
 				child.notifyError(err)
 			}
+			subscription.release()
 		}
 	}
 }
