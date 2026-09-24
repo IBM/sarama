@@ -475,6 +475,13 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 		if retries <= 0 {
 			return nil, syncGroupResponse.Err
 		}
+		if held != nil {
+			// the member joined this generation still owning held.claims, so
+			// report it on the retry; a Java 3.3 or earlier leader reassigns
+			// the owned partitions of a member reporting an older generation
+			// without waiting for them to be revoked
+			held.generationID = join.GenerationId
+		}
 		return c.retryJoinSync(ctx, topics, held, retries, true)
 	case ErrFencedInstancedId:
 		if c.groupInstanceId != nil {
