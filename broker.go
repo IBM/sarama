@@ -521,7 +521,10 @@ type ProduceCallback func(*ProduceResponse, error)
 // If an error is returned because the request could not be sent then the callback
 // will not be invoked either.
 //
-// Make sure not to Close the broker in the callback as it will lead to a deadlock.
+// The callback runs on the goroutine that reads responses from the broker, so
+// it must not call methods on the broker (not even Connected, and never
+// Close): a request waiting for its response would never get one, and both
+// would deadlock. Hand the response to another goroutine instead.
 func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
