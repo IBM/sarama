@@ -1086,6 +1086,11 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 	client.lock.Lock()
 	defer client.lock.Unlock()
 
+	// Close may have run since the check above, leaving nil maps
+	if client.brokers == nil {
+		return false, nil
+	}
+
 	// Check health of existing brokers, including seed brokers, dead
 	// seed brokers, and registered brokers.
 	// - if error occurred on broker's tcp socket, close the tcp
