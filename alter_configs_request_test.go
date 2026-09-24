@@ -29,6 +29,23 @@ var (
 		2,                                                    // Configs
 		11, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's', // Name
 		5, '1', '0', '0', '0', // Value
+		0, // tagged fields (config)
+		0, // tagged fields (resource)
+		0, // ValidateOnly
+		0, // tagged fields
+	}
+
+	twoConfigsAlterConfigsRequestV2 = []byte{
+		2,                // Resources
+		2,                // ResourceType
+		4, 'f', 'o', 'o', // ResourceName
+		3,                                                    // Configs
+		11, 's', 'e', 'g', 'm', 'e', 'n', 't', '.', 'm', 's', // Name
+		5, '1', '0', '0', '0', // Value
+		0,                                         // tagged fields (config 1)
+		9, 'f', 'l', 'u', 's', 'h', '.', 'm', 's', // Name
+		5, '1', '0', '0', '0', // Value
+		0, // tagged fields (config 2)
 		0, // tagged fields (resource)
 		0, // ValidateOnly
 		0, // tagged fields
@@ -79,6 +96,23 @@ func TestAlterConfigsRequest(t *testing.T) {
 
 	request.Version = 2
 	testRequest(t, "one config v2", request, singleAlterConfigsRequestV2)
+	request.Version = 0
+
+	request = &AlterConfigsRequest{
+		Resources: []*AlterConfigsResource{
+			{
+				Type: TopicResource,
+				Name: "foo",
+				ConfigEntries: map[string]*string{
+					"segment.ms": &configValue,
+					"flush.ms":   &configValue,
+				},
+			},
+		},
+	}
+
+	request.Version = 2
+	testRequest(t, "two config v2", request, twoConfigsAlterConfigsRequestV2)
 	request.Version = 0
 
 	request = &AlterConfigsRequest{
