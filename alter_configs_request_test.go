@@ -2,7 +2,12 @@
 
 package sarama
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
 
 var (
 	emptyAlterConfigsRequest = []byte{
@@ -111,8 +116,12 @@ func TestAlterConfigsRequest(t *testing.T) {
 		},
 	}
 
+	// map order makes the encoded bytes vary, so check the fixture by decoding it
 	request.Version = 2
-	testRequest(t, "two config v2", request, twoConfigsAlterConfigsRequestV2)
+	testRequestWithoutByteComparison(t, "two config v2", request)
+	decoded := &AlterConfigsRequest{}
+	require.NoError(t, versionedDecode(twoConfigsAlterConfigsRequestV2, decoded, 2, nil))
+	assert.Equal(t, request, decoded)
 	request.Version = 0
 
 	request = &AlterConfigsRequest{
