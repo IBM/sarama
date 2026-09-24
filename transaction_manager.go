@@ -100,16 +100,36 @@ type transactionManager struct {
 	pendingPartitionsInCurrentTxn topicPartitionSet
 	partitionsInCurrentTxn        topicPartitionSet
 
-	// Offsets to add to transaction.
-	offsetsInCurrentTxn map[string]topicPartitionOffsets
+	// Offsets to add to transaction, keyed by the group metadata they were
+	// added with.
+	offsetsInCurrentTxn map[groupMetadataKey]topicPartitionOffsets
 
-	// Consumer group metadata per group whose offsets are added to the
-	// transaction, keyed by group ID.
-	groupMetadataInCurrentTxn map[string]*ConsumerGroupMetadata
+	// Consumer group metadata whose offsets are added to the transaction.
+	groupMetadataInCurrentTxn map[groupMetadataKey]*ConsumerGroupMetadata
 
 	// AddOffsetsToTxn has added a group to the transaction on the coordinator,
 	// so the transaction must end with EndTxn even with no records produced.
 	offsetsAddedToTxn bool
+}
+
+// groupMetadataKey identifies the group member and generation that offsets
+// were added for. TxnOffsetCommit sends each set with its own generation;
+// sent with a later one, offsets for a partition a rebalance has since
+// revoked would pass the coordinator's generation check.
+type groupMetadataKey struct {
+	groupID         string
+	generationID    int32
+	memberID        string
+	groupInstanceID string
+	hasInstanceID   bool
+}
+
+func newGroupMetadataKey(m *ConsumerGroupMetadata) groupMetadataKey {
+	k := groupMetadataKey{groupID: m.GroupID, generationID: m.GenerationID, memberID: m.MemberID}
+	if m.GroupInstanceID != nil {
+		k.groupInstanceID, k.hasInstanceID = *m.GroupInstanceID, true
+	}
+	return k
 }
 
 const (
@@ -289,16 +309,27 @@ func (t *transactionManager) addOffsetsToTxn(offsetsToAdd map[string][]*Partitio
 		return t.lastError
 	}
 
-	groupId := groupMetadata.GroupID
-	if _, ok := t.offsetsInCurrentTxn[groupId]; !ok {
-		t.offsetsInCurrentTxn[groupId] = topicPartitionOffsets{}
+	key := newGroupMetadataKey(groupMetadata)
+	if _, ok := t.offsetsInCurrentTxn[key]; !ok {
+		t.offsetsInCurrentTxn[key] = topicPartitionOffsets{}
 	}
-	t.groupMetadataInCurrentTxn[groupId] = groupMetadata
+	t.groupMetadataInCurrentTxn[key] = groupMetadata
 
 	for topic, offsets := range offsetsToAdd {
 		for _, offset := range offsets {
 			tp := topicPartition{topic: topic, partition: offset.Partition}
-			t.offsetsInCurrentTxn[groupId][tp] = offset
+			// a newer offset for the partition replaces one added for the
+			// same group under other metadata
+			for k, other := range t.offsetsInCurrentTxn {
+				if k != key && k.groupID == key.groupID {
+					delete(other, tp)
+					if len(other) == 0 {
+						delete(t.offsetsInCurrentTxn, k)
+						delete(t.groupMetadataInCurrentTxn, k)
+					}
+				}
+			}
+			t.offsetsInCurrentTxn[key][tp] = offset
 		}
 	}
 	return nil
@@ -638,8 +669,8 @@ func (t *transactionManager) completeTransaction() error {
 	t.epochBumpRequired.Store(false)
 	t.partitionsInCurrentTxn = topicPartitionSet{}
 	t.pendingPartitionsInCurrentTxn = topicPartitionSet{}
-	t.offsetsInCurrentTxn = map[string]topicPartitionOffsets{}
-	t.groupMetadataInCurrentTxn = map[string]*ConsumerGroupMetadata{}
+	t.offsetsInCurrentTxn = map[groupMetadataKey]topicPartitionOffsets{}
+	t.groupMetadataInCurrentTxn = map[groupMetadataKey]*ConsumerGroupMetadata{}
 	t.offsetsAddedToTxn = false
 
 	return nil
@@ -754,14 +785,14 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 	epochBump := t.epochBumpRequired.Load()
 	// If we're aborting the transaction, so there should be no need to add offsets.
 	if commit && len(t.offsetsInCurrentTxn) > 0 {
-		for group, offsets := range t.offsetsInCurrentTxn {
-			newOffsets, err := t.publishOffsetsToTxn(offsets, t.groupMetadataInCurrentTxn[group])
+		for key, offsets := range t.offsetsInCurrentTxn {
+			newOffsets, err := t.publishOffsetsToTxn(offsets, t.groupMetadataInCurrentTxn[key])
 			if err != nil {
-				t.offsetsInCurrentTxn[group] = newOffsets
+				t.offsetsInCurrentTxn[key] = newOffsets
 				return err
 			}
-			delete(t.offsetsInCurrentTxn, group)
-			delete(t.groupMetadataInCurrentTxn, group)
+			delete(t.offsetsInCurrentTxn, key)
+			delete(t.groupMetadataInCurrentTxn, key)
 		}
 	}
 
@@ -960,8 +991,8 @@ func newTransactionManager(conf *Config, client Client) (*transactionManager, er
 		client:                        client,
 		pendingPartitionsInCurrentTxn: topicPartitionSet{},
 		partitionsInCurrentTxn:        topicPartitionSet{},
-		offsetsInCurrentTxn:           make(map[string]topicPartitionOffsets),
-		groupMetadataInCurrentTxn:     make(map[string]*ConsumerGroupMetadata),
+		offsetsInCurrentTxn:           make(map[groupMetadataKey]topicPartitionOffsets),
+		groupMetadataInCurrentTxn:     make(map[groupMetadataKey]*ConsumerGroupMetadata),
 		status:                        ProducerTxnFlagUninitialized,
 	}
 

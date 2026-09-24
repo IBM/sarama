@@ -3671,4 +3671,33 @@ func TestTxnCommitOffsets(t *testing.T) {
 		assert.Equal(t, []string{"*sarama.AddOffsetsToTxnRequest", "*sarama.TxnOffsetCommitRequest", "*sarama.EndTxnRequest"}, sent,
 			"CommitTxn succeeded without committing the offsets")
 	})
+
+	t.Run("offsets keep the generation they were added with", func(t *testing.T) {
+		// offsets for partition 0 were added at generation 1; a cooperative
+		// rebalance then moved partition 0 away, and the retained partition 1
+		// added offsets at generation 2
+		broker := newTxnCoordinatorsMock(t, 2)
+		defer broker.Close()
+		producer := newTxnProducerForMock(t, broker)
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "out", Partition: 0, Value: StringEncoder("x")}
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 0, Offset: 6}}},
+			&ConsumerGroupMetadata{GroupID: "group", GenerationID: 1, MemberID: "m1"}))
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 1, Offset: 3}}},
+			&ConsumerGroupMetadata{GroupID: "group", GenerationID: 2, MemberID: "m1"}))
+
+		err := producer.CommitTxn()
+		for _, rr := range broker.History() {
+			if req, ok := rr.Request.(*TxnOffsetCommitRequest); ok {
+				for _, o := range req.Topics["in"] {
+					assert.False(t, o.Partition == 0 && req.GenerationID == 2,
+						"offset added at generation 1 sent with generation 2")
+				}
+			}
+		}
+		require.ErrorIs(t, err, ErrIllegalGeneration)
+	})
 }
