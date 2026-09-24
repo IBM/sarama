@@ -920,6 +920,24 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 		assertOffsets(t, c, 1, 2, 3, 4)
 	})
 
+	t.Run("does not count the switch to the follower towards Retry.Max", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: func(cfg *Config) {
+				cfg.Consumer.Retry.Max = 1
+				cfg.Consumer.Retry.Backoff = 10 * time.Millisecond
+			},
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{err: ErrNotLeaderForPartition},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
 	t.Run("falls back to leader on out of range offset from follower", func(t *testing.T) {
 		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
 			leaderFetches: []readReplicaFetch{
