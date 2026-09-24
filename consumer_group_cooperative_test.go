@@ -33,6 +33,43 @@ type mockCooperativeCoordinator struct {
 	heartbeats  []string
 
 	rebalanceHeartbeats int
+
+	ownedGens     []int32  // generation reported with the owned partitions, per join
+	syncErrs      []KError // errors to answer the next SyncGroup requests with
+	joinErrs      []KError // errors to answer the next JoinGroup requests with
+	heartbeatErrs []KError // errors to answer the next Heartbeat requests with
+}
+
+// failNextJoin makes the coordinator answer the next JoinGroup with err.
+func (m *mockCooperativeCoordinator) failNextJoin(err KError) {
+	m.mu.Lock()
+	m.joinErrs = append(m.joinErrs, err)
+	m.mu.Unlock()
+}
+
+// failNextHeartbeat makes the coordinator answer the next Heartbeat with err.
+func (m *mockCooperativeCoordinator) failNextHeartbeat(err KError) {
+	m.mu.Lock()
+	m.heartbeatErrs = append(m.heartbeatErrs, err)
+	m.mu.Unlock()
+}
+
+// failNextSync makes the coordinator answer the next SyncGroup with err.
+func (m *mockCooperativeCoordinator) failNextSync(err KError) {
+	m.mu.Lock()
+	m.syncErrs = append(m.syncErrs, err)
+	m.mu.Unlock()
+}
+
+// ownedGenAt returns the generation the nth JoinGroup reported with its
+// owned partitions.
+func (m *mockCooperativeCoordinator) ownedGenAt(n int) int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if n >= len(m.ownedGens) {
+		return -1
+	}
+	return m.ownedGens[n]
 }
 
 // rebalanceNow makes the coordinator announce a rebalance on the next heartbeat.
@@ -71,6 +108,9 @@ func (m *mockCooperativeCoordinator) heartbeat(reqBody versionedDecoder) encoder
 	m.heartbeats = append(m.heartbeats, req.MemberId)
 	err := ErrNoError
 	switch {
+	case len(m.heartbeatErrs) > 0:
+		err = m.heartbeatErrs[0]
+		m.heartbeatErrs = m.heartbeatErrs[1:]
 	case m.fenced, req.MemberId != m.memberID:
 		err = ErrUnknownMemberId
 	case m.rebalancing:
@@ -91,6 +131,12 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 	req := reqBody.(*JoinGroupRequest)
 
 	m.mu.Lock()
+	if len(m.joinErrs) > 0 {
+		err := m.joinErrs[0]
+		m.joinErrs = m.joinErrs[1:]
+		m.mu.Unlock()
+		return &JoinGroupResponse{Version: req.Version, Err: err}
+	}
 	if m.forgotten {
 		if req.MemberId != "" {
 			m.mu.Unlock()
@@ -100,6 +146,7 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 		m.memberID = "m2"
 	}
 	owned := map[string][]int32{}
+	ownedGen := int32(-1)
 	var metadata []byte
 	for _, p := range req.OrderedGroupProtocols {
 		if p.Name != m.protocol {
@@ -112,8 +159,10 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 		for _, op := range meta.OwnedPartitions {
 			owned[op.Topic] = slices.Clone(op.Partitions)
 		}
+		ownedGen = meta.GenerationID
 	}
 	m.owned = append(m.owned, owned)
+	m.ownedGens = append(m.ownedGens, ownedGen)
 	m.gen++
 	m.rebalancing = false
 	gen := m.gen
@@ -135,6 +184,12 @@ func (m *mockCooperativeCoordinator) sync(reqBody versionedDecoder) encoderWithH
 	req := reqBody.(*SyncGroupRequest)
 
 	m.mu.Lock()
+	if len(m.syncErrs) > 0 {
+		err := m.syncErrs[0]
+		m.syncErrs = m.syncErrs[1:]
+		m.mu.Unlock()
+		return &SyncGroupResponse{Version: req.Version, Err: err}
+	}
 	idx := int(m.gen) - 1
 	if idx >= len(m.script) {
 		idx = len(m.script) - 1
@@ -711,4 +766,90 @@ func TestConsumerGroupCooperativeRebalance(t *testing.T) {
 
 		closeCooperativeGroup(t, group, consumeDone)
 	})
+}
+
+func TestConsumerGroupCooperativeRejoinErrors(t *testing.T) {
+	const topic = cooperativeTestTopic
+
+	newConfig := func(t *testing.T) *Config {
+		config := newCooperativeConfig(t)
+		config.Consumer.Group.Rebalance.Retry.Backoff = 10 * time.Millisecond
+		return config
+	}
+
+	t.Run("a rejoin after a failed SyncGroup reports the generation it joined", func(t *testing.T) {
+		all := map[string][]int32{topic: {0, 1, 2, 3}}
+		coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName, all, all, all)
+		h := newTrackingHandler()
+		group, consumeDone := startCooperativeGroup(t, coord, newConfig(t), h)
+
+		waitForClaims(t, h, 4)
+		coord.failNextSync(ErrRebalanceInProgress)
+		coord.rebalanceNow()
+		waitForJoins(t, coord, 3)
+
+		// the join for generation 2 succeeded before its SyncGroup failed, so
+		// the member still owns its partitions in generation 2
+		assert.Equal(t, int32(1), coord.ownedGenAt(1))
+		assert.Equal(t, int32(2), coord.ownedGenAt(2))
+
+		closeCooperativeGroup(t, group, consumeDone)
+	})
+
+	// a coordinator move keeps the generation, so the session should survive it
+	requireSessionKept := func(t *testing.T, h *trackingHandler) {
+		t.Helper()
+		state := h.snapshot()
+		require.Empty(t, state.exits, "claims should keep running across a coordinator move")
+		require.Zero(t, state.cleanups)
+	}
+
+	for _, tc := range []struct {
+		name string
+		err  KError
+	}{
+		{"NOT_COORDINATOR", ErrNotCoordinatorForConsumer},
+		{"COORDINATOR_NOT_AVAILABLE", ErrConsumerCoordinatorNotAvailable},
+	} {
+		t.Run("a heartbeat answered "+tc.name+" keeps the session", func(t *testing.T) {
+			coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName,
+				map[string][]int32{topic: {0, 1}},
+			)
+			h := newTrackingHandler()
+			group, consumeDone := startCooperativeGroup(t, coord, newConfig(t), h)
+
+			waitForClaims(t, h, 2)
+			coord.failNextHeartbeat(tc.err)
+			seen := len(coord.heartbeatMembers())
+			require.EventuallyWithT(t, func(c *assert.CollectT) {
+				assert.Greater(c, len(coord.heartbeatMembers()), seen+3)
+			}, 10*time.Second, 20*time.Millisecond, "heartbeats stopped")
+			requireSessionKept(t, h)
+
+			closeCooperativeGroup(t, group, consumeDone)
+		})
+	}
+
+	for _, tc := range []struct {
+		name string
+		fail func(*mockCooperativeCoordinator, KError)
+	}{
+		{"JoinGroup", (*mockCooperativeCoordinator).failNextJoin},
+		{"SyncGroup", (*mockCooperativeCoordinator).failNextSync},
+	} {
+		t.Run("a rejoin whose "+tc.name+" finds no coordinator keeps the session", func(t *testing.T) {
+			all := map[string][]int32{topic: {0, 1}}
+			coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName, all, all, all)
+			h := newTrackingHandler()
+			group, consumeDone := startCooperativeGroup(t, coord, newConfig(t), h)
+
+			waitForClaims(t, h, 2)
+			tc.fail(coord, ErrConsumerCoordinatorNotAvailable)
+			coord.rebalanceNow()
+			waitForJoins(t, coord, 2)
+			requireSessionKept(t, h)
+
+			closeCooperativeGroup(t, group, consumeDone)
+		})
+	}
 }

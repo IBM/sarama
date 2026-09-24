@@ -439,6 +439,23 @@ func (s *consumerGroupSession) heartbeatLoop() {
 			retries = s.parent.config.Metadata.Retry.Max
 		case ErrRebalanceInProgress:
 			retries = s.parent.config.Metadata.Retry.Max
+		case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable:
+			// the group has moved to another coordinator, which keeps the
+			// generation, so find it and carry on heartbeating
+			if retries <= 0 {
+				s.parent.handleError(err, "", -1)
+				s.cancel(err)
+				return
+			}
+			_ = s.parent.client.RefreshCoordinator(s.parent.groupID)
+			retryBackoff.Reset(s.parent.config.Metadata.Retry.Backoff)
+			select {
+			case <-s.hbDying:
+				return
+			case <-retryBackoff.C:
+				retries--
+			}
+			continue
 		case ErrUnknownMemberId, ErrIllegalGeneration:
 			s.cancel(err)
 			return
