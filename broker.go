@@ -32,6 +32,7 @@ type Broker struct {
 	lock          sync.Mutex
 	opened        atomic.Bool
 	responses     chan *responsePromise
+	inFlight      chan struct{}
 	done          chan bool
 
 	metricRegistry             metrics.Registry
@@ -312,6 +313,7 @@ func (b *Broker) Open(conf *Config) error {
 
 		b.done = make(chan bool)
 		b.responses = make(chan *responsePromise, b.conf.Net.MaxOpenRequests-1)
+		b.inFlight = make(chan struct{}, b.conf.Net.MaxOpenRequests)
 
 		go withRecover(b.responseReceiver)
 		if conf.Net.SASL.Enable && !useSaslV0 {
@@ -519,7 +521,10 @@ type ProduceCallback func(*ProduceResponse, error)
 // If an error is returned because the request could not be sent then the callback
 // will not be invoked either.
 //
-// Make sure not to Close the broker in the callback as it will lead to a deadlock.
+// The callback runs on the goroutine that reads responses from the broker, so
+// it must not call methods on the broker (not even Connected, and never
+// Close): a request waiting for its response would never get one, and both
+// would deadlock. Hand the response to another goroutine instead.
 func (b *Broker) AsyncProduce(request *ProduceRequest, cb ProduceCallback) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
@@ -1195,6 +1200,13 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	// check and wait if throttled
 	b.waitIfThrottled()
 
+	// take a slot before writing, otherwise a request is written while its
+	// promise waits for room in b.responses and MaxOpenRequests+1 are in
+	// flight; responseReceiver frees the slot once the response is read
+	if promise != nil {
+		b.inFlight <- struct{}{}
+	}
+
 	requestTime := time.Now()
 	// Will be decremented in responseReceiver (except error or request with NoResponse)
 	b.addRequestInFlightMetrics(1)
@@ -1202,6 +1214,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	b.updateOutgoingCommunicationMetrics(bytes)
 	b.updateProtocolMetrics(rb)
 	if err != nil {
+		if promise != nil {
+			<-b.inFlight
+		}
 		b.addRequestInFlightMetrics(-1)
 		return err
 	}
@@ -1337,12 +1352,14 @@ func (b *Broker) encode(pe packetEncoder, version int16) (err error) {
 
 func (b *Broker) responseReceiver() {
 	var dead error
+	inFlight := b.inFlight
 
 	for promise := range b.responses {
 		if dead != nil {
 			// This was previously incremented in send() and
 			// we are not calling updateIncomingCommunicationMetrics()
 			b.addRequestInFlightMetrics(-1)
+			<-inFlight
 			promise.handle(nil, dead)
 			continue
 		}
@@ -1355,6 +1372,7 @@ func (b *Broker) responseReceiver() {
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
+			<-inFlight
 			promise.handle(nil, err)
 			continue
 		}
@@ -1364,6 +1382,7 @@ func (b *Broker) responseReceiver() {
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
+			<-inFlight
 			promise.handle(nil, err)
 			continue
 		}
@@ -1372,6 +1391,7 @@ func (b *Broker) responseReceiver() {
 			// TODO if decoded ID < cur ID, discard until we catch up
 			// TODO if decoded ID > cur ID, save it so when cur ID catches up we have a response
 			dead = PacketDecodingError{fmt.Sprintf("correlation ID didn't match, wanted %d, got %d", promise.correlationID, decodedHeader.correlationID)}
+			<-inFlight
 			promise.handle(nil, dead)
 			continue
 		}
@@ -1381,10 +1401,12 @@ func (b *Broker) responseReceiver() {
 		b.updateIncomingCommunicationMetrics(bytesReadHeader+bytesReadBody, requestLatency)
 		if err != nil {
 			dead = err
+			<-inFlight
 			promise.handle(nil, err)
 			continue
 		}
 
+		<-inFlight
 		promise.handle(buf, nil)
 	}
 	close(b.done)
