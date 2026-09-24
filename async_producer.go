@@ -1408,7 +1408,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition,
 			ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend, ErrKafkaStorageError:
 			if bp.parent.conf.Producer.Retry.Max <= 0 {
-				bp.parent.abandonBrokerConnection(bp.broker)
+				bp.parent.abandonBrokerConnection(bp)
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
@@ -1422,7 +1422,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		// Other non-retriable errors
 		default:
 			if bp.parent.conf.Producer.Retry.Max <= 0 {
-				bp.parent.abandonBrokerConnection(bp.broker)
+				bp.parent.abandonBrokerConnection(bp)
 			}
 			bp.parent.returnErrors(pSet.msgs, block.Err)
 		}
@@ -1539,7 +1539,7 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 		bp.parent.muter.unmute(sent)
 	} else {
 		Logger.Printf("producer/broker/%d state change to [closing] because %s\n", bp.broker.ID(), err)
-		bp.parent.abandonBrokerConnection(bp.broker)
+		bp.parent.abandonBrokerConnection(bp)
 		_ = bp.broker.Close()
 		bp.closing = err
 		var retryTopics []string
@@ -1797,14 +1797,17 @@ func (p *asyncProducer) unrefBrokerProducer(broker *Broker, bp *brokerProducer) 
 	}
 }
 
-func (p *asyncProducer) abandonBrokerConnection(broker *Broker) {
+func (p *asyncProducer) abandonBrokerConnection(bp *brokerProducer) {
 	p.brokerLock.Lock()
 	defer p.brokerLock.Unlock()
 
-	bc, ok := p.brokers[broker]
-	if ok && bc.abandoned != nil {
-		close(bc.abandoned)
+	// a brokerProducer still draining responses after being replaced must not
+	// abandon its replacement
+	if p.brokers[bp.broker] != bp {
+		return
 	}
-
-	delete(p.brokers, broker)
+	if bp.abandoned != nil {
+		close(bp.abandoned)
+	}
+	delete(p.brokers, bp.broker)
 }

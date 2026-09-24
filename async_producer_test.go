@@ -2187,6 +2187,25 @@ func TestRetryBatchReleasesMuteOnShutdown(t *testing.T) {
 }
 
 func TestBrokerProducerHandleError(t *testing.T) {
+	t.Run("leaves a replacement brokerProducer in place", func(t *testing.T) {
+		parent := &asyncProducer{brokers: make(map[*Broker]*brokerProducer)}
+		broker := &Broker{id: 1}
+		// the old brokerProducer is still draining responses after its
+		// broker got a new one
+		old := &brokerProducer{parent: parent, broker: broker}
+		replacement := &brokerProducer{parent: parent, broker: broker, abandoned: make(chan struct{})}
+		parent.brokers[broker] = replacement
+
+		parent.abandonBrokerConnection(old)
+
+		assert.Same(t, replacement, parent.brokers[broker])
+		select {
+		case <-replacement.abandoned:
+			assert.Fail(t, "the replacement was abandoned")
+		default:
+		}
+	})
+
 	t.Run("keeps non-idempotent connection retries muted", func(t *testing.T) {
 		config := NewTestConfig()
 		config.Producer.Idempotent = false
