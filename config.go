@@ -477,6 +477,11 @@ type Config struct {
 			AutoCommit struct {
 				// Whether or not to auto-commit updated offsets back to the broker.
 				// (default enabled).
+				//
+				// When disabled, marked offsets are only sent by
+				// ConsumerGroupSession.Commit, and any still uncommitted when a
+				// partition is revoked or the session ends are discarded. Call
+				// Commit before ConsumeClaim returns, or in Cleanup, to keep them.
 				Enable bool
 
 				// How frequently to commit updated offsets. Ineffective unless
