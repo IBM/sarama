@@ -565,6 +565,98 @@ func TestOffsetManagerFetchInitialLoadInProgress(t *testing.T) {
 	}
 }
 
+// A read_committed consumer must not start from a committed offset while a
+// transactional offset commit for the partition is still pending.
+func TestOffsetManagerFetchInitialStable(t *testing.T) {
+	newStableTest := func(t *testing.T, offsetFetch requestHandlerFunc, apiVersions []ApiVersionsResponseKey) PartitionOffsetManager {
+		t.Helper()
+		seedBroker := NewMockBroker(t, 1)
+		t.Cleanup(seedBroker.Close)
+		handlers := map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				resp := &MetadataResponse{Version: req.body.version()}
+				resp.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+				return resp
+			},
+			"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+				resp := &FindCoordinatorResponse{Version: req.body.version()}
+				resp.Coordinator = &Broker{id: seedBroker.brokerID, addr: seedBroker.Addr()}
+				return resp
+			},
+			"OffsetFetchRequest": offsetFetch,
+		}
+		config := NewTestConfig()
+		if apiVersions != nil {
+			config.ApiVersionsRequest = true
+			handlers["ApiVersionsRequest"] = func(r *request) encoderWithHeader {
+				return &ApiVersionsResponse{Version: r.body.version(), ApiKeys: apiVersions}
+			}
+		}
+		seedBroker.SetHandlerFuncByMap(handlers)
+
+		config.Version = V2_5_0_0
+		config.Consumer.IsolationLevel = ReadCommitted
+		config.Metadata.Retry.Backoff = 0
+		testClient, err := NewClient([]string{seedBroker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { safeClose(t, testClient) })
+		om, err := NewOffsetManagerFromClient("group", testClient)
+		require.NoError(t, err)
+		t.Cleanup(func() { safeClose(t, om) })
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		t.Cleanup(func() { safeClose(t, pom) })
+		return pom
+	}
+
+	t.Run("waits for a pending transactional offset", func(t *testing.T) {
+		var unstable atomic.Int32
+		// offset 5 is committed and a transaction's offset 6 is pending; the
+		// commit marker lands after the first UNSTABLE_OFFSET_COMMIT
+		pom := newStableTest(t, func(r *request) encoderWithHeader {
+			req := r.body.(*OffsetFetchRequest)
+			resp := &OffsetFetchResponse{Version: req.Version}
+			block := &OffsetFetchResponseBlock{Offset: 5, LeaderEpoch: -1}
+			switch {
+			case req.RequireStable && unstable.Load() == 0:
+				unstable.Add(1)
+				block = &OffsetFetchResponseBlock{Offset: -1, LeaderEpoch: -1, Err: ErrUnstableOffsetCommit}
+			case unstable.Load() > 0:
+				block.Offset = 6
+			}
+			resp.AddBlock("my_topic", 0, block)
+			return resp
+		}, nil)
+
+		offset, _ := pom.NextOffset()
+		require.EqualValues(t, 6, offset, "started before the pending transactional offset was committed")
+	})
+
+	t.Run("fetches without RequireStable from a broker before 2.5", func(t *testing.T) {
+		var fetched atomic.Pointer[OffsetFetchRequest]
+		pom := newStableTest(t, func(r *request) encoderWithHeader {
+			req := r.body.(*OffsetFetchRequest)
+			fetched.Store(req)
+			resp := &OffsetFetchResponse{Version: req.Version}
+			resp.AddBlock("my_topic", 0, &OffsetFetchResponseBlock{Offset: 5, LeaderEpoch: -1})
+			return resp
+		}, []ApiVersionsResponseKey{
+			{ApiKey: apiKeyMetadata, MaxVersion: 9},
+			{ApiKey: apiKeyOffsetFetch, MaxVersion: 6},
+			{ApiKey: apiKeyFindCoordinator, MaxVersion: 3},
+			{ApiKey: apiKeyApiVersions, MaxVersion: 3},
+		})
+
+		offset, _ := pom.NextOffset()
+		require.EqualValues(t, 5, offset)
+		req := fetched.Load()
+		require.NotNil(t, req)
+		require.EqualValues(t, 6, req.Version)
+		require.False(t, req.RequireStable)
+	})
+}
+
 // fetchInitialOffset must retry when OffsetFetchResponse v2+ surfaces a
 // retriable coordinator error at the top level with no per-partition blocks
 func TestOffsetManagerFetchInitialTopLevelErr(t *testing.T) {

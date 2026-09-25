@@ -20,10 +20,17 @@ type OffsetFetchRequest struct {
 	RequireStable bool   // v7+
 	partitions    map[string][]int32
 	Groups        []OffsetFetchRequestGroup // v8+
+
+	// clear RequireStable when a broker only supports versions below 7
+	// (otherwise the request fails to encode)
+	dropUnsupportedRequireStable bool
 }
 
 func (r *OffsetFetchRequest) setVersion(v int16) {
 	r.Version = v
+	if v < 7 && r.dropUnsupportedRequireStable {
+		r.RequireStable = false
+	}
 }
 
 func NewOffsetFetchRequest(
