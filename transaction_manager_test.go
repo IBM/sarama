@@ -348,6 +348,13 @@ func TestAddOffsetsToTxn(t *testing.T) {
 			newOffsets:    originalOffsets,
 		},
 		{
+			brokerErr:     ErrNetworkException,
+			initialFlags:  ProducerTxnFlagInTransaction,
+			expectedFlags: ProducerTxnFlagInTransaction,
+			expectedError: ErrNetworkException,
+			newOffsets:    originalOffsets,
+		},
+		{
 			brokerErr:     ErrUnknownProducerID,
 			initialFlags:  ProducerTxnFlagInTransaction,
 			expectedFlags: ProducerTxnFlagFatalError,
@@ -600,6 +607,32 @@ func TestTxnOffsetsCommit(t *testing.T) {
 			expectedOffsets: originalOffsets,
 		},
 		{
+			brokerErr:    ErrConcurrentTransactions,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrConcurrentTransactions),
+			expectedOffsets: originalOffsets,
+		},
+		{
+			brokerErr:    ErrNetworkException,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrNetworkException),
+			expectedOffsets: originalOffsets,
+		},
+		{
 			brokerErr:    ErrIllegalGeneration,
 			initialFlags: ProducerTxnFlagInTransaction,
 			initialOffsets: topicPartitionOffsets{
@@ -660,8 +693,21 @@ func TestTxnOffsetsCommit(t *testing.T) {
 					Offset:    0,
 				},
 			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrKafkaStorageError),
+			expectedOffsets: originalOffsets,
+		},
+		{
+			brokerErr:    ErrTransactionalIDAuthorizationFailed,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
 			expectedFlags:   ProducerTxnFlagFatalError,
-			expectedError:   ErrKafkaStorageError,
+			expectedError:   ErrTransactionalIDAuthorizationFailed,
 			expectedOffsets: originalOffsets,
 		},
 	}
@@ -764,6 +810,12 @@ func TestEndTxn(t *testing.T) {
 			commit:        true,
 			expectedFlags: ProducerTxnFlagEndTransaction,
 			expectedError: ErrConcurrentTransactions,
+		},
+		{
+			brokerErr:     ErrNetworkException,
+			commit:        true,
+			expectedFlags: ProducerTxnFlagEndTransaction,
+			expectedError: ErrNetworkException,
 		},
 		{
 			brokerErr:     ErrUnknownProducerID,
@@ -910,8 +962,15 @@ func TestPublishPartitionToTxn(t *testing.T) {
 		},
 		{
 			brokerErr:                 ErrKafkaStorageError,
+			expectedFlags:             ProducerTxnFlagInTransaction,
+			expectedError:             Wrap(ErrAddPartitionsToTxn, ErrKafkaStorageError),
+			expectedPartitionsInTxn:   topicPartitionSet{},
+			expectedPendingPartitions: initialPendingTopicPartitionSet,
+		},
+		{
+			brokerErr:                 ErrTransactionalIDAuthorizationFailed,
 			expectedFlags:             ProducerTxnFlagFatalError,
-			expectedError:             ErrKafkaStorageError,
+			expectedError:             ErrTransactionalIDAuthorizationFailed,
 			expectedPartitionsInTxn:   topicPartitionSet{},
 			expectedPendingPartitions: topicPartitionSet{},
 		},
