@@ -756,7 +756,7 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used")
 			}
 		default:
-			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s` and `%s`",
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are %#q, %#q, %#q, %#q and %#q",
 				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI)
 			return ConfigurationError(msg)
 		}
