@@ -80,7 +80,7 @@ func consumerGroupDescribeTestResponse(version int16) *ConsumerGroupDescribeResp
 			GroupID: "g", GroupState: "Stable", GroupEpoch: 7,
 			AssignmentEpoch: 6, AssignorName: "uniform", AuthorizedOperations: 42,
 			Members: []ConsumerGroupMemberDescription{{
-				MemberID: "m", InstanceID: nullString("i"), RackID: nullString(""),
+				MemberID: "m", InstanceID: new("i"), RackID: new(""),
 				MemberEpoch: 5, ClientID: "c", ClientHost: "h",
 				SubscribedTopicNames: []string{"t"}, MemberType: memberType,
 				Assignment: ConsumerGroupAssignment{TopicPartitions: []ConsumerGroupTopicPartitions{{
@@ -128,7 +128,7 @@ func TestConsumerGroupDescribeResponseError(t *testing.T) {
 		testResponse(t, "group not found", &ConsumerGroupDescribeResponse{
 			Version: version,
 			Groups: []ConsumerGroupDescription{{
-				ErrorCode: ErrGroupIDNotFound, ErrorMessage: nullString("missing"),
+				ErrorCode: ErrGroupIDNotFound, ErrorMessage: new("missing"),
 				GroupID: "g", Members: []ConsumerGroupMemberDescription{},
 				AuthorizedOperations: -2147483648,
 			}},
@@ -152,7 +152,7 @@ func TestConsumerGroupDescribeResponseEmptyAssignment(t *testing.T) {
 		member.InstanceID = nil
 		member.RackID = nil
 		member.SubscribedTopicNames = nil
-		member.SubscribedTopicRegex = nullString("t.*")
+		member.SubscribedTopicRegex = new("t.*")
 		member.Assignment.TopicPartitions = []ConsumerGroupTopicPartitions{}
 		member.TargetAssignment.TopicPartitions[0].Partitions = []int32{}
 

@@ -1057,7 +1057,7 @@ func initHandledOffsetManager(t *testing.T, config *Config, commit MockResponse)
 	broker := NewMockBroker(t, 1)
 	metadata := NewMockMetadataResponse(t).SetBroker(broker.Addr(), broker.BrokerID())
 	offsetFetch := NewMockOffsetFetchResponse(t).SetError(ErrNoError)
-	for p := int32(0); p < 4; p++ {
+	for p := range int32(4) {
 		metadata = metadata.SetLeader("my_topic", p, broker.BrokerID())
 		offsetFetch = offsetFetch.SetOffset("group", "my_topic", p, 5, "", ErrNoError)
 	}
@@ -1098,7 +1098,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 		om, capture := newCapturingOffsetManager(t, true)
 
 		poms := map[int32]PartitionOffsetManager{}
-		for p := int32(0); p < 4; p++ {
+		for p := range int32(4) {
 			pom, err := om.ManagePartition("my_topic", p)
 			require.NoError(t, err)
 			pom.MarkOffset(int64(100+p), "")
@@ -1128,7 +1128,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 		om, capture := newCapturingOffsetManager(t, false)
 
 		poms := map[int32]PartitionOffsetManager{}
-		for p := int32(0); p < 2; p++ {
+		for p := range int32(2) {
 			pom, err := om.ManagePartition("my_topic", p)
 			require.NoError(t, err)
 			pom.MarkOffset(int64(100+p), "")
@@ -1162,21 +1162,19 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 		config.Consumer.Return.Errors = true
 
 		commit := NewMockOffsetCommitResponse(t)
-		for p := int32(0); p < 4; p++ {
+		for p := range int32(4) {
 			commit = commit.SetError("group", "my_topic", p, ErrOffsetMetadataTooLarge)
 		}
 		om, _, _ := initHandledOffsetManager(t, config, commit)
 
 		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < 300; i++ {
+		wg.Go(func() {
+			for range 300 {
 				om.Commit()
 			}
-		}()
+		})
 
-		for i := 0; i < 120; i++ {
+		for i := range 120 {
 			p := int32(i % 4)
 			pom, err := om.ManagePartition("my_topic", p)
 			require.NoError(t, err)
