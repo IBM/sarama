@@ -1877,6 +1877,9 @@ func TestListConsumerGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	_, err = admin.ListConsumerGroups()
+	require.ErrorIs(t, err, ErrClosedClient)
 }
 
 func TestListConsumerGroupsMultiBroker(t *testing.T) {
@@ -2581,6 +2584,9 @@ func TestDescribeLogDirs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	_, err = admin.DescribeLogDirs([]int32{seedBroker.BrokerID()})
+	require.ErrorIs(t, err, ErrClosedClient)
 }
 
 func TestDescribeLogDirsUnknownBroker(t *testing.T) {
