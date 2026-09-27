@@ -154,9 +154,9 @@ func (ca *clusterAdmin) ListOffsets(partitions map[string]map[int32]int64, optio
 
 // AlterConsumerGroupOffsets retries on transport-level errors and on
 // per-partition coordinator errors (NOT_COORDINATOR,
-// COORDINATOR_NOT_AVAILABLE, EOF). Other per-partition errors
-// (e.g. UNKNOWN_TOPIC_OR_PARTITION) are returned to the caller in
-// OffsetCommitResponse.Errors without retry.
+// COORDINATOR_NOT_AVAILABLE, COORDINATOR_LOAD_IN_PROGRESS, EOF). Other
+// per-partition errors (e.g. UNKNOWN_TOPIC_OR_PARTITION) are returned to the
+// caller in OffsetCommitResponse.Errors without retry.
 func (ca *clusterAdmin) AlterConsumerGroupOffsets(group string, offsets map[string]map[int32]OffsetAndMetadata, _ *AlterConsumerGroupOffsetsOptions) (*OffsetCommitResponse, error) {
 	if len(offsets) == 0 {
 		return nil, ConfigurationError("no offsets provided")

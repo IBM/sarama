@@ -263,9 +263,11 @@ func isRetriableControllerError(err error) bool {
 
 // isRetriableGroupCoordinatorError returns `true` if the given error type
 // unwraps to an `ErrNotCoordinatorForConsumer`,
-// `ErrConsumerCoordinatorNotAvailable` or `EOF` response from Kafka
+// `ErrConsumerCoordinatorNotAvailable`, `ErrOffsetsLoadInProgress` or `EOF`
+// response from Kafka
 func isRetriableGroupCoordinatorError(err error) bool {
-	return errors.Is(err, ErrNotCoordinatorForConsumer) || errors.Is(err, ErrConsumerCoordinatorNotAvailable) || errors.Is(err, io.EOF)
+	return errors.Is(err, ErrNotCoordinatorForConsumer) || errors.Is(err, ErrConsumerCoordinatorNotAvailable) ||
+		errors.Is(err, ErrOffsetsLoadInProgress) || errors.Is(err, io.EOF)
 }
 
 // isRetriableListTopicsError returns true for controller errors and transient
