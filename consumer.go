@@ -583,7 +583,10 @@ func (child *partitionConsumer) dispatcher() {
 			child.waitForBrokerHandover()
 			return
 		case <-child.trigger:
-			if max := child.conf.Consumer.Retry.Max; max > 0 && int(child.retries.Load()) >= max {
+			// a broker switch is not a failed dispatch attempt, so it does not
+			// exhaust Consumer.Retry.Max
+			switching := backoff == nil && child.switchingBroker.Swap(false)
+			if max := child.conf.Consumer.Retry.Max; max > 0 && !switching && int(child.retries.Load()) >= max {
 				Logger.Printf("consumer/%s/%d giving up after %d consecutive failures\n",
 					child.topic, child.partition, child.retries.Load())
 				child.sendError(ErrConsumerRetriesExhausted)
@@ -594,7 +597,7 @@ func (child *partitionConsumer) dispatcher() {
 			// only set the timer when none is pending, so retries increments
 			// once per dispatch attempt rather than once per trigger
 			if backoff == nil {
-				if child.switchingBroker.Swap(false) {
+				if switching {
 					backoff = time.After(0)
 				} else {
 					backoff = time.After(child.computeBackoff())

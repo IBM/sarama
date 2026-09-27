@@ -939,6 +939,37 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 		assertOffsets(t, c, 1, 2, 3, 4)
 	})
 
+	t.Run("does not count the switch back to the leader towards Retry.Max", func(t *testing.T) {
+		metadata := &failOnceMetadata{}
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: func(cfg *Config) {
+				cfg.Consumer.Retry.Max = 1
+				// the preference lease; long enough for both dispatches to
+				// the follower to run before it expires
+				cfg.Metadata.RefreshFrequency = 500 * time.Millisecond
+			},
+			metadata: func(meta MockResponse) MockResponse {
+				metadata.MockResponse = meta
+				return metadata
+			},
+			leaderFetches: []readReplicaFetch{
+				{
+					records: []int64{1, 2}, preferredReadReplica: preferredReplica(1),
+					// the dispatch to the follower fails once, so the child
+					// reaches the follower with one failure counted
+					before: func() { metadata.armed.Store(true) },
+				},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				// no block for the partition until the preference expires
+				{throttled: true},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
 	t.Run("falls back to leader on out of range offset from follower", func(t *testing.T) {
 		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
 			leaderFetches: []readReplicaFetch{
@@ -987,6 +1018,7 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 
 type readReplicaTestConfig struct {
 	configure       func(*Config)
+	metadata        func(MockResponse) MockResponse
 	leaderFetches   []readReplicaFetch
 	followerFetches []readReplicaFetch
 }
@@ -995,6 +1027,25 @@ type readReplicaFetch struct {
 	records              []int64
 	preferredReadReplica preferredReadReplica
 	err                  KError
+	// throttled answers with a throttle time and no blocks
+	throttled bool
+	before    func()
+}
+
+// failOnceMetadata fails the topics in the next metadata response once armed
+type failOnceMetadata struct {
+	MockResponse
+	armed atomic.Bool
+}
+
+func (m *failOnceMetadata) For(reqBody versionedDecoder) encoderWithHeader {
+	res := m.MockResponse.For(reqBody)
+	if m.armed.CompareAndSwap(true, false) {
+		for _, topic := range res.(*MetadataResponse).Topics {
+			topic.Err = ErrInvalidTopic
+		}
+	}
+	return res
 }
 
 type preferredReadReplica struct {
@@ -1003,8 +1054,15 @@ type preferredReadReplica struct {
 }
 
 func (fetch readReplicaFetch) For(reqBody versionedDecoder) encoderWithHeader {
+	if fetch.before != nil {
+		fetch.before()
+	}
 	fetchRequest := reqBody.(*FetchRequest)
 	response := &FetchResponse{Version: fetchRequest.Version}
+	if fetch.throttled {
+		response.ThrottleTime = time.Millisecond
+		return response
+	}
 	for _, offset := range fetch.records {
 		response.AddMessage("my_topic", 0, nil, testMsg, offset)
 	}
@@ -1045,6 +1103,11 @@ func newReadReplicaTest(t *testing.T, testConfig readReplicaTestConfig) (Partiti
 		SetOffset("my_topic", 0, OffsetNewest, 1234).
 		SetOffset("my_topic", 0, OffsetOldest, 0)
 
+	var metadata MockResponse = meta
+	if testConfig.metadata != nil {
+		metadata = testConfig.metadata(meta)
+	}
+
 	toSequence := func(fetches []readReplicaFetch) MockResponse {
 		responses := make([]any, len(fetches))
 		for i, fetch := range fetches {
@@ -1054,13 +1117,13 @@ func newReadReplicaTest(t *testing.T, testConfig readReplicaTestConfig) (Partiti
 	}
 
 	leader.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": meta,
+		"MetadataRequest": metadata,
 		"OffsetRequest":   offsets,
 		"FetchRequest":    toSequence(testConfig.leaderFetches),
 	})
 	if follower != nil {
 		follower.SetHandlerByMap(map[string]MockResponse{
-			"MetadataRequest": meta,
+			"MetadataRequest": metadata,
 			"OffsetRequest":   offsets,
 			"FetchRequest":    toSequence(testConfig.followerFetches),
 		})
