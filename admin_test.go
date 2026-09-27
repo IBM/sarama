@@ -90,6 +90,68 @@ func TestClusterAdminCreateTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("retries on the new controller after the controller stops", func(t *testing.T) {
+		b1 := NewMockBroker(t, 1)
+		b2 := NewMockBroker(t, 2)
+		t.Cleanup(b2.Close)
+
+		var controllerID atomic.Int32
+		controllerID.Store(b1.BrokerID())
+		meta := func(req *request) encoderWithHeader {
+			return NewMockMetadataResponse(t).SetController(controllerID.Load()).
+				SetBroker(b1.Addr(), b1.BrokerID()).
+				SetBroker(b2.Addr(), b2.BrokerID()).For(req.body)
+		}
+		b1.SetHandlerFuncByMap(map[string]requestHandlerFunc{"MetadataRequest": meta})
+		b2.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": meta,
+			"CreateTopicsRequest": func(req *request) encoderWithHeader {
+				return NewMockCreateTopicsResponse(t).For(req.body)
+			},
+		})
+
+		config := NewTestConfig()
+		config.Version = V0_10_2_0
+		config.Admin.Retry.Backoff = time.Millisecond
+		admin, err := NewClusterAdmin([]string{b1.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		// broker 1 goes away with the admin connected to it as the controller
+		controllerID.Store(b2.BrokerID())
+		b1.Close()
+
+		err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+		require.NoError(t, err)
+	})
+
+	t.Run("concurrent calls all retry on the new controller", func(t *testing.T) {
+		created := func(req *request) encoderWithHeader {
+			return NewMockCreateTopicsResponse(t).For(req.body)
+		}
+		notController := func(req *request) encoderWithHeader {
+			r := req.body.(*CreateTopicsRequest)
+			rsp := &CreateTopicsResponse{Version: r.version(), TopicErrors: make(map[string]*TopicError)}
+			for topic := range r.TopicDetails {
+				rsp.TopicErrors[topic] = &TopicError{Err: ErrNotController}
+			}
+			return rsp
+		}
+		admin, retriedOnNewController := staleControllerAdmin(t, V0_10_2_0, "CreateTopicsRequest", notController, created)
+
+		const calls = 6
+		errs := make(chan error, calls)
+		for range calls {
+			go func() {
+				errs <- admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+			}()
+		}
+		for range calls {
+			require.NoError(t, <-errs)
+		}
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried requests")
+	})
 }
 
 func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
@@ -559,6 +621,20 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("retries on stale controller", func(t *testing.T) {
+		alterOK := func(req *request) encoderWithHeader {
+			return NewMockAlterPartitionReassignmentsResponse(t).For(req.body)
+		}
+		notController := func(req *request) encoderWithHeader {
+			return &AlterPartitionReassignmentsResponse{Version: req.body.version(), ErrorCode: ErrNotController}
+		}
+		admin, retriedOnNewController := staleControllerAdmin(t, V2_4_0_0, "AlterPartitionReassignmentsRequest", notController, alterOK)
+
+		err := admin.AlterPartitionReassignments("my_topic", [][]int32{{1, 2}})
+		require.NoError(t, err)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
 }
 
 func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
