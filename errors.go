@@ -463,3 +463,21 @@ func (err KError) Error() string {
 
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
 }
+
+// isRetriableKError reports whether err maps to a RetriableException in the
+// Java client, which resends a request that fails with one.
+func isRetriableKError(err KError) bool {
+	switch err {
+	case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable,
+		ErrNotLeaderForPartition, ErrRequestTimedOut, ErrReplicaNotAvailable,
+		ErrNetworkException, ErrOffsetsLoadInProgress, ErrConsumerCoordinatorNotAvailable,
+		ErrNotCoordinatorForConsumer, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend,
+		ErrNotController, ErrConcurrentTransactions, ErrKafkaStorageError,
+		ErrFetchSessionIDNotFound, ErrInvalidFetchSessionEpoch, ErrListenerNotFound,
+		ErrFencedLeaderEpoch, ErrUnknownLeaderEpoch, ErrOffsetNotAvailable,
+		ErrPreferredLeaderNotAvailable, ErrEligibleLeadersNotAvailable, ErrElectionNotNeeded,
+		ErrUnstableOffsetCommit, ErrThrottlingQuotaExceeded:
+		return true
+	}
+	return false
+}
