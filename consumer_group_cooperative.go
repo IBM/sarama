@@ -74,7 +74,8 @@ func (c *consumerGroup) rejoinCooperative(ctx context.Context, topics []string, 
 
 		res = result
 		// joinSync rejoins under a new member id after UNKNOWN_MEMBER_ID
-		sess.memberID.Store(&res.memberID)
+		// copy, as a pointer into res would keep its claim maps alive
+		sess.memberID.Store(new(res.memberID))
 		sess.generationID.Store(res.generationID)
 		return res.generationID, res.memberID, nil
 	})
