@@ -1832,6 +1832,95 @@ func TestDescribeConsumerGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// describeWith answers DescribeGroups for every requested group with the
+	// error from errFor
+	describeWith := func(errFor func(group string) KError) requestHandlerFunc {
+		return func(req *request) encoderWithHeader {
+			r := req.body.(*DescribeGroupsRequest)
+			res := &DescribeGroupsResponse{Version: r.version()}
+			for _, group := range r.Groups {
+				kerr := errFor(group)
+				res.Groups = append(res.Groups, &GroupDescription{Version: r.version(), GroupId: group, Err: kerr, ErrorCode: int16(kerr)})
+			}
+			return res
+		}
+	}
+
+	t.Run("retries on the new coordinator after NOT_COORDINATOR", func(t *testing.T) {
+		b1 := NewMockBroker(t, 1)
+		b2 := NewMockBroker(t, 2)
+		t.Cleanup(b1.Close)
+		t.Cleanup(b2.Close)
+
+		var coordinator atomic.Pointer[MockBroker]
+		coordinator.Store(b1)
+		handlers := func(describe requestHandlerFunc) map[string]requestHandlerFunc {
+			return map[string]requestHandlerFunc{
+				"MetadataRequest": func(req *request) encoderWithHeader {
+					return mockMetadataFor(t, b1, b2).For(req.body)
+				},
+				"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+					return NewMockFindCoordinatorResponse(t).
+						SetCoordinator(CoordinatorGroup, expectedGroupID, coordinator.Load()).For(req.body)
+				},
+				"DescribeGroupsRequest": describe,
+			}
+		}
+		b1.SetHandlerFuncByMap(handlers(describeWith(func(string) KError {
+			// the group has moved to broker 2
+			coordinator.Store(b2)
+			return ErrNotCoordinatorForConsumer
+		})))
+		b2.SetHandlerFuncByMap(handlers(describeWith(func(string) KError { return ErrNoError })))
+
+		config := NewTestConfig()
+		config.Version = V1_0_0_0
+		config.Admin.Retry.Backoff = 0
+		admin, err := NewClusterAdmin([]string{b1.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		result, err := admin.DescribeConsumerGroups([]string{expectedGroupID})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, expectedGroupID, result[0].GroupId)
+		assert.Equal(t, ErrNoError, result[0].Err)
+	})
+
+	t.Run("retries while the coordinator loads", func(t *testing.T) {
+		broker := NewMockBroker(t, 1)
+		t.Cleanup(broker.Close)
+
+		var loaded atomic.Bool
+		broker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				return mockMetadataFor(t, broker).For(req.body)
+			},
+			"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+				return NewMockFindCoordinatorResponse(t).
+					SetCoordinator(CoordinatorGroup, expectedGroupID, broker).For(req.body)
+			},
+			"DescribeGroupsRequest": describeWith(func(string) KError {
+				if loaded.CompareAndSwap(false, true) {
+					return ErrOffsetsLoadInProgress
+				}
+				return ErrNoError
+			}),
+		})
+
+		config := NewTestConfig()
+		config.Version = V1_0_0_0
+		config.Admin.Retry.Backoff = 0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		result, err := admin.DescribeConsumerGroups([]string{expectedGroupID})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, ErrNoError, result[0].Err)
+	})
 }
 
 func TestListConsumerGroups(t *testing.T) {

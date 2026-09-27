@@ -1232,43 +1232,88 @@ func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[s
 }
 
 func (ca *clusterAdmin) DescribeConsumerGroups(groups []string) (result []*GroupDescription, err error) {
-	groupsPerBroker := make(map[*Broker][]string)
+	described := make(map[string]*GroupDescription, len(groups))
+	pending := groups
+	for attemptsRemaining := ca.conf.Admin.Retry.Max + 1; len(pending) > 0; {
+		attemptsRemaining--
+		var retry []string
+		groupsPerBroker := make(map[*Broker][]string)
+
+		for _, group := range pending {
+			coordinator, err := ca.client.Coordinator(group)
+			if err != nil {
+				return nil, err
+			}
+			groupsPerBroker[coordinator] = append(groupsPerBroker[coordinator], group)
+		}
+
+		for broker, brokerGroups := range groupsPerBroker {
+			describeReq := &DescribeGroupsRequest{
+				Groups: brokerGroups,
+			}
+
+			if ca.conf.Version.IsAtLeast(V2_4_0_0) {
+				// Starting in version 4, the response will include group.instance.id info for members.
+				// Starting in version 5, the response uses flexible encoding
+				describeReq.Version = 5
+			} else if ca.conf.Version.IsAtLeast(V2_3_0_0) {
+				// Starting in version 3, authorized operations can be requested.
+				describeReq.Version = 3
+			} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
+				// Version 2 is the same as version 0.
+				describeReq.Version = 2
+			} else if ca.conf.Version.IsAtLeast(V1_1_0_0) {
+				// Version 1 is the same as version 0.
+				describeReq.Version = 1
+			}
+			response, err := broker.DescribeGroups(describeReq)
+			if err != nil {
+				if attemptsRemaining <= 0 || !isRetriableBrokerError(err) {
+					return nil, err
+				}
+				for _, group := range brokerGroups {
+					_ = ca.client.RefreshCoordinator(group)
+				}
+				retry = append(retry, brokerGroups...)
+				continue
+			}
+
+			for _, description := range response.Groups {
+				if attemptsRemaining > 0 && isRetriableDescribeGroupError(description.Err) {
+					// a coordinator that is loading keeps the group
+					if !errors.Is(description.Err, ErrOffsetsLoadInProgress) {
+						_ = ca.client.RefreshCoordinator(description.GroupId)
+					}
+					retry = append(retry, description.GroupId)
+					continue
+				}
+				described[description.GroupId] = description
+			}
+		}
+
+		pending = retry
+		if len(pending) > 0 {
+			Logger.Printf(
+				"admin/request retrying after %dms... (%d attempts remaining)\n",
+				ca.conf.Admin.Retry.Backoff/time.Millisecond, attemptsRemaining)
+			time.Sleep(ca.conf.Admin.Retry.Backoff)
+		}
+	}
 
 	for _, group := range groups {
-		coordinator, err := ca.client.Coordinator(group)
-		if err != nil {
-			return nil, err
+		if description, ok := described[group]; ok {
+			result = append(result, description)
 		}
-		groupsPerBroker[coordinator] = append(groupsPerBroker[coordinator], group)
-	}
-
-	for broker, brokerGroups := range groupsPerBroker {
-		describeReq := &DescribeGroupsRequest{
-			Groups: brokerGroups,
-		}
-
-		if ca.conf.Version.IsAtLeast(V2_4_0_0) {
-			// Starting in version 4, the response will include group.instance.id info for members.
-			// Starting in version 5, the response uses flexible encoding
-			describeReq.Version = 5
-		} else if ca.conf.Version.IsAtLeast(V2_3_0_0) {
-			// Starting in version 3, authorized operations can be requested.
-			describeReq.Version = 3
-		} else if ca.conf.Version.IsAtLeast(V2_0_0_0) {
-			// Version 2 is the same as version 0.
-			describeReq.Version = 2
-		} else if ca.conf.Version.IsAtLeast(V1_1_0_0) {
-			// Version 1 is the same as version 0.
-			describeReq.Version = 1
-		}
-		response, err := broker.DescribeGroups(describeReq)
-		if err != nil {
-			return nil, err
-		}
-
-		result = append(result, response.Groups...)
 	}
 	return result, nil
+}
+
+// isRetriableDescribeGroupError returns true for group errors that clear once
+// the coordinator is looked up again or has finished loading
+func isRetriableDescribeGroupError(err KError) bool {
+	return errors.Is(err, ErrNotCoordinatorForConsumer) ||
+		errors.Is(err, ErrConsumerCoordinatorNotAvailable) ||
+		errors.Is(err, ErrOffsetsLoadInProgress)
 }
 
 func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err error) {
