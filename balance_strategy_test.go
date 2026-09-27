@@ -1672,7 +1672,7 @@ func Test_stickyBalanceStrategy_Plan_SameSubscriptions(t *testing.T) {
 	topics := make(map[string][]int32, 15)
 	for i := range 15 {
 		partitions := make([]int32, i)
-		for j := 0; j < i; j++ {
+		for j := range i {
 			partitions[j] = int32(j)
 		}
 		topics[fmt.Sprintf("topic%d", i)] = partitions

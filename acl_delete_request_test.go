@@ -88,16 +88,16 @@ func TestDeleteAclsRequest(t *testing.T) {
 
 	testRequest(t, "delete request nulls", req, aclDeleteRequestNulls)
 
-	req.Filters[0].ResourceName = nullString("filter")
-	req.Filters[0].Principal = nullString("principal")
-	req.Filters[0].Host = nullString("host")
+	req.Filters[0].ResourceName = new("filter")
+	req.Filters[0].Principal = new("principal")
+	req.Filters[0].Host = new("host")
 	req.Filters[0].Operation = AclOperationWrite
 
 	testRequest(t, "delete request", req, aclDeleteRequest)
 
 	req.Filters = append(req.Filters, &AclFilter{
 		ResourceType:   AclResourceTopic,
-		ResourceName:   nullString("topic"),
+		ResourceName:   new("topic"),
 		Operation:      AclOperationDelete,
 		PermissionType: AclPermissionDeny,
 	})
@@ -118,9 +118,9 @@ func TestDeleteAclsRequestV1(t *testing.T) {
 
 	testRequest(t, "delete request nulls", req, aclDeleteRequestNullsv1)
 
-	req.Filters[0].ResourceName = nullString("filter")
-	req.Filters[0].Principal = nullString("principal")
-	req.Filters[0].Host = nullString("host")
+	req.Filters[0].ResourceName = new("filter")
+	req.Filters[0].Principal = new("principal")
+	req.Filters[0].Host = new("host")
 	req.Filters[0].Operation = AclOperationWrite
 
 	testRequest(t, "delete request", req, aclDeleteRequestv1)
@@ -130,9 +130,9 @@ func TestDeleteAclsRequestV2(t *testing.T) {
 	req := &DeleteAclsRequest{
 		Version: 2,
 		Filters: []*AclFilter{{
-			ResourceName:              nullString("filter"),
-			Principal:                 nullString("principal"),
-			Host:                      nullString("host"),
+			ResourceName:              new("filter"),
+			Principal:                 new("principal"),
+			Host:                      new("host"),
 			ResourceType:              AclResourceAny,
 			Operation:                 AclOperationWrite,
 			PermissionType:            AclPermissionAllow,

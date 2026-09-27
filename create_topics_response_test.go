@@ -140,7 +140,7 @@ func TestCreateTopicsResponse(t *testing.T) {
 			ReplicationFactor: 2,
 			Configs: map[string]*CreatableTopicConfigs{
 				"bar": {
-					Value:        nullString("baz"),
+					Value:        new("baz"),
 					ConfigSource: SourceDefault,
 				},
 			},

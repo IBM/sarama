@@ -72,7 +72,7 @@ func TestDeleteTopicsResponse(t *testing.T) {
 	resp.Version = 5
 	resp.TopicErrorCodes["topic"] = ErrThrottlingQuotaExceeded
 	resp.TopicErrorMessages = map[string]*string{
-		"topic": nullString("msg"),
+		"topic": new("msg"),
 	}
 	testResponse(t, "version 5", resp, deleteTopicsResponseV5)
 
