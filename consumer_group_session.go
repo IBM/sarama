@@ -378,12 +378,16 @@ func (s *consumerGroupSession) sendHeartbeat(coordinator *Broker) (*HeartbeatRes
 	s.generationMu.Lock()
 	defer s.generationMu.Unlock()
 	resp, err := s.parent.heartbeatRequest(coordinator, s.MemberID(), s.GenerationID())
-	if err == nil && errors.Is(resp.Err, ErrRebalanceInProgress) {
+	if err != nil {
+		return nil, err
+	}
+
+	if errors.Is(resp.Err, ErrRebalanceInProgress) {
 		// Signal while still holding generationMu, so the signal cannot arrive
 		// after a cooperative rejoin has already joined this rebalance.
 		s.triggerRebalance(resp.Err)
 	}
-	return resp, err
+	return resp, nil
 }
 
 func (s *consumerGroupSession) heartbeatLoop() {
