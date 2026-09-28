@@ -87,7 +87,10 @@ func (krbAuth *GSSAPIKerberosAuth) readPackage(broker *Broker) ([]byte, int, err
 		return nil, bytesRead, err
 	}
 	bytesRead += bytes
-	payloadLength := binary.BigEndian.Uint32(lengthInBytes)
+	payloadLength, err := decodeSASLv0Length(lengthInBytes)
+	if err != nil {
+		return nil, bytesRead, err
+	}
 	payloadBytes := make([]byte, payloadLength)         // buffer for read..
 	bytes, err = io.ReadFull(broker.conn, payloadBytes) // read bytes
 	if err != nil {
