@@ -503,7 +503,9 @@ type Config struct {
 
 			Retry struct {
 				// The total number of times to retry failing commit
-				// requests during OffsetManager shutdown (default 3).
+				// requests during OffsetManager shutdown and when partitions
+				// are revoked (default 3). Attempts are Metadata.Retry.Backoff
+				// (or BackoffFunc) apart.
 				Max int
 			}
 		}
