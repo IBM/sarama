@@ -57,8 +57,7 @@ func errorForTopics(topics []string, err error) error {
 	if err == nil {
 		return nil
 	}
-	var re refreshError
-	if errors.As(err, &re) {
+	if re, ok := errors.AsType[refreshError](err); ok {
 		return re.forTopics(topics)
 	}
 	return err

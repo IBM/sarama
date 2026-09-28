@@ -1022,8 +1022,6 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
 
 		response, err := broker.GetMetadata(req)
-		var kerror KError
-		var packetEncodingError PacketEncodingError
 		if err == nil {
 			// When talking to the startup phase of a broker, it is possible to receive an empty metadata set. We should remove that broker and try next broker (https://issues.apache.org/jira/browse/KAFKA-7924).
 			if len(response.Brokers) == 0 {
@@ -1043,10 +1041,10 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 			// concurrent refreshes would short-circuit each other's retries
 			client.updateMetadataMs.Store(time.Now().UnixMilli())
 			return err
-		} else if errors.As(err, &packetEncodingError) {
+		} else if _, ok := errors.AsType[PacketEncodingError](err); ok {
 			// didn't even send, return the error
 			return err
-		} else if errors.As(err, &kerror) {
+		} else if _, ok := errors.AsType[KError](err); ok {
 			// if SASL auth error return as this _should_ be a non retryable err for all brokers
 			if errors.Is(err, ErrSASLAuthenticationFailed) {
 				Logger.Println("client/metadata failed SASL authentication")
@@ -1266,8 +1264,7 @@ func (client *client) findCoordinator(coordinatorKey string, coordinatorType Coo
 		if err != nil {
 			Logger.Printf("client/coordinator request to broker %s failed: %s\n", broker.Addr(), err)
 
-			var packetEncodingError PacketEncodingError
-			if errors.As(err, &packetEncodingError) {
+			if _, ok := errors.AsType[PacketEncodingError](err); ok {
 				return nil, err
 			} else {
 				brokerErrors = append(brokerErrors, err)

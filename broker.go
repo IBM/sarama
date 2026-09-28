@@ -1458,8 +1458,7 @@ func shouldCloseBrokerConn(err error) bool {
 		return true
 	}
 
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if netErr, ok := errors.AsType[net.Error](err); ok {
 		return !netErr.Timeout()
 	}
 
