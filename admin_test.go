@@ -2186,6 +2186,23 @@ func TestListConsumerGroupOffsetsBatch(t *testing.T) {
 		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
 	})
 
+	t.Run("retries while the coordinator loads", func(t *testing.T) {
+		first := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			{GroupId: groupA, Err: ErrOffsetsLoadInProgress},
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		second := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			groupBlock(groupA, expectedOffsetA),
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		admin := setup(t, NewMockSequence(first, second), groupA, groupB)
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
+
 	t.Run("returns non-retriable per-group error without retry", func(t *testing.T) {
 		resp := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
 			{GroupId: groupA, Err: ErrGroupAuthorizationFailed},
@@ -2465,6 +2482,22 @@ func TestAlterConsumerGroupOffsets(t *testing.T) {
 		broker.SetHandlerByMap(map[string]MockResponse{
 			"OffsetCommitRequest": NewMockSequence(
 				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNotCoordinatorForConsumer),
+				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNoError),
+			),
+			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, broker),
+			"MetadataRequest":        mockMetadataFor(t, broker),
+		})
+
+		response, err := newTestAdmin(t, broker).AlterConsumerGroupOffsets(group, offsets, nil)
+		require.NoError(t, err)
+		assert.Equal(t, ErrNoError, response.Errors[topic][partition])
+	})
+
+	t.Run("retries on per-partition COORDINATOR_LOAD_IN_PROGRESS", func(t *testing.T) {
+		broker := newMockBroker(t, 1)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"OffsetCommitRequest": NewMockSequence(
+				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrOffsetsLoadInProgress),
 				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNoError),
 			),
 			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, broker),
