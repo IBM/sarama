@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -1048,6 +1049,40 @@ func (c *offsetCommitCapture) requests() []*OffsetCommitRequest {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return slices.Clone(c.reqs)
+}
+
+func TestPartitionOffsetManagerClose(t *testing.T) {
+	t.Run("returns without auto-commit", func(t *testing.T) {
+		om, capture := newCapturingOffsetManager(t, false)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		closed := make(chan error, 1)
+		go func() { closed <- pom.Close() }()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Len(c, closed, 1, "pom.Close did not return")
+		}, 2*time.Second, 10*time.Millisecond)
+		require.NoError(t, <-closed)
+		require.Nil(t, om.findPOM("my_topic", 0))
+		require.Empty(t, capture.requests())
+	})
+
+	t.Run("leaves the POM that replaced it managed", func(t *testing.T) {
+		om, _ := newCapturingOffsetManager(t, false)
+
+		old, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		old.AsyncClose()
+		om.Commit()
+
+		replacement, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+
+		require.NoError(t, old.Close())
+		require.Same(t, replacement, om.findPOM("my_topic", 0))
+	})
 }
 
 func initHandledOffsetManager(t *testing.T, config *Config, commit MockResponse) (*offsetManager, Client, *MockBroker) {
