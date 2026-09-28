@@ -973,16 +973,12 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 func TestConstructRequestRetentionTime(t *testing.T) {
 	expectedRetention := func(version KafkaVersion, retention time.Duration) int64 {
 		switch {
-		case version.IsAtLeast(V2_1_0_0):
-			// version >= 2.1.0: Client specified retention time isn't supported in the
-			// offset commit request anymore, thus the retention time field set in the
-			// OffsetCommitRequest struct should be 0.
-			return 0
 		case version.IsAtLeast(V0_9_0_0):
-			// 0.9.0 <= version < 2.1.0: Retention time *is* supported in the offset commit
-			// request. Sarama's default retention times (0) must be mapped to the Kafka
-			// default (-1). Non-zero Sarama times are converted from time.Duration to
-			// an int64 millisecond value.
+			// version >= 0.9.0: Retention time *is* supported in the offset commit
+			// request (v2-v4, which the broker can negotiate v5+ down to). Sarama's
+			// default retention times (0) must be mapped to the Kafka default (-1).
+			// Non-zero Sarama times are converted from time.Duration to an int64
+			// millisecond value.
 			if retention > 0 {
 				return int64(retention / time.Millisecond)
 			} else {
@@ -1026,6 +1022,51 @@ func TestConstructRequestRetentionTime(t *testing.T) {
 			})
 		}
 	}
+
+	t.Run("sends the retention time when the broker negotiates v4", func(t *testing.T) {
+		for _, retention := range []time.Duration{0, time.Hour} {
+			broker := NewMockBroker(t, 1)
+			t.Cleanup(broker.Close)
+			capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+			broker.SetHandlerByMap(map[string]MockResponse{
+				"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
+					{ApiKey: apiKeyMetadata, MaxVersion: 9},
+					{ApiKey: apiKeyFindCoordinator, MaxVersion: 3},
+					{ApiKey: apiKeyOffsetFetch, MaxVersion: 6},
+					// a broker before 2.1
+					{ApiKey: apiKeyOffsetCommit, MaxVersion: 4},
+					{ApiKey: apiKeyApiVersions, MaxVersion: 3},
+				}),
+				"MetadataRequest":        NewMockMetadataResponse(t).SetBroker(broker.Addr(), broker.BrokerID()).SetLeader("my_topic", 0, broker.BrokerID()),
+				"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, "group", broker),
+				"OffsetFetchRequest":     NewMockOffsetFetchResponse(t).SetOffset("group", "my_topic", 0, 5, "", ErrNoError),
+				"OffsetCommitRequest":    capture,
+			})
+
+			config := NewTestConfig()
+			config.Version = V2_4_0_0
+			config.ApiVersionsRequest = true
+			config.Consumer.Offsets.AutoCommit.Enable = false
+			config.Consumer.Offsets.Retention = retention
+			client, err := NewClient([]string{broker.Addr()}, config)
+			require.NoError(t, err)
+			t.Cleanup(func() { safeClose(t, client) })
+			om, err := NewOffsetManagerFromClient("group", client)
+			require.NoError(t, err)
+			t.Cleanup(func() { safeClose(t, om) })
+
+			pom, err := om.ManagePartition("my_topic", 0)
+			require.NoError(t, err)
+			pom.MarkOffset(10, "")
+			om.Commit()
+
+			reqs := capture.requests()
+			require.Len(t, reqs, 1)
+			require.Equal(t, int16(4), reqs[0].Version)
+			require.Equal(t, expectedRetention(V2_0_0_0, retention), reqs[0].RetentionTime,
+				"retention %s", retention)
+		}
+	})
 }
 
 // offsetCommitCapture records every OffsetCommitRequest it sees before
