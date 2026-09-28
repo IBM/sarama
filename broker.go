@@ -1434,8 +1434,7 @@ func shouldCloseBrokerConn(err error) bool {
 		return false
 	}
 
-	var fatalErr connFatalError
-	if errors.As(err, &fatalErr) {
+	if _, ok := errors.AsType[connFatalError](err); ok {
 		return true
 	}
 
