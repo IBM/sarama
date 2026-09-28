@@ -5,6 +5,7 @@ package sarama
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"runtime"
 	"slices"
 	"sync"
@@ -1154,6 +1155,22 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 		require.NotNil(t, om.findPOM("my_topic", 0))
 	})
 
+	t.Run("backs off between attempts while the coordinator loads", func(t *testing.T) {
+		config := NewTestConfig()
+		commit := newLoadingCommitResponse()
+		config.Metadata.Retry.BackoffFunc = commit.backoff
+		om, _, _ := initHandledOffsetManager(t, config, commit)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		om.removePartitions(map[string][]int32{"my_topic": {0}})
+
+		require.Equal(t, map[int32]int64{0: 100}, commit.committed(),
+			"revoked offset dropped while the coordinator was loading")
+	})
+
 	// send-on-closed-channel safety when a commit runs concurrently with removePartitions (#2608)
 	t.Run("is safe against a concurrent commit", func(t *testing.T) {
 		config := NewTestConfig()
@@ -1299,6 +1316,70 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 		require.Len(t, reqs, 1)
 		require.Equal(t, int32(7), reqs[0].ConsumerGroupGeneration)
 	})
+}
+
+func TestOffsetManagerClose(t *testing.T) {
+	t.Run("backs off between attempts while the coordinator loads", func(t *testing.T) {
+		config := NewTestConfig()
+		commit := newLoadingCommitResponse()
+		config.Metadata.Retry.BackoffFunc = commit.backoff
+		om, _, _ := initHandledOffsetManager(t, config, commit)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		require.NoError(t, om.Close())
+
+		require.Equal(t, map[int32]int64{0: 100}, commit.committed(),
+			"offset dropped on Close while the coordinator was loading")
+	})
+}
+
+// loadingCommitResponse answers COORDINATOR_LOAD_IN_PROGRESS until the offset
+// manager backs off after such an answer, as a coordinator that finishes
+// loading while the client waits
+type loadingCommitResponse struct {
+	mu       sync.Mutex
+	answered bool
+	loaded   bool
+	offsets  map[int32]int64
+}
+
+func newLoadingCommitResponse() *loadingCommitResponse {
+	return &loadingCommitResponse{offsets: make(map[int32]int64)}
+}
+
+func (r *loadingCommitResponse) backoff(retries, maxRetries int) time.Duration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.loaded = r.loaded || r.answered
+	return 0
+}
+
+func (r *loadingCommitResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*OffsetCommitRequest)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	res := &OffsetCommitResponse{Version: req.version()}
+	for topic, blocks := range req.blocks {
+		for partition, block := range blocks {
+			if !r.loaded {
+				r.answered = true
+				res.AddError(topic, partition, ErrOffsetsLoadInProgress)
+				continue
+			}
+			r.offsets[partition] = block.offset
+			res.AddError(topic, partition, ErrNoError)
+		}
+	}
+	return res
+}
+
+func (r *loadingCommitResponse) committed() map[int32]int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return maps.Clone(r.offsets)
 }
 
 // gatedResponse holds the first request in flight: it closes entered when that
