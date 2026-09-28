@@ -1421,10 +1421,22 @@ func getHeaderLength(headerVersion int16) int8 {
 	}
 }
 
+// connFatalError wraps an error after which the connection is no longer in
+// step with the broker and must be closed.
+type connFatalError struct{ err error }
+
+func (e connFatalError) Error() string { return e.err.Error() }
+func (e connFatalError) Unwrap() error { return e.err }
+
 // shouldCloseBrokerConn reports whether a transport error should trigger closing.
 func shouldCloseBrokerConn(err error) bool {
 	if err == nil {
 		return false
+	}
+
+	var fatalErr connFatalError
+	if errors.As(err, &fatalErr) {
+		return true
 	}
 
 	if errors.Is(err, io.EOF) {
@@ -1453,6 +1465,29 @@ func shouldCloseBrokerConn(err error) bool {
 	}
 
 	return false
+}
+
+// decodeResponseHeaderV0 decodes a non-flexible response header read outside
+// responseReceiver and returns the length of the body that follows it.
+func decodeResponseHeaderV0(buf []byte, correlationID int32, metricRegistry metrics.Registry) (int, error) {
+	var header responseHeader
+	if err := versionedDecode(buf, &header, 0, metricRegistry); err != nil {
+		return 0, err
+	}
+	if header.correlationID != correlationID {
+		return 0, PacketDecodingError{fmt.Sprintf("correlation ID didn't match, wanted %d, got %d", correlationID, header.correlationID)}
+	}
+	return int(header.length) - 4, nil
+}
+
+// decodeSASLv0Length decodes the 4-byte length prefix of a SASL v0 token,
+// which is sent without a Kafka response header.
+func decodeSASLv0Length(buf []byte) (int, error) {
+	length := int32(binary.BigEndian.Uint32(buf))
+	if length < 0 || length > MaxResponseSize {
+		return 0, PacketDecodingError{fmt.Sprintf("SASL response of length %d too large or too small", length)}
+	}
+	return int(length), nil
 }
 
 func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error) {
@@ -1491,11 +1526,15 @@ func (b *Broker) sendAndReceiveApiVersions(v int16) (*ApiVersionsResponse, error
 		return nil, err
 	}
 
-	length := binary.BigEndian.Uint32(header[:4])
-	// we're not using the correlation ID here, but it is part of the response header
-	// correlationID := binary.BigEndian.Uint32(header[4:])
+	bodyLength, err := decodeResponseHeaderV0(header, req.correlationID, b.metricRegistry)
+	if err != nil {
+		b.addRequestInFlightMetrics(-1)
+		Logger.Printf("Failed to decode ApiVersionsResponse V%d header from %s: %s\n", v, b.addr, err)
+		// the body is still unread, so the connection cannot be reused for the v0 retry
+		return nil, connFatalError{err}
+	}
 
-	payload := make([]byte, length-4)
+	payload := make([]byte, bodyLength)
 	n, err := b.readFull(payload)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
@@ -1635,8 +1674,14 @@ func (b *Broker) sendAndReceiveSASLHandshake(saslType SASLMechanism, version int
 		return err
 	}
 
-	length := binary.BigEndian.Uint32(header[:4])
-	payload := make([]byte, length-4)
+	bodyLength, err := decodeResponseHeaderV0(header, req.correlationID, b.metricRegistry)
+	if err != nil {
+		b.addRequestInFlightMetrics(-1)
+		Logger.Printf("Failed to decode SASL handshake header : %s\n", err.Error())
+		return err
+	}
+
+	payload := make([]byte, bodyLength)
 	n, err := b.readFull(payload)
 	if err != nil {
 		b.addRequestInFlightMetrics(-1)
@@ -1801,11 +1846,12 @@ func (b *Broker) sendAndReceiveSASLSCRAMv0() error {
 			Logger.Printf("Failed to read response header while authenticating with SASL to broker %s: %s\n", b.addr, err.Error())
 			return err
 		}
-		payloadLength := binary.BigEndian.Uint32(header)
-		if int64(payloadLength) > int64(MaxResponseSize) {
-			return PacketDecodingError{fmt.Sprintf("SASL response of length %d too large", payloadLength)}
+		payloadLength, err := decodeSASLv0Length(header)
+		if err != nil {
+			b.addRequestInFlightMetrics(-1)
+			return err
 		}
-		payload := make([]byte, int(payloadLength))
+		payload := make([]byte, payloadLength)
 		n, err := b.readFull(payload)
 		if err != nil {
 			b.addRequestInFlightMetrics(-1)
