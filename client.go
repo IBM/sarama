@@ -160,6 +160,7 @@ type client struct {
 	metadata                map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
 	metadataTopics          map[string]none                         // topics that need to collect metadata
 	topicIDs                map[string]Uuid                         // last topic id seen per topic, to tell a re-created topic from a lagging broker
+	lastPartitions          map[string]map[int32]*PartitionMetadata // last partitions stored per topic, kept when the topic leaves metadata
 	coordinators            map[string]int32                        // Maps consumer group names to coordinating broker IDs
 	transactionCoordinators map[string]int32                        // Maps transaction ids to coordinating broker IDs
 
@@ -1110,7 +1111,6 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 
 	client.controllerID = data.ControllerID
 
-	previous := client.metadata
 	if allKnownMetaData {
 		client.metadata = make(map[string]map[int32]*PartitionMetadata)
 		client.metadataTopics = make(map[string]none)
@@ -1125,7 +1125,6 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		if _, exists := client.metadataTopics[topic.Name]; !exists {
 			client.metadataTopics[topic.Name] = none{}
 		}
-		cached := previous[topic.Name]
 		delete(client.metadata, topic.Name)
 		delete(client.cachedPartitionsResults, topic.Name)
 
@@ -1150,12 +1149,16 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 
 		// a broker with a lagging metadata cache can report an older leader
 		// epoch; keep the newer entry unless the topic id shows the topic was
-		// re-created (leader epochs restart then)
+		// re-created (leader epochs restart then). Compare with lastPartitions,
+		// which keeps the entry after a lagging broker that did not know the
+		// topic yet removed it from metadata.
 		sameTopic := topic.Uuid != (Uuid{}) && topic.Uuid == client.topicIDs[topic.Name]
 		if client.topicIDs == nil {
 			client.topicIDs = make(map[string]Uuid)
+			client.lastPartitions = make(map[string]map[int32]*PartitionMetadata)
 		}
 		client.topicIDs[topic.Name] = topic.Uuid
+		cached := client.lastPartitions[topic.Name]
 
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
@@ -1169,6 +1172,8 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 				retry = true
 			}
 		}
+
+		client.lastPartitions[topic.Name] = client.metadata[topic.Name]
 
 		var partitionCache [maxPartitionIndex][]int32
 		partitionCache[allPartitions] = client.setPartitionCache(topic.Name, allPartitions)
