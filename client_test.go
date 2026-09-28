@@ -1173,6 +1173,65 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestClientSingleFlightRefresh(t *testing.T) {
+	t.Run("refreshes a named topic requested during an all-topics refresh", func(t *testing.T) {
+		seedBroker := NewMockBroker(t, 1)
+		defer seedBroker.Close()
+
+		var holdAll atomic.Bool
+		allReceived := make(chan struct{})
+		release := make(chan struct{})
+		seedBroker.setHandler(func(req *request) encoderWithHeader {
+			mr, ok := req.body.(*MetadataRequest)
+			if !ok {
+				return nil
+			}
+			resp := &MetadataResponse{Version: mr.Version}
+			resp.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+			if mr.Topics == nil {
+				if holdAll.CompareAndSwap(true, false) {
+					close(allReceived)
+					<-release
+				}
+				return resp
+			}
+			// the broker creates a topic named in the request
+			for _, topic := range mr.Topics {
+				resp.AddTopicPartition(topic, 0, seedBroker.BrokerID(), nil, nil, nil, ErrNoError)
+			}
+			return resp
+		})
+
+		client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+		require.NoError(t, err)
+		defer safeClose(t, client)
+
+		holdAll.Store(true)
+		allDone := make(chan error, 1)
+		go func() { allDone <- client.RefreshMetadata() }()
+		<-allReceived
+
+		type result struct {
+			partitions []int32
+			err        error
+		}
+		partitionsDone := make(chan result, 1)
+		go func() {
+			partitions, err := client.Partitions("new_topic")
+			partitionsDone <- result{partitions, err}
+		}()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, goroutineBlocked("getPartitions", "chan receive"))
+		}, 5*time.Second, time.Millisecond)
+		close(release)
+
+		require.NoError(t, <-allDone)
+		got := <-partitionsDone
+		require.NoError(t, got.err)
+		assert.Equal(t, []int32{0}, got.partitions)
+	})
+}
+
 func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	coordinator := NewMockBroker(t, 2)
