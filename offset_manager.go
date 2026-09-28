@@ -587,6 +587,21 @@ func (om *offsetManager) releaseSelectedPOMs(force bool, targets partitionTarget
 	return
 }
 
+// releasePOM releases pom unless another POM has replaced it
+func (om *offsetManager) releasePOM(pom *partitionOffsetManager) {
+	om.pomsLock.Lock()
+	defer om.pomsLock.Unlock()
+
+	if om.poms[pom.topic][pom.partition] != pom {
+		return
+	}
+	pom.release()
+	delete(om.poms[pom.topic], pom.partition)
+	if len(om.poms[pom.topic]) == 0 {
+		delete(om.poms, pom.topic)
+	}
+}
+
 func (om *offsetManager) findPOM(topic string, partition int32) *partitionOffsetManager {
 	om.pomsLock.RLock()
 	defer om.pomsLock.RUnlock()
@@ -656,7 +671,8 @@ type PartitionOffsetManager interface {
 	// Close stops the PartitionOffsetManager from managing offsets. It is required to
 	// call this function (or AsyncClose) before a PartitionOffsetManager object
 	// passes out of scope, as it will otherwise leak memory. You must call this
-	// before calling Close on the underlying client.
+	// before calling Close on the underlying client. When auto-commit is disabled,
+	// offsets marked since the last Commit are discarded.
 	Close() error
 }
 
@@ -747,6 +763,11 @@ func (pom *partitionOffsetManager) AsyncClose() {
 
 func (pom *partitionOffsetManager) Close() error {
 	pom.AsyncClose()
+	// release the POM here without auto-commit (otherwise errors stays open
+	// until the next Commit or the OffsetManager's Close)
+	if !pom.parent.conf.Consumer.Offsets.AutoCommit.Enable {
+		pom.parent.releasePOM(pom)
+	}
 
 	var errors ConsumerErrors
 	for err := range pom.errors {
