@@ -2348,6 +2348,51 @@ func TestListOffsets(t *testing.T) {
 		require.NotNil(t, missing)
 		assert.ErrorIs(t, missing.Err, ErrUnknownTopicOrPartition)
 	})
+
+	t.Run("does not reconnect the leader once the admin is closed", func(t *testing.T) {
+		const partition = int32(0)
+
+		seed := newMockBroker(t, 1)
+		leader := NewMockBroker(t, 2)
+		leaderAddr := leader.Addr()
+		seed.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": mockMetadataFor(t, seed, leader).SetLeader(topic, partition, leader.BrokerID()),
+		})
+		// with the leader down, each ListOffsets attempt fails and backs off
+		leader.Close()
+
+		config := NewTestConfig()
+		config.Version = V2_1_0_0
+		config.Admin.Retry.Max = 100
+		config.Admin.Retry.Backoff = 10 * time.Millisecond
+		client, err := NewClient([]string{seed.Addr()}, config)
+		require.NoError(t, err)
+		admin, err := NewClusterAdminFromClient(client)
+		require.NoError(t, err)
+		broker, err := client.Leader(topic, partition)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = broker.Close() })
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = admin.ListOffsets(map[string]map[int32]int64{topic: {partition: OffsetNewest}}, nil)
+		}()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, goroutineBlocked("retryOnError", "sleep"))
+		}, 5*time.Second, time.Millisecond)
+
+		require.NoError(t, admin.Close())
+		restarted := NewMockBrokerAddr(t, leader.BrokerID(), leaderAddr)
+		t.Cleanup(restarted.Close)
+		restarted.SetHandlerByMap(map[string]MockResponse{
+			"OffsetRequest": NewMockOffsetResponse(t).SetOffset(topic, partition, OffsetNewest, 42),
+		})
+		<-done
+
+		connected, _ := broker.Connected()
+		assert.False(t, connected, "a connection opened after Close is never closed")
+	})
 }
 
 func TestAlterConsumerGroupOffsets(t *testing.T) {
