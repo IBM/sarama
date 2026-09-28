@@ -565,16 +565,6 @@ func (client *client) Controller() (*Broker, error) {
 	return controller, nil
 }
 
-// deregisterController removes the cached controllerID
-func (client *client) deregisterController() {
-	client.lock.Lock()
-	defer client.lock.Unlock()
-	if controller, ok := client.brokers[client.controllerID]; ok {
-		_ = controller.Close()
-		delete(client.brokers, client.controllerID)
-	}
-}
-
 // RefreshController retrieves the cluster controller from fresh metadata
 // and stores it in the local cache. Requires Kafka 0.10 or higher.
 func (client *client) RefreshController() (*Broker, error) {
@@ -582,8 +572,8 @@ func (client *client) RefreshController() (*Broker, error) {
 		return nil, ErrClosedClient
 	}
 
-	client.deregisterController()
-
+	// keep the old controller registered and connected (otherwise requests
+	// still using it fail with ErrNotConnected)
 	if err := client.refreshMetadata(); err != nil {
 		return nil, err
 	}

@@ -256,9 +256,10 @@ func (ca *clusterAdmin) refreshController() (*Broker, error) {
 }
 
 // isRetriableControllerError returns `true` if the given error type unwraps to
-// an `ErrNotController` or `EOF` response from Kafka
+// an `ErrNotController` response from Kafka or to a connection error, either
+// of which can mean the controller has moved
 func isRetriableControllerError(err error) bool {
-	return errors.Is(err, ErrNotController) || errors.Is(err, io.EOF)
+	return errors.Is(err, ErrNotController) || errors.Is(err, ErrNotConnected) || shouldCloseBrokerConn(err)
 }
 
 // isRetriableGroupCoordinatorError returns `true` if the given error type
@@ -307,12 +308,22 @@ func (ca *clusterAdmin) retryOnError(retryable func(error) bool, fn func() error
 	}
 }
 
+// retryOnControllerError is retryOnError for requests sent to the controller.
+// It refreshes the cached controller before each retry, so the retry goes to
+// the controller named by fresh metadata.
+func (ca *clusterAdmin) retryOnControllerError(fn func() error) error {
+	return ca.retryOnError(func(err error) bool {
+		if !isRetriableControllerError(err) {
+			return false
+		}
+		_, _ = ca.refreshController()
+		return true
+	}, fn)
+}
+
 func (ca *clusterAdmin) controllerError(code KError, msg *string) error {
 	if errors.Is(code, ErrNoError) {
 		return nil
-	}
-	if isRetriableControllerError(code) {
-		_, _ = ca.refreshController()
 	}
 	if msg != nil && *msg != "" {
 		return fmt.Errorf("%w: %s", code, *msg)
@@ -340,7 +351,7 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 		validateOnly,
 	)
 
-	return ca.retryOnError(isRetriableControllerError, func() error {
+	return ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -357,9 +368,6 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 		}
 
 		if !errors.Is(topicErr.Err, ErrNoError) {
-			if isRetriableControllerError(topicErr.Err) {
-				_, _ = ca.refreshController()
-			}
 			return topicErr
 		}
 
@@ -369,16 +377,13 @@ func (ca *clusterAdmin) CreateTopic(topic string, detail *TopicDetail, validateO
 
 func (ca *clusterAdmin) DescribeTopics(topics []string) (metadata []*TopicMetadata, err error) {
 	var response *MetadataResponse
-	err = ca.retryOnError(isRetriableControllerError, func() error {
+	err = ca.retryOnControllerError(func() error {
 		controller, err := ca.Controller()
 		if err != nil {
 			return err
 		}
 		request := NewMetadataRequest(ca.conf.Version, topics)
 		response, err = controller.GetMetadata(request)
-		if isRetriableControllerError(err) {
-			_, _ = ca.refreshController()
-		}
 		return err
 	})
 	if err != nil {
@@ -402,7 +407,7 @@ func (ca *clusterAdmin) DescribeCluster() (brokers []*Broker, controllerID int32
 
 func (ca *clusterAdmin) describeClusterUsingAPI() (brokers []*Broker, controllerID int32, err error) {
 	var response *DescribeClusterResponse
-	err = ca.retryOnError(isRetriableControllerError, func() error {
+	err = ca.retryOnControllerError(func() error {
 		controller, err := ca.Controller()
 		if err != nil {
 			return err
@@ -414,9 +419,6 @@ func (ca *clusterAdmin) describeClusterUsingAPI() (brokers []*Broker, controller
 			return err
 		}
 		if !errors.Is(response.Err, ErrNoError) {
-			if isRetriableControllerError(response.Err) {
-				_, _ = ca.refreshController()
-			}
 			if response.ErrorMessage != nil && *response.ErrorMessage != "" {
 				return fmt.Errorf("%w: %s", response.Err, *response.ErrorMessage)
 			}
@@ -434,7 +436,7 @@ func (ca *clusterAdmin) describeClusterUsingAPI() (brokers []*Broker, controller
 
 func (ca *clusterAdmin) describeClusterUsingMetadata() (brokers []*Broker, controllerID int32, err error) {
 	var response *MetadataResponse
-	err = ca.retryOnError(isRetriableControllerError, func() error {
+	err = ca.retryOnControllerError(func() error {
 		controller, err := ca.Controller()
 		if err != nil {
 			return err
@@ -442,9 +444,6 @@ func (ca *clusterAdmin) describeClusterUsingMetadata() (brokers []*Broker, contr
 
 		request := NewMetadataRequest(ca.conf.Version, nil)
 		response, err = controller.GetMetadata(request)
-		if isRetriableControllerError(err) {
-			_, _ = ca.refreshController()
-		}
 		return err
 	})
 	if err != nil {
@@ -599,7 +598,7 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		ca.conf.Admin.Timeout,
 	)
 
-	return ca.retryOnError(isRetriableControllerError, func() error {
+	return ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -616,9 +615,6 @@ func (ca *clusterAdmin) DeleteTopic(topic string) error {
 		}
 
 		if !errors.Is(topicErr, ErrNoError) {
-			if errors.Is(topicErr, ErrNotController) {
-				_, _ = ca.refreshController()
-			}
 			return topicErr
 		}
 
@@ -651,7 +647,7 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		request.Version = 1
 	}
 
-	return ca.retryOnError(isRetriableControllerError, func() error {
+	return ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -668,9 +664,6 @@ func (ca *clusterAdmin) CreatePartitions(topic string, count int32, assignment [
 		}
 
 		if !errors.Is(topicErr.Err, ErrNoError) {
-			if errors.Is(topicErr.Err, ErrNotController) {
-				_, _ = ca.refreshController()
-			}
 			return topicErr
 		}
 
@@ -692,7 +685,7 @@ func (ca *clusterAdmin) AlterPartitionReassignments(topic string, assignment [][
 		request.AddBlock(topic, int32(i), assignment[i])
 	}
 
-	return ca.retryOnError(isRetriableControllerError, func() error {
+	return ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -739,7 +732,7 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 	request.AddBlock(topic, partitions)
 
 	var rsp *ListPartitionReassignmentsResponse
-	err = ca.retryOnError(isRetriableControllerError, func() error {
+	err = ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -747,9 +740,6 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 		_ = b.Open(ca.client.Config())
 
 		rsp, err = b.ListPartitionReassignments(request)
-		if isRetriableControllerError(err) {
-			_, _ = ca.refreshController()
-		}
 		return err
 	})
 
@@ -1076,16 +1066,13 @@ func (ca *clusterAdmin) CreateACL(resource Resource, acl Acl) error {
 		request.Version = 1
 	}
 
-	return ca.retryOnError(isRetriableControllerError, func() error {
+	return ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
 		}
 
 		_, err = b.CreateAcls(request)
-		if isRetriableControllerError(err) {
-			_, _ = ca.refreshController()
-		}
 		return err
 	})
 }
@@ -1103,16 +1090,13 @@ func (ca *clusterAdmin) CreateACLs(resourceACLs []*ResourceAcls) error {
 		request.Version = 1
 	}
 
-	return ca.retryOnError(isRetriableControllerError, func() error {
+	return ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
 		}
 
 		_, err = b.CreateAcls(request)
-		if isRetriableControllerError(err) {
-			_, _ = ca.refreshController()
-		}
 		return err
 	})
 }
@@ -1127,7 +1111,7 @@ func (ca *clusterAdmin) ListAcls(filter AclFilter) ([]ResourceAcls, error) {
 	}
 
 	var acls []ResourceAcls
-	err := ca.retryOnError(isRetriableControllerError, func() error {
+	err := ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -1165,7 +1149,7 @@ func (ca *clusterAdmin) DeleteACL(filter AclFilter, validateOnly bool) ([]Matchi
 	}
 
 	var matchingAcls []MatchingAcl
-	err := ca.retryOnError(isRetriableControllerError, func() error {
+	err := ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -1207,7 +1191,7 @@ func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[s
 	}
 
 	var res *ElectLeadersResponse
-	if err := ca.retryOnError(isRetriableControllerError, func() error {
+	if err := ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -1219,9 +1203,6 @@ func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[s
 			return err
 		}
 		if !errors.Is(res.ErrorCode, ErrNoError) {
-			if isRetriableControllerError(res.ErrorCode) {
-				_, _ = ca.refreshController()
-			}
 			return res.ErrorCode
 		}
 		return nil
@@ -1563,7 +1544,7 @@ func (ca *clusterAdmin) DescribeUserScramCredentials(users []string) ([]*Describ
 	}
 
 	var rsp *DescribeUserScramCredentialsResponse
-	err := ca.retryOnError(isRetriableControllerError, func() error {
+	err := ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -1607,7 +1588,7 @@ func (ca *clusterAdmin) AlterUserScramCredentials(u []AlterUserScramCredentialsU
 	}
 
 	var rsp *AlterUserScramCredentialsResponse
-	err := ca.retryOnError(isRetriableControllerError, func() error {
+	err := ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -1630,7 +1611,7 @@ func (ca *clusterAdmin) UpdateFeatures(featureUpdates []FeatureUpdate) ([]Updata
 	}
 
 	var rsp *UpdateFeaturesResponse
-	err := ca.retryOnError(isRetriableControllerError, func() error {
+	err := ca.retryOnControllerError(func() error {
 		b, err := ca.Controller()
 		if err != nil {
 			return err
@@ -1642,9 +1623,6 @@ func (ca *clusterAdmin) UpdateFeatures(featureUpdates []FeatureUpdate) ([]Updata
 		}
 
 		if !errors.Is(rsp.ErrorCode, ErrNoError) {
-			if errors.Is(rsp.ErrorCode, ErrNotController) {
-				_, _ = ca.refreshController()
-			}
 			if rsp.ErrorMessage != nil {
 				return fmt.Errorf("%w - %s", rsp.ErrorCode, *rsp.ErrorMessage)
 			}
