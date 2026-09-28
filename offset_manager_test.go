@@ -7,11 +7,13 @@ import (
 	"fmt"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -756,29 +758,73 @@ func TestPartitionOffsetManagerNextOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerResetOffset(t *testing.T) {
-	om, testClient, broker, coordinator := initOffsetManager(t, 0)
-	defer broker.Close()
-	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	t.Run("returns the reset offset and metadata", func(t *testing.T) {
+		om, testClient, broker, coordinator := initOffsetManager(t, 0)
+		defer broker.Close()
+		defer coordinator.Close()
+		pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
-	ocResponse := new(OffsetCommitResponse)
-	ocResponse.AddError("my_topic", 0, ErrNoError)
-	coordinator.Returns(ocResponse)
+		ocResponse := new(OffsetCommitResponse)
+		ocResponse.AddError("my_topic", 0, ErrNoError)
+		coordinator.Returns(ocResponse)
 
-	expected := int64(1)
-	pom.ResetOffset(expected, "modified_meta")
-	actual, meta := pom.NextOffset()
+		expected := int64(1)
+		pom.ResetOffset(expected, "modified_meta")
+		actual, meta := pom.NextOffset()
 
-	if actual != expected {
-		t.Errorf("Expected offset %v. Actual: %v", expected, actual)
-	}
-	if meta != "modified_meta" {
-		t.Errorf("Expected metadata \"modified_meta\". Actual: %q", meta)
-	}
+		if actual != expected {
+			t.Errorf("Expected offset %v. Actual: %v", expected, actual)
+		}
+		if meta != "modified_meta" {
+			t.Errorf("Expected metadata \"modified_meta\". Actual: %q", meta)
+		}
 
-	safeClose(t, pom)
-	safeClose(t, om)
-	safeClose(t, testClient)
+		safeClose(t, pom)
+		safeClose(t, om)
+		safeClose(t, testClient)
+	})
+
+	t.Run("commits a reset to the offset of an earlier commit still in flight", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		gate := &gatedResponse{inner: capture, entered: make(chan none), release: make(chan none)}
+		om, _, _ := initHandledOffsetManager(t, config, gate)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+
+		pom.MarkOffset(10, "")
+		first := make(chan none)
+		go func() {
+			om.Commit()
+			close(first)
+		}()
+		<-gate.entered
+
+		// the second commit is written behind the first, which the coordinator holds
+		pom.MarkOffset(20, "")
+		second := make(chan none)
+		go func() {
+			om.Commit()
+			close(second)
+		}()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Equal(c, 2, goroutinesIn("flushToBrokerFor", "handleResponsePromise"))
+		}, 5*time.Second, time.Millisecond)
+
+		pom.ResetOffset(10, "")
+		close(gate.release)
+		<-first
+		<-second
+
+		om.Commit()
+		reqs := capture.requests()
+		require.NotEmpty(t, reqs)
+		last := reqs[len(reqs)-1].blocks["my_topic"][0]
+		require.NotNil(t, last)
+		require.Equal(t, int64(10), last.offset, "the reset to 10 was never committed after 20")
+	})
 }
 
 func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
@@ -1017,7 +1063,7 @@ func TestConstructRequestRetentionTime(t *testing.T) {
 					},
 				}
 
-				req := om.constructRequestFor(nil)
+				req, _ := om.constructRequestFor(nil)
 
 				expectedRetention := expectedRetention(version, retention)
 				if req.RetentionTime != expectedRetention {
@@ -1317,4 +1363,17 @@ func (g *gatedResponse) For(reqBody versionedDecoder) encoderWithHeader {
 		<-g.release
 	})
 	return g.inner.For(reqBody)
+}
+
+// goroutinesIn counts the goroutines whose stack includes every one of functions
+func goroutinesIn(functions ...string) int {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	n := 0
+	for g := range strings.SplitSeq(string(buf), "\n\n") {
+		if !slices.ContainsFunc(functions, func(f string) bool { return !strings.Contains(g, "."+f+"(") }) {
+			n++
+		}
+	}
+	return n
 }
