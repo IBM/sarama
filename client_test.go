@@ -914,6 +914,40 @@ func TestClientController(t *testing.T) {
 		}
 	})
 
+	t.Run("finds the controller with no tracked topics and Full disabled", func(t *testing.T) {
+		seedBroker := NewMockBroker(t, 1)
+		defer seedBroker.Close()
+		seedBroker.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetController(controllerBroker.BrokerID()).
+				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+				SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
+		})
+
+		cfg := NewTestConfig()
+		cfg.Version = V1_0_0_0
+		cfg.Metadata.Full = false
+		client, err := NewClient([]string{seedBroker.Addr()}, cfg)
+		require.NoError(t, err)
+		defer safeClose(t, client)
+
+		broker, err := client.Controller()
+		require.NoError(t, err)
+		assert.Equal(t, controllerBroker.Addr(), broker.Addr())
+
+		broker, err = client.RefreshController()
+		require.NoError(t, err)
+		assert.Equal(t, controllerBroker.Addr(), broker.Addr())
+
+		var requested [][]string
+		for _, rr := range seedBroker.History() {
+			if req, ok := rr.Request.(*MetadataRequest); ok {
+				requested = append(requested, req.Topics)
+			}
+		}
+		assert.Equal(t, [][]string{{}, {}}, requested, "metadata requests should name no topics")
+	})
+
 	// test kafka version earlier than 0.10.0.0
 	t.Run("V0_9_0_1", func(t *testing.T) {
 		cfg.Version = V0_9_0_1
