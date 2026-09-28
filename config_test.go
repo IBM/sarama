@@ -554,8 +554,7 @@ func TestValidGroupInstanceId(t *testing.T) {
 			if err == nil {
 				t.Errorf("Expected validGroupInstanceId %s to be error, got nil", testcase.grouptInstanceId)
 			}
-			var target ConfigurationError
-			if !errors.As(err, &target) {
+			if _, ok := errors.AsType[ConfigurationError](err); !ok {
 				t.Errorf("Excepted err to be ConfigurationError, got %v", err)
 			}
 		}

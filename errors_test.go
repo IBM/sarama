@@ -28,11 +28,10 @@ func TestSentinelWithSingleWrappedError(t *testing.T) {
 		t.Error("errors.Is unexpected result")
 	}
 
-	var opError *net.OpError
-	if !errors.As(error, &opError) {
-		t.Error("errors.As unexpected result")
+	if opError, ok := errors.AsType[*net.OpError](error); !ok {
+		t.Error("errors.AsType unexpected result")
 	} else if opError != myNetError {
-		t.Error("errors.As wrong value")
+		t.Error("errors.AsType wrong value")
 	}
 
 	unwrapped := errors.Unwrap(error)
