@@ -1319,6 +1319,24 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 }
 
 func TestOffsetManagerClose(t *testing.T) {
+	t.Run("commits marked offsets", func(t *testing.T) {
+		config := NewTestConfig()
+		// only the flush in Close can send the commit
+		config.Consumer.Offsets.AutoCommit.Interval = time.Hour
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		om, _, _ := initHandledOffsetManager(t, config, capture)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		require.NoError(t, om.Close())
+
+		reqs := capture.requests()
+		require.Len(t, reqs, 1, "Close did not commit the marked offset")
+		require.Equal(t, int64(100), reqs[0].blocks["my_topic"][0].offset)
+	})
+
 	t.Run("backs off between attempts while the coordinator loads", func(t *testing.T) {
 		config := NewTestConfig()
 		commit := newLoadingCommitResponse()
