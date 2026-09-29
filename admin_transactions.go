@@ -244,6 +244,11 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 		return nil, ConfigurationError("ListTransactions durationFilterMs requires Version >= V3_8_0_0")
 	}
 
+	// a closed client has no brokers, which would look like no transactions
+	if ca.client.Closed() {
+		return nil, ErrClosedClient
+	}
+
 	// Transactions may be listed by any broker, so query all brokers in parallel
 	// and merge the results.
 	brokers := ca.client.Brokers()
