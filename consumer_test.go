@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -856,7 +857,8 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 		t.Helper()
 		for _, want := range offsets {
 			select {
-			case msg := <-c.Messages():
+			case msg, ok := <-c.Messages():
+				require.Truef(t, ok, "partition consumer shut down before offset %d", want)
 				assertMessageOffset(t, msg, want)
 			case <-time.After(5 * time.Second):
 				require.Failf(t, "timed out waiting for message", "offset %d", want)
@@ -919,6 +921,70 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 		assertOffsets(t, c, 1, 2, 3, 4)
 	})
 
+	t.Run("does not count the switch to the follower towards Retry.Max", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: func(cfg *Config) {
+				cfg.Consumer.Retry.Max = 1
+				cfg.Consumer.Retry.Backoff = 10 * time.Millisecond
+			},
+			leaderFetches: []readReplicaFetch{
+				{records: []int64{1, 2}, preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{err: ErrNotLeaderForPartition},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("does not count the switch back to the leader towards Retry.Max", func(t *testing.T) {
+		metadata := &failOnceMetadata{}
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			configure: func(cfg *Config) {
+				cfg.Consumer.Retry.Max = 1
+				// the preference lease; long enough for both dispatches to
+				// the follower to run before it expires
+				cfg.Metadata.RefreshFrequency = 500 * time.Millisecond
+			},
+			metadata: func(meta MockResponse) MockResponse {
+				metadata.MockResponse = meta
+				return metadata
+			},
+			leaderFetches: []readReplicaFetch{
+				{
+					records: []int64{1, 2}, preferredReadReplica: preferredReplica(1),
+					// the dispatch to the follower fails once, so the child
+					// reaches the follower with one failure counted
+					before: func() { metadata.armed.Store(true) },
+				},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				// no block for the partition until the preference expires
+				{throttled: true},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
+	t.Run("falls back to leader on out of range offset from follower", func(t *testing.T) {
+		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
+			leaderFetches: []readReplicaFetch{
+				{preferredReadReplica: preferredReplica(1)},
+				{records: []int64{3, 4}},
+			},
+			followerFetches: []readReplicaFetch{
+				{records: []int64{1, 2}},
+				{err: ErrOffsetOutOfRange},
+			},
+		})
+		defer cleanup()
+		assertOffsets(t, c, 1, 2, 3, 4)
+	})
+
 	t.Run("expires after Metadata.RefreshFrequency and falls back to leader", func(t *testing.T) {
 		c, cleanup := newReadReplicaTest(t, readReplicaTestConfig{
 			configure: withRefreshFrequency(50 * time.Millisecond),
@@ -952,6 +1018,7 @@ func TestConsumeMessagesFromReadReplica(t *testing.T) {
 
 type readReplicaTestConfig struct {
 	configure       func(*Config)
+	metadata        func(MockResponse) MockResponse
 	leaderFetches   []readReplicaFetch
 	followerFetches []readReplicaFetch
 }
@@ -960,6 +1027,25 @@ type readReplicaFetch struct {
 	records              []int64
 	preferredReadReplica preferredReadReplica
 	err                  KError
+	// throttled answers with a throttle time and no blocks
+	throttled bool
+	before    func()
+}
+
+// failOnceMetadata fails the topics in the next metadata response once armed
+type failOnceMetadata struct {
+	MockResponse
+	armed atomic.Bool
+}
+
+func (m *failOnceMetadata) For(reqBody versionedDecoder) encoderWithHeader {
+	res := m.MockResponse.For(reqBody)
+	if m.armed.CompareAndSwap(true, false) {
+		for _, topic := range res.(*MetadataResponse).Topics {
+			topic.Err = ErrInvalidTopic
+		}
+	}
+	return res
 }
 
 type preferredReadReplica struct {
@@ -968,8 +1054,15 @@ type preferredReadReplica struct {
 }
 
 func (fetch readReplicaFetch) For(reqBody versionedDecoder) encoderWithHeader {
+	if fetch.before != nil {
+		fetch.before()
+	}
 	fetchRequest := reqBody.(*FetchRequest)
 	response := &FetchResponse{Version: fetchRequest.Version}
+	if fetch.throttled {
+		response.ThrottleTime = time.Millisecond
+		return response
+	}
 	for _, offset := range fetch.records {
 		response.AddMessage("my_topic", 0, nil, testMsg, offset)
 	}
@@ -1010,6 +1103,11 @@ func newReadReplicaTest(t *testing.T, testConfig readReplicaTestConfig) (Partiti
 		SetOffset("my_topic", 0, OffsetNewest, 1234).
 		SetOffset("my_topic", 0, OffsetOldest, 0)
 
+	var metadata MockResponse = meta
+	if testConfig.metadata != nil {
+		metadata = testConfig.metadata(meta)
+	}
+
 	toSequence := func(fetches []readReplicaFetch) MockResponse {
 		responses := make([]any, len(fetches))
 		for i, fetch := range fetches {
@@ -1019,13 +1117,13 @@ func newReadReplicaTest(t *testing.T, testConfig readReplicaTestConfig) (Partiti
 	}
 
 	leader.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": meta,
+		"MetadataRequest": metadata,
 		"OffsetRequest":   offsets,
 		"FetchRequest":    toSequence(testConfig.leaderFetches),
 	})
 	if follower != nil {
 		follower.SetHandlerByMap(map[string]MockResponse{
-			"MetadataRequest": meta,
+			"MetadataRequest": metadata,
 			"OffsetRequest":   offsets,
 			"FetchRequest":    toSequence(testConfig.followerFetches),
 		})
@@ -2547,6 +2645,45 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		}
 	})
 
+	t.Run("keeps errors open while Close races the broker error", func(t *testing.T) {
+		// the errors buffer is full, so abort blocks sending the broker error
+		child := newChild(1)
+		child.errors <- &ConsumerError{
+			Topic:     child.topic,
+			Partition: child.partition,
+			Err:       errors.New("existing error"),
+		}
+		bc := newBrokerConsumer(child)
+
+		go withRecover(child.dispatcher)
+		go withRecover(child.responseFeeder)
+		go withRecover(bc.subscriptionManager)
+		aborted := make(chan any, 1)
+		go func() {
+			defer func() { aborted <- recover() }()
+			bc.abort(errors.New("broker disconnected"))
+		}()
+
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, goroutineBlocked("notifyError", "chan send"))
+		}, 5*time.Second, time.Millisecond, "abort did not block delivering the broker error")
+
+		child.AsyncClose()
+
+		// the dispatcher must wait for the handover while abort still owns the
+		// subscription; otherwise errors is closed under the blocked send
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, len(aborted) > 0 || goroutineBlocked("waitForBrokerHandover", "select"))
+		}, 5*time.Second, time.Millisecond)
+
+		var errs []string
+		for err := range child.errors {
+			errs = append(errs, err.Err.Error())
+		}
+		assert.Equal(t, []string{"existing error", "broker disconnected"}, errs)
+		require.Nil(t, assertDoneWithin(t, aborted, 5*time.Second), "abort panicked")
+	})
+
 	t.Run("rejects new subscriptions after abort starts", func(t *testing.T) {
 		child := newChild(config.ChannelBufferSize)
 		bc := newBrokerConsumer(child)
@@ -2578,6 +2715,18 @@ func TestConsumerAbortNoGoroutineLeak(t *testing.T) {
 		case <-time.After(5 * time.Second):
 			require.FailNow(t, "abort() did not return")
 		}
+	})
+
+	t.Run("abandoning a replaced broker consumer keeps its replacement", func(t *testing.T) {
+		old := newBrokerConsumer(newChild(config.ChannelBufferSize))
+		c := old.consumer
+		// the old worker's last child left and a new one took the broker
+		replacement := &brokerConsumer{consumer: c, broker: realBroker, refs: 1}
+		c.brokerConsumers[realBroker] = replacement
+
+		c.abandonBrokerConsumer(old)
+
+		assert.Same(t, replacement, c.brokerConsumers[realBroker])
 	})
 }
 
@@ -2670,4 +2819,18 @@ func TestConsumerPause(t *testing.T) {
 		require.NoError(t, c.addChild(reassigned))
 		assert.False(t, reassigned.IsPaused())
 	})
+}
+
+// goroutineBlocked reports whether a goroutine is parked in the given wait
+// state (as runtime.Stack prints it, e.g. "chan send") inside function.
+func goroutineBlocked(function, state string) bool {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	for g := range strings.SplitSeq(string(buf), "\n\n") {
+		header, _, _ := strings.Cut(g, "\n")
+		if strings.Contains(header, "["+state) && strings.Contains(g, "."+function+"(") {
+			return true
+		}
+	}
+	return false
 }

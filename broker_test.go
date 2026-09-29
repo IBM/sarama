@@ -4,8 +4,10 @@ package sarama
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"reflect"
 	"sync"
@@ -14,6 +16,7 @@ import (
 
 	"github.com/jcmturner/gokrb5/v8/krberror"
 	"github.com/rcrowley/go-metrics"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -244,6 +247,66 @@ func TestBrokerClose(t *testing.T) {
 	})
 }
 
+func TestBrokerMaxOpenRequests(t *testing.T) {
+	t.Run("holds back a request while the limit is reached", func(t *testing.T) {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		defer ln.Close()
+
+		// the server reads requests as they arrive and answers only when told
+		requests := make(chan *request, 2)
+		accepted := make(chan net.Conn, 1)
+		go func() {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			accepted <- conn
+			for {
+				req, _, err := decodeRequest(conn)
+				if err != nil {
+					return
+				}
+				requests <- req
+			}
+		}()
+		respond := func(conn net.Conn, req *request) {
+			body, err := encode(&ProduceResponse{Version: req.body.version()}, nil)
+			require.NoError(t, err)
+			header := make([]byte, 8)
+			binary.BigEndian.PutUint32(header, uint32(len(body)+4))
+			binary.BigEndian.PutUint32(header[4:], uint32(req.correlationID))
+			_, err = conn.Write(append(header, body...))
+			require.NoError(t, err)
+		}
+
+		conf := NewTestConfig()
+		conf.Net.MaxOpenRequests = 1
+		broker := NewBroker(ln.Addr().String())
+		require.NoError(t, broker.Open(conf))
+		defer func() { _ = broker.Close() }()
+
+		results := make(chan error, 2)
+		callback := func(_ *ProduceResponse, err error) { results <- err }
+		require.NoError(t, broker.AsyncProduce(&ProduceRequest{RequiredAcks: WaitForLocal}, callback))
+		first := assertDoneWithin(t, requests, 5*time.Second)
+		conn := <-accepted
+		defer conn.Close()
+
+		go func() {
+			assert.NoError(t, broker.AsyncProduce(&ProduceRequest{RequiredAcks: WaitForLocal}, callback))
+		}()
+		// with the first request unanswered, the second must not be written
+		require.Never(t, func() bool { return len(requests) > 0 }, 200*time.Millisecond, 5*time.Millisecond,
+			"a request was written while correlation id %d was unanswered", first.correlationID)
+
+		respond(conn, first)
+		respond(conn, assertDoneWithin(t, requests, 5*time.Second))
+		require.NoError(t, assertDoneWithin(t, results, 5*time.Second))
+		require.NoError(t, assertDoneWithin(t, results, 5*time.Second))
+	})
+}
+
 // closeImmediatelyDialer is a test dialer that returns a net.Conn whose peer is
 // already closed. This reliably triggers a transport-level failure (e.g. EOF)
 // during ApiVersions negotiation in Broker.Open.
@@ -294,6 +357,263 @@ func TestBrokerOpenApiVersionsTransportError(t *testing.T) {
 		t.Fatalf("expected Open retry allowed, got: %v", err)
 	}
 	_, _ = broker.Connected()
+}
+
+// serveRawConn accepts a single connection on a loopback listener and passes
+// it to serve, then holds it open until the client closes it.
+func serveRawConn(t *testing.T, serve func(conn net.Conn)) string {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ln.Close() })
+
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		serve(conn)
+		_, _ = io.Copy(io.Discard, conn)
+	}()
+	return ln.Addr().String()
+}
+
+// writeRawResponse writes a v0 response header declaring length, followed by body.
+func writeRawResponse(t *testing.T, conn net.Conn, length uint32, correlationID int32, body []byte) {
+	header := make([]byte, 8)
+	binary.BigEndian.PutUint32(header, length)
+	binary.BigEndian.PutUint32(header[4:], uint32(correlationID))
+	_, err := conn.Write(append(header, body...))
+	assert.NoError(t, err)
+}
+
+func TestDecodeResponseHeaderV0(t *testing.T) {
+	for _, tc := range []struct {
+		length     uint32
+		bodyLength int
+		wantErr    bool
+	}{
+		{length: 0, wantErr: true},
+		{length: 1, wantErr: true},
+		{length: 3, wantErr: true},
+		{length: 4, wantErr: true},
+		{length: 5, bodyLength: 1},
+		{length: uint32(MaxResponseSize), bodyLength: int(MaxResponseSize) - 4},
+		{length: uint32(MaxResponseSize) + 1, wantErr: true},
+		{length: 0x80000000, wantErr: true},
+		{length: 0xFFFFFFFF, wantErr: true},
+	} {
+		t.Run(fmt.Sprintf("length %#x", tc.length), func(t *testing.T) {
+			header := binary.BigEndian.AppendUint32(nil, tc.length)
+			header = binary.BigEndian.AppendUint32(header, 7)
+			bodyLength, err := decodeResponseHeaderV0(header, 7, nil)
+			if tc.wantErr {
+				var decodingErr PacketDecodingError
+				assert.ErrorAs(t, err, &decodingErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.bodyLength, bodyLength)
+		})
+	}
+
+	t.Run("mismatched correlation ID", func(t *testing.T) {
+		header := binary.BigEndian.AppendUint32(nil, 5)
+		header = binary.BigEndian.AppendUint32(header, 8)
+		_, err := decodeResponseHeaderV0(header, 7, nil)
+		var decodingErr PacketDecodingError
+		require.ErrorAs(t, err, &decodingErr)
+		assert.Contains(t, decodingErr.Info, "correlation ID didn't match")
+	})
+}
+
+func TestDecodeSASLv0Length(t *testing.T) {
+	for _, tc := range []struct {
+		length  uint32
+		wantErr bool
+	}{
+		{length: 0},
+		{length: 1},
+		{length: 3},
+		{length: 4},
+		{length: 5},
+		{length: uint32(MaxResponseSize)},
+		{length: uint32(MaxResponseSize) + 1, wantErr: true},
+		{length: 0x80000000, wantErr: true},
+		{length: 0xFFFFFFFF, wantErr: true},
+	} {
+		t.Run(fmt.Sprintf("length %#x", tc.length), func(t *testing.T) {
+			length, err := decodeSASLv0Length(binary.BigEndian.AppendUint32(nil, tc.length))
+			if tc.wantErr {
+				var decodingErr PacketDecodingError
+				assert.ErrorAs(t, err, &decodingErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, int(tc.length), length)
+		})
+	}
+}
+
+func TestBrokerOpenApiVersionsResponseHeader(t *testing.T) {
+	openWith := func(t *testing.T, respond func(conn net.Conn, req *request)) (bool, error) {
+		addr := serveRawConn(t, func(conn net.Conn) {
+			if req, _, err := decodeRequest(conn); err == nil {
+				respond(conn, req)
+			}
+		})
+		conf := NewConfig()
+		conf.ApiVersionsRequest = true
+		conf.Net.ReadTimeout = time.Second
+		broker := NewBroker(addr)
+		require.NoError(t, broker.Open(conf))
+		t.Cleanup(func() { _ = broker.Close() })
+		return broker.Connected()
+	}
+
+	for _, tc := range []struct {
+		name   string
+		length uint32
+	}{
+		{"header without body", 4},
+		{"length above MaxResponseSize", uint32(MaxResponseSize) + 1},
+	} {
+		t.Run("rejects "+tc.name, func(t *testing.T) {
+			connected, err := openWith(t, func(conn net.Conn, req *request) {
+				writeRawResponse(t, conn, tc.length, req.correlationID, nil)
+			})
+			assert.False(t, connected)
+			var decodingErr PacketDecodingError
+			assert.ErrorAs(t, err, &decodingErr)
+		})
+	}
+
+	validBody := func(t *testing.T, req *request) []byte {
+		body, err := encode(&ApiVersionsResponse{
+			Version: req.body.version(),
+			ApiKeys: []ApiVersionsResponseKey{{ApiKey: apiKeyMetadata, MaxVersion: 9}},
+		}, nil)
+		assert.NoError(t, err)
+		return body
+	}
+
+	t.Run("rejects a mismatched correlation ID", func(t *testing.T) {
+		connected, err := openWith(t, func(conn net.Conn, req *request) {
+			body := validBody(t, req)
+			writeRawResponse(t, conn, uint32(len(body)+4), req.correlationID+1, body)
+		})
+		assert.False(t, connected)
+		var decodingErr PacketDecodingError
+		require.ErrorAs(t, err, &decodingErr)
+		assert.Contains(t, decodingErr.Info, "correlation ID didn't match")
+	})
+
+	t.Run("accepts a valid response", func(t *testing.T) {
+		connected, err := openWith(t, func(conn net.Conn, req *request) {
+			body := validBody(t, req)
+			writeRawResponse(t, conn, uint32(len(body)+4), req.correlationID, body)
+		})
+		assert.True(t, connected)
+		assert.NoError(t, err)
+	})
+}
+
+func TestBrokerOpenSASLv0ResponseLength(t *testing.T) {
+	openWith := func(t *testing.T, mechanism SASLMechanism, serve func(conn net.Conn)) (bool, error) {
+		conf := NewConfig()
+		conf.ApiVersionsRequest = false
+		conf.Net.ReadTimeout = time.Second
+		conf.Net.SASL.Enable = true
+		conf.Net.SASL.Version = SASLHandshakeV0
+		conf.Net.SASL.Mechanism = mechanism
+		conf.Net.SASL.User = "user"
+		conf.Net.SASL.Password = "pass"
+		conf.Net.SASL.SCRAMClientGeneratorFunc = func() SCRAMClient { return &MockSCRAMClient{} }
+		broker := NewBroker(serveRawConn(t, serve))
+		require.NoError(t, broker.Open(conf))
+		t.Cleanup(func() { _ = broker.Close() })
+		return broker.Connected()
+	}
+
+	handshake := func(conn net.Conn) *request {
+		req, _, _ := decodeRequest(conn)
+		return req
+	}
+
+	t.Run("handshake rejects a header without body", func(t *testing.T) {
+		connected, err := openWith(t, SASLTypePlaintext, func(conn net.Conn) {
+			if req := handshake(conn); req != nil {
+				writeRawResponse(t, conn, 4, req.correlationID, nil)
+			}
+		})
+		assert.False(t, connected)
+		var decodingErr PacketDecodingError
+		assert.ErrorAs(t, err, &decodingErr)
+	})
+
+	t.Run("handshake rejects a header length above MaxResponseSize", func(t *testing.T) {
+		connected, err := openWith(t, SASLTypePlaintext, func(conn net.Conn) {
+			if req := handshake(conn); req != nil {
+				writeRawResponse(t, conn, uint32(MaxResponseSize)+1, req.correlationID, nil)
+			}
+		})
+		assert.False(t, connected)
+		var decodingErr PacketDecodingError
+		assert.ErrorAs(t, err, &decodingErr)
+	})
+
+	t.Run("handshake rejects a mismatched correlation ID", func(t *testing.T) {
+		body, err := encode(&SaslHandshakeResponse{EnabledMechanisms: []string{SASLTypePlaintext}}, nil)
+		require.NoError(t, err)
+		connected, err := openWith(t, SASLTypePlaintext, func(conn net.Conn) {
+			if req := handshake(conn); req != nil {
+				writeRawResponse(t, conn, uint32(len(body)+4), req.correlationID+1, body)
+			}
+		})
+		assert.False(t, connected)
+		var decodingErr PacketDecodingError
+		require.ErrorAs(t, err, &decodingErr)
+		assert.Contains(t, decodingErr.Info, "correlation ID didn't match")
+	})
+
+	// scram answers a successful handshake, reads the client's first SCRAM
+	// message and replies with a bare length prefix followed by token
+	scram := func(t *testing.T, length uint32, token string) func(conn net.Conn) {
+		body, err := encode(&SaslHandshakeResponse{EnabledMechanisms: []string{SASLTypeSCRAMSHA512}}, nil)
+		require.NoError(t, err)
+		return func(conn net.Conn) {
+			req := handshake(conn)
+			if req == nil {
+				return
+			}
+			writeRawResponse(t, conn, uint32(len(body)+4), req.correlationID, body)
+
+			lengthBytes := make([]byte, 4)
+			if _, err := io.ReadFull(conn, lengthBytes); err != nil {
+				return
+			}
+			if _, err := io.CopyN(io.Discard, conn, int64(binary.BigEndian.Uint32(lengthBytes))); err != nil {
+				return
+			}
+			binary.BigEndian.PutUint32(lengthBytes, length)
+			_, err := conn.Write(append(lengthBytes, token...))
+			assert.NoError(t, err)
+		}
+	}
+
+	t.Run("SCRAM rejects a token length above MaxResponseSize", func(t *testing.T) {
+		connected, err := openWith(t, SASLTypeSCRAMSHA512, scram(t, uint32(MaxResponseSize)+1, ""))
+		assert.False(t, connected)
+		var decodingErr PacketDecodingError
+		assert.ErrorAs(t, err, &decodingErr)
+	})
+
+	t.Run("SCRAM accepts a valid token", func(t *testing.T) {
+		connected, err := openWith(t, SASLTypeSCRAMSHA512, scram(t, 4, "pong"))
+		assert.True(t, connected)
+		assert.NoError(t, err)
+	})
 }
 
 func TestBrokerOpenSASLv1FailThenReopenTransportError(t *testing.T) {
@@ -920,6 +1240,40 @@ func TestGSSAPIKerberosAuth_Authorize(t *testing.T) {
 			mockBroker.Close()
 		})
 	}
+}
+
+func TestGSSAPIKerberosAuthReadPackage(t *testing.T) {
+	readWith := func(t *testing.T, frame []byte) ([]byte, error) {
+		client, server := net.Pipe()
+		t.Cleanup(func() { _ = client.Close(); _ = server.Close() })
+		go func() {
+			_, _ = server.Write(frame)
+			_ = server.Close()
+		}()
+		krbAuth := &GSSAPIKerberosAuth{}
+		payload, _, err := krbAuth.readPackage(&Broker{conn: client})
+		return payload, err
+	}
+
+	for _, tc := range []struct {
+		name   string
+		length uint32
+	}{
+		{"length above MaxResponseSize", uint32(MaxResponseSize) + 1},
+	} {
+		t.Run("rejects "+tc.name, func(t *testing.T) {
+			frame := binary.BigEndian.AppendUint32(nil, tc.length)
+			_, err := readWith(t, frame)
+			var decodingErr PacketDecodingError
+			assert.ErrorAs(t, err, &decodingErr)
+		})
+	}
+
+	t.Run("reads a valid token", func(t *testing.T) {
+		payload, err := readWith(t, append(binary.BigEndian.AppendUint32(nil, 5), "token"...))
+		require.NoError(t, err)
+		assert.Equal(t, []byte("token"), payload)
+	})
 }
 
 func TestBuildClientFirstMessage(t *testing.T) {

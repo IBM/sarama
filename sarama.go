@@ -105,9 +105,11 @@ var (
 	// to process.
 	MaxRequestSize int32 = 100 * 1024 * 1024
 
-	// MaxResponseSize is the maximum size (in bytes) of any response that Sarama will attempt to parse. If
-	// a broker returns a response message larger than this value, Sarama will return a PacketDecodingError to
-	// protect the client from running out of memory. Please note that brokers do not have any natural limit on
+	// MaxResponseSize is a sanity limit on the size (in bytes) of a single response frame read from a broker.
+	// It applies to every response frame, including the ApiVersions exchange made while opening a connection
+	// and the SASL exchanges that follow it. If a broker declares a response frame larger than this value,
+	// Sarama returns a PacketDecodingError before allocating a buffer for it, so that a corrupt or
+	// misbehaving peer cannot cause an oversized allocation. Please note that brokers do not have any natural limit on
 	// the size of responses they send. In particular, they can send arbitrarily large fetch responses to consumers
 	// (see https://issues.apache.org/jira/browse/KAFKA-2063).
 	MaxResponseSize int32 = 100 * 1024 * 1024

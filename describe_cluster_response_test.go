@@ -9,7 +9,7 @@ func TestDescribeClusterResponse(t *testing.T) {
 		BrokerID: 1,
 		Host:     "localhost",
 		Port:     9092,
-		Rack:     nullString("rack-a"),
+		Rack:     new("rack-a"),
 		IsFenced: true,
 	}
 

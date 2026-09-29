@@ -1,10 +1,10 @@
 package sarama
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -85,8 +85,9 @@ type transactionManager struct {
 	// used to recover when producer failed.
 	coordinatorSupportsBumpingEpoch bool
 
-	// When producer need to bump it's epoch.
-	epochBumpRequired bool
+	// When producer need to bump it's epoch. Produce errors set it from
+	// brokerProducer goroutines, so it is atomic.
+	epochBumpRequired atomic.Bool
 	// Record last seen error.
 	lastError error
 
@@ -99,12 +100,36 @@ type transactionManager struct {
 	pendingPartitionsInCurrentTxn topicPartitionSet
 	partitionsInCurrentTxn        topicPartitionSet
 
-	// Offsets to add to transaction.
-	offsetsInCurrentTxn map[string]topicPartitionOffsets
+	// Offsets to add to transaction, keyed by the group metadata they were
+	// added with.
+	offsetsInCurrentTxn map[groupMetadataKey]topicPartitionOffsets
 
-	// Consumer group metadata per group whose offsets are added to the
-	// transaction, keyed by group ID.
-	groupMetadataInCurrentTxn map[string]*ConsumerGroupMetadata
+	// Consumer group metadata whose offsets are added to the transaction.
+	groupMetadataInCurrentTxn map[groupMetadataKey]*ConsumerGroupMetadata
+
+	// AddOffsetsToTxn has added a group to the transaction on the coordinator,
+	// so the transaction must end with EndTxn even with no records produced.
+	offsetsAddedToTxn bool
+}
+
+// groupMetadataKey identifies the group member and generation that offsets
+// were added for. TxnOffsetCommit sends each set with its own generation;
+// sent with a later one, offsets for a partition a rebalance has since
+// revoked would pass the coordinator's generation check.
+type groupMetadataKey struct {
+	groupID         string
+	generationID    int32
+	memberID        string
+	groupInstanceID string
+	hasInstanceID   bool
+}
+
+func newGroupMetadataKey(m *ConsumerGroupMetadata) groupMetadataKey {
+	k := groupMetadataKey{groupID: m.GroupID, generationID: m.GenerationID, memberID: m.MemberID}
+	if m.GroupInstanceID != nil {
+		k.groupInstanceID, k.hasInstanceID = *m.GroupInstanceID, true
+	}
+	return k
 }
 
 const (
@@ -232,13 +257,16 @@ func (t *transactionManager) transitionTo(target ProducerTxnStatusFlag, err erro
 	return err
 }
 
-func (t *transactionManager) getAndIncrementSequenceNumber(topic string, partition int32) (int32, int16) {
+// getAndAddSequenceNumbers reserves n sequence numbers for the partition and
+// returns the first, with the producer id and epoch they belong to. All three
+// come from one critical section, so an epoch bump cannot split a batch.
+func (t *transactionManager) getAndAddSequenceNumbers(topic string, partition int32, n int32) (int64, int16, int32) {
 	key := fmt.Sprintf("%s-%d", topic, partition)
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
-	sequence := t.sequenceNumbers[key]
-	t.sequenceNumbers[key] = sequence + 1
-	return sequence, t.producerEpoch
+	first := t.sequenceNumbers[key]
+	t.sequenceNumbers[key] = first + n
+	return t.producerID, t.producerEpoch, first
 }
 
 func (t *transactionManager) bumpEpoch() {
@@ -284,16 +312,27 @@ func (t *transactionManager) addOffsetsToTxn(offsetsToAdd map[string][]*Partitio
 		return t.lastError
 	}
 
-	groupId := groupMetadata.GroupID
-	if _, ok := t.offsetsInCurrentTxn[groupId]; !ok {
-		t.offsetsInCurrentTxn[groupId] = topicPartitionOffsets{}
+	key := newGroupMetadataKey(groupMetadata)
+	if _, ok := t.offsetsInCurrentTxn[key]; !ok {
+		t.offsetsInCurrentTxn[key] = topicPartitionOffsets{}
 	}
-	t.groupMetadataInCurrentTxn[groupId] = groupMetadata
+	t.groupMetadataInCurrentTxn[key] = groupMetadata
 
 	for topic, offsets := range offsetsToAdd {
 		for _, offset := range offsets {
 			tp := topicPartition{topic: topic, partition: offset.Partition}
-			t.offsetsInCurrentTxn[groupId][tp] = offset
+			// a newer offset for the partition replaces one added for the
+			// same group under other metadata
+			for k, other := range t.offsetsInCurrentTxn {
+				if k != key && k.groupID == key.groupID {
+					delete(other, tp)
+					if len(other) == 0 {
+						delete(t.offsetsInCurrentTxn, k)
+						delete(t.groupMetadataInCurrentTxn, k)
+					}
+				}
+			}
+			t.offsetsInCurrentTxn[key][tp] = offset
 		}
 	}
 	return nil
@@ -369,12 +408,17 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		case ErrConcurrentTransactions:
 			// Retry
 		case ErrUnknownProducerID:
-			fallthrough
-		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrInvalidProducerIDMapping:
+			// fatal: the transactional id expired, and re-initializing could let an
+			// instance that was already fenced commit again
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		case ErrGroupAuthorizationFailed:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		default:
+			if isRetriableTxnError(response.Err) {
+				break
+			}
 			// Others are fatal
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		}
@@ -384,6 +428,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 	if lastError != nil {
 		return offsets, lastError
 	}
+	t.offsetsAddedToTxn = true
 
 	resultOffsets := offsets
 	// Then TxnOffsetCommit
@@ -473,6 +518,9 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 				case ErrGroupAuthorizationFailed:
 					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, partitionError.Err)
 				default:
+					if isRetriableTxnError(partitionError.Err) {
+						break
+					}
 					// Others are fatal
 					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, partitionError.Err)
 				}
@@ -528,11 +576,11 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 		if err != nil {
 			return -1, -1, err
 		}
-		DebugLogger.Printf("txnmgr/init-producer-id [%s] invoking InitProducerId for the first time in order to acquire a producer ID\n",
-			t.transactionalID)
-	} else {
 		DebugLogger.Printf("txnmgr/init-producer-id [%s] invoking InitProducerId with current producer ID %d and epoch %d in order to bump the epoch\n",
 			t.transactionalID, t.producerID, t.producerEpoch)
+	} else {
+		DebugLogger.Printf("txnmgr/init-producer-id [%s] invoking InitProducerId for the first time in order to acquire a producer ID\n",
+			t.transactionalID)
 	}
 
 	attemptsRemaining := t.client.Config().Producer.Transaction.Retry.Max
@@ -558,8 +606,8 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 		var coordinator *Broker
 		if t.isTransactional() {
 			coordinator, err = t.client.TransactionCoordinator(t.transactionalID)
-		} else {
-			coordinator = t.client.LeastLoadedBroker()
+		} else if coordinator = t.client.LeastLoadedBroker(); coordinator == nil {
+			err = ErrOutOfBrokers
 		}
 		if err != nil {
 			return -1, -1, true, err
@@ -594,18 +642,42 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 				_ = coordinator.Close()
 				_ = t.client.RefreshTransactionCoordinator(t.transactionalID)
 			}
+		case ErrConcurrentTransactions:
+			// Retry: the coordinator is still finishing the previous transaction.
 		// Fatal errors
 		default:
+			if isRetriableTxnError(response.Err) {
+				break
+			}
 			return -1, -1, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		}
 		return -1, -1, true, response.Err
 	}, nil)
 }
 
+// isRetriableTxnError reports whether err maps to a RetriableException in the
+// Java client, whose transaction manager resends any transaction request that
+// fails with one.
+func isRetriableTxnError(err KError) bool {
+	switch err {
+	case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable,
+		ErrNotLeaderForPartition, ErrRequestTimedOut, ErrReplicaNotAvailable,
+		ErrNetworkException, ErrOffsetsLoadInProgress, ErrConsumerCoordinatorNotAvailable,
+		ErrNotCoordinatorForConsumer, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend,
+		ErrNotController, ErrConcurrentTransactions, ErrKafkaStorageError,
+		ErrFetchSessionIDNotFound, ErrInvalidFetchSessionEpoch, ErrListenerNotFound,
+		ErrFencedLeaderEpoch, ErrUnknownLeaderEpoch, ErrOffsetNotAvailable,
+		ErrPreferredLeaderNotAvailable, ErrEligibleLeadersNotAvailable, ErrElectionNotNeeded,
+		ErrUnstableOffsetCommit, ErrThrottlingQuotaExceeded:
+		return true
+	}
+	return false
+}
+
 // if kafka cluster is at least 2.5.0 mark txnmngr to bump epoch else mark it as fatal.
 func (t *transactionManager) abortableErrorIfPossible(err error) error {
 	if t.coordinatorSupportsBumpingEpoch {
-		t.epochBumpRequired = true
+		t.epochBumpRequired.Store(true)
 		return t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, err)
 	}
 	return t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, err)
@@ -613,7 +685,7 @@ func (t *transactionManager) abortableErrorIfPossible(err error) error {
 
 // End current transaction.
 func (t *transactionManager) completeTransaction() error {
-	if t.epochBumpRequired {
+	if t.epochBumpRequired.Load() {
 		err := t.transitionTo(ProducerTxnFlagInitializing, nil)
 		if err != nil {
 			return err
@@ -625,12 +697,12 @@ func (t *transactionManager) completeTransaction() error {
 		}
 	}
 
-	t.lastError = nil
-	t.epochBumpRequired = false
+	t.epochBumpRequired.Store(false)
 	t.partitionsInCurrentTxn = topicPartitionSet{}
 	t.pendingPartitionsInCurrentTxn = topicPartitionSet{}
-	t.offsetsInCurrentTxn = map[string]topicPartitionOffsets{}
-	t.groupMetadataInCurrentTxn = map[string]*ConsumerGroupMetadata{}
+	t.offsetsInCurrentTxn = map[groupMetadataKey]topicPartitionOffsets{}
+	t.groupMetadataInCurrentTxn = map[groupMetadataKey]*ConsumerGroupMetadata{}
+	t.offsetsAddedToTxn = false
 
 	return nil
 }
@@ -702,11 +774,16 @@ func (t *transactionManager) endTxn(commit bool) error {
 		case ErrConcurrentTransactions:
 			// Just retry
 		case ErrUnknownProducerID:
-			fallthrough
-		case ErrInvalidProducerIDMapping:
 			return false, t.abortableErrorIfPossible(response.Err)
+		case ErrInvalidProducerIDMapping:
+			// fatal: the transactional id expired, and re-initializing could let an
+			// instance that was already fenced commit again
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		// Fatal errors
 		default:
+			if isRetriableTxnError(response.Err) {
+				break
+			}
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		}
 		return true, response.Err
@@ -726,22 +803,30 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 		return t.lastError
 	}
 
-	// if no records has been sent don't do anything.
-	if len(t.partitionsInCurrentTxn) == 0 {
-		return t.completeTransaction()
+	// if nothing has been added to the transaction on the brokers and a commit
+	// has no offsets to add, don't do anything.
+	if len(t.partitionsInCurrentTxn) == 0 && !t.offsetsAddedToTxn &&
+		(!commit || len(t.offsetsInCurrentTxn) == 0) {
+		// There is no EndTxn to send, but a required epoch bump must still
+		// happen. Otherwise the producer stays in Initializing.
+		epochBump := t.epochBumpRequired.Load()
+		if err := t.completeTransaction(); err != nil || !epochBump {
+			return err
+		}
+		return t.initializeTransactions()
 	}
 
-	epochBump := t.epochBumpRequired
+	epochBump := t.epochBumpRequired.Load()
 	// If we're aborting the transaction, so there should be no need to add offsets.
 	if commit && len(t.offsetsInCurrentTxn) > 0 {
-		for group, offsets := range t.offsetsInCurrentTxn {
-			newOffsets, err := t.publishOffsetsToTxn(offsets, t.groupMetadataInCurrentTxn[group])
+		for key, offsets := range t.offsetsInCurrentTxn {
+			newOffsets, err := t.publishOffsetsToTxn(offsets, t.groupMetadataInCurrentTxn[key])
 			if err != nil {
-				t.offsetsInCurrentTxn[group] = newOffsets
+				t.offsetsInCurrentTxn[key] = newOffsets
 				return err
 			}
-			delete(t.offsetsInCurrentTxn, group)
-			delete(t.groupMetadataInCurrentTxn, group)
+			delete(t.offsetsInCurrentTxn, key)
+			delete(t.groupMetadataInCurrentTxn, key)
 		}
 	}
 
@@ -749,14 +834,11 @@ func (t *transactionManager) finishTransaction(commit bool) error {
 		return t.lastError
 	}
 
-	if !errors.Is(t.lastError, ErrInvalidProducerIDMapping) {
-		err := t.endTxn(commit)
-		if err != nil {
-			return err
-		}
-		if !epochBump {
-			return nil
-		}
+	if err := t.endTxn(commit); err != nil {
+		return err
+	}
+	if !epochBump {
+		return nil
 	}
 	// reset pid and epoch if needed.
 	return t.initializeTransactions()
@@ -779,6 +861,18 @@ func (t *transactionManager) maybeAddPartitionToCurrentTxn(topic string, partiti
 	}
 
 	t.pendingPartitionsInCurrentTxn[tp] = struct{}{}
+}
+
+// allPartitionsInTxn reports whether every partition in the set has been
+// added to the current transaction.
+func (t *transactionManager) allPartitionsInTxn(set *produceSet) bool {
+	t.partitionInTxnLock.Lock()
+	defer t.partitionInTxnLock.Unlock()
+
+	return !set.anyPartition(func(topic string, partition int32, _ *partitionSet) bool {
+		_, ok := t.partitionsInCurrentTxn[topicPartition{topic: topic, partition: partition}]
+		return !ok
+	})
 }
 
 // Makes a request to kafka to add a list of partitions to the current transaction.
@@ -897,12 +991,18 @@ func (t *transactionManager) publishTxnPartitions() error {
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 				case ErrUnknownProducerID:
-					fallthrough
-				case ErrInvalidProducerIDMapping:
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.abortableErrorIfPossible(response.Err)
+				case ErrInvalidProducerIDMapping:
+					// fatal: the transactional id expired, and re-initializing could let an
+					// instance that was already fenced commit again
+					removeAllPartitionsOnFatalOrAbortedError()
+					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 				// Fatal errors
 				default:
+					if isRetriableTxnError(response.Err) {
+						break
+					}
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 				}
@@ -928,8 +1028,8 @@ func newTransactionManager(conf *Config, client Client) (*transactionManager, er
 		client:                        client,
 		pendingPartitionsInCurrentTxn: topicPartitionSet{},
 		partitionsInCurrentTxn:        topicPartitionSet{},
-		offsetsInCurrentTxn:           make(map[string]topicPartitionOffsets),
-		groupMetadataInCurrentTxn:     make(map[string]*ConsumerGroupMetadata),
+		offsetsInCurrentTxn:           make(map[groupMetadataKey]topicPartitionOffsets),
+		groupMetadataInCurrentTxn:     make(map[groupMetadataKey]*ConsumerGroupMetadata),
 		status:                        ProducerTxnFlagUninitialized,
 	}
 
@@ -952,7 +1052,15 @@ func newTransactionManager(conf *Config, client Client) (*transactionManager, er
 }
 
 // re-init producer-id and producer-epoch if needed.
-func (t *transactionManager) initializeTransactions() (err error) {
-	t.producerID, t.producerEpoch, err = t.initProducerId()
-	return
+func (t *transactionManager) initializeTransactions() error {
+	producerID, producerEpoch, err := t.initProducerId()
+	if err != nil {
+		// Keep the current producer id and epoch, and bump again on the next
+		// commit or abort. Otherwise the producer can reach Ready with no
+		// producer id.
+		t.epochBumpRequired.Store(true)
+		return err
+	}
+	t.producerID, t.producerEpoch = producerID, producerEpoch
+	return nil
 }

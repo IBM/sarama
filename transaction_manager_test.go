@@ -129,50 +129,60 @@ func TestTxnmgrInitProducerIdTxn(t *testing.T) {
 }
 
 // TestTxnmgrInitProducerIdTxnCoordinatorLoading ensure we retry initProducerId when either FindCoordinator or InitProducerID returns ErrOffsetsLoadInProgress
-func TestTxnmgrInitProducerIdTxnCoordinatorLoading(t *testing.T) {
-	config := NewTestConfig()
-	config.Producer.Idempotent = true
-	config.Producer.Transaction.ID = "txid-group"
-	config.Version = V0_11_0_0
-	config.Producer.RequiredAcks = WaitForAll
-	config.Net.MaxOpenRequests = 1
+func TestTxnmgrInitProducerIdTxnRetriableErrors(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  KError
+	}{
+		{"coordinator loading", ErrOffsetsLoadInProgress},
+		{"previous transaction still completing", ErrConcurrentTransactions},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			config := NewTestConfig()
+			config.Producer.Idempotent = true
+			config.Producer.Transaction.ID = "txid-group"
+			config.Version = V0_11_0_0
+			config.Producer.RequiredAcks = WaitForAll
+			config.Net.MaxOpenRequests = 1
 
-	broker := NewMockBroker(t, 1)
-	defer broker.Close()
+			broker := NewMockBroker(t, 1)
+			defer broker.Close()
 
-	broker.SetHandlerByMap(map[string]MockResponse{
-		"MetadataRequest": NewMockMetadataResponse(t).
-			SetController(broker.BrokerID()).
-			SetBroker(broker.Addr(), broker.BrokerID()),
-		"FindCoordinatorRequest": NewMockSequence(
-			NewMockFindCoordinatorResponse(t).
-				SetError(CoordinatorTransaction, "txid-group", ErrOffsetsLoadInProgress),
-			NewMockFindCoordinatorResponse(t).
-				SetError(CoordinatorTransaction, "txid-group", ErrOffsetsLoadInProgress),
-			NewMockFindCoordinatorResponse(t).
-				SetCoordinator(CoordinatorTransaction, "txid-group", broker),
-		),
-		"InitProducerIDRequest": NewMockSequence(
-			NewMockInitProducerIDResponse(t).
-				SetError(ErrOffsetsLoadInProgress),
-			NewMockInitProducerIDResponse(t).
-				SetError(ErrOffsetsLoadInProgress),
-			NewMockInitProducerIDResponse(t).
-				SetProducerID(1).
-				SetProducerEpoch(0),
-		),
-	})
+			broker.SetHandlerByMap(map[string]MockResponse{
+				"MetadataRequest": NewMockMetadataResponse(t).
+					SetController(broker.BrokerID()).
+					SetBroker(broker.Addr(), broker.BrokerID()),
+				"FindCoordinatorRequest": NewMockSequence(
+					NewMockFindCoordinatorResponse(t).
+						SetError(CoordinatorTransaction, "txid-group", ErrOffsetsLoadInProgress),
+					NewMockFindCoordinatorResponse(t).
+						SetError(CoordinatorTransaction, "txid-group", ErrOffsetsLoadInProgress),
+					NewMockFindCoordinatorResponse(t).
+						SetCoordinator(CoordinatorTransaction, "txid-group", broker),
+				),
+				"InitProducerIDRequest": NewMockSequence(
+					NewMockInitProducerIDResponse(t).
+						SetError(tc.err),
+					NewMockInitProducerIDResponse(t).
+						SetError(tc.err),
+					NewMockInitProducerIDResponse(t).
+						SetProducerID(1).
+						SetProducerEpoch(0),
+				),
+			})
 
-	client, err := NewClient([]string{broker.Addr()}, config)
-	require.NoError(t, err)
-	defer client.Close()
+			client, err := NewClient([]string{broker.Addr()}, config)
+			require.NoError(t, err)
+			defer client.Close()
 
-	txmng, err := newTransactionManager(config, client)
-	require.NoError(t, err)
+			txmng, err := newTransactionManager(config, client)
+			require.NoError(t, err)
 
-	require.Equal(t, int64(1), txmng.producerID)
-	require.Equal(t, int16(0), txmng.producerEpoch)
-	require.Equal(t, ProducerTxnFlagReady, txmng.status)
+			require.Equal(t, int64(1), txmng.producerID)
+			require.Equal(t, int16(0), txmng.producerEpoch)
+			require.Equal(t, ProducerTxnFlagReady, txmng.status)
+		})
+	}
 }
 
 func TestMaybeAddPartitionToCurrentTxn(t *testing.T) {
@@ -345,6 +355,13 @@ func TestAddOffsetsToTxn(t *testing.T) {
 			initialFlags:  ProducerTxnFlagInTransaction,
 			expectedFlags: ProducerTxnFlagInTransaction,
 			expectedError: ErrConcurrentTransactions,
+			newOffsets:    originalOffsets,
+		},
+		{
+			brokerErr:     ErrNetworkException,
+			initialFlags:  ProducerTxnFlagInTransaction,
+			expectedFlags: ProducerTxnFlagInTransaction,
+			expectedError: ErrNetworkException,
 			newOffsets:    originalOffsets,
 		},
 		{
@@ -600,6 +617,32 @@ func TestTxnOffsetsCommit(t *testing.T) {
 			expectedOffsets: originalOffsets,
 		},
 		{
+			brokerErr:    ErrConcurrentTransactions,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrConcurrentTransactions),
+			expectedOffsets: originalOffsets,
+		},
+		{
+			brokerErr:    ErrNetworkException,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrNetworkException),
+			expectedOffsets: originalOffsets,
+		},
+		{
 			brokerErr:    ErrIllegalGeneration,
 			initialFlags: ProducerTxnFlagInTransaction,
 			initialOffsets: topicPartitionOffsets{
@@ -660,8 +703,21 @@ func TestTxnOffsetsCommit(t *testing.T) {
 					Offset:    0,
 				},
 			},
+			expectedFlags:   ProducerTxnFlagInTransaction,
+			expectedError:   Wrap(ErrTxnOffsetCommit, ErrKafkaStorageError),
+			expectedOffsets: originalOffsets,
+		},
+		{
+			brokerErr:    ErrTransactionalIDAuthorizationFailed,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
 			expectedFlags:   ProducerTxnFlagFatalError,
-			expectedError:   ErrKafkaStorageError,
+			expectedError:   ErrTransactionalIDAuthorizationFailed,
 			expectedOffsets: originalOffsets,
 		},
 	}
@@ -764,6 +820,12 @@ func TestEndTxn(t *testing.T) {
 			commit:        true,
 			expectedFlags: ProducerTxnFlagEndTransaction,
 			expectedError: ErrConcurrentTransactions,
+		},
+		{
+			brokerErr:     ErrNetworkException,
+			commit:        true,
+			expectedFlags: ProducerTxnFlagEndTransaction,
+			expectedError: ErrNetworkException,
 		},
 		{
 			brokerErr:     ErrUnknownProducerID,
@@ -910,8 +972,15 @@ func TestPublishPartitionToTxn(t *testing.T) {
 		},
 		{
 			brokerErr:                 ErrKafkaStorageError,
+			expectedFlags:             ProducerTxnFlagInTransaction,
+			expectedError:             Wrap(ErrAddPartitionsToTxn, ErrKafkaStorageError),
+			expectedPartitionsInTxn:   topicPartitionSet{},
+			expectedPendingPartitions: initialPendingTopicPartitionSet,
+		},
+		{
+			brokerErr:                 ErrTransactionalIDAuthorizationFailed,
 			expectedFlags:             ProducerTxnFlagFatalError,
-			expectedError:             ErrKafkaStorageError,
+			expectedError:             ErrTransactionalIDAuthorizationFailed,
 			expectedPartitionsInTxn:   topicPartitionSet{},
 			expectedPendingPartitions: topicPartitionSet{},
 		},

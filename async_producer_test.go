@@ -4,6 +4,7 @@ package sarama
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -60,47 +61,103 @@ func expectResults(t *testing.T, p AsyncProducer, successCount, errorCount int) 
 	expectResultsWithTimeout(t, p, successCount, errorCount, 5*time.Minute)
 }
 
-func TestPartitionProducerFlushRetryBuffersAssignsSequence(t *testing.T) {
-	cfg := NewTestConfig()
-	cfg.Producer.Idempotent = true
-
-	txnmgr := &transactionManager{
-		producerID:      1,
-		producerEpoch:   0,
-		sequenceNumbers: map[string]int32{"topic-0": 1},
+func TestBrokerProducerSequencing(t *testing.T) {
+	type batchID struct {
+		epoch    int16
+		firstSeq int32
 	}
 
-	parent := &asyncProducer{
-		conf:   cfg,
-		txnmgr: txnmgr,
+	newParent := func() *asyncProducer {
+		cfg := NewTestConfig()
+		cfg.Version = V0_11_0_0
+		cfg.Producer.Idempotent = true
+		return &asyncProducer{
+			conf:   cfg,
+			muter:  newPartitionMuter(),
+			txnmgr: &transactionManager{producerID: 1, sequenceNumbers: make(map[string]int32)},
+		}
 	}
 
-	bp := &brokerProducer{
-		input: make(chan *ProducerMessage, 1),
+	// start runs brokerProducer.run and returns its input and output, and a
+	// function that stops it
+	start := func(t *testing.T, parent *asyncProducer) (chan<- *ProducerMessage, <-chan *produceSet, func()) {
+		t.Helper()
+		input := make(chan *ProducerMessage)
+		output := make(chan *produceSet)
+		responses := make(chan *brokerProducerResponse)
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             input,
+			output:            output,
+			responses:         responses,
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			bp.run()
+		}()
+		return input, output, func() {
+			close(input)
+			// shutdown flushes what is left, then closes output
+			for set := range output {
+				parent.muter.unmute(set)
+			}
+			close(responses)
+			assertDoneWithin(t, done, 2*time.Second)
+		}
 	}
 
-	pp := &partitionProducer{
-		parent:         parent,
-		topic:          "topic",
-		partition:      0,
-		brokerProducer: bp,
-		retryState:     make([]partitionRetryState, 1),
-		highWatermark:  1,
+	// flushed waits for the next flushed batch, unmutes it, and returns its ID
+	flushed := func(t *testing.T, parent *asyncProducer, output <-chan *produceSet) batchID {
+		t.Helper()
+		set := assertDoneWithin(t, output, 2*time.Second)
+		parent.muter.unmute(set)
+		batch := set.msgs["topic"][0].recordsToSend.RecordBatch
+		return batchID{epoch: batch.ProducerEpoch, firstSeq: batch.FirstSequence}
 	}
 
-	msg := &ProducerMessage{Topic: "topic", Partition: 0}
-	pp.retryState[0].buf = []*ProducerMessage{msg}
-
-	pp.flushRetryBuffers()
-
-	select {
-	case flushed := <-bp.input:
-		require.True(t, flushed.hasSequence, "message should have a sequence assigned")
-		require.Equal(t, int32(1), flushed.sequenceNumber, "sequence number should have increased")
-		require.Equal(t, txnmgr.producerEpoch, flushed.producerEpoch, "producer epoch should be the same")
-	default:
-		t.Fatal("expected buffered message to flush")
+	newMessage := func(value string) *ProducerMessage {
+		return &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder(value)}
 	}
+
+	t.Run("numbers batches in the order they are sent", func(t *testing.T) {
+		parent := newParent()
+		input, output, stop := start(t, parent)
+		defer stop()
+
+		var sent []batchID
+		for _, value := range []string{"first", "second"} {
+			input <- newMessage(value)
+			sent = append(sent, flushed(t, parent, output))
+		}
+
+		assert.Equal(t, []batchID{{epoch: 0, firstSeq: 0}, {epoch: 0, firstSeq: 1}}, sent)
+	})
+
+	t.Run("starts the new epoch at zero for a batch that waited through a bump", func(t *testing.T) {
+		parent := newParent()
+		// sequence 0 went to a batch that failed, so the broker never saw it
+		parent.txnmgr.getAndAddSequenceNumbers("topic", 0, 1)
+		// that batch keeps the partition muted until its failure is handled
+		failed := newProduceSet(parent)
+		safeAddMessage(t, failed, newMessage("failed"))
+		require.True(t, parent.muter.tryMute(failed))
+
+		input, output, stop := start(t, parent)
+		defer stop()
+		// the second send returns once the first message has been handled
+		input <- newMessage("waiting")
+		input <- newMessage("waiting too")
+
+		// the failure bumps the epoch, then releases the partition
+		parent.txnmgr.bumpEpoch()
+		parent.muter.unmute(failed)
+
+		assert.Equal(t, batchID{epoch: 1, firstSeq: 0}, flushed(t, parent, output))
+	})
 }
 
 type testPartitioner chan *int32
@@ -1513,6 +1570,28 @@ func TestAsyncProducerIdempotentRetryBatchBackoff(t *testing.T) {
 		"BackoffFunc should be called at least Retry.Max times during idempotent retryBatch")
 }
 
+func TestReturnErrors(t *testing.T) {
+	t.Run("bumps the idempotent epoch once per failed batch", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Producer.Idempotent = true
+		config.Producer.Return.Errors = false
+		p := &asyncProducer{
+			conf:   config,
+			txnmgr: &transactionManager{producerID: 1, sequenceNumbers: make(map[string]int32)},
+		}
+		var batch []*ProducerMessage
+		for seq := range int32(3) {
+			batch = append(batch, &ProducerMessage{Topic: "topic", Partition: 0, sequenceNumber: seq, hasSequence: true})
+		}
+		p.inFlight.Add(len(batch))
+
+		p.returnErrors(batch, ErrOutOfOrderSequenceNumber)
+
+		_, epoch := p.txnmgr.getProducerID()
+		assert.Equal(t, int16(1), epoch)
+	})
+}
+
 func TestAsyncProducerIdempotentErrorOnOutOfSeq(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 
@@ -1742,38 +1821,6 @@ func TestBrokerProducerShutdown(t *testing.T) {
 	mockBroker.Close()
 }
 
-// TestBrokerProducerWaitForSpaceEmptyBufferRollover ensures forced rollovers with an empty buffer
-// do not deadlock waiting for responses when no partitions are muted.
-func TestBrokerProducerWaitForSpaceEmptyBufferRollover(t *testing.T) {
-	config := NewTestConfig()
-	parent := &asyncProducer{
-		conf:   config,
-		muter:  newPartitionMuter(),
-		txnmgr: &transactionManager{},
-	}
-
-	bp := &brokerProducer{
-		parent:            parent,
-		accumulatingBatch: newProduceSet(parent),
-		output:            make(chan *produceSet, 1),
-		responses:         make(chan *brokerProducerResponse),
-	}
-
-	done := make(chan error, 1)
-	go func() {
-		done <- bp.waitForSpace(&ProducerMessage{Topic: "topic", Partition: 0}, true)
-	}()
-
-	select {
-	case err := <-done:
-		if err != nil {
-			t.Fatalf("expected nil error, got %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("waitForSpace blocked on empty buffer rollover")
-	}
-}
-
 func awaitMuterBlocked(t *testing.T, m *partitionMuter, set *produceSet) {
 	t.Helper()
 	require.EventuallyWithT(t, func(c *assert.CollectT) {
@@ -1809,6 +1856,7 @@ func assertDoneWithin[T any](t *testing.T, ch <-chan T, timeout time.Duration) T
 // deadlock when partitions are muted by another producer and are unmuted elsewhere.
 func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
 	config := NewTestConfig()
+	config.Producer.Flush.MaxMessages = 1 // the queued message fills the batch
 	txnMgr := &transactionManager{
 		producerID:      0,
 		producerEpoch:   0,
@@ -1838,7 +1886,7 @@ func TestBrokerProducerWaitForSpaceRespectsExternalUnmute(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- bp.waitForSpace(msg, true)
+		done <- bp.waitForSpace(msg)
 	}()
 
 	awaitMuterBlocked(t, parent.muter, bp.accumulatingBatch)
@@ -1954,6 +2002,7 @@ func TestAsyncProducerUnblocksOnExternalUnmute(t *testing.T) {
 // when all partitions in the accumulating batch are externally muted and later unmuted.
 func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
 	config := NewTestConfig()
+	config.Producer.Flush.MaxMessages = 1 // the waiting message fills the batch
 	parent := &asyncProducer{
 		conf:   config,
 		muter:  newPartitionMuter(),
@@ -1977,7 +2026,7 @@ func TestBrokerProducerWaitForSpaceAllPartitionsMuted(t *testing.T) {
 
 	done := make(chan error, 1)
 	go func() {
-		done <- bp.waitForSpace(&ProducerMessage{Topic: "topic", Partition: 0}, true)
+		done <- bp.waitForSpace(&ProducerMessage{Topic: "topic", Partition: 0})
 	}()
 
 	assertNotDone(t, done, 50*time.Millisecond)
@@ -2187,6 +2236,25 @@ func TestRetryBatchReleasesMuteOnShutdown(t *testing.T) {
 }
 
 func TestBrokerProducerHandleError(t *testing.T) {
+	t.Run("leaves a replacement brokerProducer in place", func(t *testing.T) {
+		parent := &asyncProducer{brokers: make(map[*Broker]*brokerProducer)}
+		broker := &Broker{id: 1}
+		// the old brokerProducer is still draining responses after its
+		// broker got a new one
+		old := &brokerProducer{parent: parent, broker: broker}
+		replacement := &brokerProducer{parent: parent, broker: broker, abandoned: make(chan struct{})}
+		parent.brokers[broker] = replacement
+
+		parent.abandonBrokerConnection(old)
+
+		assert.Same(t, replacement, parent.brokers[broker])
+		select {
+		case <-replacement.abandoned:
+			assert.Fail(t, "the replacement was abandoned")
+		default:
+		}
+	})
+
 	t.Run("keeps non-idempotent connection retries muted", func(t *testing.T) {
 		config := NewTestConfig()
 		config.Producer.Idempotent = false
@@ -2235,6 +2303,87 @@ func TestBrokerProducerHandleError(t *testing.T) {
 		contender := newProduceSet(parent)
 		safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
 		require.False(t, parent.muter.tryMute(contender), "partition should stay muted by the retrying batch")
+	})
+}
+
+func TestBrokerProducerHandleSuccess(t *testing.T) {
+	// setup returns a non-idempotent parent whose leader is served by a
+	// brokerProducer with the returned output, plus a brokerProducer to
+	// handle the response and a batch it sent, muted
+	setup := func(t *testing.T) (*asyncProducer, chan *produceSet, *brokerProducer, *produceSet) {
+		t.Helper()
+		config := NewTestConfig()
+		config.Producer.Idempotent = false
+		config.Producer.Retry.Max = 2
+		config.Producer.Retry.Backoff = 0
+
+		parent := &asyncProducer{
+			conf:       config,
+			muter:      newPartitionMuter(),
+			brokers:    make(map[*Broker]*brokerProducer),
+			brokerRefs: make(map[*brokerProducer]int),
+			retries:    make(chan *ProducerMessage, 4),
+			txnmgr:     &transactionManager{},
+		}
+		leader := &Broker{id: 2}
+		parent.client = &stubLeaderClient{leader: leader, cfg: config}
+		output := make(chan *produceSet, 1)
+		parent.brokers[leader] = &brokerProducer{
+			parent: parent,
+			broker: leader,
+			output: output,
+			input:  make(chan *ProducerMessage),
+		}
+
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             make(chan *ProducerMessage),
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+
+		sent := newProduceSet(parent)
+		safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("retry")})
+		require.True(t, parent.muter.tryMute(sent), "sent batch should mute its partition")
+		return parent, output, bp, sent
+	}
+
+	notLeader := func() *ProduceResponse {
+		res := new(ProduceResponse)
+		res.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
+		return res
+	}
+
+	newContender := func(t *testing.T, parent *asyncProducer) *produceSet {
+		t.Helper()
+		contender := newProduceSet(parent)
+		safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
+		return contender
+	}
+
+	t.Run("keeps a resent batch muted on a retriable error", func(t *testing.T) {
+		parent, output, bp, sent := setup(t)
+		sent.resent = true
+		retryPartitionSet := sent.msgs["topic"][0]
+
+		bp.handleSuccess(sent, notLeader())
+
+		retrySet := assertDoneWithin(t, output, 2*time.Second)
+		defer parent.muter.unmute(retrySet)
+		require.Equal(t, retryPartitionSet, retrySet.msgs["topic"][0])
+		assert.False(t, parent.muter.tryMute(newContender(t, parent)), "partition should stay muted by the retrying batch")
+		assert.Empty(t, parent.retries, "the batch should not go back through the partitionProducer")
+	})
+
+	t.Run("sends a first attempt back through the partitionProducer", func(t *testing.T) {
+		parent, _, bp, sent := setup(t)
+
+		bp.handleSuccess(sent, notLeader())
+
+		retried := assertDoneWithin(t, parent.retries, 2*time.Second)
+		assert.Equal(t, 1, retried.retries)
+		assert.True(t, parent.muter.tryMute(newContender(t, parent)), "partition should be unmuted")
 	})
 }
 
@@ -2889,6 +3038,231 @@ func TestTxnCanAbort(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestMaybeTransitionToErrorState(t *testing.T) {
+	newProducer := func() *asyncProducer {
+		return &asyncProducer{
+			conf: NewTestConfig(),
+			txnmgr: &transactionManager{
+				transactionalID:                 "test",
+				coordinatorSupportsBumpingEpoch: true,
+				status:                          ProducerTxnFlagInitializing,
+			},
+		}
+	}
+
+	t.Run("is safe while the transaction completes", func(t *testing.T) {
+		// run with -race: a produce error arrives on a brokerProducer
+		// goroutine while the user goroutine completes the transaction,
+		// here while an epoch bump is pending
+		p := newProducer()
+		done := make(chan none)
+		go func() {
+			defer close(done)
+			_ = p.maybeTransitionToErrorState(ErrOutOfOrderSequenceNumber)
+		}()
+		_ = p.txnmgr.completeTransaction()
+		assertDoneWithin(t, done, 2*time.Second)
+	})
+}
+
+func TestTxnAbortRecovery(t *testing.T) {
+	type scenario struct {
+		addErr       KError    // answer to every AddPartitionsToTxn
+		endErr       KError    // answer to every EndTxn
+		initFails    int       // InitProducerId calls to fail after the first
+		produceErr   KError    // answer to every Produce
+		produceGate  chan none // if set, Produce answers once it is closed
+		retryBackoff time.Duration
+	}
+
+	// start runs a transactional producer against a broker that behaves as
+	// sc describes, and returns the producer and a count of the requests the
+	// broker received by type
+	start := func(t *testing.T, sc scenario) (*asyncProducer, func(string) int) {
+		t.Helper()
+		broker := NewMockBroker(t, 1)
+		t.Cleanup(broker.Close)
+
+		var mu sync.Mutex
+		counts := make(map[string]int)
+		count := func(name string) int {
+			mu.Lock()
+			defer mu.Unlock()
+			return counts[name]
+		}
+		handlers := map[string]func(n int, req *request) encoderWithHeader{
+			"MetadataRequest": func(_ int, req *request) encoderWithHeader {
+				return NewMockMetadataResponse(t).
+					SetController(broker.BrokerID()).
+					SetBroker(broker.Addr(), broker.BrokerID()).
+					SetLeader("test-topic", 0, broker.BrokerID()).For(req.body)
+			},
+			"FindCoordinatorRequest": func(_ int, req *request) encoderWithHeader {
+				return NewMockFindCoordinatorResponse(t).
+					SetCoordinator(CoordinatorTransaction, "test", broker).For(req.body)
+			},
+			"InitProducerIDRequest": func(n int, req *request) encoderWithHeader {
+				if n > 1 && n <= 1+sc.initFails {
+					return &InitProducerIDResponse{Version: req.body.version(), Err: ErrConcurrentTransactions}
+				}
+				// each successful call bumps the epoch
+				epoch := n - 1
+				if n > 1 {
+					epoch -= sc.initFails
+				}
+				return &InitProducerIDResponse{Version: req.body.version(), ProducerID: 1000, ProducerEpoch: int16(epoch)}
+			},
+			"AddPartitionsToTxnRequest": func(_ int, req *request) encoderWithHeader {
+				return &AddPartitionsToTxnResponse{
+					Version: req.body.version(),
+					Errors:  map[string][]*PartitionError{"test-topic": {{Partition: 0, Err: sc.addErr}}},
+				}
+			},
+			"ProduceRequest": func(_ int, req *request) encoderWithHeader {
+				if sc.produceGate != nil {
+					<-sc.produceGate
+				}
+				res := &ProduceResponse{Version: req.body.version()}
+				res.AddTopicPartition("test-topic", 0, sc.produceErr)
+				return res
+			},
+			"EndTxnRequest": func(_ int, req *request) encoderWithHeader {
+				return &EndTxnResponse{Version: req.body.version(), Err: sc.endErr}
+			},
+		}
+		funcs := make(map[string]requestHandlerFunc, len(handlers))
+		for name, handle := range handlers {
+			funcs[name] = func(req *request) encoderWithHeader {
+				mu.Lock()
+				counts[name]++
+				n := counts[name]
+				mu.Unlock()
+				return handle(n, req)
+			}
+		}
+		broker.SetHandlerFuncByMap(funcs)
+
+		config := NewTestConfig()
+		config.Version = V2_6_0_0
+		config.ApiVersionsRequest = false
+		config.Producer.Idempotent = true
+		config.Producer.Transaction.ID = "test"
+		config.Producer.Transaction.Retry.Backoff = 10 * time.Millisecond
+		config.Producer.Transaction.Retry.Max = 2
+		config.Producer.RequiredAcks = WaitForAll
+		config.Producer.Partitioner = NewManualPartitioner
+		config.Producer.Return.Errors = true
+		config.Producer.Retry.Max = 1
+		config.Producer.Retry.Backoff = sc.retryBackoff
+		config.Net.MaxOpenRequests = 1
+
+		ap, err := NewAsyncProducer([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = ap.Close() })
+		return ap.(*asyncProducer), count
+	}
+
+	t.Run("bumps the epoch when no partition was added", func(t *testing.T) {
+		producer, count := start(t, scenario{addErr: ErrUnknownProducerID, retryBackoff: 10 * time.Millisecond})
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		pErr := assertDoneWithin(t, producer.Errors(), 5*time.Second)
+		require.ErrorIs(t, pErr, ErrUnknownProducerID)
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		assert.Equal(t, 2, count("InitProducerIDRequest"))
+		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+		assert.NoError(t, producer.BeginTxn())
+	})
+
+	t.Run("does not send a retried batch for a partition never added", func(t *testing.T) {
+		// the backoff keeps the batch waiting to retry while AbortTxn starts
+		producer, count := start(t, scenario{addErr: ErrOperationNotAttempted, retryBackoff: 500 * time.Millisecond})
+
+		// AbortTxn waits for the batch, whose error must be read meanwhile
+		errs := make(chan *ProducerError, 1)
+		go func() { errs <- <-producer.Errors() }()
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.NotZero(c, producer.TxnStatus()&ProducerTxnFlagAbortableError)
+		}, 5*time.Second, time.Millisecond)
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Zero(t, count("ProduceRequest"), "records sent for a partition outside the transaction")
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		pErr := assertDoneWithin(t, errs, 5*time.Second)
+		assert.Error(t, pErr.Err, "the batch should fail instead of being sent")
+	})
+
+	t.Run("treats an invalid producer id mapping as fatal", func(t *testing.T) {
+		producer, count := start(t, scenario{endErr: ErrInvalidProducerIDMapping, retryBackoff: 10 * time.Millisecond})
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		require.ErrorIs(t, producer.CommitTxn(), ErrInvalidProducerIDMapping)
+
+		// the transactional id has expired: carrying on under a new producer
+		// id could let an instance that was already fenced commit again
+		assert.NotZero(t, producer.TxnStatus()&ProducerTxnFlagFatalError)
+		require.Error(t, producer.AbortTxn())
+		assert.Equal(t, 1, count("InitProducerIDRequest"))
+	})
+
+	t.Run("retries a failed epoch bump on the next abort", func(t *testing.T) {
+		// the first bump fails on every attempt
+		producer, count := start(t, scenario{addErr: ErrUnknownProducerID, initFails: 3, retryBackoff: 10 * time.Millisecond})
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		pErr := assertDoneWithin(t, producer.Errors(), 5*time.Second)
+		require.ErrorIs(t, pErr, ErrUnknownProducerID)
+
+		require.ErrorIs(t, producer.AbortTxn(), ErrConcurrentTransactions)
+		assert.Equal(t, int64(1000), producer.txnmgr.producerID, "a failed bump should keep the producer id")
+
+		require.NoError(t, producer.AbortTxn())
+		assert.Equal(t, 5, count("InitProducerIDRequest"))
+		assert.Equal(t, ProducerTxnFlagReady, producer.TxnStatus())
+		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+		assert.NoError(t, producer.BeginTxn())
+	})
+
+	t.Run("bumps the epoch after a produce fails during commit", func(t *testing.T) {
+		gate := make(chan none)
+		producer, count := start(t, scenario{
+			produceErr:   ErrOutOfOrderSequenceNumber,
+			produceGate:  gate,
+			retryBackoff: 10 * time.Millisecond,
+		})
+		errs := make(chan *ProducerError, 1)
+		go func() { errs <- <-producer.Errors() }()
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "test-topic", Partition: 0, Value: StringEncoder(TestMessage)}
+		commitDone := make(chan error, 1)
+		go func() { commitDone <- producer.CommitTxn() }()
+
+		// the batch fails only once the commit has started
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.NotZero(c, producer.TxnStatus()&ProducerTxnFlagEndTransaction)
+		}, 5*time.Second, time.Millisecond)
+		close(gate)
+		require.ErrorIs(t, assertDoneWithin(t, commitDone, 5*time.Second), ErrOutOfOrderSequenceNumber)
+		require.ErrorIs(t, assertDoneWithin(t, errs, 5*time.Second), ErrOutOfOrderSequenceNumber)
+
+		// the failed batch used sequence numbers the broker never saw, so the
+		// next transaction must start under a new epoch
+		require.NoError(t, producer.AbortTxn())
+		assert.Equal(t, 2, count("InitProducerIDRequest"))
+		assert.Equal(t, int16(1), producer.txnmgr.producerEpoch)
+		assert.NoError(t, producer.BeginTxn())
+	})
+}
+
 func TestProducerRetryBufferLimits(t *testing.T) {
 	broker := NewMockBroker(t, 1)
 	defer broker.Close()
@@ -3345,5 +3719,133 @@ func TestAsyncProducerPartitionUnmuting(t *testing.T) {
 		}
 
 		closeProducer(t, producer)
+	})
+}
+
+// newTxnCoordinatorsMock serves a transaction coordinator and a group
+// coordinator whose group is at generation groupGeneration. TxnOffsetCommit
+// requests from any other generation get ILLEGAL_GENERATION.
+func newTxnCoordinatorsMock(t *testing.T, groupGeneration int32) *MockBroker {
+	broker := NewMockBroker(t, 1)
+	broker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+		"MetadataRequest": func(req *request) encoderWithHeader {
+			resp := &MetadataResponse{Version: req.body.version(), ControllerID: broker.BrokerID()}
+			resp.AddBroker(broker.Addr(), broker.BrokerID())
+			resp.AddTopicPartition("out", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+			return resp
+		},
+		"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+			return &FindCoordinatorResponse{
+				Version:     req.body.version(),
+				Coordinator: &Broker{id: broker.BrokerID(), addr: broker.Addr()},
+			}
+		},
+		"InitProducerIDRequest": func(req *request) encoderWithHeader {
+			return &InitProducerIDResponse{Version: req.body.version(), ProducerID: 1}
+		},
+		"AddPartitionsToTxnRequest": func(req *request) encoderWithHeader {
+			r := req.body.(*AddPartitionsToTxnRequest)
+			resp := &AddPartitionsToTxnResponse{Version: r.Version, Errors: map[string][]*PartitionError{}}
+			for topic, partitions := range r.TopicPartitions {
+				for _, p := range partitions {
+					resp.Errors[topic] = append(resp.Errors[topic], &PartitionError{Partition: p})
+				}
+			}
+			return resp
+		},
+		"ProduceRequest": func(req *request) encoderWithHeader {
+			resp := &ProduceResponse{Version: req.body.version()}
+			resp.AddTopicPartition("out", 0, ErrNoError)
+			return resp
+		},
+		"AddOffsetsToTxnRequest": func(req *request) encoderWithHeader {
+			return &AddOffsetsToTxnResponse{Version: req.body.version()}
+		},
+		"TxnOffsetCommitRequest": func(req *request) encoderWithHeader {
+			r := req.body.(*TxnOffsetCommitRequest)
+			kerr := ErrNoError
+			if r.Version >= 3 && r.GenerationID != groupGeneration {
+				kerr = ErrIllegalGeneration
+			}
+			resp := &TxnOffsetCommitResponse{Version: r.Version, Topics: map[string][]*PartitionError{}}
+			for topic, offsets := range r.Topics {
+				for _, o := range offsets {
+					resp.Topics[topic] = append(resp.Topics[topic], &PartitionError{Partition: o.Partition, Err: kerr})
+				}
+			}
+			return resp
+		},
+		"EndTxnRequest": func(req *request) encoderWithHeader {
+			return &EndTxnResponse{Version: req.body.version()}
+		},
+	})
+	return broker
+}
+
+func newTxnProducerForMock(t *testing.T, broker *MockBroker) *asyncProducer {
+	config := NewTestConfig()
+	config.Producer.Idempotent = true
+	config.Producer.Transaction.ID = "test"
+	config.Version = V2_5_0_0
+	config.Producer.RequiredAcks = WaitForAll
+	config.Net.MaxOpenRequests = 1
+	config.Producer.Transaction.Retry.Backoff = 0
+
+	ap, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = ap.Close() })
+	return ap.(*asyncProducer)
+}
+
+func TestTxnCommitOffsets(t *testing.T) {
+	t.Run("a transaction with only offsets commits them", func(t *testing.T) {
+		broker := newTxnCoordinatorsMock(t, 1)
+		defer broker.Close()
+		producer := newTxnProducerForMock(t, broker)
+
+		require.NoError(t, producer.BeginTxn())
+		group := &ConsumerGroupMetadata{GroupID: "group", GenerationID: 1, MemberID: "m1"}
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 0, Offset: 6}}}, group))
+		require.NoError(t, producer.CommitTxn())
+
+		var sent []string
+		for _, rr := range broker.History() {
+			switch rr.Request.(type) {
+			case *AddOffsetsToTxnRequest, *TxnOffsetCommitRequest, *EndTxnRequest:
+				sent = append(sent, fmt.Sprintf("%T", rr.Request))
+			}
+		}
+		assert.Equal(t, []string{"*sarama.AddOffsetsToTxnRequest", "*sarama.TxnOffsetCommitRequest", "*sarama.EndTxnRequest"}, sent,
+			"CommitTxn succeeded without committing the offsets")
+	})
+
+	t.Run("offsets keep the generation they were added with", func(t *testing.T) {
+		// offsets for partition 0 were added at generation 1; a cooperative
+		// rebalance then moved partition 0 away, and the retained partition 1
+		// added offsets at generation 2
+		broker := newTxnCoordinatorsMock(t, 2)
+		defer broker.Close()
+		producer := newTxnProducerForMock(t, broker)
+
+		require.NoError(t, producer.BeginTxn())
+		producer.Input() <- &ProducerMessage{Topic: "out", Partition: 0, Value: StringEncoder("x")}
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 0, Offset: 6}}},
+			&ConsumerGroupMetadata{GroupID: "group", GenerationID: 1, MemberID: "m1"}))
+		require.NoError(t, producer.AddOffsetsToTxnWithGroupMetadata(
+			map[string][]*PartitionOffsetMetadata{"in": {{Partition: 1, Offset: 3}}},
+			&ConsumerGroupMetadata{GroupID: "group", GenerationID: 2, MemberID: "m1"}))
+
+		err := producer.CommitTxn()
+		for _, rr := range broker.History() {
+			if req, ok := rr.Request.(*TxnOffsetCommitRequest); ok {
+				for _, o := range req.Topics["in"] {
+					assert.False(t, o.Partition == 0 && req.GenerationID == 2,
+						"offset added at generation 1 sent with generation 2")
+				}
+			}
+		}
+		require.ErrorIs(t, err, ErrIllegalGeneration)
 	})
 }

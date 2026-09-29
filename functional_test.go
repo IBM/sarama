@@ -78,6 +78,7 @@ func testMain(m *testing.M) int {
 	if err != nil {
 		panic(err)
 	}
+	env.UsingExisting = usingExisting
 	if !usingExisting {
 		err := prepareDockerTestEnvironment(ctx, &env)
 		if err != nil {
@@ -113,6 +114,16 @@ type testEnvironment struct {
 	Proxies          map[string]*toxiproxy.Proxy
 	KafkaBrokerAddrs []string
 	KafkaVersion     string
+
+	// UsingExisting is true when the test process did not start the cluster
+	UsingExisting bool
+}
+
+func skipIfExistingEnvironment(t *testing.T) {
+	t.Helper()
+	if FunctionalTestEnv.UsingExisting {
+		t.Skip("Skipping test that requires docker compose exec against an existing environment")
+	}
 }
 
 // setupToxiProxies will configure the toxiproxy proxies with routes for the
@@ -505,10 +516,15 @@ func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Durat
 	config.Metadata.Retry.Backoff = 10 * time.Second
 	config.ClientID = "sarama-ensureFullyReplicated"
 
-	var testTopicNames []string
+	// __consumer_offsets leadership places the group coordinators
+	topicNames := []string{"__consumer_offsets"}
 	for topic := range testTopicDetails {
-		testTopicNames = append(testTopicNames, topic)
+		topicNames = append(topicNames, topic)
 	}
+
+	// ElectLeaders needs 2.4+, and without it a ZooKeeper controller can leave
+	// leadership unbalanced indefinitely
+	canElectLeaders := parseKafkaVersion(FunctionalTestEnv.KafkaVersion).satisfies(parseKafkaVersion("2.4.0"))
 
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
@@ -524,19 +540,33 @@ func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Durat
 			defer client.Close()
 			broker := client.LeastLoadedBroker()
 			defer broker.Close()
-			request := NewMetadataRequest(config.Version, testTopicNames)
+			request := NewMetadataRequest(config.Version, topicNames)
 			return broker.GetMetadata(request)
 		}()
 		if err != nil {
 			Logger.Printf("failed to get metadata during test setup: %v\n", err)
 		} else {
 			ok := true
+			unpreferred := make(map[string][]int32)
 			for _, topic := range resp.Topics {
 				for _, partition := range topic.Partitions {
-					if len(partition.Isr) != 3 {
+					if len(partition.Isr) != len(partition.Replicas) {
 						ok = false
 						Logger.Printf("topic %s/%d is not fully-replicated Isr=%v Offline=%v\n", topic.Name, partition.ID, partition.Isr, partition.OfflineReplicas)
+					} else if canElectLeaders && len(partition.Replicas) > 0 && partition.Leader != partition.Replicas[0] {
+						unpreferred[topic.Name] = append(unpreferred[topic.Name], partition.ID)
 					}
+				}
+			}
+			// a restarted broker regains leadership and group coordinators
+			// soon after it rejoins the ISR, so elect preferred leaders here
+			// (otherwise a running test gets NotLeaderForPartition or
+			// NotCoordinatorForConsumer)
+			if ok && len(unpreferred) > 0 {
+				ok = false
+				Logger.Printf("electing preferred leaders for %v\n", unpreferred)
+				if err := electPreferredLeaders(unpreferred); err != nil {
+					Logger.Printf("failed to elect preferred leaders during test setup: %v\n", err)
 				}
 			}
 			if ok {
@@ -549,6 +579,20 @@ func ensureFullyReplicated(t testing.TB, timeout time.Duration, retry time.Durat
 		case <-tick.C:
 		}
 	}
+}
+
+func electPreferredLeaders(partitions map[string][]int32) error {
+	config := NewFunctionalTestConfig()
+	config.ClientID = "sarama-electPreferredLeaders"
+	admin, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
+	if err != nil {
+		return err
+	}
+	defer admin.Close()
+	// ignore per-partition errors such as ElectionNotNeeded; the next
+	// metadata poll shows whether leadership moved
+	_, err = admin.ElectLeaders(PreferredElection, partitions)
+	return err
 }
 
 type kafkaVersion []int

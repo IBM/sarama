@@ -688,5 +688,3 @@ func TestDecodeRequestErrorReturns(t *testing.T) {
 		t.Errorf("Decode of short request should read 7 bytes but was %d", bytesRead)
 	}
 }
-
-func nullString(s string) *string { return &s }

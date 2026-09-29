@@ -477,6 +477,11 @@ type Config struct {
 			AutoCommit struct {
 				// Whether or not to auto-commit updated offsets back to the broker.
 				// (default enabled).
+				//
+				// When disabled, marked offsets are only sent by
+				// ConsumerGroupSession.Commit, and any still uncommitted when a
+				// partition is revoked or the session ends are discarded. Call
+				// Commit before ConsumeClaim returns, or in Cleanup, to keep them.
 				Enable bool
 
 				// How frequently to commit updated offsets. Ineffective unless
@@ -751,7 +756,7 @@ func (c *Config) Validate() error {
 				return ConfigurationError("Net.SASL.GSSAPI.Realm must not be empty when GSS-API mechanism is used")
 			}
 		default:
-			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are `%s`, `%s`, `%s`, `%s` and `%s`",
+			msg := fmt.Sprintf("The SASL mechanism configuration is invalid. Possible values are %#q, %#q, %#q, %#q and %#q",
 				SASLTypeOAuth, SASLTypePlaintext, SASLTypeSCRAMSHA256, SASLTypeSCRAMSHA512, SASLTypeGSSAPI)
 			return ConfigurationError(msg)
 		}
