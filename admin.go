@@ -1292,6 +1292,10 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 				errChan <- err
 				return
 			}
+			if !errors.Is(response.Err, ErrNoError) {
+				errChan <- fmt.Errorf("list groups on broker %s: %w", b.Addr(), response.Err)
+				return
+			}
 
 			groupMaps <- maps.Clone(response.Groups)
 		}(b, ca.conf)
