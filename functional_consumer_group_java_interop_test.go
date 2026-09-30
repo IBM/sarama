@@ -11,11 +11,14 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/IBM/sarama/internal/toxiproxy"
 )
 
 const (
@@ -146,12 +149,25 @@ type javaConsumerGroupMember struct {
 	pidFile string
 	cmd     *exec.Cmd
 
+	// cooperative rebalances call onPartitionsAssigned even when nothing is
+	// added, so this counts the rebalances the member has completed
+	assignedEvents atomic.Int32
+
 	stderrMu    sync.Mutex
 	stderr      strings.Builder
 	processDone chan error
 }
 
 func runJavaConsumerGroupMember(t *testing.T, groupID, name, topic, assignor string) *javaConsumerGroupMember {
+	t.Helper()
+	m := startJavaConsumerGroupMember(t, groupID, name, topic, assignor)
+	m.waitUntilJoined()
+	return m
+}
+
+// startJavaConsumerGroupMember does not wait for an assignment, which a member
+// subscribed to a topic the cluster lacks never gets
+func startJavaConsumerGroupMember(t *testing.T, groupID, name, topic, assignor string) *javaConsumerGroupMember {
 	t.Helper()
 
 	args := []string{
@@ -223,7 +239,6 @@ func runJavaConsumerGroupMember(t *testing.T, groupID, name, topic, assignor str
 		}
 	})
 
-	m.waitUntilJoined()
 	return m
 }
 
@@ -244,6 +259,7 @@ func (m *javaConsumerGroupMember) readEvents(stdout io.Reader) {
 
 		switch event.Name {
 		case "partitions_assigned":
+			m.assignedEvents.Add(1)
 			for _, p := range event.Partitions {
 				m.assign(p.Topic, p.Partition)
 			}
@@ -343,6 +359,11 @@ type saramaInteropMember struct {
 
 func runSaramaInteropMember(t *testing.T, groupID, name, topic string, primary BalanceStrategy, extra ...BalanceStrategy) *saramaInteropMember {
 	t.Helper()
+	return runConfiguredSaramaInteropMember(t, groupID, name, topic, nil, primary, extra...)
+}
+
+func runConfiguredSaramaInteropMember(t *testing.T, groupID, name, topic string, configure func(*Config), primary BalanceStrategy, extra ...BalanceStrategy) *saramaInteropMember {
+	t.Helper()
 
 	counting := &countingStrategy{BalanceStrategy: primary}
 	config := NewFunctionalTestConfig()
@@ -355,6 +376,9 @@ func runSaramaInteropMember(t *testing.T, groupID, name, topic string, primary B
 	config.Consumer.Group.Rebalance.GroupStrategies = append(
 		[]BalanceStrategy{counting}, extra...,
 	)
+	if configure != nil {
+		configure(config)
+	}
 
 	group, err := NewConsumerGroup(FunctionalTestEnv.KafkaBrokerAddrs, groupID, config)
 	require.NoError(t, err)
@@ -474,6 +498,94 @@ func TestFuncJavaInteropCooperativeRebalance(t *testing.T) {
 		requireUntouched(t, leader, map[string][]int32{"test.1": {0}})
 
 		requireGroupStable(t, groupID, CooperativeStickyBalanceStrategyName, 3)
+		leader.StopGracefully()
+	})
+
+	t.Run("java leads while a sarama member's SyncGroup is answered REBALANCE_IN_PROGRESS", func(t *testing.T) {
+		// from 3.4 a Java leader reads the generation from the subscription,
+		// so only earlier leaders depend on the user data, and the held
+		// requests make this take minutes
+		if kafkaVersionAtLeast("3.4.0") {
+			t.Skip("Java 3.4 and later leaders do not read the generation from the user data")
+		}
+		groupID := testFuncConsumerGroupID(t)
+
+		leader := runJavaConsumerGroupMember(t, groupID, "J", "test.4", javaCooperativeStickyAssignor)
+		const syncDelay = 20 * time.Second
+		s1 := runConfiguredSaramaInteropMember(t, groupID, "S1", "test.4", func(config *Config) {
+			// a session long enough that S1 is not removed while its requests
+			// are held (otherwise its partitions move for that reason)
+			config.Consumer.Group.Session.Timeout = 10 * syncDelay
+			config.Consumer.Group.Rebalance.Timeout = 10 * syncDelay
+			config.Consumer.Group.Heartbeat.Interval = 3 * time.Second
+			// commits share the held connection (otherwise they delay the rejoin)
+			config.Consumer.Offsets.AutoCommit.Enable = false
+			// the joined generation is recorded on the cooperative-sticky
+			// strategy itself, which the plan-counting wrapper hides
+			config.Consumer.Group.Rebalance.GroupStrategies = []BalanceStrategy{NewBalanceStrategyCooperativeSticky()}
+		}, NewBalanceStrategyCooperativeSticky())
+		s1.waitFor(func(o map[string][]int32) bool { return len(o["test.4"]) == 2 }, "to be given half of test.4")
+		requireGroupStable(t, groupID, CooperativeStickyBalanceStrategyName, 2)
+
+		client, err := NewClient(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
+		require.NoError(t, err)
+		coordinator, err := client.Coordinator(groupID)
+		require.NoError(t, err)
+		require.NoError(t, client.Close())
+
+		// hold sarama's requests to the coordinator; the java members connect
+		// directly, so their joins are not delayed
+		_, err = proxyForBrokerID(t, coordinator.ID()).AddToxic("sync-delay", "latency", "upstream", 1,
+			toxiproxy.Attributes{"latency": int(syncDelay / time.Millisecond)})
+		require.NoError(t, err)
+		t.Cleanup(func() { resetProxies(t) })
+
+		// the leader completes the next rebalance while S1's SyncGroup is still
+		// held, and a third member joining then makes the broker answer that
+		// SyncGroup REBALANCE_IN_PROGRESS
+		completed := leader.assignedEvents.Load()
+		j2 := startJavaConsumerGroupMember(t, groupID, "J2", "test.4", javaCooperativeStickyAssignor)
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Greater(c, leader.assignedEvents.Load(), completed)
+		}, 10*syncDelay, 100*time.Millisecond, "the leader should complete the rebalance J2 started")
+		completed = leader.assignedEvents.Load()
+		j3 := startJavaConsumerGroupMember(t, groupID, "J3", "test.4", javaCooperativeStickyAssignor)
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Greater(c, leader.assignedEvents.Load(), completed)
+		}, 10*syncDelay, 100*time.Millisecond, "the leader should complete the rebalance J3 started")
+
+		// S1 still owns its partitions until its next SyncGroup gets through; a
+		// Java 3.3 or earlier leader that missed the generation S1 joined would
+		// already have given them to another member
+		stolen := func() string {
+			for _, j := range []*javaConsumerGroupMember{leader, j2, j3} {
+				for _, p := range j.Owned()["test.4"] {
+					if slices.Contains(s1.Owned()["test.4"], p) {
+						return fmt.Sprintf("%s owns test.4/%d while S1 still does", j.Name(), p)
+					}
+				}
+			}
+			return ""
+		}
+		window := time.NewTimer(5 * time.Second)
+		defer window.Stop()
+		tick := time.NewTicker(50 * time.Millisecond)
+		defer tick.Stop()
+	watch:
+		for {
+			select {
+			case <-window.C:
+				break watch
+			case <-tick.C:
+				require.Empty(t, stolen())
+			}
+		}
+
+		resetProxies(t)
+		requireGroupStable(t, groupID, CooperativeStickyBalanceStrategyName, 4)
+		require.Empty(t, stolen())
+		j3.StopGracefully()
+		j2.StopGracefully()
 		leader.StopGracefully()
 	})
 
