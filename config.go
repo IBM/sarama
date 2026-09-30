@@ -653,6 +653,7 @@ func (c *Config) Validate() error {
 	if c.Producer.MaxMessageBytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.MaxMessageBytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
+
 	topicMaxMessageBytesTopics := make([]string, 0, len(c.Producer.TopicMaxMessageBytes))
 	for topic := range c.Producer.TopicMaxMessageBytes {
 		topicMaxMessageBytesTopics = append(topicMaxMessageBytesTopics, topic)
@@ -664,6 +665,7 @@ func (c *Config) Validate() error {
 			Logger.Printf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize; it will be ignored.\n", topic)
 		}
 	}
+
 	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.Flush.Bytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
