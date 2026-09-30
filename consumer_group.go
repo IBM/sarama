@@ -489,6 +489,11 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 			// the owned partitions of a member reporting an older generation
 			// without waiting for them to be revoked
 			held.generationID = join.GenerationId
+			// Java 3.3 and earlier leaders read the generation from the
+			// cooperative-sticky user data, whatever the subscription version
+			if s, ok := strategy.(*cooperativeStickyBalanceStrategy); ok {
+				s.generation.Store(join.GenerationId)
+			}
 		}
 		return c.retryJoinSync(ctx, topics, held, retries, true)
 	case ErrFencedInstancedId:
