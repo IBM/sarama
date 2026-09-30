@@ -231,6 +231,14 @@ func (c *consumerGroup) Consume(ctx context.Context, topics []string, handler Co
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
+	// Close may have left the group between the check above and taking the
+	// lock; joining now would add a member that nothing ever removes
+	select {
+	case <-c.closed:
+		return ErrClosedConsumerGroup
+	default:
+	}
+
 	// Quick exit when no topics are provided
 	if len(topics) == 0 {
 		return fmt.Errorf("no topics provided")
@@ -393,7 +401,7 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 			return nil, join.Err
 		}
 		return c.joinSync(ctx, topics, held, retries)
-	case ErrNotCoordinatorForConsumer, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
+	case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
 		// retry after backoff
 		if retries <= 0 {
 			return nil, join.Err
@@ -470,10 +478,17 @@ func (c *consumerGroup) joinSync(ctx context.Context, topics []string, held *hel
 			return nil, syncGroupResponse.Err
 		}
 		return c.joinSync(ctx, topics, held, retries)
-	case ErrNotCoordinatorForConsumer, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
+	case ErrNotCoordinatorForConsumer, ErrConsumerCoordinatorNotAvailable, ErrRebalanceInProgress, ErrOffsetsLoadInProgress:
 		// retry after backoff
 		if retries <= 0 {
 			return nil, syncGroupResponse.Err
+		}
+		if held != nil {
+			// the member joined this generation still owning held.claims, so
+			// report it on the retry; a Java 3.3 or earlier leader reassigns
+			// the owned partitions of a member reporting an older generation
+			// without waiting for them to be revoked
+			held.generationID = join.GenerationId
 		}
 		return c.retryJoinSync(ctx, topics, held, retries, true)
 	case ErrFencedInstancedId:

@@ -20,6 +20,11 @@ type produceSet struct {
 
 	bufferBytes int
 	bufferCount int
+
+	// resent marks a batch that retryBatch sent straight to a broker. Its
+	// messages did not go through the partitionProducer, so the fin/retry
+	// ordering there does not cover them.
+	resent bool
 }
 
 func newProduceSet(parent *asyncProducer) *produceSet {

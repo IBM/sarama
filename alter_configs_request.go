@@ -87,6 +87,7 @@ func (a *AlterConfigsResource) encode(pe packetEncoder) error {
 		if err := pe.putNullableString(configValue); err != nil {
 			return err
 		}
+		pe.putEmptyTaggedFieldArray()
 	}
 
 	pe.putEmptyTaggedFieldArray()
@@ -123,6 +124,9 @@ func (a *AlterConfigsResource) decode(pd packetDecoder, version int16) error {
 				return err
 			}
 			if a.ConfigEntries[configKey], err = pd.getNullableString(); err != nil {
+				return err
+			}
+			if _, err = pd.getEmptyTaggedFieldArray(); err != nil {
 				return err
 			}
 		}

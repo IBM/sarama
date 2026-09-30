@@ -5,6 +5,8 @@ package sarama
 import (
 	"errors"
 	"maps"
+	"math"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -88,6 +90,68 @@ func TestClusterAdminCreateTopic(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("retries on the new controller after the controller stops", func(t *testing.T) {
+		b1 := NewMockBroker(t, 1)
+		b2 := NewMockBroker(t, 2)
+		t.Cleanup(b2.Close)
+
+		var controllerID atomic.Int32
+		controllerID.Store(b1.BrokerID())
+		meta := func(req *request) encoderWithHeader {
+			return NewMockMetadataResponse(t).SetController(controllerID.Load()).
+				SetBroker(b1.Addr(), b1.BrokerID()).
+				SetBroker(b2.Addr(), b2.BrokerID()).For(req.body)
+		}
+		b1.SetHandlerFuncByMap(map[string]requestHandlerFunc{"MetadataRequest": meta})
+		b2.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": meta,
+			"CreateTopicsRequest": func(req *request) encoderWithHeader {
+				return NewMockCreateTopicsResponse(t).For(req.body)
+			},
+		})
+
+		config := NewTestConfig()
+		config.Version = V0_10_2_0
+		config.Admin.Retry.Backoff = time.Millisecond
+		admin, err := NewClusterAdmin([]string{b1.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		// broker 1 goes away with the admin connected to it as the controller
+		controllerID.Store(b2.BrokerID())
+		b1.Close()
+
+		err = admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+		require.NoError(t, err)
+	})
+
+	t.Run("concurrent calls all retry on the new controller", func(t *testing.T) {
+		created := func(req *request) encoderWithHeader {
+			return NewMockCreateTopicsResponse(t).For(req.body)
+		}
+		notController := func(req *request) encoderWithHeader {
+			r := req.body.(*CreateTopicsRequest)
+			rsp := &CreateTopicsResponse{Version: r.version(), TopicErrors: make(map[string]*TopicError)}
+			for topic := range r.TopicDetails {
+				rsp.TopicErrors[topic] = &TopicError{Err: ErrNotController}
+			}
+			return rsp
+		}
+		admin, retriedOnNewController := staleControllerAdmin(t, V0_10_2_0, "CreateTopicsRequest", notController, created)
+
+		const calls = 6
+		errs := make(chan error, calls)
+		for range calls {
+			go func() {
+				errs <- admin.CreateTopic("my_topic", &TopicDetail{NumPartitions: 1, ReplicationFactor: 1}, false)
+			}()
+		}
+		for range calls {
+			require.NoError(t, <-errs)
+		}
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried requests")
+	})
 }
 
 func TestClusterAdminCreateTopicWithInvalidTopicDetail(t *testing.T) {
@@ -557,6 +621,20 @@ func TestClusterAdminAlterPartitionReassignments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("retries on stale controller", func(t *testing.T) {
+		alterOK := func(req *request) encoderWithHeader {
+			return NewMockAlterPartitionReassignmentsResponse(t).For(req.body)
+		}
+		notController := func(req *request) encoderWithHeader {
+			return &AlterPartitionReassignmentsResponse{Version: req.body.version(), ErrorCode: ErrNotController}
+		}
+		admin, retriedOnNewController := staleControllerAdmin(t, V2_4_0_0, "AlterPartitionReassignmentsRequest", notController, alterOK)
+
+		err := admin.AlterPartitionReassignments("my_topic", [][]int32{{1, 2}})
+		require.NoError(t, err)
+		assert.True(t, retriedOnNewController(), "expected broker 2 to receive the retried request")
+	})
 }
 
 func TestClusterAdminAlterPartitionReassignmentsWithDiffVersion(t *testing.T) {
@@ -873,6 +951,39 @@ func TestClusterAdminDeleteRecordsWithLeaderNotAvailable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestClusterAdminDescribeCluster(t *testing.T) {
+	t.Run("falls back to metadata when the broker omits the DescribeCluster API", func(t *testing.T) {
+		broker := NewMockBroker(t, 1)
+		defer broker.Close()
+
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"ApiVersionsRequest": mockApiVersionsFor(t),
+			"MetadataRequest":    mockMetadataFor(t, broker),
+		})
+
+		config := NewTestConfig()
+		config.ApiVersionsRequest = true
+		config.Version = V2_8_0_0
+		// the mock has no DescribeCluster handler, so a request that reaches it
+		// waits out this deadline
+		config.Net.ReadTimeout = time.Second
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		defer safeClose(t, admin)
+
+		brokers, controllerID, err := admin.DescribeCluster()
+		require.NoError(t, err)
+		assert.Equal(t, broker.BrokerID(), controllerID)
+		require.Len(t, brokers, 1)
+		assert.Equal(t, broker.Addr(), brokers[0].Addr())
+
+		for _, exchange := range broker.History() {
+			_, sent := exchange.Request.(*DescribeClusterRequest)
+			assert.False(t, sent, "sent DescribeCluster to a broker that does not advertise it")
+		}
+	})
 }
 
 func TestClusterAdminDescribeConfig(t *testing.T) {
@@ -2012,9 +2123,9 @@ func TestListConsumerGroupOffsetsBatch(t *testing.T) {
 	t.Run("rejects broker downgrade below v8", func(t *testing.T) {
 		broker := newMockBroker(t, 1)
 		broker.SetHandlerByMap(map[string]MockResponse{
-			"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
-				{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 7},
-			}),
+			"ApiVersionsRequest": mockApiVersionsFor(t,
+				ApiVersionsResponseKey{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 7},
+			),
 			"MetadataRequest":        mockMetadataFor(t, broker),
 			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groupA, groupB),
 		})
@@ -2035,9 +2146,9 @@ func TestListConsumerGroupOffsetsBatch(t *testing.T) {
 		// 9999 keeps this test honest as we add more protocol versions later.
 		broker := newMockBroker(t, 1)
 		broker.SetHandlerByMap(map[string]MockResponse{
-			"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
-				{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 9999},
-			}),
+			"ApiVersionsRequest": mockApiVersionsFor(t,
+				ApiVersionsResponseKey{ApiKey: apiKeyOffsetFetch, MinVersion: 0, MaxVersion: 9999},
+			),
 			"MetadataRequest":        mockMetadataFor(t, broker),
 			"FindCoordinatorRequest": mockGroupCoordinators(t, broker, groupA, groupB),
 			"OffsetFetchRequest": NewMockOffsetFetchResponse(t).
@@ -2061,6 +2172,23 @@ func TestListConsumerGroupOffsetsBatch(t *testing.T) {
 	t.Run("retries on retriable per-group error", func(t *testing.T) {
 		first := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
 			{GroupId: groupA, Err: ErrNotCoordinatorForConsumer},
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		second := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			groupBlock(groupA, expectedOffsetA),
+			groupBlock(groupB, expectedOffsetB),
+		}}
+		admin := setup(t, NewMockSequence(first, second), groupA, groupB)
+
+		result, err := admin.ListConsumerGroupOffsetsBatch(bothGroups)
+		require.NoError(t, err)
+		assertGroupOffset(t, result, groupA, topic, 0, expectedOffsetA)
+		assertGroupOffset(t, result, groupB, topic, 0, expectedOffsetB)
+	})
+
+	t.Run("retries while the coordinator loads", func(t *testing.T) {
+		first := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
+			{GroupId: groupA, Err: ErrOffsetsLoadInProgress},
 			groupBlock(groupB, expectedOffsetB),
 		}}
 		second := &OffsetFetchResponse{Version: 8, Groups: []OffsetFetchResponseGroup{
@@ -2170,6 +2298,21 @@ func assertGroupOffset(t *testing.T, result map[string]*OffsetFetchResponseGroup
 	block := result[groupID].GetBlock(topic, partition)
 	require.NotNil(t, block)
 	assert.Equal(t, expected, block.Offset)
+}
+
+// mockApiVersionsFor advertises the given API keys plus the ones a client needs
+// to connect and find a coordinator, each over a range that leaves the
+// negotiated version alone. An API key left out reads as unsupported.
+func mockApiVersionsFor(t *testing.T, keys ...ApiVersionsResponseKey) *MockApiVersionsResponse {
+	t.Helper()
+	advertised := map[int16]ApiVersionsResponseKey{}
+	for _, key := range []int16{apiKeyMetadata, apiKeyFindCoordinator, apiKeyApiVersions} {
+		advertised[key] = ApiVersionsResponseKey{ApiKey: key, MinVersion: 0, MaxVersion: math.MaxInt16}
+	}
+	for _, key := range keys {
+		advertised[key.ApiKey] = key
+	}
+	return NewMockApiVersionsResponse(t).SetApiKeys(slices.Collect(maps.Values(advertised)))
 }
 
 // mockMetadataFor builds a MockMetadataResponse with controller and brokers
@@ -2339,6 +2482,22 @@ func TestAlterConsumerGroupOffsets(t *testing.T) {
 		broker.SetHandlerByMap(map[string]MockResponse{
 			"OffsetCommitRequest": NewMockSequence(
 				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNotCoordinatorForConsumer),
+				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNoError),
+			),
+			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, broker),
+			"MetadataRequest":        mockMetadataFor(t, broker),
+		})
+
+		response, err := newTestAdmin(t, broker).AlterConsumerGroupOffsets(group, offsets, nil)
+		require.NoError(t, err)
+		assert.Equal(t, ErrNoError, response.Errors[topic][partition])
+	})
+
+	t.Run("retries on per-partition COORDINATOR_LOAD_IN_PROGRESS", func(t *testing.T) {
+		broker := newMockBroker(t, 1)
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"OffsetCommitRequest": NewMockSequence(
+				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrOffsetsLoadInProgress),
 				NewMockOffsetCommitResponse(t).SetError(group, topic, partition, ErrNoError),
 			),
 			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, group, broker),

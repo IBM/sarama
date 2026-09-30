@@ -23,7 +23,12 @@ func (h *handler) Cleanup(s ConsumerGroupSession) error { return nil }
 func (h *handler) ConsumeClaim(sess ConsumerGroupSession, claim ConsumerGroupClaim) error {
 	for {
 		select {
-		case msg := <-claim.Messages():
+		case msg, ok := <-claim.Messages():
+			if !ok {
+				// Close can end the claim before the session context is done
+				h.messageCh <- &ConsumerMessage{Value: []byte("session done")}
+				return nil
+			}
 			sess.MarkMessage(msg, "")
 			h.messageCh <- msg
 		case <-sess.Context().Done():
