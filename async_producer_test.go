@@ -61,6 +61,61 @@ func expectResults(t *testing.T, p AsyncProducer, successCount, errorCount int) 
 	expectResultsWithTimeout(t, p, successCount, errorCount, 5*time.Minute)
 }
 
+func TestAsyncProducerMessageSizeLimitForTopic(t *testing.T) {
+	tests := []struct {
+		name          string
+		topic         string
+		configure     func(*Config)
+		expectedError string
+	}{
+		{
+			name:  "global limit fallback",
+			topic: "default-topic",
+			configure: func(config *Config) {
+				config.Producer.MaxMessageBytes = 1
+			},
+			expectedError: "Attempt to produce message larger than configured Producer.MaxMessageBytes:",
+		},
+		{
+			name:  "topic limit override",
+			topic: "small-topic",
+			configure: func(config *Config) {
+				config.Producer.MaxMessageBytes = 10_000
+				config.Producer.TopicMaxMessageBytes = map[string]int{
+					"small-topic": 1,
+				}
+			},
+			expectedError: `Attempt to produce message larger than configured Producer.TopicMaxMessageBytes for topic "small-topic":`,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config := NewTestConfig()
+			config.Producer.Return.Errors = true
+			test.configure(config)
+
+			producer := &asyncProducer{
+				conf:   config,
+				input:  make(chan *ProducerMessage),
+				errors: make(chan *ProducerError, 1),
+				txnmgr: &transactionManager{},
+				muter:  newPartitionMuter(),
+			}
+
+			go producer.dispatcher()
+			producer.input <- &ProducerMessage{
+				Topic: test.topic,
+				Value: StringEncoder(TestMessage),
+			}
+			close(producer.input)
+
+			producerError := <-producer.errors
+			require.ErrorContains(t, producerError.Err, test.expectedError)
+		})
+	}
+}
+
 func TestBrokerProducerSequencing(t *testing.T) {
 	type batchID struct {
 		epoch    int16
