@@ -161,7 +161,10 @@ type ClusterAdmin interface {
 	// Delete a consumer group.
 	DeleteConsumerGroup(group string) error
 
-	// Get information about the nodes in the cluster
+	// Get information about the nodes in the cluster. On a KRaft cluster the
+	// controllerID is that of a random broker, as clients cannot reach the
+	// controllers directly. Use DescribeMetadataQuorum to find the active
+	// controller.
 	DescribeCluster() (brokers []*Broker, controllerID int32, err error)
 
 	// Get information about all log directories on the given set of brokers
@@ -189,7 +192,9 @@ type ClusterAdmin interface {
 	AlterClientQuotas(entity []QuotaEntityComponent, op ClientQuotasOp, validateOnly bool) error
 
 	// Controller returns the cluster controller broker. It will return a
-	// locally cached value if it's available.
+	// locally cached value if it's available. On a KRaft cluster this is a
+	// random broker, which forwards controller requests to the active
+	// controller.
 	Controller() (*Broker, error)
 
 	// Coordinator returns the coordinating broker for a consumer group. It will
