@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
@@ -193,6 +194,12 @@ type Config struct {
 		// will still be rejected.
 		// This value must remain smaller than sarama.MaxRequestSize.
 		MaxMessageBytes int
+		// TopicMaxMessageBytes overrides MaxMessageBytes for individual topics.
+		// Each value is the maximum permitted size of a message and the
+		// pre-compression size estimate of a batch for a single partition of the
+		// corresponding topic. Topics absent from the map use MaxMessageBytes.
+		// The map must not be modified after the client is created.
+		TopicMaxMessageBytes map[string]int
 		// The level of acknowledgement reliability needed from the broker (defaults
 		// to WaitForLocal). Equivalent to the `request.required.acks` setting of the
 		// JVM producer.
@@ -651,6 +658,19 @@ func (c *Config) Validate() error {
 	if c.Producer.MaxMessageBytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.MaxMessageBytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
+
+	topicMaxMessageBytesTopics := make([]string, 0, len(c.Producer.TopicMaxMessageBytes))
+	for topic := range c.Producer.TopicMaxMessageBytes {
+		topicMaxMessageBytesTopics = append(topicMaxMessageBytesTopics, topic)
+	}
+	slices.Sort(topicMaxMessageBytesTopics)
+	for _, topic := range topicMaxMessageBytesTopics {
+		maxMessageBytes := c.Producer.TopicMaxMessageBytes[topic]
+		if maxMessageBytes >= int(MaxRequestSize) {
+			Logger.Printf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize; it will be ignored.\n", topic)
+		}
+	}
+
 	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.Flush.Bytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
@@ -804,6 +824,12 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
 	}
 
+	for _, topic := range topicMaxMessageBytesTopics {
+		if c.Producer.TopicMaxMessageBytes[topic] <= 0 {
+			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be > 0", topic))
+		}
+	}
+
 	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
 		return ConfigurationError("lz4 compression requires Version >= V0_10_0_0")
 	}
@@ -936,6 +962,14 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func (c *Config) producerMaxMessageBytes(topic string) (int, bool) {
+	maxMessageBytes, ok := c.Producer.TopicMaxMessageBytes[topic]
+	if ok {
+		return maxMessageBytes, true
+	}
+	return c.Producer.MaxMessageBytes, false
 }
 
 func (c *Config) getDialer() proxy.Dialer {
