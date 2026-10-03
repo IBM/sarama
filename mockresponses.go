@@ -1667,6 +1667,53 @@ func (m *MockDescribeProducersResponse) For(reqBody versionedDecoder) encoderWit
 	return res
 }
 
+// MockDescribeQuorumResponse is a `DescribeQuorumResponse` builder. It echoes
+// back the requested topic-partitions, populating each with the quorum state
+// registered by SetQuorum.
+type MockDescribeQuorumResponse struct {
+	t         TestReporter
+	err       KError
+	partition DescribeQuorumResponsePartition
+	nodes     []DescribeQuorumResponseNode
+}
+
+func NewMockDescribeQuorumResponse(t TestReporter) *MockDescribeQuorumResponse {
+	return &MockDescribeQuorumResponse{t: t}
+}
+
+func (m *MockDescribeQuorumResponse) SetError(kerror KError) *MockDescribeQuorumResponse {
+	m.err = kerror
+	return m
+}
+
+func (m *MockDescribeQuorumResponse) SetQuorum(partition DescribeQuorumResponsePartition) *MockDescribeQuorumResponse {
+	m.partition = partition
+	return m
+}
+
+func (m *MockDescribeQuorumResponse) SetNodes(nodes ...DescribeQuorumResponseNode) *MockDescribeQuorumResponse {
+	m.nodes = nodes
+	return m
+}
+
+func (m *MockDescribeQuorumResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*DescribeQuorumRequest)
+	res := &DescribeQuorumResponse{Version: req.version(), ErrorCode: m.err}
+	for _, reqTopic := range req.Topics {
+		resTopic := DescribeQuorumResponseTopic{TopicName: reqTopic.TopicName}
+		for _, partition := range reqTopic.PartitionIndexes {
+			resPartition := m.partition
+			resPartition.PartitionIndex = partition
+			resTopic.Partitions = append(resTopic.Partitions, resPartition)
+		}
+		res.Topics = append(res.Topics, resTopic)
+	}
+	if res.Version >= 2 {
+		res.Nodes = m.nodes
+	}
+	return res
+}
+
 // MockDescribeTransactionsResponse is a `DescribeTransactionsResponse` builder.
 // It echoes back the requested transactional ids, populating each with any state
 // or error code registered for it.
