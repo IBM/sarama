@@ -396,6 +396,52 @@ func TestConsumerGroupJoinSync(t *testing.T) {
 		assert.ErrorIs(t, err, ErrIllegalGeneration)
 		assert.Len(t, joinGroupRequests(broker), 1)
 	})
+	t.Run("a leader assigns the topics it has metadata for when a member subscribes to one without", func(t *testing.T) {
+		join := NewMockJoinGroupResponse(t).
+			SetGroupProtocol(RangeBalanceStrategyName).
+			SetGenerationId(1).
+			SetLeaderId("member-1").
+			SetMemberId("member-1").
+			SetMember("member-1", &ConsumerGroupMemberMetadata{Topics: []string{"my-topic"}}).
+			SetMember("member-2", &ConsumerGroupMemberMetadata{Topics: []string{"my-topic", "missing-topic"}})
+		syncResponse := NewMockSyncGroupResponse(t).SetMemberAssignment(
+			&ConsumerGroupMemberAssignment{Topics: map[string][]int32{"my-topic": {0}}},
+		)
+		c, broker := newJoinSyncConsumerGroup(t, V3_2_0_0, join, syncResponse)
+		c.config.Metadata.Retry.Max = 0
+		broker.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetBroker(broker.Addr(), broker.BrokerID()).
+				SetLeader("my-topic", 0, broker.BrokerID()).
+				SetLeader("my-topic", 1, broker.BrokerID()),
+			"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+				SetCoordinator(CoordinatorGroup, "my-group", broker),
+			"JoinGroupRequest":  join,
+			"SyncGroupRequest":  syncResponse,
+			"LeaveGroupRequest": NewMockLeaveGroupResponse(t),
+		})
+
+		// a Java leader skips a topic without metadata; failing here fails
+		// every generation this member leads
+		result, err := c.joinSync(t.Context(), []string{"my-topic"}, nil, 0)
+		assert.NoError(t, err)
+		assert.True(t, result.isLeader)
+
+		var assigned []int32
+		for _, exchange := range broker.History() {
+			request, ok := exchange.Request.(*SyncGroupRequest)
+			if !ok {
+				continue
+			}
+			for _, block := range request.GroupAssignments {
+				assignment := &ConsumerGroupMemberAssignment{}
+				assert.NoError(t, decode(block.Assignment, assignment, nil))
+				assert.NotContains(t, assignment.Topics, "missing-topic")
+				assigned = append(assigned, assignment.Topics["my-topic"]...)
+			}
+		}
+		assert.ElementsMatch(t, []int32{0, 1}, assigned)
+	})
 }
 
 // TestJoinGroupVersionSelection checks the JoinGroup version picked for each
