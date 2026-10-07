@@ -756,12 +756,48 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	if topic == "" {
 		return ErrInvalidTopic
 	}
-	errs := make([]error, 0)
+	var errs []error
+	pending := partitionOffsets
+	for attemptsRemaining := ca.conf.Admin.Retry.Max + 1; len(pending) > 0; {
+		failed := ca.deleteRecordsFromLeaders(topic, pending)
+		attemptsRemaining--
+		var retry map[int32]int64
+		for partition, err := range failed {
+			if attemptsRemaining > 0 && isRetriableDeleteRecordsError(err) {
+				if retry == nil {
+					retry = make(map[int32]int64, len(failed))
+				}
+				retry[partition] = pending[partition]
+				continue
+			}
+			errs = append(errs, err)
+		}
+		pending = retry
+		if len(pending) > 0 {
+			Logger.Printf("admin/request retrying after %dms... (%d attempts remaining)\n",
+				ca.conf.Admin.Retry.Backoff/time.Millisecond, attemptsRemaining)
+			time.Sleep(ca.conf.Admin.Retry.Backoff)
+			// the leader may have moved
+			_ = ca.client.RefreshMetadata(topic)
+		}
+	}
+	if len(errs) > 0 {
+		return Wrap(ErrDeleteRecords, errs...)
+	}
+	// todo since we are dealing with couple of partitions it would be good if we return slice of errors
+	// for each partition instead of one error
+	return nil
+}
+
+// deleteRecordsFromLeaders sends a DeleteRecords request to each partition
+// leader and returns the error for each partition that failed
+func (ca *clusterAdmin) deleteRecordsFromLeaders(topic string, partitionOffsets map[int32]int64) map[int32]error {
+	failed := make(map[int32]error)
 	partitionPerBroker := make(map[*Broker][]int32)
 	for partition := range partitionOffsets {
 		broker, err := ca.client.Leader(topic, partition)
 		if err != nil {
-			errs = append(errs, err)
+			failed[partition] = err
 			continue
 		}
 		partitionPerBroker[broker] = append(partitionPerBroker[broker], partition)
@@ -786,30 +822,25 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 			request.Version = 1
 		}
 		rsp, err := broker.DeleteRecords(request)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		deleteRecordsResponseTopic, ok := rsp.Topics[topic]
-		if !ok {
-			errs = append(errs, ErrIncompleteResponse)
-			continue
-		}
-
-		for _, deleteRecordsResponsePartition := range deleteRecordsResponseTopic.Partitions {
-			if !errors.Is(deleteRecordsResponsePartition.Err, ErrNoError) {
-				errs = append(errs, deleteRecordsResponsePartition.Err)
-				continue
+		for _, p := range partitions {
+			switch {
+			case err != nil:
+				failed[p] = err
+			case rsp.Topics[topic] == nil || rsp.Topics[topic].Partitions[p] == nil:
+				failed[p] = ErrIncompleteResponse
+			case !errors.Is(rsp.Topics[topic].Partitions[p].Err, ErrNoError):
+				failed[p] = rsp.Topics[topic].Partitions[p].Err
 			}
 		}
 	}
-	if len(errs) > 0 {
-		return Wrap(ErrDeleteRecords, errs...)
-	}
-	// todo since we are dealing with couple of partitions it would be good if we return slice of errors
-	// for each partition instead of one error
-	return nil
+	return failed
+}
+
+// isRetriableDeleteRecordsError returns true for connection errors and for
+// Kafka errors that can clear once the leader is looked up again
+func isRetriableDeleteRecordsError(err error) bool {
+	kerr, isKErr := errors.AsType[KError](err)
+	return isRetriableBrokerError(err) || (isKErr && isRetriableKError(kerr))
 }
 
 // Returns a bool indicating whether the resource request needs to go to a
