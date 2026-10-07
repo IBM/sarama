@@ -769,9 +769,12 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	for attemptsRemaining := ca.conf.Admin.Retry.Max + 1; len(pending) > 0; {
 		failed := ca.deleteRecordsFromLeaders(topic, pending)
 		attemptsRemaining--
-		retry := make(map[int32]int64)
+		var retry map[int32]int64
 		for partition, err := range failed {
 			if attemptsRemaining > 0 && isRetriableDeleteRecordsError(err) {
+				if retry == nil {
+					retry = make(map[int32]int64, len(failed))
+				}
 				retry[partition] = pending[partition]
 				continue
 			}
@@ -779,8 +782,7 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 		}
 		pending = retry
 		if len(pending) > 0 {
-			Logger.Printf(
-				"admin/request retrying after %dms... (%d attempts remaining)\n",
+			Logger.Printf("admin/request retrying after %dms... (%d attempts remaining)\n",
 				ca.conf.Admin.Retry.Backoff/time.Millisecond, attemptsRemaining)
 			time.Sleep(ca.conf.Admin.Retry.Backoff)
 			// the leader may have moved
@@ -845,8 +847,8 @@ func (ca *clusterAdmin) deleteRecordsFromLeaders(topic string, partitionOffsets 
 // isRetriableDeleteRecordsError returns true for connection errors and for
 // Kafka errors that can clear once the leader is looked up again
 func isRetriableDeleteRecordsError(err error) bool {
-	var kerr KError
-	return isRetriableBrokerError(err) || (errors.As(err, &kerr) && isRetriableKError(kerr))
+	kerr, isKErr := errors.AsType[KError](err)
+	return isRetriableBrokerError(err) || (isKErr && isRetriableKError(kerr))
 }
 
 // Returns a bool indicating whether the resource request needs to go to a
