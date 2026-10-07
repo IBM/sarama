@@ -316,7 +316,7 @@ func (om *offsetManager) flushToBrokerFor(targets partitionTargets) {
 	// Care needs to be taken to unlock this. Don't want to defer the unlock as this would
 	// cause the lock to be held while waiting for the broker to reply.
 	broker.lock.Lock()
-	req := om.constructRequestFor(targets)
+	req, versions := om.constructRequestFor(targets)
 	if req == nil {
 		broker.lock.Unlock()
 		return
@@ -340,7 +340,7 @@ func (om *offsetManager) flushToBrokerFor(targets partitionTargets) {
 	}
 
 	broker.handleThrottledResponse(resp)
-	om.handleResponse(broker, req, resp)
+	om.handleResponse(broker, req, resp, versions)
 }
 
 func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCommitResponse, *responsePromise, error) {
@@ -354,7 +354,8 @@ func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCom
 	return resp, promise, nil
 }
 
-func (om *offsetManager) constructRequestFor(targets partitionTargets) *OffsetCommitRequest {
+// constructRequestFor also returns the version of each POM it took an offset from
+func (om *offsetManager) constructRequestFor(targets partitionTargets) (*OffsetCommitRequest, map[*partitionOffsetManager]uint64) {
 	r := &OffsetCommitRequest{
 		Version:       1,
 		ConsumerGroup: om.group,
@@ -413,6 +414,7 @@ func (om *offsetManager) constructRequestFor(targets partitionTargets) *OffsetCo
 	om.pomsLock.RLock()
 	defer om.pomsLock.RUnlock()
 
+	versions := make(map[*partitionOffsetManager]uint64)
 	for topic, topicManagers := range om.poms {
 		for partition, pom := range topicManagers {
 			if !targets.covers(topic, partition) {
@@ -421,19 +423,20 @@ func (om *offsetManager) constructRequestFor(targets partitionTargets) *OffsetCo
 			pom.lock.Lock()
 			if pom.dirty {
 				r.AddBlockWithLeaderEpoch(pom.topic, pom.partition, pom.offset, pom.leaderEpoch, commitTimestamp, pom.metadata)
+				versions[pom] = pom.version
 			}
 			pom.lock.Unlock()
 		}
 	}
 
 	if len(r.blocks) > 0 {
-		return r
+		return r, versions
 	}
 
-	return nil
+	return nil, nil
 }
 
-func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest, resp *OffsetCommitResponse) {
+func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest, resp *OffsetCommitResponse, versions map[*partitionOffsetManager]uint64) {
 	// release coordinator after dropping pomsLock to avoid lock inversion (#3191)
 	shouldRelease := false
 
@@ -458,8 +461,7 @@ func (om *offsetManager) handleResponse(broker *Broker, req *OffsetCommitRequest
 
 			switch err {
 			case ErrNoError:
-				block := req.blocks[pom.topic][pom.partition]
-				pom.updateCommitted(block.offset, block.metadata)
+				pom.updateCommitted(versions[pom])
 			case ErrNotLeaderForPartition, ErrLeaderNotAvailable,
 				ErrConsumerCoordinatorNotAvailable, ErrNotCoordinatorForConsumer:
 				// not a critical error, we just need to redispatch
@@ -685,8 +687,13 @@ type partitionOffsetManager struct {
 	lock     sync.Mutex
 	offset   int64
 	metadata string
-	dirty    bool
-	done     bool
+	// version increases with every MarkOffset or ResetOffset that sets offset;
+	// an acknowledged commit clears dirty only if nothing was set after it was
+	// built (otherwise a reset back to its offset, made while a later commit is
+	// in flight, is never committed)
+	version uint64
+	dirty   bool
+	done    bool
 
 	releaseOnce sync.Once
 	errors      chan *ConsumerError
@@ -720,6 +727,7 @@ func (pom *partitionOffsetManager) MarkOffset(offset int64, metadata string) {
 	if offset > pom.offset {
 		pom.offset = offset
 		pom.metadata = metadata
+		pom.version++
 		pom.dirty = true
 	}
 }
@@ -731,15 +739,17 @@ func (pom *partitionOffsetManager) ResetOffset(offset int64, metadata string) {
 	if offset <= pom.offset {
 		pom.offset = offset
 		pom.metadata = metadata
+		pom.version++
 		pom.dirty = true
 	}
 }
 
-func (pom *partitionOffsetManager) updateCommitted(offset int64, metadata string) {
+// updateCommitted clears dirty when the POM is unchanged since the commit of version was built
+func (pom *partitionOffsetManager) updateCommitted(version uint64) {
 	pom.lock.Lock()
 	defer pom.lock.Unlock()
 
-	if pom.offset == offset && pom.metadata == metadata {
+	if pom.version == version {
 		pom.dirty = false
 	}
 }
