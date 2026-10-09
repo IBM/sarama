@@ -528,6 +528,118 @@ func TestAsyncProducerEncoderFailures(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestAsyncProducerTopicMaxMessageBytes(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("small_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("large_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	metadataResponse.AddTopicPartition("default_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("small_topic", 0, ErrNoError)
+	prodSuccess.AddTopicPartition("large_topic", 0, ErrNoError)
+	prodSuccess.AddTopicPartition("default_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+	leader.Returns(prodSuccess)
+	leader.Returns(prodSuccess)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 1
+	config.Producer.Return.Successes = true
+	config.Producer.Return.Errors = true
+	config.Producer.Partitioner = NewManualPartitioner
+	config.Producer.MaxMessageBytes = 500
+	config.Producer.TopicMaxMessageBytes = map[string]int{
+		"small_topic": 100,
+		"large_topic": 1000,
+	}
+
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 1. Message to small_topic that exceeds topic limit (100) even though it is < global limit (500)
+	oversizedSmall := &ProducerMessage{Topic: "small_topic", Value: ByteEncoder(make([]byte, 150))}
+	producer.Input() <- oversizedSmall
+	select {
+	case err := <-producer.Errors():
+		var cfgErr ConfigurationError
+		if !errors.As(err.Err, &cfgErr) {
+			t.Fatalf("expected ConfigurationError for oversized small_topic message, got: %v", err.Err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for error on oversized small_topic message")
+	}
+
+	// 2. Valid message to small_topic (<= 100 bytes)
+	validSmall := &ProducerMessage{Topic: "small_topic", Value: ByteEncoder(make([]byte, 10))}
+	producer.Input() <- validSmall
+	select {
+	case <-producer.Successes():
+	case err := <-producer.Errors():
+		t.Fatalf("unexpected error for valid small_topic message: %v", err.Err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for success on valid small_topic message")
+	}
+
+	// 3. Message to large_topic that exceeds global limit (500) but is within topic limit (1000)
+	largeMsg := &ProducerMessage{Topic: "large_topic", Value: ByteEncoder(make([]byte, 700))}
+	producer.Input() <- largeMsg
+	select {
+	case <-producer.Successes():
+	case err := <-producer.Errors():
+		t.Fatalf("unexpected error for largeMsg within topic limit: %v", err.Err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for success on largeMsg")
+	}
+
+	// 4. Message to large_topic that exceeds topic limit (1000)
+	oversizedLarge := &ProducerMessage{Topic: "large_topic", Value: ByteEncoder(make([]byte, 1100))}
+	producer.Input() <- oversizedLarge
+	select {
+	case err := <-producer.Errors():
+		var cfgErr ConfigurationError
+		if !errors.As(err.Err, &cfgErr) {
+			t.Fatalf("expected ConfigurationError for oversized large_topic message, got: %v", err.Err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for error on oversized large_topic message")
+	}
+
+	// 5. Message to default_topic exceeding global limit (500)
+	oversizedDefault := &ProducerMessage{Topic: "default_topic", Value: ByteEncoder(make([]byte, 600))}
+	producer.Input() <- oversizedDefault
+	select {
+	case err := <-producer.Errors():
+		var cfgErr ConfigurationError
+		if !errors.As(err.Err, &cfgErr) {
+			t.Fatalf("expected ConfigurationError for oversized default_topic message, got: %v", err.Err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for error on oversized default_topic message")
+	}
+
+	// 6. Valid message to default_topic (<= 500)
+	validDefault := &ProducerMessage{Topic: "default_topic", Value: ByteEncoder(make([]byte, 10))}
+	producer.Input() <- validDefault
+	select {
+	case <-producer.Successes():
+	case err := <-producer.Errors():
+		t.Fatalf("unexpected error for valid default_topic message: %v", err.Err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for success on valid default_topic message")
+	}
+
+	closeProducer(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
 // If a Kafka broker becomes unavailable and then returns back in service, then
 // producer reconnects to it and continues sending messages.
 func TestAsyncProducerBrokerBounce(t *testing.T) {
