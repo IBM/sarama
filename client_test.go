@@ -1802,3 +1802,250 @@ func TestClientCoordinatorMoves(t *testing.T) {
 		}, 5*time.Second, 10*time.Millisecond)
 	})
 }
+
+func TestClientMetadataSnapshot(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddBroker("127.0.0.1:12345", 2)
+	metadataResponse.ControllerID = 1
+	metadataResponse.AddTopicPartition("topic1", 0, 1, []int32{1, 2}, []int32{1}, []int32{2}, ErrNoError)
+	metadataResponse.AddTopicPartition("topic1", 1, -1, []int32{1, 2}, []int32{2}, []int32{}, ErrLeaderNotAvailable)
+	metadataResponse.AddTopicPartition("topic2", 0, 2, []int32{2}, []int32{2}, []int32{}, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	config.Metadata.Retry.Max = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	snapshotter, ok := client.(MetadataSnapshotterClient)
+	require.True(t, ok)
+
+	snapshot := snapshotter.MetadataSnapshot()
+	require.NotNil(t, snapshot)
+
+	assert.Equal(t, int32(1), snapshot.ControllerID)
+	assert.Equal(t, seedBroker.Addr(), snapshot.Brokers[1])
+	assert.Equal(t, "127.0.0.1:12345", snapshot.Brokers[2])
+
+	require.Contains(t, snapshot.Topics, "topic1")
+	require.Contains(t, snapshot.Topics, "topic2")
+
+	// Verify topic1 partition 0
+	p0 := snapshot.Topics["topic1"][0]
+	require.NotNil(t, p0)
+	assert.Equal(t, int32(0), p0.ID)
+	assert.Equal(t, int32(1), p0.Leader)
+	assert.Equal(t, []int32{1, 2}, p0.Replicas)
+	assert.Equal(t, []int32{1}, p0.Isr)
+	assert.Equal(t, []int32{2}, p0.OfflineReplicas)
+	assert.Equal(t, ErrNoError, p0.Err)
+
+	// Verify topic1 partition 1
+	p1 := snapshot.Topics["topic1"][1]
+	require.NotNil(t, p1)
+	assert.Equal(t, int32(1), p1.ID)
+	assert.Equal(t, int32(-1), p1.Leader)
+	assert.Equal(t, ErrLeaderNotAvailable, p1.Err)
+
+	// Verify helper methods on snapshot
+	assert.Equal(t, []int32{0, 1}, snapshot.Partitions("topic1"))
+	assert.Equal(t, []int32{0}, snapshot.WritablePartitions("topic1"))
+	assert.Equal(t, []int32{0}, snapshot.Partitions("topic2"))
+	assert.Nil(t, snapshot.Partitions("nonexistent"))
+	assert.Nil(t, snapshot.WritablePartitions("nonexistent"))
+
+	leaderID, leaderAddr, err := snapshot.Leader("topic1", 0)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), leaderID)
+	assert.Equal(t, seedBroker.Addr(), leaderAddr)
+
+	_, _, err = snapshot.Leader("topic1", 1)
+	require.ErrorIs(t, err, ErrLeaderNotAvailable)
+
+	_, _, err = snapshot.Leader("nonexistent", 0)
+	require.ErrorIs(t, err, ErrUnknownTopicOrPartition)
+
+	replicas, err := snapshot.Replicas("topic1", 0)
+	require.NoError(t, err)
+	assert.Equal(t, []int32{1, 2}, replicas)
+
+	isr, err := snapshot.InSyncReplicas("topic1", 0)
+	require.NoError(t, err)
+	assert.Equal(t, []int32{1}, isr)
+
+	offline, err := snapshot.OfflineReplicas("topic1", 0)
+	require.NoError(t, err)
+	assert.Equal(t, []int32{2}, offline)
+
+	_, err = snapshot.Replicas("nonexistent", 0)
+	require.ErrorIs(t, err, ErrUnknownTopicOrPartition)
+
+	// Verify nopCloserClient also forwards MetadataSnapshot
+	ncc := &nopCloserClient{Client: client}
+	nccSnapshot := ncc.MetadataSnapshot()
+	require.NotNil(t, nccSnapshot)
+	assert.Equal(t, snapshot.ControllerID, nccSnapshot.ControllerID)
+
+	seedBroker.Close()
+}
+
+func TestClientMetadataSnapshotCacheIndependence(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddBroker("127.0.0.1:12345", 2)
+	metadataResponse.ControllerID = 1
+	metadataResponse.AddTopicPartition("topic1", 0, 1, []int32{1, 2}, []int32{1}, []int32{2}, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+	config.Metadata.Retry.Max = 0
+	client, err := NewClient([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	snapshotter := client.(MetadataSnapshotterClient)
+	s1 := snapshotter.MetadataSnapshot()
+	require.NotNil(t, s1)
+
+	// Mutate snapshot s1 fields, maps, and inner slices
+	s1.Brokers[1] = "mutated:9999"
+	s1.Brokers[99] = "newbroker:9999"
+	s1.Topics["topic1"][0].Leader = 99
+	s1.Topics["topic1"][0].Replicas[0] = 999
+	s1.Topics["topic1"][0].Isr[0] = 888
+	s1.Topics["topic1"][0].OfflineReplicas[0] = 777
+	s1.Topics["mutated_topic"] = map[int32]*PartitionMetadata{}
+
+	// Take second snapshot and verify it was unaffected by mutations to s1
+	s2 := snapshotter.MetadataSnapshot()
+	require.NotNil(t, s2)
+
+	assert.Equal(t, seedBroker.Addr(), s2.Brokers[1])
+	_, exists := s2.Brokers[99]
+	assert.False(t, exists)
+
+	p0 := s2.Topics["topic1"][0]
+	assert.Equal(t, int32(1), p0.Leader)
+	assert.Equal(t, []int32{1, 2}, p0.Replicas)
+	assert.Equal(t, []int32{1}, p0.Isr)
+	assert.Equal(t, []int32{2}, p0.OfflineReplicas)
+
+	_, exists = s2.Topics["mutated_topic"]
+	assert.False(t, exists)
+
+	// Verify client direct accessors are unaffected
+	broker, err := client.Leader("topic1", 0)
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), broker.ID())
+
+	seedBroker.Close()
+}
+
+func TestClientMetadataSnapshotNoNetworkCalls(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddTopicPartition("topic1", 0, 1, []int32{1}, []int32{1}, []int32{}, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	// Close seed broker so any attempted network call would fail
+	seedBroker.Close()
+
+	snapshotter := client.(MetadataSnapshotterClient)
+	snapshot := snapshotter.MetadataSnapshot()
+	require.NotNil(t, snapshot)
+	assert.Equal(t, seedBroker.Addr(), snapshot.Brokers[1])
+	assert.Contains(t, snapshot.Topics, "topic1")
+}
+
+func TestClientMetadataSnapshotClosedClient(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	require.NoError(t, err)
+
+	snapshotter := client.(MetadataSnapshotterClient)
+	require.NoError(t, client.Close())
+	seedBroker.Close()
+
+	snapshot := snapshotter.MetadataSnapshot()
+	assert.Nil(t, snapshot)
+}
+
+func TestClientMetadataSnapshotConcurrentSafety(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	metadataResponse.AddTopicPartition("topic1", 0, 1, []int32{1}, []int32{1}, []int32{}, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+	require.NoError(t, err)
+	defer safeClose(t, client)
+
+	snapshotter := client.(MetadataSnapshotterClient)
+
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					snap := snapshotter.MetadataSnapshot()
+					if snap != nil {
+						_ = snap.Partitions("topic1")
+						_ = snap.WritablePartitions("topic1")
+						_, _, _ = snap.Leader("topic1", 0)
+					}
+				}
+			}
+		}()
+	}
+
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					_, _ = client.Topics()
+					_, _ = client.Partitions("topic1")
+					_, _ = client.Leader("topic1", 0)
+				}
+			}
+		}()
+	}
+
+	time.Sleep(100 * time.Millisecond)
+	close(stop)
+	wg.Wait()
+
+	seedBroker.Close()
+}
