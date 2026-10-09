@@ -127,6 +127,138 @@ type Client interface {
 	Closed() bool
 }
 
+// MetadataSnapshotterClient extends Client with the ability to retrieve
+// a detached snapshot of currently cached metadata.
+type MetadataSnapshotterClient interface {
+	Client
+
+	// MetadataSnapshot returns a detached copy of currently cached cluster
+	// and topic metadata without network calls or metadata refresh.
+	// Returns nil if the client is closed.
+	MetadataSnapshot() *MetadataSnapshot
+}
+
+// MetadataSnapshot represents a detached, point-in-time snapshot of the
+// client's cached cluster metadata.
+type MetadataSnapshot struct {
+	// ControllerID is the broker ID of the controller, or -1 if unknown.
+	ControllerID int32
+
+	// Brokers maps broker IDs to their addresses.
+	Brokers map[int32]string
+
+	// BrokerRacks maps broker IDs to their rack configuration, if known.
+	BrokerRacks map[int32]string
+
+	// Topics maps topic names to partition metadata maps keyed by partition ID.
+	Topics map[string]map[int32]*PartitionMetadata
+
+	// TopicIDs maps topic names to their UUIDs, if known.
+	TopicIDs map[string]Uuid
+}
+
+// Partitions returns the sorted partition IDs for the given topic,
+// or nil if the topic is not present in the snapshot.
+func (s *MetadataSnapshot) Partitions(topic string) []int32 {
+	if s == nil || s.Topics == nil {
+		return nil
+	}
+	partitions, ok := s.Topics[topic]
+	if !ok {
+		return nil
+	}
+	res := make([]int32, 0, len(partitions))
+	for id := range partitions {
+		res = append(res, id)
+	}
+	slices.Sort(res)
+	return res
+}
+
+// WritablePartitions returns the sorted partition IDs that have an available
+// leader for the given topic, or nil if the topic is not present in the snapshot.
+func (s *MetadataSnapshot) WritablePartitions(topic string) []int32 {
+	if s == nil || s.Topics == nil {
+		return nil
+	}
+	partitions, ok := s.Topics[topic]
+	if !ok {
+		return nil
+	}
+	res := make([]int32, 0, len(partitions))
+	for _, p := range partitions {
+		if p != nil && !errors.Is(p.Err, ErrLeaderNotAvailable) {
+			res = append(res, p.ID)
+		}
+	}
+	slices.Sort(res)
+	return res
+}
+
+// Leader returns the leader broker ID and address for the given topic and partition,
+// or an error if the topic or partition is unknown, or the leader is unavailable.
+func (s *MetadataSnapshot) Leader(topic string, partitionID int32) (int32, string, error) {
+	if s == nil || s.Topics == nil {
+		return -1, "", ErrUnknownTopicOrPartition
+	}
+	partitions, ok := s.Topics[topic]
+	if !ok {
+		return -1, "", ErrUnknownTopicOrPartition
+	}
+	pm, ok := partitions[partitionID]
+	if !ok || pm == nil {
+		return -1, "", ErrUnknownTopicOrPartition
+	}
+	if errors.Is(pm.Err, ErrLeaderNotAvailable) {
+		return -1, "", ErrLeaderNotAvailable
+	}
+	addr, ok := s.Brokers[pm.Leader]
+	if !ok {
+		return pm.Leader, "", ErrLeaderNotAvailable
+	}
+	return pm.Leader, addr, nil
+}
+
+// Replicas returns replica IDs for the given topic and partition in the snapshot.
+func (s *MetadataSnapshot) Replicas(topic string, partitionID int32) ([]int32, error) {
+	return s.getReplicas(topic, partitionID, func(pm *PartitionMetadata) []int32 {
+		return pm.Replicas
+	})
+}
+
+// InSyncReplicas returns in-sync replica IDs for the given topic and partition in the snapshot.
+func (s *MetadataSnapshot) InSyncReplicas(topic string, partitionID int32) ([]int32, error) {
+	return s.getReplicas(topic, partitionID, func(pm *PartitionMetadata) []int32 {
+		return pm.Isr
+	})
+}
+
+// OfflineReplicas returns offline replica IDs for the given topic and partition in the snapshot.
+func (s *MetadataSnapshot) OfflineReplicas(topic string, partitionID int32) ([]int32, error) {
+	return s.getReplicas(topic, partitionID, func(pm *PartitionMetadata) []int32 {
+		return pm.OfflineReplicas
+	})
+}
+
+func (s *MetadataSnapshot) getReplicas(topic string, partitionID int32, extractor func(*PartitionMetadata) []int32) ([]int32, error) {
+	if s == nil || s.Topics == nil {
+		return nil, ErrUnknownTopicOrPartition
+	}
+	partitions, ok := s.Topics[topic]
+	if !ok {
+		return nil, ErrUnknownTopicOrPartition
+	}
+	pm, ok := partitions[partitionID]
+	if !ok || pm == nil {
+		return nil, ErrUnknownTopicOrPartition
+	}
+	replicas := extractor(pm)
+	if errors.Is(pm.Err, ErrReplicaNotAvailable) {
+		return slices.Clone(replicas), pm.Err
+	}
+	return slices.Clone(replicas), nil
+}
+
 const (
 	// OffsetNewest stands for the log head offset, i.e. the offset that will be
 	// assigned to the next message that will be produced to the partition. You
@@ -378,6 +510,55 @@ func (client *client) MetadataTopics() ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+func (client *client) MetadataSnapshot() *MetadataSnapshot {
+	client.lock.RLock()
+	defer client.lock.RUnlock()
+
+	if client.brokers == nil {
+		return nil
+	}
+
+	snapshot := &MetadataSnapshot{
+		ControllerID: client.controllerID,
+		Brokers:      make(map[int32]string, len(client.brokers)),
+		BrokerRacks:  make(map[int32]string),
+		Topics:       make(map[string]map[int32]*PartitionMetadata, len(client.metadata)),
+		TopicIDs:     make(map[string]Uuid, len(client.topicIDs)),
+	}
+
+	for id, b := range client.brokers {
+		if b == nil {
+			continue
+		}
+		snapshot.Brokers[id] = b.Addr()
+		if rack := b.Rack(); rack != "" {
+			snapshot.BrokerRacks[id] = rack
+		}
+	}
+
+	for topic, u := range client.topicIDs {
+		snapshot.TopicIDs[topic] = u
+	}
+
+	for topic, partitions := range client.metadata {
+		partMap := make(map[int32]*PartitionMetadata, len(partitions))
+		for pID, pm := range partitions {
+			if pm == nil {
+				partMap[pID] = nil
+				continue
+			}
+			pmCopy := *pm
+			pmCopy.Replicas = slices.Clone(pm.Replicas)
+			pmCopy.Isr = slices.Clone(pm.Isr)
+			pmCopy.OfflineReplicas = slices.Clone(pm.OfflineReplicas)
+			partMap[pID] = &pmCopy
+		}
+		snapshot.Topics[topic] = partMap
+	}
+
+	return snapshot
 }
 
 func (client *client) Partitions(topic string) ([]int32, error) {
@@ -1359,6 +1540,18 @@ type nopCloserClient struct {
 func (ncc *nopCloserClient) Close() error {
 	return nil
 }
+
+func (ncc *nopCloserClient) MetadataSnapshot() *MetadataSnapshot {
+	if snapshotter, ok := ncc.Client.(MetadataSnapshotterClient); ok {
+		return snapshotter.MetadataSnapshot()
+	}
+	return nil
+}
+
+var (
+	_ MetadataSnapshotterClient = (*client)(nil)
+	_ MetadataSnapshotterClient = (*nopCloserClient)(nil)
+)
 
 func (client *client) PartitionNotReadable(topic string, partition int32) bool {
 	client.lock.RLock()
