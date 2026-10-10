@@ -13,6 +13,7 @@ _test
 *.[568vq]
 [568vq].out
 
+temp_auto_push.bat
 *.cgo1.go
 *.cgo2.c
 _cgo_defun.c
@@ -29,3 +30,5 @@ _testmain.go
 /output.json
 
 .idea
+.gitignore
+branch_structure.json
