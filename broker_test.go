@@ -1783,13 +1783,13 @@ func Test_handleThrottledResponse(t *testing.T) {
 	})
 	t.Run("records throttle while connection is closing", func(t *testing.T) {
 		broker := NewBroker("unused")
-		broker.cancelThrottle()
+		broker.interruptThrottleWaits()
 
 		before := time.Now().Add(time.Hour)
 		broker.setThrottle(time.Hour)
 		after := time.Now().Add(time.Hour)
 
-		require.True(t, broker.throttleCanceled)
+		require.True(t, broker.throttleWaitInterrupted)
 		require.False(t, broker.throttleDeadline.Before(before))
 		require.False(t, broker.throttleDeadline.After(after))
 	})
