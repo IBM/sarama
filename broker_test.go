@@ -257,39 +257,57 @@ func TestBrokerClose(t *testing.T) {
 		require.True(t, connected)
 
 		broker.setThrottle(time.Hour)
+		throttleDeadline := broker.throttleDeadline
 
 		request := ProduceRequest{RequiredAcks: NoResponse}
-		sendErrs := make(chan error, 1)
-		go func() {
-			sendErrs <- broker.AsyncProduce(&request, nil)
-		}()
+		assertCloseInterruptsThrottle := func() {
+			t.Helper()
 
-		require.Eventually(t, func() bool {
-			if broker.lock.TryLock() {
-				broker.lock.Unlock()
-				return false
+			sendErrs := make(chan error, 1)
+			go func() {
+				sendErrs <- broker.AsyncProduce(&request, nil)
+			}()
+
+			require.Eventually(t, func() bool {
+				if broker.lock.TryLock() {
+					broker.lock.Unlock()
+					return false
+				}
+				return true
+			}, time.Second, time.Millisecond, "send did not enter the throttle wait")
+
+			closeErrs := make(chan error, 1)
+			go func() {
+				closeErrs <- broker.Close()
+			}()
+
+			select {
+			case err := <-sendErrs:
+				require.ErrorIs(t, err, ErrNotConnected)
+			case <-time.After(time.Second):
+				require.FailNow(t, "throttled send was not interrupted by Close")
 			}
-			return true
-		}, time.Second, time.Millisecond, "send did not enter the throttle wait")
 
-		closeErrs := make(chan error, 1)
-		go func() {
-			closeErrs <- broker.Close()
-		}()
-
-		select {
-		case err := <-sendErrs:
-			require.ErrorIs(t, err, ErrNotConnected)
-		case <-time.After(time.Second):
-			require.FailNow(t, "throttled send was not interrupted by Close")
+			select {
+			case err := <-closeErrs:
+				require.NoError(t, err)
+			case <-time.After(time.Second):
+				require.FailNow(t, "Close blocked on the broker throttle wait")
+			}
 		}
 
-		select {
-		case err := <-closeErrs:
-			require.NoError(t, err)
-		case <-time.After(time.Second):
-			require.FailNow(t, "Close blocked on the broker throttle wait")
-		}
+		assertCloseInterruptsThrottle()
+		require.Equal(t, throttleDeadline, broker.throttleDeadline)
+
+		require.NoError(t, broker.Open(conf))
+		connected, err = broker.Connected()
+		require.NoError(t, err)
+		require.True(t, connected)
+		require.Equal(t, throttleDeadline, broker.throttleDeadline)
+
+		// The reopened connection must honor the remaining throttle duration,
+		// while Close must still be able to interrupt that new wait.
+		assertCloseInterruptsThrottle()
 	})
 }
 
@@ -1762,5 +1780,17 @@ func Test_handleThrottledResponse(t *testing.T) {
 		if broker.brokerThrottleTime.Max() != int64(throttleTimeMs*2) {
 			t.Fatal("expected throttling to update metrics")
 		}
+	})
+	t.Run("records throttle while connection is closing", func(t *testing.T) {
+		broker := NewBroker("unused")
+		broker.cancelThrottle()
+
+		before := time.Now().Add(time.Hour)
+		broker.setThrottle(time.Hour)
+		after := time.Now().Add(time.Hour)
+
+		require.True(t, broker.throttleCanceled)
+		require.False(t, broker.throttleDeadline.Before(before))
+		require.False(t, broker.throttleDeadline.After(after))
 	})
 }

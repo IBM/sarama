@@ -1989,12 +1989,6 @@ func (b *Broker) setThrottle(throttleTime time.Duration) {
 	b.throttleLock.Lock()
 	defer b.throttleLock.Unlock()
 
-	// Ignore responses racing with connection shutdown. A subsequent Open
-	// resets the throttle state for the new connection.
-	if b.throttleCanceled {
-		return
-	}
-
 	b.throttleDeadline = time.Now().Add(throttleTime)
 	b.notifyThrottleWaitersLocked()
 }
@@ -2025,24 +2019,24 @@ func (b *Broker) waitIfThrottled() error {
 	}
 }
 
-// cancelThrottle interrupts active throttle waits for the current connection.
-// It must be called before Close attempts to acquire b.lock.
+// cancelThrottle interrupts active throttle waits for the current connection
+// while preserving the deadline for a subsequent connection. It must be called
+// before Close attempts to acquire b.lock.
 func (b *Broker) cancelThrottle() {
 	b.throttleLock.Lock()
 	defer b.throttleLock.Unlock()
 
 	b.throttleCanceled = true
-	b.throttleDeadline = time.Time{}
 	b.notifyThrottleWaitersLocked()
 }
 
-// resetThrottle initializes the throttle state for a newly opened connection.
+// resetThrottle enables throttle waits for a newly opened connection without
+// discarding the remaining broker-provided throttle duration.
 func (b *Broker) resetThrottle() {
 	b.throttleLock.Lock()
 	defer b.throttleLock.Unlock()
 
 	b.throttleCanceled = false
-	b.throttleDeadline = time.Time{}
 	b.notifyThrottleWaitersLocked()
 }
 
