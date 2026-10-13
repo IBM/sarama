@@ -474,21 +474,24 @@ func convertDescribeClusterBrokers(entries []*DescribeClusterBroker) []*Broker {
 	return result
 }
 
+// findBroker returns the registered broker with the given id, opened by the
+// client under its lock. Opening a *Broker after the client has dropped it
+// (a metadata refresh or Close) leaves a connection that nothing closes.
 func (ca *clusterAdmin) findBroker(id int32) (*Broker, error) {
-	brokers := ca.client.Brokers()
-	for _, b := range brokers {
-		if b.ID() == id {
-			return b, nil
-		}
+	b, err := ca.client.Broker(id)
+	if err != nil {
+		return nil, fmt.Errorf("could not find broker id %d", id)
 	}
-	return nil, fmt.Errorf("could not find broker id %d", id)
+	return b, nil
 }
 
 func (ca *clusterAdmin) findAnyBroker() (*Broker, error) {
 	brokers := ca.client.Brokers()
 	if len(brokers) > 0 {
 		index := rand.Intn(len(brokers))
-		return brokers[index], nil
+		if b, err := ca.client.Broker(brokers[index].ID()); err == nil {
+			return b, nil
+		}
 	}
 	return nil, errors.New("no available broker")
 }
@@ -507,7 +510,6 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 		if err != nil {
 			return err
 		}
-		_ = b.Open(ca.client.Config())
 
 		metadataReq := NewMetadataRequest(ca.conf.Version, nil)
 		metadataResp, err := b.GetMetadata(metadataReq)
@@ -739,7 +741,6 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 		if err != nil {
 			return err
 		}
-		_ = b.Open(ca.client.Config())
 
 		rsp, err = b.ListPartitionReassignments(request)
 		return err
@@ -914,7 +915,6 @@ func (ca *clusterAdmin) DescribeConfigs(resources []*ConfigResource, options Des
 			request.Version = 1
 		}
 
-		_ = b.Open(ca.client.Config())
 		rsp, err := b.DescribeConfigs(request)
 		if err != nil {
 			return nil, err
@@ -984,7 +984,6 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		return err
 	}
 
-	_ = b.Open(ca.client.Config())
 	rsp, err := b.AlterConfigs(request)
 	if err != nil {
 		return err
@@ -1037,7 +1036,6 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 		return err
 	}
 
-	_ = b.Open(ca.client.Config())
 	rsp, err := b.IncrementalAlterConfigs(request)
 	if err != nil {
 		return err
@@ -1198,7 +1196,6 @@ func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[s
 		if err != nil {
 			return err
 		}
-		_ = b.Open(ca.client.Config())
 
 		res, err = b.ElectLeaders(request)
 		if err != nil {
@@ -1267,7 +1264,11 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 		wg.Add(1)
 		go func(b *Broker, conf *Config) {
 			defer wg.Done()
-			_ = b.Open(conf) // Ensure that broker is opened
+			b, err := ca.findBroker(b.ID())
+			if err != nil {
+				errChan <- err
+				return
+			}
 
 			request := &ListGroupsRequest{}
 			if ca.conf.Version.IsAtLeast(V3_8_0_0) {
@@ -1498,7 +1499,6 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 		wg.Add(1)
 		go func(b *Broker, conf *Config) {
 			defer wg.Done()
-			_ = b.Open(conf) // Ensure that broker is opened
 
 			request := &DescribeLogDirsRequest{}
 			if ca.conf.Version.IsAtLeast(V3_3_0_0) {
