@@ -481,26 +481,16 @@ func TestProducerMaxMessageBytesForTopic(t *testing.T) {
 	config := NewTestConfig()
 	config.Producer.MaxMessageBytes = 1000
 
-	maxMessageBytes, overridden := config.producerMaxMessageBytes("default-topic")
-	assert.Equal(t, 1000, maxMessageBytes)
-	assert.False(t, overridden)
+	assert.Equal(t, 1000, config.producerMaxMessageBytes("default-topic"))
 
 	config.Producer.TopicMaxMessageBytes = map[string]int{
 		"small-topic": 100,
 		"large-topic": 2000,
 	}
 
-	maxMessageBytes, overridden = config.producerMaxMessageBytes("small-topic")
-	assert.Equal(t, 100, maxMessageBytes)
-	assert.True(t, overridden)
-
-	maxMessageBytes, overridden = config.producerMaxMessageBytes("large-topic")
-	assert.Equal(t, 2000, maxMessageBytes)
-	assert.True(t, overridden)
-
-	maxMessageBytes, overridden = config.producerMaxMessageBytes("default-topic")
-	assert.Equal(t, 1000, maxMessageBytes)
-	assert.False(t, overridden)
+	assert.Equal(t, 100, config.producerMaxMessageBytes("small-topic"))
+	assert.Equal(t, 2000, config.producerMaxMessageBytes("large-topic"))
+	assert.Equal(t, 1000, config.producerMaxMessageBytes("default-topic"))
 
 	assert.NoError(t, config.Validate())
 }

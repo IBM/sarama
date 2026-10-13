@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"regexp"
 	"slices"
@@ -659,14 +660,10 @@ func (c *Config) Validate() error {
 		Logger.Println("Producer.MaxMessageBytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
 
-	topicMaxMessageBytesTopics := make([]string, 0, len(c.Producer.TopicMaxMessageBytes))
-	for topic := range c.Producer.TopicMaxMessageBytes {
-		topicMaxMessageBytesTopics = append(topicMaxMessageBytesTopics, topic)
-	}
-	slices.Sort(topicMaxMessageBytesTopics)
-	for _, topic := range topicMaxMessageBytesTopics {
-		maxMessageBytes := c.Producer.TopicMaxMessageBytes[topic]
-		if maxMessageBytes >= int(MaxRequestSize) {
+	topics := slices.Sorted(maps.Keys(c.Producer.TopicMaxMessageBytes))
+	for _, topic := range topics {
+		maxMsgBytes := c.Producer.TopicMaxMessageBytes[topic]
+		if maxMsgBytes >= int(MaxRequestSize) {
 			Logger.Printf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize; it will be ignored.\n", topic)
 		}
 	}
@@ -824,7 +821,7 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
 	}
 
-	for _, topic := range topicMaxMessageBytesTopics {
+	for _, topic := range topics {
 		if c.Producer.TopicMaxMessageBytes[topic] <= 0 {
 			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be > 0", topic))
 		}
@@ -964,12 +961,11 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func (c *Config) producerMaxMessageBytes(topic string) (int, bool) {
-	maxMessageBytes, ok := c.Producer.TopicMaxMessageBytes[topic]
-	if ok {
-		return maxMessageBytes, true
+func (c *Config) producerMaxMessageBytes(topic string) int {
+	if maxMsgBytes, ok := c.Producer.TopicMaxMessageBytes[topic]; ok {
+		return maxMsgBytes
 	}
-	return c.Producer.MaxMessageBytes, false
+	return c.Producer.MaxMessageBytes
 }
 
 func (c *Config) getDialer() proxy.Dialer {

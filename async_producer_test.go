@@ -87,6 +87,17 @@ func TestAsyncProducerMessageSizeLimitForTopic(t *testing.T) {
 			},
 			expectedError: `Attempt to produce message larger than configured Producer.TopicMaxMessageBytes for topic "small-topic":`,
 		},
+		{
+			name:  "topic limit override equal to global limit",
+			topic: "equal-topic",
+			configure: func(config *Config) {
+				config.Producer.MaxMessageBytes = 1
+				config.Producer.TopicMaxMessageBytes = map[string]int{
+					"equal-topic": 1,
+				}
+			},
+			expectedError: `Attempt to produce message larger than configured Producer.TopicMaxMessageBytes for topic "equal-topic":`,
+		},
 	}
 
 	for _, test := range tests {
