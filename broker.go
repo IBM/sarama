@@ -1037,6 +1037,19 @@ func (b *Broker) ConsumerGroupDescribe(req *ConsumerGroupDescribeRequest) (*Cons
 	return res, nil
 }
 
+// DescribeQuorum sends a request to describe the state of a KRaft quorum. A
+// broker forwards it to the active controller.
+func (b *Broker) DescribeQuorum(req *DescribeQuorumRequest) (*DescribeQuorumResponse, error) {
+	res := new(DescribeQuorumResponse)
+
+	err := b.sendAndReceive(req, res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // DescribeProducers sends a request to list the active producer state for
 // topic partitions led by this broker
 func (b *Broker) DescribeProducers(req *DescribeProducersRequest) (*DescribeProducersResponse, error) {

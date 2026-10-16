@@ -69,7 +69,7 @@ var names = map[int16]string{
 	52:                                 "VoteRequest",
 	53:                                 "BeginQuorumEpochRequest",
 	54:                                 "EndQuorumEpochRequest",
-	55:                                 "DescribeQuorumRequest",
+	apiKeyDescribeQuorum:               "DescribeQuorumRequest",
 	56:                                 "AlterPartitionRequest",
 	apiKeyUpdateFeatures:               "UpdateFeaturesRequest",
 	58:                                 "EnvelopeRequest",
@@ -313,6 +313,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDeleteTopics:                 5,  // up from 4
 				apiKeyCreatePartitions:             3,  // up from 2
 				apiKeyUpdateFeatures:               0,  // new in 2.7
+				apiKeyDescribeQuorum:               0,  // new in 2.7
 			},
 		},
 		{
@@ -369,6 +370,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 			V3_3_0_0,
 			map[int16]int16{
 				apiKeyDescribeLogDirs: 4, // up from 3
+				apiKeyDescribeQuorum:  1, // up from 0
 				// TODO: DescribeAclsRequest v3 is not supported, but expected for KafkaVersion 3.3.0
 				// apiKeyDescribeAcls: 3, // up from 2
 				// TODO: CreateAclsRequest v3 is not supported, but expected for KafkaVersion 3.3.0
@@ -441,7 +443,8 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyListOffsets:         9, // up from 8
 				// TODO: FindCoordinatorRequest v6 is not supported, but expected for KafkaVersion 3.9.0
 				// apiKeyFindCoordinator:     6,  // up from 5
-				apiKeyApiVersions: 4, // up from 3
+				apiKeyApiVersions:    4, // up from 3
+				apiKeyDescribeQuorum: 2, // up from 1
 			},
 		},
 		{
@@ -535,6 +538,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyAlterClientQuotas:            maxVersion(&AlterClientQuotasRequest{}),
 				apiKeyDescribeUserScramCredentials: maxVersion(&DescribeUserScramCredentialsRequest{}),
 				apiKeyAlterUserScramCredentials:    maxVersion(&AlterUserScramCredentialsRequest{}),
+				apiKeyDescribeQuorum:               maxVersion(&DescribeQuorumRequest{}),
 				apiKeyUpdateFeatures:               maxVersion(&UpdateFeaturesRequest{}),
 				apiKeyDescribeCluster:              maxVersion(&DescribeClusterRequest{}),
 				apiKeyDescribeProducers:            maxVersion(&DescribeProducersRequest{}),
