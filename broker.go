@@ -62,8 +62,10 @@ type Broker struct {
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
 
-	throttleTimer     *time.Timer
-	throttleTimerLock sync.Mutex
+	throttleLock            sync.Mutex
+	throttleDeadline        time.Time
+	throttleNotify          chan struct{}
+	throttleWaitInterrupted bool
 }
 
 // SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
@@ -202,6 +204,7 @@ func (b *Broker) Open(conf *Config) error {
 	}
 
 	b.lock.Lock()
+	b.enableThrottleWaits()
 
 	if b.metricRegistry == nil {
 		b.metricRegistry = newCleanupRegistry(conf.MetricRegistry)
@@ -374,6 +377,11 @@ func (b *Broker) TLSConnectionState() (state tls.ConnectionState, ok bool) {
 
 // Close closes the broker resources
 func (b *Broker) Close() error {
+	// Wake a send waiting on a broker-provided throttle before acquiring
+	// b.lock. The send owns b.lock while waiting, so acquiring it first would
+	// make Close wait for the complete throttle duration.
+	b.interruptThrottleWaits()
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -396,6 +404,8 @@ func (b *Broker) maybeCloseLocked(err error) bool {
 // closeLocked closes the broker connection and resets state.
 // NOTE: caller must hold b.lock.
 func (b *Broker) closeLocked() error {
+	b.interruptThrottleWaits()
+
 	if b.conn == nil {
 		return ErrNotConnected
 	}
@@ -1198,7 +1208,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	}
 
 	// check and wait if throttled
-	b.waitIfThrottled()
+	if err := b.waitIfThrottled(); err != nil {
+		return err
+	}
 
 	// take a slot before writing, otherwise a request is written while its
 	// promise waits for room in b.responses and MaxOpenRequests+1 are in
@@ -2053,25 +2065,65 @@ func (b *Broker) handleThrottledResponse(resp protocolBody) {
 }
 
 func (b *Broker) setThrottle(throttleTime time.Duration) {
-	b.throttleTimerLock.Lock()
-	defer b.throttleTimerLock.Unlock()
-	if b.throttleTimer != nil {
-		// if there is an existing timer stop/clear it
-		if !b.throttleTimer.Stop() {
-			<-b.throttleTimer.C
-		}
-	}
-	b.throttleTimer = time.NewTimer(throttleTime)
+	b.throttleLock.Lock()
+	defer b.throttleLock.Unlock()
+
+	b.throttleDeadline = time.Now().Add(throttleTime)
+	b.notifyThrottleWaitersLocked()
 }
 
-func (b *Broker) waitIfThrottled() {
-	b.throttleTimerLock.Lock()
-	defer b.throttleTimerLock.Unlock()
-	if b.throttleTimer != nil {
+func (b *Broker) waitIfThrottled() error {
+	for {
+		b.throttleLock.Lock()
+		if b.throttleWaitInterrupted {
+			b.throttleLock.Unlock()
+			return ErrNotConnected
+		}
+		remaining := time.Until(b.throttleDeadline)
+		if remaining <= 0 {
+			b.throttleLock.Unlock()
+			return nil
+		}
+		if b.throttleNotify == nil {
+			b.throttleNotify = make(chan struct{})
+		}
+		notify := b.throttleNotify
+		b.throttleLock.Unlock()
+
 		DebugLogger.Printf("broker/%d waiting for throttle timer\n", b.ID())
-		<-b.throttleTimer.C
-		b.throttleTimer = nil
+		select {
+		case <-time.After(remaining):
+		case <-notify:
+		}
 	}
+}
+
+// interruptThrottleWaits interrupts active throttle waits for the current connection
+// while preserving the deadline for a subsequent connection. It must be called
+// before Close attempts to acquire b.lock.
+func (b *Broker) interruptThrottleWaits() {
+	b.throttleLock.Lock()
+	defer b.throttleLock.Unlock()
+
+	b.throttleWaitInterrupted = true
+	b.notifyThrottleWaitersLocked()
+}
+
+// enableThrottleWaits enables throttle waits for a newly opened connection without
+// discarding the remaining broker-provided throttle duration.
+func (b *Broker) enableThrottleWaits() {
+	b.throttleLock.Lock()
+	defer b.throttleLock.Unlock()
+
+	b.throttleWaitInterrupted = false
+	b.notifyThrottleWaitersLocked()
+}
+
+func (b *Broker) notifyThrottleWaitersLocked() {
+	if b.throttleNotify != nil {
+		close(b.throttleNotify)
+	}
+	b.throttleNotify = make(chan struct{})
 }
 
 func (b *Broker) updateThrottleMetric(throttleTime time.Duration) {
