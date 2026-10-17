@@ -62,8 +62,12 @@ type Broker struct {
 	kerberosAuthenticator               GSSAPIKerberosAuth
 	clientSessionReauthenticationTimeMs int64
 
-	throttleTimer     *time.Timer
-	throttleTimerLock sync.Mutex
+	throttleTimer        *time.Timer
+	throttleTimerLock    sync.Mutex
+	throttleCancel       chan struct{}
+	throttleTimerUpdated chan struct{}
+	throttleAborted      bool
+	throttleErr          error
 }
 
 // SASLMechanism specifies the SASL mechanism the client uses to authenticate with the broker
@@ -224,6 +228,7 @@ func (b *Broker) Open(conf *Config) error {
 
 		b.conn = newBufConn(b.conn)
 		b.conf = conf
+		b.resetThrottle()
 
 		// Create or reuse the global metrics shared between brokers
 		b.incomingByteRate = metrics.GetOrRegisterMeter("incoming-byte-rate", b.metricRegistry)
@@ -374,6 +379,8 @@ func (b *Broker) TLSConnectionState() (state tls.ConnectionState, ok bool) {
 
 // Close closes the broker resources
 func (b *Broker) Close() error {
+	b.abortThrottle(ErrNotConnected)
+
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -396,6 +403,8 @@ func (b *Broker) maybeCloseLocked(err error) bool {
 // closeLocked closes the broker connection and resets state.
 // NOTE: caller must hold b.lock.
 func (b *Broker) closeLocked() error {
+	b.abortThrottle(ErrNotConnected)
+
 	if b.conn == nil {
 		return ErrNotConnected
 	}
@@ -1198,7 +1207,9 @@ func (b *Broker) sendInternal(rb protocolBody, promise *responsePromise) error {
 	}
 
 	// check and wait if throttled
-	b.waitIfThrottled()
+	if err := b.waitIfThrottled(); err != nil {
+		return err
+	}
 
 	// take a slot before writing, otherwise a request is written while its
 	// promise waits for room in b.responses and MaxOpenRequests+1 are in
@@ -1372,6 +1383,7 @@ func (b *Broker) responseReceiver() {
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
+			b.abortThrottle(err)
 			<-inFlight
 			promise.handle(nil, err)
 			continue
@@ -1382,6 +1394,7 @@ func (b *Broker) responseReceiver() {
 		if err != nil {
 			b.updateIncomingCommunicationMetrics(bytesReadHeader, requestLatency)
 			dead = err
+			b.abortThrottle(err)
 			<-inFlight
 			promise.handle(nil, err)
 			continue
@@ -1391,6 +1404,7 @@ func (b *Broker) responseReceiver() {
 			// TODO if decoded ID < cur ID, discard until we catch up
 			// TODO if decoded ID > cur ID, save it so when cur ID catches up we have a response
 			dead = PacketDecodingError{fmt.Sprintf("correlation ID didn't match, wanted %d, got %d", promise.correlationID, decodedHeader.correlationID)}
+			b.abortThrottle(dead)
 			<-inFlight
 			promise.handle(nil, dead)
 			continue
@@ -1401,6 +1415,7 @@ func (b *Broker) responseReceiver() {
 		b.updateIncomingCommunicationMetrics(bytesReadHeader+bytesReadBody, requestLatency)
 		if err != nil {
 			dead = err
+			b.abortThrottle(err)
 			<-inFlight
 			promise.handle(nil, err)
 			continue
@@ -2052,25 +2067,141 @@ func (b *Broker) handleThrottledResponse(resp protocolBody) {
 	b.updateThrottleMetric(throttleTime)
 }
 
+func (b *Broker) ensureThrottleChannelsLocked() {
+	if b.throttleCancel == nil {
+		b.throttleCancel = make(chan struct{})
+	}
+	if b.throttleTimerUpdated == nil {
+		b.throttleTimerUpdated = make(chan struct{})
+	}
+}
+
+func (b *Broker) abortThrottle(err error) {
+	b.throttleTimerLock.Lock()
+	defer b.throttleTimerLock.Unlock()
+
+	b.throttleAborted = true
+	if b.throttleErr == nil && err != nil {
+		b.throttleErr = err
+	}
+	if b.throttleTimer != nil {
+		if !b.throttleTimer.Stop() {
+			select {
+			case <-b.throttleTimer.C:
+			default:
+			}
+		}
+		b.throttleTimer = nil
+	}
+	if b.throttleCancel != nil {
+		select {
+		case <-b.throttleCancel:
+		default:
+			close(b.throttleCancel)
+		}
+	}
+}
+
+func (b *Broker) resetThrottle() {
+	b.throttleTimerLock.Lock()
+	defer b.throttleTimerLock.Unlock()
+
+	b.throttleAborted = false
+	b.throttleErr = nil
+	if b.throttleCancel != nil {
+		select {
+		case <-b.throttleCancel:
+			b.throttleCancel = make(chan struct{})
+		default:
+		}
+	} else {
+		b.throttleCancel = make(chan struct{})
+	}
+	if b.throttleTimerUpdated == nil {
+		b.throttleTimerUpdated = make(chan struct{})
+	}
+}
+
 func (b *Broker) setThrottle(throttleTime time.Duration) {
 	b.throttleTimerLock.Lock()
 	defer b.throttleTimerLock.Unlock()
+
+	if b.throttleAborted {
+		return
+	}
 	if b.throttleTimer != nil {
 		// if there is an existing timer stop/clear it
 		if !b.throttleTimer.Stop() {
-			<-b.throttleTimer.C
+			select {
+			case <-b.throttleTimer.C:
+			default:
+			}
 		}
 	}
 	b.throttleTimer = time.NewTimer(throttleTime)
+	b.ensureThrottleChannelsLocked()
+	if b.throttleTimerUpdated != nil {
+		select {
+		case <-b.throttleTimerUpdated:
+		default:
+			close(b.throttleTimerUpdated)
+		}
+	}
+	b.throttleTimerUpdated = make(chan struct{})
 }
 
-func (b *Broker) waitIfThrottled() {
-	b.throttleTimerLock.Lock()
-	defer b.throttleTimerLock.Unlock()
-	if b.throttleTimer != nil {
+func (b *Broker) waitIfThrottled() error {
+	for {
+		b.throttleTimerLock.Lock()
+		if b.throttleAborted {
+			err := b.throttleErr
+			if err == nil {
+				err = ErrNotConnected
+			}
+			b.throttleTimerLock.Unlock()
+			return err
+		}
+		if b.throttleTimer == nil {
+			b.throttleTimerLock.Unlock()
+			return nil
+		}
+		timer := b.throttleTimer
+		b.ensureThrottleChannelsLocked()
+		cancelCh := b.throttleCancel
+		timerUpdatedCh := b.throttleTimerUpdated
+		b.throttleTimerLock.Unlock()
+
 		DebugLogger.Printf("broker/%d waiting for throttle timer\n", b.ID())
-		<-b.throttleTimer.C
-		b.throttleTimer = nil
+
+		select {
+		case <-timer.C:
+			b.throttleTimerLock.Lock()
+			if b.throttleAborted {
+				err := b.throttleErr
+				if err == nil {
+					err = ErrNotConnected
+				}
+				b.throttleTimerLock.Unlock()
+				return err
+			}
+			if b.throttleTimer != timer {
+				b.throttleTimerLock.Unlock()
+				continue
+			}
+			b.throttleTimer = nil
+			b.throttleTimerLock.Unlock()
+			return nil
+		case <-cancelCh:
+			b.throttleTimerLock.Lock()
+			err := b.throttleErr
+			if err == nil {
+				err = ErrNotConnected
+			}
+			b.throttleTimerLock.Unlock()
+			return err
+		case <-timerUpdatedCh:
+			continue
+		}
 	}
 }
 
