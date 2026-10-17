@@ -1461,17 +1461,24 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend, ErrKafkaStorageError:
 				Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
 					bp.broker.ID(), topic, partition, block.Err)
-				if bp.currentRetries[topic] == nil {
-					bp.currentRetries[topic] = make(map[int32]error)
+				dropped := bp.accumulatingBatch.dropPartition(topic, partition)
+				// only messages sent back through the partitionProducer are
+				// followed by the fin that clears this; left set after
+				// retryBatch resends the batch, the next message is sent back
+				// too and uses up a retry
+				if !retryAsBatch || len(dropped) > 0 {
+					if bp.currentRetries[topic] == nil {
+						bp.currentRetries[topic] = make(map[int32]error)
+					}
+					bp.currentRetries[topic][partition] = block.Err
 				}
-				bp.currentRetries[topic][partition] = block.Err
 				if retryAsBatch {
 					go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
 				} else {
 					bp.parent.retryMessages(pSet.msgs, block.Err)
 				}
 				// dropping the following messages has the side effect of incrementing their retry count
-				bp.parent.retryMessages(bp.accumulatingBatch.dropPartition(topic, partition), block.Err)
+				bp.parent.retryMessages(dropped, block.Err)
 			}
 		})
 	}
