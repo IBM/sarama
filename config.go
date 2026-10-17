@@ -4,8 +4,10 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"regexp"
+	"slices"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
@@ -193,6 +195,12 @@ type Config struct {
 		// will still be rejected.
 		// This value must remain smaller than sarama.MaxRequestSize.
 		MaxMessageBytes int
+		// TopicMaxMessageBytes overrides MaxMessageBytes for individual topics.
+		// Each value is the maximum permitted size of a message and the
+		// pre-compression size estimate of a batch for a single partition of the
+		// corresponding topic. Topics absent from the map use MaxMessageBytes.
+		// The map must not be modified after the client is created.
+		TopicMaxMessageBytes map[string]int
 		// The level of acknowledgement reliability needed from the broker (defaults
 		// to WaitForLocal). Equivalent to the `request.required.acks` setting of the
 		// JVM producer.
@@ -651,6 +659,15 @@ func (c *Config) Validate() error {
 	if c.Producer.MaxMessageBytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.MaxMessageBytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
+
+	topics := slices.Sorted(maps.Keys(c.Producer.TopicMaxMessageBytes))
+	for _, topic := range topics {
+		maxMsgBytes := c.Producer.TopicMaxMessageBytes[topic]
+		if maxMsgBytes >= int(MaxRequestSize) {
+			Logger.Printf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize; it will be ignored.\n", topic)
+		}
+	}
+
 	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.Flush.Bytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
@@ -804,6 +821,12 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
 	}
 
+	for _, topic := range topics {
+		if c.Producer.TopicMaxMessageBytes[topic] <= 0 {
+			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be > 0", topic))
+		}
+	}
+
 	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
 		return ConfigurationError("lz4 compression requires Version >= V0_10_0_0")
 	}
@@ -936,6 +959,13 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+func (c *Config) producerMaxMessageBytes(topic string) int {
+	if maxMsgBytes, ok := c.Producer.TopicMaxMessageBytes[topic]; ok {
+		return maxMsgBytes
+	}
+	return c.Producer.MaxMessageBytes
 }
 
 func (c *Config) getDialer() proxy.Dialer {
