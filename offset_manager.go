@@ -763,10 +763,15 @@ func (pom *partitionOffsetManager) AsyncClose() {
 
 func (pom *partitionOffsetManager) Close() error {
 	pom.AsyncClose()
-	// release the POM here without auto-commit (otherwise errors stays open
-	// until the next Commit or the OffsetManager's Close)
+	// A concurrent commit may hold pomsLock while blocked sending an error.
+	// Release in another goroutine so Close can drain errors and unblock it.
 	if !pom.parent.conf.Consumer.Offsets.AutoCommit.Enable {
-		pom.parent.releasePOM(pom)
+		released := make(chan none)
+		go func() {
+			defer close(released)
+			pom.parent.releasePOM(pom)
+		}()
+		defer func() { <-released }()
 	}
 
 	var errors ConsumerErrors
