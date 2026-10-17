@@ -276,6 +276,42 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestAsyncProducerCloseFlushesPartialBatch(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+	leader := NewMockBroker(t, 2)
+	defer leader.Close()
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 5
+	// without a Frequency the batch below would never be sent
+	config.Producer.Flush.Frequency = 30 * time.Second
+	config.Producer.Return.Successes = true
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+
+	closed := make(chan error, 1)
+	go func() { closed <- producer.Close() }()
+	select {
+	case err := <-closed:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		assert.Fail(t, "Close waited for the flush triggers")
+		require.NoError(t, <-closed)
+	}
+}
+
 func TestAsyncProducerMultipleBrokers(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader0 := NewMockBroker(t, 2)
@@ -1159,6 +1195,29 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
+	prodNotLeader := new(ProduceResponse)
+	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	// the first batch fails once the producer is shutting down; the retried
+	// messages are then flushed without waiting for Flush.Messages, so they
+	// can take several requests
+	shuttingDown := make(chan struct{})
+	var produced atomic.Int32
+	leader.setHandler(func(req *request) encoderWithHeader {
+		switch req.body.key() {
+		case 3:
+			return metadataLeader
+		case 0:
+			if produced.Add(1) == 1 {
+				<-shuttingDown
+				return prodNotLeader
+			}
+			return prodSuccess
+		}
+		return nil
+	})
+
 	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
@@ -1178,16 +1237,8 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	if err := <-producer.Errors(); !errors.Is(err.Err, ErrShuttingDown) {
 		t.Error(err)
 	}
+	close(shuttingDown)
 
-	prodNotLeader := new(ProduceResponse)
-	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
-	leader.Returns(prodNotLeader)
-
-	leader.Returns(metadataLeader)
-
-	prodSuccess := new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-	leader.Returns(prodSuccess)
 	expectResults(t, producer, 10, 0)
 
 	seedBroker.Close()
@@ -1207,6 +1258,14 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 	metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
+
+	// once Close starts, messages are flushed without waiting for
+	// Flush.Messages, so they can take several requests
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.SetHandlerByMap(map[string]MockResponse{
+		"ProduceRequest": NewMockWrapper(prodSuccess),
+	})
 
 	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
@@ -1229,10 +1288,6 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 		}
 		close(wait)
 	}()
-
-	prodSuccess := new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-	leader.Returns(prodSuccess)
 
 	<-wait
 	seedBroker.Close()

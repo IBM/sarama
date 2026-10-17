@@ -1123,9 +1123,15 @@ func (bp *brokerProducer) run() {
 	var output chan<- *produceSet
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
+	// shutdown waits for every buffered message before it closes bp.input, so
+	// once the producer is closing, flush without waiting for the Flush
+	// thresholds or Frequency (otherwise Close can block forever)
+	done := bp.parent.done
+	flushAll := false
+
 	for {
 		var unmuteSignal <-chan struct{}
-		if bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush()) {
+		if bp.flushingBatch == nil && (bp.timerFired || flushAll || bp.accumulatingBatch.readyToFlush()) {
 			unmuteSignal = bp.tryBuildFlushingBatch()
 		}
 
@@ -1202,6 +1208,9 @@ func (bp *brokerProducer) run() {
 			}
 		case <-timerChan:
 			bp.timerFired = true
+		case <-done:
+			flushAll = true
+			done = nil
 		case output <- bp.flushingBatch:
 			bp.flushingBatch = nil
 		case <-unmuteSignal:
