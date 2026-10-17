@@ -153,6 +153,15 @@ type javaConsumerGroupMember struct {
 
 func runJavaConsumerGroupMember(t *testing.T, groupID, name, topic, assignor string) *javaConsumerGroupMember {
 	t.Helper()
+	m := startJavaConsumerGroupMember(t, groupID, name, topic, assignor)
+	m.waitUntilJoined()
+	return m
+}
+
+// startJavaConsumerGroupMember does not wait for an assignment, which a member
+// subscribed to a topic the cluster lacks never gets
+func startJavaConsumerGroupMember(t *testing.T, groupID, name, topic, assignor string) *javaConsumerGroupMember {
+	t.Helper()
 
 	args := []string{
 		"--bootstrap-server", brokerAddr, // in-container listener, no toxiproxy
@@ -223,7 +232,6 @@ func runJavaConsumerGroupMember(t *testing.T, groupID, name, topic, assignor str
 		}
 	})
 
-	m.waitUntilJoined()
 	return m
 }
 
@@ -498,6 +506,26 @@ func TestFuncJavaInteropCooperativeRebalance(t *testing.T) {
 		requireUntouched(t, leader, map[string][]int32{"test.1": {0}})
 		require.Equal(t, 1, leader.claimCount("test.1", 0),
 			"the leader's partition should have been claimed once and never re-claimed")
+
+		requireGroupStable(t, groupID, CooperativeStickyBalanceStrategyName, 3)
+		j.StopGracefully()
+	})
+
+	t.Run("sarama leads while a member subscribes to a topic the cluster lacks", func(t *testing.T) {
+		groupID := testFuncConsumerGroupID(t)
+		// brokers run with auto.create.topics.enable=false, so it stays missing
+		missing := fmt.Sprintf("missing.%d", time.Now().UnixNano())
+
+		leader := runSaramaInteropMember(t, groupID, "S1", "test.1", NewBalanceStrategyCooperativeSticky())
+		j := startJavaConsumerGroupMember(t, groupID, "J", missing, javaCooperativeStickyAssignor)
+		requireGroupStable(t, groupID, CooperativeStickyBalanceStrategyName, 2)
+
+		s2 := runSaramaInteropMember(t, groupID, "S2", "test.4", NewBalanceStrategyCooperativeSticky())
+		s2.waitFor(func(o map[string][]int32) bool { return len(o["test.4"]) == 4 }, "to own all of test.4")
+
+		require.NotZero(t, leader.strategy.planCount(), "S1 should have led the group")
+		require.Empty(t, j.Owned(), "the java member's topic does not exist")
+		requireUntouched(t, leader, map[string][]int32{"test.1": {0}})
 
 		requireGroupStable(t, groupID, CooperativeStickyBalanceStrategyName, 3)
 		j.StopGracefully()
