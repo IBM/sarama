@@ -71,6 +71,7 @@ func (mc *MockSequence) For(reqBody versionedDecoder) (res encoderWithHeader) {
 
 type MockListGroupsResponse struct {
 	groups map[string]string
+	err    KError
 	t      TestReporter
 }
 
@@ -85,6 +86,7 @@ func (m *MockListGroupsResponse) For(reqBody versionedDecoder) encoderWithHeader
 	request := reqBody.(*ListGroupsRequest)
 	response := &ListGroupsResponse{
 		Version: request.Version,
+		Err:     m.err,
 		Groups:  m.groups,
 	}
 	return response
@@ -92,6 +94,12 @@ func (m *MockListGroupsResponse) For(reqBody versionedDecoder) encoderWithHeader
 
 func (m *MockListGroupsResponse) AddGroup(groupID, protocolType string) *MockListGroupsResponse {
 	m.groups[groupID] = protocolType
+	return m
+}
+
+// SetError sets the top-level error code of the response.
+func (m *MockListGroupsResponse) SetError(err KError) *MockListGroupsResponse {
+	m.err = err
 	return m
 }
 
