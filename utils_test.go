@@ -3,6 +3,7 @@
 package sarama
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -109,6 +110,8 @@ func TestExponentialBackoffValidCases(t *testing.T) {
 		{1, 5, 80 * time.Millisecond, 120 * time.Millisecond},
 		{3, 5, 320 * time.Millisecond, 480 * time.Millisecond},
 		{5, 5, 1280 * time.Millisecond, 1920 * time.Millisecond},
+		{0, 5, 100 * time.Millisecond, 100 * time.Millisecond},
+		{-1, 5, 100 * time.Millisecond, 100 * time.Millisecond},
 	}
 
 	for _, tc := range testCases {
@@ -117,6 +120,32 @@ func TestExponentialBackoffValidCases(t *testing.T) {
 		if backoff < tc.minBackoff || backoff > tc.maxBackoffExpected {
 			t.Errorf("backoff(%d, %d): expected between %v and %v, got %v", tc.retries, tc.maxRetries, tc.minBackoff, tc.maxBackoffExpected, backoff)
 		}
+	}
+}
+
+func TestExponentialBackoffOverflow(t *testing.T) {
+	testCases := []struct {
+		name       string
+		backoff    time.Duration
+		maxBackoff time.Duration
+		retries    int
+	}{
+		{"duration multiplication", 100 * time.Millisecond, time.Second, 38},
+		{"signed shift", time.Nanosecond, time.Second, 64},
+		{"shift overflow", time.Nanosecond, time.Second, 65},
+		{"floating-point exponent overflow", time.Nanosecond, time.Second, 1025},
+		{"maximum retries", time.Nanosecond, time.Second, math.MaxInt},
+		{"maximum duration", time.Duration(math.MaxInt64), time.Duration(math.MaxInt64), 2},
+		{"default durations", 0, defaultRetryMaxBackoff, 65},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			backoffFunc := NewExponentialBackoff(tc.backoff, tc.maxBackoff)
+			if backoff := backoffFunc(tc.retries, tc.retries); backoff != tc.maxBackoff {
+				t.Errorf("backoff(%d, %d): expected %v, got %v", tc.retries, tc.retries, tc.maxBackoff, backoff)
+			}
+		})
 	}
 }
 
