@@ -129,6 +129,7 @@ func (om *offsetManager) Close() error {
 				if om.releasePOMs(false) == 0 {
 					break
 				}
+				om.backoffCommit(attempt)
 			}
 		}
 
@@ -548,8 +549,18 @@ func (om *offsetManager) removePartitions(topicPartitions map[string][]int32) {
 		if om.releaseSelectedPOMs(false, targets) == 0 {
 			return
 		}
+		om.backoffCommit(attempt)
 	}
 	om.releaseSelectedPOMs(true, targets)
+}
+
+// backoffCommit waits between attempts at a final commit (otherwise a
+// coordinator that is still loading rejects every attempt within milliseconds
+// and the offsets are dropped)
+func (om *offsetManager) backoffCommit(attempt int) {
+	if retries := om.conf.Consumer.Offsets.Retry.Max - attempt; retries > 0 {
+		time.Sleep(om.computeBackoff(retries))
+	}
 }
 
 // Releases/removes closed POMs once they are clean (or when forced)
