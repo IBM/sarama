@@ -199,6 +199,7 @@ type Config struct {
 		// Each value is the maximum permitted size of a message and the
 		// pre-compression size estimate of a batch for a single partition of the
 		// corresponding topic. Topics absent from the map use MaxMessageBytes.
+		// Each value must remain smaller than MaxRequestSize.
 		// The map must not be modified after the client is created.
 		TopicMaxMessageBytes map[string]int
 		// The level of acknowledgement reliability needed from the broker (defaults
@@ -660,14 +661,6 @@ func (c *Config) Validate() error {
 		Logger.Println("Producer.MaxMessageBytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
 
-	topics := slices.Sorted(maps.Keys(c.Producer.TopicMaxMessageBytes))
-	for _, topic := range topics {
-		maxMsgBytes := c.Producer.TopicMaxMessageBytes[topic]
-		if maxMsgBytes >= int(MaxRequestSize) {
-			Logger.Printf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize; it will be ignored.\n", topic)
-		}
-	}
-
 	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.Flush.Bytes must be smaller than MaxRequestSize; it will be ignored.")
 	}
@@ -821,9 +814,14 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
 	}
 
+	topics := slices.Sorted(maps.Keys(c.Producer.TopicMaxMessageBytes))
 	for _, topic := range topics {
-		if c.Producer.TopicMaxMessageBytes[topic] <= 0 {
+		maxMsgBytes := c.Producer.TopicMaxMessageBytes[topic]
+		if maxMsgBytes <= 0 {
 			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be > 0", topic))
+		}
+		if maxMsgBytes >= int(MaxRequestSize) {
+			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize", topic))
 		}
 	}
 

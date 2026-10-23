@@ -360,6 +360,15 @@ func TestProducerConfigValidates(t *testing.T) {
 			`Producer.TopicMaxMessageBytes["a-topic"] must be > 0`,
 		},
 		{
+			"TopicMaxMessageBytesMaxRequestSize",
+			func(cfg *Config) {
+				cfg.Producer.TopicMaxMessageBytes = map[string]int{
+					"oversized-topic": int(MaxRequestSize),
+				}
+			},
+			`Producer.TopicMaxMessageBytes["oversized-topic"] must be smaller than MaxRequestSize`,
+		},
+		{
 			"RequiredAcks",
 			func(cfg *Config) {
 				cfg.Producer.RequiredAcks = -2
