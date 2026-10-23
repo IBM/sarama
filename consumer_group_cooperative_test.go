@@ -31,6 +31,7 @@ type mockCooperativeCoordinator struct {
 	memberID    string
 	forgotten   bool
 	heartbeats  []string
+	others      []GroupMember // members listed after this one in the leader's JoinGroup response
 
 	rebalanceHeartbeats int
 
@@ -176,7 +177,7 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 		GroupProtocol: m.protocol,
 		LeaderId:      m.leaderID,
 		MemberId:      memberID,
-		Members:       []GroupMember{{MemberId: memberID, Metadata: metadata}},
+		Members:       append([]GroupMember{{MemberId: memberID, Metadata: metadata}}, m.others...),
 	}
 }
 
@@ -763,6 +764,44 @@ func TestConsumerGroupCooperativeRebalance(t *testing.T) {
 		broker.SetHandlerByMap(cooperativeBrokerHandlers(t, broker, coord, 3))
 		coord.rebalanceNow()
 		waitForClaims(t, h, 3)
+
+		closeCooperativeGroup(t, group, consumeDone)
+	})
+}
+
+func TestConsumerGroupCooperativeSubscriptions(t *testing.T) {
+	const topic = cooperativeTestTopic
+
+	t.Run("a leader keeps its session while another member subscribes to a topic the cluster lacks", func(t *testing.T) {
+		const missing = "missing-topic"
+		coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName,
+			map[string][]int32{topic: {0, 1}},
+		)
+		other, err := encode(&ConsumerGroupMemberMetadata{Topics: []string{topic, missing}}, nil)
+		require.NoError(t, err)
+		coord.others = []GroupMember{{MemberId: "m9", Metadata: other}}
+		config := newCooperativeConfig(t)
+		config.Metadata.RefreshFrequency = 50 * time.Millisecond
+		config.Metadata.Retry.Max = 0
+		h := newTrackingHandler()
+		broker, group, consumeDone := startCooperativeGroupWithPartitions(t, coord, 2, config, h)
+
+		waitForClaims(t, h, 2)
+		requireJoinsStayAt(t, coord, 1)
+
+		// the topic appearing is a partition count change
+		handlers := cooperativeBrokerHandlers(t, broker, coord, 2)
+		handlers["MetadataRequest"] = NewMockMetadataResponse(t).
+			SetBroker(broker.Addr(), broker.BrokerID()).
+			SetLeader(topic, 0, broker.BrokerID()).
+			SetLeader(topic, 1, broker.BrokerID()).
+			SetLeader(missing, 0, broker.BrokerID())
+		broker.SetHandlerByMap(handlers)
+		waitForJoins(t, coord, 2)
+
+		state := h.snapshot()
+		require.Equal(t, 1, state.setups, "the session should have survived the rebalance")
+		require.Zero(t, state.cleanups)
 
 		closeCooperativeGroup(t, group, consumeDone)
 	})

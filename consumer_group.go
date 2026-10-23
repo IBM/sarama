@@ -755,19 +755,28 @@ func (c *consumerGroup) balance(strategy BalanceStrategy, members map[string]Con
 	// refresh metadata for all the subscribed topics in the consumer group
 	// to avoid using stale metadata to assigning partitions
 	err := c.client.RefreshMetadata(allSubscribedTopics...)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrUnknownTopicOrPartition) {
 		return nil, nil, nil, err
 	}
 
+	// leave out a topic the cluster does not have (otherwise one member
+	// subscribed to it leaves every generation this member leads without an
+	// assignment); the partition watcher counts it as 0 partitions, so the
+	// leader rejoins once it is created
+	assignable := make(map[string][]int32, len(topicPartitions))
 	for topic := range topicPartitions {
 		partitions, err := c.client.Partitions(topic)
+		if errors.Is(err, ErrUnknownTopicOrPartition) {
+			continue
+		}
 		if err != nil {
 			return nil, nil, nil, err
 		}
 		topicPartitions[topic] = partitions
+		assignable[topic] = partitions
 	}
 
-	plan, err := strategy.Plan(members, topicPartitions)
+	plan, err := strategy.Plan(members, assignable)
 	return topicPartitions, allSubscribedTopics, plan, err
 }
 
@@ -905,7 +914,9 @@ func (c *consumerGroup) loopCheckPartitionNumbers(ctx context.Context, allSubscr
 func (c *consumerGroup) topicToPartitionNumbers(topics []string) (map[string]int, error) {
 	topicToPartitionNum := make(map[string]int, len(topics))
 	for _, topic := range topics {
-		if partitionNum, err := c.client.Partitions(topic); err != nil {
+		if partitionNum, err := c.client.Partitions(topic); errors.Is(err, ErrUnknownTopicOrPartition) {
+			topicToPartitionNum[topic] = 0
+		} else if err != nil {
 			Logger.Printf(
 				"consumergroup/%s topic %s get partition number failed due to '%v'\n",
 				c.groupID, topic, err)
