@@ -805,6 +805,100 @@ func TestClusterAdminDeleteRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// deleteRecordsWith answers each partition with the error from errFor
+	deleteRecordsWith := func(errFor func(partition int32) (KError, bool)) requestHandlerFunc {
+		return func(req *request) encoderWithHeader {
+			r := req.body.(*DeleteRecordsRequest)
+			res := &DeleteRecordsResponse{Version: r.version(), Topics: map[string]*DeleteRecordsResponseTopic{}}
+			for topic, rt := range r.Topics {
+				partitions := make(map[int32]*DeleteRecordsResponsePartition)
+				for partition := range rt.PartitionOffsets {
+					if kerr, ok := errFor(partition); ok {
+						partitions[partition] = &DeleteRecordsResponsePartition{Err: kerr}
+					}
+				}
+				res.Topics[topic] = &DeleteRecordsResponseTopic{Partitions: partitions}
+			}
+			return res
+		}
+	}
+
+	t.Run("retries on the new leader after NOT_LEADER_OR_FOLLOWER", func(t *testing.T) {
+		b1 := NewMockBroker(t, 1)
+		b2 := NewMockBroker(t, 2)
+		t.Cleanup(b1.Close)
+		t.Cleanup(b2.Close)
+
+		var leader atomic.Int32
+		leader.Store(b1.BrokerID())
+		meta := func(req *request) encoderWithHeader {
+			return NewMockMetadataResponse(t).
+				SetController(b1.BrokerID()).
+				SetBroker(b1.Addr(), b1.BrokerID()).
+				SetBroker(b2.Addr(), b2.BrokerID()).
+				SetLeader(topicName, 1, leader.Load()).
+				SetLeader(topicName, 2, b1.BrokerID()).
+				For(req.body)
+		}
+		var deletedOnNewLeader atomic.Bool
+		b1.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": meta,
+			"DeleteRecordsRequest": deleteRecordsWith(func(partition int32) (KError, bool) {
+				if partition == 1 {
+					// leadership of partition 1 has moved to broker 2
+					leader.Store(b2.BrokerID())
+					return ErrNotLeaderForPartition, true
+				}
+				return ErrNoError, true
+			}),
+		})
+		b2.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": meta,
+			"DeleteRecordsRequest": deleteRecordsWith(func(int32) (KError, bool) {
+				deletedOnNewLeader.Store(true)
+				return ErrNoError, true
+			}),
+		})
+
+		config := NewTestConfig()
+		config.Version = V1_0_0_0
+		config.Admin.Retry.Backoff = 0
+		admin, err := NewClusterAdmin([]string{b1.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		require.NoError(t, admin.DeleteRecords(topicName, map[int32]int64{1: 1000, 2: 1000}))
+		assert.True(t, deletedOnNewLeader.Load(), "expected broker 2 to receive the retried request")
+	})
+
+	t.Run("fails a partition missing from the response", func(t *testing.T) {
+		broker := NewMockBroker(t, 1)
+		t.Cleanup(broker.Close)
+		broker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				return NewMockMetadataResponse(t).
+					SetController(broker.BrokerID()).
+					SetBroker(broker.Addr(), broker.BrokerID()).
+					SetLeader(topicName, 1, broker.BrokerID()).
+					SetLeader(topicName, 2, broker.BrokerID()).
+					For(req.body)
+			},
+			"DeleteRecordsRequest": deleteRecordsWith(func(partition int32) (KError, bool) {
+				return ErrNoError, partition != 2
+			}),
+		})
+
+		config := NewTestConfig()
+		config.Version = V1_0_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		err = admin.DeleteRecords(topicName, map[int32]int64{1: 1000, 2: 1000})
+		require.ErrorIs(t, err, ErrDeleteRecords)
+		assert.ErrorIs(t, err, ErrIncompleteResponse)
+	})
 }
 
 func TestClusterAdminDeleteRecordsWithInCorrectBroker(t *testing.T) {
@@ -2440,6 +2534,51 @@ func TestListOffsets(t *testing.T) {
 		missing := result[topic][missingPartition]
 		require.NotNil(t, missing)
 		assert.ErrorIs(t, missing.Err, ErrUnknownTopicOrPartition)
+	})
+
+	t.Run("does not reconnect the leader once the admin is closed", func(t *testing.T) {
+		const partition = int32(0)
+
+		seed := newMockBroker(t, 1)
+		leader := NewMockBroker(t, 2)
+		leaderAddr := leader.Addr()
+		seed.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": mockMetadataFor(t, seed, leader).SetLeader(topic, partition, leader.BrokerID()),
+		})
+		// with the leader down, each ListOffsets attempt fails and backs off
+		leader.Close()
+
+		config := NewTestConfig()
+		config.Version = V2_1_0_0
+		config.Admin.Retry.Max = 100
+		config.Admin.Retry.Backoff = 10 * time.Millisecond
+		client, err := NewClient([]string{seed.Addr()}, config)
+		require.NoError(t, err)
+		admin, err := NewClusterAdminFromClient(client)
+		require.NoError(t, err)
+		broker, err := client.Leader(topic, partition)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = broker.Close() })
+
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = admin.ListOffsets(map[string]map[int32]int64{topic: {partition: OffsetNewest}}, nil)
+		}()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, goroutineBlocked("retryOnError", "sleep"))
+		}, 5*time.Second, time.Millisecond)
+
+		require.NoError(t, admin.Close())
+		restarted := NewMockBrokerAddr(t, leader.BrokerID(), leaderAddr)
+		t.Cleanup(restarted.Close)
+		restarted.SetHandlerByMap(map[string]MockResponse{
+			"OffsetRequest": NewMockOffsetResponse(t).SetOffset(topic, partition, OffsetNewest, 42),
+		})
+		<-done
+
+		connected, _ := broker.Connected()
+		assert.False(t, connected, "a connection opened after Close is never closed")
 	})
 }
 

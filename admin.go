@@ -474,21 +474,24 @@ func convertDescribeClusterBrokers(entries []*DescribeClusterBroker) []*Broker {
 	return result
 }
 
+// findBroker returns the registered broker with the given id, opened by the
+// client under its lock. Opening a *Broker after the client has dropped it
+// (a metadata refresh or Close) leaves a connection that nothing closes.
 func (ca *clusterAdmin) findBroker(id int32) (*Broker, error) {
-	brokers := ca.client.Brokers()
-	for _, b := range brokers {
-		if b.ID() == id {
-			return b, nil
-		}
+	b, err := ca.client.Broker(id)
+	if err != nil {
+		return nil, fmt.Errorf("could not find broker id %d", id)
 	}
-	return nil, fmt.Errorf("could not find broker id %d", id)
+	return b, nil
 }
 
 func (ca *clusterAdmin) findAnyBroker() (*Broker, error) {
 	brokers := ca.client.Brokers()
 	if len(brokers) > 0 {
 		index := rand.Intn(len(brokers))
-		return brokers[index], nil
+		if b, err := ca.client.Broker(brokers[index].ID()); err == nil {
+			return b, nil
+		}
 	}
 	return nil, errors.New("no available broker")
 }
@@ -507,7 +510,6 @@ func (ca *clusterAdmin) ListTopics() (map[string]TopicDetail, error) {
 		if err != nil {
 			return err
 		}
-		_ = b.Open(ca.client.Config())
 
 		metadataReq := NewMetadataRequest(ca.conf.Version, nil)
 		metadataResp, err := b.GetMetadata(metadataReq)
@@ -739,7 +741,6 @@ func (ca *clusterAdmin) ListPartitionReassignments(topic string, partitions []in
 		if err != nil {
 			return err
 		}
-		_ = b.Open(ca.client.Config())
 
 		rsp, err = b.ListPartitionReassignments(request)
 		return err
@@ -756,12 +757,48 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 	if topic == "" {
 		return ErrInvalidTopic
 	}
-	errs := make([]error, 0)
+	var errs []error
+	pending := partitionOffsets
+	for attemptsRemaining := ca.conf.Admin.Retry.Max + 1; len(pending) > 0; {
+		failed := ca.deleteRecordsFromLeaders(topic, pending)
+		attemptsRemaining--
+		var retry map[int32]int64
+		for partition, err := range failed {
+			if attemptsRemaining > 0 && isRetriableDeleteRecordsError(err) {
+				if retry == nil {
+					retry = make(map[int32]int64, len(failed))
+				}
+				retry[partition] = pending[partition]
+				continue
+			}
+			errs = append(errs, err)
+		}
+		pending = retry
+		if len(pending) > 0 {
+			Logger.Printf("admin/request retrying after %dms... (%d attempts remaining)\n",
+				ca.conf.Admin.Retry.Backoff/time.Millisecond, attemptsRemaining)
+			time.Sleep(ca.conf.Admin.Retry.Backoff)
+			// the leader may have moved
+			_ = ca.client.RefreshMetadata(topic)
+		}
+	}
+	if len(errs) > 0 {
+		return Wrap(ErrDeleteRecords, errs...)
+	}
+	// todo since we are dealing with couple of partitions it would be good if we return slice of errors
+	// for each partition instead of one error
+	return nil
+}
+
+// deleteRecordsFromLeaders sends a DeleteRecords request to each partition
+// leader and returns the error for each partition that failed
+func (ca *clusterAdmin) deleteRecordsFromLeaders(topic string, partitionOffsets map[int32]int64) map[int32]error {
+	failed := make(map[int32]error)
 	partitionPerBroker := make(map[*Broker][]int32)
 	for partition := range partitionOffsets {
 		broker, err := ca.client.Leader(topic, partition)
 		if err != nil {
-			errs = append(errs, err)
+			failed[partition] = err
 			continue
 		}
 		partitionPerBroker[broker] = append(partitionPerBroker[broker], partition)
@@ -786,30 +823,25 @@ func (ca *clusterAdmin) DeleteRecords(topic string, partitionOffsets map[int32]i
 			request.Version = 1
 		}
 		rsp, err := broker.DeleteRecords(request)
-		if err != nil {
-			errs = append(errs, err)
-			continue
-		}
-
-		deleteRecordsResponseTopic, ok := rsp.Topics[topic]
-		if !ok {
-			errs = append(errs, ErrIncompleteResponse)
-			continue
-		}
-
-		for _, deleteRecordsResponsePartition := range deleteRecordsResponseTopic.Partitions {
-			if !errors.Is(deleteRecordsResponsePartition.Err, ErrNoError) {
-				errs = append(errs, deleteRecordsResponsePartition.Err)
-				continue
+		for _, p := range partitions {
+			switch {
+			case err != nil:
+				failed[p] = err
+			case rsp.Topics[topic] == nil || rsp.Topics[topic].Partitions[p] == nil:
+				failed[p] = ErrIncompleteResponse
+			case !errors.Is(rsp.Topics[topic].Partitions[p].Err, ErrNoError):
+				failed[p] = rsp.Topics[topic].Partitions[p].Err
 			}
 		}
 	}
-	if len(errs) > 0 {
-		return Wrap(ErrDeleteRecords, errs...)
-	}
-	// todo since we are dealing with couple of partitions it would be good if we return slice of errors
-	// for each partition instead of one error
-	return nil
+	return failed
+}
+
+// isRetriableDeleteRecordsError returns true for connection errors and for
+// Kafka errors that can clear once the leader is looked up again
+func isRetriableDeleteRecordsError(err error) bool {
+	kerr, isKErr := errors.AsType[KError](err)
+	return isRetriableBrokerError(err) || (isKErr && isRetriableKError(kerr))
 }
 
 // Returns a bool indicating whether the resource request needs to go to a
@@ -914,7 +946,6 @@ func (ca *clusterAdmin) DescribeConfigs(resources []*ConfigResource, options Des
 			request.Version = 1
 		}
 
-		_ = b.Open(ca.client.Config())
 		rsp, err := b.DescribeConfigs(request)
 		if err != nil {
 			return nil, err
@@ -984,7 +1015,6 @@ func (ca *clusterAdmin) AlterConfig(resourceType ConfigResourceType, name string
 		return err
 	}
 
-	_ = b.Open(ca.client.Config())
 	rsp, err := b.AlterConfigs(request)
 	if err != nil {
 		return err
@@ -1037,7 +1067,6 @@ func (ca *clusterAdmin) IncrementalAlterConfig(resourceType ConfigResourceType, 
 		return err
 	}
 
-	_ = b.Open(ca.client.Config())
 	rsp, err := b.IncrementalAlterConfigs(request)
 	if err != nil {
 		return err
@@ -1198,7 +1227,6 @@ func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[s
 		if err != nil {
 			return err
 		}
-		_ = b.Open(ca.client.Config())
 
 		res, err = b.ElectLeaders(request)
 		if err != nil {
@@ -1267,7 +1295,11 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 		wg.Add(1)
 		go func(b *Broker, conf *Config) {
 			defer wg.Done()
-			_ = b.Open(conf) // Ensure that broker is opened
+			b, err := ca.findBroker(b.ID())
+			if err != nil {
+				errChan <- err
+				return
+			}
 
 			request := &ListGroupsRequest{}
 			if ca.conf.Version.IsAtLeast(V3_8_0_0) {
@@ -1498,7 +1530,6 @@ func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32
 		wg.Add(1)
 		go func(b *Broker, conf *Config) {
 			defer wg.Done()
-			_ = b.Open(conf) // Ensure that broker is opened
 
 			request := &DescribeLogDirsRequest{}
 			if ca.conf.Version.IsAtLeast(V3_3_0_0) {

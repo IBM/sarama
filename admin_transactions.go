@@ -257,7 +257,11 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 	var wg sync.WaitGroup
 	for _, b := range brokers {
 		wg.Go(func() {
-			_ = b.Open(ca.conf) // Ensure that broker is opened
+			b, err := ca.findBroker(b.ID())
+			if err != nil {
+				results <- queryResult{err: fmt.Errorf("list transactions: %w", err)}
+				return
+			}
 
 			request := NewListTransactionsRequest(ca.conf.Version)
 			request.StateFilters = stateFilters
