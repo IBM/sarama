@@ -35,6 +35,7 @@ type mockCooperativeCoordinator struct {
 	rebalanceHeartbeats int
 
 	ownedGens     []int32  // generation reported with the owned partitions, per join
+	userDataGens  []int32  // generation in the cooperative-sticky user data, per join
 	syncErrs      []KError // errors to answer the next SyncGroup requests with
 	joinErrs      []KError // errors to answer the next JoinGroup requests with
 	heartbeatErrs []KError // errors to answer the next Heartbeat requests with
@@ -70,6 +71,17 @@ func (m *mockCooperativeCoordinator) ownedGenAt(n int) int32 {
 		return -1
 	}
 	return m.ownedGens[n]
+}
+
+// userDataGenAt returns the generation the nth JoinGroup carried in its
+// cooperative-sticky user data.
+func (m *mockCooperativeCoordinator) userDataGenAt(n int) int32 {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if n >= len(m.userDataGens) {
+		return -1
+	}
+	return m.userDataGens[n]
 }
 
 // rebalanceNow makes the coordinator announce a rebalance on the next heartbeat.
@@ -147,6 +159,7 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 	}
 	owned := map[string][]int32{}
 	ownedGen := int32(-1)
+	userDataGen := int32(-1)
 	var metadata []byte
 	for _, p := range req.OrderedGroupProtocols {
 		if p.Name != m.protocol {
@@ -160,9 +173,15 @@ func (m *mockCooperativeCoordinator) join(reqBody versionedDecoder) encoderWithH
 			owned[op.Topic] = slices.Clone(op.Partitions)
 		}
 		ownedGen = meta.GenerationID
+		if len(meta.UserData) > 0 {
+			userData := &cooperativeStickyAssignorUserData{}
+			assert.NoError(m.t, decode(meta.UserData, userData, nil)) //nolint:testifylint // callbacks cannot call require through TestReporter
+			userDataGen = userData.Generation
+		}
 	}
 	m.owned = append(m.owned, owned)
 	m.ownedGens = append(m.ownedGens, ownedGen)
+	m.userDataGens = append(m.userDataGens, userDataGen)
 	m.gen++
 	m.rebalancing = false
 	gen := m.gen
@@ -795,6 +814,30 @@ func TestConsumerGroupCooperativeRejoinErrors(t *testing.T) {
 
 		closeCooperativeGroup(t, group, consumeDone)
 	})
+
+	// a Java 3.3 or earlier leader takes the generation from the user data,
+	// whatever the subscription version, and hands the owned partitions of a
+	// member reporting an older one than the others to someone else
+	for _, version := range []KafkaVersion{V2_8_0_0, V3_2_0_0} {
+		t.Run("a rejoin after a failed SyncGroup puts the generation it joined in the user data at "+version.String(), func(t *testing.T) {
+			all := map[string][]int32{topic: {0, 1, 2, 3}}
+			coord := newMockCooperativeCoordinator(t, CooperativeStickyBalanceStrategyName, all, all, all)
+			h := newTrackingHandler()
+			config := newConfig(t)
+			config.Version = version
+			group, consumeDone := startCooperativeGroup(t, coord, config, h)
+
+			waitForClaims(t, h, 4)
+			coord.failNextSync(ErrRebalanceInProgress)
+			coord.rebalanceNow()
+			waitForJoins(t, coord, 3)
+
+			assert.Equal(t, int32(1), coord.userDataGenAt(1))
+			assert.Equal(t, int32(2), coord.userDataGenAt(2))
+
+			closeCooperativeGroup(t, group, consumeDone)
+		})
+	}
 
 	// a coordinator move keeps the generation, so the session should survive it
 	requireSessionKept := func(t *testing.T, h *trackingHandler) {
