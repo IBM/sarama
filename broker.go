@@ -1026,6 +1026,17 @@ func (b *Broker) UpdateFeatures(req *UpdateFeaturesRequest) (*UpdateFeaturesResp
 	return res, nil
 }
 
+// ConsumerGroupHeartbeat sends a KIP-848 consumer group heartbeat to the broker.
+func (b *Broker) ConsumerGroupHeartbeat(req *ConsumerGroupHeartbeatRequest) (*ConsumerGroupHeartbeatResponse, error) {
+	res := new(ConsumerGroupHeartbeatResponse)
+
+	if err := b.sendAndReceive(req, res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // ConsumerGroupDescribe describes KIP-848 consumer groups coordinated by this broker.
 func (b *Broker) ConsumerGroupDescribe(req *ConsumerGroupDescribeRequest) (*ConsumerGroupDescribeResponse, error) {
 	res := new(ConsumerGroupDescribeResponse)
