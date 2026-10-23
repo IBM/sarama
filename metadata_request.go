@@ -11,7 +11,9 @@ func (u Uuid) String() string {
 type MetadataRequest struct {
 	// Version defines the protocol version to use for encode and decode
 	Version int16
-	// Topics contains the topics to fetch metadata for.
+	// Topics contains the topics to fetch metadata for. Nil fetches all
+	// topics; from version 1 an empty, non-nil slice fetches none, which
+	// still returns the brokers and the controller.
 	Topics []string
 	// AllowAutoTopicCreation contains a If this is true, the broker may auto-create topics that we requested which do not already exist, if it is configured to do so.
 	AllowAutoTopicCreation             bool
@@ -24,6 +26,9 @@ func (r *MetadataRequest) setVersion(v int16) {
 }
 
 func NewMetadataRequest(version KafkaVersion, topics []string) *MetadataRequest {
+	if len(topics) == 0 {
+		topics = nil // all topics
+	}
 	m := &MetadataRequest{Topics: topics}
 	if version.IsAtLeast(V2_8_0_0) {
 		m.Version = 11
@@ -51,7 +56,7 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 	if r.Version < 0 || r.Version > 11 {
 		return PacketEncodingError{"invalid or unsupported MetadataRequest version field"}
 	}
-	if r.Version == 0 || len(r.Topics) > 0 {
+	if r.Version == 0 || r.Topics != nil {
 		if err := pe.putArrayLength(len(r.Topics)); err != nil {
 			return err
 		}
@@ -96,11 +101,20 @@ func (r *MetadataRequest) encode(pe packetEncoder) (err error) {
 
 func (r *MetadataRequest) decode(pd packetDecoder, version int16) (err error) {
 	r.Version = version
+	nullTopics := false
+	if r.isFlexibleVersion(version) {
+		// getArrayLength reads a null compact array as empty
+		first, err := pd.peekInt8(0)
+		if err != nil {
+			return err
+		}
+		nullTopics = first == 0
+	}
 	size, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
-	if size > 0 {
+	if size > 0 || (size == 0 && version > 0 && !nullTopics) {
 		r.Topics = make([]string, size)
 	}
 	if version <= 9 {
