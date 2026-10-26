@@ -1570,6 +1570,87 @@ func TestAsyncProducerIdempotentRetryBatchBackoff(t *testing.T) {
 		"BackoffFunc should be called at least Retry.Max times during idempotent retryBatch")
 }
 
+// TestAsyncProducerIdempotentRetryRefreshesOnlyStaleMetadata checks that the
+// idempotent producer, like the Java producer, refreshes metadata before a
+// retry only when the error means the cached metadata is stale. The other
+// retriable errors come from the current leader, and a synchronous refresh
+// there can wait out Net.ReadTimeout on an unresponsive broker (#3843).
+func TestAsyncProducerIdempotentRetryRefreshesOnlyStaleMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     KError
+		refresh bool
+	}{
+		{"UnknownTopicOrPartition", ErrUnknownTopicOrPartition, true},
+		{"LeaderNotAvailable", ErrLeaderNotAvailable, true},
+		{"NotLeaderForPartition", ErrNotLeaderForPartition, true},
+		{"KafkaStorageError", ErrKafkaStorageError, true},
+		{"InvalidMessage", ErrInvalidMessage, false},
+		{"RequestTimedOut", ErrRequestTimedOut, false},
+		{"NotEnoughReplicas", ErrNotEnoughReplicas, false},
+		{"NotEnoughReplicasAfterAppend", ErrNotEnoughReplicasAfterAppend, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			broker := NewMockBroker(t, 1)
+			defer broker.Close()
+
+			metadataResponse := &MetadataResponse{Version: 4, ControllerID: 1}
+			metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+			metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+			initProducerIDResponse := &InitProducerIDResponse{ProducerID: 1000, ProducerEpoch: 1}
+			okResponse := &ProduceResponse{Version: 3}
+			okResponse.AddTopicPartition("my_topic", 0, ErrNoError)
+			errResponse := &ProduceResponse{Version: 3}
+			errResponse.AddTopicPartition("my_topic", 0, tc.err)
+
+			// The first produce request succeeds, so the partition has its
+			// broker producer before counting starts. The second fails once.
+			var metadataRequests, produceRequests atomic.Int32
+			broker.setHandler(func(req *request) (res encoderWithHeader) {
+				switch req.body.key() {
+				case 3:
+					metadataRequests.Add(1)
+					return metadataResponse
+				case 22:
+					return initProducerIDResponse
+				case 0:
+					if produceRequests.Add(1) == 2 {
+						return errResponse
+					}
+					return okResponse
+				}
+				return nil
+			})
+
+			config := NewTestConfig()
+			config.Version = V0_11_0_0
+			config.Producer.Idempotent = true
+			config.Net.MaxOpenRequests = 1
+			config.Producer.Retry.Max = 3
+			config.Producer.RequiredAcks = WaitForAll
+			config.Producer.Return.Successes = true
+
+			producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+			require.NoError(t, err)
+			defer closeProducer(t, producer)
+
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+			expectResults(t, producer, 1, 0)
+
+			metadataRequests.Store(0)
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+			expectResults(t, producer, 1, 0)
+
+			assert.Equal(t, int32(3), produceRequests.Load(), "the failed batch should be retried once")
+			if tc.refresh {
+				assert.Positive(t, metadataRequests.Load(), "a stale-metadata error should refresh before the retry")
+			} else {
+				assert.Zero(t, metadataRequests.Load(), "an error from the current leader should retry without a refresh")
+			}
+		})
+	}
+}
+
 func TestReturnErrors(t *testing.T) {
 	t.Run("bumps the idempotent epoch once per failed batch", func(t *testing.T) {
 		config := NewTestConfig()

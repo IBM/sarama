@@ -1377,6 +1377,19 @@ func (bp *brokerProducer) handleResponse(response *brokerProducerResponse) {
 	}
 }
 
+// staleMetadata reports whether a produce error means the cached metadata is
+// out of date. These are the errors the Java producer treats as an
+// InvalidMetadataException, the only ones after which it asks for a metadata
+// update.
+func staleMetadata(err KError) bool {
+	switch err {
+	case ErrUnknownTopicOrPartition, ErrLeaderNotAvailable, ErrNotLeaderForPartition, ErrKafkaStorageError:
+		return true
+	default:
+		return false
+	}
+}
+
 func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceResponse) {
 	// On a retriable error, send the batch to retryBatch and keep its
 	// partition muted if the producer is idempotent, or if retryBatch already
@@ -1387,7 +1400,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
-	var retryTopics []string
+	var retryTopics, refreshTopics []string
 	keepMuted := make(map[string]map[int32]struct{})
 	sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 		if response == nil {
@@ -1425,6 +1438,9 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
 				retryTopics = append(retryTopics, topic)
+				if staleMetadata(block.Err) {
+					refreshTopics = append(refreshTopics, topic)
+				}
 				if retryAsBatch {
 					if keepMuted[topic] == nil {
 						keepMuted[topic] = make(map[int32]struct{})
@@ -1442,8 +1458,12 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 	})
 
 	if len(retryTopics) > 0 {
-		if retryAsBatch {
-			err := bp.parent.client.RefreshMetadata(retryTopics...)
+		// Like the Java producer, refresh first only when an error says the
+		// cached metadata is stale. The other retriable errors come from the
+		// current leader, and a synchronous refresh would hold the retry until
+		// an unresponsive broker hits Net.ReadTimeout.
+		if retryAsBatch && len(refreshTopics) > 0 {
+			err := bp.parent.client.RefreshMetadata(refreshTopics...)
 			if err != nil {
 				Logger.Printf("Failed refreshing metadata because of %v\n", err)
 			}
@@ -1512,7 +1532,8 @@ func (p *asyncProducer) retryBatch(topic string, partition int32, pSet *partitio
 		p.backoff(pSet.msgs[0].retries)
 	}
 
-	// it's expected that a metadata refresh has been requested prior to calling retryBatch
+	// callers refresh the metadata first whenever it may be stale; otherwise the
+	// cached leader is the broker that answered
 	leader, leaderErr := p.client.Leader(topic, partition)
 	if leaderErr != nil {
 		Logger.Printf("Failed retrying batch for %v-%d because of %v while looking up for new leader\n", topic, partition, leaderErr)
