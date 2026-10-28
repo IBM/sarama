@@ -1570,6 +1570,66 @@ func TestAsyncProducerIdempotentRetryBatchBackoff(t *testing.T) {
 		"BackoffFunc should be called at least Retry.Max times during idempotent retryBatch")
 }
 
+func TestAsyncProducerIdempotentRetryAfterRecovery(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	metadataResponse := &MetadataResponse{Version: 4, ControllerID: 1}
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	initProducerIDResponse := &InitProducerIDResponse{ProducerID: 1000, ProducerEpoch: 1}
+	failResponse := &ProduceResponse{Version: 3}
+	failResponse.AddTopicPartition("my_topic", 0, ErrNotEnoughReplicas)
+	okResponse := &ProduceResponse{Version: 3}
+	okResponse.AddTopicPartition("my_topic", 0, ErrNoError)
+
+	// every batch fails on its first attempt and succeeds on the second
+	var mu sync.Mutex
+	attempts := make(map[int32]int)
+	broker.setHandler(func(req *request) encoderWithHeader {
+		switch req.body.key() {
+		case 3:
+			return metadataResponse
+		case 22:
+			return initProducerIDResponse
+		case 0:
+			batch := req.body.(*ProduceRequest).records["my_topic"][0].RecordBatch
+			mu.Lock()
+			defer mu.Unlock()
+			attempts[batch.FirstSequence]++
+			if attempts[batch.FirstSequence] == 1 {
+				return failResponse
+			}
+			return okResponse
+		}
+		return nil
+	})
+
+	config := NewTestConfig()
+	config.Version = V0_11_0_0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer closeProducer(t, producer)
+
+	for i := range 2 {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+		select {
+		case <-producer.Successes():
+		case pErr := <-producer.Errors():
+			require.FailNow(t, "message failed after one retriable error", "message %d: %v", i, pErr.Err)
+		case <-time.After(10 * time.Second):
+			require.FailNow(t, "no result", "message %d", i)
+		}
+	}
+}
+
 func TestReturnErrors(t *testing.T) {
 	t.Run("bumps the idempotent epoch once per failed batch", func(t *testing.T) {
 		config := NewTestConfig()
