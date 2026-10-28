@@ -2304,6 +2304,71 @@ func TestBrokerProducerHandleError(t *testing.T) {
 		safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
 		require.False(t, parent.muter.tryMute(contender), "partition should stay muted by the retrying batch")
 	})
+
+	t.Run("keeps the flushing batch ahead of the retried accumulating batch", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Producer.Idempotent = false
+		config.Producer.Retry.Max = 2
+		config.Producer.Retry.Backoff = 0
+
+		parent := &asyncProducer{
+			conf:       config,
+			muter:      newPartitionMuter(),
+			brokers:    make(map[*Broker]*brokerProducer),
+			brokerRefs: make(map[*brokerProducer]int),
+			retries:    make(chan *ProducerMessage, 4),
+			txnmgr:     &transactionManager{},
+		}
+		retryLeader := &Broker{id: 2}
+		parent.client = &stubLeaderClient{leader: retryLeader, cfg: config}
+
+		output := make(chan *produceSet, 1)
+		leaderBp := &brokerProducer{
+			parent: parent,
+			broker: retryLeader,
+			output: output,
+			input:  make(chan *ProducerMessage),
+		}
+		parent.brokers[retryLeader] = leaderBp
+		// held by a partitionProducer, so both retries reach this output
+		parent.brokerRefs[leaderBp] = 1
+
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             make(chan *ProducerMessage),
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+
+		// partition 0: "first" is muted and waiting to be sent, "second"
+		// accumulates behind it; partition 1 has a request in flight
+		first := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("first")}
+		second := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("second")}
+		bp.flushingBatch = newProduceSet(parent)
+		safeAddMessage(t, bp.flushingBatch, first)
+		require.True(t, parent.muter.tryMute(bp.flushingBatch))
+		flushing := bp.flushingBatch
+		safeAddMessage(t, bp.accumulatingBatch, second)
+		sent := newProduceSet(parent)
+		safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("other")})
+		require.True(t, parent.muter.tryMute(sent))
+
+		bp.handleError(sent, ErrOutOfBrokers)
+		assert.Same(t, second, assertDoneWithin(t, parent.retries, 2*time.Second))
+		parent.muter.unmute(assertDoneWithin(t, output, 2*time.Second))
+
+		// the closing brokerProducer still sends "first", on a reconnected
+		// broker that is no longer the leader
+		notLeader := new(ProduceResponse)
+		notLeader.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
+		bp.handleSuccess(flushing, notLeader)
+
+		require.Empty(t, parent.retries, "first went back through the partitionProducer behind second")
+		retrySet := assertDoneWithin(t, output, 2*time.Second)
+		defer parent.muter.unmute(retrySet)
+		assert.Same(t, first, retrySet.msgs["topic"][0].msgs[0])
+	})
 }
 
 func TestBrokerProducerHandleSuccess(t *testing.T) {
