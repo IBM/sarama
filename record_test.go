@@ -4,6 +4,8 @@ package sarama
 
 import (
 	"encoding/binary"
+	"errors"
+	"hash/crc32"
 	"math"
 	"reflect"
 	"testing"
@@ -306,5 +308,108 @@ func TestRecordBatchLargeNumRecords(t *testing.T) {
 	err := decode(encodedBatch, &batch, nil)
 	if err != nil {
 		t.Fatal("received error while decoding record batch", err)
+	}
+}
+
+func TestRecordBatchMoreRecordsThanCompressedBytes(t *testing.T) {
+	// zstd squeezes 2000 small, similar records into fewer than 2000 bytes,
+	// so the record count is larger than the bytes left on the wire.
+	const numRecords = 2000
+	batch := RecordBatch{
+		Version:         2,
+		Codec:           CompressionZSTD,
+		LastOffsetDelta: numRecords - 1,
+	}
+	for i := range numRecords {
+		batch.addRecord(&Record{OffsetDelta: int64(i), Value: []byte("hello")})
+	}
+
+	encoded, err := encode(&batch, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) >= numRecords {
+		t.Fatalf("expected the encoded batch to be smaller than %d bytes, got %d", numRecords, len(encoded))
+	}
+
+	var decoded RecordBatch
+	if err := decode(encoded, &decoded, nil); err != nil {
+		t.Fatal("received error while decoding record batch", err)
+	}
+	if decoded.PartialTrailingRecord {
+		t.Fatal("complete record batch decoded as partial")
+	}
+	if len(decoded.Records) != numRecords {
+		t.Fatalf("expected %d records, got %d", numRecords, len(decoded.Records))
+	}
+	for i, r := range decoded.Records {
+		if r.OffsetDelta != int64(i) || string(r.Value) != "hello" {
+			t.Fatalf("record %d decoded as offset delta %d value %q", i, r.OffsetDelta, r.Value)
+		}
+	}
+}
+
+func TestRecordBatchCompressedRecordCountDoesNotDriveAllocation(t *testing.T) {
+	// a small gzip batch can claim far more records than it holds; it must
+	// decode as a partial batch without allocating for the claimed count
+	const valueSize = 1 << 20
+	encoded, err := encode(&RecordBatch{
+		Version: 2,
+		Codec:   CompressionGZIP,
+		Records: []*Record{{Value: make([]byte, valueSize)}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	binary.BigEndian.PutUint32(encoded[57:], uint32(MaxResponseSize))
+	binary.BigEndian.PutUint32(encoded[17:], crc32.Checksum(encoded[21:], crc32.MakeTable(crc32.Castagnoli)))
+
+	var decoded RecordBatch
+	if err := decode(encoded, &decoded, nil); err != nil {
+		t.Fatal("received error while decoding record batch", err)
+	}
+	if !decoded.PartialTrailingRecord || decoded.Records != nil {
+		t.Fatalf("expected a partial batch with no records, got partial=%v records=%d",
+			decoded.PartialTrailingRecord, len(decoded.Records))
+	}
+}
+
+func TestLazyRecordsAllocateAsTheyDecode(t *testing.T) {
+	// one real record followed by nothing, but a claimed count of 1<<30
+	raw, err := encode(recordsArray{{Value: []byte("hello")}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := &lazyRecords{n: 1 << 30}
+	if err := decode(raw, records, nil); !errors.Is(err, ErrInsufficientData) {
+		t.Fatalf("expected ErrInsufficientData, got %v", err)
+	}
+	if len(records.records) != 1 || cap(records.records) > recordsChunk {
+		t.Fatalf("decoded %d records with capacity %d, want 1 record and capacity <= %d",
+			len(records.records), cap(records.records), recordsChunk)
+	}
+}
+
+func TestRecordBatchRecordCountLargerThanRecords(t *testing.T) {
+	// an uncompressed batch claiming more records than its payload could
+	// hold must not allocate for the claimed count
+	encoded, err := encode(&RecordBatch{
+		Version: 2,
+		Records: []*Record{{Value: []byte{1}}},
+	}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the record count sits at offset 57, the CRC at 17 covers offset 21 on
+	binary.BigEndian.PutUint32(encoded[57:], uint32(MaxResponseSize))
+	binary.BigEndian.PutUint32(encoded[17:], crc32.Checksum(encoded[21:], crc32.MakeTable(crc32.Castagnoli)))
+
+	var decoded RecordBatch
+	if err := decode(encoded, &decoded, nil); err != nil {
+		t.Fatal("received error while decoding record batch", err)
+	}
+	if !decoded.PartialTrailingRecord || decoded.Records != nil {
+		t.Fatalf("expected a partial batch with no records, got partial=%v records=%d",
+			decoded.PartialTrailingRecord, len(decoded.Records))
 	}
 }
