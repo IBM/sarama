@@ -1885,6 +1885,41 @@ func TestElectLeaders(t *testing.T) {
 	}
 }
 
+func TestElectLeadersUncleanOnV0Broker(t *testing.T) {
+	// a broker that only speaks ElectLeaders v0 (Kafka 2.2 and 2.3) can only
+	// run preferred elections, so an unclean one must fail rather than be
+	// sent as a preferred election
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	broker.SetHandlerByMap(map[string]MockResponse{
+		"ApiVersionsRequest": mockApiVersionsFor(t,
+			ApiVersionsResponseKey{ApiKey: apiKeyElectLeaders, MinVersion: 0, MaxVersion: 0}),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(broker.BrokerID()).
+			SetBroker(broker.Addr(), broker.BrokerID()),
+		"ElectLeadersRequest": NewMockElectLeadersResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_4_0_0
+	config.ApiVersionsRequest = true
+	admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, admin)
+
+	if _, err := admin.ElectLeaders(UncleanElection, map[string][]int32{"my_topic": {0}}); err == nil {
+		t.Fatal("expected an error for an unclean election against an ElectLeaders v0 broker")
+	}
+	for _, rr := range broker.History() {
+		if req, ok := rr.Request.(*ElectLeadersRequest); ok {
+			t.Fatalf("unclean election was sent to the broker as a v%d %v election", req.Version, req.Type)
+		}
+	}
+}
+
 func TestDescribeTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
