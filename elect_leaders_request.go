@@ -12,6 +12,14 @@ func (r *ElectLeadersRequest) setVersion(v int16) {
 }
 
 func (r *ElectLeadersRequest) encode(pe packetEncoder) error {
+	// Version 0 has no election type and always elects the preferred leader.
+	// Refuse other types rather than silently running a preferred election:
+	// this catches both a too-low Config.Version and a runtime downgrade by
+	// restrictApiVersion, which runs before encode.
+	if r.Version == 0 && r.Type != PreferredElection {
+		return PacketEncodingError{"only PreferredElection is supported by version 0. use version 1 or later"}
+	}
+
 	if r.Version > 0 {
 		pe.putInt8(int8(r.Type))
 	}
