@@ -1883,6 +1883,54 @@ func TestElectLeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("a 2.3 client sends v0", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Version = V2_3_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, admin)
+
+		seen := len(broker.History())
+		if _, err := admin.ElectLeaders(PreferredElection, map[string][]int32{"my_topic": {0}}); err != nil {
+			t.Fatal(err)
+		}
+		var sent *ElectLeadersRequest
+		for _, rr := range broker.History()[seen:] {
+			if req, ok := rr.Request.(*ElectLeadersRequest); ok {
+				sent = req
+			}
+		}
+		if sent == nil {
+			t.Fatal("no ElectLeadersRequest reached the broker")
+		}
+		if sent.Version != 0 {
+			t.Fatalf("expected ElectLeaders v0 for a 2.3 client, got v%d", sent.Version)
+		}
+	})
+
+	t.Run("a client older than 2.2 is unsupported", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Version = V2_1_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, admin)
+
+		seen := len(broker.History())
+		_, err = admin.ElectLeaders(PreferredElection, map[string][]int32{"my_topic": {0}})
+		if !errors.Is(err, ErrUnsupportedVersion) {
+			t.Fatalf("expected ErrUnsupportedVersion, got %v", err)
+		}
+		for _, rr := range broker.History()[seen:] {
+			if req, ok := rr.Request.(*ElectLeadersRequest); ok {
+				t.Fatalf("ElectLeaders v%d reached the broker", req.Version)
+			}
+		}
+	})
 }
 
 func TestElectLeadersUncleanOnV0Broker(t *testing.T) {
