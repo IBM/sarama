@@ -8,6 +8,13 @@ import (
 )
 
 var (
+	electLeadersRequestOneTopicV0 = []byte{
+		0, 0, 0, 1, // 1 topic
+		0, 5, 116, 111, 112, 105, 99, // topic name "topic"
+		0, 0, 0, 1, // 1 partition
+		0, 0, 0, 0, // partition 0
+		0, 0, 39, 16, // timeout 10000
+	}
 	electLeadersRequestOneTopicV1 = []byte{
 		0,          // preferred election type
 		0, 0, 0, 1, // 1 topic
@@ -38,10 +45,36 @@ func TestElectLeadersRequest(t *testing.T) {
 		Type: PreferredElection,
 	}
 
+	request.Version = 0
+	testRequest(t, "one topic V0", request, electLeadersRequestOneTopicV0)
+
+	request.Version = 1
 	testRequest(t, "one topic V1", request, electLeadersRequestOneTopicV1)
 
 	request.Version = 2
 	testRequest(t, "one topic V2", request, electLeadersRequestOneTopicV2)
+}
+
+func TestElectLeadersRequestV0RejectsUnclean(t *testing.T) {
+	// v0 has no election type field, so an unclean election can't be sent
+	// with it and must not go out as a preferred one
+	request := &ElectLeadersRequest{
+		TimeoutMs: int32(10000),
+		Version:   int16(0),
+		TopicPartitions: map[string][]int32{
+			"topic": {0},
+		},
+		Type: UncleanElection,
+	}
+
+	if _, err := encode(request, nil); err == nil {
+		t.Fatal("expected an error encoding an unclean election at version 0")
+	}
+
+	request.Version = 1
+	if _, err := encode(request, nil); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestElectLeadersRequestHeaderVersion(t *testing.T) {
