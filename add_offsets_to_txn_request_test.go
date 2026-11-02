@@ -33,4 +33,7 @@ func TestAddOffsetsToTxnRequest(t *testing.T) {
 
 	req.Version = 3
 	testRequest(t, "v3", req, addOffsetsToTxnRequestV3)
+
+	req.Version = 4
+	testRequest(t, "v4", req, addOffsetsToTxnRequestV3)
 }

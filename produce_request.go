@@ -255,11 +255,13 @@ func (r *ProduceRequest) isFlexibleVersion(version int16) bool {
 }
 
 func (r *ProduceRequest) isValidVersion() bool {
-	return r.Version >= 0 && r.Version <= 10
+	return r.Version >= 0 && r.Version <= 11
 }
 
 func (r *ProduceRequest) requiredVersion() KafkaVersion {
 	switch r.Version {
+	case 11:
+		return V3_8_0_0
 	case 10:
 		return V3_7_0_0
 	case 9:

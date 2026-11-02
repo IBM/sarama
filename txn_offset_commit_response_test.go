@@ -57,4 +57,7 @@ func TestTxnOffsetCommitResponseV3(t *testing.T) {
 	}
 
 	testResponse(t, "V3", resp, txnOffsetCommitResponseV3)
+
+	resp.Version = 4
+	testResponse(t, "V4", resp, txnOffsetCommitResponseV3)
 }

@@ -151,6 +151,12 @@ func TestProduceRequest(t *testing.T) {
 	packet = testRequestEncode(t, "one record v9", request, produceRequestOneRecordV9)
 	batch.compressedRecords = nil
 	testRequestDecode(t, "one record v9", request, packet)
+
+	// v10 and v11 only add error codes, so the wire format is unchanged from v9
+	request.Version = 11
+	packet = testRequestEncode(t, "one record v11", request, produceRequestOneRecordV9)
+	batch.compressedRecords = nil
+	testRequestDecode(t, "one record v11", request, packet)
 }
 
 func benchmarkProduceRequestEncodeMetrics(b *testing.B, partitions int) {

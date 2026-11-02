@@ -30,4 +30,7 @@ func TestAddOffsetsToTxnResponse(t *testing.T) {
 
 	resp.Version = 3
 	testResponse(t, "v3", resp, addOffsetsToTxnResponseV3)
+
+	resp.Version = 4
+	testResponse(t, "v4", resp, addOffsetsToTxnResponseV3)
 }
