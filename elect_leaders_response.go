@@ -154,12 +154,10 @@ func (r *ElectLeadersResponse) isFlexibleVersion(version int16) bool {
 
 func (r *ElectLeadersResponse) requiredVersion() KafkaVersion {
 	switch r.Version {
-	case 2:
+	case 1, 2:
 		return V2_4_0_0
-	case 1:
-		return V0_11_0_0
 	case 0:
-		return V0_10_0_0
+		return V2_2_0_0
 	default:
 		return V2_4_0_0
 	}
