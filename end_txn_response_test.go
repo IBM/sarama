@@ -30,4 +30,7 @@ func TestEndTxnResponse(t *testing.T) {
 
 	resp.Version = 3
 	testResponse(t, "v3", resp, endTxnResponseV3)
+
+	resp.Version = 4
+	testResponse(t, "v4", resp, endTxnResponseV3)
 }

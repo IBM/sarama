@@ -414,22 +414,17 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 		{
 			V3_8_0_0,
 			map[int16]int16{
-				apiKeyListGroups:       5, // up from 4
-				apiKeyListTransactions: 1, // up from 0
-				// TODO: ProduceRequest v11 is not supported, but expected for KafkaVersion 3.8.0
-				// apiKeyProduce:            11, // up from 10
+				apiKeyListGroups:       5,  // up from 4
+				apiKeyListTransactions: 1,  // up from 0
+				apiKeyProduce:          11, // up from 10
 				// TODO: FindCoordinatorRequest v5 is not supported, but expected for KafkaVersion 3.8.0
 				// apiKeyFindCoordinator:    5,  // up from 4
-				// TODO: InitProducerIdRequest v5 is not supported, but expected for KafkaVersion 3.8.0
-				// apiKeyInitProducerId:     5,  // up from 4
+				apiKeyInitProducerId: 5, // up from 4
 				// TODO: AddPartitionsToTxnRequest v5 is not supported, but expected for KafkaVersion 3.8.0
 				// apiKeyAddPartitionsToTxn: 5,  // up from 4
-				// TODO: AddOffsetsToTxnRequest v4 is not supported, but expected for KafkaVersion 3.8.0
-				// apiKeyAddOffsetsToTxn:    4,  // up from 3
-				// TODO: EndTxnRequest v4 is not supported, but expected for KafkaVersion 3.8.0
-				// apiKeyEndTxn:             4,  // up from 3
-				// TODO: TxnOffsetCommitRequest v4 is not supported, but expected for KafkaVersion 3.8.0
-				// apiKeyTxnOffsetCommit:    4,  // up from 3
+				apiKeyAddOffsetsToTxn: 4, // up from 3
+				apiKeyEndTxn:          4, // up from 3
+				apiKeyTxnOffsetCommit: 4, // up from 3
 			},
 		},
 		{
