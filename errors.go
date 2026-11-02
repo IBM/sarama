@@ -176,197 +176,287 @@ type KError int16
 
 // Numeric error codes returned by the Kafka server.
 const (
-	ErrUnknown                            KError = -1 // Errors.UNKNOWN_SERVER_ERROR
-	ErrNoError                            KError = 0  // Errors.NONE
-	ErrOffsetOutOfRange                   KError = 1  // Errors.OFFSET_OUT_OF_RANGE
-	ErrInvalidMessage                     KError = 2  // Errors.CORRUPT_MESSAGE
-	ErrUnknownTopicOrPartition            KError = 3  // Errors.UNKNOWN_TOPIC_OR_PARTITION
-	ErrInvalidMessageSize                 KError = 4  // Errors.INVALID_FETCH_SIZE
-	ErrLeaderNotAvailable                 KError = 5  // Errors.LEADER_NOT_AVAILABLE
-	ErrNotLeaderForPartition              KError = 6  // Errors.NOT_LEADER_OR_FOLLOWER
-	ErrRequestTimedOut                    KError = 7  // Errors.REQUEST_TIMED_OUT
-	ErrBrokerNotAvailable                 KError = 8  // Errors.BROKER_NOT_AVAILABLE
-	ErrReplicaNotAvailable                KError = 9  // Errors.REPLICA_NOT_AVAILABLE
-	ErrMessageSizeTooLarge                KError = 10 // Errors.MESSAGE_TOO_LARGE
-	ErrStaleControllerEpochCode           KError = 11 // Errors.STALE_CONTROLLER_EPOCH
-	ErrOffsetMetadataTooLarge             KError = 12 // Errors.OFFSET_METADATA_TOO_LARGE
-	ErrNetworkException                   KError = 13 // Errors.NETWORK_EXCEPTION
-	ErrOffsetsLoadInProgress              KError = 14 // Errors.COORDINATOR_LOAD_IN_PROGRESS
-	ErrConsumerCoordinatorNotAvailable    KError = 15 // Errors.COORDINATOR_NOT_AVAILABLE
-	ErrNotCoordinatorForConsumer          KError = 16 // Errors.NOT_COORDINATOR
-	ErrInvalidTopic                       KError = 17 // Errors.INVALID_TOPIC_EXCEPTION
-	ErrMessageSetSizeTooLarge             KError = 18 // Errors.RECORD_LIST_TOO_LARGE
-	ErrNotEnoughReplicas                  KError = 19 // Errors.NOT_ENOUGH_REPLICAS
-	ErrNotEnoughReplicasAfterAppend       KError = 20 // Errors.NOT_ENOUGH_REPLICAS_AFTER_APPEND
-	ErrInvalidRequiredAcks                KError = 21 // Errors.INVALID_REQUIRED_ACKS
-	ErrIllegalGeneration                  KError = 22 // Errors.ILLEGAL_GENERATION
-	ErrInconsistentGroupProtocol          KError = 23 // Errors.INCONSISTENT_GROUP_PROTOCOL
-	ErrInvalidGroupId                     KError = 24 // Errors.INVALID_GROUP_ID
-	ErrUnknownMemberId                    KError = 25 // Errors.UNKNOWN_MEMBER_ID
-	ErrInvalidSessionTimeout              KError = 26 // Errors.INVALID_SESSION_TIMEOUT
-	ErrRebalanceInProgress                KError = 27 // Errors.REBALANCE_IN_PROGRESS
-	ErrInvalidCommitOffsetSize            KError = 28 // Errors.INVALID_COMMIT_OFFSET_SIZE
-	ErrTopicAuthorizationFailed           KError = 29 // Errors.TOPIC_AUTHORIZATION_FAILED
-	ErrGroupAuthorizationFailed           KError = 30 // Errors.GROUP_AUTHORIZATION_FAILED
-	ErrClusterAuthorizationFailed         KError = 31 // Errors.CLUSTER_AUTHORIZATION_FAILED
-	ErrInvalidTimestamp                   KError = 32 // Errors.INVALID_TIMESTAMP
-	ErrUnsupportedSASLMechanism           KError = 33 // Errors.UNSUPPORTED_SASL_MECHANISM
-	ErrIllegalSASLState                   KError = 34 // Errors.ILLEGAL_SASL_STATE
-	ErrUnsupportedVersion                 KError = 35 // Errors.UNSUPPORTED_VERSION
-	ErrTopicAlreadyExists                 KError = 36 // Errors.TOPIC_ALREADY_EXISTS
-	ErrInvalidPartitions                  KError = 37 // Errors.INVALID_PARTITIONS
-	ErrInvalidReplicationFactor           KError = 38 // Errors.INVALID_REPLICATION_FACTOR
-	ErrInvalidReplicaAssignment           KError = 39 // Errors.INVALID_REPLICA_ASSIGNMENT
-	ErrInvalidConfig                      KError = 40 // Errors.INVALID_CONFIG
-	ErrNotController                      KError = 41 // Errors.NOT_CONTROLLER
-	ErrInvalidRequest                     KError = 42 // Errors.INVALID_REQUEST
-	ErrUnsupportedForMessageFormat        KError = 43 // Errors.UNSUPPORTED_FOR_MESSAGE_FORMAT
-	ErrPolicyViolation                    KError = 44 // Errors.POLICY_VIOLATION
-	ErrOutOfOrderSequenceNumber           KError = 45 // Errors.OUT_OF_ORDER_SEQUENCE_NUMBER
-	ErrDuplicateSequenceNumber            KError = 46 // Errors.DUPLICATE_SEQUENCE_NUMBER
-	ErrInvalidProducerEpoch               KError = 47 // Errors.INVALID_PRODUCER_EPOCH
-	ErrInvalidTxnState                    KError = 48 // Errors.INVALID_TXN_STATE
-	ErrInvalidProducerIDMapping           KError = 49 // Errors.INVALID_PRODUCER_ID_MAPPING
-	ErrInvalidTransactionTimeout          KError = 50 // Errors.INVALID_TRANSACTION_TIMEOUT
-	ErrConcurrentTransactions             KError = 51 // Errors.CONCURRENT_TRANSACTIONS
-	ErrTransactionCoordinatorFenced       KError = 52 // Errors.TRANSACTION_COORDINATOR_FENCED
-	ErrTransactionalIDAuthorizationFailed KError = 53 // Errors.TRANSACTIONAL_ID_AUTHORIZATION_FAILED
-	ErrSecurityDisabled                   KError = 54 // Errors.SECURITY_DISABLED
-	ErrOperationNotAttempted              KError = 55 // Errors.OPERATION_NOT_ATTEMPTED
-	ErrKafkaStorageError                  KError = 56 // Errors.KAFKA_STORAGE_ERROR
-	ErrLogDirNotFound                     KError = 57 // Errors.LOG_DIR_NOT_FOUND
-	ErrSASLAuthenticationFailed           KError = 58 // Errors.SASL_AUTHENTICATION_FAILED
-	ErrUnknownProducerID                  KError = 59 // Errors.UNKNOWN_PRODUCER_ID
-	ErrReassignmentInProgress             KError = 60 // Errors.REASSIGNMENT_IN_PROGRESS
-	ErrDelegationTokenAuthDisabled        KError = 61 // Errors.DELEGATION_TOKEN_AUTH_DISABLED
-	ErrDelegationTokenNotFound            KError = 62 // Errors.DELEGATION_TOKEN_NOT_FOUND
-	ErrDelegationTokenOwnerMismatch       KError = 63 // Errors.DELEGATION_TOKEN_OWNER_MISMATCH
-	ErrDelegationTokenRequestNotAllowed   KError = 64 // Errors.DELEGATION_TOKEN_REQUEST_NOT_ALLOWED
-	ErrDelegationTokenAuthorizationFailed KError = 65 // Errors.DELEGATION_TOKEN_AUTHORIZATION_FAILED
-	ErrDelegationTokenExpired             KError = 66 // Errors.DELEGATION_TOKEN_EXPIRED
-	ErrInvalidPrincipalType               KError = 67 // Errors.INVALID_PRINCIPAL_TYPE
-	ErrNonEmptyGroup                      KError = 68 // Errors.NON_EMPTY_GROUP
-	ErrGroupIDNotFound                    KError = 69 // Errors.GROUP_ID_NOT_FOUND
-	ErrFetchSessionIDNotFound             KError = 70 // Errors.FETCH_SESSION_ID_NOT_FOUND
-	ErrInvalidFetchSessionEpoch           KError = 71 // Errors.INVALID_FETCH_SESSION_EPOCH
-	ErrListenerNotFound                   KError = 72 // Errors.LISTENER_NOT_FOUND
-	ErrTopicDeletionDisabled              KError = 73 // Errors.TOPIC_DELETION_DISABLED
-	ErrFencedLeaderEpoch                  KError = 74 // Errors.FENCED_LEADER_EPOCH
-	ErrUnknownLeaderEpoch                 KError = 75 // Errors.UNKNOWN_LEADER_EPOCH
-	ErrUnsupportedCompressionType         KError = 76 // Errors.UNSUPPORTED_COMPRESSION_TYPE
-	ErrStaleBrokerEpoch                   KError = 77 // Errors.STALE_BROKER_EPOCH
-	ErrOffsetNotAvailable                 KError = 78 // Errors.OFFSET_NOT_AVAILABLE
-	ErrMemberIdRequired                   KError = 79 // Errors.MEMBER_ID_REQUIRED
-	ErrPreferredLeaderNotAvailable        KError = 80 // Errors.PREFERRED_LEADER_NOT_AVAILABLE
-	ErrGroupMaxSizeReached                KError = 81 // Errors.GROUP_MAX_SIZE_REACHED
-	ErrFencedInstancedId                  KError = 82 // Errors.FENCED_INSTANCE_ID
-	ErrEligibleLeadersNotAvailable        KError = 83 // Errors.ELIGIBLE_LEADERS_NOT_AVAILABLE
-	ErrElectionNotNeeded                  KError = 84 // Errors.ELECTION_NOT_NEEDED
-	ErrNoReassignmentInProgress           KError = 85 // Errors.NO_REASSIGNMENT_IN_PROGRESS
-	ErrGroupSubscribedToTopic             KError = 86 // Errors.GROUP_SUBSCRIBED_TO_TOPIC
-	ErrInvalidRecord                      KError = 87 // Errors.INVALID_RECORD
-	ErrUnstableOffsetCommit               KError = 88 // Errors.UNSTABLE_OFFSET_COMMIT
-	ErrThrottlingQuotaExceeded            KError = 89 // Errors.THROTTLING_QUOTA_EXCEEDED
-	ErrProducerFenced                     KError = 90 // Errors.PRODUCER_FENCED
-	ErrInvalidUpdateVersion               KError = 95 // Errors.INVALID_UPDATE_VERSION
+	ErrUnknown                                KError = -1  // Errors.UNKNOWN_SERVER_ERROR
+	ErrNoError                                KError = 0   // Errors.NONE
+	ErrOffsetOutOfRange                       KError = 1   // Errors.OFFSET_OUT_OF_RANGE
+	ErrInvalidMessage                         KError = 2   // Errors.CORRUPT_MESSAGE
+	ErrUnknownTopicOrPartition                KError = 3   // Errors.UNKNOWN_TOPIC_OR_PARTITION
+	ErrInvalidMessageSize                     KError = 4   // Errors.INVALID_FETCH_SIZE
+	ErrLeaderNotAvailable                     KError = 5   // Errors.LEADER_NOT_AVAILABLE
+	ErrNotLeaderForPartition                  KError = 6   // Errors.NOT_LEADER_OR_FOLLOWER
+	ErrRequestTimedOut                        KError = 7   // Errors.REQUEST_TIMED_OUT
+	ErrBrokerNotAvailable                     KError = 8   // Errors.BROKER_NOT_AVAILABLE
+	ErrReplicaNotAvailable                    KError = 9   // Errors.REPLICA_NOT_AVAILABLE
+	ErrMessageSizeTooLarge                    KError = 10  // Errors.MESSAGE_TOO_LARGE
+	ErrStaleControllerEpochCode               KError = 11  // Errors.STALE_CONTROLLER_EPOCH
+	ErrOffsetMetadataTooLarge                 KError = 12  // Errors.OFFSET_METADATA_TOO_LARGE
+	ErrNetworkException                       KError = 13  // Errors.NETWORK_EXCEPTION
+	ErrOffsetsLoadInProgress                  KError = 14  // Errors.COORDINATOR_LOAD_IN_PROGRESS
+	ErrConsumerCoordinatorNotAvailable        KError = 15  // Errors.COORDINATOR_NOT_AVAILABLE
+	ErrNotCoordinatorForConsumer              KError = 16  // Errors.NOT_COORDINATOR
+	ErrInvalidTopic                           KError = 17  // Errors.INVALID_TOPIC_EXCEPTION
+	ErrMessageSetSizeTooLarge                 KError = 18  // Errors.RECORD_LIST_TOO_LARGE
+	ErrNotEnoughReplicas                      KError = 19  // Errors.NOT_ENOUGH_REPLICAS
+	ErrNotEnoughReplicasAfterAppend           KError = 20  // Errors.NOT_ENOUGH_REPLICAS_AFTER_APPEND
+	ErrInvalidRequiredAcks                    KError = 21  // Errors.INVALID_REQUIRED_ACKS
+	ErrIllegalGeneration                      KError = 22  // Errors.ILLEGAL_GENERATION
+	ErrInconsistentGroupProtocol              KError = 23  // Errors.INCONSISTENT_GROUP_PROTOCOL
+	ErrInvalidGroupId                         KError = 24  // Errors.INVALID_GROUP_ID
+	ErrUnknownMemberId                        KError = 25  // Errors.UNKNOWN_MEMBER_ID
+	ErrInvalidSessionTimeout                  KError = 26  // Errors.INVALID_SESSION_TIMEOUT
+	ErrRebalanceInProgress                    KError = 27  // Errors.REBALANCE_IN_PROGRESS
+	ErrInvalidCommitOffsetSize                KError = 28  // Errors.INVALID_COMMIT_OFFSET_SIZE
+	ErrTopicAuthorizationFailed               KError = 29  // Errors.TOPIC_AUTHORIZATION_FAILED
+	ErrGroupAuthorizationFailed               KError = 30  // Errors.GROUP_AUTHORIZATION_FAILED
+	ErrClusterAuthorizationFailed             KError = 31  // Errors.CLUSTER_AUTHORIZATION_FAILED
+	ErrInvalidTimestamp                       KError = 32  // Errors.INVALID_TIMESTAMP
+	ErrUnsupportedSASLMechanism               KError = 33  // Errors.UNSUPPORTED_SASL_MECHANISM
+	ErrIllegalSASLState                       KError = 34  // Errors.ILLEGAL_SASL_STATE
+	ErrUnsupportedVersion                     KError = 35  // Errors.UNSUPPORTED_VERSION
+	ErrTopicAlreadyExists                     KError = 36  // Errors.TOPIC_ALREADY_EXISTS
+	ErrInvalidPartitions                      KError = 37  // Errors.INVALID_PARTITIONS
+	ErrInvalidReplicationFactor               KError = 38  // Errors.INVALID_REPLICATION_FACTOR
+	ErrInvalidReplicaAssignment               KError = 39  // Errors.INVALID_REPLICA_ASSIGNMENT
+	ErrInvalidConfig                          KError = 40  // Errors.INVALID_CONFIG
+	ErrNotController                          KError = 41  // Errors.NOT_CONTROLLER
+	ErrInvalidRequest                         KError = 42  // Errors.INVALID_REQUEST
+	ErrUnsupportedForMessageFormat            KError = 43  // Errors.UNSUPPORTED_FOR_MESSAGE_FORMAT
+	ErrPolicyViolation                        KError = 44  // Errors.POLICY_VIOLATION
+	ErrOutOfOrderSequenceNumber               KError = 45  // Errors.OUT_OF_ORDER_SEQUENCE_NUMBER
+	ErrDuplicateSequenceNumber                KError = 46  // Errors.DUPLICATE_SEQUENCE_NUMBER
+	ErrInvalidProducerEpoch                   KError = 47  // Errors.INVALID_PRODUCER_EPOCH
+	ErrInvalidTxnState                        KError = 48  // Errors.INVALID_TXN_STATE
+	ErrInvalidProducerIDMapping               KError = 49  // Errors.INVALID_PRODUCER_ID_MAPPING
+	ErrInvalidTransactionTimeout              KError = 50  // Errors.INVALID_TRANSACTION_TIMEOUT
+	ErrConcurrentTransactions                 KError = 51  // Errors.CONCURRENT_TRANSACTIONS
+	ErrTransactionCoordinatorFenced           KError = 52  // Errors.TRANSACTION_COORDINATOR_FENCED
+	ErrTransactionalIDAuthorizationFailed     KError = 53  // Errors.TRANSACTIONAL_ID_AUTHORIZATION_FAILED
+	ErrSecurityDisabled                       KError = 54  // Errors.SECURITY_DISABLED
+	ErrOperationNotAttempted                  KError = 55  // Errors.OPERATION_NOT_ATTEMPTED
+	ErrKafkaStorageError                      KError = 56  // Errors.KAFKA_STORAGE_ERROR
+	ErrLogDirNotFound                         KError = 57  // Errors.LOG_DIR_NOT_FOUND
+	ErrSASLAuthenticationFailed               KError = 58  // Errors.SASL_AUTHENTICATION_FAILED
+	ErrUnknownProducerID                      KError = 59  // Errors.UNKNOWN_PRODUCER_ID
+	ErrReassignmentInProgress                 KError = 60  // Errors.REASSIGNMENT_IN_PROGRESS
+	ErrDelegationTokenAuthDisabled            KError = 61  // Errors.DELEGATION_TOKEN_AUTH_DISABLED
+	ErrDelegationTokenNotFound                KError = 62  // Errors.DELEGATION_TOKEN_NOT_FOUND
+	ErrDelegationTokenOwnerMismatch           KError = 63  // Errors.DELEGATION_TOKEN_OWNER_MISMATCH
+	ErrDelegationTokenRequestNotAllowed       KError = 64  // Errors.DELEGATION_TOKEN_REQUEST_NOT_ALLOWED
+	ErrDelegationTokenAuthorizationFailed     KError = 65  // Errors.DELEGATION_TOKEN_AUTHORIZATION_FAILED
+	ErrDelegationTokenExpired                 KError = 66  // Errors.DELEGATION_TOKEN_EXPIRED
+	ErrInvalidPrincipalType                   KError = 67  // Errors.INVALID_PRINCIPAL_TYPE
+	ErrNonEmptyGroup                          KError = 68  // Errors.NON_EMPTY_GROUP
+	ErrGroupIDNotFound                        KError = 69  // Errors.GROUP_ID_NOT_FOUND
+	ErrFetchSessionIDNotFound                 KError = 70  // Errors.FETCH_SESSION_ID_NOT_FOUND
+	ErrInvalidFetchSessionEpoch               KError = 71  // Errors.INVALID_FETCH_SESSION_EPOCH
+	ErrListenerNotFound                       KError = 72  // Errors.LISTENER_NOT_FOUND
+	ErrTopicDeletionDisabled                  KError = 73  // Errors.TOPIC_DELETION_DISABLED
+	ErrFencedLeaderEpoch                      KError = 74  // Errors.FENCED_LEADER_EPOCH
+	ErrUnknownLeaderEpoch                     KError = 75  // Errors.UNKNOWN_LEADER_EPOCH
+	ErrUnsupportedCompressionType             KError = 76  // Errors.UNSUPPORTED_COMPRESSION_TYPE
+	ErrStaleBrokerEpoch                       KError = 77  // Errors.STALE_BROKER_EPOCH
+	ErrOffsetNotAvailable                     KError = 78  // Errors.OFFSET_NOT_AVAILABLE
+	ErrMemberIdRequired                       KError = 79  // Errors.MEMBER_ID_REQUIRED
+	ErrPreferredLeaderNotAvailable            KError = 80  // Errors.PREFERRED_LEADER_NOT_AVAILABLE
+	ErrGroupMaxSizeReached                    KError = 81  // Errors.GROUP_MAX_SIZE_REACHED
+	ErrFencedInstancedId                      KError = 82  // Errors.FENCED_INSTANCE_ID
+	ErrEligibleLeadersNotAvailable            KError = 83  // Errors.ELIGIBLE_LEADERS_NOT_AVAILABLE
+	ErrElectionNotNeeded                      KError = 84  // Errors.ELECTION_NOT_NEEDED
+	ErrNoReassignmentInProgress               KError = 85  // Errors.NO_REASSIGNMENT_IN_PROGRESS
+	ErrGroupSubscribedToTopic                 KError = 86  // Errors.GROUP_SUBSCRIBED_TO_TOPIC
+	ErrInvalidRecord                          KError = 87  // Errors.INVALID_RECORD
+	ErrUnstableOffsetCommit                   KError = 88  // Errors.UNSTABLE_OFFSET_COMMIT
+	ErrThrottlingQuotaExceeded                KError = 89  // Errors.THROTTLING_QUOTA_EXCEEDED
+	ErrProducerFenced                         KError = 90  // Errors.PRODUCER_FENCED
+	ErrResourceNotFound                       KError = 91  // Errors.RESOURCE_NOT_FOUND
+	ErrDuplicateResource                      KError = 92  // Errors.DUPLICATE_RESOURCE
+	ErrUnacceptableCredential                 KError = 93  // Errors.UNACCEPTABLE_CREDENTIAL
+	ErrInconsistentVoterSet                   KError = 94  // Errors.INCONSISTENT_VOTER_SET
+	ErrInvalidUpdateVersion                   KError = 95  // Errors.INVALID_UPDATE_VERSION
+	ErrFeatureUpdateFailed                    KError = 96  // Errors.FEATURE_UPDATE_FAILED
+	ErrPrincipalDeserializationFailure        KError = 97  // Errors.PRINCIPAL_DESERIALIZATION_FAILURE
+	ErrSnapshotNotFound                       KError = 98  // Errors.SNAPSHOT_NOT_FOUND
+	ErrPositionOutOfRange                     KError = 99  // Errors.POSITION_OUT_OF_RANGE
+	ErrUnknownTopicID                         KError = 100 // Errors.UNKNOWN_TOPIC_ID
+	ErrDuplicateBrokerRegistration            KError = 101 // Errors.DUPLICATE_BROKER_REGISTRATION
+	ErrBrokerIDNotRegistered                  KError = 102 // Errors.BROKER_ID_NOT_REGISTERED
+	ErrInconsistentTopicID                    KError = 103 // Errors.INCONSISTENT_TOPIC_ID
+	ErrInconsistentClusterID                  KError = 104 // Errors.INCONSISTENT_CLUSTER_ID
+	ErrTransactionalIDNotFound                KError = 105 // Errors.TRANSACTIONAL_ID_NOT_FOUND
+	ErrFetchSessionTopicIDError               KError = 106 // Errors.FETCH_SESSION_TOPIC_ID_ERROR
+	ErrIneligibleReplica                      KError = 107 // Errors.INELIGIBLE_REPLICA
+	ErrNewLeaderElected                       KError = 108 // Errors.NEW_LEADER_ELECTED
+	ErrOffsetMovedToTieredStorage             KError = 109 // Errors.OFFSET_MOVED_TO_TIERED_STORAGE
+	ErrFencedMemberEpoch                      KError = 110 // Errors.FENCED_MEMBER_EPOCH
+	ErrUnreleasedInstanceID                   KError = 111 // Errors.UNRELEASED_INSTANCE_ID
+	ErrUnsupportedAssignor                    KError = 112 // Errors.UNSUPPORTED_ASSIGNOR
+	ErrStaleMemberEpoch                       KError = 113 // Errors.STALE_MEMBER_EPOCH
+	ErrMismatchedEndpointType                 KError = 114 // Errors.MISMATCHED_ENDPOINT_TYPE
+	ErrUnsupportedEndpointType                KError = 115 // Errors.UNSUPPORTED_ENDPOINT_TYPE
+	ErrUnknownControllerID                    KError = 116 // Errors.UNKNOWN_CONTROLLER_ID
+	ErrUnknownSubscriptionID                  KError = 117 // Errors.UNKNOWN_SUBSCRIPTION_ID
+	ErrTelemetryTooLarge                      KError = 118 // Errors.TELEMETRY_TOO_LARGE
+	ErrInvalidRegistration                    KError = 119 // Errors.INVALID_REGISTRATION
+	ErrTransactionAbortable                   KError = 120 // Errors.TRANSACTION_ABORTABLE
+	ErrInvalidRecordState                     KError = 121 // Errors.INVALID_RECORD_STATE
+	ErrShareSessionNotFound                   KError = 122 // Errors.SHARE_SESSION_NOT_FOUND
+	ErrInvalidShareSessionEpoch               KError = 123 // Errors.INVALID_SHARE_SESSION_EPOCH
+	ErrFencedStateEpoch                       KError = 124 // Errors.FENCED_STATE_EPOCH
+	ErrInvalidVoterKey                        KError = 125 // Errors.INVALID_VOTER_KEY
+	ErrDuplicateVoter                         KError = 126 // Errors.DUPLICATE_VOTER
+	ErrVoterNotFound                          KError = 127 // Errors.VOTER_NOT_FOUND
+	ErrInvalidRegularExpression               KError = 128 // Errors.INVALID_REGULAR_EXPRESSION
+	ErrRebootstrapRequired                    KError = 129 // Errors.REBOOTSTRAP_REQUIRED
+	ErrStreamsInvalidTopology                 KError = 130 // Errors.STREAMS_INVALID_TOPOLOGY
+	ErrStreamsInvalidTopologyEpoch            KError = 131 // Errors.STREAMS_INVALID_TOPOLOGY_EPOCH
+	ErrStreamsTopologyFenced                  KError = 132 // Errors.STREAMS_TOPOLOGY_FENCED
+	ErrShareSessionLimitReached               KError = 133 // Errors.SHARE_SESSION_LIMIT_REACHED
+	ErrGroupDeletionFailed                    KError = 134 // Errors.GROUP_DELETION_FAILED
+	ErrStreamsTopologyDescriptionUpdateFailed KError = 135 // Errors.STREAMS_TOPOLOGY_DESCRIPTION_UPDATE_FAILED
+	ErrControllerIDNotRegistered              KError = 136 // Errors.CONTROLLER_ID_NOT_REGISTERED
 )
 
 // kErrorMessages holds the broker-side description of each error code.
 // Error messages stolen/adapted from
 // https://kafka.apache.org/protocol#protocol_error_codes
 var kErrorMessages = map[KError]string{
-	ErrNoError:                            "Not an error, why are you printing me?",
-	ErrUnknown:                            "Unexpected (unknown?) server error",
-	ErrOffsetOutOfRange:                   "The requested offset is outside the range of offsets maintained by the server for the given topic/partition",
-	ErrInvalidMessage:                     "Message contents does not match its CRC",
-	ErrUnknownTopicOrPartition:            "Request was for a topic or partition that does not exist on this broker",
-	ErrInvalidMessageSize:                 "The message has a negative size",
-	ErrLeaderNotAvailable:                 "In the middle of a leadership election, there is currently no leader for this partition and hence it is unavailable for writes",
-	ErrNotLeaderForPartition:              "Tried to send a message to a replica that is not the leader for some partition. Your metadata is out of date",
-	ErrRequestTimedOut:                    "Request exceeded the user-specified time limit in the request",
-	ErrBrokerNotAvailable:                 "Broker not available. Not a client facing error, we should never receive this!!!",
-	ErrReplicaNotAvailable:                "Replica information not available, one or more brokers are down",
-	ErrMessageSizeTooLarge:                "Message was too large, server rejected it to avoid allocation error",
-	ErrStaleControllerEpochCode:           "StaleControllerEpochCode (internal error code for broker-to-broker communication)",
-	ErrOffsetMetadataTooLarge:             "Specified a string larger than the configured maximum for offset metadata",
-	ErrNetworkException:                   "The server disconnected before a response was received",
-	ErrOffsetsLoadInProgress:              "The coordinator is still loading offsets and cannot currently process requests",
-	ErrConsumerCoordinatorNotAvailable:    "The coordinator is not available",
-	ErrNotCoordinatorForConsumer:          "Request was for a consumer group that is not coordinated by this broker",
-	ErrInvalidTopic:                       "The request attempted to perform an operation on an invalid topic",
-	ErrMessageSetSizeTooLarge:             "The request included message batch larger than the configured segment size on the server",
-	ErrNotEnoughReplicas:                  "Messages are rejected since there are fewer in-sync replicas than required",
-	ErrNotEnoughReplicasAfterAppend:       "Messages are written to the log, but to fewer in-sync replicas than required",
-	ErrInvalidRequiredAcks:                "The number of required acks is invalid (should be either -1, 0, or 1)",
-	ErrIllegalGeneration:                  "The provided generation id is not the current generation",
-	ErrInconsistentGroupProtocol:          "The provider group protocol type is incompatible with the other members",
-	ErrInvalidGroupId:                     "The provided group id was empty",
-	ErrUnknownMemberId:                    "The provided member is not known in the current generation",
-	ErrInvalidSessionTimeout:              "The provided session timeout is outside the allowed range",
-	ErrRebalanceInProgress:                "A rebalance for the group is in progress. Please re-join the group",
-	ErrInvalidCommitOffsetSize:            "The provided commit metadata was too large",
-	ErrTopicAuthorizationFailed:           "The client is not authorized to access this topic",
-	ErrGroupAuthorizationFailed:           "The client is not authorized to access this group",
-	ErrClusterAuthorizationFailed:         "The client is not authorized to send this request type",
-	ErrInvalidTimestamp:                   "The timestamp of the message is out of acceptable range",
-	ErrUnsupportedSASLMechanism:           "The broker does not support the requested SASL mechanism",
-	ErrIllegalSASLState:                   "Request is not valid given the current SASL state",
-	ErrUnsupportedVersion:                 "The version of API is not supported",
-	ErrTopicAlreadyExists:                 "Topic with this name already exists",
-	ErrInvalidPartitions:                  "Number of partitions is invalid",
-	ErrInvalidReplicationFactor:           "Replication-factor is invalid",
-	ErrInvalidReplicaAssignment:           "Replica assignment is invalid",
-	ErrInvalidConfig:                      "Configuration is invalid",
-	ErrNotController:                      "This is not the correct controller for this cluster",
-	ErrInvalidRequest:                     "This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details",
-	ErrUnsupportedForMessageFormat:        "The requested operation is not supported by the message format version",
-	ErrPolicyViolation:                    "Request parameters do not satisfy the configured policy",
-	ErrOutOfOrderSequenceNumber:           "The broker received an out of order sequence number",
-	ErrDuplicateSequenceNumber:            "The broker received a duplicate sequence number",
-	ErrInvalidProducerEpoch:               "Producer attempted an operation with an old epoch",
-	ErrInvalidTxnState:                    "The producer attempted a transactional operation in an invalid state",
-	ErrInvalidProducerIDMapping:           "The producer attempted to use a producer id which is not currently assigned to its transactional id",
-	ErrInvalidTransactionTimeout:          "The transaction timeout is larger than the maximum value allowed by the broker (as configured by max.transaction.timeout.ms)",
-	ErrConcurrentTransactions:             "The producer attempted to update a transaction while another concurrent operation on the same transaction was ongoing",
-	ErrTransactionCoordinatorFenced:       "The transaction coordinator sending a WriteTxnMarker is no longer the current coordinator for a given producer",
-	ErrTransactionalIDAuthorizationFailed: "Transactional ID authorization failed",
-	ErrSecurityDisabled:                   "Security features are disabled",
-	ErrOperationNotAttempted:              "The broker did not attempt to execute this operation",
-	ErrKafkaStorageError:                  "Disk error when trying to access log file on the disk",
-	ErrLogDirNotFound:                     "The specified log directory is not found in the broker config",
-	ErrSASLAuthenticationFailed:           "SASL Authentication failed",
-	ErrUnknownProducerID:                  "The broker could not locate the producer metadata associated with the Producer ID",
-	ErrReassignmentInProgress:             "A partition reassignment is in progress",
-	ErrDelegationTokenAuthDisabled:        "Delegation Token feature is not enabled",
-	ErrDelegationTokenNotFound:            "Delegation Token is not found on server",
-	ErrDelegationTokenOwnerMismatch:       "Specified Principal is not valid Owner/Renewer",
-	ErrDelegationTokenRequestNotAllowed:   "Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels",
-	ErrDelegationTokenAuthorizationFailed: "Delegation Token authorization failed",
-	ErrDelegationTokenExpired:             "Delegation Token is expired",
-	ErrInvalidPrincipalType:               "Supplied principalType is not supported",
-	ErrNonEmptyGroup:                      "The group is not empty",
-	ErrGroupIDNotFound:                    "The group id does not exist",
-	ErrFetchSessionIDNotFound:             "The fetch session ID was not found",
-	ErrInvalidFetchSessionEpoch:           "The fetch session epoch is invalid",
-	ErrListenerNotFound:                   "There is no listener on the leader broker that matches the listener on which metadata request was processed",
-	ErrTopicDeletionDisabled:              "Topic deletion is disabled",
-	ErrFencedLeaderEpoch:                  "The leader epoch in the request is older than the epoch on the broker",
-	ErrUnknownLeaderEpoch:                 "The leader epoch in the request is newer than the epoch on the broker",
-	ErrUnsupportedCompressionType:         "The requesting client does not support the compression type of given partition",
-	ErrStaleBrokerEpoch:                   "Broker epoch has changed",
-	ErrOffsetNotAvailable:                 "The leader high watermark has not caught up from a recent leader election so the offsets cannot be guaranteed to be monotonically increasing",
-	ErrMemberIdRequired:                   "The group member needs to have a valid member id before actually entering a consumer group",
-	ErrPreferredLeaderNotAvailable:        "The preferred leader was not available",
-	ErrGroupMaxSizeReached:                "Consumer group The consumer group has reached its max size. already has the configured maximum number of members",
-	ErrFencedInstancedId:                  "The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id",
-	ErrEligibleLeadersNotAvailable:        "Eligible topic partition leaders are not available",
-	ErrElectionNotNeeded:                  "Leader election not needed for topic partition",
-	ErrNoReassignmentInProgress:           "No partition reassignment is in progress",
-	ErrGroupSubscribedToTopic:             "Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it",
-	ErrInvalidRecord:                      "This record has failed the validation on broker and hence will be rejected",
-	ErrUnstableOffsetCommit:               "There are unstable offsets that need to be cleared",
-	ErrThrottlingQuotaExceeded:            "The throttling quota has been exceeded",
-	ErrInvalidUpdateVersion:               "The given update version was invalid",
+	ErrNoError:                                "Not an error, why are you printing me?",
+	ErrUnknown:                                "Unexpected (unknown?) server error",
+	ErrOffsetOutOfRange:                       "The requested offset is outside the range of offsets maintained by the server for the given topic/partition",
+	ErrInvalidMessage:                         "Message contents does not match its CRC",
+	ErrUnknownTopicOrPartition:                "Request was for a topic or partition that does not exist on this broker",
+	ErrInvalidMessageSize:                     "The message has a negative size",
+	ErrLeaderNotAvailable:                     "In the middle of a leadership election, there is currently no leader for this partition and hence it is unavailable for writes",
+	ErrNotLeaderForPartition:                  "Tried to send a message to a replica that is not the leader for some partition. Your metadata is out of date",
+	ErrRequestTimedOut:                        "Request exceeded the user-specified time limit in the request",
+	ErrBrokerNotAvailable:                     "Broker not available. Not a client facing error, we should never receive this!!!",
+	ErrReplicaNotAvailable:                    "Replica information not available, one or more brokers are down",
+	ErrMessageSizeTooLarge:                    "Message was too large, server rejected it to avoid allocation error",
+	ErrStaleControllerEpochCode:               "StaleControllerEpochCode (internal error code for broker-to-broker communication)",
+	ErrOffsetMetadataTooLarge:                 "Specified a string larger than the configured maximum for offset metadata",
+	ErrNetworkException:                       "The server disconnected before a response was received",
+	ErrOffsetsLoadInProgress:                  "The coordinator is still loading offsets and cannot currently process requests",
+	ErrConsumerCoordinatorNotAvailable:        "The coordinator is not available",
+	ErrNotCoordinatorForConsumer:              "Request was for a consumer group that is not coordinated by this broker",
+	ErrInvalidTopic:                           "The request attempted to perform an operation on an invalid topic",
+	ErrMessageSetSizeTooLarge:                 "The request included message batch larger than the configured segment size on the server",
+	ErrNotEnoughReplicas:                      "Messages are rejected since there are fewer in-sync replicas than required",
+	ErrNotEnoughReplicasAfterAppend:           "Messages are written to the log, but to fewer in-sync replicas than required",
+	ErrInvalidRequiredAcks:                    "The number of required acks is invalid (should be either -1, 0, or 1)",
+	ErrIllegalGeneration:                      "The provided generation id is not the current generation",
+	ErrInconsistentGroupProtocol:              "The provider group protocol type is incompatible with the other members",
+	ErrInvalidGroupId:                         "The provided group id was empty",
+	ErrUnknownMemberId:                        "The provided member is not known in the current generation",
+	ErrInvalidSessionTimeout:                  "The provided session timeout is outside the allowed range",
+	ErrRebalanceInProgress:                    "A rebalance for the group is in progress. Please re-join the group",
+	ErrInvalidCommitOffsetSize:                "The provided commit metadata was too large",
+	ErrTopicAuthorizationFailed:               "The client is not authorized to access this topic",
+	ErrGroupAuthorizationFailed:               "The client is not authorized to access this group",
+	ErrClusterAuthorizationFailed:             "The client is not authorized to send this request type",
+	ErrInvalidTimestamp:                       "The timestamp of the message is out of acceptable range",
+	ErrUnsupportedSASLMechanism:               "The broker does not support the requested SASL mechanism",
+	ErrIllegalSASLState:                       "Request is not valid given the current SASL state",
+	ErrUnsupportedVersion:                     "The version of API is not supported",
+	ErrTopicAlreadyExists:                     "Topic with this name already exists",
+	ErrInvalidPartitions:                      "Number of partitions is invalid",
+	ErrInvalidReplicationFactor:               "Replication-factor is invalid",
+	ErrInvalidReplicaAssignment:               "Replica assignment is invalid",
+	ErrInvalidConfig:                          "Configuration is invalid",
+	ErrNotController:                          "This is not the correct controller for this cluster",
+	ErrInvalidRequest:                         "This most likely occurs because of a request being malformed by the client library or the message was sent to an incompatible broker. See the broker logs for more details",
+	ErrUnsupportedForMessageFormat:            "The requested operation is not supported by the message format version",
+	ErrPolicyViolation:                        "Request parameters do not satisfy the configured policy",
+	ErrOutOfOrderSequenceNumber:               "The broker received an out of order sequence number",
+	ErrDuplicateSequenceNumber:                "The broker received a duplicate sequence number",
+	ErrInvalidProducerEpoch:                   "Producer attempted an operation with an old epoch",
+	ErrInvalidTxnState:                        "The producer attempted a transactional operation in an invalid state",
+	ErrInvalidProducerIDMapping:               "The producer attempted to use a producer id which is not currently assigned to its transactional id",
+	ErrInvalidTransactionTimeout:              "The transaction timeout is larger than the maximum value allowed by the broker (as configured by max.transaction.timeout.ms)",
+	ErrConcurrentTransactions:                 "The producer attempted to update a transaction while another concurrent operation on the same transaction was ongoing",
+	ErrTransactionCoordinatorFenced:           "The transaction coordinator sending a WriteTxnMarker is no longer the current coordinator for a given producer",
+	ErrTransactionalIDAuthorizationFailed:     "Transactional ID authorization failed",
+	ErrSecurityDisabled:                       "Security features are disabled",
+	ErrOperationNotAttempted:                  "The broker did not attempt to execute this operation",
+	ErrKafkaStorageError:                      "Disk error when trying to access log file on the disk",
+	ErrLogDirNotFound:                         "The specified log directory is not found in the broker config",
+	ErrSASLAuthenticationFailed:               "SASL Authentication failed",
+	ErrUnknownProducerID:                      "The broker could not locate the producer metadata associated with the Producer ID",
+	ErrReassignmentInProgress:                 "A partition reassignment is in progress",
+	ErrDelegationTokenAuthDisabled:            "Delegation Token feature is not enabled",
+	ErrDelegationTokenNotFound:                "Delegation Token is not found on server",
+	ErrDelegationTokenOwnerMismatch:           "Specified Principal is not valid Owner/Renewer",
+	ErrDelegationTokenRequestNotAllowed:       "Delegation Token requests are not allowed on PLAINTEXT/1-way SSL channels and on delegation token authenticated channels",
+	ErrDelegationTokenAuthorizationFailed:     "Delegation Token authorization failed",
+	ErrDelegationTokenExpired:                 "Delegation Token is expired",
+	ErrInvalidPrincipalType:                   "Supplied principalType is not supported",
+	ErrNonEmptyGroup:                          "The group is not empty",
+	ErrGroupIDNotFound:                        "The group id does not exist",
+	ErrFetchSessionIDNotFound:                 "The fetch session ID was not found",
+	ErrInvalidFetchSessionEpoch:               "The fetch session epoch is invalid",
+	ErrListenerNotFound:                       "There is no listener on the leader broker that matches the listener on which metadata request was processed",
+	ErrTopicDeletionDisabled:                  "Topic deletion is disabled",
+	ErrFencedLeaderEpoch:                      "The leader epoch in the request is older than the epoch on the broker",
+	ErrUnknownLeaderEpoch:                     "The leader epoch in the request is newer than the epoch on the broker",
+	ErrUnsupportedCompressionType:             "The requesting client does not support the compression type of given partition",
+	ErrStaleBrokerEpoch:                       "Broker epoch has changed",
+	ErrOffsetNotAvailable:                     "The leader high watermark has not caught up from a recent leader election so the offsets cannot be guaranteed to be monotonically increasing",
+	ErrMemberIdRequired:                       "The group member needs to have a valid member id before actually entering a consumer group",
+	ErrPreferredLeaderNotAvailable:            "The preferred leader was not available",
+	ErrGroupMaxSizeReached:                    "Consumer group The consumer group has reached its max size. already has the configured maximum number of members",
+	ErrFencedInstancedId:                      "The broker rejected this static consumer since another consumer with the same group.instance.id has registered with a different member.id",
+	ErrEligibleLeadersNotAvailable:            "Eligible topic partition leaders are not available",
+	ErrElectionNotNeeded:                      "Leader election not needed for topic partition",
+	ErrNoReassignmentInProgress:               "No partition reassignment is in progress",
+	ErrGroupSubscribedToTopic:                 "Deleting offsets of a topic is forbidden while the consumer group is actively subscribed to it",
+	ErrInvalidRecord:                          "This record has failed the validation on broker and hence will be rejected",
+	ErrUnstableOffsetCommit:                   "There are unstable offsets that need to be cleared",
+	ErrThrottlingQuotaExceeded:                "The throttling quota has been exceeded",
+	ErrResourceNotFound:                       "A request illegally referred to a resource that does not exist",
+	ErrDuplicateResource:                      "A request illegally referred to the same resource twice",
+	ErrUnacceptableCredential:                 "Requested credential would not meet criteria for acceptability",
+	ErrInconsistentVoterSet:                   "Indicates that the either the sender or recipient of a voter-only request is not one of the expected voters",
+	ErrInvalidUpdateVersion:                   "The given update version was invalid",
+	ErrFeatureUpdateFailed:                    "Unable to update finalized features due to an unexpected server error",
+	ErrPrincipalDeserializationFailure:        "Request principal deserialization failed during forwarding. This indicates an internal error on the broker cluster security setup",
+	ErrSnapshotNotFound:                       "Requested snapshot was not found",
+	ErrPositionOutOfRange:                     "Requested position is not greater than or equal to zero, and less than the size of the snapshot",
+	ErrUnknownTopicID:                         "This server does not host this topic ID",
+	ErrDuplicateBrokerRegistration:            "This broker ID is already in use",
+	ErrBrokerIDNotRegistered:                  "The given broker ID was not registered",
+	ErrInconsistentTopicID:                    "The log's topic ID did not match the topic ID in the request",
+	ErrInconsistentClusterID:                  "The clusterId in the request does not match that found on the server",
+	ErrTransactionalIDNotFound:                "The transactionalId could not be found",
+	ErrFetchSessionTopicIDError:               "The fetch session encountered inconsistent topic ID usage",
+	ErrIneligibleReplica:                      "The new ISR contains at least one ineligible replica",
+	ErrNewLeaderElected:                       "The AlterPartition request successfully updated the partition state but the leader has changed",
+	ErrOffsetMovedToTieredStorage:             "The requested offset is moved to tiered storage",
+	ErrFencedMemberEpoch:                      "The member epoch is fenced by the group coordinator. The member must abandon all its partitions and rejoin",
+	ErrUnreleasedInstanceID:                   "The instance ID is still used by another member in the consumer group. That member must leave first",
+	ErrUnsupportedAssignor:                    "The assignor or its version range is not supported by the consumer group",
+	ErrStaleMemberEpoch:                       "The member epoch is stale. The member must retry after receiving its updated member epoch via the ConsumerGroupHeartbeat API",
+	ErrMismatchedEndpointType:                 "The request was sent to an endpoint of the wrong type",
+	ErrUnsupportedEndpointType:                "This endpoint type is not supported yet",
+	ErrUnknownControllerID:                    "This controller ID is not known",
+	ErrUnknownSubscriptionID:                  "Client sent a push telemetry request with an invalid or outdated subscription ID",
+	ErrTelemetryTooLarge:                      "Client sent a push telemetry request larger than the maximum size the broker will accept",
+	ErrInvalidRegistration:                    "The controller has considered the broker registration to be invalid",
+	ErrTransactionAbortable:                   "The server encountered an error with the transaction. The client can abort the transaction to continue using this transactional ID",
+	ErrInvalidRecordState:                     "The record state is invalid. The acknowledgement of delivery could not be completed",
+	ErrShareSessionNotFound:                   "The share session was not found",
+	ErrInvalidShareSessionEpoch:               "The share session epoch is invalid",
+	ErrFencedStateEpoch:                       "The coordinator rejected the request because the state epoch did not match",
+	ErrInvalidVoterKey:                        "The voter key doesn't match the receiving replica's key",
+	ErrDuplicateVoter:                         "The voter is already part of the set of voters",
+	ErrVoterNotFound:                          "The voter is not part of the set of voters",
+	ErrInvalidRegularExpression:               "The regular expression is not valid",
+	ErrRebootstrapRequired:                    "Client metadata is stale. The client should rebootstrap to obtain new metadata",
+	ErrStreamsInvalidTopology:                 "The supplied topology is invalid",
+	ErrStreamsInvalidTopologyEpoch:            "The supplied topology epoch is invalid",
+	ErrStreamsTopologyFenced:                  "The supplied topology epoch is outdated",
+	ErrShareSessionLimitReached:               "The limit of share sessions has been reached",
+	ErrGroupDeletionFailed:                    "DeleteGroups could not complete; see the error message on the per-group result for details",
+	ErrStreamsTopologyDescriptionUpdateFailed: "The broker could not process the topology description update; see the error message for details",
+	ErrControllerIDNotRegistered:              "The given controller ID was not registered",
 }
 
 func (err KError) Error() string {

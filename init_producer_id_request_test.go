@@ -53,4 +53,7 @@ func TestInitProducerIDRequest(t *testing.T) {
 	req.ProducerEpoch = 321
 
 	testRequest(t, "producer id", req, initProducerIDRequestProducerId)
+
+	req.Version = 5
+	testRequest(t, "producer id v5", req, initProducerIDRequestProducerId)
 }

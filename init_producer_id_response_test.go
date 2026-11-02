@@ -47,4 +47,7 @@ func TestInitProducerIDResponse(t *testing.T) {
 
 	resp.Version = 2
 	testResponse(t, "with tagged fields", resp, initProducerIdResponseWithTaggedFields)
+
+	resp.Version = 5
+	testResponse(t, "with tagged fields v5", resp, initProducerIdResponseWithTaggedFields)
 }

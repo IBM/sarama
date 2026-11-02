@@ -33,4 +33,7 @@ func TestEndTxnRequest(t *testing.T) {
 
 	req.Version = 3
 	testRequest(t, "v3", req, endTxnRequestV3)
+
+	req.Version = 4
+	testRequest(t, "v4", req, endTxnRequestV3)
 }
