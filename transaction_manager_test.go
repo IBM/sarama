@@ -126,6 +126,15 @@ func TestTxnmgrInitProducerIdTxn(t *testing.T) {
 	require.Equal(t, int64(1), txmng.producerID)
 	require.Equal(t, int16(0), txmng.producerEpoch)
 	require.Equal(t, ProducerTxnFlagReady, txmng.status)
+
+	t.Run("abortable error", func(t *testing.T) {
+		// a re-init after an epoch bump runs from the initializing state
+		txmng.status = ProducerTxnFlagInitializing
+		broker.Returns(&InitProducerIDResponse{Err: ErrTransactionAbortable})
+		_, _, err := txmng.initProducerId()
+		require.ErrorIs(t, err, ErrTransactionAbortable)
+		require.NotEqual(t, 0, txmng.currentTxnStatus()&ProducerTxnFlagAbortableError)
+	})
 }
 
 // TestTxnmgrInitProducerIdTxnCoordinatorLoading ensure we retry initProducerId when either FindCoordinator or InitProducerID returns ErrOffsetsLoadInProgress
@@ -383,6 +392,13 @@ func TestAddOffsetsToTxn(t *testing.T) {
 			initialFlags:  ProducerTxnFlagInTransaction,
 			expectedFlags: ProducerTxnFlagAbortableError,
 			expectedError: ErrGroupAuthorizationFailed,
+			newOffsets:    originalOffsets,
+		},
+		{
+			brokerErr:     ErrTransactionAbortable,
+			initialFlags:  ProducerTxnFlagInTransaction,
+			expectedFlags: ProducerTxnFlagAbortableError,
+			expectedError: ErrTransactionAbortable,
 			newOffsets:    originalOffsets,
 		},
 	}
@@ -695,6 +711,19 @@ func TestTxnOffsetsCommit(t *testing.T) {
 			expectedOffsets: originalOffsets,
 		},
 		{
+			brokerErr:    ErrTransactionAbortable,
+			initialFlags: ProducerTxnFlagInTransaction,
+			initialOffsets: topicPartitionOffsets{
+				topicPartition{topic: "test-topic", partition: 0}: {
+					Partition: 0,
+					Offset:    0,
+				},
+			},
+			expectedFlags:   ProducerTxnFlagAbortableError,
+			expectedError:   ErrTransactionAbortable,
+			expectedOffsets: originalOffsets,
+		},
+		{
 			brokerErr:    ErrKafkaStorageError,
 			initialFlags: ProducerTxnFlagInTransaction,
 			initialOffsets: topicPartitionOffsets{
@@ -839,6 +868,18 @@ func TestEndTxn(t *testing.T) {
 			expectedFlags: ProducerTxnFlagFatalError,
 			expectedError: ErrInvalidProducerIDMapping,
 		},
+		{
+			brokerErr:     ErrTransactionAbortable,
+			commit:        true,
+			expectedFlags: ProducerTxnFlagAbortableError,
+			expectedError: ErrTransactionAbortable,
+		},
+		{
+			brokerErr:     ErrTransactionAbortable,
+			commit:        false,
+			expectedFlags: ProducerTxnFlagFatalError,
+			expectedError: ErrTransactionAbortable,
+		},
 	}
 
 	broker := NewMockBroker(t, 1)
@@ -953,6 +994,13 @@ func TestPublishPartitionToTxn(t *testing.T) {
 			brokerErr:                 ErrTopicAuthorizationFailed,
 			expectedFlags:             ProducerTxnFlagAbortableError,
 			expectedError:             ErrTopicAuthorizationFailed,
+			expectedPartitionsInTxn:   topicPartitionSet{},
+			expectedPendingPartitions: topicPartitionSet{},
+		},
+		{
+			brokerErr:                 ErrTransactionAbortable,
+			expectedFlags:             ProducerTxnFlagAbortableError,
+			expectedError:             ErrTransactionAbortable,
 			expectedPartitionsInTxn:   topicPartitionSet{},
 			expectedPendingPartitions: topicPartitionSet{},
 		},

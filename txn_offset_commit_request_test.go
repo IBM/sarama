@@ -110,4 +110,7 @@ func TestTxnOffsetCommitRequestV3(t *testing.T) {
 	}
 
 	testRequest(t, "V3", req, txnOffsetCommitRequestV3)
+
+	req.Version = 4
+	testRequest(t, "V4", req, txnOffsetCommitRequestV3)
 }
