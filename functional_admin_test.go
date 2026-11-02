@@ -836,18 +836,18 @@ func TestFuncAdminDeleteTopic(t *testing.T) {
 	}
 }
 
-// TestFuncAdminElectLeadersV1 covers low-version client compatibility against a
-// newer broker for the ElectLeaders V1 non-flexible path. See
+// TestFuncAdminElectLeadersV0 covers low-version client compatibility against a
+// newer broker for the ElectLeaders non-flexible path. See
 // https://github.com/IBM/sarama/pull/3312.
-func TestFuncAdminElectLeadersV1(t *testing.T) {
+func TestFuncAdminElectLeadersV0(t *testing.T) {
 	t.Parallel()
 	checkKafkaVersion(t, "2.3.0.0")
 	setupFunctionalTest(t)
 	defer teardownFunctionalTest(t)
 
 	config := NewFunctionalTestConfig()
-	// Force ElectLeaders onto request/response version 1 so the broker emits
-	// the non-flexible wire format that previously regressed.
+	// a 2.3 client only has ElectLeaders v0, so the broker emits the
+	// non-flexible wire format
 	config.Version = V2_3_0_0
 
 	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, config)
