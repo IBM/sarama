@@ -392,7 +392,7 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 				ticker := time.NewTicker(time.Second)
 				for _, message := range messages {
 					for range throughput {
-						_, _, err = producer.SendMessage(message)
+						_, _, err := producer.SendMessage(message)
 						if err != nil {
 							printErrorAndExit(69, "Failed to send message: %s", err)
 						}
@@ -406,7 +406,7 @@ func runSyncProducer(topic string, partition, messageLoad, messageSize, routines
 		for _, messages := range messages {
 			wg.Go(func() {
 				for _, message := range messages {
-					_, _, err = producer.SendMessage(message)
+					_, _, err := producer.SendMessage(message)
 					if err != nil {
 						printErrorAndExit(69, "Failed to send message: %s", err)
 					}
