@@ -82,7 +82,7 @@ var names = map[int16]string{
 	apiKeyDescribeTransactions:         "DescribeTransactionsRequest",
 	apiKeyListTransactions:             "ListTransactionsRequest",
 	67:                                 "AllocateProducerIdsRequest",
-	68:                                 "ConsumerGroupHeartbeatRequest",
+	apiKeyConsumerGroupHeartbeat:       "ConsumerGroupHeartbeatRequest",
 	apiKeyConsumerGroupDescribe:        "ConsumerGroupDescribeRequest",
 }
 
@@ -388,8 +388,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyListOffsets:        8,  // up from 7
 				// TODO: AddPartitionsToTxnRequest v4 is not supported, but expected for KafkaVersion 3.5.0
 				// apiKeyAddPartitionsToTxn: 4,  // up from 3
-				// TODO: ConsumerGroupHeartbeatRequest v0 is not supported, but expected for KafkaVersion 3.5.0
-				// apiKeyConsumerGroupHeartbeat /* (68) */: 0, // new in 3.5
+				apiKeyConsumerGroupHeartbeat: 0, // new in 3.5
 			},
 		},
 		{
@@ -463,8 +462,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				// apiKeyTxnOffsetCommit:     5,  // up from 4
 				// TODO: UpdateFeaturesRequest v2 is not supported, but expected for KafkaVersion 4.0.0
 				// apiKeyUpdateFeatures /* (57) */: 2, // up from 1
-				// TODO: ConsumerGroupHeartbeatRequest v1 is not supported, but expected for KafkaVersion 4.0.0
-				// apiKeyConsumerGroupHeartbeat /* (68) */: 1, // up from 0
+				apiKeyConsumerGroupHeartbeat: 1, // up from 0
 			},
 		},
 		{
@@ -540,6 +538,7 @@ func TestAllocateBodyProtocolVersions(t *testing.T) {
 				apiKeyDescribeProducers:            maxVersion(&DescribeProducersRequest{}),
 				apiKeyDescribeTransactions:         maxVersion(&DescribeTransactionsRequest{}),
 				apiKeyListTransactions:             maxVersion(&ListTransactionsRequest{}),
+				apiKeyConsumerGroupHeartbeat:       maxVersion(&ConsumerGroupHeartbeatRequest{}),
 				apiKeyConsumerGroupDescribe:        maxVersion(&ConsumerGroupDescribeRequest{}),
 			},
 		},
