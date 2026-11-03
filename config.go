@@ -814,15 +814,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
 	}
 
-	topics := slices.Sorted(maps.Keys(c.Producer.TopicMaxMessageBytes))
-	for _, topic := range topics {
-		maxMsgBytes := c.Producer.TopicMaxMessageBytes[topic]
-		if maxMsgBytes <= 0 {
-			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be > 0", topic))
-		}
-		if maxMsgBytes >= int(MaxRequestSize) {
-			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize", topic))
-		}
+	if err := c.validateTopicMaxMessageBytes(); err != nil {
+		return err
 	}
 
 	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
@@ -956,6 +949,20 @@ func (c *Config) Validate() error {
 		return ConfigurationError(fmt.Sprintf("ClientID value %q is not valid for Kafka versions before 1.0.0", c.ClientID))
 	}
 
+	return nil
+}
+
+func (c *Config) validateTopicMaxMessageBytes() error {
+	topics := slices.Sorted(maps.Keys(c.Producer.TopicMaxMessageBytes))
+	for _, topic := range topics {
+		maxMsgBytes := c.Producer.TopicMaxMessageBytes[topic]
+		if maxMsgBytes <= 0 {
+			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be > 0", topic))
+		}
+		if maxMsgBytes >= int(MaxRequestSize) {
+			return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%q] must be smaller than MaxRequestSize", topic))
+		}
+	}
 	return nil
 }
 
