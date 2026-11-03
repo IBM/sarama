@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/IBM/sarama"
 )
@@ -128,6 +129,58 @@ func TestProducerFailTxn(t *testing.T) {
 
 	if len(trm.errors) != 1 {
 		t.Error("must have fail with txn begin error")
+	}
+}
+
+func TestProducerTxnAfterSendOutsideTxn(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Transaction.ID = "test"
+	config.Producer.RequiredAcks = sarama.WaitForAll
+	config.Producer.Retry.Backoff = 0
+	config.Producer.Idempotent = true
+	config.Producer.Return.Successes = true
+	config.Net.MaxOpenRequests = 1
+	config.Version = sarama.V0_11_0_0
+
+	trm := newTestReporterMock()
+	mp := NewAsyncProducer(trm, config).
+		ExpectInputAndSucceed()
+
+	mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
+	<-mp.Errors()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+
+		if err := mp.BeginTxn(); err != nil {
+			t.Error(err)
+		}
+
+		if mp.TxnStatus()&sarama.ProducerTxnFlagInTransaction == 0 {
+			t.Error("transaction must be started")
+		}
+
+		mp.Input() <- &sarama.ProducerMessage{Topic: "test"}
+		<-mp.Successes()
+
+		if err := mp.CommitTxn(); err != nil {
+			t.Error(err)
+		}
+
+		if err := mp.Close(); err != nil {
+			t.Error(err)
+		}
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("producer blocked after a message was sent outside a transaction")
+	}
+
+	if len(trm.errors) != 1 {
+		t.Errorf("expected 1 reported error, got %d: %v", len(trm.errors), trm.errors)
 	}
 }
 

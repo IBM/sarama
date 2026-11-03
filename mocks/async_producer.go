@@ -63,6 +63,7 @@ func NewAsyncProducer(t ErrorReporter, config *sarama.Config) *AsyncProducer {
 		for msg := range mp.input {
 			mp.txnLock.Lock()
 			if mp.IsTransactional() && mp.txnStatus&sarama.ProducerTxnFlagInTransaction == 0 {
+				mp.txnLock.Unlock()
 				mp.t.Errorf("attempt to send message when transaction is not started or is in ending state.")
 				mp.errors <- &sarama.ProducerError{Err: errors.New("attempt to send message when transaction is not started or is in ending state"), Msg: msg}
 				continue
