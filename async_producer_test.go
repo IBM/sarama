@@ -241,6 +241,55 @@ done:
 	seedBroker.Close()
 }
 
+func TestAsyncProducerBufferedInputDeliveredBeforeShutdown(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 10
+	config.Producer.Return.Successes = true
+	config.Producer.InputChannelBufferSize = 10
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range 10 {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage), Metadata: i}
+	}
+	producer.AsyncClose()
+
+	for i := range 10 {
+		select {
+		case msg := <-producer.Errors():
+			t.Fatal(msg.Err)
+		case msg := <-producer.Successes():
+			if msg.Metadata.(int) != i {
+				t.Errorf("got message %d, want %d", msg.Metadata.(int), i)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("timeout waiting for message %d", i)
+		}
+	}
+	for msg := range producer.Errors() {
+		t.Error(msg.Err)
+	}
+	for msg := range producer.Successes() {
+		t.Errorf("unexpected message %v after shutdown", msg.Metadata)
+	}
+	leader.Close()
+	seedBroker.Close()
+}
+
 func TestAsyncProducerMultipleFlushes(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader := NewMockBroker(t, 2)
@@ -2633,8 +2682,10 @@ func TestTxnProduceBumpEpoch(t *testing.T) {
 	producer.Input() <- &ProducerMessage{Topic: "test-topic", Key: nil, Value: StringEncoder(TestMessage)}
 
 	// Force send
+	processed := make(chan struct{})
 	producer.inFlight.Add(1)
-	producer.Input() <- &ProducerMessage{flags: shutdown}
+	producer.Input() <- &ProducerMessage{flags: shutdown, processed: processed}
+	<-processed
 	producer.inFlight.Wait()
 
 	err = producer.CommitTxn()

@@ -304,6 +304,14 @@ type Config struct {
 			MaxBufferBytes int64
 		}
 
+		// The number of messages to buffer in the AsyncProducer's Input channel
+		// (defaults to 0, unbuffered). With a buffer, a send completes without
+		// waiting for the dispatcher goroutine to receive it, so goroutines
+		// producing concurrently don't each hand off to, and wait for, the
+		// dispatcher. Buffered messages are held in memory and backpressure only
+		// starts once the buffer is full.
+		InputChannelBufferSize int
+
 		// Interceptors to be called when the producer dispatcher reads the
 		// message for the first time. Interceptors allows to intercept and
 		// possible mutate the message before they are published to Kafka
@@ -802,6 +810,8 @@ func (c *Config) Validate() error {
 		return ConfigurationError("Producer.Retry.Max must be >= 0")
 	case c.Producer.Retry.Backoff < 0:
 		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
+	case c.Producer.InputChannelBufferSize < 0:
+		return ConfigurationError("Producer.InputChannelBufferSize must be >= 0")
 	}
 
 	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
