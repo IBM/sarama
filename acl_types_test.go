@@ -7,7 +7,7 @@ import (
 )
 
 func TestAclOperationTextMarshal(t *testing.T) {
-	for i := AclOperationUnknown; i <= AclOperationIdempotentWrite; i++ {
+	for i := AclOperationUnknown; i <= AclOperationTwoPhaseCommit; i++ {
 		text, err := i.MarshalText()
 		if err != nil {
 			t.Errorf("couldn't marshal %d to text: %s", i, err)
@@ -41,7 +41,7 @@ func TestAclPermissionTypeTextMarshal(t *testing.T) {
 }
 
 func TestAclResourceTypeTextMarshal(t *testing.T) {
-	for i := AclResourceUnknown; i <= AclResourceTransactionalID; i++ {
+	for i := AclResourceUnknown; i <= AclResourceUser; i++ {
 		text, err := i.MarshalText()
 		if err != nil {
 			t.Errorf("couldn't marshal %d to text: %s", i, err)
@@ -71,5 +71,30 @@ func TestAclResourcePatternTypeTextMarshal(t *testing.T) {
 		if got != i {
 			t.Errorf("got %d, want %d", got, i)
 		}
+	}
+}
+
+func TestAclTypesTextMarshalKIP373(t *testing.T) {
+	// values added to the Java enums for delegation tokens (KIP-373) and
+	// two-phase commit (KIP-939)
+	for code, name := range map[AclOperation]string{13: "CreateTokens", 14: "DescribeTokens", 15: "TwoPhaseCommit"} {
+		text, err := code.MarshalText()
+		if err != nil || string(text) != name {
+			t.Errorf("AclOperation(%d).MarshalText() = %q, %v; want %q", code, text, err, name)
+		}
+		var got AclOperation
+		if err := got.UnmarshalText([]byte(name)); err != nil || got != code {
+			t.Errorf("UnmarshalText(%q) = %d, %v; want %d", name, got, err, code)
+		}
+	}
+
+	user := AclResourceType(7)
+	text, err := user.MarshalText()
+	if err != nil || string(text) != "User" {
+		t.Errorf("AclResourceType(7).MarshalText() = %q, %v; want %q", text, err, "User")
+	}
+	var got AclResourceType
+	if err := got.UnmarshalText([]byte("User")); err != nil || got != user {
+		t.Errorf("UnmarshalText(%q) = %d, %v; want %d", "User", got, err, user)
 	}
 }
