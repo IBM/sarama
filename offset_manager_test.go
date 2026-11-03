@@ -1353,3 +1353,57 @@ func (g *gatedResponse) For(reqBody versionedDecoder) encoderWithHeader {
 	})
 	return g.inner.For(reqBody)
 }
+
+func TestPartitionOffsetManagerCloseWithBlockedCommit(t *testing.T) {
+	config := NewTestConfig()
+	config.ChannelBufferSize = 1
+	config.Consumer.Offsets.AutoCommit.Enable = false
+	config.Consumer.Offsets.Retry.Max = 0
+	config.Consumer.Return.Errors = true
+	capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t).SetError("group", "my_topic", 0, ErrOffsetMetadataTooLarge)}
+	om, _, _ := initHandledOffsetManager(t, config, capture)
+
+	pom, err := om.ManagePartition("my_topic", 0)
+	require.NoError(t, err)
+	// Unblock the commit on a failed assertion before the manager's cleanup.
+	t.Cleanup(func() {
+		go func() {
+			for range pom.Errors() {
+			}
+		}()
+	})
+	pom.MarkOffset(100, "")
+
+	om.Commit() // fills the errors channel
+	committed := make(chan none)
+	go func() {
+		defer close(committed)
+		om.Commit()
+	}()
+	// Wait until the second commit holds pomsLock while sending its error.
+	require.Eventually(t, func() bool { return len(capture.requests()) == 2 }, 5*time.Second, time.Millisecond)
+	require.Eventually(t, func() bool {
+		if om.pomsLock.TryLock() {
+			om.pomsLock.Unlock()
+			return false
+		}
+		return true
+	}, 5*time.Second, time.Millisecond)
+
+	closed := make(chan error, 1)
+	go func() { closed <- pom.Close() }()
+	select {
+	case err := <-closed:
+		var errs ConsumerErrors
+		require.ErrorAs(t, err, &errs)
+		require.Len(t, errs, 2)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close did not drain the errors of the blocked commit")
+	}
+	require.Nil(t, om.findPOM("my_topic", 0))
+	select {
+	case <-committed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Commit did not return after Close drained its errors")
+	}
+}
