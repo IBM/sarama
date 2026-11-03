@@ -51,7 +51,7 @@ type AsyncProducer interface {
 	Close() error
 
 	// Input is the input channel for the user to write messages to that they
-	// wish to send.
+	// wish to send. It is unbuffered unless Producer.InputChannelBufferSize is set.
 	Input() chan<- *ProducerMessage
 
 	// Successes is the success output channel back to the user when Return.Successes is
@@ -313,7 +313,7 @@ func newAsyncProducer(client Client) (AsyncProducer, error) {
 		client:          client,
 		conf:            client.Config(),
 		errors:          make(chan *ProducerError),
-		input:           make(chan *ProducerMessage),
+		input:           make(chan *ProducerMessage, client.Config().Producer.InputChannelBufferSize),
 		successes:       make(chan *ProducerMessage),
 		retries:         make(chan *ProducerMessage),
 		done:            make(chan struct{}),
@@ -384,9 +384,14 @@ type ProducerMessage struct {
 	// successfully delivered and RequiredAcks is not NoResponse.
 	Timestamp time.Time
 
-	retries        int
-	flags          flagSet
-	expectation    chan *ProducerError
+	retries     int
+	flags       flagSet
+	expectation chan *ProducerError
+	// processed is closed by the dispatcher once it handles a shutdown or endtxn message.
+	// With a buffered Input, the sender's channel send no longer orders the dispatcher's
+	// earlier inFlight.Add calls before the sender's inFlight.Wait, so the sender waits for
+	// this instead.
+	processed      chan struct{}
 	sequenceNumber int32
 	producerEpoch  int16
 	hasSequence    bool
@@ -534,12 +539,14 @@ func (p *asyncProducer) AbortTxn() error {
 }
 
 func (p *asyncProducer) finishTransaction(commit bool) error {
-	p.inFlight.Add(1)
+	flags := endtxn | aborttxn
 	if commit {
-		p.input <- &ProducerMessage{flags: endtxn | committxn}
-	} else {
-		p.input <- &ProducerMessage{flags: endtxn | aborttxn}
+		flags = endtxn | committxn
 	}
+	processed := make(chan struct{})
+	p.inFlight.Add(1)
+	p.input <- &ProducerMessage{flags: flags, processed: processed}
+	<-processed
 	p.inFlight.Wait()
 	return p.txnmgr.finishTransaction(commit)
 }
@@ -608,12 +615,14 @@ func (p *asyncProducer) dispatcher() {
 				Logger.Printf("producer/txnmgr unable to end transaction %s", err)
 			}
 			p.inFlight.Done()
+			close(msg.processed)
 			continue
 		}
 
 		if msg.flags&shutdown != 0 {
 			shuttingDown = true
 			p.inFlight.Done()
+			close(msg.processed)
 			continue
 		}
 
@@ -1674,9 +1683,10 @@ func (p *asyncProducer) shutdown() {
 	if p.done != nil && p.closed.CompareAndSwap(false, true) {
 		close(p.done)
 	}
+	processed := make(chan struct{})
 	p.inFlight.Add(1)
-	p.input <- &ProducerMessage{flags: shutdown}
-
+	p.input <- &ProducerMessage{flags: shutdown, processed: processed}
+	<-processed
 	p.inFlight.Wait()
 
 	err := p.client.Close()
