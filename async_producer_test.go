@@ -1172,12 +1172,6 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
 	producer.AsyncClose()
-	time.Sleep(5 * time.Millisecond) // let the shutdown goroutine kick in
-
-	producer.Input() <- &ProducerMessage{Topic: "FOO"}
-	if err := <-producer.Errors(); !errors.Is(err.Err, ErrShuttingDown) {
-		t.Error(err)
-	}
 
 	prodNotLeader := new(ProduceResponse)
 	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
@@ -1197,6 +1191,31 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	for err := range producer.Errors() {
 		t.Error(err)
 	}
+}
+
+func TestAsyncProducerRejectsMessagesAfterShutdown(t *testing.T) {
+	config := NewTestConfig()
+	config.Producer.Return.Errors = true
+	producer := &asyncProducer{
+		conf:   config,
+		input:  make(chan *ProducerMessage),
+		errors: make(chan *ProducerError, 1),
+	}
+
+	finished := make(chan struct{})
+	go func() {
+		defer close(finished)
+		producer.dispatcher()
+	}()
+
+	producer.inFlight.Add(1)
+	producer.input <- &ProducerMessage{flags: shutdown}
+	producer.input <- &ProducerMessage{Topic: "FOO"}
+
+	require.ErrorIs(t, (<-producer.errors).Err, ErrShuttingDown)
+
+	close(producer.input)
+	<-finished
 }
 
 func TestAsyncProducerNoReturns(t *testing.T) {
