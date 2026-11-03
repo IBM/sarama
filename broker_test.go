@@ -245,6 +245,193 @@ func TestBrokerClose(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, connected)
 	})
+
+	t.Run("interrupts active throttle timer on Close", func(t *testing.T) {
+		mockBroker := NewMockBroker(t, 0)
+		defer mockBroker.Close()
+
+		broker := NewBroker(mockBroker.Addr())
+		conf := NewTestConfig()
+		conf.ApiVersionsRequest = false
+
+		require.NoError(t, broker.Open(conf))
+		connected, err := broker.Connected()
+		require.NoError(t, err)
+		require.True(t, connected)
+
+		// Set a long throttle duration
+		broker.handleThrottledResponse(&ProduceResponse{
+			ThrottleTime: 10 * time.Minute,
+		})
+
+		sendErrs := make(chan error, 1)
+		go func() {
+			req := &ProduceRequest{RequiredAcks: WaitForLocal}
+			sendErrs <- broker.AsyncProduce(req, func(_ *ProduceResponse, err error) {})
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+
+		closeErrs := make(chan error, 1)
+		go func() {
+			closeErrs <- broker.Close()
+		}()
+
+		select {
+		case err := <-closeErrs:
+			require.NoError(t, err)
+		case <-time.After(500 * time.Millisecond):
+			require.FailNow(t, "Close blocked on pending throttle timer")
+		}
+
+		select {
+		case err := <-sendErrs:
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrNotConnected)
+		case <-time.After(500 * time.Millisecond):
+			require.FailNow(t, "timed out waiting for AsyncProduce to return")
+		}
+
+		connected, err = broker.Connected()
+		require.NoError(t, err)
+		require.False(t, connected)
+	})
+
+	t.Run("interrupts synchronous send blocked on throttle timer on Close", func(t *testing.T) {
+		mockBroker := NewMockBroker(t, 0)
+		defer mockBroker.Close()
+
+		broker := NewBroker(mockBroker.Addr())
+		conf := NewTestConfig()
+		conf.ApiVersionsRequest = false
+
+		require.NoError(t, broker.Open(conf))
+		connected, err := broker.Connected()
+		require.NoError(t, err)
+		require.True(t, connected)
+
+		// Set a long throttle duration
+		broker.handleThrottledResponse(&ProduceResponse{
+			ThrottleTime: 10 * time.Minute,
+		})
+
+		sendErrs := make(chan error, 1)
+		go func() {
+			req := &ProduceRequest{RequiredAcks: WaitForLocal}
+			_, err := broker.Produce(req)
+			sendErrs <- err
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+
+		closeErrs := make(chan error, 1)
+		go func() {
+			closeErrs <- broker.Close()
+		}()
+
+		select {
+		case err := <-closeErrs:
+			require.NoError(t, err)
+		case <-time.After(500 * time.Millisecond):
+			require.FailNow(t, "Close blocked on pending throttle timer during synchronous Produce")
+		}
+
+		select {
+		case err := <-sendErrs:
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrNotConnected)
+		case <-time.After(500 * time.Millisecond):
+			require.FailNow(t, "timed out waiting for Produce to return")
+		}
+	})
+
+	t.Run("interrupts waitIfThrottled directly on Close", func(t *testing.T) {
+		broker := NewBroker("127.0.0.1:0")
+		broker.handleThrottledResponse(&ProduceResponse{
+			ThrottleTime: 10 * time.Minute,
+		})
+
+		waitErrs := make(chan error, 1)
+		go func() {
+			waitErrs <- broker.waitIfThrottled()
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+
+		closeErrs := make(chan error, 1)
+		go func() {
+			closeErrs <- broker.Close()
+		}()
+
+		select {
+		case err := <-closeErrs:
+			// broker was never opened, so Close returns ErrNotConnected
+			require.ErrorIs(t, err, ErrNotConnected)
+		case <-time.After(500 * time.Millisecond):
+			require.FailNow(t, "Close blocked while waitIfThrottled is active")
+		}
+
+		select {
+		case err := <-waitErrs:
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrNotConnected)
+		case <-time.After(500 * time.Millisecond):
+			require.FailNow(t, "timed out waiting for waitIfThrottled to return")
+		}
+	})
+
+	t.Run("interrupts pending throttle timer on responseReceiver connection failure", func(t *testing.T) {
+		mockBroker := NewMockBroker(t, 0)
+
+		broker := NewBroker(mockBroker.Addr())
+		conf := NewTestConfig()
+		conf.ApiVersionsRequest = false
+
+		require.NoError(t, broker.Open(conf))
+		connected, err := broker.Connected()
+		require.NoError(t, err)
+		require.True(t, connected)
+
+		// Send an initial in-flight request that mock broker leaves unanswered
+		firstReqErrs := make(chan error, 1)
+		req1 := &ProduceRequest{RequiredAcks: WaitForLocal}
+		require.NoError(t, broker.AsyncProduce(req1, func(_ *ProduceResponse, err error) {
+			firstReqErrs <- err
+		}))
+
+		// Set a long throttle duration
+		broker.handleThrottledResponse(&ProduceResponse{
+			ThrottleTime: 10 * time.Minute,
+		})
+
+		// Send a second request that blocks on the throttle timer
+		sendErrs := make(chan error, 1)
+		go func() {
+			req2 := &ProduceRequest{RequiredAcks: WaitForLocal}
+			sendErrs <- broker.AsyncProduce(req2, func(_ *ProduceResponse, err error) {})
+		}()
+
+		time.Sleep(50 * time.Millisecond)
+
+		// Close mock broker to cause transport read error in responseReceiver for the first request
+		mockBroker.Close()
+
+		select {
+		case err := <-sendErrs:
+			require.Error(t, err)
+		case <-time.After(time.Second):
+			require.FailNow(t, "AsyncProduce did not unblock on transport failure in responseReceiver")
+		}
+
+		select {
+		case err := <-firstReqErrs:
+			require.Error(t, err)
+		case <-time.After(time.Second):
+			require.FailNow(t, "in-flight request did not receive error on transport failure")
+		}
+
+		_ = broker.Close()
+	})
 }
 
 func TestBrokerMaxOpenRequests(t *testing.T) {
