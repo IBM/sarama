@@ -1,6 +1,9 @@
 package sarama
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 var expectationsPool = sync.Pool{
 	New: func() any {
@@ -30,6 +33,16 @@ type SyncProducer interface {
 	// can succeed and fail individually; if some succeed and some fail,
 	// SendMessages will return an error.
 	SendMessages(msgs []*ProducerMessage) error
+
+	// SendMessageContext is like SendMessage, but returns ctx.Err() if ctx is
+	// done before the message has either succeeded or failed. The message is
+	// then still owned by the producer and must not be reused.
+	SendMessageContext(ctx context.Context, msg *ProducerMessage) (partition int32, offset int64, err error)
+
+	// SendMessagesContext is like SendMessages, but returns ctx.Err() if ctx is
+	// done before all messages have either succeeded or failed. Messages without
+	// a result are then still owned by the producer and must not be reused.
+	SendMessagesContext(ctx context.Context, msgs []*ProducerMessage) error
 
 	// Close shuts down the producer; you must call this function before a producer
 	// object passes out of scope, as it may otherwise leak memory.
@@ -126,10 +139,31 @@ func verifyProducerConfig(config *Config) error {
 }
 
 func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error) {
+	return sp.SendMessageContext(context.Background(), msg)
+}
+
+func (sp *syncProducer) SendMessageContext(ctx context.Context, msg *ProducerMessage) (partition int32, offset int64, err error) {
+	if err := ctx.Err(); err != nil {
+		return -1, -1, err
+	}
+
 	expectation := expectationsPool.Get().(chan *ProducerError)
 	msg.expectation = expectation
-	sp.producer.Input() <- msg
-	pErr := <-expectation
+	select {
+	case sp.producer.Input() <- msg:
+	case <-ctx.Done():
+		msg.expectation = nil
+		expectationsPool.Put(expectation)
+		return -1, -1, ctx.Err()
+	}
+
+	var pErr *ProducerError
+	select {
+	case pErr = <-expectation:
+	case <-ctx.Done():
+		// the producer still has the expectation, so it can't go back in the pool
+		return -1, -1, ctx.Err()
+	}
 	msg.expectation = nil
 	expectationsPool.Put(expectation)
 	if pErr != nil {
@@ -140,26 +174,53 @@ func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offs
 }
 
 func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
+	return sp.SendMessagesContext(context.Background(), msgs)
+}
+
+func (sp *syncProducer) SendMessagesContext(ctx context.Context, msgs []*ProducerMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	indices := make(chan int, len(msgs))
 	go func() {
+		defer close(indices)
 		for i, msg := range msgs {
 			expectation := expectationsPool.Get().(chan *ProducerError)
 			msg.expectation = expectation
-			sp.producer.Input() <- msg
+			select {
+			case sp.producer.Input() <- msg:
+			case <-ctx.Done():
+				msg.expectation = nil
+				expectationsPool.Put(expectation)
+				return
+			}
 			indices <- i
 		}
-		close(indices)
 	}()
 
 	var errors ProducerErrors
+	var results int
 	for i := range indices {
 		expectation := msgs[i].expectation
-		pErr := <-expectation
+		var pErr *ProducerError
+		select {
+		case pErr = <-expectation:
+		case <-ctx.Done():
+			// wait for the sender to stop so nothing reaches the producer after we return
+			for range indices {
+			}
+			return ctx.Err()
+		}
 		msgs[i].expectation = nil
 		expectationsPool.Put(expectation)
+		results++
 		if pErr != nil {
 			errors = append(errors, pErr)
 		}
+	}
+	if results < len(msgs) {
+		return ctx.Err()
 	}
 
 	if len(errors) > 0 {

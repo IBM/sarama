@@ -3,10 +3,12 @@
 package sarama
 
 import (
+	"context"
 	"errors"
 	"log"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestSyncProducer(t *testing.T) {
@@ -327,6 +329,111 @@ func TestSyncProducerRecoveryWithRetriesDisabled(t *testing.T) {
 	leader1.Close()
 	leader2.Close()
 	safeClose(t, producer)
+}
+
+func TestSyncProducerSendMessageContext(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+	leader.SetLatency(500 * time.Millisecond)
+
+	config := NewTestConfig()
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	_, _, err = producer.SendMessageContext(ctx, &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Error("Expected context.DeadlineExceeded, found:", err)
+	}
+
+	safeClose(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
+func TestSyncProducerSendMessagesContext(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+	leader.SetLatency(500 * time.Millisecond)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 3
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	err = producer.SendMessagesContext(ctx, []*ProducerMessage{
+		{Topic: "my_topic", Value: StringEncoder(TestMessage)},
+		{Topic: "my_topic", Value: StringEncoder(TestMessage)},
+		{Topic: "my_topic", Value: StringEncoder(TestMessage)},
+	})
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Error("Expected context.DeadlineExceeded, found:", err)
+	}
+
+	safeClose(t, producer)
+	leader.Close()
+	seedBroker.Close()
+}
+
+func TestSyncProducerSendMessagesContextDone(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	leader := NewMockBroker(t, 2)
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	config := NewTestConfig()
+	config.Producer.Return.Successes = true
+	producer, err := NewSyncProducer([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	msg := &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+	if _, _, err := producer.SendMessageContext(ctx, msg); !errors.Is(err, context.Canceled) {
+		t.Error("Expected context.Canceled, found:", err)
+	}
+	if err := producer.SendMessagesContext(ctx, []*ProducerMessage{msg}); !errors.Is(err, context.Canceled) {
+		t.Error("Expected context.Canceled, found:", err)
+	}
+
+	safeClose(t, producer)
+	if len(leader.History()) > 0 {
+		t.Error("Expected no requests to the leader, found:", len(leader.History()))
+	}
+	leader.Close()
+	seedBroker.Close()
 }
 
 // This example shows the basic usage pattern of the SyncProducer.

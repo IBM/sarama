@@ -1,6 +1,7 @@
 package mocks
 
 import (
+	"context"
 	"errors"
 	"sync"
 
@@ -133,6 +134,26 @@ func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 	}
 	sp.t.Errorf("Insufficient expectations set on this mock producer to handle the input messages.")
 	return errOutOfExpectations
+}
+
+// SendMessageContext corresponds with the SendMessageContext method of sarama's SyncProducer
+// implementation. It returns ctx.Err() without using an expectation if ctx is already done,
+// otherwise it behaves like SendMessage.
+func (sp *SyncProducer) SendMessageContext(ctx context.Context, msg *sarama.ProducerMessage) (partition int32, offset int64, err error) {
+	if err := ctx.Err(); err != nil {
+		return -1, -1, err
+	}
+	return sp.SendMessage(msg)
+}
+
+// SendMessagesContext corresponds with the SendMessagesContext method of sarama's SyncProducer
+// implementation. It returns ctx.Err() without using any expectations if ctx is already done,
+// otherwise it behaves like SendMessages.
+func (sp *SyncProducer) SendMessagesContext(ctx context.Context, msgs []*sarama.ProducerMessage) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return sp.SendMessages(msgs)
 }
 
 func (sp *SyncProducer) partitioner(topic string) sarama.Partitioner {
