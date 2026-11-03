@@ -1171,13 +1171,19 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	for range 10 {
 		producer.Input() <- &ProducerMessage{Topic: "my_topic", Key: nil, Value: StringEncoder(TestMessage)}
 	}
-	producer.AsyncClose()
-	time.Sleep(5 * time.Millisecond) // let the shutdown goroutine kick in
+
+	// Queue the shutdown marker directly so the dispatcher is guaranteed to
+	// be shutting down before the new message and the retries reach it.
+	p := producer.(*asyncProducer)
+	p.inFlight.Add(1)
+	p.input <- &ProducerMessage{flags: shutdown}
 
 	producer.Input() <- &ProducerMessage{Topic: "FOO"}
 	if err := <-producer.Errors(); !errors.Is(err.Err, ErrShuttingDown) {
 		t.Error(err)
 	}
+
+	producer.AsyncClose()
 
 	prodNotLeader := new(ProduceResponse)
 	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
