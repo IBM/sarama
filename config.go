@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"regexp"
+	"sort"
 	"time"
 
 	"github.com/klauspost/compress/gzip"
@@ -193,6 +194,10 @@ type Config struct {
 		// will still be rejected.
 		// This value must remain smaller than sarama.MaxRequestSize.
 		MaxMessageBytes int
+		// Per-topic overrides for MaxMessageBytes. When a topic is present in this map,
+		// its value is used instead of MaxMessageBytes for batch and message size bounds.
+		// Topics not present in the map fall back to MaxMessageBytes.
+		TopicMaxMessageBytes map[string]int
 		// The level of acknowledgement reliability needed from the broker (defaults
 		// to WaitForLocal). Equivalent to the `request.required.acks` setting of the
 		// JVM producer.
@@ -628,12 +633,16 @@ func (c *Config) groupStrategies() []BalanceStrategy {
 	return c.Consumer.Group.Rebalance.GroupStrategies
 }
 
-// Validate checks a Config instance. It will return a
-// ConfigurationError if the specified values don't make sense.
-//
-//nolint:gocyclo // This function's cyclomatic complexity has go beyond 100
-func (c *Config) Validate() error {
-	// some configuration values should be warned on but not fail completely, do those first
+// producerMaxMessageBytes returns the maximum permitted size of a message and
+// batch for the given topic, respecting per-topic overrides when configured.
+func (c *Config) producerMaxMessageBytes(topic string) int {
+	if limit, ok := c.Producer.TopicMaxMessageBytes[topic]; ok {
+		return limit
+	}
+	return c.Producer.MaxMessageBytes
+}
+
+func (c *Config) validateWarnings() {
 	if !c.Net.TLS.Enable && c.Net.TLS.Config != nil {
 		Logger.Println("Net.TLS is disabled but a non-nil configuration was provided.")
 	}
@@ -650,6 +659,18 @@ func (c *Config) Validate() error {
 	}
 	if c.Producer.MaxMessageBytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.MaxMessageBytes must be smaller than MaxRequestSize; it will be ignored.")
+	}
+	if len(c.Producer.TopicMaxMessageBytes) > 0 {
+		topics := make([]string, 0, len(c.Producer.TopicMaxMessageBytes))
+		for topic := range c.Producer.TopicMaxMessageBytes {
+			topics = append(topics, topic)
+		}
+		sort.Strings(topics)
+		for _, topic := range topics {
+			if c.Producer.TopicMaxMessageBytes[topic] >= int(MaxRequestSize) {
+				Logger.Printf("Producer.TopicMaxMessageBytes[%s] must be smaller than MaxRequestSize; it will be ignored.", topic)
+			}
+		}
 	}
 	if c.Producer.Flush.Bytes >= int(MaxRequestSize) {
 		Logger.Println("Producer.Flush.Bytes must be smaller than MaxRequestSize; it will be ignored.")
@@ -681,6 +702,92 @@ func (c *Config) Validate() error {
 	if c.ClientID == defaultClientID {
 		Logger.Println("ClientID is the default of 'sarama', you should consider setting it to something application-specific.")
 	}
+}
+
+func (c *Config) validateProducer() error {
+	switch {
+	case c.Producer.MaxMessageBytes <= 0:
+		return ConfigurationError("Producer.MaxMessageBytes must be > 0")
+	case c.Producer.RequiredAcks < -1:
+		return ConfigurationError("Producer.RequiredAcks must be >= -1")
+	case c.Producer.Timeout <= 0:
+		return ConfigurationError("Producer.Timeout must be > 0")
+	case c.Producer.Partitioner == nil:
+		return ConfigurationError("Producer.Partitioner must not be nil")
+	case c.Producer.Flush.Bytes < 0:
+		return ConfigurationError("Producer.Flush.Bytes must be >= 0")
+	case c.Producer.Flush.Messages < 0:
+		return ConfigurationError("Producer.Flush.Messages must be >= 0")
+	case c.Producer.Flush.Frequency < 0:
+		return ConfigurationError("Producer.Flush.Frequency must be >= 0")
+	case c.Producer.Flush.MaxMessages < 0:
+		return ConfigurationError("Producer.Flush.MaxMessages must be >= 0")
+	case c.Producer.Flush.MaxMessages > 0 && c.Producer.Flush.MaxMessages < c.Producer.Flush.Messages:
+		return ConfigurationError("Producer.Flush.MaxMessages must be >= Producer.Flush.Messages when set")
+	case c.Producer.Retry.Max < 0:
+		return ConfigurationError("Producer.Retry.Max must be >= 0")
+	case c.Producer.Retry.Backoff < 0:
+		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
+	}
+
+	if len(c.Producer.TopicMaxMessageBytes) > 0 {
+		topics := make([]string, 0, len(c.Producer.TopicMaxMessageBytes))
+		for topic := range c.Producer.TopicMaxMessageBytes {
+			topics = append(topics, topic)
+		}
+		sort.Strings(topics)
+		for _, topic := range topics {
+			if c.Producer.TopicMaxMessageBytes[topic] <= 0 {
+				return ConfigurationError(fmt.Sprintf("Producer.TopicMaxMessageBytes[%s] must be > 0", topic))
+			}
+		}
+	}
+
+	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
+		return ConfigurationError("lz4 compression requires Version >= V0_10_0_0")
+	}
+
+	if c.Producer.Compression == CompressionGZIP {
+		if c.Producer.CompressionLevel != CompressionLevelDefault {
+			if _, err := gzip.NewWriterLevel(io.Discard, c.Producer.CompressionLevel); err != nil {
+				return ConfigurationError(fmt.Sprintf("gzip compression does not work with level %d: %v", c.Producer.CompressionLevel, err))
+			}
+		}
+	}
+
+	if c.Producer.Compression == CompressionZSTD && !c.Version.IsAtLeast(V2_1_0_0) {
+		return ConfigurationError("zstd compression requires Version >= V2_1_0_0")
+	}
+
+	if c.Producer.Idempotent {
+		if !c.Version.IsAtLeast(V0_11_0_0) {
+			return ConfigurationError("Idempotent producer requires Version >= V0_11_0_0")
+		}
+		if c.Producer.Retry.Max == 0 {
+			return ConfigurationError("Idempotent producer requires Producer.Retry.Max >= 1")
+		}
+		if c.Producer.RequiredAcks != WaitForAll {
+			return ConfigurationError("Idempotent producer requires Producer.RequiredAcks to be WaitForAll")
+		}
+		if c.Net.MaxOpenRequests > 1 {
+			return ConfigurationError("Idempotent producer requires Net.MaxOpenRequests to be 1")
+		}
+	}
+
+	if c.Producer.Transaction.ID != "" && !c.Producer.Idempotent {
+		return ConfigurationError("Transactional producer requires Idempotent to be true")
+	}
+
+	return nil
+}
+
+// Validate checks a Config instance. It will return a
+// ConfigurationError if the specified values don't make sense.
+//
+//nolint:gocyclo // This function's cyclomatic complexity has go beyond 100
+func (c *Config) Validate() error {
+	// some configuration values should be warned on but not fail completely, do those first
+	c.validateWarnings()
 
 	// validate Net values
 	switch {
@@ -779,64 +886,8 @@ func (c *Config) Validate() error {
 	}
 
 	// validate the Producer values
-	switch {
-	case c.Producer.MaxMessageBytes <= 0:
-		return ConfigurationError("Producer.MaxMessageBytes must be > 0")
-	case c.Producer.RequiredAcks < -1:
-		return ConfigurationError("Producer.RequiredAcks must be >= -1")
-	case c.Producer.Timeout <= 0:
-		return ConfigurationError("Producer.Timeout must be > 0")
-	case c.Producer.Partitioner == nil:
-		return ConfigurationError("Producer.Partitioner must not be nil")
-	case c.Producer.Flush.Bytes < 0:
-		return ConfigurationError("Producer.Flush.Bytes must be >= 0")
-	case c.Producer.Flush.Messages < 0:
-		return ConfigurationError("Producer.Flush.Messages must be >= 0")
-	case c.Producer.Flush.Frequency < 0:
-		return ConfigurationError("Producer.Flush.Frequency must be >= 0")
-	case c.Producer.Flush.MaxMessages < 0:
-		return ConfigurationError("Producer.Flush.MaxMessages must be >= 0")
-	case c.Producer.Flush.MaxMessages > 0 && c.Producer.Flush.MaxMessages < c.Producer.Flush.Messages:
-		return ConfigurationError("Producer.Flush.MaxMessages must be >= Producer.Flush.Messages when set")
-	case c.Producer.Retry.Max < 0:
-		return ConfigurationError("Producer.Retry.Max must be >= 0")
-	case c.Producer.Retry.Backoff < 0:
-		return ConfigurationError("Producer.Retry.Backoff must be >= 0")
-	}
-
-	if c.Producer.Compression == CompressionLZ4 && !c.Version.IsAtLeast(V0_10_0_0) {
-		return ConfigurationError("lz4 compression requires Version >= V0_10_0_0")
-	}
-
-	if c.Producer.Compression == CompressionGZIP {
-		if c.Producer.CompressionLevel != CompressionLevelDefault {
-			if _, err := gzip.NewWriterLevel(io.Discard, c.Producer.CompressionLevel); err != nil {
-				return ConfigurationError(fmt.Sprintf("gzip compression does not work with level %d: %v", c.Producer.CompressionLevel, err))
-			}
-		}
-	}
-
-	if c.Producer.Compression == CompressionZSTD && !c.Version.IsAtLeast(V2_1_0_0) {
-		return ConfigurationError("zstd compression requires Version >= V2_1_0_0")
-	}
-
-	if c.Producer.Idempotent {
-		if !c.Version.IsAtLeast(V0_11_0_0) {
-			return ConfigurationError("Idempotent producer requires Version >= V0_11_0_0")
-		}
-		if c.Producer.Retry.Max == 0 {
-			return ConfigurationError("Idempotent producer requires Producer.Retry.Max >= 1")
-		}
-		if c.Producer.RequiredAcks != WaitForAll {
-			return ConfigurationError("Idempotent producer requires Producer.RequiredAcks to be WaitForAll")
-		}
-		if c.Net.MaxOpenRequests > 1 {
-			return ConfigurationError("Idempotent producer requires Net.MaxOpenRequests to be 1")
-		}
-	}
-
-	if c.Producer.Transaction.ID != "" && !c.Producer.Idempotent {
-		return ConfigurationError("Transactional producer requires Idempotent to be true")
+	if err := c.validateProducer(); err != nil {
+		return err
 	}
 
 	// validate the Consumer values

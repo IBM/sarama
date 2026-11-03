@@ -350,6 +350,20 @@ func TestProducerConfigValidates(t *testing.T) {
 			"Producer.MaxMessageBytes must be > 0",
 		},
 		{
+			"TopicMaxMessageBytes zero",
+			func(cfg *Config) {
+				cfg.Producer.TopicMaxMessageBytes = map[string]int{"topic": 0}
+			},
+			"Producer.TopicMaxMessageBytes[topic] must be > 0",
+		},
+		{
+			"TopicMaxMessageBytes negative",
+			func(cfg *Config) {
+				cfg.Producer.TopicMaxMessageBytes = map[string]int{"topic": -1}
+			},
+			"Producer.TopicMaxMessageBytes[topic] must be > 0",
+		},
+		{
 			"RequiredAcks",
 			func(cfg *Config) {
 				cfg.Producer.RequiredAcks = -2
@@ -607,6 +621,31 @@ func TestConsumerGroupStrategyCompatibility(t *testing.T) {
 		config.Version = V2_4_0_0
 		assert.NoError(t, config.Validate())
 	})
+}
+
+func TestProducerTopicMaxMessageBytesConfig(t *testing.T) {
+	cfg := NewConfig()
+	cfg.Producer.MaxMessageBytes = 1000
+	cfg.Producer.TopicMaxMessageBytes = map[string]int{
+		"topic-override": 500,
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected valid config, got error: %v", err)
+	}
+
+	if got := cfg.producerMaxMessageBytes("topic-override"); got != 500 {
+		t.Errorf("expected 500 for topic-override, got %d", got)
+	}
+	if got := cfg.producerMaxMessageBytes("other-topic"); got != 1000 {
+		t.Errorf("expected 1000 fallback for other-topic, got %d", got)
+	}
+
+	cfgNoOverrides := NewConfig()
+	cfgNoOverrides.Producer.MaxMessageBytes = 2000
+	if got := cfgNoOverrides.producerMaxMessageBytes("any-topic"); got != 2000 {
+		t.Errorf("expected 2000 fallback when TopicMaxMessageBytes is nil, got %d", got)
+	}
 }
 
 // This example shows how to integrate with an existing registry as well as publishing metrics
