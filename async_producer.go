@@ -1586,6 +1586,12 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 			bp.parent.retryMessages(pSet.msgs, err)
 		})
 		bp.rollOver()
+		// the messages behind the flushing batch have gone back through the
+		// partitionProducer, so keep it muted on a retriable error like a
+		// resent batch (otherwise it is retried behind them)
+		if bp.flushingBatch != nil {
+			bp.flushingBatch.resent = true
+		}
 
 		unmuteSet := sent.copyFunc(func(topic string, partition int32) bool {
 			if partitions := keepMuted[topic]; partitions != nil {
