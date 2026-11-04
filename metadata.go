@@ -145,7 +145,10 @@ func (r *currentRefresh) hasTopics(topics []string) bool {
 		return r.allTopics
 	}
 	if r.allTopics {
-		return true
+		// a request for all topics names none: the broker does not create
+		// a missing topic for it, and the refresh does not retry a topic
+		// the broker does not know yet
+		return false
 	}
 	for _, topic := range topics {
 		if _, ok := r.topicsMap[topic]; !ok {
@@ -231,7 +234,8 @@ func newMetadataRefresh(f func(topics []string) error) *singleFlightMetadataRefr
 // the metadata. This function blocks until a refresh is issued, and its
 // result is received, for the list of topics the caller provided.
 // If a refresh was already ongoing for this list of topics, the function
-// waits on that refresh to complete, and returns its result.
+// waits on that refresh to complete, and returns its result. A refresh for
+// all topics does not count as one for a list of named topics.
 // If a refresh was already ongoing for a different list of topics, the function
 // accumulates the list of topics to refresh in the next refresh, and queues that refresh.
 // If no refresh is ongoing, it will start a new refresh, and return its result.
@@ -253,7 +257,9 @@ func (m *singleFlightMetadataRefresher) Refresh(topics []string) error {
 // When calling refreshOrQueue, three things can happen:
 //  1. either no refresh is ongoing.
 //     In this case, a new refresh is started, and the channel that's returned will
-//     contain the result of that refresh, so it returns "false" as the second return value.
+//     contain the result of that refresh, so it returns "false" as the second return value,
+//     unless the new refresh is for all topics and the caller named topics: then the
+//     caller is queued as in case 3.
 //  2. a refresh is ongoing, and it contains the topics we need.
 //     In this case, the channel that's returned will contain the result of that refresh,
 //     so it returns "false" as the second return value.
@@ -274,10 +280,18 @@ func (m *singleFlightMetadataRefresher) refreshOrQueue(topics []string) (chan er
 		m.next.mu.Lock()
 		m.current.addTopicsFrom(m.next)
 		m.next.clear()
+		// a caller naming topics waits for its own refresh after the
+		// all-topics one, as hasTopics explains
+		queued := m.current.allTopics && len(topics) > 0
+		if queued {
+			m.next.addTopics(topics)
+		}
 		m.next.mu.Unlock()
-		m.current.addTopics(topics)
+		if !queued {
+			m.current.addTopics(topics)
+		}
 		ch := m.current.start()
-		return ch, false
+		return ch, queued
 	}
 	if m.current.hasTopics(topics) {
 		// A refresh is ongoing, and we were lucky: it is refreshing the topics we need already:
