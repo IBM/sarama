@@ -200,6 +200,7 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		conf:                    conf,
 		closer:                  make(chan none),
 		closed:                  make(chan none),
+		controllerID:            -1,
 		brokers:                 make(map[int32]*Broker),
 		metadata:                make(map[string]map[int32]*PartitionMetadata),
 		metadataTopics:          make(map[string]none),
@@ -1098,7 +1099,10 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 	// - otherwise ignore it, replacing our existing one would just bounce the connection
 	client.updateBroker(data.Brokers)
 
-	client.controllerID = data.ControllerID
+	client.controllerID = -1
+	if data.Version >= 1 {
+		client.controllerID = data.ControllerID
+	}
 
 	previous := client.metadata
 	if allKnownMetaData {
