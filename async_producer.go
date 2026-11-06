@@ -1400,7 +1400,8 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 
 	// we iterate through the blocks in the request set, not the response, so that we notice
 	// if the response is missing a block completely
-	var retryTopics, refreshTopics []string
+	var hasRetries bool
+	var refreshTopics []string
 	keepMuted := make(map[string]map[int32]struct{})
 	sent.eachPartition(func(topic string, partition int32, pSet *partitionSet) {
 		if response == nil {
@@ -1437,7 +1438,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				bp.parent.abandonBrokerConnection(bp)
 				bp.parent.returnErrors(pSet.msgs, block.Err)
 			} else {
-				retryTopics = append(retryTopics, topic)
+				hasRetries = true
 				if staleMetadata(block.Err) {
 					refreshTopics = append(refreshTopics, topic)
 				}
@@ -1457,7 +1458,7 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 		}
 	})
 
-	if len(retryTopics) > 0 {
+	if hasRetries {
 		// Like the Java producer, refresh first only when an error says the
 		// cached metadata is stale. The other retriable errors come from the
 		// current leader, and a synchronous refresh would hold the retry until
