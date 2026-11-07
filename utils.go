@@ -3,6 +3,7 @@ package sarama
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"math/rand"
 	"net"
 	"regexp"
@@ -385,10 +386,15 @@ func NewExponentialBackoff(backoff time.Duration, maxBackoff time.Duration) func
 			return backoff
 		}
 
-		calculatedBackoff := backoff * time.Duration(1<<(retries-1))
+		// Calculate in float64: backoff * 2**(retries-1) overflows time.Duration
+		// after a few dozen retries, so saturate at maxBackoff instead.
+		calculatedBackoff := float64(backoff) * math.Pow(2, float64(retries-1))
 		jitter := 0.8 + 0.4*rand.Float64()
-		calculatedBackoff = time.Duration(float64(calculatedBackoff) * jitter)
+		calculatedBackoff *= jitter
 
-		return min(calculatedBackoff, maxBackoff)
+		if calculatedBackoff >= float64(maxBackoff) {
+			return maxBackoff
+		}
+		return time.Duration(calculatedBackoff)
 	}
 }
