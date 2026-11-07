@@ -3,6 +3,7 @@
 package sarama
 
 import (
+	"math"
 	"testing"
 	"time"
 )
@@ -116,6 +117,21 @@ func TestExponentialBackoffValidCases(t *testing.T) {
 		backoff := backoffFunc(tc.retries, tc.maxRetries)
 		if backoff < tc.minBackoff || backoff > tc.maxBackoffExpected {
 			t.Errorf("backoff(%d, %d): expected between %v and %v, got %v", tc.retries, tc.maxRetries, tc.minBackoff, tc.maxBackoffExpected, backoff)
+		}
+	}
+}
+
+func TestExponentialBackoffLargeRetries(t *testing.T) {
+	maxBackoff := 2 * time.Second
+	backoffFunc := NewExponentialBackoff(100*time.Millisecond, maxBackoff)
+
+	// From the 6th retry on, 100ms * 2^(retries-1) * 0.8 exceeds maxBackoff,
+	// so every result must be capped at exactly maxBackoff, including retry
+	// counts large enough to overflow an int64 number of nanoseconds.
+	retries := []int{6, 30, 37, 38, 40, 62, 63, 64, 65, 100, 1000, math.MaxInt32, math.MaxInt}
+	for _, r := range retries {
+		if backoff := backoffFunc(r, r); backoff != maxBackoff {
+			t.Errorf("backoff(%d, %d): expected %v, got %v", r, r, maxBackoff, backoff)
 		}
 	}
 }
