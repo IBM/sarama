@@ -207,17 +207,10 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		coordinators:            make(map[string]int32),
 		transactionCoordinators: make(map[string]int32),
 	}
-	refresh := func(topics []string) error {
-		deadline := time.Time{}
-		if client.conf.Metadata.Timeout > 0 {
-			deadline = time.Now().Add(client.conf.Metadata.Timeout)
-		}
-		return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
-	}
 	if conf.Metadata.SingleFlight {
-		client.metadataRefresh = newSingleFlightRefresher(refresh)
+		client.metadataRefresh = newSingleFlightRefresher(client.refreshTopics)
 	} else {
-		client.metadataRefresh = refresh
+		client.metadataRefresh = client.refreshTopics
 	}
 
 	if conf.Net.ResolveCanonicalBootstrapServers {
@@ -522,7 +515,18 @@ func (client *client) RefreshMetadata(topics ...string) error {
 	if slices.Contains(topics, "") {
 		return ErrInvalidTopic // this is the error that 0.8.2 and later correctly return
 	}
+	if len(topics) == 0 {
+		topics = nil // all topics; an empty list would ask for none
+	}
 	return client.metadataRefresh(topics)
+}
+
+func (client *client) refreshTopics(topics []string) error {
+	deadline := time.Time{}
+	if client.conf.Metadata.Timeout > 0 {
+		deadline = time.Now().Add(client.conf.Metadata.Timeout)
+	}
+	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
 }
 
 func (client *client) GetOffset(topic string, partitionID int32, timestamp int64) (int64, error) {
@@ -552,7 +556,7 @@ func (client *client) Controller() (*Broker, error) {
 
 	controller := client.cachedController()
 	if controller == nil {
-		if err := client.refreshMetadata(); err != nil {
+		if err := client.refreshControllerMetadata(); err != nil {
 			return nil, err
 		}
 		controller = client.cachedController()
@@ -574,7 +578,7 @@ func (client *client) RefreshController() (*Broker, error) {
 
 	// keep the old controller registered and connected (otherwise requests
 	// still using it fail with ErrNotConnected)
-	if err := client.refreshMetadata(); err != nil {
+	if err := client.refreshControllerMetadata(); err != nil {
 		return nil, err
 	}
 
@@ -966,6 +970,19 @@ func (client *client) refreshMetadata() error {
 	return nil
 }
 
+// refreshControllerMetadata refreshes the metadata the controller comes from.
+// With Metadata.Full disabled and no tracked topics it asks for no topics,
+// which still returns the brokers and the controller.
+func (client *client) refreshControllerMetadata() error {
+	err := client.refreshMetadata()
+	if errors.Is(err, ErrNoTopicsToUpdateMetadata) {
+		return client.refreshTopics([]string{})
+	}
+	return err
+}
+
+// tryRefreshMetadata fetches metadata for topics: nil asks for all topics
+// and replaces the cache, an empty list asks for brokers and the controller only.
 func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int, deadline time.Time) error {
 	pastDeadline := func(backoff time.Duration) bool {
 		if !deadline.IsZero() && time.Now().Add(backoff).After(deadline) {
@@ -1003,12 +1020,15 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		allowAutoTopicCreation := client.conf.Metadata.AllowAutoTopicCreation
 		if len(topics) > 0 {
 			DebugLogger.Printf("client/metadata fetching metadata for %v from broker %s\n", topics, broker.addr)
-		} else {
+		} else if topics == nil {
 			allowAutoTopicCreation = false
 			DebugLogger.Printf("client/metadata fetching metadata for all topics from broker %s\n", broker.addr)
+		} else {
+			DebugLogger.Printf("client/metadata fetching brokers and controller from broker %s\n", broker.addr)
 		}
 
 		req := NewMetadataRequest(client.conf.Version, topics)
+		req.Topics = topics // NewMetadataRequest turns an empty list into all topics
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
 
 		response, err := broker.GetMetadata(req)
@@ -1020,7 +1040,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				_ = broker.Close()
 				continue
 			}
-			allKnownMetaData := len(topics) == 0
+			allKnownMetaData := topics == nil
 			// valid response, use it
 			shouldRetry, err := client.updateMetadata(response, allKnownMetaData)
 			if shouldRetry {
