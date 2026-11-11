@@ -355,41 +355,11 @@ func sendOffsetCommit(coordinator *Broker, req *OffsetCommitRequest) (*OffsetCom
 }
 
 func (om *offsetManager) constructRequestFor(targets partitionTargets) *OffsetCommitRequest {
-	r := &OffsetCommitRequest{
-		Version:       1,
-		ConsumerGroup: om.group,
-		ConsumerID:    om.memberID,
-		// om.generation is read under generationLock, held by flushToBrokerFor
-		ConsumerGroupGeneration: om.generation,
-	}
-	// Version 1 adds timestamp and group membership information, as well as the commit timestamp.
-	//
-	// Version 2 adds retention time.  It removes the commit timestamp added in version 1.
-	if om.conf.Version.IsAtLeast(V0_9_0_0) {
-		r.Version = 2
-	}
-	// Version 3 and 4 are the same as version 2.
-	if om.conf.Version.IsAtLeast(V0_11_0_0) {
-		r.Version = 3
-	}
-	if om.conf.Version.IsAtLeast(V2_0_0_0) {
-		r.Version = 4
-	}
-	// Version 5 removes the retention time, which is now controlled only by a broker configuration.
-	//
-	// Version 6 adds the leader epoch for fencing.
-	if om.conf.Version.IsAtLeast(V2_1_0_0) {
-		r.Version = 6
-	}
-	// version 7 adds a new field called groupInstanceId to indicate member identity across restarts.
-	if om.conf.Version.IsAtLeast(V2_3_0_0) {
-		r.Version = 7
-		r.GroupInstanceId = om.groupInstanceId
-	}
-	// Version 8 is the first flexible version.
-	if om.conf.Version.IsAtLeast(V2_4_0_0) {
-		r.Version = 8
-	}
+	r := NewOffsetCommitRequest(om.conf, om.group)
+	r.ConsumerID = om.memberID
+	// om.generation is read under generationLock, held by flushToBrokerFor
+	r.ConsumerGroupGeneration = om.generation
+	r.GroupInstanceId = om.groupInstanceId
 
 	// commit timestamp was only briefly supported in V1 where we set it to
 	// ReceiveTime (-1) to tell the broker to set it to the time when the commit
@@ -397,17 +367,6 @@ func (om *offsetManager) constructRequestFor(targets partitionTargets) *OffsetCo
 	var commitTimestamp int64
 	if r.Version == 1 {
 		commitTimestamp = ReceiveTime
-	}
-
-	// request controlled retention was only supported from V2-V4 (it became
-	// broker-only after that) so if the user has set the config options then
-	// flow those through as retention time on the commit request.
-	if r.Version >= 2 && r.Version < 5 {
-		// Map Sarama's default of 0 to Kafka's default of -1
-		r.RetentionTime = -1
-		if om.conf.Consumer.Offsets.Retention > 0 {
-			r.RetentionTime = int64(om.conf.Consumer.Offsets.Retention / time.Millisecond)
-		}
 	}
 
 	om.pomsLock.RLock()
