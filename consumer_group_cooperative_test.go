@@ -831,11 +831,15 @@ func TestConsumerGroupCooperativeRejoinErrors(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name string
-		fail func(*mockCooperativeCoordinator, KError)
+		name  string
+		fail  func(*mockCooperativeCoordinator, KError)
+		joins int
 	}{
-		{"JoinGroup", (*mockCooperativeCoordinator).failNextJoin},
-		{"SyncGroup", (*mockCooperativeCoordinator).failNextSync},
+		{"JoinGroup", (*mockCooperativeCoordinator).failNextJoin, 2},
+		// the failed SyncGroup follows a counted join, so the member joins once
+		// more (otherwise Close can land in the retry backoff and Consume
+		// returns ErrClosedConsumerGroup)
+		{"SyncGroup", (*mockCooperativeCoordinator).failNextSync, 3},
 	} {
 		t.Run("a rejoin whose "+tc.name+" finds no coordinator keeps the session", func(t *testing.T) {
 			all := map[string][]int32{topic: {0, 1}}
@@ -846,7 +850,7 @@ func TestConsumerGroupCooperativeRejoinErrors(t *testing.T) {
 			waitForClaims(t, h, 2)
 			tc.fail(coord, ErrConsumerCoordinatorNotAvailable)
 			coord.rebalanceNow()
-			waitForJoins(t, coord, 2)
+			waitForJoins(t, coord, tc.joins)
 			requireSessionKept(t, h)
 
 			closeCooperativeGroup(t, group, consumeDone)
