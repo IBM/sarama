@@ -1726,6 +1726,50 @@ func TestClientLeaderEpoch(t *testing.T) {
 			assert.Equal(t, tc.wantEpoch, e)
 		})
 	}
+
+	t.Run("keeps the newer epoch after a lagging broker did not know the topic", func(t *testing.T) {
+		seed := NewMockBroker(t, 1)
+		defer seed.Close()
+
+		var epoch atomic.Int32
+		var unknown atomic.Bool
+		epoch.Store(5)
+		seed.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				res := &MetadataResponse{Version: req.body.version()}
+				res.AddBroker(seed.Addr(), seed.BrokerID())
+				if unknown.Load() {
+					res.AddTopic("my_topic", ErrUnknownTopicOrPartition)
+					return res
+				}
+				res.AddTopicPartition("my_topic", 0, seed.BrokerID(), nil, nil, nil, ErrNoError)
+				res.Topics[0].Uuid = Uuid{1}
+				res.Topics[0].Partitions[0].LeaderEpoch = epoch.Load()
+				return res
+			},
+		})
+
+		conf := NewTestConfig()
+		conf.Version = V2_8_0_0 // metadata responses carry topic ids
+		conf.Metadata.Retry.Max = 0
+		c, err := NewClient([]string{seed.Addr()}, conf)
+		require.NoError(t, err)
+		defer safeClose(t, c)
+
+		_, e, err := c.LeaderAndEpoch("my_topic", 0)
+		require.NoError(t, err)
+		require.Equal(t, int32(5), e)
+
+		unknown.Store(true)
+		require.ErrorIs(t, c.RefreshMetadata("my_topic"), ErrUnknownTopicOrPartition)
+		unknown.Store(false)
+		epoch.Store(3)
+		require.NoError(t, c.RefreshMetadata("my_topic"))
+
+		_, e, err = c.LeaderAndEpoch("my_topic", 0)
+		require.NoError(t, err)
+		assert.Equal(t, int32(5), e)
+	})
 }
 
 func TestClientCoordinatorMoves(t *testing.T) {
