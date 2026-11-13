@@ -88,6 +88,7 @@ const (
 	apiKeyAlterClientQuotas            = 49
 	apiKeyDescribeUserScramCredentials = 50
 	apiKeyAlterUserScramCredentials    = 51
+	apiKeyDescribeQuorum               = 55
 	apiKeyUpdateFeatures               = 57
 	apiKeyDescribeCluster              = 60
 	apiKeyDescribeProducers            = 61

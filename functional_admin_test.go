@@ -1141,3 +1141,27 @@ func TestFuncAdminUpdateFeatures(t *testing.T) {
 		}
 	}, 30*time.Second, 250*time.Millisecond, "finalized feature levels did not reach the requested levels")
 }
+
+func TestFuncAdminDescribeMetadataQuorum(t *testing.T) {
+	// the functional test cluster runs in KRaft mode from Kafka 4.0
+	checkKafkaVersion(t, "4.0.0")
+	setupFunctionalTest(t)
+	defer teardownFunctionalTest(t)
+
+	adminClient, err := NewClusterAdmin(FunctionalTestEnv.KafkaBrokerAddrs, NewFunctionalTestConfig())
+	require.NoError(t, err)
+	defer safeClose(t, adminClient)
+
+	info, err := adminClient.(MetadataQuorumClusterAdmin).DescribeMetadataQuorum()
+	require.NoError(t, err)
+
+	// every node is a voter (see KAFKA_CFG_CONTROLLER_QUORUM_VOTERS)
+	voterIDs := make([]int32, 0, len(info.Voters))
+	for _, voter := range info.Voters {
+		voterIDs = append(voterIDs, voter.ReplicaID)
+	}
+	assert.ElementsMatch(t, []int32{1, 2, 3, 4, 5}, voterIDs)
+	assert.Contains(t, voterIDs, info.LeaderID)
+	assert.Positive(t, info.LeaderEpoch)
+	assert.Positive(t, info.HighWatermark)
+}
