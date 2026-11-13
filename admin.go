@@ -1328,6 +1328,10 @@ func isRetriableDescribeGroupError(err KError) bool {
 }
 
 func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err error) {
+	// a closed client has no brokers, which would look like no groups
+	if ca.client.Closed() {
+		return nil, ErrClosedClient
+	}
 	allGroups = make(map[string]string)
 
 	// Query brokers in parallel, since we have to query *all* brokers
@@ -1557,6 +1561,10 @@ func (ca *clusterAdmin) DeleteConsumerGroup(group string) error {
 }
 
 func (ca *clusterAdmin) DescribeLogDirs(brokerIds []int32) (allLogDirs map[int32][]DescribeLogDirsResponseDirMetadata, err error) {
+	// a closed client has no brokers, which would look like no log dirs
+	if ca.client.Closed() {
+		return nil, ErrClosedClient
+	}
 	type result struct {
 		id      int32
 		logdirs []DescribeLogDirsResponseDirMetadata
