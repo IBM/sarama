@@ -1194,6 +1194,7 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 		config := NewTestConfig()
 		commit := newLoadingCommitResponse()
 		config.Metadata.Retry.BackoffFunc = commit.backoff
+		config.Consumer.Offsets.Retry.Max = 5
 		om, _, _ := initHandledOffsetManager(t, config, commit)
 
 		pom, err := om.ManagePartition("my_topic", 0)
@@ -1204,6 +1205,8 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 
 		require.Equal(t, map[int32]int64{0: 100}, commit.committed(),
 			"revoked offset dropped while the coordinator was loading")
+		require.Equal(t, []backoffCall{{retries: 0, maxRetries: 5}}, commit.backoffs(),
+			"backoff not given the retries made and Consumer.Offsets.Retry.Max")
 	})
 
 	// send-on-closed-channel safety when a commit runs concurrently with removePartitions (#2608)
@@ -1358,6 +1361,7 @@ func TestOffsetManagerClose(t *testing.T) {
 		config := NewTestConfig()
 		commit := newLoadingCommitResponse()
 		config.Metadata.Retry.BackoffFunc = commit.backoff
+		config.Consumer.Offsets.Retry.Max = 5
 		om, _, _ := initHandledOffsetManager(t, config, commit)
 
 		pom, err := om.ManagePartition("my_topic", 0)
@@ -1368,6 +1372,8 @@ func TestOffsetManagerClose(t *testing.T) {
 
 		require.Equal(t, map[int32]int64{0: 100}, commit.committed(),
 			"offset dropped on Close while the coordinator was loading")
+		require.Equal(t, []backoffCall{{retries: 0, maxRetries: 5}}, commit.backoffs(),
+			"backoff not given the retries made and Consumer.Offsets.Retry.Max")
 	})
 }
 
@@ -1379,6 +1385,12 @@ type loadingCommitResponse struct {
 	answered bool
 	loaded   bool
 	offsets  map[int32]int64
+	waits    []backoffCall
+}
+
+// backoffCall is the arguments of one call to a Retry.BackoffFunc
+type backoffCall struct {
+	retries, maxRetries int
 }
 
 func newLoadingCommitResponse() *loadingCommitResponse {
@@ -1389,7 +1401,15 @@ func (r *loadingCommitResponse) backoff(retries, maxRetries int) time.Duration {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.loaded = r.loaded || r.answered
+	r.waits = append(r.waits, backoffCall{retries, maxRetries})
 	return 0
+}
+
+// backoffs returns each backoff the offset manager asked for, in order
+func (r *loadingCommitResponse) backoffs() []backoffCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.waits)
 }
 
 func (r *loadingCommitResponse) For(reqBody versionedDecoder) encoderWithHeader {
