@@ -129,6 +129,7 @@ func (om *offsetManager) Close() error {
 				if om.releasePOMs(false) == 0 {
 					break
 				}
+				om.backoffCommit(attempt)
 			}
 		}
 
@@ -140,9 +141,9 @@ func (om *offsetManager) Close() error {
 	return nil
 }
 
-func (om *offsetManager) computeBackoff(retries int) time.Duration {
+func (om *offsetManager) computeBackoff(retries, maxRetries int) time.Duration {
 	if om.conf.Metadata.Retry.BackoffFunc != nil {
-		return om.conf.Metadata.Retry.BackoffFunc(retries, om.conf.Metadata.Retry.Max)
+		return om.conf.Metadata.Retry.BackoffFunc(retries, maxRetries)
 	} else {
 		return om.conf.Metadata.Retry.Backoff
 	}
@@ -194,7 +195,8 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 		// a coordinator still loading __consumer_offsets answers FindCoordinator
 		// with itself while rejecting the fetch, so wait between attempts
 		// (otherwise the retry budget is spent in a few milliseconds)
-		backoff := om.computeBackoff(retries)
+		maxRetries := om.conf.Metadata.Retry.Max
+		backoff := om.computeBackoff(maxRetries-retries, maxRetries)
 		select {
 		case <-om.closing:
 			return 0, 0, "", block.Err
@@ -205,7 +207,8 @@ func (om *offsetManager) fetchInitialOffset(topic string, partition int32, retri
 		if retries <= 0 {
 			return 0, 0, "", block.Err
 		}
-		backoff := om.computeBackoff(retries)
+		maxRetries := om.conf.Metadata.Retry.Max
+		backoff := om.computeBackoff(maxRetries-retries, maxRetries)
 		select {
 		case <-om.closing:
 			return 0, 0, "", block.Err
@@ -548,8 +551,18 @@ func (om *offsetManager) removePartitions(topicPartitions map[string][]int32) {
 		if om.releaseSelectedPOMs(false, targets) == 0 {
 			return
 		}
+		om.backoffCommit(attempt)
 	}
 	om.releaseSelectedPOMs(true, targets)
+}
+
+// backoffCommit waits between attempts at a final commit (otherwise a
+// coordinator that is still loading rejects every attempt within milliseconds
+// and the offsets are dropped)
+func (om *offsetManager) backoffCommit(attempt int) {
+	if maxRetries := om.conf.Consumer.Offsets.Retry.Max; attempt < maxRetries {
+		time.Sleep(om.computeBackoff(attempt, maxRetries))
+	}
 }
 
 // Releases/removes closed POMs once they are clean (or when forced)
