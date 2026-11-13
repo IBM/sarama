@@ -179,6 +179,56 @@ func (m *MockConsumerGroupDescribeResponse) For(reqBody versionedDecoder) encode
 	return res
 }
 
+// MockConsumerGroupHeartbeatResponse builds responses for KIP-848 consumer group heartbeats.
+type MockConsumerGroupHeartbeatResponse struct {
+	response *ConsumerGroupHeartbeatResponse
+	t        TestReporter
+}
+
+func NewMockConsumerGroupHeartbeatResponse(t TestReporter) *MockConsumerGroupHeartbeatResponse {
+	return &MockConsumerGroupHeartbeatResponse{
+		t:        t,
+		response: &ConsumerGroupHeartbeatResponse{},
+	}
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) SetError(kerr KError) *MockConsumerGroupHeartbeatResponse {
+	m.response.ErrorCode = kerr
+	return m
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) SetErrorMessage(msg string) *MockConsumerGroupHeartbeatResponse {
+	m.response.ErrorMessage = &msg
+	return m
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) SetMemberId(memberId string) *MockConsumerGroupHeartbeatResponse {
+	m.response.MemberId = &memberId
+	return m
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) SetMemberEpoch(memberEpoch int32) *MockConsumerGroupHeartbeatResponse {
+	m.response.MemberEpoch = memberEpoch
+	return m
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) SetHeartbeatIntervalMs(interval int32) *MockConsumerGroupHeartbeatResponse {
+	m.response.HeartbeatIntervalMs = interval
+	return m
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) SetAssignment(assignment *ConsumerGroupHeartbeatAssignment) *MockConsumerGroupHeartbeatResponse {
+	m.response.Assignment = assignment
+	return m
+}
+
+func (m *MockConsumerGroupHeartbeatResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*ConsumerGroupHeartbeatRequest)
+	res := *m.response
+	res.Version = req.Version
+	return &res
+}
+
 // MockMetadataResponse is a `MetadataResponse` builder.
 type MockMetadataResponse struct {
 	controllerID int32
