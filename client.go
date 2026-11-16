@@ -160,6 +160,7 @@ type client struct {
 	metadata                map[string]map[int32]*PartitionMetadata // maps topics to partition ids to metadata
 	metadataTopics          map[string]none                         // topics that need to collect metadata
 	topicIDs                map[string]Uuid                         // last topic id seen per topic, to tell a re-created topic from a lagging broker
+	lastPartitions          map[string]map[int32]*PartitionMetadata // last partitions stored per topic, kept when the topic leaves metadata
 	coordinators            map[string]int32                        // Maps consumer group names to coordinating broker IDs
 	transactionCoordinators map[string]int32                        // Maps transaction ids to coordinating broker IDs
 
@@ -208,17 +209,10 @@ func NewClient(addrs []string, conf *Config) (Client, error) {
 		coordinators:            make(map[string]int32),
 		transactionCoordinators: make(map[string]int32),
 	}
-	refresh := func(topics []string) error {
-		deadline := time.Time{}
-		if client.conf.Metadata.Timeout > 0 {
-			deadline = time.Now().Add(client.conf.Metadata.Timeout)
-		}
-		return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
-	}
 	if conf.Metadata.SingleFlight {
-		client.metadataRefresh = newSingleFlightRefresher(refresh)
+		client.metadataRefresh = newSingleFlightRefresher(client.refreshTopics)
 	} else {
-		client.metadataRefresh = refresh
+		client.metadataRefresh = client.refreshTopics
 	}
 
 	if conf.Net.ResolveCanonicalBootstrapServers {
@@ -523,7 +517,18 @@ func (client *client) RefreshMetadata(topics ...string) error {
 	if slices.Contains(topics, "") {
 		return ErrInvalidTopic // this is the error that 0.8.2 and later correctly return
 	}
+	if len(topics) == 0 {
+		topics = nil // all topics; an empty list would ask for none
+	}
 	return client.metadataRefresh(topics)
+}
+
+func (client *client) refreshTopics(topics []string) error {
+	deadline := time.Time{}
+	if client.conf.Metadata.Timeout > 0 {
+		deadline = time.Now().Add(client.conf.Metadata.Timeout)
+	}
+	return client.tryRefreshMetadata(topics, client.conf.Metadata.Retry.Max, deadline)
 }
 
 func (client *client) GetOffset(topic string, partitionID int32, timestamp int64) (int64, error) {
@@ -553,7 +558,7 @@ func (client *client) Controller() (*Broker, error) {
 
 	controller := client.cachedController()
 	if controller == nil {
-		if err := client.refreshMetadata(); err != nil {
+		if err := client.refreshControllerMetadata(); err != nil {
 			return nil, err
 		}
 		controller = client.cachedController()
@@ -575,7 +580,7 @@ func (client *client) RefreshController() (*Broker, error) {
 
 	// keep the old controller registered and connected (otherwise requests
 	// still using it fail with ErrNotConnected)
-	if err := client.refreshMetadata(); err != nil {
+	if err := client.refreshControllerMetadata(); err != nil {
 		return nil, err
 	}
 
@@ -967,6 +972,19 @@ func (client *client) refreshMetadata() error {
 	return nil
 }
 
+// refreshControllerMetadata refreshes the metadata the controller comes from.
+// With Metadata.Full disabled and no tracked topics it asks for no topics,
+// which still returns the brokers and the controller.
+func (client *client) refreshControllerMetadata() error {
+	err := client.refreshMetadata()
+	if errors.Is(err, ErrNoTopicsToUpdateMetadata) {
+		return client.refreshTopics([]string{})
+	}
+	return err
+}
+
+// tryRefreshMetadata fetches metadata for topics: nil asks for all topics
+// and replaces the cache, an empty list asks for brokers and the controller only.
 func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int, deadline time.Time) error {
 	pastDeadline := func(backoff time.Duration) bool {
 		if !deadline.IsZero() && time.Now().Add(backoff).After(deadline) {
@@ -1004,12 +1022,15 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 		allowAutoTopicCreation := client.conf.Metadata.AllowAutoTopicCreation
 		if len(topics) > 0 {
 			DebugLogger.Printf("client/metadata fetching metadata for %v from broker %s\n", topics, broker.addr)
-		} else {
+		} else if topics == nil {
 			allowAutoTopicCreation = false
 			DebugLogger.Printf("client/metadata fetching metadata for all topics from broker %s\n", broker.addr)
+		} else {
+			DebugLogger.Printf("client/metadata fetching brokers and controller from broker %s\n", broker.addr)
 		}
 
 		req := NewMetadataRequest(client.conf.Version, topics)
+		req.Topics = topics // NewMetadataRequest turns an empty list into all topics
 		req.AllowAutoTopicCreation = allowAutoTopicCreation
 
 		response, err := broker.GetMetadata(req)
@@ -1021,7 +1042,7 @@ func (client *client) tryRefreshMetadata(topics []string, attemptsRemaining int,
 				_ = broker.Close()
 				continue
 			}
-			allKnownMetaData := len(topics) == 0
+			allKnownMetaData := topics == nil
 			// valid response, use it
 			shouldRetry, err := client.updateMetadata(response, allKnownMetaData)
 			if shouldRetry {
@@ -1104,7 +1125,6 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		client.controllerID = data.ControllerID
 	}
 
-	previous := client.metadata
 	if allKnownMetaData {
 		client.metadata = make(map[string]map[int32]*PartitionMetadata)
 		client.metadataTopics = make(map[string]none)
@@ -1119,7 +1139,6 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 		if _, exists := client.metadataTopics[topic.Name]; !exists {
 			client.metadataTopics[topic.Name] = none{}
 		}
-		cached := previous[topic.Name]
 		delete(client.metadata, topic.Name)
 		delete(client.cachedPartitionsResults, topic.Name)
 
@@ -1144,12 +1163,16 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 
 		// a broker with a lagging metadata cache can report an older leader
 		// epoch; keep the newer entry unless the topic id shows the topic was
-		// re-created (leader epochs restart then)
+		// re-created (leader epochs restart then). Compare with lastPartitions,
+		// which keeps the entry after a lagging broker that did not know the
+		// topic yet removed it from metadata.
 		sameTopic := topic.Uuid != (Uuid{}) && topic.Uuid == client.topicIDs[topic.Name]
 		if client.topicIDs == nil {
 			client.topicIDs = make(map[string]Uuid)
+			client.lastPartitions = make(map[string]map[int32]*PartitionMetadata)
 		}
 		client.topicIDs[topic.Name] = topic.Uuid
+		cached := client.lastPartitions[topic.Name]
 
 		client.metadata[topic.Name] = make(map[int32]*PartitionMetadata, len(topic.Partitions))
 		for _, partition := range topic.Partitions {
@@ -1163,6 +1186,8 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 				retry = true
 			}
 		}
+
+		client.lastPartitions[topic.Name] = client.metadata[topic.Name]
 
 		var partitionCache [maxPartitionIndex][]int32
 		partitionCache[allPartitions] = client.setPartitionCache(topic.Name, allPartitions)
