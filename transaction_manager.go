@@ -416,7 +416,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 		case ErrGroupAuthorizationFailed:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		default:
-			if isRetriableTxnError(response.Err) {
+			if isRetriableKError(response.Err) {
 				break
 			}
 			// Others are fatal
@@ -518,7 +518,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 				case ErrGroupAuthorizationFailed:
 					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, partitionError.Err)
 				default:
-					if isRetriableTxnError(partitionError.Err) {
+					if isRetriableKError(partitionError.Err) {
 						break
 					}
 					// Others are fatal
@@ -646,32 +646,13 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 			// Retry: the coordinator is still finishing the previous transaction.
 		// Fatal errors
 		default:
-			if isRetriableTxnError(response.Err) {
+			if isRetriableKError(response.Err) {
 				break
 			}
 			return -1, -1, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		}
 		return -1, -1, true, response.Err
 	}, nil)
-}
-
-// isRetriableTxnError reports whether err maps to a RetriableException in the
-// Java client, whose transaction manager resends any transaction request that
-// fails with one.
-func isRetriableTxnError(err KError) bool {
-	switch err {
-	case ErrInvalidMessage, ErrUnknownTopicOrPartition, ErrLeaderNotAvailable,
-		ErrNotLeaderForPartition, ErrRequestTimedOut, ErrReplicaNotAvailable,
-		ErrNetworkException, ErrOffsetsLoadInProgress, ErrConsumerCoordinatorNotAvailable,
-		ErrNotCoordinatorForConsumer, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend,
-		ErrNotController, ErrConcurrentTransactions, ErrKafkaStorageError,
-		ErrFetchSessionIDNotFound, ErrInvalidFetchSessionEpoch, ErrListenerNotFound,
-		ErrFencedLeaderEpoch, ErrUnknownLeaderEpoch, ErrOffsetNotAvailable,
-		ErrPreferredLeaderNotAvailable, ErrEligibleLeadersNotAvailable, ErrElectionNotNeeded,
-		ErrUnstableOffsetCommit, ErrThrottlingQuotaExceeded:
-		return true
-	}
-	return false
 }
 
 // if kafka cluster is at least 2.5.0 mark txnmngr to bump epoch else mark it as fatal.
@@ -781,7 +762,7 @@ func (t *transactionManager) endTxn(commit bool) error {
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 		// Fatal errors
 		default:
-			if isRetriableTxnError(response.Err) {
+			if isRetriableKError(response.Err) {
 				break
 			}
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
@@ -1000,7 +981,7 @@ func (t *transactionManager) publishTxnPartitions() error {
 					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
 				// Fatal errors
 				default:
-					if isRetriableTxnError(response.Err) {
+					if isRetriableKError(response.Err) {
 						break
 					}
 					removeAllPartitionsOnFatalOrAbortedError()

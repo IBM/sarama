@@ -244,6 +244,11 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 		return nil, ConfigurationError("ListTransactions durationFilterMs requires Version >= V3_8_0_0")
 	}
 
+	// a closed client has no brokers, which would look like no transactions
+	if ca.client.Closed() {
+		return nil, ErrClosedClient
+	}
+
 	// Transactions may be listed by any broker, so query all brokers in parallel
 	// and merge the results.
 	brokers := ca.client.Brokers()
@@ -257,7 +262,11 @@ func (ca *clusterAdmin) ListTransactions(stateFilters []string, producerIDFilter
 	var wg sync.WaitGroup
 	for _, b := range brokers {
 		wg.Go(func() {
-			_ = b.Open(ca.conf) // Ensure that broker is opened
+			b, err := ca.findBroker(b.ID())
+			if err != nil {
+				results <- queryResult{err: fmt.Errorf("list transactions: %w", err)}
+				return
+			}
 
 			request := NewListTransactionsRequest(ca.conf.Version)
 			request.StateFilters = stateFilters

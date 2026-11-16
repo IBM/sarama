@@ -1123,9 +1123,15 @@ func (bp *brokerProducer) run() {
 	var output chan<- *produceSet
 	Logger.Printf("producer/broker/%d starting up\n", bp.broker.ID())
 
+	// shutdown waits for every buffered message before it closes bp.input, so
+	// once the producer is closing, flush without waiting for the Flush
+	// thresholds or Frequency (otherwise Close can block forever)
+	done := bp.parent.done
+	flushAll := false
+
 	for {
 		var unmuteSignal <-chan struct{}
-		if bp.flushingBatch == nil && (bp.timerFired || bp.accumulatingBatch.readyToFlush()) {
+		if bp.flushingBatch == nil && (bp.timerFired || flushAll || bp.accumulatingBatch.readyToFlush()) {
 			unmuteSignal = bp.tryBuildFlushingBatch()
 		}
 
@@ -1202,6 +1208,9 @@ func (bp *brokerProducer) run() {
 			}
 		case <-timerChan:
 			bp.timerFired = true
+		case <-done:
+			flushAll = true
+			done = nil
 		case output <- bp.flushingBatch:
 			bp.flushingBatch = nil
 		case <-unmuteSignal:
@@ -1461,17 +1470,24 @@ func (bp *brokerProducer) handleSuccess(sent *produceSet, response *ProduceRespo
 				ErrRequestTimedOut, ErrNotEnoughReplicas, ErrNotEnoughReplicasAfterAppend, ErrKafkaStorageError:
 				Logger.Printf("producer/broker/%d state change to [retrying] on %s/%d because %v\n",
 					bp.broker.ID(), topic, partition, block.Err)
-				if bp.currentRetries[topic] == nil {
-					bp.currentRetries[topic] = make(map[int32]error)
+				dropped := bp.accumulatingBatch.dropPartition(topic, partition)
+				// only messages sent back through the partitionProducer are
+				// followed by the fin that clears this; left set after
+				// retryBatch resends the batch, the next message is sent back
+				// too and uses up a retry
+				if !retryAsBatch || len(dropped) > 0 {
+					if bp.currentRetries[topic] == nil {
+						bp.currentRetries[topic] = make(map[int32]error)
+					}
+					bp.currentRetries[topic][partition] = block.Err
 				}
-				bp.currentRetries[topic][partition] = block.Err
 				if retryAsBatch {
 					go bp.parent.retryBatch(topic, partition, pSet, block.Err, true)
 				} else {
 					bp.parent.retryMessages(pSet.msgs, block.Err)
 				}
 				// dropping the following messages has the side effect of incrementing their retry count
-				bp.parent.retryMessages(bp.accumulatingBatch.dropPartition(topic, partition), block.Err)
+				bp.parent.retryMessages(dropped, block.Err)
 			}
 		})
 	}
@@ -1586,6 +1602,12 @@ func (bp *brokerProducer) handleError(sent *produceSet, err error) {
 			bp.parent.retryMessages(pSet.msgs, err)
 		})
 		bp.rollOver()
+		// the messages behind the flushing batch have gone back through the
+		// partitionProducer, so keep it muted on a retriable error like a
+		// resent batch (otherwise it is retried behind them)
+		if bp.flushingBatch != nil {
+			bp.flushingBatch.resent = true
+		}
 
 		unmuteSet := sent.copyFunc(func(topic string, partition int32) bool {
 			if partitions := keepMuted[topic]; partitions != nil {
