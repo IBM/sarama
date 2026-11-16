@@ -26,10 +26,10 @@ jobs:
         script: |
           const sizes = [
             {name: 'size/XS', max: 9, color: '009900', range: '0-9'},
-            {name: 'size/S', max: 29, color: '77bb00', range: '10-29'},
-            {name: 'size/M', max: 99, color: 'eebb00', range: '30-99'},
-            {name: 'size/L', max: 499, color: 'ee9900', range: '100-499'},
-            {name: 'size/XL', max: 999, color: 'ee5500', range: '500-999'},
+            {name: 'size/S', max: 59, color: '77bb00', range: '10-59'},
+            {name: 'size/M', max: 299, color: 'eebb00', range: '60-299'},
+            {name: 'size/L', max: 599, color: 'ee9900', range: '300-599'},
+            {name: 'size/XL', max: 999, color: 'ee5500', range: '600-999'},
             {name: 'size/XXL', max: Infinity, color: 'ee0000', range: '1000+'},
           ];
           const {owner, repo} = context.repo;
