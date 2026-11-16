@@ -1,0 +1,65 @@
+name: PR Size
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  pull-requests: write
+
+jobs:
+  label:
+    name: Label PR size
+    runs-on: ubuntu-latest
+    steps:
+    # Only read PR metadata; never check out or execute the PR's code.
+    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          const sizes = [
+            {name: 'size/XS', max: 9, color: '009900', range: '0-9'},
+            {name: 'size/S', max: 29, color: '77bb00', range: '10-29'},
+            {name: 'size/M', max: 99, color: 'eebb00', range: '30-99'},
+            {name: 'size/L', max: 499, color: 'ee9900', range: '100-499'},
+            {name: 'size/XL', max: 999, color: 'ee5500', range: '500-999'},
+            {name: 'size/XXL', max: Infinity, color: 'ee0000', range: '1000+'},
+          ];
+          const {owner, repo} = context.repo;
+          const pull_number = context.payload.pull_request.number;
+          const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number});
+          const changes = pr.additions + pr.deletions;
+          const target = sizes.find(size => changes <= size.max);
+
+          const labels = await github.paginate(github.rest.issues.listLabelsForRepo, {
+            owner, repo, per_page: 100,
+          });
+          for (const size of sizes) {
+            if (labels.some(label => label.name === size.name)) continue;
+            try {
+              await github.rest.issues.createLabel({
+                owner, repo, name: size.name, color: size.color,
+                description: `PR changes ${size.range} lines (additions + deletions)`,
+              });
+            } catch (error) {
+              // Another PR may have created the same repository label.
+              if (error.status !== 422 || !error.response?.data?.errors?.some(
+                detail => detail.code === 'already_exists'
+              )) throw error;
+            }
+          }
+
+          const issue_number = pull_number;
+          if (!pr.labels.some(label => label.name === target.name)) {
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number, labels: [target.name],
+            });
+          }
+          for (const label of pr.labels) {
+            if (label.name !== target.name && sizes.some(size => size.name === label.name)) {
+              await github.rest.issues.removeLabel({owner, repo, issue_number, name: label.name});
+            }
+          }
+          core.info(`${changes} changed lines: ${target.name}`);
