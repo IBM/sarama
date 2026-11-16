@@ -1,21 +1,26 @@
 name: PR Size
+
+# SECURITY: pull_request_target runs with a write token, also for PRs from
+# forks. Do not check out or run PR code, and do not put PR-controlled text
+# (title, body, branch names) in ${{ }} expressions.
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
 
 concurrency:
   group: pr-size-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
-permissions:
-  pull-requests: write
+permissions: {}
 
 jobs:
   label:
     name: Label PR size
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
     steps:
-    # Only read PR metadata; never check out or execute the PR's code.
     - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         script: |
@@ -28,38 +33,52 @@ jobs:
             {name: 'size/XXL', max: Infinity, color: 'ee0000', range: '1000+'},
           ];
           const {owner, repo} = context.repo;
-          const pull_number = context.payload.pull_request.number;
-          const {data: pr} = await github.rest.pulls.get({owner, repo, pull_number});
+          const issue_number = context.payload.pull_request.number;
+
+          // The event payload can be stale if the run was queued or re-run.
+          const {data: pr} = await github.rest.pulls.get({
+            owner, repo, pull_number: issue_number,
+          });
           const changes = pr.additions + pr.deletions;
           const target = sizes.find(size => changes <= size.max);
+          const current = pr.labels.map(label => label.name);
 
-          const labels = await github.paginate(github.rest.issues.listLabelsForRepo, {
-            owner, repo, per_page: 100,
-          });
-          for (const size of sizes) {
-            if (labels.some(label => label.name === size.name)) continue;
+          if (!current.includes(target.name)) {
             try {
-              await github.rest.issues.createLabel({
-                owner, repo, name: size.name, color: size.color,
-                description: `PR changes ${size.range} lines (additions + deletions)`,
-              });
+              await github.rest.issues.getLabel({owner, repo, name: target.name});
             } catch (error) {
-              // Another PR may have created the same repository label.
-              if (error.status !== 422 || !error.response?.data?.errors?.some(
-                detail => detail.code === 'already_exists'
-              )) throw error;
+              if (error.status !== 404) throw error;
+              try {
+                await github.rest.issues.createLabel({
+                  owner, repo, name: target.name, color: target.color,
+                  description: `PR changes ${target.range} lines (additions + deletions)`,
+                });
+              } catch (createError) {
+                if (createError.status === 403) {
+                  core.setFailed(
+                    `The token cannot create the label "${target.name}". ` +
+                    'Create the size/* labels manually one time.'
+                  );
+                  return;
+                }
+                // 422: a parallel run for a different PR created the label.
+                if (createError.status !== 422) throw createError;
+              }
             }
-          }
-
-          const issue_number = pull_number;
-          if (!pr.labels.some(label => label.name === target.name)) {
             await github.rest.issues.addLabels({
               owner, repo, issue_number, labels: [target.name],
             });
           }
-          for (const label of pr.labels) {
-            if (label.name !== target.name && sizes.some(size => size.name === label.name)) {
-              await github.rest.issues.removeLabel({owner, repo, issue_number, name: label.name});
+
+          const stale = sizes
+            .map(size => size.name)
+            .filter(name => name !== target.name && current.includes(name));
+          for (const name of stale) {
+            try {
+              await github.rest.issues.removeLabel({owner, repo, issue_number, name});
+            } catch (error) {
+              // 404: the label was removed after the PR state was read.
+              if (error.status !== 404) throw error;
             }
           }
           core.info(`${changes} changed lines: ${target.name}`);
