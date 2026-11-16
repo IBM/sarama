@@ -82,6 +82,11 @@ linters:
       text: 'G115: integer overflow conversion'
     - path: (.+)\.go$
       text: 'G404: Use of weak random number generator'
+    # errcheck reports a bare receive from a chan error as an unchecked error,
+    # but staticcheck S1005 rejects the "_ = <-ch" form that would silence it.
+    - linters:
+      - errcheck
+      source: ^\s*(case\s+)?<-
     paths:
     - third_party$
     - builtin$
