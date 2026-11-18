@@ -917,12 +917,17 @@ func TestClientController(t *testing.T) {
 	t.Run("finds the controller with no tracked topics and Full disabled", func(t *testing.T) {
 		seedBroker := NewMockBroker(t, 1)
 		defer seedBroker.Close()
-		seedBroker.SetHandlerByMap(map[string]MockResponse{
+		controllerBroker := NewMockBroker(t, 2)
+		defer controllerBroker.Close()
+		// either broker may be asked for metadata
+		handlers := map[string]MockResponse{
 			"MetadataRequest": NewMockMetadataResponse(t).
 				SetController(controllerBroker.BrokerID()).
 				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
 				SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
-		})
+		}
+		seedBroker.SetHandlerByMap(handlers)
+		controllerBroker.SetHandlerByMap(handlers)
 
 		cfg := NewTestConfig()
 		cfg.Version = V1_0_0_0
@@ -940,9 +945,11 @@ func TestClientController(t *testing.T) {
 		assert.Equal(t, controllerBroker.Addr(), broker.Addr())
 
 		var requested [][]string
-		for _, rr := range seedBroker.History() {
-			if req, ok := rr.Request.(*MetadataRequest); ok {
-				requested = append(requested, req.Topics)
+		for _, b := range []*MockBroker{seedBroker, controllerBroker} {
+			for _, rr := range b.History() {
+				if req, ok := rr.Request.(*MetadataRequest); ok {
+					requested = append(requested, req.Topics)
+				}
 			}
 		}
 		assert.Equal(t, [][]string{{}, {}}, requested, "metadata requests should name no topics")
