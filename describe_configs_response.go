@@ -21,6 +21,12 @@ func (s ConfigSource) String() string {
 		return "StaticBroker"
 	case SourceDefault:
 		return "Default"
+	case SourceDynamicBrokerLogger:
+		return "DynamicBrokerLogger"
+	case SourceClientMetrics:
+		return "ClientMetrics"
+	case SourceGroup:
+		return "Group"
 	}
 	return fmt.Sprintf("Source Invalid: %d", int(s))
 }
@@ -32,6 +38,9 @@ const (
 	SourceDynamicDefaultBroker
 	SourceStaticBroker
 	SourceDefault
+	SourceDynamicBrokerLogger
+	SourceClientMetrics
+	SourceGroup
 )
 
 type ConfigType int8

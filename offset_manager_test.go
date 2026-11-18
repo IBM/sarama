@@ -5,8 +5,10 @@ package sarama
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -757,29 +759,73 @@ func TestPartitionOffsetManagerNextOffset(t *testing.T) {
 }
 
 func TestPartitionOffsetManagerResetOffset(t *testing.T) {
-	om, testClient, broker, coordinator := initOffsetManager(t, 0)
-	defer broker.Close()
-	defer coordinator.Close()
-	pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
+	t.Run("returns the reset offset and metadata", func(t *testing.T) {
+		om, testClient, broker, coordinator := initOffsetManager(t, 0)
+		defer broker.Close()
+		defer coordinator.Close()
+		pom := initPartitionOffsetManager(t, om, coordinator, 5, "original_meta")
 
-	ocResponse := new(OffsetCommitResponse)
-	ocResponse.AddError("my_topic", 0, ErrNoError)
-	coordinator.Returns(ocResponse)
+		ocResponse := new(OffsetCommitResponse)
+		ocResponse.AddError("my_topic", 0, ErrNoError)
+		coordinator.Returns(ocResponse)
 
-	expected := int64(1)
-	pom.ResetOffset(expected, "modified_meta")
-	actual, meta := pom.NextOffset()
+		expected := int64(1)
+		pom.ResetOffset(expected, "modified_meta")
+		actual, meta := pom.NextOffset()
 
-	if actual != expected {
-		t.Errorf("Expected offset %v. Actual: %v", expected, actual)
-	}
-	if meta != "modified_meta" {
-		t.Errorf("Expected metadata \"modified_meta\". Actual: %q", meta)
-	}
+		if actual != expected {
+			t.Errorf("Expected offset %v. Actual: %v", expected, actual)
+		}
+		if meta != "modified_meta" {
+			t.Errorf("Expected metadata \"modified_meta\". Actual: %q", meta)
+		}
 
-	safeClose(t, pom)
-	safeClose(t, om)
-	safeClose(t, testClient)
+		safeClose(t, pom)
+		safeClose(t, om)
+		safeClose(t, testClient)
+	})
+
+	t.Run("commits a reset to the offset of an earlier commit still in flight", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Consumer.Offsets.AutoCommit.Enable = false
+		capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+		gate := &gatedResponse{inner: capture, entered: make(chan none), release: make(chan none)}
+		om, _, _ := initHandledOffsetManager(t, config, gate)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+
+		pom.MarkOffset(10, "")
+		first := make(chan none)
+		go func() {
+			om.Commit()
+			close(first)
+		}()
+		<-gate.entered
+
+		// the second commit is written behind the first, which the coordinator holds
+		pom.MarkOffset(20, "")
+		second := make(chan none)
+		go func() {
+			om.Commit()
+			close(second)
+		}()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.Equal(c, 2, goroutinesIn("flushToBrokerFor", "handleResponsePromise"))
+		}, 5*time.Second, time.Millisecond)
+
+		pom.ResetOffset(10, "")
+		close(gate.release)
+		<-first
+		<-second
+
+		om.Commit()
+		reqs := capture.requests()
+		require.NotEmpty(t, reqs)
+		last := reqs[len(reqs)-1].blocks["my_topic"][0]
+		require.NotNil(t, last)
+		require.Equal(t, int64(10), last.offset, "the reset to 10 was never committed after 20")
+	})
 }
 
 func TestPartitionOffsetManagerResetOffsetWithRetention(t *testing.T) {
@@ -974,16 +1020,12 @@ func TestAbortPartitionOffsetManager(t *testing.T) {
 func TestConstructRequestRetentionTime(t *testing.T) {
 	expectedRetention := func(version KafkaVersion, retention time.Duration) int64 {
 		switch {
-		case version.IsAtLeast(V2_1_0_0):
-			// version >= 2.1.0: Client specified retention time isn't supported in the
-			// offset commit request anymore, thus the retention time field set in the
-			// OffsetCommitRequest struct should be 0.
-			return 0
 		case version.IsAtLeast(V0_9_0_0):
-			// 0.9.0 <= version < 2.1.0: Retention time *is* supported in the offset commit
-			// request. Sarama's default retention times (0) must be mapped to the Kafka
-			// default (-1). Non-zero Sarama times are converted from time.Duration to
-			// an int64 millisecond value.
+			// version >= 0.9.0: Retention time *is* supported in the offset commit
+			// request (v2-v4, which the broker can negotiate v5+ down to). Sarama's
+			// default retention times (0) must be mapped to the Kafka default (-1).
+			// Non-zero Sarama times are converted from time.Duration to an int64
+			// millisecond value.
 			if retention > 0 {
 				return int64(retention / time.Millisecond)
 			} else {
@@ -1018,7 +1060,7 @@ func TestConstructRequestRetentionTime(t *testing.T) {
 					},
 				}
 
-				req := om.constructRequestFor(nil)
+				req, _ := om.constructRequestFor(nil)
 
 				expectedRetention := expectedRetention(version, retention)
 				if req.RetentionTime != expectedRetention {
@@ -1027,6 +1069,51 @@ func TestConstructRequestRetentionTime(t *testing.T) {
 			})
 		}
 	}
+
+	t.Run("sends the retention time when the broker negotiates v4", func(t *testing.T) {
+		for _, retention := range []time.Duration{0, time.Hour} {
+			broker := NewMockBroker(t, 1)
+			t.Cleanup(broker.Close)
+			capture := &offsetCommitCapture{inner: NewMockOffsetCommitResponse(t)}
+			broker.SetHandlerByMap(map[string]MockResponse{
+				"ApiVersionsRequest": NewMockApiVersionsResponse(t).SetApiKeys([]ApiVersionsResponseKey{
+					{ApiKey: apiKeyMetadata, MaxVersion: 9},
+					{ApiKey: apiKeyFindCoordinator, MaxVersion: 3},
+					{ApiKey: apiKeyOffsetFetch, MaxVersion: 6},
+					// a broker before 2.1
+					{ApiKey: apiKeyOffsetCommit, MaxVersion: 4},
+					{ApiKey: apiKeyApiVersions, MaxVersion: 3},
+				}),
+				"MetadataRequest":        NewMockMetadataResponse(t).SetBroker(broker.Addr(), broker.BrokerID()).SetLeader("my_topic", 0, broker.BrokerID()),
+				"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).SetCoordinator(CoordinatorGroup, "group", broker),
+				"OffsetFetchRequest":     NewMockOffsetFetchResponse(t).SetOffset("group", "my_topic", 0, 5, "", ErrNoError),
+				"OffsetCommitRequest":    capture,
+			})
+
+			config := NewTestConfig()
+			config.Version = V2_4_0_0
+			config.ApiVersionsRequest = true
+			config.Consumer.Offsets.AutoCommit.Enable = false
+			config.Consumer.Offsets.Retention = retention
+			client, err := NewClient([]string{broker.Addr()}, config)
+			require.NoError(t, err)
+			t.Cleanup(func() { safeClose(t, client) })
+			om, err := NewOffsetManagerFromClient("group", client)
+			require.NoError(t, err)
+			t.Cleanup(func() { safeClose(t, om) })
+
+			pom, err := om.ManagePartition("my_topic", 0)
+			require.NoError(t, err)
+			pom.MarkOffset(10, "")
+			om.Commit()
+
+			reqs := capture.requests()
+			require.Len(t, reqs, 1)
+			require.Equal(t, int16(4), reqs[0].Version)
+			require.Equal(t, expectedRetention(V2_0_0_0, retention), reqs[0].RetentionTime,
+				"retention %s", retention)
+		}
+	})
 }
 
 // offsetCommitCapture records every OffsetCommitRequest it sees before
@@ -1189,6 +1276,25 @@ func TestOffsetManagerRemovePartitions(t *testing.T) {
 		require.NotNil(t, om.findPOM("my_topic", 0))
 	})
 
+	t.Run("backs off between attempts while the coordinator loads", func(t *testing.T) {
+		config := NewTestConfig()
+		commit := newLoadingCommitResponse()
+		config.Metadata.Retry.BackoffFunc = commit.backoff
+		config.Consumer.Offsets.Retry.Max = 5
+		om, _, _ := initHandledOffsetManager(t, config, commit)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		om.removePartitions(map[string][]int32{"my_topic": {0}})
+
+		require.Equal(t, map[int32]int64{0: 100}, commit.committed(),
+			"revoked offset dropped while the coordinator was loading")
+		require.Equal(t, []backoffCall{{retries: 0, maxRetries: 5}}, commit.backoffs(),
+			"backoff not given the retries made and Consumer.Offsets.Retry.Max")
+	})
+
 	// send-on-closed-channel safety when a commit runs concurrently with removePartitions (#2608)
 	t.Run("is safe against a concurrent commit", func(t *testing.T) {
 		config := NewTestConfig()
@@ -1336,6 +1442,87 @@ func TestOffsetManagerTransitionGeneration(t *testing.T) {
 	})
 }
 
+func TestOffsetManagerClose(t *testing.T) {
+	t.Run("backs off between attempts while the coordinator loads", func(t *testing.T) {
+		config := NewTestConfig()
+		commit := newLoadingCommitResponse()
+		config.Metadata.Retry.BackoffFunc = commit.backoff
+		config.Consumer.Offsets.Retry.Max = 5
+		om, _, _ := initHandledOffsetManager(t, config, commit)
+
+		pom, err := om.ManagePartition("my_topic", 0)
+		require.NoError(t, err)
+		pom.MarkOffset(100, "")
+
+		require.NoError(t, om.Close())
+
+		require.Equal(t, map[int32]int64{0: 100}, commit.committed(),
+			"offset dropped on Close while the coordinator was loading")
+		require.Equal(t, []backoffCall{{retries: 0, maxRetries: 5}}, commit.backoffs(),
+			"backoff not given the retries made and Consumer.Offsets.Retry.Max")
+	})
+}
+
+// loadingCommitResponse answers COORDINATOR_LOAD_IN_PROGRESS until the offset
+// manager backs off after such an answer, as a coordinator that finishes
+// loading while the client waits
+type loadingCommitResponse struct {
+	mu       sync.Mutex
+	answered bool
+	loaded   bool
+	offsets  map[int32]int64
+	waits    []backoffCall
+}
+
+// backoffCall is the arguments of one call to a Retry.BackoffFunc
+type backoffCall struct {
+	retries, maxRetries int
+}
+
+func newLoadingCommitResponse() *loadingCommitResponse {
+	return &loadingCommitResponse{offsets: make(map[int32]int64)}
+}
+
+func (r *loadingCommitResponse) backoff(retries, maxRetries int) time.Duration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.loaded = r.loaded || r.answered
+	r.waits = append(r.waits, backoffCall{retries, maxRetries})
+	return 0
+}
+
+// backoffs returns each backoff the offset manager asked for, in order
+func (r *loadingCommitResponse) backoffs() []backoffCall {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.waits)
+}
+
+func (r *loadingCommitResponse) For(reqBody versionedDecoder) encoderWithHeader {
+	req := reqBody.(*OffsetCommitRequest)
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	res := &OffsetCommitResponse{Version: req.version()}
+	for topic, blocks := range req.blocks {
+		for partition, block := range blocks {
+			if !r.loaded {
+				r.answered = true
+				res.AddError(topic, partition, ErrOffsetsLoadInProgress)
+				continue
+			}
+			r.offsets[partition] = block.offset
+			res.AddError(topic, partition, ErrNoError)
+		}
+	}
+	return res
+}
+
+func (r *loadingCommitResponse) committed() map[int32]int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return maps.Clone(r.offsets)
+}
+
 // gatedResponse holds the first request in flight: it closes entered when that
 // request arrives, then blocks until release is closed. Later requests pass
 // straight through to the wrapped response.
@@ -1352,4 +1539,17 @@ func (g *gatedResponse) For(reqBody versionedDecoder) encoderWithHeader {
 		<-g.release
 	})
 	return g.inner.For(reqBody)
+}
+
+// goroutinesIn counts the goroutines whose stack includes every one of functions
+func goroutinesIn(functions ...string) int {
+	buf := make([]byte, 1<<20)
+	buf = buf[:runtime.Stack(buf, true)]
+	n := 0
+	for g := range strings.SplitSeq(string(buf), "\n\n") {
+		if !slices.ContainsFunc(functions, func(f string) bool { return !strings.Contains(g, "."+f+"(") }) {
+			n++
+		}
+	}
+	return n
 }

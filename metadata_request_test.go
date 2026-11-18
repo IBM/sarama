@@ -173,6 +173,9 @@ func TestMetadataRequestV1(t *testing.T) {
 	request.Version = 1
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV1)
 
+	request.Topics = []string{}
+	testRequest(t, "empty topic list", request, []byte{0x00, 0x00, 0x00, 0x00})
+
 	request.Topics = []string{"topic1"}
 	testRequest(t, "one topic", request, metadataRequestOneTopicV1)
 
@@ -310,6 +313,9 @@ func TestMetadataRequestV11(t *testing.T) {
 	request := new(MetadataRequest)
 	request.Version = 11
 	testRequest(t, "no topics", request, metadataRequestNoTopicsV11)
+
+	request.Topics = []string{}
+	testRequest(t, "empty topic list", request, []byte{0x01, 0x00, 0x00, 0x00})
 
 	request.Topics = []string{"topic1", "topic2"}
 	testRequest(t, "two topics", request, metadataRequestTwoTopicsV11)

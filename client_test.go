@@ -914,6 +914,40 @@ func TestClientController(t *testing.T) {
 		}
 	})
 
+	t.Run("finds the controller with no tracked topics and Full disabled", func(t *testing.T) {
+		seedBroker := NewMockBroker(t, 1)
+		defer seedBroker.Close()
+		seedBroker.SetHandlerByMap(map[string]MockResponse{
+			"MetadataRequest": NewMockMetadataResponse(t).
+				SetController(controllerBroker.BrokerID()).
+				SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
+				SetBroker(controllerBroker.Addr(), controllerBroker.BrokerID()),
+		})
+
+		cfg := NewTestConfig()
+		cfg.Version = V1_0_0_0
+		cfg.Metadata.Full = false
+		client, err := NewClient([]string{seedBroker.Addr()}, cfg)
+		require.NoError(t, err)
+		defer safeClose(t, client)
+
+		broker, err := client.Controller()
+		require.NoError(t, err)
+		assert.Equal(t, controllerBroker.Addr(), broker.Addr())
+
+		broker, err = client.RefreshController()
+		require.NoError(t, err)
+		assert.Equal(t, controllerBroker.Addr(), broker.Addr())
+
+		var requested [][]string
+		for _, rr := range seedBroker.History() {
+			if req, ok := rr.Request.(*MetadataRequest); ok {
+				requested = append(requested, req.Topics)
+			}
+		}
+		assert.Equal(t, [][]string{{}, {}}, requested, "metadata requests should name no topics")
+	})
+
 	// test kafka version earlier than 0.10.0.0
 	t.Run("V0_9_0_1", func(t *testing.T) {
 		cfg.Version = V0_9_0_1
@@ -1171,6 +1205,65 @@ func TestClientRefreshesMetadataConcurrently(t *testing.T) {
 	waitGroup.Wait()
 	safeClose(t, client)
 	seedBroker.Close()
+}
+
+func TestClientSingleFlightRefresh(t *testing.T) {
+	t.Run("refreshes a named topic requested during an all-topics refresh", func(t *testing.T) {
+		seedBroker := NewMockBroker(t, 1)
+		defer seedBroker.Close()
+
+		var holdAll atomic.Bool
+		allReceived := make(chan struct{})
+		release := make(chan struct{})
+		seedBroker.setHandler(func(req *request) encoderWithHeader {
+			mr, ok := req.body.(*MetadataRequest)
+			if !ok {
+				return nil
+			}
+			resp := &MetadataResponse{Version: mr.Version}
+			resp.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+			if mr.Topics == nil {
+				if holdAll.CompareAndSwap(true, false) {
+					close(allReceived)
+					<-release
+				}
+				return resp
+			}
+			// the broker creates a topic named in the request
+			for _, topic := range mr.Topics {
+				resp.AddTopicPartition(topic, 0, seedBroker.BrokerID(), nil, nil, nil, ErrNoError)
+			}
+			return resp
+		})
+
+		client, err := NewClient([]string{seedBroker.Addr()}, NewTestConfig())
+		require.NoError(t, err)
+		defer safeClose(t, client)
+
+		holdAll.Store(true)
+		allDone := make(chan error, 1)
+		go func() { allDone <- client.RefreshMetadata() }()
+		<-allReceived
+
+		type result struct {
+			partitions []int32
+			err        error
+		}
+		partitionsDone := make(chan result, 1)
+		go func() {
+			partitions, err := client.Partitions("new_topic")
+			partitionsDone <- result{partitions, err}
+		}()
+		require.EventuallyWithT(t, func(c *assert.CollectT) {
+			assert.True(c, goroutineBlocked("getPartitions", "chan receive"))
+		}, 5*time.Second, time.Millisecond)
+		close(release)
+
+		require.NoError(t, <-allDone)
+		got := <-partitionsDone
+		require.NoError(t, got.err)
+		assert.Equal(t, []int32{0}, got.partitions)
+	})
 }
 
 func TestClientCoordinatorWithConsumerOffsetsTopic(t *testing.T) {
@@ -1726,6 +1819,50 @@ func TestClientLeaderEpoch(t *testing.T) {
 			assert.Equal(t, tc.wantEpoch, e)
 		})
 	}
+
+	t.Run("keeps the newer epoch after a lagging broker did not know the topic", func(t *testing.T) {
+		seed := NewMockBroker(t, 1)
+		defer seed.Close()
+
+		var epoch atomic.Int32
+		var unknown atomic.Bool
+		epoch.Store(5)
+		seed.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				res := &MetadataResponse{Version: req.body.version()}
+				res.AddBroker(seed.Addr(), seed.BrokerID())
+				if unknown.Load() {
+					res.AddTopic("my_topic", ErrUnknownTopicOrPartition)
+					return res
+				}
+				res.AddTopicPartition("my_topic", 0, seed.BrokerID(), nil, nil, nil, ErrNoError)
+				res.Topics[0].Uuid = Uuid{1}
+				res.Topics[0].Partitions[0].LeaderEpoch = epoch.Load()
+				return res
+			},
+		})
+
+		conf := NewTestConfig()
+		conf.Version = V2_8_0_0 // metadata responses carry topic ids
+		conf.Metadata.Retry.Max = 0
+		c, err := NewClient([]string{seed.Addr()}, conf)
+		require.NoError(t, err)
+		defer safeClose(t, c)
+
+		_, e, err := c.LeaderAndEpoch("my_topic", 0)
+		require.NoError(t, err)
+		require.Equal(t, int32(5), e)
+
+		unknown.Store(true)
+		require.ErrorIs(t, c.RefreshMetadata("my_topic"), ErrUnknownTopicOrPartition)
+		unknown.Store(false)
+		epoch.Store(3)
+		require.NoError(t, c.RefreshMetadata("my_topic"))
+
+		_, e, err = c.LeaderAndEpoch("my_topic", 0)
+		require.NoError(t, err)
+		assert.Equal(t, int32(5), e)
+	})
 }
 
 func TestClientCoordinatorMoves(t *testing.T) {

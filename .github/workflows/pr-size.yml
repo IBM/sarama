@@ -1,0 +1,84 @@
+name: PR Size
+
+# SECURITY: pull_request_target runs with a write token, also for PRs from
+# forks. Do not check out or run PR code, and do not put PR-controlled text
+# (title, body, branch names) in ${{ }} expressions.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-size-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  label:
+    name: Label PR size
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+    - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      with:
+        script: |
+          const sizes = [
+            {name: 'size/XS', max: 9, color: '009900', range: '0-9'},
+            {name: 'size/S', max: 59, color: '77bb00', range: '10-59'},
+            {name: 'size/M', max: 299, color: 'eebb00', range: '60-299'},
+            {name: 'size/L', max: 599, color: 'ee9900', range: '300-599'},
+            {name: 'size/XL', max: 999, color: 'ee5500', range: '600-999'},
+            {name: 'size/XXL', max: Infinity, color: 'ee0000', range: '1000+'},
+          ];
+          const {owner, repo} = context.repo;
+          const issue_number = context.payload.pull_request.number;
+
+          // The event payload can be stale if the run was queued or re-run.
+          const {data: pr} = await github.rest.pulls.get({
+            owner, repo, pull_number: issue_number,
+          });
+          const changes = pr.additions + pr.deletions;
+          const target = sizes.find(size => changes <= size.max);
+          const current = pr.labels.map(label => label.name);
+
+          if (!current.includes(target.name)) {
+            try {
+              await github.rest.issues.getLabel({owner, repo, name: target.name});
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              try {
+                await github.rest.issues.createLabel({
+                  owner, repo, name: target.name, color: target.color,
+                  description: `PR changes ${target.range} lines (additions + deletions)`,
+                });
+              } catch (createError) {
+                if (createError.status === 403) {
+                  core.setFailed(
+                    `The token cannot create the label "${target.name}". ` +
+                    'Create the size/* labels manually one time.'
+                  );
+                  return;
+                }
+                // 422: a parallel run for a different PR created the label.
+                if (createError.status !== 422) throw createError;
+              }
+            }
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number, labels: [target.name],
+            });
+          }
+
+          const stale = sizes
+            .map(size => size.name)
+            .filter(name => name !== target.name && current.includes(name));
+          for (const name of stale) {
+            try {
+              await github.rest.issues.removeLabel({owner, repo, issue_number, name});
+            } catch (error) {
+              // 404: the label was removed after the PR state was read.
+              if (error.status !== 404) throw error;
+            }
+          }
+          core.info(`${changes} changed lines: ${target.name}`);
