@@ -38,6 +38,11 @@ var ErrInsufficientData = errors.New("kafka: insufficient data to decode packet,
 // ErrShuttingDown is returned when a producer receives a message during shutdown.
 var ErrShuttingDown = errors.New("kafka: message received by producer in process of shutting down")
 
+// ErrMessageNotSubmitted is wrapped, along with the context's error, by the
+// error for a message whose context-aware send ended before the message was
+// submitted to the producer. Such a message can be sent again.
+var ErrMessageNotSubmitted = errors.New("kafka: message was not submitted to the producer")
+
 // ErrMessageTooLarge is returned when the next message to consume is larger than the configured Consumer.Fetch.Max
 var ErrMessageTooLarge = errors.New("kafka: message is larger than Consumer.Fetch.Max")
 
