@@ -1885,6 +1885,41 @@ func TestElectLeaders(t *testing.T) {
 	}
 }
 
+func TestElectLeadersUncleanOnV0Broker(t *testing.T) {
+	// a broker that only speaks ElectLeaders v0 (Kafka 2.2 and 2.3) can only
+	// run preferred elections, so an unclean one must fail rather than be
+	// sent as a preferred election
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	broker.SetHandlerByMap(map[string]MockResponse{
+		"ApiVersionsRequest": mockApiVersionsFor(t,
+			ApiVersionsResponseKey{ApiKey: apiKeyElectLeaders, MinVersion: 0, MaxVersion: 0}),
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(broker.BrokerID()).
+			SetBroker(broker.Addr(), broker.BrokerID()),
+		"ElectLeadersRequest": NewMockElectLeadersResponse(t),
+	})
+
+	config := NewTestConfig()
+	config.Version = V2_4_0_0
+	config.ApiVersionsRequest = true
+	admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, admin)
+
+	if _, err := admin.ElectLeaders(UncleanElection, map[string][]int32{"my_topic": {0}}); err == nil {
+		t.Fatal("expected an error for an unclean election against an ElectLeaders v0 broker")
+	}
+	for _, rr := range broker.History() {
+		if req, ok := rr.Request.(*ElectLeadersRequest); ok {
+			t.Fatalf("unclean election was sent to the broker as a v%d %v election", req.Version, req.Type)
+		}
+	}
+}
+
 func TestDescribeTopic(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	defer seedBroker.Close()
@@ -2002,6 +2037,95 @@ func TestDescribeConsumerGroup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// describeWith answers DescribeGroups for every requested group with the
+	// error from errFor
+	describeWith := func(errFor func(group string) KError) requestHandlerFunc {
+		return func(req *request) encoderWithHeader {
+			r := req.body.(*DescribeGroupsRequest)
+			res := &DescribeGroupsResponse{Version: r.version()}
+			for _, group := range r.Groups {
+				kerr := errFor(group)
+				res.Groups = append(res.Groups, &GroupDescription{Version: r.version(), GroupId: group, Err: kerr, ErrorCode: int16(kerr)})
+			}
+			return res
+		}
+	}
+
+	t.Run("retries on the new coordinator after NOT_COORDINATOR", func(t *testing.T) {
+		b1 := NewMockBroker(t, 1)
+		b2 := NewMockBroker(t, 2)
+		t.Cleanup(b1.Close)
+		t.Cleanup(b2.Close)
+
+		var coordinator atomic.Pointer[MockBroker]
+		coordinator.Store(b1)
+		handlers := func(describe requestHandlerFunc) map[string]requestHandlerFunc {
+			return map[string]requestHandlerFunc{
+				"MetadataRequest": func(req *request) encoderWithHeader {
+					return mockMetadataFor(t, b1, b2).For(req.body)
+				},
+				"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+					return NewMockFindCoordinatorResponse(t).
+						SetCoordinator(CoordinatorGroup, expectedGroupID, coordinator.Load()).For(req.body)
+				},
+				"DescribeGroupsRequest": describe,
+			}
+		}
+		b1.SetHandlerFuncByMap(handlers(describeWith(func(string) KError {
+			// the group has moved to broker 2
+			coordinator.Store(b2)
+			return ErrNotCoordinatorForConsumer
+		})))
+		b2.SetHandlerFuncByMap(handlers(describeWith(func(string) KError { return ErrNoError })))
+
+		config := NewTestConfig()
+		config.Version = V1_0_0_0
+		config.Admin.Retry.Backoff = 0
+		admin, err := NewClusterAdmin([]string{b1.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		result, err := admin.DescribeConsumerGroups([]string{expectedGroupID})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, expectedGroupID, result[0].GroupId)
+		assert.Equal(t, ErrNoError, result[0].Err)
+	})
+
+	t.Run("retries while the coordinator loads", func(t *testing.T) {
+		broker := NewMockBroker(t, 1)
+		t.Cleanup(broker.Close)
+
+		var loaded atomic.Bool
+		broker.SetHandlerFuncByMap(map[string]requestHandlerFunc{
+			"MetadataRequest": func(req *request) encoderWithHeader {
+				return mockMetadataFor(t, broker).For(req.body)
+			},
+			"FindCoordinatorRequest": func(req *request) encoderWithHeader {
+				return NewMockFindCoordinatorResponse(t).
+					SetCoordinator(CoordinatorGroup, expectedGroupID, broker).For(req.body)
+			},
+			"DescribeGroupsRequest": describeWith(func(string) KError {
+				if loaded.CompareAndSwap(false, true) {
+					return ErrOffsetsLoadInProgress
+				}
+				return ErrNoError
+			}),
+		})
+
+		config := NewTestConfig()
+		config.Version = V1_0_0_0
+		config.Admin.Retry.Backoff = 0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = admin.Close() })
+
+		result, err := admin.DescribeConsumerGroups([]string{expectedGroupID})
+		require.NoError(t, err)
+		require.Len(t, result, 1)
+		assert.Equal(t, ErrNoError, result[0].Err)
+	})
 }
 
 func TestListConsumerGroups(t *testing.T) {
@@ -2047,6 +2171,9 @@ func TestListConsumerGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	_, err = admin.ListConsumerGroups()
+	require.ErrorIs(t, err, ErrClosedClient)
 }
 
 func TestListConsumerGroupsMultiBroker(t *testing.T) {
@@ -2829,6 +2956,9 @@ func TestDescribeLogDirs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	_, err = admin.DescribeLogDirs([]int32{seedBroker.BrokerID()})
+	require.ErrorIs(t, err, ErrClosedClient)
 }
 
 func TestDescribeLogDirsUnknownBroker(t *testing.T) {

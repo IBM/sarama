@@ -623,6 +623,10 @@ func TestClusterAdminListTransactions(t *testing.T) {
 	require.Equal(t, "tx-1", result[0].TransactionalID)
 	require.Equal(t, int64(100), result[0].ProducerID)
 	require.Equal(t, TransactionStateOngoing, result[0].TransactionState)
+
+	require.NoError(t, admin.Close())
+	_, err = txAdmin.ListTransactions(nil, nil, -1)
+	require.ErrorIs(t, err, ErrClosedClient)
 }
 
 func TestClusterAdminListTransactionsMultiBroker(t *testing.T) {

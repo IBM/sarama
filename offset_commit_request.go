@@ -64,7 +64,7 @@ type OffsetCommitRequest struct {
 	ConsumerGroupGeneration int32   // v1 or later
 	ConsumerID              string  // v1 or later
 	GroupInstanceId         *string // v7 or later
-	RetentionTime           int64   // v2 or later
+	RetentionTime           int64   // v2-v4
 
 	// Version can be:
 	// - 0 (kafka 0.8.1 and later)
@@ -83,10 +83,9 @@ func (r *OffsetCommitRequest) setVersion(v int16) {
 	r.Version = v
 }
 
-// NewOffsetCommitRequest creates an OffsetCommitRequest initialized for admin use.
-//
-// The version-mapping logic mirrors offsetManager.constructRequest in
-// offset_manager.go; protocol bumps must be applied to both call sites.
+// NewOffsetCommitRequest creates an OffsetCommitRequest with the highest
+// version conf.Version allows and the retention time from
+// conf.Consumer.Offsets.Retention.
 func NewOffsetCommitRequest(conf *Config, group string) *OffsetCommitRequest {
 	request := &OffsetCommitRequest{
 		ConsumerGroup:           group,
@@ -116,7 +115,10 @@ func NewOffsetCommitRequest(conf *Config, group string) *OffsetCommitRequest {
 		request.Version = 1
 	}
 
-	if request.Version >= 2 && request.Version < 5 {
+	// set for every version from 2 up: the broker can negotiate v5+ down to
+	// v2-v4, which send RetentionTime (otherwise 0 there expires the offsets
+	// straight away)
+	if request.Version >= 2 {
 		request.RetentionTime = -1
 		if conf.Consumer.Offsets.Retention > 0 {
 			request.RetentionTime = conf.Consumer.Offsets.Retention.Milliseconds()
@@ -152,7 +154,7 @@ func (r *OffsetCommitRequest) encode(pe packetEncoder) error {
 	// Version 5 removes RetentionTime, which is now controlled only by a broker configuration.
 	if r.Version >= 2 && r.Version <= 4 {
 		pe.putInt64(r.RetentionTime)
-	} else if r.RetentionTime != 0 {
+	} else if r.Version < 2 && r.RetentionTime != 0 {
 		Logger.Println("Non-zero RetentionTime specified for OffsetCommitRequest version <2, it will be ignored")
 	}
 

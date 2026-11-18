@@ -21,9 +21,10 @@ type produceSet struct {
 	bufferBytes int
 	bufferCount int
 
-	// resent marks a batch that retryBatch sent straight to a broker. Its
-	// messages did not go through the partitionProducer, so the fin/retry
-	// ordering there does not cover them.
+	// resent marks a batch that the fin/retry ordering of the
+	// partitionProducer does not cover: retryBatch sent it straight to a
+	// broker, or a connection error sent the messages behind it back through
+	// the partitionProducer first.
 	resent bool
 }
 
