@@ -118,7 +118,13 @@ func NewConsumer(addrs []string, config *Config) (Consumer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newConsumer(client)
+	c, err := newConsumer(client)
+	if err != nil {
+		// Return untyped nil rather than a Consumer interface with a typed nil pointer
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // NewConsumerFromClient creates a new consumer using the given client. It is still
@@ -127,10 +133,16 @@ func NewConsumerFromClient(client Client) (Consumer, error) {
 	// For clients passed in by the client, ensure we don't
 	// call Close() on it.
 	cli := &nopCloserClient{client}
-	return newConsumer(cli)
+	c, err := newConsumer(cli)
+	if err != nil {
+		// Return untyped nil rather than a Consumer interface with a typed nil pointer
+		return nil, err
+	}
+
+	return c, nil
 }
 
-func newConsumer(client Client) (Consumer, error) {
+func newConsumer(client Client) (*consumer, error) {
 	// Check that we are not dealing with a closed Client before processing any other arguments
 	if client.Closed() {
 		return nil, ErrClosedClient
@@ -162,6 +174,17 @@ func (c *consumer) Partitions(topic string) ([]int32, error) {
 }
 
 func (c *consumer) ConsumePartition(topic string, partition int32, offset int64) (PartitionConsumer, error) {
+	pc, err := c.consumePartition(topic, partition, offset)
+	if err != nil {
+		// Return untyped nil rather than a PartitionConsumer interface with a typed nil pointer
+		return nil, err
+	}
+
+	return pc, nil
+}
+
+// consumePartition returns the concrete partitionConsumer struct used internally in the ConsumerGroup implementation
+func (c *consumer) consumePartition(topic string, partition int32, offset int64) (*partitionConsumer, error) {
 	child := &partitionConsumer{
 		consumer:             c,
 		conf:                 c.conf,
@@ -428,6 +451,16 @@ type PartitionConsumer interface {
 	IsPaused() bool
 }
 
+// InitialOffsetPartitionConsumer is an extension of PartitionConsumer that adds InitialOffset. The object returned
+// from the default Consumer.ConsumePartition implements this interface.
+type InitialOffsetPartitionConsumer interface {
+	PartitionConsumer
+
+	// InitialOffset returns the initial offset that was used as a starting
+	// point for this partition.
+	InitialOffset() int64
+}
+
 type partitionConsumerResponse struct {
 	broker       *brokerConsumer
 	subscription *brokerSubscription
@@ -477,6 +510,7 @@ type partitionConsumer struct {
 	responseResult     error
 	fetchSize          int32
 	offset             int64
+	initialOffset      int64
 	retries            atomic.Int32
 	// set when a successful fetch moves the child to or from its preferred read
 	// replica, so the next dispatch runs without backoff and is not counted
@@ -725,6 +759,8 @@ func (child *partitionConsumer) chooseStartingOffset(offset int64) error {
 		return ErrOffsetOutOfRange
 	}
 
+	child.initialOffset = child.offset
+
 	return nil
 }
 
@@ -756,6 +792,10 @@ func (child *partitionConsumer) Close() error {
 		return consumerErrors
 	}
 	return nil
+}
+
+func (child *partitionConsumer) InitialOffset() int64 {
+	return child.initialOffset
 }
 
 func (child *partitionConsumer) HighWaterMarkOffset() int64 {
