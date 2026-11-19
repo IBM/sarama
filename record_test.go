@@ -144,8 +144,8 @@ func recordBatchTestCases() []struct {
 				0, 0, 0, 0, 0, 0, 0, 0, // First Offset
 				0, 0, 0, 95, // Length
 				0, 0, 0, 0, // Partition Leader Epoch
-				2,                 // Version
-				231, 74, 206, 165, // CRC
+				2,              // Version
+				216, 0, 85, 91, // CRC
 				0, 1, // Attributes
 				0, 0, 0, 0, // Last Offset Delta
 				0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
@@ -154,7 +154,7 @@ func recordBatchTestCases() []struct {
 				0, 0, // Producer Epoch
 				0, 0, 0, 0, // First Sequence
 				0, 0, 0, 1, // Number of Records
-				31, 139, 8, 0, 0, 9, 110, 136, 0, 255, 0, 21, 0, 234, 255, 40, 0, 10, 0, 8, 1, 2,
+				31, 139, 8, 0, 0, 0, 0, 0, 0, 255, 0, 21, 0, 234, 255, 40, 0, 10, 0, 8, 1, 2,
 				3, 4, 6, 5, 6, 7, 2, 6, 8, 9, 10, 4, 11, 12, 3, 0, 173, 201, 88, 103, 21, 0, 0, 0,
 			},
 		},

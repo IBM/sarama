@@ -14,7 +14,7 @@ Basic example to use a producer interceptor that produces [OpenTelemetry](https:
 
 [txn_producer](./txn_producer) Basic example to use a transactional producer that produce on some topic within a Kafka transaction. To ensure transactional-id uniqueness it implement some **_ProducerProvider_** that build a producer appending an integer that grow when producer is created.
 
-#### Exacly-once transactional paradigm
+#### Exactly-once transactional paradigm
 
 [exactly_once](./exactly_once) Basic example to use a transactional producer that produce consumed message from some topics within a Kafka transaction. To ensure transactional-id uniqueness it implement some **_ProducerProvider_** that build a producer using current message topic-partition.
 

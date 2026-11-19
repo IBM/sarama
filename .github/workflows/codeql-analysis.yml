@@ -5,8 +5,6 @@ on:
     branches:
     - main
   pull_request:
-    branches:
-    - "**"
   schedule:
   - cron: "39 12 * * 1"
 
@@ -25,28 +23,33 @@ jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
-      actions: read  # for github/codeql-action to list actions
       contents: read  # for actions/checkout to fetch code
       security-events: write  # for github/codeql-action to report security issues
     strategy:
       fail-fast: false
       matrix:
-        language: ["actions", "go"]
+        include:
+        - language: actions
+          build-mode: none
+        - language: go
+          build-mode: autobuild
     steps:
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         persist-credentials: false
-    - name: Initialize CodeQL
-      uses: github/codeql-action/init@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
-      with:
-        languages: ${{ matrix.language }}
     - name: Setup Go
+      if: matrix.language == 'go'
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: stable
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      with:
+        languages: ${{ matrix.language }}
+        build-mode: ${{ matrix.build-mode }}
+        queries: security-extended
     - name: Perform CodeQL Analysis
-      uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+      uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3

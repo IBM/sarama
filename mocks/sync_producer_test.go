@@ -3,6 +3,7 @@
 package mocks
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"testing"
@@ -15,6 +16,56 @@ func TestMockSyncProducerImplementsSyncProducerInterface(t *testing.T) {
 	if _, ok := mp.(sarama.SyncProducer); !ok {
 		t.Error("The mock async producer should implement the sarama.SyncProducer interface.")
 	}
+}
+
+func TestSyncProducerContextAlreadyDone(t *testing.T) {
+	trm := newTestReporterMock()
+	sp := NewSyncProducer(trm, nil)
+	defer func() {
+		if err := sp.Close(); err != nil {
+			t.Error(err)
+		}
+		if len(trm.errors) != 0 {
+			t.Error("Expected no errors reported, found:", trm.errors)
+		}
+	}()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	msg := &sarama.ProducerMessage{Topic: "test"}
+
+	t.Run("single send", func(t *testing.T) {
+		_, _, err := sp.SendMessageContext(ctx, msg)
+		if !errors.Is(err, context.Canceled) || !errors.Is(err, sarama.ErrMessageNotSubmitted) {
+			t.Error("Expected context.Canceled and ErrMessageNotSubmitted, found:", err)
+		}
+	})
+
+	t.Run("batch send", func(t *testing.T) {
+		err := sp.SendMessagesContext(ctx, []*sarama.ProducerMessage{msg})
+		if !errors.Is(err, context.Canceled) {
+			t.Error("Expected context.Canceled, found:", err)
+		}
+		pErrs, ok := errors.AsType[sarama.ProducerErrors](err)
+		if !ok {
+			t.Fatal("Expected sarama.ProducerErrors, found:", err)
+		}
+		if len(pErrs) != 1 {
+			t.Fatal("Expected 1 message listed, found:", len(pErrs))
+		}
+		if pErrs[0].Msg != msg {
+			t.Error("Expected the unsent message listed, found:", pErrs[0].Msg)
+		}
+		if !errors.Is(pErrs[0].Err, sarama.ErrMessageNotSubmitted) {
+			t.Error("Expected ErrMessageNotSubmitted, found:", pErrs[0].Err)
+		}
+	})
+
+	t.Run("empty batch send", func(t *testing.T) {
+		if err := sp.SendMessagesContext(ctx, nil); err != nil {
+			t.Error("Expected no error, found:", err)
+		}
+	})
 }
 
 func TestSyncProducerReturnsExpectationsToSendMessage(t *testing.T) {

@@ -1,6 +1,11 @@
 package sarama
 
-import "sync"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync"
+)
 
 var expectationsPool = sync.Pool{
 	New: func() any {
@@ -68,6 +73,35 @@ type SyncProducer interface {
 	AddMessageToTxnWithGroupMetadata(msg *ConsumerMessage, groupMetadata *ConsumerGroupMetadata, metadata *string) error
 }
 
+// SyncProducerContext is a SyncProducer whose sends can be bounded by a
+// context. The producers returned by NewSyncProducer and
+// NewSyncProducerFromClient implement it.
+//
+// If a context ends after a message is submitted to the producer but before
+// its result arrives, its outcome is unknown. It may still be delivered and
+// must not be reused. Close waits for submitted messages, even after their
+// send calls return; if a result never arrives, Close does not return.
+type SyncProducerContext interface {
+	SyncProducer
+
+	// SendMessageContext is like SendMessage, but returns an error wrapping
+	// ctx.Err() if ctx is done before the message has either succeeded or
+	// failed. If the message was not submitted to the producer, the error
+	// also wraps ErrMessageNotSubmitted and the message can be sent again.
+	SendMessageContext(ctx context.Context, msg *ProducerMessage) (partition int32, offset int64, err error)
+
+	// SendMessagesContext is like SendMessages, but returns once ctx is done
+	// even if some messages have neither succeeded nor failed. The error then
+	// wraps ctx.Err() and a ProducerErrors holding the messages that failed
+	// and the messages that have no result, whose errors wrap ctx.Err().
+	// Errors for messages that were not submitted to the producer also wrap
+	// ErrMessageNotSubmitted, and those messages can be sent again. Messages
+	// not listed in it succeeded.
+	SendMessagesContext(ctx context.Context, msgs []*ProducerMessage) error
+}
+
+var _ SyncProducerContext = (*syncProducer)(nil)
+
 type syncProducer struct {
 	producer *asyncProducer
 	wg       sync.WaitGroup
@@ -126,46 +160,111 @@ func verifyProducerConfig(config *Config) error {
 }
 
 func (sp *syncProducer) SendMessage(msg *ProducerMessage) (partition int32, offset int64, err error) {
-	expectation := expectationsPool.Get().(chan *ProducerError)
-	msg.expectation = expectation
-	sp.producer.Input() <- msg
-	pErr := <-expectation
-	msg.expectation = nil
-	expectationsPool.Put(expectation)
-	if pErr != nil {
-		return -1, -1, pErr.Err
+	return sp.SendMessageContext(context.Background(), msg)
+}
+
+func (sp *syncProducer) SendMessageContext(ctx context.Context, msg *ProducerMessage) (partition int32, offset int64, err error) {
+	if err := ctx.Err(); err != nil {
+		return -1, -1, notSubmittedError(err)
 	}
 
-	return msg.Partition, msg.Offset, nil
+	expectation := expectationsPool.Get().(chan *ProducerError)
+	msg.expectation = expectation
+	select {
+	case sp.producer.Input() <- msg:
+	case <-ctx.Done():
+		// the producer never received the message, so nothing else holds the expectation
+		msg.expectation = nil
+		expectationsPool.Put(expectation)
+		return -1, -1, notSubmittedError(ctx.Err())
+	}
+
+	select {
+	case pErr := <-expectation:
+		msg.expectation = nil
+		expectationsPool.Put(expectation)
+		if pErr != nil {
+			return -1, -1, pErr.Err
+		}
+		return msg.Partition, msg.Offset, nil
+	case <-ctx.Done():
+		// the producer still has the expectation, so it can't go back in the pool
+		return -1, -1, ctx.Err()
+	}
 }
 
 func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
-	indices := make(chan int, len(msgs))
-	go func() {
-		for i, msg := range msgs {
-			expectation := expectationsPool.Get().(chan *ProducerError)
-			msg.expectation = expectation
-			sp.producer.Input() <- msg
-			indices <- i
-		}
-		close(indices)
-	}()
+	return sp.SendMessagesContext(context.Background(), msgs)
+}
 
-	var errors ProducerErrors
-	for i := range indices {
-		expectation := msgs[i].expectation
-		pErr := <-expectation
-		msgs[i].expectation = nil
-		expectationsPool.Put(expectation)
-		if pErr != nil {
-			errors = append(errors, pErr)
+func (sp *syncProducer) SendMessagesContext(ctx context.Context, msgs []*ProducerMessage) error {
+	// each result channel holds one outcome, so sending does not depend on collecting results
+	sent := 0
+send:
+	for _, msg := range msgs {
+		// select picks at random when both cases are ready, so stop before offering another message
+		if ctx.Err() != nil {
+			break
+		}
+		expectation := expectationsPool.Get().(chan *ProducerError)
+		msg.expectation = expectation
+		select {
+		case sp.producer.Input() <- msg:
+			sent++
+		case <-ctx.Done():
+			// the producer never received the message, so nothing else holds the expectation
+			msg.expectation = nil
+			expectationsPool.Put(expectation)
+			break send
 		}
 	}
 
-	if len(errors) > 0 {
-		return errors
+	var pErrs ProducerErrors
+	unfinished := len(msgs) - sent
+	for _, msg := range msgs[:sent] {
+		pErr, ok := waitResult(ctx, msg)
+		if !ok {
+			unfinished++
+			pErr = &ProducerError{Msg: msg, Err: ctx.Err()}
+		}
+		if pErr != nil {
+			pErrs = append(pErrs, pErr)
+		}
+	}
+	for _, msg := range msgs[sent:] {
+		pErrs = append(pErrs, &ProducerError{Msg: msg, Err: notSubmittedError(ctx.Err())})
+	}
+
+	if unfinished > 0 {
+		return errors.Join(ctx.Err(), pErrs)
+	}
+	if len(pErrs) > 0 {
+		return pErrs
 	}
 	return nil
+}
+
+// waitResult reports false if ctx ends before msg's result arrives
+func waitResult(ctx context.Context, msg *ProducerMessage) (*ProducerError, bool) {
+	var pErr *ProducerError
+	select {
+	case pErr = <-msg.expectation:
+	case <-ctx.Done():
+		// select picks at random when both cases are ready, so take a result that has already arrived
+		select {
+		case pErr = <-msg.expectation:
+		default:
+			// the producer may still write a result, so the channel must not be reused
+			return nil, false
+		}
+	}
+	expectationsPool.Put(msg.expectation)
+	msg.expectation = nil
+	return pErr, true
+}
+
+func notSubmittedError(err error) error {
+	return fmt.Errorf("%w: %w", ErrMessageNotSubmitted, err)
 }
 
 func (sp *syncProducer) handleSuccesses() {

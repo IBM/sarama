@@ -402,6 +402,50 @@ func TestDescribeConfigsResponseWithDocumentationv4(t *testing.T) {
 	testResponse(t, "response with documentation", response, describeConfigsResponseWithDocumentationv4)
 }
 
+func TestDescribeConfigsResponseBrokerLoggerv1(t *testing.T) {
+	// brokers report every broker logger entry with the
+	// DYNAMIC_BROKER_LOGGER_CONFIG source (6)
+	payload := []byte{
+		0, 0, 0, 0, // throttle
+		0, 0, 0, 1, // response
+		0, 0, // errorcode
+		0, 0, // string
+		8, // broker logger
+		0, 1, '1',
+		0, 0, 0, 1, // configs
+		0, 4, 'r', 'o', 'o', 't',
+		0, 4, 'I', 'N', 'F', 'O',
+		0,          // ReadOnly
+		6,          // Source
+		0,          // Sensitive
+		0, 0, 0, 0, // No Synonym
+	}
+	response := &DescribeConfigsResponse{}
+	testVersionDecodable(t, "broker logger", response, payload, 1)
+	if got := response.Resources[0].Configs[0].Source.String(); got != "DynamicBrokerLogger" {
+		t.Errorf("expected source DynamicBrokerLogger, got %q", got)
+	}
+}
+
+func TestConfigSourceString(t *testing.T) {
+	for source, want := range map[ConfigSource]string{
+		0: "Unknown",
+		1: "Topic",
+		2: "DynamicBroker",
+		3: "DynamicDefaultBroker",
+		4: "StaticBroker",
+		5: "Default",
+		6: "DynamicBrokerLogger",
+		7: "ClientMetrics",
+		8: "Group",
+		9: "Source Invalid: 9",
+	} {
+		if got := source.String(); got != want {
+			t.Errorf("ConfigSource(%d).String() = %q, want %q", source, got, want)
+		}
+	}
+}
+
 func TestDescribeConfigError(t *testing.T) {
 	// Assert that DescribeConfigError satisfies error interface
 	var err error = &DescribeConfigError{

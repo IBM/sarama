@@ -155,7 +155,7 @@ services:
 
   toxiproxy:
     container_name: 'toxiproxy'
-    image: 'ghcr.io/shopify/toxiproxy:2.12.0'
+    image: 'ghcr.io/shopify/toxiproxy:2.13.0'
     init: true
     healthcheck:
       test: ['CMD', '/toxiproxy-cli', 'l']

@@ -34,7 +34,7 @@ var (
 	} // value
 
 	emptyGzipMessage = []byte{
-		196, 46, 92, 177, // CRC
+		15, 115, 103, 13, // CRC
 		0x00,                   // magic version byte
 		0x01,                   // attribute flags
 		0xFF, 0xFF, 0xFF, 0xFF, // key
@@ -42,7 +42,7 @@ var (
 		0x00, 0x00, 0x00, 0x14,
 		0x1f, 0x8b,
 		0x08,
-		0, 0, 9, 110, 136, 0, 255, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 255, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 
 	emptyLZ4Message = []byte{

@@ -276,6 +276,42 @@ func TestAsyncProducerMultipleFlushes(t *testing.T) {
 	seedBroker.Close()
 }
 
+func TestAsyncProducerCloseFlushesPartialBatch(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+	leader := NewMockBroker(t, 2)
+	defer leader.Close()
+
+	metadataResponse := new(MetadataResponse)
+	metadataResponse.AddBroker(leader.Addr(), leader.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
+	seedBroker.Returns(metadataResponse)
+
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.Returns(prodSuccess)
+
+	config := NewTestConfig()
+	config.Producer.Flush.Messages = 5
+	// without a Frequency the batch below would never be sent
+	config.Producer.Flush.Frequency = 30 * time.Second
+	config.Producer.Return.Successes = true
+	producer, err := NewAsyncProducer([]string{seedBroker.Addr()}, config)
+	require.NoError(t, err)
+
+	producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+
+	closed := make(chan error, 1)
+	go func() { closed <- producer.Close() }()
+	select {
+	case err := <-closed:
+		require.NoError(t, err)
+	case <-time.After(5 * time.Second):
+		assert.Fail(t, "Close waited for the flush triggers")
+		require.NoError(t, <-closed)
+	}
+}
+
 func TestAsyncProducerMultipleBrokers(t *testing.T) {
 	seedBroker := NewMockBroker(t, 1)
 	leader0 := NewMockBroker(t, 2)
@@ -1159,6 +1195,29 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
 
+	prodNotLeader := new(ProduceResponse)
+	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	// the first batch fails once the producer is shutting down; the retried
+	// messages are then flushed without waiting for Flush.Messages, so they
+	// can take several requests
+	shuttingDown := make(chan struct{})
+	var produced atomic.Int32
+	leader.setHandler(func(req *request) encoderWithHeader {
+		switch req.body.key() {
+		case 3:
+			return metadataLeader
+		case 0:
+			if produced.Add(1) == 1 {
+				<-shuttingDown
+				return prodNotLeader
+			}
+			return prodSuccess
+		}
+		return nil
+	})
+
 	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
 	config.Producer.Return.Successes = true
@@ -1182,18 +1241,9 @@ func TestAsyncProducerRetryShutdown(t *testing.T) {
 	if err := <-producer.Errors(); !errors.Is(err.Err, ErrShuttingDown) {
 		t.Error(err)
 	}
-
 	producer.AsyncClose()
+	close(shuttingDown)
 
-	prodNotLeader := new(ProduceResponse)
-	prodNotLeader.AddTopicPartition("my_topic", 0, ErrNotLeaderForPartition)
-	leader.Returns(prodNotLeader)
-
-	leader.Returns(metadataLeader)
-
-	prodSuccess := new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-	leader.Returns(prodSuccess)
 	expectResults(t, producer, 10, 0)
 
 	seedBroker.Close()
@@ -1213,6 +1263,14 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 	metadataLeader.AddBroker(leader.Addr(), leader.BrokerID())
 	metadataLeader.AddTopicPartition("my_topic", 0, leader.BrokerID(), nil, nil, nil, ErrNoError)
 	seedBroker.Returns(metadataLeader)
+
+	// once Close starts, messages are flushed without waiting for
+	// Flush.Messages, so they can take several requests
+	prodSuccess := new(ProduceResponse)
+	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
+	leader.SetHandlerByMap(map[string]MockResponse{
+		"ProduceRequest": NewMockWrapper(prodSuccess),
+	})
 
 	config := NewTestConfig()
 	config.Producer.Flush.Messages = 10
@@ -1235,10 +1293,6 @@ func TestAsyncProducerNoReturns(t *testing.T) {
 		}
 		close(wait)
 	}()
-
-	prodSuccess := new(ProduceResponse)
-	prodSuccess.AddTopicPartition("my_topic", 0, ErrNoError)
-	leader.Returns(prodSuccess)
 
 	<-wait
 	seedBroker.Close()
@@ -1574,6 +1628,147 @@ func TestAsyncProducerIdempotentRetryBatchBackoff(t *testing.T) {
 
 	assert.GreaterOrEqual(t, int(backoffCalls.Load()), config.Producer.Retry.Max,
 		"BackoffFunc should be called at least Retry.Max times during idempotent retryBatch")
+}
+
+// TestAsyncProducerIdempotentRetryRefreshesOnlyStaleMetadata checks that the
+// idempotent producer, like the Java producer, refreshes metadata before a
+// retry only when the error means the cached metadata is stale. The other
+// retriable errors come from the current leader, and a synchronous refresh
+// there can wait out Net.ReadTimeout on an unresponsive broker (#3843).
+func TestAsyncProducerIdempotentRetryRefreshesOnlyStaleMetadata(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		err     KError
+		refresh bool
+	}{
+		{"UnknownTopicOrPartition", ErrUnknownTopicOrPartition, true},
+		{"LeaderNotAvailable", ErrLeaderNotAvailable, true},
+		{"NotLeaderForPartition", ErrNotLeaderForPartition, true},
+		{"KafkaStorageError", ErrKafkaStorageError, true},
+		{"InvalidMessage", ErrInvalidMessage, false},
+		{"RequestTimedOut", ErrRequestTimedOut, false},
+		{"NotEnoughReplicas", ErrNotEnoughReplicas, false},
+		{"NotEnoughReplicasAfterAppend", ErrNotEnoughReplicasAfterAppend, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			broker := NewMockBroker(t, 1)
+			defer broker.Close()
+
+			metadataResponse := &MetadataResponse{Version: 4, ControllerID: 1}
+			metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+			metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+			initProducerIDResponse := &InitProducerIDResponse{ProducerID: 1000, ProducerEpoch: 1}
+			okResponse := &ProduceResponse{Version: 3}
+			okResponse.AddTopicPartition("my_topic", 0, ErrNoError)
+			errResponse := &ProduceResponse{Version: 3}
+			errResponse.AddTopicPartition("my_topic", 0, tc.err)
+
+			// The first produce request succeeds, so the partition has its
+			// broker producer before counting starts. The second fails once.
+			var metadataRequests, produceRequests atomic.Int32
+			broker.setHandler(func(req *request) (res encoderWithHeader) {
+				switch req.body.key() {
+				case 3:
+					metadataRequests.Add(1)
+					return metadataResponse
+				case 22:
+					return initProducerIDResponse
+				case 0:
+					if produceRequests.Add(1) == 2 {
+						return errResponse
+					}
+					return okResponse
+				}
+				return nil
+			})
+
+			config := NewTestConfig()
+			config.Version = V0_11_0_0
+			config.Producer.Idempotent = true
+			config.Net.MaxOpenRequests = 1
+			config.Producer.Retry.Max = 3
+			config.Producer.RequiredAcks = WaitForAll
+			config.Producer.Return.Successes = true
+
+			producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+			require.NoError(t, err)
+			defer closeProducer(t, producer)
+
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+			expectResults(t, producer, 1, 0)
+
+			metadataRequests.Store(0)
+			producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+			expectResults(t, producer, 1, 0)
+
+			assert.Equal(t, int32(3), produceRequests.Load(), "the failed batch should be retried once")
+			if tc.refresh {
+				assert.Positive(t, metadataRequests.Load(), "a stale-metadata error should refresh before the retry")
+			} else {
+				assert.Zero(t, metadataRequests.Load(), "an error from the current leader should retry without a refresh")
+			}
+		})
+	}
+}
+
+func TestAsyncProducerIdempotentRetryAfterRecovery(t *testing.T) {
+	broker := NewMockBroker(t, 1)
+	defer broker.Close()
+
+	metadataResponse := &MetadataResponse{Version: 4, ControllerID: 1}
+	metadataResponse.AddBroker(broker.Addr(), broker.BrokerID())
+	metadataResponse.AddTopicPartition("my_topic", 0, broker.BrokerID(), nil, nil, nil, ErrNoError)
+	initProducerIDResponse := &InitProducerIDResponse{ProducerID: 1000, ProducerEpoch: 1}
+	failResponse := &ProduceResponse{Version: 3}
+	failResponse.AddTopicPartition("my_topic", 0, ErrNotEnoughReplicas)
+	okResponse := &ProduceResponse{Version: 3}
+	okResponse.AddTopicPartition("my_topic", 0, ErrNoError)
+
+	// every batch fails on its first attempt and succeeds on the second
+	var mu sync.Mutex
+	attempts := make(map[int32]int)
+	broker.setHandler(func(req *request) encoderWithHeader {
+		switch req.body.key() {
+		case 3:
+			return metadataResponse
+		case 22:
+			return initProducerIDResponse
+		case 0:
+			batch := req.body.(*ProduceRequest).records["my_topic"][0].RecordBatch
+			mu.Lock()
+			defer mu.Unlock()
+			attempts[batch.FirstSequence]++
+			if attempts[batch.FirstSequence] == 1 {
+				return failResponse
+			}
+			return okResponse
+		}
+		return nil
+	})
+
+	config := NewTestConfig()
+	config.Version = V0_11_0_0
+	config.Producer.Idempotent = true
+	config.Net.MaxOpenRequests = 1
+	config.Producer.RequiredAcks = WaitForAll
+	config.Producer.Return.Successes = true
+	config.Producer.Retry.Max = 1
+	config.Producer.Retry.Backoff = 0
+
+	producer, err := NewAsyncProducer([]string{broker.Addr()}, config)
+	require.NoError(t, err)
+	defer closeProducer(t, producer)
+
+	for i := range 2 {
+		producer.Input() <- &ProducerMessage{Topic: "my_topic", Value: StringEncoder(TestMessage)}
+		select {
+		case <-producer.Successes():
+		case pErr := <-producer.Errors():
+			require.FailNow(t, "message failed after one retriable error", "message %d: %v", i, pErr.Err)
+		case <-time.After(10 * time.Second):
+			require.FailNow(t, "no result", "message %d", i)
+		}
+	}
 }
 
 func TestReturnErrors(t *testing.T) {
@@ -2309,6 +2504,71 @@ func TestBrokerProducerHandleError(t *testing.T) {
 		contender := newProduceSet(parent)
 		safeAddMessage(t, contender, &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("next")})
 		require.False(t, parent.muter.tryMute(contender), "partition should stay muted by the retrying batch")
+	})
+
+	t.Run("keeps the flushing batch ahead of the retried accumulating batch", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Producer.Idempotent = false
+		config.Producer.Retry.Max = 2
+		config.Producer.Retry.Backoff = 0
+
+		parent := &asyncProducer{
+			conf:       config,
+			muter:      newPartitionMuter(),
+			brokers:    make(map[*Broker]*brokerProducer),
+			brokerRefs: make(map[*brokerProducer]int),
+			retries:    make(chan *ProducerMessage, 4),
+			txnmgr:     &transactionManager{},
+		}
+		retryLeader := &Broker{id: 2}
+		parent.client = &stubLeaderClient{leader: retryLeader, cfg: config}
+
+		output := make(chan *produceSet, 1)
+		leaderBp := &brokerProducer{
+			parent: parent,
+			broker: retryLeader,
+			output: output,
+			input:  make(chan *ProducerMessage),
+		}
+		parent.brokers[retryLeader] = leaderBp
+		// held by a partitionProducer, so both retries reach this output
+		parent.brokerRefs[leaderBp] = 1
+
+		bp := &brokerProducer{
+			parent:            parent,
+			broker:            &Broker{id: 1},
+			input:             make(chan *ProducerMessage),
+			accumulatingBatch: newProduceSet(parent),
+			currentRetries:    make(map[string]map[int32]error),
+		}
+
+		// partition 0: "first" is muted and waiting to be sent, "second"
+		// accumulates behind it; partition 1 has a request in flight
+		first := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("first")}
+		second := &ProducerMessage{Topic: "topic", Partition: 0, Value: StringEncoder("second")}
+		bp.flushingBatch = newProduceSet(parent)
+		safeAddMessage(t, bp.flushingBatch, first)
+		require.True(t, parent.muter.tryMute(bp.flushingBatch))
+		flushing := bp.flushingBatch
+		safeAddMessage(t, bp.accumulatingBatch, second)
+		sent := newProduceSet(parent)
+		safeAddMessage(t, sent, &ProducerMessage{Topic: "topic", Partition: 1, Value: StringEncoder("other")})
+		require.True(t, parent.muter.tryMute(sent))
+
+		bp.handleError(sent, ErrOutOfBrokers)
+		assert.Same(t, second, assertDoneWithin(t, parent.retries, 2*time.Second))
+		parent.muter.unmute(assertDoneWithin(t, output, 2*time.Second))
+
+		// the closing brokerProducer still sends "first", on a reconnected
+		// broker that is no longer the leader
+		notLeader := new(ProduceResponse)
+		notLeader.AddTopicPartition("topic", 0, ErrNotLeaderForPartition)
+		bp.handleSuccess(flushing, notLeader)
+
+		require.Empty(t, parent.retries, "first went back through the partitionProducer behind second")
+		retrySet := assertDoneWithin(t, output, 2*time.Second)
+		defer parent.muter.unmute(retrySet)
+		assert.Same(t, first, retrySet.msgs["topic"][0].msgs[0])
 	})
 }
 

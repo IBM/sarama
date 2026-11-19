@@ -24,6 +24,9 @@ updates:
       actions:
         patterns:
           - "actions/*"
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
 
   - package-ecosystem: gomod
     directories:
