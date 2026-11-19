@@ -442,6 +442,9 @@ func TestSyncProducerContext(t *testing.T) {
 		if !errors.Is(pErrs[0].Err, ErrMessageNotSubmitted) {
 			t.Error("Expected ErrMessageNotSubmitted, found:", pErrs[0].Err)
 		}
+		if err := producer.SendMessagesContext(ctx, nil); err != nil {
+			t.Error("Expected no error for an empty batch, found:", err)
+		}
 	})
 
 	t.Run("cancellation while input is blocked", func(t *testing.T) {

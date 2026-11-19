@@ -173,25 +173,24 @@ func (sp *syncProducer) SendMessageContext(ctx context.Context, msg *ProducerMes
 	select {
 	case sp.producer.Input() <- msg:
 	case <-ctx.Done():
+		// the producer never received the message, so nothing else holds the expectation
 		msg.expectation = nil
 		expectationsPool.Put(expectation)
 		return -1, -1, notSubmittedError(ctx.Err())
 	}
 
-	var pErr *ProducerError
 	select {
-	case pErr = <-expectation:
+	case pErr := <-expectation:
+		msg.expectation = nil
+		expectationsPool.Put(expectation)
+		if pErr != nil {
+			return -1, -1, pErr.Err
+		}
+		return msg.Partition, msg.Offset, nil
 	case <-ctx.Done():
 		// the producer still has the expectation, so it can't go back in the pool
 		return -1, -1, ctx.Err()
 	}
-	msg.expectation = nil
-	expectationsPool.Put(expectation)
-	if pErr != nil {
-		return -1, -1, pErr.Err
-	}
-
-	return msg.Partition, msg.Offset, nil
 }
 
 func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
@@ -199,71 +198,69 @@ func (sp *syncProducer) SendMessages(msgs []*ProducerMessage) error {
 }
 
 func (sp *syncProducer) SendMessagesContext(ctx context.Context, msgs []*ProducerMessage) error {
-	if err := ctx.Err(); err != nil {
-		return canceledSendError(err, nil, msgs, nil)
-	}
-
 	// each result channel holds one outcome, so sending does not depend on collecting results
-	for i, msg := range msgs {
+	sent := 0
+send:
+	for _, msg := range msgs {
 		// select picks at random when both cases are ready, so stop before offering another message
-		if err := ctx.Err(); err != nil {
-			return canceledSendError(err, msgs[:i], msgs[i:], nil)
+		if ctx.Err() != nil {
+			break
 		}
 		expectation := expectationsPool.Get().(chan *ProducerError)
 		msg.expectation = expectation
 		select {
 		case sp.producer.Input() <- msg:
+			sent++
 		case <-ctx.Done():
+			// the producer never received the message, so nothing else holds the expectation
 			msg.expectation = nil
 			expectationsPool.Put(expectation)
-			return canceledSendError(ctx.Err(), msgs[:i], msgs[i:], nil)
+			break send
 		}
 	}
 
-	var failures ProducerErrors
-	for i, msg := range msgs {
-		expectation := msg.expectation
-		select {
-		case pErr := <-expectation:
-			msg.expectation = nil
-			expectationsPool.Put(expectation)
-			if pErr != nil {
-				failures = append(failures, pErr)
-			}
-		case <-ctx.Done():
-			return canceledSendError(ctx.Err(), msgs[i:], nil, failures)
+	var pErrs ProducerErrors
+	unfinished := len(msgs) - sent
+	for _, msg := range msgs[:sent] {
+		pErr, ok := waitResult(ctx, msg)
+		if !ok {
+			unfinished++
+			pErr = &ProducerError{Msg: msg, Err: ctx.Err()}
+		}
+		if pErr != nil {
+			pErrs = append(pErrs, pErr)
 		}
 	}
+	for _, msg := range msgs[sent:] {
+		pErrs = append(pErrs, &ProducerError{Msg: msg, Err: notSubmittedError(ctx.Err())})
+	}
 
-	if len(failures) > 0 {
-		return failures
+	if unfinished > 0 {
+		return errors.Join(ctx.Err(), pErrs)
+	}
+	if len(pErrs) > 0 {
+		return pErrs
 	}
 	return nil
 }
 
-// pending messages belong to the producer; unsent messages are safe for the caller to reuse
-func canceledSendError(err error, pending, unsent []*ProducerMessage, failures ProducerErrors) error {
-	for _, msg := range pending {
-		expectation := msg.expectation
+// waitResult reports false if ctx ends before msg's result arrives
+func waitResult(ctx context.Context, msg *ProducerMessage) (*ProducerError, bool) {
+	var pErr *ProducerError
+	select {
+	case pErr = <-msg.expectation:
+	case <-ctx.Done():
+		// select picks at random when both cases are ready, so take a result that has already arrived
 		select {
-		case pErr := <-expectation:
-			msg.expectation = nil
-			expectationsPool.Put(expectation)
-			if pErr != nil {
-				failures = append(failures, pErr)
-			}
+		case pErr = <-msg.expectation:
 		default:
 			// the producer may still write a result, so the channel must not be reused
-			failures = append(failures, &ProducerError{Msg: msg, Err: err})
+			return nil, false
 		}
 	}
-	for _, msg := range unsent {
-		failures = append(failures, &ProducerError{Msg: msg, Err: notSubmittedError(err)})
-	}
-	if len(failures) == 0 {
-		return err
-	}
-	return errors.Join(err, failures)
+	expectationsPool.Put(msg.expectation)
+	msg.expectation = nil
+	return pErr, true
 }
 
 func notSubmittedError(err error) error {

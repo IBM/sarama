@@ -150,17 +150,15 @@ func (sp *SyncProducer) SendMessageContext(ctx context.Context, msg *sarama.Prod
 }
 
 // SendMessagesContext corresponds with the SendMessagesContext method of sarama's SyncProducer
-// implementation. If ctx is already done it uses no expectations and returns an error wrapping
-// ctx.Err() and a sarama.ProducerErrors listing every message with an error wrapping ctx.Err()
-// and sarama.ErrMessageNotSubmitted, otherwise it behaves like SendMessages.
+// implementation. If ctx is already done and msgs is not empty, it uses no expectations and
+// returns an error wrapping ctx.Err() and a sarama.ProducerErrors listing every message with an
+// error wrapping ctx.Err() and sarama.ErrMessageNotSubmitted, otherwise it behaves like
+// SendMessages.
 func (sp *SyncProducer) SendMessagesContext(ctx context.Context, msgs []*sarama.ProducerMessage) error {
-	if err := ctx.Err(); err != nil {
-		if len(msgs) == 0 {
-			return err
-		}
-		pErrs := make(sarama.ProducerErrors, len(msgs))
-		for i, msg := range msgs {
-			pErrs[i] = &sarama.ProducerError{Msg: msg, Err: fmt.Errorf("%w: %w", sarama.ErrMessageNotSubmitted, err)}
+	if err := ctx.Err(); err != nil && len(msgs) > 0 {
+		pErrs := make(sarama.ProducerErrors, 0, len(msgs))
+		for _, msg := range msgs {
+			pErrs = append(pErrs, &sarama.ProducerError{Msg: msg, Err: fmt.Errorf("%w: %w", sarama.ErrMessageNotSubmitted, err)})
 		}
 		return errors.Join(err, pErrs)
 	}
