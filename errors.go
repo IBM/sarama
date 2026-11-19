@@ -321,12 +321,12 @@ const (
 	ErrControllerIDNotRegistered              KError = 136 // Errors.CONTROLLER_ID_NOT_REGISTERED
 )
 
-// kErrorMessages holds the broker-side description of each error code.
+// kErrorMessages holds the broker-side description of each error code,
+// indexed by code. ErrUnknown is the only negative code, so Error handles it.
 // Error messages stolen/adapted from
 // https://kafka.apache.org/protocol#protocol_error_codes
-var kErrorMessages = map[KError]string{
+var kErrorMessages = [...]string{
 	ErrNoError:                                "Not an error, why are you printing me?",
-	ErrUnknown:                                "Unexpected (unknown?) server error",
 	ErrOffsetOutOfRange:                       "The requested offset is outside the range of offsets maintained by the server for the given topic/partition",
 	ErrInvalidMessage:                         "Message contents does not match its CRC",
 	ErrUnknownTopicOrPartition:                "Request was for a topic or partition that does not exist on this broker",
@@ -416,6 +416,7 @@ var kErrorMessages = map[KError]string{
 	ErrInvalidRecord:                          "This record has failed the validation on broker and hence will be rejected",
 	ErrUnstableOffsetCommit:                   "There are unstable offsets that need to be cleared",
 	ErrThrottlingQuotaExceeded:                "The throttling quota has been exceeded",
+	ErrProducerFenced:                         "There is a newer producer with the same transactionalId which fences the current one",
 	ErrResourceNotFound:                       "A request illegally referred to a resource that does not exist",
 	ErrDuplicateResource:                      "A request illegally referred to the same resource twice",
 	ErrUnacceptableCredential:                 "Requested credential would not meet criteria for acceptability",
@@ -465,8 +466,11 @@ var kErrorMessages = map[KError]string{
 }
 
 func (err KError) Error() string {
-	if msg, ok := kErrorMessages[err]; ok {
-		return "kafka server: " + msg
+	if err == ErrUnknown {
+		return "kafka server: Unexpected (unknown?) server error"
+	}
+	if err >= 0 && int(err) < len(kErrorMessages) && kErrorMessages[err] != "" {
+		return "kafka server: " + kErrorMessages[err]
 	}
 	return fmt.Sprintf("Unknown error, how did this happen? Error code = %d", err)
 }
