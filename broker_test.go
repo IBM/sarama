@@ -2148,3 +2148,47 @@ func Test_handleThrottledResponse(t *testing.T) {
 		require.False(t, broker.throttleDeadline.After(after))
 	})
 }
+
+// A caller that gets ErrAlreadyConnected from Open must not see
+// ErrNotConnected from a request while the other Open is still connecting.
+func TestBrokerConcurrentOpenRequest(t *testing.T) {
+	mockBroker := NewMockBroker(t, 0)
+	defer mockBroker.Close()
+	mockBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(mockBroker.Addr(), mockBroker.BrokerID()),
+	})
+
+	conf := NewTestConfig()
+	conf.ApiVersionsRequest = false
+
+	for range 200 {
+		broker := NewBroker(mockBroker.Addr())
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_ = broker.Open(conf)
+		}()
+
+		var requestErr error
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if err := broker.Open(conf); !errors.Is(err, ErrAlreadyConnected) {
+				// This goroutine performed the Open itself.
+				return
+			}
+			_, requestErr = broker.GetMetadata(&MetadataRequest{Version: 1})
+		}()
+
+		close(start)
+		wg.Wait()
+		_ = broker.Close()
+		require.NotErrorIs(t, requestErr, ErrNotConnected)
+	}
+}

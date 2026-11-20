@@ -190,7 +190,9 @@ func (b *Broker) getSockError() error {
 // follow it by a call to Connected(). The only errors Open will return directly are ConfigurationError or
 // AlreadyConnected. If conf is nil, the result of NewConfig() is used.
 func (b *Broker) Open(conf *Config) error {
-	if !b.opened.CompareAndSwap(false, true) {
+	// Fast path for an open or connecting broker, so callers do not wait for
+	// a connection attempt that is still running.
+	if b.opened.Load() {
 		return ErrAlreadyConnected
 	}
 
@@ -203,7 +205,15 @@ func (b *Broker) Open(conf *Config) error {
 		return err
 	}
 
+	// Mark the broker as opened only while holding the lock that the
+	// connecting goroutine keeps until the dial completes. Otherwise a caller
+	// that sees ErrAlreadyConnected can take the lock first and fail its
+	// request with ErrNotConnected while the connection is being established.
 	b.lock.Lock()
+	if !b.opened.CompareAndSwap(false, true) {
+		b.lock.Unlock()
+		return ErrAlreadyConnected
+	}
 	b.enableThrottleWaits()
 
 	if b.metricRegistry == nil {
