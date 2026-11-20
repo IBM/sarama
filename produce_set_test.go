@@ -88,6 +88,50 @@ func TestProduceSetAddingMessagesOverflowBytesLimit(t *testing.T) {
 	}
 }
 
+func TestProduceSetAddingMessagesOverflowTopicBytesLimit(t *testing.T) {
+	parent, ps := makeProduceSet()
+	parent.conf.Producer.MaxMessageBytes = 10_000
+	parent.conf.Producer.TopicMaxMessageBytes = map[string]int{
+		"small-topic": 1000,
+	}
+
+	msg := &ProducerMessage{
+		Topic: "small-topic",
+		Key:   StringEncoder(TestMessage),
+		Value: StringEncoder(TestMessage),
+	}
+
+	for ps.bufferBytes+msg.ByteSize(2) < parent.conf.Producer.TopicMaxMessageBytes[msg.Topic] {
+		if ps.wouldOverflow(msg) {
+			t.Error("set shouldn't fill up before the topic-specific limit")
+		}
+		safeAddMessage(t, ps, msg)
+	}
+
+	if !ps.wouldOverflow(msg) {
+		t.Error("set should be full at the topic-specific limit")
+	}
+}
+
+func TestProduceSetTopicBytesLimitOverridesGlobalLimit(t *testing.T) {
+	parent, ps := makeProduceSet()
+	msg := &ProducerMessage{
+		Topic: "large-topic",
+		Key:   StringEncoder(TestMessage),
+		Value: StringEncoder(TestMessage),
+	}
+	msgSize := msg.ByteSize(2)
+	parent.conf.Producer.MaxMessageBytes = 2 * msgSize
+	parent.conf.Producer.TopicMaxMessageBytes = map[string]int{
+		msg.Topic: 4 * msgSize,
+	}
+
+	safeAddMessage(t, ps, msg)
+	if ps.wouldOverflow(msg) {
+		t.Error("topic-specific limit should replace a smaller global limit")
+	}
+}
+
 func TestProduceSetPartitionTracking(t *testing.T) {
 	_, ps := makeProduceSet()
 
