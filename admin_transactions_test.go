@@ -272,6 +272,10 @@ func TestClusterAdminDescribeTransactionsMultiCoordinator(t *testing.T) {
 			SetController(seedBroker.BrokerID()).
 			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()).
 			SetBroker(secondBroker.Addr(), secondBroker.BrokerID()),
+		// either broker may be asked for a coordinator
+		"FindCoordinatorRequest": NewMockFindCoordinatorResponse(t).
+			SetCoordinator(CoordinatorTransaction, firstTx, seedBroker).
+			SetCoordinator(CoordinatorTransaction, secondTx, secondBroker),
 		"DescribeTransactionsRequest": NewMockDescribeTransactionsResponse(t).
 			AddTransaction(secondTx, TransactionState{TransactionState: TransactionStateEmpty}),
 	})

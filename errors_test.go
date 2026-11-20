@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +63,16 @@ func TestSentinelWithMultipleWrappedErrors(t *testing.T) {
 	unwrapped := errors.Unwrap(error)
 	if errors.Is(unwrapped, ErrOutOfBrokers) || !errors.Is(unwrapped, myNetError) || !errors.Is(unwrapped, myAddrError) {
 		t.Errorf("unwrapped value unexpected result")
+	}
+}
+
+func TestKErrorMessages(t *testing.T) {
+	for code := ErrUnknown; code <= ErrControllerIDNotRegistered; code++ {
+		if msg := code.Error(); !strings.HasPrefix(msg, "kafka server: ") {
+			t.Errorf("Expected a message for error code %d, found: %s", code, msg)
+		}
+	}
+	if msg := (ErrControllerIDNotRegistered + 1).Error(); strings.HasPrefix(msg, "kafka server: ") {
+		t.Error("Expected an unknown code to be reported as unknown, found:", msg)
 	}
 }

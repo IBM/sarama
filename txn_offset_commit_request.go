@@ -146,7 +146,7 @@ func (a *TxnOffsetCommitRequest) headerVersion() int16 {
 }
 
 func (a *TxnOffsetCommitRequest) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 3
+	return a.Version >= 0 && a.Version <= 4
 }
 
 func (a *TxnOffsetCommitRequest) isFlexible() bool {
@@ -159,6 +159,8 @@ func (a *TxnOffsetCommitRequest) isFlexibleVersion(version int16) bool {
 
 func (a *TxnOffsetCommitRequest) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 4:
+		return V3_8_0_0
 	case 3:
 		return V2_5_0_0
 	case 2:

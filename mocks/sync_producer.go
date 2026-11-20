@@ -1,7 +1,9 @@
 package mocks
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/IBM/sarama"
@@ -25,6 +27,8 @@ type SyncProducer struct {
 	txnLock         sync.Mutex
 	txnStatus       sarama.ProducerTxnStatusFlag
 }
+
+var _ sarama.SyncProducerContext = (*SyncProducer)(nil)
 
 // NewSyncProducer instantiates a new SyncProducer mock. The t argument should
 // be the *testing.T instance of your test method. An error will be written to it if
@@ -133,6 +137,32 @@ func (sp *SyncProducer) SendMessages(msgs []*sarama.ProducerMessage) error {
 	}
 	sp.t.Errorf("Insufficient expectations set on this mock producer to handle the input messages.")
 	return errOutOfExpectations
+}
+
+// SendMessageContext corresponds with the SendMessageContext method of sarama's SyncProducer
+// implementation. If ctx is already done it uses no expectation and returns an error wrapping
+// ctx.Err() and sarama.ErrMessageNotSubmitted, otherwise it behaves like SendMessage.
+func (sp *SyncProducer) SendMessageContext(ctx context.Context, msg *sarama.ProducerMessage) (partition int32, offset int64, err error) {
+	if err := ctx.Err(); err != nil {
+		return -1, -1, fmt.Errorf("%w: %w", sarama.ErrMessageNotSubmitted, err)
+	}
+	return sp.SendMessage(msg)
+}
+
+// SendMessagesContext corresponds with the SendMessagesContext method of sarama's SyncProducer
+// implementation. If ctx is already done and msgs is not empty, it uses no expectations and
+// returns an error wrapping ctx.Err() and a sarama.ProducerErrors listing every message with an
+// error wrapping ctx.Err() and sarama.ErrMessageNotSubmitted, otherwise it behaves like
+// SendMessages.
+func (sp *SyncProducer) SendMessagesContext(ctx context.Context, msgs []*sarama.ProducerMessage) error {
+	if err := ctx.Err(); err != nil && len(msgs) > 0 {
+		pErrs := make(sarama.ProducerErrors, 0, len(msgs))
+		for _, msg := range msgs {
+			pErrs = append(pErrs, &sarama.ProducerError{Msg: msg, Err: fmt.Errorf("%w: %w", sarama.ErrMessageNotSubmitted, err)})
+		}
+		return errors.Join(err, pErrs)
+	}
+	return sp.SendMessages(msgs)
 }
 
 func (sp *SyncProducer) partitioner(topic string) sarama.Partitioner {

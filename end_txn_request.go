@@ -64,7 +64,7 @@ func (r *EndTxnRequest) headerVersion() int16 {
 }
 
 func (a *EndTxnRequest) isValidVersion() bool {
-	return a.Version >= 0 && a.Version <= 3
+	return a.Version >= 0 && a.Version <= 4
 }
 
 func (a *EndTxnRequest) isFlexible() bool {
@@ -77,6 +77,8 @@ func (a *EndTxnRequest) isFlexibleVersion(version int16) bool {
 
 func (a *EndTxnRequest) requiredVersion() KafkaVersion {
 	switch a.Version {
+	case 4:
+		return V3_8_0_0
 	case 3:
 		return V2_8_0_0
 	case 2:

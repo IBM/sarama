@@ -1883,6 +1883,54 @@ func TestElectLeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	t.Run("a 2.3 client sends v0", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Version = V2_3_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, admin)
+
+		seen := len(broker.History())
+		if _, err := admin.ElectLeaders(PreferredElection, map[string][]int32{"my_topic": {0}}); err != nil {
+			t.Fatal(err)
+		}
+		var sent *ElectLeadersRequest
+		for _, rr := range broker.History()[seen:] {
+			if req, ok := rr.Request.(*ElectLeadersRequest); ok {
+				sent = req
+			}
+		}
+		if sent == nil {
+			t.Fatal("no ElectLeadersRequest reached the broker")
+		}
+		if sent.Version != 0 {
+			t.Fatalf("expected ElectLeaders v0 for a 2.3 client, got v%d", sent.Version)
+		}
+	})
+
+	t.Run("a client older than 2.2 is unsupported", func(t *testing.T) {
+		config := NewTestConfig()
+		config.Version = V2_1_0_0
+		admin, err := NewClusterAdmin([]string{broker.Addr()}, config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer safeClose(t, admin)
+
+		seen := len(broker.History())
+		_, err = admin.ElectLeaders(PreferredElection, map[string][]int32{"my_topic": {0}})
+		if !errors.Is(err, ErrUnsupportedVersion) {
+			t.Fatalf("expected ErrUnsupportedVersion, got %v", err)
+		}
+		for _, rr := range broker.History()[seen:] {
+			if req, ok := rr.Request.(*ElectLeadersRequest); ok {
+				t.Fatalf("ElectLeaders v%d reached the broker", req.Version)
+			}
+		}
+	})
 }
 
 func TestElectLeadersUncleanOnV0Broker(t *testing.T) {
@@ -2174,6 +2222,39 @@ func TestListConsumerGroups(t *testing.T) {
 
 	_, err = admin.ListConsumerGroups()
 	require.ErrorIs(t, err, ErrClosedClient)
+}
+
+func TestListConsumerGroupsBrokerError(t *testing.T) {
+	seedBroker := NewMockBroker(t, 1)
+	defer seedBroker.Close()
+
+	// A broker that is still loading its coordinator state answers with an
+	// error code and an incomplete group list; that must surface as an error,
+	// like ListTransactions and DescribeLogDirs do, not as "no groups".
+	seedBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetController(seedBroker.BrokerID()).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+		"ListGroupsRequest": NewMockListGroupsResponse(t).
+			SetError(ErrOffsetsLoadInProgress),
+	})
+
+	config := NewTestConfig()
+	config.Version = V1_0_0_0
+
+	admin, err := NewClusterAdmin([]string{seedBroker.Addr()}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer safeClose(t, admin)
+
+	groups, err := admin.ListConsumerGroups()
+	if !errors.Is(err, ErrOffsetsLoadInProgress) {
+		t.Fatalf("expected ErrOffsetsLoadInProgress, got %v", err)
+	}
+	if len(groups) != 0 {
+		t.Fatalf("expected no groups alongside the error, got %v", groups)
+	}
 }
 
 func TestListConsumerGroupsMultiBroker(t *testing.T) {

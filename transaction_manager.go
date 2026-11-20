@@ -369,7 +369,10 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 			ProducerID:      t.producerID,
 			GroupID:         groupId,
 		}
-		if t.client.Config().Version.IsAtLeast(V2_8_0_0) {
+		if t.client.Config().Version.IsAtLeast(V3_8_0_0) {
+			// Version 4 adds the support for new error code TRANSACTION_ABORTABLE.
+			request.Version = 4
+		} else if t.client.Config().Version.IsAtLeast(V2_8_0_0) {
 			// Version 3 enables flexible versions.
 			request.Version = 3
 		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
@@ -413,7 +416,7 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 			// fatal: the transactional id expired, and re-initializing could let an
 			// instance that was already fenced commit again
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
-		case ErrGroupAuthorizationFailed:
+		case ErrGroupAuthorizationFailed, ErrTransactionAbortable:
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		default:
 			if isRetriableKError(response.Err) {
@@ -463,11 +466,16 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 			Topics:          offsets.mapToRequest(),
 		}
 		if t.client.Config().Version.IsAtLeast(V2_5_0_0) {
+			if t.client.Config().Version.IsAtLeast(V3_8_0_0) {
+				// Version 4 adds the support for new error code TRANSACTION_ABORTABLE.
+				request.Version = 4
+			} else {
+				request.Version = 3
+			}
 			// Version 3 adds the member ID, group instance ID and generation ID,
 			// which let the broker fence stale group members. Callers that don't
 			// supply them get the protocol defaults (generation -1, empty member
 			// ID, null instance ID) which tell the broker to skip that fencing.
-			request.Version = 3
 			request.GenerationID = groupMetadata.GenerationID
 			request.MemberID = groupMetadata.MemberID
 			request.GroupInstanceID = groupMetadata.GroupInstanceID
@@ -516,6 +524,8 @@ func (t *transactionManager) publishOffsetsToTxn(offsets topicPartitionOffsets, 
 				case ErrFencedInstancedId:
 					fallthrough
 				case ErrGroupAuthorizationFailed:
+					fallthrough
+				case ErrTransactionAbortable:
 					return resultOffsets, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, partitionError.Err)
 				default:
 					if isRetriableKError(partitionError.Err) {
@@ -551,7 +561,10 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 	}
 
 	if t.client.Config().Version.IsAtLeast(V2_5_0_0) {
-		if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
+		if t.client.Config().Version.IsAtLeast(V3_8_0_0) {
+			// Version 5 adds the support for new error code TRANSACTION_ABORTABLE.
+			req.Version = 5
+		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
 			// Version 4 adds the support for new error code PRODUCER_FENCED.
 			req.Version = 4
 		} else {
@@ -644,6 +657,8 @@ func (t *transactionManager) initProducerId() (int64, int16, error) {
 			}
 		case ErrConcurrentTransactions:
 			// Retry: the coordinator is still finishing the previous transaction.
+		case ErrTransactionAbortable:
+			return -1, -1, false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		// Fatal errors
 		default:
 			if isRetriableKError(response.Err) {
@@ -717,7 +732,10 @@ func (t *transactionManager) endTxn(commit bool) error {
 			ProducerID:        t.producerID,
 			TransactionResult: commit,
 		}
-		if t.client.Config().Version.IsAtLeast(V2_8_0_0) {
+		if t.client.Config().Version.IsAtLeast(V3_8_0_0) {
+			// Version 4 adds the support for new error code TRANSACTION_ABORTABLE.
+			request.Version = 4
+		} else if t.client.Config().Version.IsAtLeast(V2_8_0_0) {
 			// Version 3 enables flexible versions.
 			request.Version = 3
 		} else if t.client.Config().Version.IsAtLeast(V2_7_0_0) {
@@ -760,6 +778,13 @@ func (t *transactionManager) endTxn(commit bool) error {
 			// fatal: the transactional id expired, and re-initializing could let an
 			// instance that was already fenced commit again
 			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
+		case ErrTransactionAbortable:
+			if !commit {
+				// an abort that fails with an abortable error would only be
+				// retried with another abort, so it is fatal instead
+				return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagFatalError, response.Err)
+			}
+			return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 		// Fatal errors
 		default:
 			if isRetriableKError(response.Err) {
@@ -969,6 +994,8 @@ func (t *transactionManager) publishTxnPartitions() error {
 				case ErrOperationNotAttempted:
 					fallthrough
 				case ErrTopicAuthorizationFailed:
+					fallthrough
+				case ErrTransactionAbortable:
 					removeAllPartitionsOnFatalOrAbortedError()
 					return false, t.transitionTo(ProducerTxnFlagInError|ProducerTxnFlagAbortableError, response.Err)
 				case ErrUnknownProducerID:

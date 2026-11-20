@@ -1215,10 +1215,9 @@ func (ca *clusterAdmin) ElectLeaders(electionType ElectionType, partitions map[s
 		TimeoutMs:       int32(60000),
 	}
 
+	// v1 and v2 both arrived in 2.4, so a 2.2 or 2.3 broker only speaks v0
 	if ca.conf.Version.IsAtLeast(V2_4_0_0) {
 		request.Version = 2
-	} else if ca.conf.Version.IsAtLeast(V0_11_0_0) {
-		request.Version = 1
 	}
 
 	var res *ElectLeadersResponse
@@ -1371,6 +1370,10 @@ func (ca *clusterAdmin) ListConsumerGroups() (allGroups map[string]string, err e
 			response, err := b.ListGroups(request)
 			if err != nil {
 				errChan <- err
+				return
+			}
+			if !errors.Is(response.Err, ErrNoError) {
+				errChan <- fmt.Errorf("list groups on broker %s: %w", b.Addr(), response.Err)
 				return
 			}
 
