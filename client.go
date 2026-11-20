@@ -170,6 +170,9 @@ type client struct {
 
 	lock sync.RWMutex // protects access to the maps that hold cluster state.
 
+	snapshotLock sync.Mutex                       // so readers after a change build snapshot once
+	snapshot     atomic.Pointer[MetadataSnapshot] // built on first read, dropped when the cache changes
+
 	metadataRefresh metadataRefresh
 }
 
@@ -332,6 +335,7 @@ func (client *client) Close() error {
 	client.brokers = nil
 	client.metadata = nil
 	client.metadataTopics = nil
+	client.dropMetadataSnapshot()
 
 	return nil
 }
@@ -489,6 +493,7 @@ func (client *client) RefreshBrokers(addrs []string) error {
 		safeAsyncClose(broker)
 	}
 	client.brokers = make(map[int32]*Broker)
+	client.dropMetadataSnapshot()
 
 	for _, broker := range client.seedBrokers {
 		safeAsyncClose(broker)
@@ -696,6 +701,7 @@ func (client *client) checkBrokersHealth() {
 			Logger.Printf("client/brokers close broker #%d at %s due to socket error: %v", broker.ID(), broker.Addr(), err)
 			safeAsyncClose(broker)
 			delete(client.brokers, id)
+			client.dropMetadataSnapshot()
 		}
 	}
 
@@ -717,10 +723,12 @@ func (client *client) updateBroker(brokers []*Broker) {
 		currentBroker[broker.ID()] = broker
 		if client.brokers[broker.ID()] == nil { // add new broker
 			client.brokers[broker.ID()] = broker
+			client.dropMetadataSnapshot()
 			DebugLogger.Printf("client/brokers registered new broker #%d at %s", broker.ID(), broker.Addr())
 		} else if broker.Addr() != client.brokers[broker.ID()].Addr() { // replace broker with new address
 			safeAsyncClose(client.brokers[broker.ID()])
 			client.brokers[broker.ID()] = broker
+			client.dropMetadataSnapshot()
 			Logger.Printf("client/brokers replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 		}
 	}
@@ -729,6 +737,7 @@ func (client *client) updateBroker(brokers []*Broker) {
 		if _, exist := currentBroker[id]; !exist { // remove old broker
 			safeAsyncClose(broker)
 			delete(client.brokers, id)
+			client.dropMetadataSnapshot()
 			Logger.Printf("client/broker remove invalid broker #%d with %s", broker.ID(), broker.Addr())
 		}
 	}
@@ -745,10 +754,12 @@ func (client *client) registerBroker(broker *Broker) {
 
 	if client.brokers[broker.ID()] == nil {
 		client.brokers[broker.ID()] = broker
+		client.dropMetadataSnapshot()
 		DebugLogger.Printf("client/brokers registered new broker #%d at %s", broker.ID(), broker.Addr())
 	} else if broker.Addr() != client.brokers[broker.ID()].Addr() {
 		safeAsyncClose(client.brokers[broker.ID()])
 		client.brokers[broker.ID()] = broker
+		client.dropMetadataSnapshot()
 		Logger.Printf("client/brokers replaced registered broker #%d with %s", broker.ID(), broker.Addr())
 	}
 }
@@ -766,6 +777,7 @@ func (client *client) deregisterBroker(broker *Broker) {
 	if client.brokers[broker.ID()] == broker {
 		Logger.Printf("client/brokers deregistered broker #%d at %s", broker.ID(), broker.Addr())
 		delete(client.brokers, broker.ID())
+		client.dropMetadataSnapshot()
 		return
 	}
 	if len(client.seedBrokers) > 0 && broker == client.seedBrokers[0] {
@@ -1104,6 +1116,7 @@ func (client *client) updateMetadata(data *MetadataResponse, allKnownMetaData bo
 	if client.brokers == nil {
 		return false, nil
 	}
+	client.dropMetadataSnapshot()
 
 	// Check health of existing brokers, including seed brokers, dead
 	// seed brokers, and registered brokers.

@@ -45,6 +45,7 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 		}
 	})
 
+	cache := baseClient.(*client)
 	client, ok := baseClient.(MetadataSnapshotterClient)
 	require.True(t, ok)
 
@@ -58,7 +59,6 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 		Topics: map[string]map[int32]PartitionSnapshot{
 			"topic": {
 				0: {
-					Version:         11,
 					Err:             ErrNoError,
 					ID:              0,
 					Leader:          1,
@@ -82,23 +82,26 @@ func TestMetadataSnapshotReturnsDetachedCachedStateWithoutRefresh(t *testing.T) 
 	)
 	require.Equal(t, expected, snapshot)
 
-	snapshot.ControllerID = 99
-	broker := snapshot.Brokers[1]
-	broker.Addr = "changed:9092"
-	*broker.Rack = "rack-b"
-	snapshot.Brokers[1] = broker
-	delete(snapshot.Brokers, 2)
-	partition := snapshot.Topics["topic"][0]
-	partition.Leader = 99
-	partition.Replicas[0] = 99
-	partition.InSyncReplicas[0] = 99
-	partition.OfflineReplicas[0] = 99
-	snapshot.Topics["topic"][0] = partition
-	snapshot.Topics["added"] = map[int32]PartitionSnapshot{}
-
-	snapshot, err = client.MetadataSnapshot()
+	again, err := client.MetadataSnapshot()
 	require.NoError(t, err)
-	require.Equal(t, expected, snapshot, "mutating a snapshot must not affect the client cache")
+	require.Same(t, snapshot, again, "MetadataSnapshot must reuse the snapshot until the cache changes")
+
+	update := &MetadataResponse{Version: 11, ControllerID: 1}
+	update.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	update.AddBroker("broker-2:9092", 2)
+	update.AddTopicPartition("topic", 0, seedBroker.BrokerID(), []int32{1, 2}, []int32{1, 2}, []int32{}, ErrNoError)
+	_, err = cache.updateMetadata(update, true)
+	require.NoError(t, err)
+	refreshed, err := client.MetadataSnapshot()
+	require.NoError(t, err)
+	require.Equal(t, int32(1), refreshed.ControllerID, "MetadataSnapshot must reflect a refresh")
+	require.Equal(t, expected, snapshot, "a refresh must not change an earlier snapshot")
+
+	// a caller modifying a snapshot must not corrupt the cache
+	refreshed.Topics["topic"][0].Replicas[0] = 99
+	replicas, err := baseClient.Replicas("topic", 0)
+	require.NoError(t, err)
+	require.Equal(t, []int32{1, 2}, replicas)
 
 	require.NoError(t, baseClient.Close())
 	snapshot, err = client.MetadataSnapshot()
@@ -251,7 +254,6 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 			[]int32{},
 			ErrNoError,
 		)
-		response.Topics[0].Partitions[0].Version = response.Version
 
 		return metadataState{
 			response: response,
@@ -264,7 +266,6 @@ func TestMetadataSnapshotConsistentDuringConcurrentUpdates(t *testing.T) {
 				Topics: map[string]map[int32]PartitionSnapshot{
 					"topic": {
 						partitionID: {
-							Version:         11,
 							ID:              partitionID,
 							Leader:          controllerID,
 							Replicas:        []int32{controllerID},
@@ -352,13 +353,23 @@ func BenchmarkMetadataSnapshot(b *testing.B) {
 				metadata: map[string]map[int32]*PartitionMetadata{"topic": partitions},
 			}
 
-			b.ReportAllocs()
-			b.ResetTimer()
-			for range b.N {
-				if _, err := client.MetadataSnapshot(); err != nil {
-					b.Fatal(err)
+			b.Run("build", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					client.dropMetadataSnapshot()
+					if _, err := client.MetadataSnapshot(); err != nil {
+						b.Fatal(err)
+					}
 				}
-			}
+			})
+			b.Run("cached", func(b *testing.B) {
+				b.ReportAllocs()
+				for range b.N {
+					if _, err := client.MetadataSnapshot(); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
 		})
 	}
 }
