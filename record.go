@@ -107,8 +107,19 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 		}
 		r.Headers = make([]*RecordHeader, numHeaders)
 	}
+	// Allocate the headers in one slice. One header keeps new(RecordHeader),
+	// because it is faster than a make of one element.
+	var hdrs []RecordHeader
+	if numHeaders > 1 {
+		hdrs = make([]RecordHeader, numHeaders)
+	}
 	for i := range numHeaders {
-		hdr := new(RecordHeader)
+		var hdr *RecordHeader
+		if hdrs != nil {
+			hdr = &hdrs[i]
+		} else {
+			hdr = new(RecordHeader)
+		}
 		if err := hdr.decode(pd); err != nil {
 			return err
 		}
