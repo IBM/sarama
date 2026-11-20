@@ -108,6 +108,8 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 		r.Headers = make([]*RecordHeader, numHeaders)
 	}
 	switch {
+	case numHeaders <= 0:
+		// No headers. A negative count must not reach make.
 	case numHeaders == 1:
 		// new is faster than a make of one element.
 		hdr := new(RecordHeader)
@@ -115,7 +117,7 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 			return err
 		}
 		r.Headers[0] = hdr
-	case numHeaders > 1:
+	default:
 		hdrs := make([]RecordHeader, numHeaders)
 		for i := range hdrs {
 			if err := hdrs[i].decode(pd); err != nil {

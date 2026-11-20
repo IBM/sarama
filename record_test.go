@@ -318,6 +318,25 @@ func TestRecordBatchDecoding(t *testing.T) {
 	}
 }
 
+func TestRecordDecodeNegativeHeaderCount(t *testing.T) {
+	encoded := []byte{
+		12, // Record Length
+		0,  // Attributes
+		0,  // Timestamp Delta
+		0,  // Offset Delta
+		1,  // Key Length (-1)
+		1,  // Value Length (-1)
+		1,  // Number of Headers (-1)
+	}
+	var r Record
+	if err := decode(encoded, &r, nil); err != nil {
+		t.Fatal(err)
+	}
+	if r.Headers != nil {
+		t.Errorf("got headers %v, want nil", r.Headers)
+	}
+}
+
 func TestRecordBatchLargeNumRecords(t *testing.T) {
 	numOfRecords := 10 + (2 * math.MaxUint16)
 	numofRecordsBytes := make([]byte, 4)
