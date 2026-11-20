@@ -101,18 +101,31 @@ func (r *Record) decode(pd packetDecoder) (err error) {
 		return err
 	}
 
-	if numHeaders >= 0 {
-		if numHeaders > int64(pd.remaining()) {
-			return ErrInsufficientData
-		}
-		r.Headers = make([]*RecordHeader, numHeaders)
+	if numHeaders < 0 {
+		return pd.pop()
 	}
-	for i := range numHeaders {
+	if numHeaders > int64(pd.remaining()) {
+		return ErrInsufficientData
+	}
+	r.Headers = make([]*RecordHeader, numHeaders)
+
+	switch numHeaders {
+	case 0:
+	case 1:
+		// new is faster than a make of one element.
 		hdr := new(RecordHeader)
 		if err := hdr.decode(pd); err != nil {
 			return err
 		}
-		r.Headers[i] = hdr
+		r.Headers[0] = hdr
+	default:
+		hdrs := make([]RecordHeader, numHeaders)
+		for i := range hdrs {
+			if err := hdrs[i].decode(pd); err != nil {
+				return err
+			}
+			r.Headers[i] = &hdrs[i]
+		}
 	}
 
 	return pd.pop()

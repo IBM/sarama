@@ -123,6 +123,60 @@ func recordBatchTestCases() []struct {
 			},
 		},
 		{
+			name: "uncompressed record with two headers",
+			batch: RecordBatch{
+				Version:         2,
+				FirstTimestamp:  time.Unix(1479847795, 0),
+				MaxTimestamp:    time.Unix(0, 0),
+				LastOffsetDelta: 0,
+				Records: []*Record{{
+					TimestampDelta: 5 * time.Millisecond,
+					Key:            []byte{1, 2, 3, 4},
+					Value:          []byte{5, 6, 7},
+					Headers: []*RecordHeader{{
+						Key:   []byte{8, 9, 10},
+						Value: []byte{11, 12},
+					}, {
+						Key:   []byte{13},
+						Value: []byte{14, 15, 16},
+					}},
+				}},
+				recordsLen: 27,
+			},
+			encoded: []byte{
+				0, 0, 0, 0, 0, 0, 0, 0, // First Offset
+				0, 0, 0, 76, // Length
+				0, 0, 0, 0, // Partition Leader Epoch
+				2,               // Version
+				41, 70, 15, 217, // CRC
+				0, 0, // Attributes
+				0, 0, 0, 0, // Last Offset Delta
+				0, 0, 1, 88, 141, 205, 89, 56, // First Timestamp
+				0, 0, 0, 0, 0, 0, 0, 0, // Max Timestamp
+				0, 0, 0, 0, 0, 0, 0, 0, // Producer ID
+				0, 0, // Producer Epoch
+				0, 0, 0, 0, // First Sequence
+				0, 0, 0, 1, // Number of Records
+				52, // Record Length
+				0,  // Attributes
+				10, // Timestamp Delta
+				0,  // Offset Delta
+				8,  // Key Length
+				1, 2, 3, 4,
+				6, // Value Length
+				5, 6, 7,
+				4,        // Number of Headers
+				6,        // Header Key Length
+				8, 9, 10, // Header Key
+				4,      // Header Value Length
+				11, 12, // Header Value
+				2,          // Header Key Length
+				13,         // Header Key
+				6,          // Header Value Length
+				14, 15, 16, // Header Value
+			},
+		},
+		{
 			name: "gzipped record",
 			batch: RecordBatch{
 				Version:          2,
@@ -261,6 +315,25 @@ func TestRecordBatchDecoding(t *testing.T) {
 		if !reflect.DeepEqual(batch, tc.batch) {
 			t.Error(spew.Sprintf("invalid decode of %s\ngot %+v\nwanted %+v", tc.name, batch, tc.batch))
 		}
+	}
+}
+
+func TestRecordDecodeNegativeHeaderCount(t *testing.T) {
+	encoded := []byte{
+		12, // Record Length
+		0,  // Attributes
+		0,  // Timestamp Delta
+		0,  // Offset Delta
+		1,  // Key Length (-1)
+		1,  // Value Length (-1)
+		1,  // Number of Headers (-1)
+	}
+	var r Record
+	if err := decode(encoded, &r, nil); err != nil {
+		t.Fatal(err)
+	}
+	if r.Headers != nil {
+		t.Errorf("got headers %v, want nil", r.Headers)
 	}
 }
 
