@@ -61,7 +61,10 @@ type Config struct {
 		// original address list. Similar to the `client.dns.lookup` option in
 		// the JVM client, this is especially useful with GSSAPI, where it
 		// allows providing an alias record instead of individual broker
-		// hostnames. Defaults to false.
+		// hostnames. The canonical hostnames are also used to verify broker
+		// TLS certificates unless Net.TLS.Config.ServerName is set, so
+		// enabling this trusts reverse DNS to name the brokers. Defaults to
+		// false.
 		ResolveCanonicalBootstrapServers bool
 
 		TLS struct {
