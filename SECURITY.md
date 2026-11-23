@@ -21,6 +21,7 @@ Sarama is a client library for the Apache Kafka protocol and follows the trust a
 - The application using Sarama, including its configuration: broker addresses, TLS settings, SASL credentials and any custom dialer or proxy.
 - The Kafka brokers the application connects to. Responses from a configured broker are treated as protocol messages from a trusted peer, not as untrusted input.
 - Authenticated Kafka principals that the cluster permits to write to topics a Sarama consumer reads.
+- Reverse DNS answers, when the application enables `Net.ResolveCanonicalBootstrapServers`. The canonical hostnames returned replace the configured bootstrap addresses and are used to verify broker TLS certificates, as with `client.dns.lookup=resolve_canonical_bootstrap_servers_only` in the Java client. Leave the option disabled if reverse DNS is not trusted.
 
 Transport security is the responsibility of the deployment. With TLS disabled, Sarama offers no protection against anyone on the network path, who can read or modify all traffic, including SASL credentials for some mechanisms.
 
