@@ -88,6 +88,54 @@ func TestProduceSetAddingMessagesOverflowBytesLimit(t *testing.T) {
 	}
 }
 
+func TestProduceSetAddingMessagesOverflowTopicBytesLimit(t *testing.T) {
+	parent, ps := makeProduceSet()
+	parent.conf.Producer.MaxMessageBytes = 2000
+	parent.conf.Producer.TopicMaxMessageBytes = map[string]int{
+		"small-topic": 500,
+		"large-topic": 3000,
+	}
+
+	// Topic with lower override (500)
+	msgSmall := &ProducerMessage{Topic: "small-topic", Partition: 0, Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
+	for ps.msgs["small-topic"] == nil || ps.msgs["small-topic"][0] == nil ||
+		ps.msgs["small-topic"][0].bufferBytes+msgSmall.ByteSize(2) < 500 {
+		if ps.wouldOverflow(msgSmall) {
+			t.Error("small-topic set shouldn't fill up before 500 bytes")
+		}
+		safeAddMessage(t, ps, msgSmall)
+	}
+	if !ps.wouldOverflow(msgSmall) {
+		t.Error("small-topic set should be full after 500 bytes")
+	}
+
+	// Topic without override falls back to MaxMessageBytes (2000)
+	msgDefault := &ProducerMessage{Topic: "default-topic", Partition: 0, Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
+	for ps.msgs["default-topic"] == nil || ps.msgs["default-topic"][0] == nil ||
+		ps.msgs["default-topic"][0].bufferBytes+msgDefault.ByteSize(2) < parent.conf.Producer.MaxMessageBytes {
+		if ps.wouldOverflow(msgDefault) {
+			t.Error("default-topic set shouldn't fill up before 2000 bytes")
+		}
+		safeAddMessage(t, ps, msgDefault)
+	}
+	if !ps.wouldOverflow(msgDefault) {
+		t.Error("default-topic set should be full after 2000 bytes")
+	}
+
+	// Topic with higher override (3000)
+	msgLarge := &ProducerMessage{Topic: "large-topic", Partition: 0, Key: StringEncoder(TestMessage), Value: StringEncoder(TestMessage)}
+	for ps.msgs["large-topic"] == nil || ps.msgs["large-topic"][0] == nil ||
+		ps.msgs["large-topic"][0].bufferBytes+msgLarge.ByteSize(2) < 3000 {
+		if ps.wouldOverflow(msgLarge) {
+			t.Error("large-topic set shouldn't fill up before 3000 bytes")
+		}
+		safeAddMessage(t, ps, msgLarge)
+	}
+	if !ps.wouldOverflow(msgLarge) {
+		t.Error("large-topic set should be full after 3000 bytes")
+	}
+}
+
 func TestProduceSetPartitionTracking(t *testing.T) {
 	_, ps := makeProduceSet()
 
