@@ -95,6 +95,50 @@ func TestConsumerGroupHeartbeatRequest(t *testing.T) {
 	}
 }
 
+func TestConsumerGroupHeartbeatRequestEmptyArrays(t *testing.T) {
+	for _, version := range []int16{0, 1} {
+		t.Run(fmt.Sprint(version), func(t *testing.T) {
+			req := &ConsumerGroupHeartbeatRequest{
+				Version:              version,
+				RebalanceTimeoutMs:   -1,
+				SubscribedTopicNames: []string{},
+				TopicPartitions:      []ConsumerGroupHeartbeatTopicPartitions{},
+			}
+
+			var expected []byte
+			if version == 0 {
+				expected = []byte{1, 1, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 1, 0}
+			} else {
+				expected = []byte{1, 1, 0, 0, 0, 0, 0, 0, 255, 255, 255, 255, 1, 0, 0, 1, 0}
+			}
+
+			encoded, err := encode(req, nil)
+			require.NoError(t, err)
+			require.Equal(t, expected, encoded)
+
+			var decoded ConsumerGroupHeartbeatRequest
+			require.NoError(t, versionedDecode(encoded, &decoded, version, nil))
+			require.Nil(t, decoded.SubscribedTopicNames)
+			require.Nil(t, decoded.TopicPartitions)
+		})
+	}
+}
+
+func TestConsumerGroupHeartbeatRequestOversizedTopicPartitions(t *testing.T) {
+	malformed := []byte{
+		1, 1, // group ID, member ID
+		0, 0, 0, 0, // member epoch
+		0, 0, // instance ID, rack ID
+		255, 255, 255, 255, // rebalance timeout ms
+		0,                // null subscribed topic names
+		0,                // null server assignor
+		0xff, 0xff, 0x01, // oversized topic partitions length
+		0, // tagged fields
+	}
+	err := versionedDecode(malformed, &ConsumerGroupHeartbeatRequest{}, 0, nil)
+	require.ErrorIs(t, err, ErrInsufficientData)
+}
+
 func TestNewConsumerGroupHeartbeatRequest(t *testing.T) {
 	for _, tc := range []struct {
 		kafka    KafkaVersion

@@ -56,14 +56,11 @@ func (r *ConsumerGroupHeartbeatRequest) encode(pe packetEncoder) error {
 	pe.putInt32(r.RebalanceTimeoutMs)
 
 	if r.SubscribedTopicNames == nil {
-		pe.putUVarint(0)
-	} else {
-		pe.putUVarint(uint64(len(r.SubscribedTopicNames)) + 1)
-		for _, name := range r.SubscribedTopicNames {
-			if err := pe.putString(name); err != nil {
-				return err
-			}
+		if err := pe.putArrayLength(-1); err != nil {
+			return err
 		}
+	} else if err := pe.putStringArray(r.SubscribedTopicNames); err != nil {
+		return err
 	}
 
 	if r.Version >= 1 {
@@ -77,9 +74,13 @@ func (r *ConsumerGroupHeartbeatRequest) encode(pe packetEncoder) error {
 	}
 
 	if r.TopicPartitions == nil {
-		pe.putUVarint(0)
+		if err := pe.putArrayLength(-1); err != nil {
+			return err
+		}
 	} else {
-		pe.putUVarint(uint64(len(r.TopicPartitions)) + 1)
+		if err := pe.putArrayLength(len(r.TopicPartitions)); err != nil {
+			return err
+		}
 		for i := range r.TopicPartitions {
 			if err := r.TopicPartitions[i].encode(pe); err != nil {
 				return err
@@ -123,20 +124,8 @@ func (r *ConsumerGroupHeartbeatRequest) decode(pd packetDecoder, version int16) 
 		return err
 	}
 
-	topicCount, err := pd.getUVarint()
-	if err != nil {
+	if r.SubscribedTopicNames, err = pd.getStringArray(); err != nil {
 		return err
-	}
-	if topicCount == 0 {
-		r.SubscribedTopicNames = nil
-	} else {
-		n := int(topicCount - 1)
-		r.SubscribedTopicNames = make([]string, n)
-		for i := range r.SubscribedTopicNames {
-			if r.SubscribedTopicNames[i], err = pd.getString(); err != nil {
-				return err
-			}
-		}
 	}
 
 	if r.Version >= 1 {
@@ -149,14 +138,13 @@ func (r *ConsumerGroupHeartbeatRequest) decode(pd packetDecoder, version int16) 
 		return err
 	}
 
-	tpCount, err := pd.getUVarint()
+	n, err := pd.getArrayLength()
 	if err != nil {
 		return err
 	}
-	if tpCount == 0 {
+	if n == 0 {
 		r.TopicPartitions = nil
 	} else {
-		n := int(tpCount - 1)
 		r.TopicPartitions = make([]ConsumerGroupHeartbeatTopicPartitions, n)
 		for i := range r.TopicPartitions {
 			if err := r.TopicPartitions[i].decode(pd, version); err != nil {

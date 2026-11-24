@@ -146,3 +146,19 @@ func TestConsumerGroupHeartbeatResponseEmptyAssignment(t *testing.T) {
 		testResponse(t, "empty assignment", res, fixture)
 	}
 }
+
+func TestConsumerGroupHeartbeatTopicPartitionsNilPartitions(t *testing.T) {
+	for _, version := range []int16{0, 1} {
+		res := consumerGroupHeartbeatTestResponse(version)
+		res.Assignment.TopicPartitions[0].Partitions = nil
+
+		encoded, err := encode(res, nil)
+		require.NoError(t, err)
+
+		var decoded ConsumerGroupHeartbeatResponse
+		require.NoError(t, versionedDecode(encoded, &decoded, version, nil))
+		require.NotNil(t, decoded.Assignment)
+		require.Len(t, decoded.Assignment.TopicPartitions, 1)
+		require.Nil(t, decoded.Assignment.TopicPartitions[0].Partitions)
+	}
+}

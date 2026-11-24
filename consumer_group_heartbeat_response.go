@@ -13,12 +13,7 @@ func (t *ConsumerGroupHeartbeatTopicPartitions) encode(pe packetEncoder) error {
 		return err
 	}
 
-	partitions := t.Partitions
-	if partitions == nil {
-		partitions = []int32{}
-	}
-
-	if err := pe.putInt32Array(partitions); err != nil {
+	if err := pe.putNullableInt32Array(t.Partitions); err != nil {
 		return err
 	}
 
@@ -32,7 +27,7 @@ func (t *ConsumerGroupHeartbeatTopicPartitions) decode(pd packetDecoder, version
 		return err
 	}
 
-	if t.Partitions, err = pd.getInt32Array(); err != nil {
+	if t.Partitions, err = pd.getNullableInt32Array(); err != nil {
 		return err
 	}
 
