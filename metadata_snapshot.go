@@ -7,8 +7,13 @@ import "slices"
 type MetadataSnapshotterClient interface {
 	Client
 
-	// MetadataSnapshot returns a detached copy of the current cached metadata
-	// without sending a request or triggering a metadata refresh.
+	// MetadataSnapshot returns the cached metadata without sending a request
+	// or triggering a metadata refresh.
+	//
+	// The first call after the cache changes copies all of it, which takes
+	// time and memory in proportion to the number of cached partitions. Later
+	// calls return the same snapshot until the cache next changes, so callers
+	// must not modify it.
 	//
 	// It returns ErrClosedClient if the client is closed. Before metadata has
 	// been cached, it returns an empty snapshot.
@@ -16,7 +21,8 @@ type MetadataSnapshotterClient interface {
 }
 
 // MetadataSnapshot contains a point-in-time copy of a client's cached cluster
-// metadata. Modifying a snapshot does not affect the client cache.
+// metadata. Later changes to the cache do not affect it. Snapshots are shared
+// between callers and must not be modified.
 type MetadataSnapshot struct {
 	// ControllerID is the broker ID of the cluster controller, or -1 if the
 	// controller is not yet known or the metadata protocol does not report it.
@@ -39,8 +45,6 @@ type BrokerSnapshot struct {
 
 // PartitionSnapshot contains the cluster metadata cached for a partition.
 type PartitionSnapshot struct {
-	// Version is the metadata protocol version used to decode the partition.
-	Version int16
 	// Err is the partition error, or ErrNoError if there was no error.
 	Err KError
 	// ID is the partition ID.
@@ -57,8 +61,8 @@ type PartitionSnapshot struct {
 	OfflineReplicas []int32
 }
 
-// MetadataSnapshot returns a detached copy of the current cached metadata
-// without sending a request or triggering a metadata refresh.
+// MetadataSnapshot returns the cached metadata without sending a request or
+// triggering a metadata refresh.
 func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 	client.lock.RLock()
 	defer client.lock.RUnlock()
@@ -66,7 +70,29 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 	if client.brokers == nil {
 		return nil, ErrClosedClient
 	}
+	if snapshot := client.snapshot.Load(); snapshot != nil {
+		return snapshot, nil
+	}
 
+	// the cache can't change while the read lock is held, so one reader
+	// builds the snapshot and any others waiting here reuse it
+	client.snapshotLock.Lock()
+	defer client.snapshotLock.Unlock()
+	if snapshot := client.snapshot.Load(); snapshot != nil {
+		return snapshot, nil
+	}
+	snapshot := client.buildMetadataSnapshot()
+	client.snapshot.Store(snapshot)
+	return snapshot, nil
+}
+
+// dropMetadataSnapshot clears the cached snapshot. Call it with the write
+// lock held after changing brokers, metadata or controllerID.
+func (client *client) dropMetadataSnapshot() {
+	client.snapshot.Store(nil)
+}
+
+func (client *client) buildMetadataSnapshot() *MetadataSnapshot {
 	snapshot := &MetadataSnapshot{
 		ControllerID: client.controllerID,
 		Brokers:      make(map[int32]BrokerSnapshot, len(client.brokers)),
@@ -87,7 +113,6 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 		snapshot.Topics[topic] = make(map[int32]PartitionSnapshot, len(partitions))
 		for id, metadata := range partitions {
 			snapshot.Topics[topic][id] = PartitionSnapshot{
-				Version:         metadata.Version,
 				Err:             metadata.Err,
 				ID:              metadata.ID,
 				Leader:          metadata.Leader,
@@ -99,7 +124,7 @@ func (client *client) MetadataSnapshot() (*MetadataSnapshot, error) {
 		}
 	}
 
-	return snapshot, nil
+	return snapshot
 }
 
 var _ MetadataSnapshotterClient = (*client)(nil)
