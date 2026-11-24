@@ -93,5 +93,6 @@ const (
 	apiKeyDescribeProducers            = 61
 	apiKeyDescribeTransactions         = 65
 	apiKeyListTransactions             = 66
+	apiKeyConsumerGroupHeartbeat       = 68
 	apiKeyConsumerGroupDescribe        = 69
 )
