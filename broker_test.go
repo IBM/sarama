@@ -11,6 +11,7 @@ import (
 	"net"
 	"reflect"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -2147,4 +2148,152 @@ func Test_handleThrottledResponse(t *testing.T) {
 		require.False(t, broker.throttleDeadline.Before(before))
 		require.False(t, broker.throttleDeadline.After(after))
 	})
+}
+
+// A caller that gets ErrAlreadyConnected from Open must not see
+// ErrNotConnected from a request while the other Open is still connecting.
+func TestBrokerConcurrentOpenRequest(t *testing.T) {
+	mockBroker := NewMockBroker(t, 0)
+	defer mockBroker.Close()
+	mockBroker.SetHandlerByMap(map[string]MockResponse{
+		"MetadataRequest": NewMockMetadataResponse(t).
+			SetBroker(mockBroker.Addr(), mockBroker.BrokerID()),
+	})
+
+	conf := NewTestConfig()
+	conf.ApiVersionsRequest = false
+
+	for range 200 {
+		broker := NewBroker(mockBroker.Addr())
+
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			_ = broker.Open(conf)
+		}()
+
+		var requestErr error
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if err := broker.Open(conf); !errors.Is(err, ErrAlreadyConnected) {
+				// This goroutine performed the Open itself.
+				return
+			}
+			_, requestErr = broker.GetMetadata(&MetadataRequest{Version: 1})
+		}()
+
+		close(start)
+		wg.Wait()
+		_ = broker.Close()
+		require.NotErrorIs(t, requestErr, ErrNotConnected)
+	}
+}
+
+// blockingDialer counts dial attempts and blocks each one until release is
+// closed, then fails it.
+type blockingDialer struct {
+	dials   atomic.Int32
+	started chan struct{}
+	release chan struct{}
+}
+
+func (d *blockingDialer) Dial(_, _ string) (net.Conn, error) {
+	if d.dials.Add(1) == 1 {
+		close(d.started)
+	}
+	<-d.release
+	return nil, errors.New("dial failed")
+}
+
+// Open must not block or dial when the broker lock is held while the broker is
+// not marked as opened, e.g. a failed dial or a Close that is still finishing.
+func TestBrokerOpenLockHeldDoesNotBlock(t *testing.T) {
+	t.Parallel()
+
+	dialer := &blockingDialer{started: make(chan struct{}), release: make(chan struct{})}
+	close(dialer.release)
+	conf := NewTestConfig()
+	conf.Net.Proxy.Enable = true
+	conf.Net.Proxy.Dialer = dialer
+
+	broker := NewBroker("127.0.0.1:9092")
+	broker.lock.Lock()
+
+	done := make(chan error, 1)
+	go func() { done <- broker.Open(conf) }()
+
+	select {
+	case err := <-done:
+		require.ErrorIs(t, err, ErrAlreadyConnected)
+	case <-time.After(5 * time.Second):
+		broker.lock.Unlock()
+		t.Fatal("Open blocked on the broker lock")
+	}
+	broker.lock.Unlock()
+
+	require.False(t, broker.opened.Load())
+	require.Zero(t, dialer.dials.Load())
+}
+
+// Concurrent Opens while a dial is in progress must all return without waiting
+// for it, and a failing dial must not be repeated by the callers that lost.
+func TestBrokerConcurrentOpenDoesNotBlockOrRedial(t *testing.T) {
+	t.Parallel()
+
+	for range 50 {
+		dialer := &blockingDialer{started: make(chan struct{}), release: make(chan struct{})}
+		conf := NewTestConfig()
+		conf.ApiVersionsRequest = false
+		conf.Net.Proxy.Enable = true
+		conf.Net.Proxy.Dialer = dialer
+
+		broker := NewBroker("127.0.0.1:9092")
+
+		const callers = 16
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+		var opened atomic.Int32
+		for range callers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				err := broker.Open(conf)
+				if err == nil {
+					opened.Add(1)
+					return
+				}
+				assert.ErrorIs(t, err, ErrAlreadyConnected)
+			}()
+		}
+		close(start)
+
+		// All Open calls must return while the dial is still blocked.
+		returned := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(returned)
+		}()
+		select {
+		case <-returned:
+		case <-time.After(5 * time.Second):
+			close(dialer.release)
+			t.Fatal("Open blocked waiting for an in-progress dial")
+		}
+
+		<-dialer.started
+		close(dialer.release)
+
+		connected, err := broker.Connected()
+		require.False(t, connected)
+		require.Error(t, err)
+
+		require.Equal(t, int32(1), opened.Load())
+		require.Equal(t, int32(1), dialer.dials.Load())
+	}
 }
