@@ -209,7 +209,16 @@ func (b *Broker) Open(conf *Config) error {
 	// connecting goroutine keeps until the dial completes. Otherwise a caller
 	// that sees ErrAlreadyConnected can take the lock first and fail its
 	// request with ErrNotConnected while the connection is being established.
-	b.lock.Lock()
+	//
+	// Use TryLock so Open never blocks: if the lock is held, another Open is
+	// connecting or the broker is busy (e.g. closing), so report the broker as
+	// already connected. Requests issued afterwards wait on the lock for the
+	// connection attempt to finish. Blocking here instead would make callers
+	// holding client.lock wait for a whole dial and, if it fails, dial again
+	// one after another.
+	if !b.lock.TryLock() {
+		return ErrAlreadyConnected
+	}
 	if !b.opened.CompareAndSwap(false, true) {
 		b.lock.Unlock()
 		return ErrAlreadyConnected
