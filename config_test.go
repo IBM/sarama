@@ -421,6 +421,13 @@ func TestProducerConfigValidates(t *testing.T) {
 			"Producer.Retry.Backoff must be >= 0",
 		},
 		{
+			"InputChannelBufferSize",
+			func(cfg *Config) {
+				cfg.Producer.InputChannelBufferSize = -1
+			},
+			"Producer.InputChannelBufferSize must be >= 0",
+		},
+		{
 			"Idempotent Version",
 			func(cfg *Config) {
 				cfg.Producer.Idempotent = true
