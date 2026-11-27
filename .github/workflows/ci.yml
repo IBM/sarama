@@ -27,7 +27,7 @@ env:
   # renovate: datasource=github-releases depName=dominikh/go-tools
   STATICCHECK_VERSION: 2026.2.2
   # renovate: datasource=github-releases depName=mfridman/tparse
-  TPARSE_VERSION: v0.18.0
+  TPARSE_VERSION: v0.20.0
 
 jobs:
   lint:
